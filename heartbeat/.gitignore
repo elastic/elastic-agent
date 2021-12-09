@@ -1,8 +1,0 @@
-/_meta/heartbeat.dev.yml
-.vagrant
-/docs/html_docs
-
-heartbeat
-
-build
-/tests/load/logs

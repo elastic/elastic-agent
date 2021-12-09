@@ -1,2 +1,0 @@
-# Palo Alto Networks module
-

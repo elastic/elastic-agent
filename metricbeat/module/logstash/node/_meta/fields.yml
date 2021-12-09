@@ -1,6 +1,0 @@
-- name: node
-  type: group
-  description: >
-    node
-  release: ga
-  fields:

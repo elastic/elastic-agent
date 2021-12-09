@@ -18,7 +18,7 @@
 package build
 
 import (
-	devtools "github.com/elastic/beats/v7/dev-tools/mage"
+	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
 )
 
 // Build builds the Beat binary.

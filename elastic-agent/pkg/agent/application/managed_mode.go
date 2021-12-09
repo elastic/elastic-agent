@@ -1,6 +1,19 @@
-// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package application
 
@@ -10,40 +23,40 @@ import (
 
 	"github.com/elastic/go-sysinfo"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/filters"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/gateway"
-	fleetgateway "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/gateway/fleet"
-	localgateway "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/gateway/fleetserver"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/info"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/paths"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/actions/handlers"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/dispatcher"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/emitter"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/emitter/modifiers"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/router"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/stream"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/upgrade"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/configuration"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/operation"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/storage"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/storage/store"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/capabilities"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/composable"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/monitoring"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/server"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/status"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi/acker/fleet"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi/acker/lazy"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi/client"
-	reporting "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/reporter"
-	fleetreporter "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/reporter/fleet"
-	logreporter "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/reporter/log"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/sorted"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/filters"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/gateway"
+	fleetgateway "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/gateway/fleet"
+	localgateway "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/gateway/fleetserver"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/actions/handlers"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/dispatcher"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/emitter"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/emitter/modifiers"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/router"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/stream"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/operation"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/storage"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/capabilities"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/composable"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/config"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/monitoring"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/server"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/status"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi/acker/fleet"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi/acker/lazy"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi/client"
+	reporting "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/reporter"
+	fleetreporter "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/reporter/fleet"
+	logreporter "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/reporter/log"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/sorted"
 )
 
 type stateStore interface {
