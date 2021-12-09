@@ -20,7 +20,6 @@ package kubernetes
 import (
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
 	"github.com/elastic/beats/v7/libbeat/common/kubernetes/metadata"
 	"github.com/elastic/beats/v7/libbeat/logp"
 )
@@ -30,8 +29,7 @@ type Config struct {
 	Scope     string    `config:"scope"`
 	Resources Resources `config:"resources"`
 
-	KubeConfig        string                       `config:"kube_config"`
-	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
+	KubeConfig string `config:"kube_config"`
 
 	Namespace      string        `config:"namespace"`
 	SyncPeriod     time.Duration `config:"sync_period"`
