@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/transpiler"
 )
 
 func TestSerialization(t *testing.T) {

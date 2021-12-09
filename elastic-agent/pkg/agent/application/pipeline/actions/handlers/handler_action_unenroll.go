@@ -8,11 +8,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/program"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/storage/store"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/program"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi"
 )
 
 type stateStore interface {

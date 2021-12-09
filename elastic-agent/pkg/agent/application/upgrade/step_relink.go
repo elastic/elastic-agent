@@ -12,8 +12,8 @@ import (
 	"runtime"
 
 	"github.com/elastic/beats/v7/libbeat/common/file"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/paths"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
 )
 
 // ChangeSymlink updates symlink paths to match current version.

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/paths"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/release"
 )
 
 // RunningInstalled returns true when executing Agent is the installed Agent.

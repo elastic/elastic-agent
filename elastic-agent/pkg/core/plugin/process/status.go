@@ -13,9 +13,9 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/process"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/server"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/state"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/server"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/state"
 )
 
 // OnStatusChange is the handler called by the GRPC server code.

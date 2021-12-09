@@ -19,8 +19,8 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/elastic/beats/v7/libbeat/logp"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config"
-	corecomp "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/composable"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/config"
+	corecomp "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/composable"
 )
 
 func Test_K8sSecretsProvider_Fetch(t *testing.T) {

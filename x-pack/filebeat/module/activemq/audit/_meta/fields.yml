@@ -1,5 +1,0 @@
-- name: audit
-  type: group
-  description: >
-    Fields from ActiveMQ audit logs.
-  fields:

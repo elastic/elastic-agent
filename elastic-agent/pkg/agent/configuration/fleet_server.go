@@ -8,7 +8,7 @@ import (
 	"net/url"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
 )
 
 // FleetServerConfig is the configuration written so Elastic Agent can run Fleet Server.

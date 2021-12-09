@@ -14,12 +14,12 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/beats/v7/libbeat/common/backoff"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/filelock"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/paths"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/storage"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config"
-	monitoringConfig "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/filelock"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/storage"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/config"
+	monitoringConfig "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/monitoring/config"
 )
 
 // defaultAgentConfigFile is a name of file used to store agent information

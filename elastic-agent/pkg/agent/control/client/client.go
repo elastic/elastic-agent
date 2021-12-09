@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/control"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/control/proto"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/control"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/control/proto"
 )
 
 // Status is the status of the Elastic Agent

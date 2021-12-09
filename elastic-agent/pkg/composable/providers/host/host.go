@@ -13,11 +13,11 @@ import (
 
 	"github.com/elastic/go-sysinfo"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/composable"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config"
-	corecomp "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/composable"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/composable"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/config"
+	corecomp "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/composable"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
 )
 
 // DefaultCheckInterval is the default timeout used to check if any host information has changed.

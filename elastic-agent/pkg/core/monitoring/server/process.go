@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elastic/beats/v7/metricbeat/mb/parse"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -17,11 +18,10 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/elastic/beats/v7/metricbeat/mb/parse"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/paths"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/program"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/monitoring/beats"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/program"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/monitoring/beats"
 )
 
 const (

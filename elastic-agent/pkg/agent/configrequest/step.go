@@ -4,7 +4,7 @@
 
 package configrequest
 
-import "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/program"
+import "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/program"
 
 const (
 	// StepRun is a name of Start program event

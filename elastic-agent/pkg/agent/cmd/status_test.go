@@ -7,7 +7,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/control/client"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/control/client"
 )
 
 var testStatus = &client.AgentStatus{

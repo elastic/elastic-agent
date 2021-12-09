@@ -13,8 +13,8 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/elastic/beats/v7/licenses"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
+	"github.com/elastic/elastic-agent-poc/licenses"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/packer"
 )
 
 var (
@@ -36,7 +36,7 @@ var tmplPgp = template.Must(template.New("pgp").Parse(`
 package release
 
 import (
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/packer"
 )
 
 // pgp bytes is a packed in public gpg key

@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/retry"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/retry"
 )
 
 // retryableOperations consists of multiple operations which are

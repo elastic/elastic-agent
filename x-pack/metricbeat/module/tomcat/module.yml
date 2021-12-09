@@ -1,6 +1,0 @@
-name: tomcat
-metricsets:
-- threading
-- memory
-- requests
-- cache

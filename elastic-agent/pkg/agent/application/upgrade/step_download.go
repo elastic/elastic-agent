@@ -8,16 +8,16 @@ import (
 	"context"
 	"strings"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/composed"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/fs"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/http"
-	downloader "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/localremote"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/snapshot"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/composed"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/fs"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/http"
+	downloader "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/localremote"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/snapshot"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/release"
 )
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string) (string, error) {

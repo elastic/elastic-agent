@@ -10,19 +10,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/state"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/state"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi/client"
 
 	"github.com/elastic/beats/v7/libbeat/common/backoff"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/gateway"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/info"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/storage/store"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/status"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/scheduler"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/gateway"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/status"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/scheduler"
 )
 
 // Max number of times an invalid API Key is checked

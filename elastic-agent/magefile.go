@@ -23,17 +23,17 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 
-	devtools "github.com/elastic/beats/v7/dev-tools/mage"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release"
+	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/release"
 
 	// mage:import
-	"github.com/elastic/beats/v7/dev-tools/mage/target/common"
+	"github.com/elastic/elastic-agent-poc/dev-tools/mage/target/common"
 	// mage:import
-	_ "github.com/elastic/beats/v7/dev-tools/mage/target/docs"
+	_ "github.com/elastic/elastic-agent-poc/dev-tools/mage/target/docs"
 	// mage:import
-	_ "github.com/elastic/beats/v7/dev-tools/mage/target/integtest/notests"
+	_ "github.com/elastic/elastic-agent-poc/dev-tools/mage/target/integtest/notests"
 	// mage:import
-	"github.com/elastic/beats/v7/dev-tools/mage/target/test"
+	"github.com/elastic/elastic-agent-poc/dev-tools/mage/target/test"
 )
 
 const (
@@ -691,12 +691,12 @@ func buildVars() map[string]string {
 	vars := make(map[string]string)
 
 	isSnapshot, _ := os.LookupEnv(snapshotEnv)
-	vars["github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release.snapshot"] = isSnapshot
+	vars["github.com/elastic/elastic-agent-poc/elastic-agent/pkg/release.snapshot"] = isSnapshot
 
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {
-			vars["github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release.allowEmptyPgp"] = "true"
-			vars["github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release.allowUpgrade"] = "true"
+			vars["github.com/elastic/elastic-agent-poc/elastic-agent/pkg/release.allowEmptyPgp"] = "true"
+			vars["github.com/elastic/elastic-agent-poc/elastic-agent/pkg/release.allowUpgrade"] = "true"
 		}
 	}
 

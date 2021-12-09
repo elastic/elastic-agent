@@ -11,7 +11,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
 )
 
 const (

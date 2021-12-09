@@ -10,7 +10,7 @@ import (
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/eql/parser"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/eql/parser"
 )
 
 // VarStore is the interface to implements when you want the expression engine to be able to fetch

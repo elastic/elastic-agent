@@ -1,3 +1,0 @@
-dashboards:
-- id: Filebeat-ibmmq-errorlog-Dashboard
-  file: Filebeat-ibmmq-errorlog.json

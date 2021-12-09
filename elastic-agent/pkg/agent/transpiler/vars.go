@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/composable"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/composable"
 
 	"github.com/elastic/beats/v7/libbeat/common"
 )

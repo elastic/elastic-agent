@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/state"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/sorted"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/state"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/sorted"
 )
 
 const (

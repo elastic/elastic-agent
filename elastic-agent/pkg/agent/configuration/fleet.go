@@ -5,9 +5,9 @@
 package configuration
 
 import (
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/remote"
-	fleetreporterConfig "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/reporter/fleet/config"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/remote"
+	fleetreporterConfig "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/reporter/fleet/config"
 )
 
 // FleetAgentConfig is the internal configuration of the agent after the enrollment is done,

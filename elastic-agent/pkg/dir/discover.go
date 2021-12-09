@@ -7,7 +7,7 @@ package dir
 import (
 	"path/filepath"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
 )
 
 // DiscoverFiles takes a slices of wildcards patterns and try to discover all the matching files

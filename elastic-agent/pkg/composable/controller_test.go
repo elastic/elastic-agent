@@ -9,21 +9,21 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/transpiler"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/composable"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/composable"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/config"
 
-	_ "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/composable/providers/env"
-	_ "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/composable/providers/host"
-	_ "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/composable/providers/local"
-	_ "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/composable/providers/localdynamic"
+	_ "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/composable/providers/env"
+	_ "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/composable/providers/host"
+	_ "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/composable/providers/local"
+	_ "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/composable/providers/localdynamic"
 )
 
 func TestController(t *testing.T) {

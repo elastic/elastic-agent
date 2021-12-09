@@ -7,7 +7,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
 )
 
 // Config is a configuration of GRPC server.

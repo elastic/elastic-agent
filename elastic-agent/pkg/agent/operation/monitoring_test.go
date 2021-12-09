@@ -12,24 +12,24 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/program"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/program"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/info"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/configrequest"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/configuration"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/stateresolver"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/app"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/monitoring"
-	monitoringConfig "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/monitoring/config"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/process"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/retry"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/server"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/state"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/status"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/stateresolver"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/config"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/app"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/monitoring"
+	monitoringConfig "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/retry"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/server"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/state"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/status"
 )
 
 func TestExportedMetrics(t *testing.T) {

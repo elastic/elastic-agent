@@ -4,7 +4,7 @@
 
 package composable
 
-import "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config"
+import "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/config"
 
 // Config is config for multiple providers.
 type Config struct {

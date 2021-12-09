@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/eql/parser"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/eql/parser"
 )
 
 var showDebug = lookupEnvOrDefault("DEBUG", "0")
