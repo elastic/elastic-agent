@@ -13,7 +13,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact"
 )
 
 func TestDownloadBodyError(t *testing.T) {

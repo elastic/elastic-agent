@@ -7,7 +7,7 @@ package configrequest
 import (
 	"time"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/program"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/program"
 )
 
 // Request is the minimal interface a config request must have.

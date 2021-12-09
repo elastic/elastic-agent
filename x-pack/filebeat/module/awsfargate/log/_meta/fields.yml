@@ -1,6 +1,0 @@
-- name: log
-  type: group
-  release: beta
-  description: >
-    Fields for Amazon Fargate container logs.
-  fields:
