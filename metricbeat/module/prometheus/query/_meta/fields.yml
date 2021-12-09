@@ -1,6 +1,0 @@
-- name: query
-  type: group
-  description: >
-    query metricset
-  release: ga
-  fields:

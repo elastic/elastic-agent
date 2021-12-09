@@ -1,5 +1,0 @@
-type: http
-url: "/metrics"
-suffix: plain
-module:
-  timeout: 30s

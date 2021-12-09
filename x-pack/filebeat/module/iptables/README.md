@@ -1,3 +1,0 @@
-# iptables module
-
-

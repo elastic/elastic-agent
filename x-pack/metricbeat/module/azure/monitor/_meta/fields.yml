@@ -1,8 +1,0 @@
-- name: monitor
-  type: group
-  release: ga
-  description: >
-    monitor
-  fields:
-
-

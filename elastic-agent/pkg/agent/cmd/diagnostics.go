@@ -1,6 +1,19 @@
-// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package cmd
 
@@ -22,14 +35,14 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/info"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/paths"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/configuration"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/control/client"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/control/proto"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/cli"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config/operations"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/control/client"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/control/proto"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/cli"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/config/operations"
 )
 
 var diagOutputs = map[string]outputter{
@@ -399,7 +412,7 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf) error {
+func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig) error {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err

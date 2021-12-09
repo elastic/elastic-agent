@@ -1,9 +1,0 @@
-- key: cyberarkpas
-  title: CyberArk PAS
-  description: >
-    cyberarkpas fields.
-  fields:
-    - name: cyberarkpas
-      type: group
-      fields:
-
