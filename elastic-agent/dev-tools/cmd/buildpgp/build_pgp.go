@@ -13,8 +13,8 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/elastic/elastic-agent-poc/licenses"
 	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/packer"
+	"github.com/elastic/elastic-agent-poc/licenses"
 )
 
 var (

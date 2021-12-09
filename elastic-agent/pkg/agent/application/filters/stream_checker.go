@@ -7,9 +7,9 @@ package filters
 import (
 	"strings"
 
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
 	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
 )
 
 // ErrInvalidNamespace is error returned when namespace value provided is invalid.

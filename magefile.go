@@ -101,14 +101,15 @@ func AddLicenseHeaders() error {
 
 	return multierr.Combine(
 		licenser(
+			licenser.Check(),
 			licenser.License("ASL2"),
-			licenser.Exclude("x-pack"),
+			licenser.Exclude("elastic-agent"),
 			licenser.Exclude("generator/_templates/beat/{beat}"),
 			licenser.Exclude("generator/_templates/metricbeat/{beat}"),
 		),
 		licenser(
 			licenser.License("Elastic"),
-			licenser.Path("x-pack"),
+			licenser.Path("elastic-agent"),
 		),
 	)
 }
@@ -126,14 +127,14 @@ func CheckLicenseHeaders() error {
 		licenser(
 			licenser.Check(),
 			licenser.License("ASL2"),
-			licenser.Exclude("x-pack"),
+			licenser.Exclude("elastic-agent"),
 			licenser.Exclude("generator/_templates/beat/{beat}"),
 			licenser.Exclude("generator/_templates/metricbeat/{beat}"),
 		),
 		licenser(
 			licenser.Check(),
 			licenser.License("Elastic"),
-			licenser.Path("x-pack"),
+			licenser.Path("elastic-agent"),
 		),
 	)
 }

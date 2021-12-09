@@ -84,7 +84,7 @@ func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
 
 // Run initializes the k8s secrets context provider.
 func (p *contextProviderK8sSecrets) Run(comm corecomp.ContextProviderComm) error {
-	client, err := getK8sClientFunc(p.config.KubeConfig, p.config.KubeClientOptions)
+	client, err := getK8sClientFunc(p.config.KubeConfig)
 	if err != nil {
 		p.logger.Debugf("Kubernetes_secrets provider skipped, unable to connect: %s", err)
 		return nil
@@ -93,6 +93,6 @@ func (p *contextProviderK8sSecrets) Run(comm corecomp.ContextProviderComm) error
 	return nil
 }
 
-func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
-	return kubernetes.GetKubernetesClient(kubeconfig, opt)
+func getK8sClient(kubeconfig string) (k8sclient.Interface, error) {
+	return kubernetes.GetKubernetesClient(kubeconfig)
 }

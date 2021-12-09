@@ -9,12 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/beats/v7/metricbeat/mb/parse"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/elastic/beats/v7/metricbeat/mb/parse"
 
 	"github.com/gorilla/mux"
 
