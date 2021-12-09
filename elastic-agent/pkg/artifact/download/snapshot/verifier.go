@@ -5,9 +5,9 @@
 package snapshot
 
 import (
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/http"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/http"
 )
 
 // NewVerifier creates a downloader which first checks local directory

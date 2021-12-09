@@ -12,7 +12,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/control"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/control"
 
 	"google.golang.org/grpc"
 )

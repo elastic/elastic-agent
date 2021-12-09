@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/control/client"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/control/client"
 )
 
 var testDiagnostics = DiagnosticsInfo{

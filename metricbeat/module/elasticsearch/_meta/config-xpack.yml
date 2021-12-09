@@ -1,7 +1,0 @@
-- module: elasticsearch
-  xpack.enabled: true
-  period: 10s
-  hosts: ["http://localhost:9200"]
-  #username: "user"
-  #password: "secret"
-

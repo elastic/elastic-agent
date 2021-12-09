@@ -5,14 +5,14 @@
 package localremote
 
 import (
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/composed"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/fs"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/http"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/artifact/download/snapshot"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/composed"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/fs"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/http"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download/snapshot"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/release"
 )
 
 // NewVerifier creates a downloader which first checks local directory

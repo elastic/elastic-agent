@@ -17,7 +17,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/errors"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/errors"
 )
 
 // CertificateAuthority is an abstraction for common certificate authority

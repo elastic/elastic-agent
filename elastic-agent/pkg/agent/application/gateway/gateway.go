@@ -4,7 +4,7 @@
 
 package gateway
 
-import "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi/client"
+import "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi/client"
 
 // FleetGateway is a gateway between the Agent and the Fleet API, it's take cares of all the
 // bidirectional communication requirements. The gateway aggregates events and will periodically

@@ -9,24 +9,24 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/configuration"
-	noopacker "github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/configuration"
+	noopacker "github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi/acker/noop"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/info"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/actions/handlers"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/dispatcher"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/emitter"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/emitter/modifiers"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/pipeline/router"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/configrequest"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/storage"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/composable"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/actions/handlers"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/dispatcher"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/emitter"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/emitter/modifiers"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/application/pipeline/router"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/storage"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/composable"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/fleetapi"
 )
 
 func TestManagedModeRouting(t *testing.T) {

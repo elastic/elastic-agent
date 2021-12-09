@@ -1,4 +1,0 @@
-name: istio
-metricsets:
-- istiod
-- proxy

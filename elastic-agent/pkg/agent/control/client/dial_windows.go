@@ -15,7 +15,7 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/api/npipe"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/control"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/control"
 )
 
 func dialContext(ctx context.Context) (*grpc.ClientConn, error) {
