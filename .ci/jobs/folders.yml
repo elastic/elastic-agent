@@ -1,0 +1,5 @@
+---
+- job:
+    name: "Elastic Agent"
+    description: "Elastic Agent"
+    project-type: folder
