@@ -1,4 +1,0 @@
-- module: awsfargate
-  period: 10s
-  metricsets:
-    - task_stats

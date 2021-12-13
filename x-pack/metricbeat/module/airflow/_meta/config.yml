@@ -1,5 +1,0 @@
-- module: airflow
-  host: "localhost"
-  port: "8126"
-  #ttl: "30s"
-  metricsets: [ 'statsd' ]

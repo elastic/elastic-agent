@@ -1,5 +1,0 @@
-- key: zoom
-  title: Zoom
-  description: >
-    Module for handling incoming Zoom webhook requests
-  fields:

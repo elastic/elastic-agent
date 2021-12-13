@@ -1,4 +1,0 @@
-type: http
-url: "/_status/vars"
-suffix: plain
-remove_fields_from_comparison: ["prometheus.labels.instance"]

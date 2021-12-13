@@ -1,3 +1,0 @@
-dashboards:
-- id: Filebeat-santa-overview-dashboard
-  file: Filebeat-santa-overview.json

@@ -1,4 +1,0 @@
-name: redisenterprise
-metricsets:
-  - node
-  - proxy

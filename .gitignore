@@ -5,14 +5,8 @@
 /build
 /*/*.template*.json
 **/html_docs
-*beat/fields.yml
-*beat/_meta/kibana.generated
-*beat/build
-*beat/logs
-*beat/data
-x-pack/functionbeat/pkg
-x-pack/elastic-agent/data
-x-pack/elastic-agent/pkg/agent/operation/tests/downloads
+elastic-agent/data
+elastic-agent/pkg/agent/operation/tests/downloads
 
 # Files
 .DS_Store
@@ -25,13 +19,10 @@ beat.db
 *.keystore
 go_env.properties
 mage_output_file.go
-x-pack/functionbeat/*/fields.yml
-x-pack/functionbeat/provider/*/functionbeat-*
-x-pack/dockerlogbeat/temproot.tar
-x-pack/elastic-agent/elastic_agent
-x-pack/elastic-agent/fleet.yml
-x-pack/elastic-agent/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86_64/configurable
-x-pack/elastic-agent/pkg/agent/operation/tests/scripts/serviceable-1.0-darwin-x86_64/serviceable
+elastic-agent/elastic_agent
+elastic-agent/fleet.yml
+elastic-agent/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86_64/configurable
+elastic-agent/pkg/agent/operation/tests/scripts/serviceable-1.0-darwin-x86_64/serviceable
 
 # Editor swap files
 *.swp
