@@ -2,7 +2,7 @@
 - job:
     name: "Elastic Agent/elastic-agent-poc-mbp"
     display-name: elastic-agent-poc
-    description: elastic-agent-poc
+    description: "POC to isolate elastic agent from beats"
     project-type: multibranch
     script-path: .ci/Jenkinsfile
     scm:
