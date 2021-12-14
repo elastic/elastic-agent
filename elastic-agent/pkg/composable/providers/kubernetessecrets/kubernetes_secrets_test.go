@@ -24,8 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
@@ -65,7 +63,7 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 
 	fp := p.(corecomp.FetchContextProvider)
 
-	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
+	getK8sClientFunc = func(kubeconfig string) (k8sclient.Interface, error) {
 		return client, nil
 	}
 	require.NoError(t, err)
@@ -104,7 +102,7 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 
 	fp := p.(corecomp.FetchContextProvider)
 
-	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
+	getK8sClientFunc = func(kubeconfig string) (k8sclient.Interface, error) {
 		return client, nil
 	}
 	require.NoError(t, err)
