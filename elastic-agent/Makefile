@@ -2,7 +2,7 @@
 #
 # Variables
 #
-ES_BEATS ?= ../..
+ES_BEATS ?= ..
 
 #
 # Includes
