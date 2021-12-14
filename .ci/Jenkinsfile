@@ -35,13 +35,13 @@ pipeline {
     stage('Lint'){
       steps {
         withGithubNotify(context: "Lint") {
-          dir("${BASE_DIR}"){
-            withGoEnv(){
+          withMageEnv(){
+            dir("${BASE_DIR}"){
               sh(label: 'lint', script: '''
-                go mod tidy && git diff --exit-code
-                gofmt -l . | read && echo "Code differs from gofmt's style. Run 'gofmt -w .'" 1>&2 && exit 1 || true
+                make -C elastic-agent check
+                make -C elastic-agent update
+                make check-no-changes
               ''')
-              sh(label: 'Go vet', script: 'go vet')
             }
           }
         }
@@ -55,7 +55,7 @@ pipeline {
         axes {
           axis {
             name 'PLATFORM'
-            values 'macosx && x86_64', 'ubuntu-20.04 && immutable', 'windows-2019 && windows-immutable'
+            values 'macosx && x86_64', 'ubuntu-20.04 && immutable', 'windows-2019 && windows-immutable', 'arm'
           }
           axis {
             name 'GO_VERSION'
@@ -68,9 +68,9 @@ pipeline {
               withGithubNotify(context: "Build-${GO_VERSION}-${PLATFORM}") {
                 deleteDir()
                 unstash 'source'
-                dir("${BASE_DIR}"){
-                  withGoEnv(){
-                    cmd(label: 'Go build', script: 'go build')
+                withMageEnv(){
+                  dir("${BASE_DIR}/elastic-agent"){
+                    cmd(label: 'Go build', script: 'mage build')
                   }
                 }
               }
@@ -79,11 +79,9 @@ pipeline {
           stage('Test') {
             steps {
               withGithubNotify(context: "Test-${GO_VERSION}-${PLATFORM}") {
-                deleteDir()
-                unstash 'source'
-                dir("${BASE_DIR}"){
-                  withGoEnv(){
-                    goTestJUnit(options: '-v ./...', output: 'junit-report.xml')
+                withMageEnv(){
+                  dir("${BASE_DIR}/elastic-agent"){
+                    cmd(label: 'Go unitTest', script: 'mage unitTest')
                   }
                 }
               }
