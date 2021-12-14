@@ -57,15 +57,11 @@ pipeline {
             name 'PLATFORM'
             values 'macosx && x86_64', 'ubuntu-20.04 && immutable', 'windows-2019 && windows-immutable', 'arm'
           }
-          axis {
-            name 'GO_VERSION'
-            values '1.14', '1.15', '1.16'
-          }
         }
         stages {
           stage('build'){
             steps {
-              withGithubNotify(context: "Build-${GO_VERSION}-${PLATFORM}") {
+              withGithubNotify(context: "Build-${PLATFORM}") {
                 deleteDir()
                 unstash 'source'
                 withMageEnv(){
@@ -78,7 +74,7 @@ pipeline {
           }
           stage('Test') {
             steps {
-              withGithubNotify(context: "Test-${GO_VERSION}-${PLATFORM}") {
+              withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
                   dir("${BASE_DIR}/elastic-agent"){
                     cmd(label: 'Go unitTest', script: 'mage unitTest')
