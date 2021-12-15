@@ -1,0 +1,100 @@
+#!/usr/bin/env groovy
+
+@Library('apm@feature/use-internal-ci') _
+
+pipeline {
+  agent { label 'ubuntu-20.04 && immutable' }
+  environment {
+    REPO = "elastic-agent-poc"
+    BASE_DIR = "src/github.com/elastic/${env.REPO}"
+    JOB_GIT_CREDENTIALS = "f6c7695a-671e-4f4f-a331-acdce44ff9ba"
+    PIPELINE_LOG_LEVEL = 'INFO'
+  }
+  options {
+    timeout(time: 1, unit: 'HOURS')
+    buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '20', daysToKeepStr: '30'))
+    timestamps()
+    ansiColor('xterm')
+    disableResume()
+    durabilityHint('PERFORMANCE_OPTIMIZED')
+    rateLimitBuilds(throttle: [count: 60, durationName: 'hour', userBoost: true])
+    quietPeriod(10)
+  }
+  triggers {
+    issueCommentTrigger("${obltGitHubComments()}")
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
+        deleteDir()
+        gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: true)
+        stash allowEmpty: true, name: 'source', useDefaultExcludes: false
+      }
+    }
+    stage('Lint'){
+      steps {
+        withGithubNotify(context: "Lint") {
+          withMageEnv(){
+            dir("${BASE_DIR}"){
+              sh(label: 'lint', script: '''
+                make -C elastic-agent check
+                make -C elastic-agent update
+                make check-no-changes
+              ''')
+            }
+          }
+        }
+      }
+    }
+    stage('Test') {
+      failFast false
+      matrix {
+        agent {label "${PLATFORM}"}
+        options { skipDefaultCheckout() }
+        axes {
+          axis {
+            name 'PLATFORM'
+            values 'macosx && x86_64', 'ubuntu-20.04 && immutable', 'aarch64' // 'windows-2019 && windows-immutable',
+          }
+        }
+        stages {
+          stage('build'){
+            steps {
+              withGithubNotify(context: "Build-${PLATFORM}") {
+                deleteDir()
+                unstash 'source'
+                withMageEnv(){
+                  dir("${BASE_DIR}/elastic-agent"){
+                    cmd(label: 'Go build', script: 'mage build')
+                  }
+                }
+              }
+            }
+          }
+          stage('Test') {
+            steps {
+              withGithubNotify(context: "Test-${PLATFORM}") {
+                withMageEnv(){
+                  dir("${BASE_DIR}/elastic-agent"){
+                    cmd(label: 'Go unitTest', script: 'mage unitTest')
+                  }
+                }
+              }
+            }
+            post {
+              always {
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: '**/junit-report.xml')
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  post {
+    cleanup {
+      notifyBuildResult(prComment: true)
+    }
+  }
+}
