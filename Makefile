@@ -1,8 +1,7 @@
 BUILD_DIR=$(CURDIR)/build
 COVERAGE_DIR=$(BUILD_DIR)/coverage
-BEATS?=auditbeat filebeat heartbeat metricbeat packetbeat winlogbeat x-pack/functionbeat x-pack/elastic-agent x-pack/osquerybeat
-PROJECTS=libbeat $(BEATS)
-PROJECTS_ENV=libbeat filebeat metricbeat
+BEATS?=elastic-agent
+PROJECTS= $(BEATS)
 PYTHON_ENV?=$(BUILD_DIR)/python-env
 PYTHON_EXE?=python3
 PYTHON_ENV_EXE=${PYTHON_ENV}/bin/$(notdir ${PYTHON_EXE})
@@ -10,22 +9,7 @@ VENV_PARAMS?=
 FIND=find . -type f -not -path "*/build/*" -not -path "*/.git/*"
 GOLINT=golint
 GOLINT_REPO=golang.org/x/lint/golint
-XPACK_SUFFIX=x-pack/
 
-# PROJECTS_XPACK_PKG is a list of Beats that have independent packaging support
-# in the x-pack directory (rather than having the OSS build produce both sets
-# of artifacts). This will be removed once we complete the transition.
-PROJECTS_XPACK_PKG=x-pack/auditbeat x-pack/dockerlogbeat x-pack/filebeat x-pack/heartbeat x-pack/metricbeat x-pack/winlogbeat x-pack/packetbeat
-# PROJECTS_XPACK_MAGE is a list of Beats whose primary build logic is based in
-# Mage. For compatibility with CI testing these projects support a subset of the
-# makefile targets. After all Beats converge to primarily using Mage we can
-# remove this and treat all sub-projects the same.
-PROJECTS_XPACK_MAGE=$(PROJECTS_XPACK_PKG) x-pack/libbeat
-
-#
-# Includes
-#
-include dev-tools/make/mage-install.mk
 
 ## help : Show this help.
 help: Makefile
