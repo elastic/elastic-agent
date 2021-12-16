@@ -436,20 +436,6 @@ func ConfigFileParams() devtools.ConfigFileParams {
 	return p
 }
 
-// fieldDocs generates docs/fields.asciidoc containing all fields
-// (including x-pack).
-func fieldDocs() error {
-	inputs := []string{
-		devtools.OSSBeatDir("input"),
-		devtools.XPackBeatDir("input"),
-	}
-	output := devtools.CreateDir("build/fields/fields.all.yml")
-	if err := devtools.GenerateFieldsYAMLTo(output, inputs...); err != nil {
-		return err
-	}
-	return devtools.Docs.FieldDocs(output)
-}
-
 func combineErr(errors ...error) error {
 	var e error
 	for _, err := range errors {
