@@ -54,13 +54,13 @@ func DefaultBuildArgs() BuildArgs {
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
 		},
 		Vars: map[string]string{
-			elasticBeatsModulePath + "/libbeat/version.buildTime": "{{ date }}",
-			elasticBeatsModulePath + "/libbeat/version.commit":    "{{ commit }}",
+			elasticAgentModulePath + "/version.buildTime": "{{ date }}",
+			elasticAgentModulePath + "/version.commit":    "{{ commit }}",
 		},
 		WinMetadata: true,
 	}
 	if versionQualified {
-		args.Vars[elasticBeatsModulePath+"/libbeat/version.qualifier"] = "{{ .Qualifier }}"
+		args.Vars[elasticAgentModulePath+"/version.qualifier"] = "{{ .Qualifier }}"
 	}
 
 	if positionIndependendCodeSupported() {
