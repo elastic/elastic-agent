@@ -214,7 +214,7 @@ func (Build) TestBinaries() error {
 
 // All run all the code checks.
 func (Check) All() {
-	mg.SerialDeps(Check.License, Check.GoLint)
+	mg.SerialDeps(Check.License, Check.GoLint, Check.Changes)
 }
 
 // GoLint run the code through the linter.

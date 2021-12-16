@@ -37,9 +37,8 @@ pipeline {
         withGithubNotify(context: "Lint") {
           withMageEnv(){
            dir("${BASE_DIR}/elastic-agent"){
-              cmd(label: 'check', script: 'mage check')
+              cmd(label: 'check licence, lint changes', script: 'mage check')
               cmd(label: 'update', script: 'mage update')
-              cmd(label: 'check-no-changes', script: 'mage check-no-changes')
             }
           }
         }
