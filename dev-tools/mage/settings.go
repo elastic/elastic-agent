@@ -45,9 +45,9 @@ const (
 	// BeatsCrossBuildImage is the image used for crossbuilding Beats.
 	BeatsCrossBuildImage = "docker.elastic.co/beats-dev/golang-crossbuild"
 
-	elasticBeatsImportPath = "github.com/elastic/beats"
+	elasticAgentImportPath = "github.com/elastic/elastic-agent-poc"
 
-	elasticBeatsModulePath = "github.com/elastic/beats/v7"
+	elasticAgentModulePath = "github.com/elastic/elastic-agent-poc/v7"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -305,7 +305,7 @@ func findElasticBeatsDir() (string, error) {
 	if repo.IsElasticBeats() {
 		return repo.RootDir, nil
 	}
-	return gotool.ListModuleCacheDir(elasticBeatsModulePath)
+	return gotool.ListModuleCacheDir(elasticAgentModulePath)
 }
 
 var (
@@ -402,9 +402,9 @@ var (
 	// DefaultBeatBuildVariableSources contains the default locations build
 	// variables are read from by Elastic Beats.
 	DefaultBeatBuildVariableSources = &BuildVariableSources{
-		BeatVersion: "{{ elastic_beats_dir }}/libbeat/version/version.go",
+		BeatVersion: "{{ elastic_beats_dir }}/elastic-agent/version/version.go",
 		GoVersion:   "{{ elastic_beats_dir }}/.go-version",
-		DocBranch:   "{{ elastic_beats_dir }}/libbeat/docs/version.asciidoc",
+		DocBranch:   "{{ elastic_beats_dir }}/elastic-agent/docs/version.asciidoc",
 	}
 
 	buildVariableSources     *BuildVariableSources
@@ -563,7 +563,7 @@ type ProjectRepoInfo struct {
 // IsElasticBeats returns true if the current project is
 // github.com/elastic/beats.
 func (r *ProjectRepoInfo) IsElasticBeats() bool {
-	return r.CanonicalRootImportPath == elasticBeatsImportPath
+	return r.CanonicalRootImportPath == elasticAgentImportPath
 }
 
 var (
