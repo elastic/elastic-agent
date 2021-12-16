@@ -428,11 +428,18 @@ func configYML() error {
 
 // ConfigFileParams returns the parameters for generating OSS config.
 func ConfigFileParams() devtools.ConfigFileParams {
-	p := devtools.DefaultConfigFileParams()
-	p.Templates = append(p.Templates, "_meta/config/*.tmpl")
-	p.Short.Template = "_meta/config/elastic-agent.yml.tmpl"
-	p.Reference.Template = "_meta/config/elastic-agent.reference.yml.tmpl"
-	p.Docker.Template = "_meta/config/elastic-agent.docker.yml.tmpl"
+	p := devtools.ConfigFileParams{
+		Templates: []string{"_meta/config/*.tmpl"},
+		Short: devtools.ConfigParams{
+			Template: "_meta/config/elastic-agent.yml.tmpl",
+		},
+		Reference: devtools.ConfigParams{
+			Template: "_meta/config/elastic-agent.reference.yml.tmpl",
+		},
+		Docker: devtools.ConfigParams{
+			Template: "_meta/config/elastic-agent.docker.yml.tmpl",
+		},
+	}
 	return p
 }
 
