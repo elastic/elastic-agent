@@ -49,8 +49,6 @@ func AddLicenseHeaders() error {
 			licenser.Check(),
 			licenser.License("ASL2"),
 			licenser.Exclude("elastic-agent"),
-			licenser.Exclude("generator/_templates/beat/{beat}"),
-			licenser.Exclude("generator/_templates/metricbeat/{beat}"),
 		),
 		licenser(
 			licenser.License("Elastic"),
@@ -73,8 +71,6 @@ func CheckLicenseHeaders() error {
 			licenser.Check(),
 			licenser.License("ASL2"),
 			licenser.Exclude("elastic-agent"),
-			licenser.Exclude("generator/_templates/beat/{beat}"),
-			licenser.Exclude("generator/_templates/metricbeat/{beat}"),
 		),
 		licenser(
 			licenser.Check(),
