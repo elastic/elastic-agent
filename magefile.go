@@ -29,18 +29,6 @@ import (
 	"github.com/elastic/elastic-agent-poc/dev-tools/mage/gotool"
 )
 
-var (
-	// BeatsWithDashboards is a list of Beats to collect dashboards from.
-	BeatsWithDashboards = []string{
-		"heartbeat",
-		"packetbeat",
-		"winlogbeat",
-		"x-pack/auditbeat",
-		"x-pack/filebeat",
-		"x-pack/metricbeat",
-	}
-)
-
 // Fmt formats code and adds license headers.
 func Fmt() {
 	mg.Deps(devtools.GoImports, devtools.PythonAutopep8)
@@ -100,3 +88,4 @@ func CheckLicenseHeaders() error {
 func DumpVariables() error {
 	return devtools.DumpVariables()
 }
+
