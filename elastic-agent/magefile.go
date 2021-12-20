@@ -428,26 +428,19 @@ func configYML() error {
 
 // ConfigFileParams returns the parameters for generating OSS config.
 func ConfigFileParams() devtools.ConfigFileParams {
-	p := devtools.DefaultConfigFileParams()
-	p.Templates = append(p.Templates, "_meta/config/*.tmpl")
-	p.Short.Template = "_meta/config/elastic-agent.yml.tmpl"
-	p.Reference.Template = "_meta/config/elastic-agent.reference.yml.tmpl"
-	p.Docker.Template = "_meta/config/elastic-agent.docker.yml.tmpl"
+	p := devtools.ConfigFileParams{
+		Templates: []string{"_meta/config/*.tmpl"},
+		Short: devtools.ConfigParams{
+			Template: "_meta/config/elastic-agent.yml.tmpl",
+		},
+		Reference: devtools.ConfigParams{
+			Template: "_meta/config/elastic-agent.reference.yml.tmpl",
+		},
+		Docker: devtools.ConfigParams{
+			Template: "_meta/config/elastic-agent.docker.yml.tmpl",
+		},
+	}
 	return p
-}
-
-// fieldDocs generates docs/fields.asciidoc containing all fields
-// (including x-pack).
-func fieldDocs() error {
-	inputs := []string{
-		devtools.OSSBeatDir("input"),
-		devtools.XPackBeatDir("input"),
-	}
-	output := devtools.CreateDir("build/fields/fields.all.yml")
-	if err := devtools.GenerateFieldsYAMLTo(output, inputs...); err != nil {
-		return err
-	}
-	return devtools.Docs.FieldDocs(output)
 }
 
 func combineErr(errors ...error) error {
@@ -598,7 +591,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
 
 		for _, b := range packedBeats {
-			pwd, err := filepath.Abs(filepath.Join("..", b))
+			pwd, err := filepath.Abs(filepath.Join("../../beats", b))
 			if err != nil {
 				panic(err)
 			}

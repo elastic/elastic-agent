@@ -36,13 +36,13 @@ pipeline {
       steps {
         withGithubNotify(context: "Lint") {
           withMageEnv(){
-            dir("${BASE_DIR}"){
-              sh(label: 'lint', script: '''
-                make -C elastic-agent check
-                make -C elastic-agent update
-                make check-no-changes
-              ''')
+           dir("${BASE_DIR}/elastic-agent"){
+              cmd(label: 'check license, lint', script: 'mage check')
+              cmd(label: 'update', script: 'mage update')
             }
+            //dir("${BASE_DIR}"){
+             // cmd(label: 'check no changes', script: 'mage checknochanges')
+            //}
           }
         }
       }

@@ -20,14 +20,11 @@ package mage
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 
@@ -35,7 +32,6 @@ import (
 	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/v7/libbeat/dashboards"
 	"github.com/elastic/beats/v7/libbeat/processors/dissect"
 	"github.com/elastic/elastic-agent-poc/dev-tools/mage/gotool"
 )
@@ -49,7 +45,7 @@ import (
 func Check() error {
 	fmt.Println(">> check: Checking source code for common problems")
 
-	mg.Deps(GoVet, CheckPythonTestNotExecutable, CheckYAMLNotExecutable, CheckDashboardsFormat)
+	mg.Deps(GoVet, CheckPythonTestNotExecutable, CheckYAMLNotExecutable)
 
 	changes, err := GitDiffIndex()
 	if err != nil {
@@ -210,168 +206,7 @@ func CheckLicenseHeaders() error {
 	return licenser(licenser.Check(), licenser.License(license))
 }
 
-// CheckDashboardsFormat checks the format of dashboards
-func CheckDashboardsFormat() error {
-	dashboardSubDir := "/_meta/kibana/"
-	dashboardFiles, err := FindFilesRecursive(func(path string, _ os.FileInfo) bool {
-		if strings.HasPrefix(path, "vendor") {
-			return false
-		}
-		return strings.Contains(filepath.ToSlash(path), dashboardSubDir) && strings.HasSuffix(path, ".json")
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to find dashboards")
-	}
 
-	hasErrors := false
-	for _, file := range dashboardFiles {
-		d, err := ioutil.ReadFile(file)
-		if err != nil {
-			return errors.Wrapf(err, "failed to read dashboard file %s", file)
-		}
 
-		if checkDashboardForErrors(file, d) {
-			hasErrors = true
-		}
-	}
 
-	if hasErrors {
-		return errors.New("there are format errors in dashboards")
-	}
-	return nil
-}
 
-func checkDashboardForErrors(file string, d []byte) bool {
-	if len(bytes.TrimRight(d, "\n")) == 0 {
-		return false
-	}
-	var hasErrors bool
-	var dashboard DashboardObject
-	err := json.Unmarshal(d, &dashboard)
-	if err != nil {
-		fmt.Println(errors.Wrapf(err, "failed to parse dashboard from %s", file).Error())
-		return true
-	}
-
-	module := moduleNameFromDashboard(file)
-	err = dashboard.CheckFormat(module)
-	if err != nil {
-		hasErrors = true
-		fmt.Printf(">> Dashboard format - %s:\n", file)
-		fmt.Println("  ", err)
-	}
-
-	replaced := dashboards.ReplaceIndexInDashboardObject("my-test-index-*", d)
-	if bytes.Contains(replaced, []byte(BeatName+"-*")) {
-		hasErrors = true
-		fmt.Printf(">> Cannot modify all index pattern references in dashboard - %s\n", file)
-		fmt.Println("Please edit the dashboard override function named ReplaceIndexInDashboardObject in libbeat.")
-		fmt.Println(string(replaced))
-	}
-
-	return hasErrors
-}
-
-func moduleNameFromDashboard(path string) string {
-	moduleDir := filepath.Clean(filepath.Join(filepath.Dir(path), "../../../.."))
-	return filepath.Base(moduleDir)
-}
-
-// DashboardObject is a dashboard
-type DashboardObject struct {
-	Version    string `json:"version"`
-	Type       string `json:"type"`
-	Attributes struct {
-		Description           string `json:"description"`
-		Title                 string `json:"title"`
-		KibanaSavedObjectMeta *struct {
-			SearchSourceJSON struct {
-				Index *string `json:"index"`
-			} `json:"searchSourceJSON,omitempty"`
-		} `json:"kibanaSavedObjectMeta"`
-		VisState *struct {
-			Params *struct {
-				IndexPattern *string `json:"index_pattern"`
-				Controls     []struct {
-					IndexPattern *string
-				} `json:"controls"`
-			} `json:"params"`
-		} `json:"visState,omitempty"`
-	} `json:"attributes"`
-	References []struct {
-		Type string `json:"type"`
-		ID   string `json:"id"`
-	} `json:"references"`
-}
-
-var (
-	visualizationTitleRegexp = regexp.MustCompile(`^.+\[([^\s]+) (.+)\]( ECS)?$`)
-	dashboardTitleRegexp     = regexp.MustCompile(`^\[([^\s]+) (.+)\].+$`)
-)
-
-// CheckFormat checks the format of a dashboard
-func (d *DashboardObject) CheckFormat(module string) error {
-	switch d.Type {
-	case "dashboard":
-		if d.Attributes.Description == "" {
-			return errors.Errorf("empty description on dashboard '%s'", d.Attributes.Title)
-		}
-		if err := checkTitle(dashboardTitleRegexp, d.Attributes.Title, module); err != nil {
-			return errors.Wrapf(err, "expected title with format '[%s Module] Some title', found '%s'", strings.Title(BeatName), d.Attributes.Title)
-		}
-	case "visualization":
-		if err := checkTitle(visualizationTitleRegexp, d.Attributes.Title, module); err != nil {
-			return errors.Wrapf(err, "expected title with format 'Some title [%s Module]', found '%s'", strings.Title(BeatName), d.Attributes.Title)
-		}
-	}
-
-	expectedIndexPattern := strings.ToLower(BeatName) + "-*"
-	if err := checkDashboardIndexPattern(expectedIndexPattern, d); err != nil {
-		return errors.Wrapf(err, "expected index pattern reference '%s'", expectedIndexPattern)
-	}
-	return nil
-}
-
-func checkTitle(re *regexp.Regexp, title string, module string) error {
-	match := re.FindStringSubmatch(title)
-	if len(match) < 3 {
-		return errors.New("title doesn't match pattern")
-	}
-	beatTitle := strings.Title(BeatName)
-	if match[1] != beatTitle {
-		return errors.Errorf("expected: '%s', found: '%s'", beatTitle, match[1])
-	}
-
-	// Compare case insensitive, and ignore spaces and underscores in module names
-	replacer := strings.NewReplacer("_", "", " ", "")
-	expectedModule := replacer.Replace(strings.ToLower(module))
-	foundModule := replacer.Replace(strings.ToLower(match[2]))
-	if expectedModule != foundModule {
-		return errors.Errorf("expected module name (%s), found '%s'", module, match[2])
-	}
-	return nil
-}
-
-func checkDashboardIndexPattern(expectedIndex string, o *DashboardObject) error {
-	if objectMeta := o.Attributes.KibanaSavedObjectMeta; objectMeta != nil {
-		if index := objectMeta.SearchSourceJSON.Index; index != nil && *index != expectedIndex {
-			return errors.Errorf("unexpected index pattern reference found in object meta: `%s` in visualization `%s`", *index, o.Attributes.Title)
-		}
-	}
-	if visState := o.Attributes.VisState; visState != nil {
-		for _, control := range visState.Params.Controls {
-			if index := control.IndexPattern; index != nil && *index != expectedIndex {
-				return errors.Errorf("unexpected index pattern reference found in visualization state: `%s` in visualization `%s`", *index, o.Attributes.Title)
-			}
-		}
-		if index := visState.Params.IndexPattern; index != nil && *index != expectedIndex {
-			return errors.Errorf("unexpected index pattern reference found in visualization state params: `%s` in visualization `%s`", *index, o.Attributes.Title)
-		}
-	}
-	for _, reference := range o.References {
-		if reference.Type == "index-pattern" && reference.ID != expectedIndex {
-			return errors.Errorf("unexpected reference to index pattern `%s`", reference.ID)
-		}
-	}
-	return nil
-}

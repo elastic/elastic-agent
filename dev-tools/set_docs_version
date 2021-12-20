@@ -14,12 +14,12 @@ def main():
     check_call("git clean -dfx", shell=True)
 
     # edit the file
-    with open("libbeat/docs/version.asciidoc", "r") as f:
+    with open("elastic-agent/docs/version.asciidoc", "r") as f:
         lines = f.readlines()
     for i, line in enumerate(lines):
         if line.startswith(":stack-version:"):
             lines[i] = ":stack-version: {}\n".format(version)
-    with open("libbeat/docs/version.asciidoc", "w") as f:
+    with open("elastic-agent/docs/version.asciidoc", "w") as f:
         f.writelines(lines)
 
     check_call("make update", shell=True)
