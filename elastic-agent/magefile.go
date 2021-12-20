@@ -591,7 +591,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
 
 		for _, b := range packedBeats {
-			pwd, err := filepath.Abs(filepath.Join("..", b))
+			pwd, err := filepath.Abs(filepath.Join("../../beats", b))
 			if err != nil {
 				panic(err)
 			}
