@@ -172,26 +172,6 @@ func PythonTest(params PythonTestArgs) error {
 	// and HTML report.
 }
 
-// PythonTestForModule executes python system tests for modules.
-//
-// Use `MODULE=module` to run only tests for `module`.
-func PythonTestForModule(params PythonTestArgs) error {
-	if module := EnvOr("MODULE", ""); module != "" {
-		fmt.Println(">> Single module selected for testing: ", module)
-		params.Files = []string{
-			fmt.Sprintf("module/%s/test_*.py", module),
-			fmt.Sprintf("module/%s/*/test_*.py", module),
-
-			// Run always the base tests, that include tests for module dashboards.
-			"tests/system/test*_base.py",
-		}
-		fmt.Println("Test files: ", params.Files)
-		params.TestName += "-" + module
-	} else {
-		fmt.Println(">> Running tests for all modules, you can use MODULE=foo to scope it down to a single module...")
-	}
-	return PythonTest(params)
-}
 
 // PythonVirtualenv constructs a virtualenv that contains the given modules as
 // defined in the requirements file pointed to by requirementsTxt. It returns
