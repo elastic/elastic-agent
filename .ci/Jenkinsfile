@@ -40,9 +40,9 @@ pipeline {
               cmd(label: 'check license, lint', script: 'mage check')
               cmd(label: 'update', script: 'mage update')
             }
-            dir("${BASE_DIR}"){
-              cmd(label: 'check no changes', script: 'mage checknochanges')
-            }
+            //dir("${BASE_DIR}"){
+             // cmd(label: 'check no changes', script: 'mage checknochanges')
+            //}
           }
         }
       }
