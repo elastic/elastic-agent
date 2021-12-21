@@ -91,10 +91,113 @@ pipeline {
         }
       }
     }
+    stage('Packages'){
+      options { skipDefaultCheckout() }
+      parallel {
+        stage('Package linux') {
+          steps {
+            withGithubNotify(context: "Package Linux") {
+              deleteDir()
+              unstash 'source'
+              withMageEnv(){
+                dir("${BASE_DIR}/elastic-agent"){
+                  withPackageLinuxEnv() {
+                    cmd(label: 'Go package', script: 'mage package')
+                  }
+                }
+              }
+            }
+          }
+        }
+        stage('Package linux/arm64') {
+          agent { label 'aarch64' }
+          options { skipDefaultCheckout() }
+          steps {
+            withGithubNotify(context: "Package linux/arm64") {
+              deleteDir()
+              unstash 'source'
+              withMageEnv(){
+                dir("${BASE_DIR}/elastic-agent"){
+                  withPackageArmEnv() {
+                    cmd(label: 'Go package', script: 'mage package')
+                  }
+                }
+              }
+            }
+          }
+        }
+        stage('Package macOS') {
+          agent { label 'macosx && x86_64' }
+          options { skipDefaultCheckout() }
+          steps {
+            withGithubNotify(context: "macOS") {
+              deleteDir()
+              unstash 'source'
+              withMageEnv(){
+                dir("${BASE_DIR}/elastic-agent"){
+                  withPackageDarwinEnv() {
+                    cmd(label: 'Go package', script: 'mage package')
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
   post {
     cleanup {
       notifyBuildResult(prComment: true)
     }
+  }
+}
+
+def withPackageLinuxEnv(Closure body) {
+  // Copied from https://github.com/elastic/beats/blob/e6e65aa92fe355c95789691ebf5a3bcecaf5b4ea/.ci/packaging.groovy#L126-L142
+  def PLATFORMS = [ '+all',
+                    'linux/amd64',
+                    'linux/386',
+                    'linux/arm64',
+                    // armv7 packaging isn't working, and we don't currently
+                    // need it for release. Do not re-enable it without
+                    // confirming it is fixed, you will break the packaging
+                    // pipeline!
+                    //'linux/armv7',
+                    // The platforms above are disabled temporarly as crossbuild images are
+                    // not available. See: https://github.com/elastic/golang-crossbuild/issues/71
+                    //'linux/ppc64le',
+                    //'linux/mips64',
+                    //'linux/s390x',
+                    'windows/amd64',
+                    'windows/386'
+  ].join(' ')
+  withEnv([
+    "PLATFORMS=${PLATFORMS}"
+  ]) {
+    body()
+  }
+}
+
+def withPackageLinuxEnv(Closure body) {
+  // Copied from https://github.com/elastic/beats/blob/e6e65aa92fe355c95789691ebf5a3bcecaf5b4ea/.ci/packaging.groovy#L126-L142
+  def PLATFORMS = [ 'linux/arm64' ].join(' ')
+  withEnv([
+    "PLATFORMS=${PLATFORMS}",
+    "PACKAGES=docker"
+  ]) {
+    body()
+  }
+}
+
+def withPackageDarwinEnv(Closure body) {
+  // Copied from https://github.com/elastic/beats/blob/e6e65aa92fe355c95789691ebf5a3bcecaf5b4ea/.ci/packaging.groovy#L126-L142
+  def PLATFORMS = [ '+all',
+                    'darwin/amd64'
+  ].join(' ')
+  withEnv([
+    "PLATFORMS=${PLATFORMS}"
+  ]) {
+    body()
   }
 }
