@@ -179,7 +179,7 @@ def withPackageLinuxEnv(Closure body) {
   }
 }
 
-def withPackageLinuxEnv(Closure body) {
+def withPackageArmEnv(Closure body) {
   // Copied from https://github.com/elastic/beats/blob/e6e65aa92fe355c95789691ebf5a3bcecaf5b4ea/.ci/packaging.groovy#L126-L142
   def PLATFORMS = [ 'linux/arm64' ].join(' ')
   withEnv([
