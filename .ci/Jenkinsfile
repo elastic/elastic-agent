@@ -84,10 +84,28 @@ pipeline {
             }
             post {
               always {
-                junit(allowEmptyResults: true, keepLongStdio: true, testResults: '**/junit-report.xml')
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/elastic-agent/**/build/TEST*.xml")
               }
             }
           }
+        }
+      }
+    }
+    stage('Integration Test') {
+      steps {
+        withGithubNotify(context: "Integration Test") {
+          deleteDir()
+          unstash 'source'
+          withMageEnv(){
+            dir("${BASE_DIR}/elastic-agent"){
+              cmd(label: 'mage goIntegTest', script: 'mage goIntegTest')
+            }
+          }
+        }
+      }
+      post {
+        always {
+          junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/elastic-agent/**/build/TEST*.xml")
         }
       }
     }
