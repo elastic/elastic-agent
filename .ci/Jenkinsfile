@@ -5,6 +5,7 @@
 pipeline {
   agent { label 'ubuntu-20.04 && immutable' }
   environment {
+    FOLDER_NAME = 'elastic-agent'
     REPO = "elastic-agent-poc"
     BASE_DIR = "src/github.com/elastic/${env.REPO}"
     JOB_GIT_CREDENTIALS = "f6c7695a-671e-4f4f-a331-acdce44ff9ba"
@@ -36,7 +37,7 @@ pipeline {
       steps {
         withGithubNotify(context: "Lint") {
           withMageEnv(){
-           dir("${BASE_DIR}/elastic-agent"){
+           dir("${BASE_DIR}/${FOLDER_NAME}"){
               cmd(label: 'check license, lint', script: 'mage check')
               cmd(label: 'update', script: 'mage update')
             }
@@ -65,7 +66,7 @@ pipeline {
                 deleteDir()
                 unstash 'source'
                 withMageEnv(){
-                  dir("${BASE_DIR}/elastic-agent"){
+                  dir("${BASE_DIR}/${FOLDER_NAME}"){
                     cmd(label: 'Go build', script: 'mage build')
                   }
                 }
@@ -76,7 +77,7 @@ pipeline {
             steps {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
-                  dir("${BASE_DIR}/elastic-agent"){
+                  dir("${BASE_DIR}/${FOLDER_NAME}"){
                     cmd(label: 'Go unitTest', script: 'mage unitTest')
                   }
                 }
@@ -84,7 +85,7 @@ pipeline {
             }
             post {
               always {
-                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/elastic-agent/**/build/TEST*.xml")
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/${FOLDER_NAME}/**/build/TEST*.xml")
               }
             }
           }
@@ -97,7 +98,7 @@ pipeline {
           deleteDir()
           unstash 'source'
           withMageEnv(){
-            dir("${BASE_DIR}/elastic-agent"){
+            dir("${BASE_DIR}/${FOLDER_NAME}"){
               cmd(label: 'mage goIntegTest', script: 'mage goIntegTest')
             }
           }
@@ -105,7 +106,7 @@ pipeline {
       }
       post {
         always {
-          junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/elastic-agent/**/build/TEST*.xml")
+          junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/${FOLDER_NAME}/**/build/TEST*.xml")
         }
       }
     }
