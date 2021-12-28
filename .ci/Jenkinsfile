@@ -130,7 +130,7 @@ pipeline {
           agent { label 'macosx && x86_64' }
           options { skipDefaultCheckout() }
           steps {
-            withGithubNotify(context: "macOS") {
+            withGithubNotify(context: "Package macOS") {
               deleteDir()
               unstash 'source'
               withMageEnv(){
