@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	libbeatVersion "github.com/elastic/beats/v7/libbeat/version"
+	"github.com/elastic/elastic-agent-poc/elastic-agent/version"
 )
 
 const (
@@ -38,7 +38,7 @@ func TrimCommit(commit string) string {
 
 // Commit returns the current build hash or unknown if it was not injected in the build process.
 func Commit() string {
-	return libbeatVersion.Commit()
+	return version.Commit()
 }
 
 // ShortCommit returns commit up to 6 characters.
@@ -48,12 +48,12 @@ func ShortCommit() string {
 
 // BuildTime returns the build time of the binaries.
 func BuildTime() time.Time {
-	return libbeatVersion.BuildTime()
+	return version.BuildTime()
 }
 
 // Version returns the version of the application.
 func Version() string {
-	return libbeatVersion.GetDefaultVersion()
+	return version.GetDefaultVersion()
 }
 
 // Snapshot returns true if binary was built as snapshot.
