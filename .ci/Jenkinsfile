@@ -102,7 +102,7 @@ pipeline {
               withMageEnv(){
                 dir("${BASE_DIR}/elastic-agent"){
                   withPackageLinuxEnv() {
-                    cmd(label: 'Go package', script: 'mage package')
+                    cmd(label: 'Go package', script: 'mage package EXTERNAL=true')
                   }
                 }
               }
