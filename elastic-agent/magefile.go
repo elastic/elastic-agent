@@ -647,6 +647,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 
 func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
 	location, err := downloads.FetchBeatsBinary(ctx, packageName, artifact, version, 3, false, downloadPath, true)
+	fmt.Println("downloaded binaries on location ", location)
 	if err != nil {
 		panic(err)
 	}
