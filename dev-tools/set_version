@@ -5,7 +5,7 @@ import re
 import sys
 from subprocess import check_call
 
-vendored_elastic_agent = os.path.normpath("vendor/github.com/elastic/elastic-agent_poc")
+vendored_elastic_agent = os.path.normpath("vendor/github.com/elastic/elastic-agent-poc")
 
 
 goversion_var_elastic_agent = "defaultAgentVersion"		# version in agent
