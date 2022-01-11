@@ -5,10 +5,11 @@
 package release
 
 import (
-	"github.com/elastic/elastic-agent-poc/elastic-agent/version"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent-poc/elastic-agent/version"
 )
 
 const (
