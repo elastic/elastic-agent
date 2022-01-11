@@ -94,12 +94,12 @@ func Notice() error {
 	fmt.Println(">> Generating NOTICE")
 	fmt.Println(">> fmt - go mod tidy")
 	err := sh.RunV("go", "mod", "tidy", "-v")
-	if err!= nil {
+	if err != nil {
 		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
 	}
 	fmt.Println(">> fmt - go mod download")
 	err = sh.RunV("go", "mod", "download")
-	if err!= nil {
+	if err != nil {
 		return errors.Wrap(err, "failed running go mod download, please fix the issues reported")
 	}
 	fmt.Println(">> fmt - go list")
@@ -108,8 +108,8 @@ func Notice() error {
 		return errors.Wrap(err, "failed running go list, please fix the issues reported")
 	}
 	fmt.Println(">> fmt - go run")
-	cmd := exec.Command("go", "run", "go.elastic.co/go-licence-detector", "-includeIndirect", "-rules", "dev-tools/notice/rules.json" , "-overrides", "dev-tools/notice/overrides.json", "-noticeTemplate", "dev-tools/notice/NOTICE.txt.tmpl",
-		"-noticeOut", "NOTICE.txt", "-depsOut","\"\"")
+	cmd := exec.Command("go", "run", "go.elastic.co/go-licence-detector", "-includeIndirect", "-rules", "dev-tools/notice/rules.json", "-overrides", "dev-tools/notice/overrides.json", "-noticeTemplate", "dev-tools/notice/NOTICE.txt.tmpl",
+		"-noticeOut", "NOTICE.txt", "-depsOut", "\"\"")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return errors.Wrap(err, "failed running go run, please fix the issues reported")
@@ -128,31 +128,29 @@ func Notice() error {
 	if err != nil {
 		return errors.Wrap(err, "failed combined output, please fix the issues reported")
 	}
-  return nil
+	return nil
 }
-
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
-	if err!= nil {
+	if err != nil {
 		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
 	}
 	fmt.Println(">> fmt - git diff")
 	err = sh.RunV("git", "diff")
-	if err!= nil {
+	if err != nil {
 		return errors.Wrap(err, "failed running git diff, please fix the issues reported")
 	}
 	fmt.Println(">> fmt - git update-index")
 	err = sh.RunV("git", "update-index", "--refresh")
-	if err!= nil {
+	if err != nil {
 		return errors.Wrap(err, "failed running git update-index --refresh, please fix the issues reported")
 	}
 	fmt.Println(">> fmt - git diff-index")
 	err = sh.RunV("git", "diff-index", "--exit-code", "HEAD", " --")
-	if err!= nil {
+	if err != nil {
 		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
 	}
 	return nil
 }
-
