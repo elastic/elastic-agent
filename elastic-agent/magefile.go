@@ -26,6 +26,7 @@ import (
 	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
 	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/release"
 
+	downloads "github.com/elastic/e2e-testing/pkg/downloads"
 	// mage:import
 	"github.com/elastic/elastic-agent-poc/dev-tools/mage/target/common"
 	// mage:import
@@ -37,14 +38,15 @@ import (
 )
 
 const (
-	goLintRepo     = "golang.org/x/lint/golint"
-	goLicenserRepo = "github.com/elastic/go-licenser"
-	buildDir       = "build"
-	metaDir        = "_meta"
-	snapshotEnv    = "SNAPSHOT"
-	devEnv         = "DEV"
-	configFile     = "elastic-agent.yml"
-	agentDropPath  = "AGENT_DROP_PATH"
+	goLintRepo        = "golang.org/x/lint/golint"
+	goLicenserRepo    = "github.com/elastic/go-licenser"
+	buildDir          = "build"
+	metaDir           = "_meta"
+	snapshotEnv       = "SNAPSHOT"
+	devEnv            = "DEV"
+	externalArtifacts = "EXTERNAL"
+	configFile        = "elastic-agent.yml"
+	agentDropPath     = "AGENT_DROP_PATH"
 )
 
 // Aliases for commands required by master makefile
@@ -325,13 +327,15 @@ func Package() {
 
 	packageAgent(requiredPackages, devtools.UseElasticAgentPackaging)
 }
-
+func getPackageName(beat, version, pkg string) (string, string) {
+	if _, ok := os.LookupEnv(snapshotEnv); ok {
+		version += "-SNAPSHOT"
+	}
+	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
+}
 func requiredPackagesPresent(basePath, beat, version string, requiredPackages []string) bool {
 	for _, pkg := range requiredPackages {
-		if _, ok := os.LookupEnv(snapshotEnv); ok {
-			version += "-SNAPSHOT"
-		}
-		packageName := fmt.Sprintf("%s-%s-%s", beat, version, pkg)
+		_, packageName := getPackageName(beat, version, pkg)
 		path := filepath.Join(basePath, "build", "distributions", packageName)
 
 		if _, err := os.Stat(path); err != nil {
@@ -589,34 +593,48 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		defer os.Unsetenv(agentDropPath)
 
 		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
-
-		for _, b := range packedBeats {
-			pwd, err := filepath.Abs(filepath.Join("../../beats", b))
-			if err != nil {
-				panic(err)
+		if devtools.ExternalBuild == true {
+			ctx := context.Background()
+			for _, beat := range packedBeats {
+				for _, reqPackage := range requiredPackages {
+					newVersion, packageName := getPackageName(beat, version, reqPackage)
+					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, dropPath)
+					if err != nil {
+						panic(err)
+					}
+				}
 			}
-
-			if !requiredPackagesPresent(pwd, b, version, requiredPackages) {
-				cmd := exec.Command("mage", "package")
-				cmd.Dir = pwd
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				cmd.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", pwd), "AGENT_PACKAGING=on")
-				if envVar := selectedPackageTypes(); envVar != "" {
-					cmd.Env = append(cmd.Env, envVar)
+		} else {
+			//build from local repo, will assume beats repo is located on the same root level
+			for _, b := range packedBeats {
+				pwd, err := filepath.Abs(filepath.Join("../../beats", b))
+				if err != nil {
+					panic(err)
 				}
 
-				if err := cmd.Run(); err != nil {
+				if !requiredPackagesPresent(pwd, b, version, requiredPackages) {
+					cmd := exec.Command("mage", "package")
+					cmd.Dir = pwd
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					cmd.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", pwd), "AGENT_PACKAGING=on")
+					if envVar := selectedPackageTypes(); envVar != "" {
+						cmd.Env = append(cmd.Env, envVar)
+					}
+
+					if err := cmd.Run(); err != nil {
+						panic(err)
+					}
+				}
+
+				// copy to new drop
+				sourcePath := filepath.Join(pwd, "build", "distributions")
+				if err := copyAll(sourcePath, dropPath); err != nil {
 					panic(err)
 				}
 			}
-
-			// copy to new drop
-			sourcePath := filepath.Join(pwd, "build", "distributions")
-			if err := copyAll(sourcePath, dropPath); err != nil {
-				panic(err)
-			}
 		}
+
 	}
 
 	// package agent
@@ -625,6 +643,14 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 	mg.Deps(Update)
 	mg.Deps(CrossBuild, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
+}
+
+func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
+	location, err := downloads.FetchBeatsBinary(ctx, packageName, artifact, version, 3, false, downloadPath, true)
+	if err != nil {
+		panic(err)
+	}
+	return nil
 }
 
 func selectedPackageTypes() string {

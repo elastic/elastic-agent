@@ -80,6 +80,7 @@ var (
 
 	Snapshot bool
 	DevBuild bool
+	ExternalBuild bool
 
 	versionQualified bool
 	versionQualifier string
@@ -123,6 +124,11 @@ func init() {
 	DevBuild, err = strconv.ParseBool(EnvOr("DEV", "false"))
 	if err != nil {
 		panic(errors.Wrap(err, "failed to parse DEV env value"))
+	}
+
+	ExternalBuild, err = strconv.ParseBool(EnvOr("EXTERNAL", "false"))
+	if err != nil {
+		panic(errors.Wrap(err, "failed to parse EXTERNAL env value"))
 	}
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
@@ -176,6 +182,7 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 		"BeatUser":        BeatUser,
 		"Snapshot":        Snapshot,
 		"DEV":             DevBuild,
+		"EXTERNAL":        ExternalBuild,
 		"Qualifier":       versionQualifier,
 	}
 
