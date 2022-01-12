@@ -124,7 +124,7 @@ func AddLicenseHeaders() error {
 	licenser := gotool.Licenser
 	return multierr.Combine(
 		licenser(
-			licenser.Check(),
+			//licenser.Check(),
 			licenser.License("ASL2"),
 			licenser.Exclude("internal"),
 		),
