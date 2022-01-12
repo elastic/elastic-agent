@@ -23,12 +23,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/e2e-testing/pkg/downloads"
-	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
-	"github.com/hashicorp/go-multierror"
-	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"os/exec"
@@ -38,6 +32,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/go-multierror"
+	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
+	"github.com/pkg/errors"
+
+	"github.com/elastic/e2e-testing/pkg/downloads"
+	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+
 	// mage:import
 	"github.com/elastic/elastic-agent-poc/dev-tools/mage/target/common"
 
@@ -498,7 +501,7 @@ func BuildSpec() error {
 
 func BuildPGP() error {
 	// go run x-pack/elastic-agent/dev-tools/cmd/buildpgp/build_pgp.go --in x-pack/agent/spec/GPG-KEY-elasticsearch --out x-pack/elastic-agent/pkg/release/pgp.go
-	goF := filepath.Join("internal","dev-tools", "cmd", "buildpgp", "build_pgp.go")
+	goF := filepath.Join("internal", "dev-tools", "cmd", "buildpgp", "build_pgp.go")
 	in := "GPG-KEY-elasticsearch"
 	out := filepath.Join("internal", "pkg", "release", "pgp.go")
 

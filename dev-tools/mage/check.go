@@ -28,6 +28,8 @@ import (
 	"runtime"
 	"strings"
 
+	"go.uber.org/multierr"
+
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
@@ -192,21 +194,18 @@ func CheckLicenseHeaders() error {
 
 	mg.Deps(InstallGoLicenser)
 
-	var license string
-	switch BeatLicense {
-	case "ASL2", "ASL 2.0":
-		license = "ASL2"
-	case "Elastic", "Elastic License":
-		license = "Elastic"
-	default:
-		return errors.Errorf("unknown license type %v", BeatLicense)
-	}
-
 	licenser := gotool.Licenser
-	return licenser(licenser.Check(), licenser.License(license))
+
+	return multierr.Combine(
+		licenser(
+			licenser.Check(),
+			licenser.License("ASL2"),
+			licenser.Exclude("internal"),
+		),
+		licenser(
+			licenser.Check(),
+			licenser.License("Elastic"),
+			licenser.Path("internal"),
+		),
+	)
 }
-
-
-
-
-

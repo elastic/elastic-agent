@@ -172,7 +172,6 @@ func PythonTest(params PythonTestArgs) error {
 	// and HTML report.
 }
 
-
 // PythonVirtualenv constructs a virtualenv that contains the given modules as
 // defined in the requirements file pointed to by requirementsTxt. It returns
 // the path to the virtualenv.

@@ -215,5 +215,3 @@ func makeHeading(title, separator string) string {
 	rightEquals := leftEquals + len(title)%2
 	return "# " + strings.Repeat(separator, leftEquals) + " " + title + " " + strings.Repeat(separator, rightEquals)
 }
-
-

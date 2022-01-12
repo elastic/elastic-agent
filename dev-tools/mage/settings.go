@@ -78,8 +78,8 @@ var (
 
 	BeatProjectType ProjectType
 
-	Snapshot bool
-	DevBuild bool
+	Snapshot      bool
+	DevBuild      bool
 	ExternalBuild bool
 
 	versionQualified bool
