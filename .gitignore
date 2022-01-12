@@ -5,8 +5,8 @@
 /build
 /*/*.template*.json
 **/html_docs
-elastic-agent/data
-elastic-agent/pkg/agent/operation/tests/downloads
+data
+internal/pkg/agent/operation/tests/downloads
 
 # Files
 .DS_Store
@@ -19,10 +19,10 @@ beat.db
 *.keystore
 go_env.properties
 mage_output_file.go
-elastic-agent/elastic_agent
-elastic-agent/fleet.yml
-elastic-agent/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86_64/configurable
-elastic-agent/pkg/agent/operation/tests/scripts/serviceable-1.0-darwin-x86_64/serviceable
+elastic_agent
+fleet.yml
+internal/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86_64/configurable
+internal/pkg/agent/operation/tests/scripts/serviceable-1.0-darwin-x86_64/serviceable
 
 # Editor swap files
 *.swp
@@ -44,3 +44,21 @@ elastic-agent/pkg/agent/operation/tests/scripts/serviceable-1.0-darwin-x86_64/se
 
 # Files generated with the bump version automations
 *.bck
+
+
+# agent
+build/
+elastic-agent
+elastic-agent.dev.yml
+elastic-agent.yml.*
+fleet.yml
+fleet.yml.lock
+fleet.yml.old
+internal/pkg/agent/operation/tests/scripts/short--1.0.yml
+internal/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86/configurable
+internal/pkg/agent/operation/tests/scripts/servicable-1.0-darwin-x86/configurable
+internal/pkg/agent/transpiler/tests/exec-1.0-darwin-x86_64/exec
+internal/pkg/agent/application/fleet.yml
+
+# VSCode
+/.vscode
