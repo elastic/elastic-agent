@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/multierr"
-
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -319,24 +317,16 @@ func (Check) GoLint() error {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 
-	fmt.Println(">> fmt - go-licenser: Checking for missing headers")
+	fmt.Println(">> fmt - go-licenser: Checking for missing headers dgdgd")
 
 	mg.Deps(devtools.InstallGoLicenser)
 
 	licenser := gotool.Licenser
-
-	return multierr.Combine(
-		licenser(
-			licenser.Check(),
-			licenser.License("ASL2"),
-			licenser.Exclude("elastic-agent"),
-		),
-		licenser(
-			licenser.Check(),
-			licenser.License("Elastic"),
-			licenser.Path("elastic-agent"),
-		),
+	return licenser(
+		licenser.Check(),
+		licenser.License("Elastic"),
 	)
+
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
