@@ -396,9 +396,9 @@ var (
 	// DefaultBeatBuildVariableSources contains the default locations build
 	// variables are read from by Elastic Beats.
 	DefaultBeatBuildVariableSources = &BuildVariableSources{
-		BeatVersion: "{{ elastic_beats_dir }}/elastic-agent/version/version.go",
+		BeatVersion: "{{ elastic_beats_dir }}/internal/version/version.go",
 		GoVersion:   "{{ elastic_beats_dir }}/.go-version",
-		DocBranch:   "{{ elastic_beats_dir }}/elastic-agent/docs/version.asciidoc",
+		DocBranch:   "{{ elastic_beats_dir }}/internal/docs/version.asciidoc",
 	}
 
 	buildVariableSources     *BuildVariableSources

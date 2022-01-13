@@ -269,8 +269,8 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	p := filepath.Join("pkg", "agent", "operation", "tests", "scripts")
-	p2 := filepath.Join("pkg", "agent", "transpiler", "tests")
+	p := filepath.Join("internal", "pkg", "agent", "operation", "tests", "scripts")
+	p2 := filepath.Join("internal", "pkg", "agent", "transpiler", "tests")
 	configurableName := "configurable"
 	serviceableName := "serviceable"
 	execName := "exec"
@@ -486,7 +486,7 @@ func ControlProto() error {
 
 // BuildSpec make sure that all the suppported program spec are built into the binary.
 func BuildSpec() error {
-	// go run x-pack/elastic-agent/dev-tools/cmd/buildspec/buildspec.go --in x-pack/agent/spec/*.yml --out x-pack/elastic-agent/pkg/agent/program/supported.go
+	// go run internal/dev-tools/cmd/buildspec/buildspec.go --in x-pack/agent/spec/*.yml --out x-pack/elastic-agent/pkg/agent/program/supported.go
 	goF := filepath.Join("internal", "dev-tools", "cmd", "buildspec", "buildspec.go")
 	in := filepath.Join("internal", "spec", "*.yml")
 	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
