@@ -696,7 +696,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	dockerRun := sh.RunCmd("docker", "run")
 	var args []string
 
-	args, err = addUidGidEnvArgs(args)
+	args, err = addUIDGidEnvArgs(args)
 	if err != nil {
 		return err
 	}
@@ -759,7 +759,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	return errors.Wrap(CreateSHA512File(spec.OutputFile), "failed to create .sha512 file")
 }
 
-func addUidGidEnvArgs(args []string) ([]string, error) {
+func addUIDGidEnvArgs(args []string) ([]string, error) {
 	if runtime.GOOS == "windows" {
 		return args, nil
 	}

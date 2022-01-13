@@ -317,7 +317,7 @@ func (Check) GoLint() error {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 
-	fmt.Println(">> fmt - go-licenser: Checking for missing headers dgdgd")
+	fmt.Println(">> fmt - go-licenser: Checking for missing headers")
 
 	mg.Deps(devtools.InstallGoLicenser)
 

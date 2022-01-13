@@ -33,6 +33,7 @@ func init() {
 	RegisterIntegrationTester(&DockerIntegrationTester{})
 }
 
+// DockerIntegrationTester returns build image
 type DockerIntegrationTester struct {
 	buildImagesOnce sync.Once
 }
@@ -64,7 +65,7 @@ func (d *DockerIntegrationTester) HasRequirements() error {
 
 // StepRequirements returns the steps required for this tester.
 func (d *DockerIntegrationTester) StepRequirements() IntegrationTestSteps {
-	return IntegrationTestSteps{&MageIntegrationTestStep{}}
+	return IntegrationTestSteps{&IntegrationTestStep{}}
 }
 
 // Test performs the tests with docker-compose.
@@ -100,7 +101,7 @@ func (d *DockerIntegrationTester) Test(_ string, mageTarget string, env map[stri
 		"-v", goPkgCache + ":" + dockerGoPkgCache + ":ro",
 		"-e", "GOPROXY=file://" + dockerGoPkgCache + ",direct",
 	}
-	args, err = addUidGidEnvArgs(args)
+	args, err = addUIDGidEnvArgs(args)
 	if err != nil {
 		return err
 	}

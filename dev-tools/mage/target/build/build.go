@@ -19,8 +19,8 @@ func GolangCrossBuild() error {
 	return devtools.GolangCrossBuild(devtools.DefaultGolangCrossBuildArgs())
 }
 
-// BuildGoDaemon builds the go-daemon binary (use crossBuildGoDaemon).
-func BuildGoDaemon() error {
+// GoDaemon builds the go-daemon binary (use crossBuildGoDaemon).
+func GoDaemon() error {
 	return devtools.BuildGoDaemon()
 }
 

@@ -11,16 +11,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// PackageInstaller contains package dependency
 type PackageInstaller struct {
 	table map[PlatformDescription][]PackageDependency
 }
 
+// PlatformDescription contains platform description
 type PlatformDescription struct {
 	Name       string
 	Arch       string
 	DefaultTag string
 }
 
+// PackageDependency contains package dependency details
 type PackageDependency struct {
 	archTag      string
 	dependencies []string
@@ -40,10 +43,12 @@ var (
 	LinuxS390x    = PlatformDescription{Name: "linux/s390x", Arch: "s390x", DefaultTag: "s390x"}
 )
 
+// NewPackageInstaller instantiates the package
 func NewPackageInstaller() *PackageInstaller {
 	return &PackageInstaller{}
 }
 
+// AddEach function adds new package installer step
 func (i *PackageInstaller) AddEach(ps []PlatformDescription, names ...string) *PackageInstaller {
 	for _, p := range ps {
 		i.Add(p, names...)
@@ -51,11 +56,13 @@ func (i *PackageInstaller) AddEach(ps []PlatformDescription, names ...string) *P
 	return i
 }
 
+// Add function adds new package
 func (i *PackageInstaller) Add(p PlatformDescription, names ...string) *PackageInstaller {
 	i.AddPackages(p, p.Packages(names...))
 	return i
 }
 
+// AddPackages function adds a list of packages
 func (i *PackageInstaller) AddPackages(p PlatformDescription, details ...PackageDependency) *PackageInstaller {
 	if i.table == nil {
 		i.table = map[PlatformDescription][]PackageDependency{}
@@ -64,6 +71,7 @@ func (i *PackageInstaller) AddPackages(p PlatformDescription, details ...Package
 	return i
 }
 
+// Installer installs the package
 func (i *PackageInstaller) Installer(name string) func() error {
 	var platform PlatformDescription
 	for p := range i.table {
@@ -81,6 +89,7 @@ func (i *PackageInstaller) Installer(name string) func() error {
 	}
 }
 
+// Install function installs the package
 func (i *PackageInstaller) Install(p PlatformDescription) error {
 	packages := map[string]struct{}{}
 	for _, details := range i.table[p] {
@@ -121,10 +130,12 @@ func installDependencies(arch string, pkgs ...string) error {
 	return sh.Run("apt-get", params...)
 }
 
+// Packages adds package dependencies
 func (p PlatformDescription) Packages(names ...string) PackageDependency {
 	return PackageDependency{}.WithTag(p.DefaultTag).Add(names...)
 }
 
+// Add adds package dependency
 func (p PackageDependency) Add(deps ...string) PackageDependency {
 	if len(deps) == 0 {
 		return p
@@ -136,11 +147,13 @@ func (p PackageDependency) Add(deps ...string) PackageDependency {
 	return p
 }
 
+// WithTag adds tag
 func (p PackageDependency) WithTag(tag string) PackageDependency {
 	p.archTag = tag
 	return p
 }
 
+// List function lists dependencies
 func (p PackageDependency) List() []string {
 	if p.archTag == "" {
 		return p.dependencies

@@ -55,6 +55,7 @@ type ConfigFileParams struct {
 	Short, Reference, Docker ConfigParams
 }
 
+// ConfigParams defines config param template
 type ConfigParams struct {
 	Template string
 	Deps     []interface{}

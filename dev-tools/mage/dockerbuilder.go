@@ -64,7 +64,7 @@ func (b *dockerBuilder) Build() error {
 		// This sleep is to avoid hitting the docker build issues when resources are not available.
 		time.Sleep(time.Second * 10)
 		tag, err = b.dockerBuild()
-		tries -= 1
+		tries --
 	}
 	if err != nil {
 		return errors.Wrap(err, "failed to build docker")

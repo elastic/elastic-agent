@@ -243,6 +243,7 @@ func TestLinuxForCentosGLIBC() error {
 	}
 }
 
+// TestBinaryGLIBCVersion checks GLIBC requirements
 func TestBinaryGLIBCVersion(elfPath, maxGlibcVersion string) error {
 	requiredGlibc, err := ReadGLIBCRequirement(elfPath)
 	if err != nil {

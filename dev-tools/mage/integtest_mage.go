@@ -14,11 +14,11 @@ var (
 	buildMageOnce sync.Once
 )
 
-// MageIntegrationTestStep setups mage to be ran.
-type MageIntegrationTestStep struct{}
+// IntegrationTestStep setups mage to be ran.
+type IntegrationTestStep struct{}
 
 // Name returns the mage name.
-func (m *MageIntegrationTestStep) Name() string {
+func (m *IntegrationTestStep) Name() string {
 	return "mage"
 }
 
@@ -26,20 +26,20 @@ func (m *MageIntegrationTestStep) Name() string {
 //
 // This step should be defined in `StepRequirements` for the tester, for it
 // to be used. It cannot be autodiscovered for usage.
-func (m *MageIntegrationTestStep) Use(dir string) (bool, error) {
+func (m *IntegrationTestStep) Use(dir string) (bool, error) {
 	return false, nil
 }
 
 // Setup ensures the mage binary is built.
 //
 // Multiple uses of this step will only build the mage binary once.
-func (m *MageIntegrationTestStep) Setup(_ map[string]string) error {
+func (m *IntegrationTestStep) Setup(_ map[string]string) error {
 	// Pre-build a mage binary to execute.
 	buildMageOnce.Do(func() { mg.Deps(buildMage) })
 	return nil
 }
 
 // Teardown does nothing.
-func (m *MageIntegrationTestStep) Teardown(_ map[string]string) error {
+func (m *IntegrationTestStep) Teardown(_ map[string]string) error {
 	return nil
 }

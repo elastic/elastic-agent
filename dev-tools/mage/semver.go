@@ -10,8 +10,10 @@ import (
 	"strconv"
 )
 
+// SemanticVersionRegex regex for semantic version
 var SemanticVersionRegex = regexp.MustCompile(`(?m)^(\d+)\.(\d+)(?:\.(\d+))?`)
 
+// SemanticVersion contains version details
 type SemanticVersion struct {
 	Major, Minor, Patch int
 }
