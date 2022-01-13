@@ -155,7 +155,7 @@ func waitKubeStateMetricsReadiness(env map[string]string, stdOut, stdErr io.Writ
 			return errors.Wrapf(err, "Timeout waiting for kube-state-metrics")
 		}
 		time.Sleep(6 * time.Second)
-		readyAttempts ++
+		readyAttempts++
 	}
 	// kube-state-metrics ready, return with no error
 	return nil
