@@ -31,27 +31,27 @@ type PackageDependency struct {
 
 var (
 	// Linux386 platform description for Linux386
-	Linux386      = PlatformDescription{Name: "linux/386", Arch: "i386", DefaultTag: "i386"}
+	Linux386 = PlatformDescription{Name: "linux/386", Arch: "i386", DefaultTag: "i386"}
 	// LinuxAMD64 platform description for LinuxAMD64
-	LinuxAMD64    = PlatformDescription{Name: "linux/amd64", Arch: "", DefaultTag: ""} // builders run on amd64 platform
+	LinuxAMD64 = PlatformDescription{Name: "linux/amd64", Arch: "", DefaultTag: ""} // builders run on amd64 platform
 	// LinuxARM64 platform description for LinuxARM64
-	LinuxARM64    = PlatformDescription{Name: "linux/arm64", Arch: "arm64", DefaultTag: "arm64"}
+	LinuxARM64 = PlatformDescription{Name: "linux/arm64", Arch: "arm64", DefaultTag: "arm64"}
 	// LinuxARM5 platform description for LinuxARM5
-	LinuxARM5     = PlatformDescription{Name: "linux/arm5", Arch: "armel", DefaultTag: "armel"}
+	LinuxARM5 = PlatformDescription{Name: "linux/arm5", Arch: "armel", DefaultTag: "armel"}
 	// LinuxARM6 platform description for LinuxARM6
-	LinuxARM6     = PlatformDescription{Name: "linux/arm6", Arch: "armel", DefaultTag: "armel"}
+	LinuxARM6 = PlatformDescription{Name: "linux/arm6", Arch: "armel", DefaultTag: "armel"}
 	// LinuxARM7 platform description for LinuxARM7
-	LinuxARM7     = PlatformDescription{Name: "linux/arm7", Arch: "armhf", DefaultTag: "armhf"}
+	LinuxARM7 = PlatformDescription{Name: "linux/arm7", Arch: "armhf", DefaultTag: "armhf"}
 	// LinuxMIPS platform description for LinuxMIPS
-	LinuxMIPS     = PlatformDescription{Name: "linux/mips", Arch: "mips", DefaultTag: "mips"}
+	LinuxMIPS = PlatformDescription{Name: "linux/mips", Arch: "mips", DefaultTag: "mips"}
 	// LinuxMIPSLE platform description for LinuxMIPSLE
-	LinuxMIPSLE   = PlatformDescription{Name: "linux/mipsle", Arch: "mipsel", DefaultTag: "mipsel"}
+	LinuxMIPSLE = PlatformDescription{Name: "linux/mipsle", Arch: "mipsel", DefaultTag: "mipsel"}
 	// LinuxMIPS64LE platform description for LinuxMIPS64LE
 	LinuxMIPS64LE = PlatformDescription{Name: "linux/mips64le", Arch: "mips64el", DefaultTag: "mips64el"}
 	// LinuxPPC64LE platform description for LinuxPPC64LE
-	LinuxPPC64LE  = PlatformDescription{Name: "linux/ppc64le", Arch: "ppc64el", DefaultTag: "ppc64el"}
+	LinuxPPC64LE = PlatformDescription{Name: "linux/ppc64le", Arch: "ppc64el", DefaultTag: "ppc64el"}
 	// LinuxS390x platform description for LinuxS390x
-	LinuxS390x    = PlatformDescription{Name: "linux/s390x", Arch: "s390x", DefaultTag: "s390x"}
+	LinuxS390x = PlatformDescription{Name: "linux/s390x", Arch: "s390x", DefaultTag: "s390x"}
 )
 
 // NewPackageInstaller instantiates the package
