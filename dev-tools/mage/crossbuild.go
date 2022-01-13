@@ -201,6 +201,7 @@ func buildMage() error {
 		"-compile", CreateDir(filepath.Join("build", "mage-linux-"+arch)))
 }
 
+// CrossBuildImage build image
 func CrossBuildImage(platform string) (string, error) {
 	tagSuffix := "main"
 
