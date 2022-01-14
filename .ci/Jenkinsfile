@@ -101,7 +101,7 @@ pipeline {
               deleteDir()
               unstash 'source'
               withMageEnv(){
-                dir("${BASE_DIR}/elastic-agent"){
+                dir("${BASE_DIR}"){
                   withPackageLinuxEnv() {
                     cmd(label: 'Go package', script: 'mage package')
                   }
@@ -118,7 +118,7 @@ pipeline {
               deleteDir()
               unstash 'source'
               withMageEnv(){
-                dir("${BASE_DIR}/elastic-agent"){
+                dir("${BASE_DIR}"){
                   withPackageArmEnv() {
                     cmd(label: 'Go package', script: 'mage package')
                   }
@@ -135,7 +135,7 @@ pipeline {
               deleteDir()
               unstash 'source'
               withMageEnv(){
-                dir("${BASE_DIR}/elastic-agent"){
+                dir("${BASE_DIR}"){
                   withPackageDarwinEnv() {
                     cmd(label: 'Go package', script: 'mage package')
                   }
