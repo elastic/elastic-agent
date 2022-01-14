@@ -1,19 +1,6 @@
-// Licensed to Elasticsearch B.V. under one or more contributor
-// license agreements. See the NOTICE file distributed with
-// this work for additional information regarding copyright
-// ownership. Elasticsearch B.V. licenses this file to you under
-// the Apache License, Version 2.0 (the "License"); you may
-// not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
 
 package mage
 
@@ -63,11 +50,11 @@ var (
 	PLATFORMS    = EnvOr("PLATFORMS", "")
 	PACKAGES     = EnvOr("PACKAGES", "")
 
-	// CrossBuildMountModcache, if true, mounts $GOPATH/pkg/mod into
+	// CrossBuildMountModcache CrossBuildMountModcache, if true, mounts $GOPATH/pkg/mod into
 	// the crossbuild images at /go/pkg/mod, read-only.
 	CrossBuildMountModcache = true
 
-	BeatName        = EnvOr("BEAT_NAME", filepath.Base(CWD()))
+	BeatName        = EnvOr("BEAT_NAME", "elastic-agent")
 	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
 	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
@@ -78,8 +65,8 @@ var (
 
 	BeatProjectType ProjectType
 
-	Snapshot bool
-	DevBuild bool
+	Snapshot      bool
+	DevBuild      bool
 	ExternalBuild bool
 
 	versionQualified bool
@@ -410,9 +397,9 @@ var (
 	// DefaultBeatBuildVariableSources contains the default locations build
 	// variables are read from by Elastic Beats.
 	DefaultBeatBuildVariableSources = &BuildVariableSources{
-		BeatVersion: "{{ elastic_beats_dir }}/elastic-agent/version/version.go",
+		BeatVersion: "{{ elastic_beats_dir }}/internal/version/version.go",
 		GoVersion:   "{{ elastic_beats_dir }}/.go-version",
-		DocBranch:   "{{ elastic_beats_dir }}/elastic-agent/docs/version.asciidoc",
+		DocBranch:   "{{ elastic_beats_dir }}/internal/docs/version.asciidoc",
 	}
 
 	buildVariableSources     *BuildVariableSources
