@@ -1,19 +1,6 @@
-// Licensed to Elasticsearch B.V. under one or more contributor
-// license agreements. See the NOTICE file distributed with
-// this work for additional information regarding copyright
-// ownership. Elasticsearch B.V. licenses this file to you under
-// the Apache License, Version 2.0 (the "License"); you may
-// not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
 
 package mage
 
@@ -43,7 +30,7 @@ const defaultCrossBuildTarget = "golangCrossBuild"
 // See NewPlatformList for details about platform filtering expressions.
 var Platforms = BuildPlatforms.Defaults()
 
-// Types is the list of package types
+// SelectedPackageTypes - Types is the list of package types
 var SelectedPackageTypes []PackageType
 
 func init() {
@@ -146,14 +133,14 @@ func CrossBuild(options ...CrossBuildOption) error {
 			if platform.GOOS() == "aix" {
 				if len(params.Platforms) != 1 {
 					return errors.New("AIX cannot be crossbuilt with other platforms. Set PLATFORMS='aix/ppc64'")
-				} else {
-					// This is basically a short-out so we can attempt to build on AIX in a relatively generic way
-					log.Printf("Target is building for AIX, skipping normal crossbuild process")
-					args := DefaultBuildArgs()
-					args.OutputDir = filepath.Join("build", "golang-crossbuild")
-					args.Name += "-" + Platform.GOOS + "-" + Platform.Arch
-					return Build(args)
 				}
+				// This is basically a short-out so we can attempt to build on AIX in a relatively generic way
+				log.Printf("Target is building for AIX, skipping normal crossbuild process")
+				args := DefaultBuildArgs()
+				args.OutputDir = filepath.Join("build", "golang-crossbuild")
+				args.Name += "-" + Platform.GOOS + "-" + Platform.Arch
+				return Build(args)
+
 			}
 		}
 		// If we're here, something isn't set.
@@ -214,6 +201,7 @@ func buildMage() error {
 		"-compile", CreateDir(filepath.Join("build", "mage-linux-"+arch)))
 }
 
+// CrossBuildImage build image
 func CrossBuildImage(platform string) (string, error) {
 	tagSuffix := "main"
 
