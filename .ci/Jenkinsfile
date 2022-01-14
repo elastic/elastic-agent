@@ -37,7 +37,7 @@ pipeline {
       steps {
         withGithubNotify(context: "Lint") {
           withMageEnv(){
-           dir("${BASE_DIR}/elastic-agent"){
+           dir("${BASE_DIR}"){
               cmd(label: 'check license, lint', script: 'mage check')
               cmd(label: 'update', script: 'mage update')
             }
@@ -66,7 +66,7 @@ pipeline {
                 deleteDir()
                 unstash 'source'
                 withMageEnv(){
-                  dir("${BASE_DIR}/elastic-agent"){
+                  dir("${BASE_DIR}"){
                     cmd(label: 'Go build', script: 'mage build')
                   }
                 }
@@ -77,7 +77,7 @@ pipeline {
             steps {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
-                  dir("${BASE_DIR}/elastic-agent"){
+                  dir("${BASE_DIR}"){
                     cmd(label: 'Go unitTest', script: 'mage unitTest')
                   }
                 }

@@ -1,19 +1,6 @@
-// Licensed to Elasticsearch B.V. under one or more contributor
-// license agreements. See the NOTICE file distributed with
-// this work for additional information regarding copyright
-// ownership. Elasticsearch B.V. licenses this file to you under
-// the Apache License, Version 2.0 (the "License"); you may
-// not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
 
 package kubernetes
 
@@ -35,19 +22,20 @@ import (
 )
 
 func init() {
-	mage.RegisterIntegrationTester(&KubernetesIntegrationTester{})
+	mage.RegisterIntegrationTester(&IntegrationTester{})
 }
 
-type KubernetesIntegrationTester struct {
+// IntegrationTester integration tester
+type IntegrationTester struct {
 }
 
 // Name returns kubernetes name.
-func (d *KubernetesIntegrationTester) Name() string {
+func (d *IntegrationTester) Name() string {
 	return "kubernetes"
 }
 
 // Use determines if this tester should be used.
-func (d *KubernetesIntegrationTester) Use(dir string) (bool, error) {
+func (d *IntegrationTester) Use(dir string) (bool, error) {
 	kubernetesFile := filepath.Join(dir, "kubernetes.yml")
 	if _, err := os.Stat(kubernetesFile); !os.IsNotExist(err) {
 		return true, nil
@@ -56,7 +44,7 @@ func (d *KubernetesIntegrationTester) Use(dir string) (bool, error) {
 }
 
 // HasRequirements ensures that the required kubectl are installed.
-func (d *KubernetesIntegrationTester) HasRequirements() error {
+func (d *IntegrationTester) HasRequirements() error {
 	if err := mage.HaveKubectl(); err != nil {
 		return err
 	}
@@ -64,12 +52,12 @@ func (d *KubernetesIntegrationTester) HasRequirements() error {
 }
 
 // StepRequirements returns the steps required for this tester.
-func (d *KubernetesIntegrationTester) StepRequirements() mage.IntegrationTestSteps {
-	return mage.IntegrationTestSteps{&mage.MageIntegrationTestStep{}, &KindIntegrationTestStep{}}
+func (d *IntegrationTester) StepRequirements() mage.IntegrationTestSteps {
+	return mage.IntegrationTestSteps{&mage.IntegrationTestStep{}, &KindIntegrationTestStep{}}
 }
 
 // Test performs the tests with kubernetes.
-func (d *KubernetesIntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
+func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
 	stdOut := ioutil.Discard
 	stdErr := ioutil.Discard
 	if mg.Verbose() {
@@ -146,7 +134,7 @@ func (d *KubernetesIntegrationTester) Test(dir string, mageTarget string, env ma
 }
 
 // InsideTest performs the tests inside of environment.
-func (d *KubernetesIntegrationTester) InsideTest(test func() error) error {
+func (d *IntegrationTester) InsideTest(test func() error) error {
 	return test()
 }
 
@@ -167,7 +155,7 @@ func waitKubeStateMetricsReadiness(env map[string]string, stdOut, stdErr io.Writ
 			return errors.Wrapf(err, "Timeout waiting for kube-state-metrics")
 		}
 		time.Sleep(6 * time.Second)
-		readyAttempts += 1
+		readyAttempts++
 	}
 	// kube-state-metrics ready, return with no error
 	return nil
