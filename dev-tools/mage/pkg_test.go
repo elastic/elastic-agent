@@ -75,7 +75,7 @@ func TestRepoRoot(t *testing.T) {
 		t.Error(err)
 	}
 
-	assert.Equal(t, "github.com/elastic/beats/v7", repo.RootImportPath)
+	assert.Equal(t, "github.com/elastic/elastic-agent-poc", repo.RootImportPath)
 	assert.True(t, filepath.IsAbs(repo.RootDir))
 	cwd := filepath.Join(repo.RootDir, repo.SubDir)
 	assert.Equal(t, CWD(), cwd)
