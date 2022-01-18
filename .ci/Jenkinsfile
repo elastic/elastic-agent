@@ -101,7 +101,8 @@ pipeline {
         axes {
           axis {
             name 'PLATFORM'
-            values 'macosx && x86_64', 'ubuntu-20.04 && immutable', 'aarch64'
+            // TODO: 'macosx && x86_64' doesn't work since docker is not available in the internal-ci macosx workers
+            values 'ubuntu-20.04 && immutable', 'aarch64'
           }
         }
         stages {
