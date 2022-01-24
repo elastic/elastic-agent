@@ -13,12 +13,12 @@ import (
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi/client"
 
-	"github.com/elastic/beats/v7/libbeat/common/backoff"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"

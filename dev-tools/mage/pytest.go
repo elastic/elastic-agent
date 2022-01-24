@@ -97,68 +97,6 @@ func DefaultPythonTestUnitArgs() PythonTestArgs { return makePythonTestArgs("Uni
 // checking for INTEGRATION_TEST=1 in the test code.
 func DefaultPythonTestIntegrationArgs() PythonTestArgs { return makePythonTestArgs("Integration") }
 
-// PythonTest executes python tests via a Python virtualenv.
-func PythonTest(params PythonTestArgs) error {
-	fmt.Println(">> python test:", params.TestName, "Testing")
-
-	ve, err := PythonVirtualenv()
-	if err != nil {
-		return err
-	}
-
-	pytestEnv := map[string]string{
-		// activate sets this. Not sure if it's ever needed.
-		"VIRTUAL_ENV": ve,
-	}
-	if IsInIntegTestEnv() {
-		pytestEnv["INTEGRATION_TESTS"] = "1"
-	}
-	for k, v := range params.Env {
-		pytestEnv[k] = v
-	}
-
-	pytestOptions := []string{
-		"--timeout=90",
-		"--durations=20",
-	}
-	if mg.Verbose() {
-		pytestOptions = append(pytestOptions, "-v")
-	}
-	if params.XUnitReportFile != "" {
-		pytestOptions = append(pytestOptions,
-			"--junit-xml="+createDir(params.XUnitReportFile),
-		)
-	}
-
-	files := pythonTestFiles
-	if len(params.Files) > 0 {
-		files = params.Files
-	}
-	testFiles, err := FindFiles(files...)
-	if err != nil {
-		return err
-	}
-	if len(testFiles) == 0 {
-		fmt.Println(">> python test:", params.TestName, "Testing - No tests found.")
-		return nil
-	}
-
-	// We check both the VE and the normal PATH because on Windows if the
-	// requirements are met by the globally installed package they are not
-	// installed to the VE.
-	pytestPath, err := LookVirtualenvPath(ve, "pytest")
-	if err != nil {
-		return err
-	}
-
-	defer fmt.Println(">> python test:", params.TestName, "Testing Complete")
-	_, err = sh.Exec(pytestEnv, os.Stdout, os.Stderr, pytestPath, append(pytestOptions, testFiles...)...)
-	return err
-
-	// TODO: Aggregate all the individual code coverage reports and generate
-	// and HTML report.
-}
-
 // PythonVirtualenv constructs a virtualenv that contains the given modules as
 // defined in the requirements file pointed to by requirementsTxt. It returns
 // the path to the virtualenv.
