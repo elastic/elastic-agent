@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/beats"
 	monitoring "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/beats"
+	monitoringCfg "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/socket"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
