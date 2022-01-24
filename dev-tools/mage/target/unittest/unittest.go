@@ -33,7 +33,7 @@ func RegisterPythonTestDeps(deps ...interface{}) {
 
 // UnitTest executes the unit tests (Go and Python).
 func UnitTest() {
-	mg.SerialDeps(GoUnitTest, PythonUnitTest)
+	mg.SerialDeps(GoUnitTest)
 }
 
 // GoUnitTest executes the Go unit tests.
@@ -42,11 +42,4 @@ func UnitTest() {
 func GoUnitTest(ctx context.Context) error {
 	mg.SerialCtxDeps(ctx, goTestDeps...)
 	return devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs())
-}
-
-// PythonUnitTest executes the python system tests.
-func PythonUnitTest() error {
-	mg.SerialDeps(pythonTestDeps...)
-	mg.Deps(devtools.BuildSystemTestBinary)
-	return devtools.PythonTest(devtools.DefaultPythonTestUnitArgs())
 }

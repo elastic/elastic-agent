@@ -34,7 +34,7 @@ const (
 
 	elasticAgentImportPath = "github.com/elastic/elastic-agent-poc"
 
-	elasticAgentModulePath = "github.com/elastic/elastic-agent-poc/v7"
+	elasticAgentModulePath = "github.com/elastic/elastic-agent-poc"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -397,9 +397,9 @@ var (
 	// DefaultBeatBuildVariableSources contains the default locations build
 	// variables are read from by Elastic Beats.
 	DefaultBeatBuildVariableSources = &BuildVariableSources{
-		BeatVersion: "{{ elastic_beats_dir }}/internal/version/version.go",
+		BeatVersion: "{{ elastic_beats_dir }}/version/version.go",
 		GoVersion:   "{{ elastic_beats_dir }}/.go-version",
-		DocBranch:   "{{ elastic_beats_dir }}/internal/docs/version.asciidoc",
+		DocBranch:   "{{ elastic_beats_dir }}/version/docs/version.asciidoc",
 	}
 
 	buildVariableSources     *BuildVariableSources

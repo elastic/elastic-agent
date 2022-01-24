@@ -1,5 +1,5 @@
 ALL=elastic-agent-standalone elastic-agent-managed
-BEAT_VERSION=$(shell head -n 1 ../../libbeat/docs/version.asciidoc | cut -c 17- )
+BEAT_VERSION=$(shell head -n 1 ../../version/docs/version.asciidoc | cut -c 17- )
 
 .PHONY: all $(ALL)
 

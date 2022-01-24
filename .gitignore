@@ -55,10 +55,11 @@ fleet.yml.old
 internal/pkg/agent/operation/tests/scripts/short--1.0.yml
 internal/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86/configurable
 internal/pkg/agent/operation/tests/scripts/servicable-1.0-darwin-x86/configurable
-internal/pkg/agent/transpiler/tests/exec-1.0-darwin-x86_64/exec
 internal/pkg/agent/operation/tests/scripts/configurable-1.0-darwin-x86_64/configurable
 internal/pkg/agent/operation/tests/scripts/serviceable-1.0-darwin-x86_64/serviceable
 internal/pkg/agent/application/fleet.yml
+internal/pkg/agent/transpiler/tests/exec-1.0-darwin-x86_64/exec
 
 # VSCode
 /.vscode
+
