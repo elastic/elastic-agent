@@ -17,7 +17,7 @@ def main():
     check_call("git clean -dfx", shell=True)
 
     # edit the file
-    with open("libbeat/docs/version.asciidoc", "r") as f:
+    with open("version/docs/version.asciidoc", "r") as f:
         lines = f.readlines()
     for i, line in enumerate(lines):
         if line.startswith(":stack-version:"):
@@ -26,7 +26,7 @@ def main():
           lines[i] = ":branch: {}\n".format(branch)
         if line.startswith(":doc-branch:"):
           lines[i] = ":doc-branch: {}\n".format(branch)
-    with open("libbeat/docs/version.asciidoc", "w") as f:
+    with open("version/docs/version.asciidoc", "w") as f:
         f.writelines(lines)
 
     check_call("make update", shell=True)
