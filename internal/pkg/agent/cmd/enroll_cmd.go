@@ -17,7 +17,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-
 	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application"
@@ -33,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent-poc/internal/pkg/cli"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/authority"
+	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
 	monitoringConfig "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/process"
@@ -40,7 +40,6 @@ import (
 	fleetclient "github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/remote"
-	"github.com/elastic/elastic-agent-poc/pkg/core/backoff"
 )
 
 const (

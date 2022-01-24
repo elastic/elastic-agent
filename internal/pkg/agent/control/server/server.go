@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/beats"
 	monitoring "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/beats"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/socket"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/status"
