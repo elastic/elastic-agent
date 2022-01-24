@@ -97,7 +97,6 @@ func DefaultPythonTestUnitArgs() PythonTestArgs { return makePythonTestArgs("Uni
 // checking for INTEGRATION_TEST=1 in the test code.
 func DefaultPythonTestIntegrationArgs() PythonTestArgs { return makePythonTestArgs("Integration") }
 
-
 // PythonVirtualenv constructs a virtualenv that contains the given modules as
 // defined in the requirements file pointed to by requirementsTxt. It returns
 // the path to the virtualenv.

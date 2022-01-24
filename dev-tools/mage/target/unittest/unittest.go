@@ -43,4 +43,3 @@ func GoUnitTest(ctx context.Context) error {
 	mg.SerialCtxDeps(ctx, goTestDeps...)
 	return devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs())
 }
-

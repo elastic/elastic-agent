@@ -58,4 +58,3 @@ func GoIntegTest(ctx context.Context) error {
 		return devtools.GoTest(ctx, devtools.DefaultGoTestIntegrationArgs())
 	})
 }
-
