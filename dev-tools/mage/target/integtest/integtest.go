@@ -40,7 +40,7 @@ func WhitelistEnvVar(key ...string) {
 
 // IntegTest executes integration tests (it uses Docker to run the tests).
 func IntegTest() {
-	mg.SerialDeps(GoIntegTest, PythonIntegTest)
+	mg.SerialDeps(GoIntegTest)
 }
 
 // GoIntegTest executes the Go integration tests.
@@ -59,20 +59,3 @@ func GoIntegTest(ctx context.Context) error {
 	})
 }
 
-// PythonIntegTest executes the python system tests in the integration
-// environment (Docker).
-// Use PYTEST_ADDOPTS="-k pattern" to only run tests matching the specified pattern.
-// Use any other PYTEST_* environment variable to influence the behavior of pytest.
-func PythonIntegTest(ctx context.Context) error {
-	if !devtools.IsInIntegTestEnv() {
-		mg.SerialDeps(pythonTestDeps...)
-	}
-	runner, err := devtools.NewDockerIntegrationRunner(append(whitelistedEnvVars, devtools.ListMatchingEnvVars("PYTEST_")...)...)
-	if err != nil {
-		return err
-	}
-	return runner.Test("pythonIntegTest", func() error {
-		mg.Deps(devtools.BuildSystemTestBinary)
-		return devtools.PythonTest(devtools.DefaultPythonTestIntegrationArgs())
-	})
-}
