@@ -13,12 +13,12 @@ import (
 	"github.com/gofrs/uuid"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
+	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
 	monitoringConfig "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/config"
 
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
