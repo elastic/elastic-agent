@@ -32,7 +32,7 @@ import (
 	"github.com/elastic/elastic-agent-poc/internal/pkg/cli"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/authority"
-	"github.com/elastic//elastic-agent-poc/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
 	monitoringConfig "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/core/process"
