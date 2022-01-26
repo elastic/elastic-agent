@@ -486,7 +486,7 @@ func ControlProto() error {
 // BuildSpec make sure that all the suppported program spec are built into the binary.
 func BuildSpec() error {
 	// go run internal/dev-tools/cmd/buildspec/buildspec.go --in x-pack/agent/spec/*.yml --out x-pack/elastic-agent/pkg/agent/program/supported.go
-	goF := filepath.Join("internal", "cmd", "buildspec", "buildspec.go")
+	goF := filepath.Join("dev-tools", "cmd", "buildspec", "buildspec.go")
 	in := filepath.Join("internal", "spec", "*.yml")
 	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
 
@@ -496,7 +496,7 @@ func BuildSpec() error {
 
 func BuildPGP() error {
 	// go run elastic-agent/dev-tools/cmd/buildpgp/build_pgp.go --in agent/spec/GPG-KEY-elasticsearch --out elastic-agent/pkg/release/pgp.go
-	goF := filepath.Join("internal", "cmd", "buildpgp", "build_pgp.go")
+	goF := filepath.Join("dev-tools", "cmd", "buildpgp", "build_pgp.go")
 	in := "GPG-KEY-elasticsearch"
 	out := filepath.Join("internal", "pkg", "release", "pgp.go")
 
@@ -543,7 +543,7 @@ func UnitTest() {
 
 // BuildFleetCfg embed the default fleet configuration as part of the binary.
 func BuildFleetCfg() error {
-	goF := filepath.Join("internal", "cmd", "buildfleetcfg", "buildfleetcfg.go")
+	goF := filepath.Join("dev-tools", "cmd", "buildfleetcfg", "buildfleetcfg.go")
 	in := filepath.Join("_meta", "elastic-agent.fleet.yml")
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 

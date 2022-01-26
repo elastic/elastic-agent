@@ -111,5 +111,4 @@ func AddLicenseHeaders() error {
 		licenser.Check(),
 		licenser.License("Elastic"),
 	)
-
 }
