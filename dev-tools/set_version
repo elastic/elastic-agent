@@ -47,7 +47,7 @@ def main():
 
     is_libbeat = vendored_elastic_agent not in os.path.realpath(__file__)
     if is_libbeat:
-        goversion_filepath  = os.path.join(get_rootfolder(), "elastic-agent", "version", "version.go")
+        goversion_filepath  = os.path.join(get_rootfolder(), "version", "version.go")
         go_var = goversion_var_elastic_agent
     else:
         goversion_filepath  = os.path.join(get_rootfolder(), "version.go")
