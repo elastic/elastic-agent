@@ -13,7 +13,7 @@ pipeline {
     SNAPSHOT = true
   }
   options {
-    timeout(time: 1, unit: 'HOURS')
+    timeout(time: 2, unit: 'HOURS')
     buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '20', daysToKeepStr: '30'))
     timestamps()
     ansiColor('xterm')
@@ -93,52 +93,29 @@ pipeline {
         }
       }
     }
-    stage('Packages'){
-      options { skipDefaultCheckout() }
-      parallel {
-        stage('Package linux') {
-          steps {
-            withGithubNotify(context: "Package Linux") {
-              deleteDir()
-              unstash 'source'
-              withMageEnv(){
-                dir("${BASE_DIR}"){
-                  withPackageLinuxEnv() {
-                    cmd(label: 'Go package', script: 'mage package')
-                  }
-                }
-              }
-            }
+    stage('Package') {
+      failFast false
+      matrix {
+        agent {label "${PLATFORM}"}
+        options { skipDefaultCheckout() }
+        axes {
+          axis {
+            name 'PLATFORM'
+            // TODO: 'macosx && x86_64' doesn't work since docker is not available in the internal-ci macosx workers
+            values 'ubuntu-20.04 && immutable', 'aarch64'
           }
         }
-        stage('Package linux/arm64') {
-          agent { label 'aarch64' }
-          options { skipDefaultCheckout() }
-          steps {
-            withGithubNotify(context: "Package linux/arm64") {
-              deleteDir()
-              unstash 'source'
-              withMageEnv(){
-                dir("${BASE_DIR}"){
-                  withPackageArmEnv() {
-                    cmd(label: 'Go package', script: 'mage package')
-                  }
-                }
-              }
-            }
-          }
-        }
-        stage('Package macOS') {
-          agent { label 'macosx && x86_64' }
-          options { skipDefaultCheckout() }
-          steps {
-            withGithubNotify(context: "Package macOS") {
-              deleteDir()
-              unstash 'source'
-              withMageEnv(){
-                dir("${BASE_DIR}"){
-                  withPackageDarwinEnv() {
-                    cmd(label: 'Go package', script: 'mage package')
+        stages {
+          stage('Package'){
+            steps {
+              withGithubNotify(context: "Package ${PLATFORM}") {
+                deleteDir()
+                unstash 'source'
+                withMageEnv(){
+                  dir("${BASE_DIR}"){
+                    withPackageEnv("${PLATFORM}") {
+                      cmd(label: 'Go package', script: 'mage package')
+                    }
                   }
                 }
               }
@@ -152,6 +129,28 @@ pipeline {
     cleanup {
       notifyBuildResult(prComment: true)
     }
+  }
+}
+
+def withPackageEnv(platform, Closure body) {
+  if (isUnix()) {
+    if (platform.contains('macosx')) {
+      withPackageDarwinEnv() {
+        body()
+      }
+    } else {
+      if (isArm()) {
+        withPackageArmEnv() {
+          body()
+        }
+      } else {
+        withPackageLinuxEnv() {
+          body()
+        }
+      }
+    }
+  } else {
+    error 'withPackageEnv: unsupported platform'
   }
 }
 
