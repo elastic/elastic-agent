@@ -34,7 +34,7 @@ const (
 
 	elasticAgentImportPath = "github.com/elastic/elastic-agent-poc"
 
-	elasticAgentModulePath = "github.com/elastic/elastic-agent-poc"
+	elasticAgentModulePath = "github.com/elastic/elastic-agent-poc/v7"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
