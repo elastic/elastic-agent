@@ -14,7 +14,7 @@ import (
 	"os"
 	"text/template"
 
-	lic "github.com/elastic/elastic-agent-poc/dev-tools/license"
+	lic "github.com/elastic/elastic-agent-poc/dev-tools/licenses"
 	"github.com/elastic/elastic-agent-poc/internal/pkg/packer"
 )
 
