@@ -95,7 +95,7 @@ pipeline {
               // TODO: Run only if changes in
               //  - "^deploy/kubernetes/.*"
               //  - "^version/docs/version.asciidoc"
-              expression { return PLATFORM == 'ubuntu-20.04 && immutable' }
+              expression { return env.PLATFORM == 'ubuntu-20.04 && immutable' }
             }
             steps {
               withGithubNotify(context: "K8s-${PLATFORM}") {
