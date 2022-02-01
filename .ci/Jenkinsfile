@@ -90,6 +90,28 @@ pipeline {
               }
             }
           }
+          stage('K8s') {
+            when {
+              // TODO: Run only if changes in
+              //  - "^deploy/kubernetes/.*"
+              //  - "^version/docs/version.asciidoc"
+              expression { return env.PLATFORM == 'ubuntu-20.04 && immutable' }
+            }
+            steps {
+              withGithubNotify(context: "K8s-${PLATFORM}") {
+                withMageEnv(){
+                  withEnv(["K8S_VERSION=v1.23.0", "KIND_VERSION=v0.11.1", "KUBECONFIG=${env.WORKSPACE}/kubecfg"]){
+                    dir("${BASE_DIR}"){
+                      retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install kind", script: ".ci/scripts/install-kind.sh") }
+                      retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install kubectl", script: ".ci/scripts/install-kubectl.sh") }
+                      sh(label: "Setup kind", script: ".ci/scripts/kind-setup.sh")
+                      sh(label: "Deploy to kubernetes",script: "make -C deploy/kubernetes test")
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
