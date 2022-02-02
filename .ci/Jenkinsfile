@@ -158,7 +158,7 @@ pipeline {
 // See https://github.com/elastic/beats/pull/21857
 def withKindEnv(Closure body) {
   try {
-    sh(label: "Setup kind", script: ".ci/scripts/kind-setup.sh")
+    //sh(label: "Setup kind", script: ".ci/scripts/kind-setup.sh")
     // Add some environmental resilience when setup does not work the very first time.
     def i = 0
     retryWithSleep(retries: 3, seconds: 5, backoff: true){
