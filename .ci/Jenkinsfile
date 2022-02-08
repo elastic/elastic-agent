@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-@Library('apm@feature/use-internal-ci') _
+@Library('apm@test/k8s') _
 
 pipeline {
   agent { label 'ubuntu-20.04 && immutable' }
@@ -100,14 +100,8 @@ pipeline {
             steps {
               withGithubNotify(context: "K8s-${PLATFORM}") {
                 withMageEnv(){
-                  withEnv(["K8S_VERSION=v1.23.0", "KIND_VERSION=v0.11.1", "KUBECONFIG=${env.WORKSPACE}/kubecfg"]){
-                    dir("${BASE_DIR}"){
-                      retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install kind", script: ".ci/scripts/install-kind.sh") }
-                      retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install kubectl", script: ".ci/scripts/install-kubectl.sh") }
-                      withKindEnv() {
-                        sh(label: "Deploy to kubernetes",script: "make -C deploy/kubernetes test")
-                      }
-                    }
+                  withKindEnv(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1') {
+                    sh(label: "Deploy to kubernetes",script: "make -C deploy/kubernetes test")
                   }
                 }
               }
@@ -152,29 +146,6 @@ pipeline {
     cleanup {
       notifyBuildResult(prComment: true)
     }
-  }
-}
-
-// See https://github.com/elastic/beats/pull/21857
-def withKindEnv(Closure body) {
-  try {
-    //sh(label: "Setup kind", script: ".ci/scripts/kind-setup.sh")
-    // Add some environmental resilience when setup does not work the very first time.
-    def i = 0
-    retryWithSleep(retries: 3, seconds: 5, backoff: true){
-      try {
-        sh(label: "Setup kind", script: ".ci/scripts/kind-setup.sh")
-      } catch(err) {
-        i++
-        sh(label: 'Delete cluster', script: 'kind delete cluster')
-        if (i > 2) {
-          error("Setup kind failed with error '${err.toString()}'")
-        }
-      }
-    }
-    body()
-  } finally {
-    sh(label: 'Delete cluster', script: 'kind delete cluster')
   }
 }
 
