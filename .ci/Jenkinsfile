@@ -101,7 +101,9 @@ pipeline {
               withGithubNotify(context: "K8s-${PLATFORM}") {
                 withMageEnv(){
                   withKindEnv(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1') {
-                    sh(label: "Deploy to kubernetes",script: "make -C deploy/kubernetes test")
+                    dir("${BASE_DIR}"){
+                      sh(label: "Deploy to kubernetes",script: "make -C deploy/kubernetes test")
+                    }
                   }
                 }
               }
