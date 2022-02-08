@@ -43,9 +43,12 @@ def runBuilds(Map args = [:]) {
 
   def quietPeriod = 0
   branches.each { branch ->
-    // TODO: configure parameters
     build(quietPeriod: quietPeriod,
           job: "elastic-agent/elastic-agent-poc-mbp/${branch}",
+          parameters: [
+            booleanParam(name: 'integration_tests_ci', value: true),
+            booleanParam(name: 'end_to_end_tests_ci', value: true)
+          ],
           wait: false, propagate: false)
     // Increate the quiet period for the next iteration
     quietPeriod += args.quietPeriodFactor
