@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-@Library('apm@current') _
+@Library('apm@feature/docker-tag-push-step') _
 
 pipeline {
   agent { label 'ubuntu-20.04 && immutable' }
@@ -143,6 +143,28 @@ pipeline {
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
                       cmd(label: 'Go package', script: 'mage package')
+                      // IMPORTANT:
+                      // As long as we use internal-ci we cannot use the upload bucket without
+                      // debugging what's the problem with the existing credentials.
+                      //uploadPackagesToGoogleBucket()
+                      pushDockerImages(
+                        secret: env.DOCKER_ELASTIC_SECRET,
+                        registry: env.DOCKER_REGISTRY,
+                        arch: PLATFORM.equals("aarch64") ? 'arm64' : 'amd64',
+                        version: env.BEAT_VERSION,
+                        snapshot: env.SNAPSHOT,
+                        project: [
+                          name: 'elastic-agent',
+                          variants: [
+                            '' : 'beats',
+                            '-oss' : 'beats',
+                            '-ubi8' : 'beats',
+                            '-complete' : 'beats',
+                            '-cloud' : 'beats-ci'
+                          ]
+                        ],
+                        targetNamespace: 'observability-ci'
+                      )
                     }
                   }
                 }
