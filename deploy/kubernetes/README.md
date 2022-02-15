@@ -2,12 +2,10 @@
 
 ## Getting started
 
-This is the list of officially supported Beats, with example manifests to run
+This is the list of officially supported Elastic Agents, with example manifests to run
 them in Kubernetes:
 
 Beat | Description
 ---- | ----
-[filebeat](filebeat) | Tails and ships logs
-[metricbeat](metricbeat) | Fetches sets of metrics from the operating system and services
-[auditbeat](auditbeat) | Collect Linux audit framework data and monitor files integrity
-[heartbeat](heartbeat) | Monitor services for their availability with active probing
+[Elastic Agent managed](elastic-agent-managed) | Elastic Agent managed by Fleet setup
+[Elastic Agent standalone](elastic-agent-standalone) | Standalone Elastic Agent setup
