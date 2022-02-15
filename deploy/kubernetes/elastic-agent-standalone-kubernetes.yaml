@@ -515,7 +515,7 @@ metadata:
   name: elastic-agent
   namespace: kube-system
   labels:
-    app: elastic-agent
+    app: elastic-agent-standalona
 spec:
   selector:
     matchLabels:
@@ -528,7 +528,7 @@ spec:
       tolerations:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
-      serviceAccountName: elastic-agent
+      serviceAccountName: elastic-agent-standalona
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
@@ -640,9 +640,9 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: elastic-agent
+  name: elastic-agent-standalona
   labels:
-    k8s-app: elastic-agent
+    k8s-app: elastic-agent-standalona
 rules:
   - apiGroups: [""]
     resources:
