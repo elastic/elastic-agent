@@ -512,10 +512,10 @@ data:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: elastic-agent
+  name: elastic-agent-standalone
   namespace: kube-system
   labels:
-    app: elastic-agent-standalona
+    app: elastic-agent
 spec:
   selector:
     matchLabels:
@@ -599,7 +599,7 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: elastic-agent
+  name: elastic-agent-standalone
 subjects:
   - kind: ServiceAccount
     name: elastic-agent
@@ -613,10 +613,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   namespace: kube-system
-  name: elastic-agent
+  name: elastic-agent-standalone
 subjects:
   - kind: ServiceAccount
-    name: elastic-agent
+    name: elastic-agent-standalone
     namespace: kube-system
 roleRef:
   kind: Role
@@ -626,11 +626,11 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: elastic-agent-kubeadm-config
+  name: elastic-agent-standalone-kubeadm-config
   namespace: kube-system
 subjects:
   - kind: ServiceAccount
-    name: elastic-agent
+    name: elastic-agent-standalone
     namespace: kube-system
 roleRef:
   kind: Role
@@ -640,9 +640,9 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: elastic-agent-standalona
+  name: elastic-agent-standalone
   labels:
-    k8s-app: elastic-agent-standalona
+    k8s-app: elastic-agent
 rules:
   - apiGroups: [""]
     resources:
@@ -689,7 +689,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: elastic-agent
+  name: elastic-agent-standalone
   # should be the namespace where elastic-agent is running
   namespace: kube-system
   labels:
@@ -704,7 +704,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: elastic-agent-kubeadm-config
+  name: elastic-agent-standalone-kubeadm-config
   namespace: kube-system
   labels:
     k8s-app: elastic-agent
@@ -719,7 +719,7 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: elastic-agent
+  name: elastic-agent-standalone
   namespace: kube-system
   labels:
     k8s-app: elastic-agent
