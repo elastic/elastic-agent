@@ -23,7 +23,16 @@ pipeline {
     quietPeriod(10)
   }
   triggers {
-    issueCommentTrigger("${obltGitHubComments()}")
+    issueCommentTrigger("(${obltGitHubComments()}|^run ((integration|end-to-end) tests|package)")
+  }
+  parameters {
+    // disabled by default, but required for merge, there are two GH checks:
+    // opt-in with 'ci:integration'
+    booleanParam(name: 'integration_tests_ci', defaultValue: false, description: 'Enable Integration tests')
+
+    // disabled by default, but required for merge:
+    // opt-in with 'ci:end-to-end' tag on PR
+    booleanParam(name: 'end_to_end_tests_ci', defaultValue: false, description: 'Enable End-to-End tests')
   }
   stages {
     stage('Checkout') {
@@ -105,6 +114,14 @@ pipeline {
       }
     }
     stage('Package') {
+      when {
+        beforeAgent true
+        anyOf {
+          expression { return env.GITHUB_COMMENT?.contains('package') }
+          expression { matchesPrLabel(label: 'ci:package') }
+          not { changeRequest() }
+        }
+      }
       failFast false
       matrix {
         agent {label "${PLATFORM}"}
@@ -144,6 +161,32 @@ pipeline {
       }
       steps {
         runAllK8s(["v1.23.0", "v1.22.0", "v1.21.1", "v1.20.7", "v1.19.11", "v1.18.19"])
+      }
+    }
+    stage('e2e tests') {
+      when {
+        beforeAgent true
+        anyOf {
+          expression { return params.end_to_end_tests_ci }
+          expression { return env.GITHUB_COMMENT?.contains('e2e tests') }
+          expression { matchesPrLabel(label: 'ci:end-to-end') }
+        }
+      }
+      steps {
+        echo 'TBD'
+      }
+    }
+    stage('Integration tests') {
+      when {
+        beforeAgent true
+        anyOf {
+          expression { return params.integration_tests_ci }
+          expression { return env.GITHUB_COMMENT?.contains('integration tests') }
+          expression { matchesPrLabel(label: 'ci:integration') }
+        }
+      }
+      steps {
+        echo 'TBD'
       }
     }
   }
