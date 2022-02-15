@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: elastic-agent
+  name: elastic-agent-standalone
   namespace: kube-system
   labels:
-    app: elastic-agent
+    app: elastic-agent-standalone
 spec:
   selector:
     matchLabels:
-      app: elastic-agent
+      app: elastic-agent-standalone
   template:
     metadata:
       labels:
-        app: elastic-agent
+        app: elastic-agent-standalone
     spec:
       tolerations:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
-      serviceAccountName: elastic-agent
+      serviceAccountName: elastic-agent-standalone
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
-        - name: elastic-agent
+        - name: elastic-agent-standalone
           image: docker.elastic.co/beats/elastic-agent:%VERSION%
           args: [
             "-c", "/etc/agent.yml",
