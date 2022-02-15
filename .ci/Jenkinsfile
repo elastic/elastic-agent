@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-@Library('apm@feature/use-internal-ci') _
+@Library('apm@current') _
 
 pipeline {
   agent { label 'ubuntu-20.04 && immutable' }
@@ -99,6 +99,17 @@ pipeline {
               }
             }
           }
+          stage('K8s') {
+            when {
+              // TODO: Run only if changes in
+              //  - "^deploy/kubernetes/.*"
+              //  - "^version/docs/version.asciidoc"
+              expression { return env.PLATFORM == 'ubuntu-20.04 && immutable' }
+            }
+            steps {
+              runK8s(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1', context: "K8s-${PLATFORM}")
+            }
+          }
         }
       }
     }
@@ -139,6 +150,17 @@ pipeline {
             }
           }
         }
+      }
+    }
+    stage('K8s') {
+      when {
+        // TODO: Run only if changes in
+        //  - "^deploy/kubernetes/.*"
+        //  - "^version/docs/version.asciidoc"
+        not { changeRequest() }
+      }
+      steps {
+        runAllK8s(["v1.23.0", "v1.22.0", "v1.21.1", "v1.20.7", "v1.19.11", "v1.18.19"])
       }
     }
     stage('e2e tests') {
@@ -243,5 +265,29 @@ def withPackageDarwinEnv(Closure body) {
     "PLATFORMS=${PLATFORMS}"
   ]) {
     body()
+  }
+}
+
+def runAllK8s(versions) {
+  def parallelTasks = [:]
+  versions.each { version ->
+    node('ubuntu-20.04 && immutable') {
+      deleteDir()
+      unstash 'source'
+      runK8s(k8sVersion: version, kindVersion: 'v0.11.1', context: "K8s-${version}")
+    }
+  }
+  parallel(parallelTasks)
+}
+
+def runK8s(Map args=[:]) {
+  withGithubNotify(context: args.context) {
+    withMageEnv(){
+      withKindEnv(args) {
+        dir("${BASE_DIR}"){
+          sh(label: "Deploy to kubernetes",script: "make -C deploy/kubernetes test")
+        }
+      }
+    }
   }
 }
