@@ -153,15 +153,13 @@ pipeline {
                         arch: PLATFORM.equals("aarch64") ? 'arm64' : 'amd64',
                         version: env.BEAT_VERSION,
                         snapshot: env.SNAPSHOT,
-                        project: [
-                          name: 'elastic-agent',
-                          variants: [
-                            '' : 'beats',
-                            '-oss' : 'beats',
-                            '-ubi8' : 'beats',
-                            '-complete' : 'beats',
-                            '-cloud' : 'beats-ci'
-                          ]
+                        imageName: 'elastic-agent',
+                        variants: [
+                          '' : 'beats',
+                          '-oss' : 'beats',
+                          '-ubi8' : 'beats',
+                          '-complete' : 'beats',
+                          '-cloud' : 'beats-ci'
                         ],
                         targetNamespace: 'observability-ci'
                       )
