@@ -685,7 +685,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		} else {
 			//build from local repo, will assume beats repo is located on the same root level
 			for _, b := range packedBeats {
-				pwd, err := filepath.Abs(filepath.Join("../../beats", b))
+				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
 				if err != nil {
 					panic(err)
 				}
