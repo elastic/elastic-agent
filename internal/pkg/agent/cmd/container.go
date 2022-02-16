@@ -22,7 +22,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -30,16 +30,16 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"github.com/elastic/beats/v7/libbeat/kibana"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/install/tar"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/cli"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/process"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/tar"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/process"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 const (

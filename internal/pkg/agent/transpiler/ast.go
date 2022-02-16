@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/eql"
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
 
 	"github.com/elastic/go-ucfg"
 )

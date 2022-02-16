@@ -13,7 +13,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 // fixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions

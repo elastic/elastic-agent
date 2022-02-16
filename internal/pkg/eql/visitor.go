@@ -11,7 +11,7 @@ import (
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/eql/parser"
+	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
 
 // Errors

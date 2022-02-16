@@ -5,14 +5,14 @@
 package localremote
 
 import (
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/composed"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/fs"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/http"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/snapshot"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/composed"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/fs"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/snapshot"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 // NewVerifier creates a downloader which first checks local directory

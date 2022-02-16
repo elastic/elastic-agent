@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
 func TestHTTPClient(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/reporter"
+	"github.com/elastic/elastic-agent/internal/pkg/reporter"
 )
 
 type logger interface {

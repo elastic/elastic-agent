@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 
-	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 // SupportedVersions is the definition of supported version files

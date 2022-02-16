@@ -1,4 +1,4 @@
-module github.com/elastic/elastic-agent-poc
+module github.com/elastic/elastic-agent
 
 go 1.17
 

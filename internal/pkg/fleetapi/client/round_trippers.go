@@ -8,7 +8,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
 // ErrInvalidAPIKey is returned when authentication fail to fleet.

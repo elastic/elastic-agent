@@ -14,8 +14,8 @@ import (
 	"os"
 	"text/template"
 
-	lic "github.com/elastic/elastic-agent-poc/dev-tools/licenses"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/packer"
+	lic "github.com/elastic/elastic-agent/dev-tools/licenses"
+	"github.com/elastic/elastic-agent/internal/pkg/packer"
 )
 
 var (
@@ -39,7 +39,7 @@ package program
 import (
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/packer"
+	"github.com/elastic/elastic-agent/internal/pkg/packer"
 )
 
 var Supported []Spec

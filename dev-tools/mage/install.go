@@ -5,7 +5,7 @@
 package mage
 
 import (
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
 var (

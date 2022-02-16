@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-poc/version"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (

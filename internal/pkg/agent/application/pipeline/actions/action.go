@@ -7,9 +7,9 @@ package actions
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
 
 // Handler handles action coming from fleet.

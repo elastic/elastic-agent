@@ -7,8 +7,8 @@ package uninstall
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/uninstall/hooks"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall/hooks"
 )
 
 // Uninstaller is an interface allowing un-installation of an artifact

@@ -9,14 +9,14 @@ import (
 	"errors"
 	"runtime"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/install/atomic"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/install/awaitable"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/install/dir"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/install/hooks"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/install/tar"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/install/zip"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/atomic"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/awaitable"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/dir"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/hooks"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/tar"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/zip"
 )
 
 var (

@@ -14,17 +14,17 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/process"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/server"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/state"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/tokenbucket"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/core/app"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
+	"github.com/elastic/elastic-agent/internal/pkg/core/process"
+	"github.com/elastic/elastic-agent/internal/pkg/core/server"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
 )
 
 var (

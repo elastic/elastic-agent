@@ -10,7 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
 // CopyModule contains a module name and the list of files or directories

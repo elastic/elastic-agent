@@ -10,7 +10,7 @@ import (
 
 	"github.com/kardianos/service"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 // StatusType is the return status types.

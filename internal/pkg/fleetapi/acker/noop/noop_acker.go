@@ -7,7 +7,7 @@ package fleet
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 // Acker is a noop acker.

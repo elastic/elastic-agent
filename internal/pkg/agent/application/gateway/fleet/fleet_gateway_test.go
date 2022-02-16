@@ -20,17 +20,17 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/gateway"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
-	noopacker "github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi/acker/noop"
-	repo "github.com/elastic/elastic-agent-poc/internal/pkg/reporter"
-	fleetreporter "github.com/elastic/elastic-agent-poc/internal/pkg/reporter/fleet"
-	fleetreporterConfig "github.com/elastic/elastic-agent-poc/internal/pkg/reporter/fleet/config"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	repo "github.com/elastic/elastic-agent/internal/pkg/reporter"
+	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
+	fleetreporterConfig "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet/config"
+	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 )
 
 type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)

@@ -26,21 +26,21 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
-	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
 	// mage:import
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/target/common"
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 
 	// mage:import
-	_ "github.com/elastic/elastic-agent-poc/dev-tools/mage/target/docs"
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/docs"
 	// mage:import
-	_ "github.com/elastic/elastic-agent-poc/dev-tools/mage/target/integtest/notests"
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
 	// mage:import
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/target/test"
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
 const (
@@ -789,12 +789,12 @@ func buildVars() map[string]string {
 	vars := make(map[string]string)
 
 	isSnapshot, _ := os.LookupEnv(snapshotEnv)
-	vars["github.com/elastic/elastic-agent-poc/internal/pkg/release.snapshot"] = isSnapshot
+	vars["github.com/elastic/elastic-agent/internal/pkg/release.snapshot"] = isSnapshot
 
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {
-			vars["github.com/elastic/elastic-agent-poc/internal/pkg/release.allowEmptyPgp"] = "true"
-			vars["github.com/elastic/elastic-agent-poc/internal/pkg/release.allowUpgrade"] = "true"
+			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowEmptyPgp"] = "true"
+			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowUpgrade"] = "true"
 		}
 	}
 

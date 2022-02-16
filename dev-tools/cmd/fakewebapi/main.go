@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 var (

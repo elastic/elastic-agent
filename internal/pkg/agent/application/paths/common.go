@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 const (

@@ -13,7 +13,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 )
 
 func TestDownloadBodyError(t *testing.T) {

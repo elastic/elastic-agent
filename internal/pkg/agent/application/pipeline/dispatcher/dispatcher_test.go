@@ -10,9 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
-	noopacker "github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 )
 
 type mockHandler struct {

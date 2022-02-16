@@ -5,8 +5,8 @@
 package noop
 
 import (
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
 // Monitor is a monitoring interface providing information about the way

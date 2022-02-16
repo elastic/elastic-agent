@@ -15,8 +15,8 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/api/npipe"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 // createListener creates a named pipe listener on Windows

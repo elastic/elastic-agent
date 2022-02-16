@@ -9,21 +9,21 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/composable"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 
-	_ "github.com/elastic/elastic-agent-poc/internal/pkg/composable/providers/env"
-	_ "github.com/elastic/elastic-agent-poc/internal/pkg/composable/providers/host"
-	_ "github.com/elastic/elastic-agent-poc/internal/pkg/composable/providers/local"
-	_ "github.com/elastic/elastic-agent-poc/internal/pkg/composable/providers/localdynamic"
+	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"
+	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/host"
+	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/local"
+	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 )
 
 func TestController(t *testing.T) {

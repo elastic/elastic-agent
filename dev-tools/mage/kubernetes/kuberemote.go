@@ -38,7 +38,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport/spdy"
 
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage"
+	"github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 const sshBitSize = 4096

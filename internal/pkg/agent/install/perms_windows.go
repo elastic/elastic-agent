@@ -15,7 +15,7 @@ import (
 	"github.com/hectane/go-acl"
 	"golang.org/x/sys/windows"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 // fixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path

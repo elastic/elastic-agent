@@ -15,7 +15,7 @@ import (
 	"github.com/hectane/go-acl"
 
 	"github.com/elastic/beats/v7/libbeat/common/file"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 // ReplaceOnSuccessStore takes a target file, a replacement content and a wrapped store. This

@@ -7,7 +7,7 @@ package main
 import (
 	"testing"
 
-	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 // Test started when the test binary is started. Only calls main.

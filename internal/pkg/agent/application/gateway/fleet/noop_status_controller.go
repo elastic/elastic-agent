@@ -5,8 +5,8 @@
 package fleet
 
 import (
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/state"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 )
 
 type noopController struct{}

@@ -9,24 +9,24 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configuration"
-	noopacker "github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/pipeline/actions/handlers"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/pipeline/dispatcher"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/pipeline/emitter"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/pipeline/emitter/modifiers"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/pipeline/router"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/composable"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/actions/handlers"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/dispatcher"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 func TestManagedModeRouting(t *testing.T) {

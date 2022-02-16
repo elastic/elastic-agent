@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 )
 
 // Bucket is a Token Bucket for rate limiting

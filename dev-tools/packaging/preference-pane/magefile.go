@@ -16,7 +16,7 @@ import (
 	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
 
-	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 var builder = preferencePaneBuilder{

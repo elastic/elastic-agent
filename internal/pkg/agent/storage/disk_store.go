@@ -12,7 +12,7 @@ import (
 	"github.com/hectane/go-acl"
 
 	"github.com/elastic/beats/v7/libbeat/common/file"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 // NewDiskStore creates an unencrypted disk store.

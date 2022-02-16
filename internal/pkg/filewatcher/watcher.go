@@ -12,8 +12,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 // Comparer receives a file and the saved information about that file from the previous scan,

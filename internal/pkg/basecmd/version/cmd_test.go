@@ -15,10 +15,10 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/logp"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/control/server"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/cli"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 func TestCmdBinaryOnly(t *testing.T) {

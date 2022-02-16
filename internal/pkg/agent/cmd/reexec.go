@@ -10,7 +10,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {

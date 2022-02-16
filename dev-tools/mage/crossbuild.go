@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/v7/libbeat/common/file"
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
 const defaultCrossBuildTarget = "golangCrossBuild"

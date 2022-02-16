@@ -4,7 +4,7 @@
 
 package common
 
-import devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+import devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
 // DumpVariables writes the template variables and values to stdout.
 func DumpVariables() error {

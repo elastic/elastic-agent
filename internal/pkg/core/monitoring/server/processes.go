@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/state"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 )
 
 const (

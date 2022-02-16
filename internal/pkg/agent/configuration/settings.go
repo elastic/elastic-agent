@@ -5,12 +5,12 @@
 package configuration
 
 import (
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	monitoringCfg "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/process"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/retry"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/server"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/process"
+	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
+	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 )
 
 // SettingsConfig is an collection of agent settings configuration.
