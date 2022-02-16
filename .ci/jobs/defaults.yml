@@ -4,7 +4,7 @@
 ##### GLOBAL METADATA
 
 - meta:
-    cluster: internal-ci
+    cluster: beats-ci
 
 ##### JOB DEFAULTS
 
