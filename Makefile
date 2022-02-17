@@ -9,6 +9,7 @@ VENV_PARAMS?=
 FIND=find . -type f -not -path "*/build/*" -not -path "*/.git/*"
 GOLINT=golint
 GOLINT_REPO=golang.org/x/lint/golint
+XPACK_SUFFIX=''
 
 
 ## help : Show this help.
@@ -46,6 +47,15 @@ check-no-changes:
 .PHONY: snapshot
 snapshot:
 	@$(MAKE) SNAPSHOT=true release
+
+## release : Builds a release.
+.PHONY: release
+release:
+	@mage dumpVariables
+	@$(foreach var,$(BEATS) ,$(MAKE) -C $(var) release || exit 1;)
+	@$(foreach var,$(BEATS), \
+      test -d $(var)/build/distributions && test -n "$$(ls $(var)/build/distributions)" || exit 0; \
+      mkdir -p build/distributions/$(subst $(XPACK_SUFFIX),'',$(var)) && mv -f $(var)/build/distributions/* build/distributions/$(subst $(XPACK_SUFFIX),'',$(var))/ || exit 1;)
 
 ## release-manager-snapshot : Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.
 .PHONY: release-manager-snapshot
