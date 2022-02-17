@@ -5,7 +5,7 @@ import re
 import sys
 from subprocess import check_call
 
-vendored_elastic_agent = os.path.normpath("vendor/github.com/elastic/elastic-agent-poc")
+vendored_elastic_agent = os.path.normpath("vendor/github.com/elastic/elastic-agent")
 
 
 goversion_var_elastic_agent = "defaultAgentVersion"		# version in agent
@@ -13,7 +13,7 @@ goversion_var = "appVersion"						# version for custom beats
 
 
 def get_rootfolder():
-    vendored_elastic_agent = os.path.normpath("vendor/github.com/elastic/elastic-agent-poc")
+    vendored_elastic_agent = os.path.normpath("vendor/github.com/elastic/elastic-agent")
     script_directory = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
     index = script_directory.find(vendored_elastic_agent)
     if index > 0:

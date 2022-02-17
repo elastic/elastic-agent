@@ -20,7 +20,7 @@ package download
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 // Downloader is an interface allowing download of an artifact

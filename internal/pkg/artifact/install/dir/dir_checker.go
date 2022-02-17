@@ -21,7 +21,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 // Checker performs basic check that the install directory exists.

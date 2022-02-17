@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/internal/yamltest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/internal/yamltest"
 )
 
 func TestRules(t *testing.T) {

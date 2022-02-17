@@ -28,9 +28,9 @@ import (
 	// import logp flags
 	_ "github.com/elastic/beats/v7/libbeat/logp/configure"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/basecmd"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/cli"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 func troubleshootMessage() string {

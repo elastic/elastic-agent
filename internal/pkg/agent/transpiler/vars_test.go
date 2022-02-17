@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/v7/libbeat/common"
-	corecomp "github.com/elastic/elastic-agent-poc/internal/pkg/core/composable"
+	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
 func TestVars_Replace(t *testing.T) {

@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
-	corecomp "github.com/elastic/elastic-agent-poc/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 // ContextProviderBuilder creates a new context provider based on the given config and returns it.

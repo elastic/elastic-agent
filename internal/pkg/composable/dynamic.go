@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 // DynamicProviderComm is the interface that an dynamic provider uses to communicate back to Elastic Agent.

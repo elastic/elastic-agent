@@ -21,7 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/tools/go/vcs"
 
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
 const (
@@ -32,9 +32,9 @@ const (
 	// BeatsCrossBuildImage is the image used for crossbuilding Beats.
 	BeatsCrossBuildImage = "docker.elastic.co/beats-dev/golang-crossbuild"
 
-	elasticAgentImportPath = "github.com/elastic/elastic-agent-poc"
+	elasticAgentImportPath = "github.com/elastic/elastic-agent"
 
-	elasticAgentModulePath = "github.com/elastic/elastic-agent-poc/v7"
+	elasticAgentModulePath = "github.com/elastic/elastic-agent/v7"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.

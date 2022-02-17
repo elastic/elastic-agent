@@ -44,7 +44,7 @@ def runBuilds(Map args = [:]) {
   def quietPeriod = 0
   branches.each { branch ->
     build(quietPeriod: quietPeriod,
-          job: "elastic-agent/elastic-agent-poc-mbp/${branch}",
+          job: "elastic-agent/elastic-agent-mbp/${branch}",
           parameters: [
             booleanParam(name: 'integration_tests_ci', value: true),
             booleanParam(name: 'end_to_end_tests_ci', value: true)

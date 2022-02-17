@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/cmd/platformcheck"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	"github.com/elastic/beats/v7/x-pack/libbeat/common/proc"
-	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/cmd"
 )
 
 // Setups and Runs agent.

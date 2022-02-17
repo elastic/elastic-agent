@@ -23,7 +23,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/core/composable"
 
 	"github.com/elastic/beats/v7/libbeat/common"
 )

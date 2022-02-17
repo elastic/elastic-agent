@@ -17,7 +17,7 @@
 
 package download
 
-import "github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
+import "github.com/elastic/elastic-agent/internal/pkg/agent/program"
 
 // Verifier is an interface verifying GPG key of a downloaded artifact
 type Verifier interface {

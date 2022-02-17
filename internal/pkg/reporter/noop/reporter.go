@@ -20,7 +20,7 @@ package noop
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/reporter"
+	"github.com/elastic/elastic-agent/internal/pkg/reporter"
 )
 
 // Reporter is a reporter without any effects, serves just as a showcase for further implementations.

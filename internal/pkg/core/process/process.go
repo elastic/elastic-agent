@@ -11,9 +11,9 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/beats/v7/x-pack/libbeat/common/proc"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
 )
 
 var (

@@ -21,7 +21,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 )
 
 // DoWithBackoff ignores retry config of delays and lets backoff decide how much time it needs.

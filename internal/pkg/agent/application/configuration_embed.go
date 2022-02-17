@@ -19,7 +19,7 @@
 
 package application
 
-import "github.com/elastic/elastic-agent-poc/internal/pkg/packer"
+import "github.com/elastic/elastic-agent/internal/pkg/packer"
 
 // DefaultAgentFleetConfig is the content of the default configuration when we enroll a beat, the elastic-agent.yml
 // will be replaced with this variables.

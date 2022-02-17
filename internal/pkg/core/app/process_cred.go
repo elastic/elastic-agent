@@ -24,7 +24,7 @@ import (
 	"os/user"
 	"strconv"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 // UserGroup returns the uid and gid for the process specification.
