@@ -21,10 +21,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 // Upgrade is a handler for UPGRADE action.

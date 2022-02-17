@@ -20,8 +20,8 @@ package lazy
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 type batchAcker interface {

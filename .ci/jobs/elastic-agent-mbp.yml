@@ -1,7 +1,7 @@
 ---
 - job:
-    name: "elastic-agent/elastic-agent-poc-mbp"
-    display-name: elastic-agent-poc
+    name: "elastic-agent/elastic-agent-mbp"
+    display-name: elastic-agent
     description: "POC to isolate elastic agent from beats"
     project-type: multibranch
     script-path: .ci/Jenkinsfile
@@ -13,7 +13,7 @@
           discover-pr-origin: merge-current
           discover-tags: true
           notification-context: 'internal-ci'
-          repo: elastic-agent-poc
+          repo: elastic-agent
           repo-owner: elastic
           credentials-id: 2a9602aa-ab9f-4e52-baf3-b71ca88469c7-UserAndToken
           ssh-checkout:

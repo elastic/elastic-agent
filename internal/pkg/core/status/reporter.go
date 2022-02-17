@@ -25,8 +25,8 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 )
 
 // AgentStatusCode is the status code for the Elastic Agent overall.

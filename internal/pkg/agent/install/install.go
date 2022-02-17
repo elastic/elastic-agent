@@ -25,9 +25,9 @@ import (
 
 	"github.com/otiai10/copy"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.

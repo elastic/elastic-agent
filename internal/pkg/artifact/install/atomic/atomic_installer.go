@@ -26,7 +26,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 type embeddedInstaller interface {

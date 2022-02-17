@@ -27,10 +27,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 func TestResolver(t *testing.T) {

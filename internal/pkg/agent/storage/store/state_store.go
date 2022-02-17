@@ -26,10 +26,10 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 type dispatcher interface {

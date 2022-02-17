@@ -22,10 +22,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 type rOp int

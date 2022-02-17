@@ -10,12 +10,12 @@ package main
 import (
 	"context"
 
-	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
 	// mage:import
-	_ "github.com/elastic/elastic-agent-poc/dev-tools/mage/target/common"
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/target/test"
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 )
 
 func init() {

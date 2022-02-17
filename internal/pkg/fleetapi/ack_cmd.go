@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
 
 const ackPath = "/api/fleet/agents/%s/acks"

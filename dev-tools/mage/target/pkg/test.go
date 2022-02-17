@@ -4,7 +4,7 @@
 
 package pkg
 
-import devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+import devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
 // PackageTest tests the generated packages in build/distributions. It checks
 // things like file ownership/mode, package attributes, etc.

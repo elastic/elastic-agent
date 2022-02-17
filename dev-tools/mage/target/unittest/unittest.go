@@ -9,8 +9,8 @@ import (
 
 	"github.com/magefile/mage/mg"
 
-	devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
-	"github.com/elastic/elastic-agent-poc/dev-tools/mage/target/test"
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 )
 
 func init() {

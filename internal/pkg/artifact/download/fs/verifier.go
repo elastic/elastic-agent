@@ -28,12 +28,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 
 	"golang.org/x/crypto/openpgp"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 )
 
 const (

@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/composable"
-	ctesting "github.com/elastic/elastic-agent-poc/internal/pkg/composable/testing"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 )
 
 func TestContextProvider(t *testing.T) {

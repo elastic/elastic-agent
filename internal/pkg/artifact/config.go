@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 // Config is a configuration used for verifier and downloader

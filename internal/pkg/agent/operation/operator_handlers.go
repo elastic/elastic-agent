@@ -20,11 +20,11 @@ package operation
 import (
 	"fmt"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/core/app"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 type handleFunc func(step configrequest.Step) error

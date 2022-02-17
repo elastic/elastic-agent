@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
 func TestConfig(t *testing.T) {

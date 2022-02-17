@@ -21,18 +21,18 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/reexec"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 // Application is the application interface implemented by the different running mode.

@@ -4,7 +4,7 @@
 
 package common
 
-import devtools "github.com/elastic/elastic-agent-poc/dev-tools/mage"
+import devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
 // Clean cleans all generated files and build artifacts.
 func Clean() error {

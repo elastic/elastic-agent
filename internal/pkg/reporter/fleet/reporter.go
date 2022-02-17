@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/reporter"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/reporter/fleet/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/reporter"
+	"github.com/elastic/elastic-agent/internal/pkg/reporter/fleet/config"
 )
 
 type event struct {

@@ -18,15 +18,15 @@
 package pipeline
 
 import (
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 )
 
 // ConfigHandler is capable of handling configrequest.

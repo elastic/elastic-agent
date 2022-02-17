@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/eql"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 const (

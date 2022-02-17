@@ -20,7 +20,7 @@ package basecmd
 import (
 	"testing"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 func TestBaseCmd(t *testing.T) {

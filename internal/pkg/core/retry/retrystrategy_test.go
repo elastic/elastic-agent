@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 )
 
 func TestRetry(t *testing.T) {

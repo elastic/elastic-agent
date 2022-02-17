@@ -22,11 +22,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 )
 
 // operationVerify verifies downloaded artifact for correct signature

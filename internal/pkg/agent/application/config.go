@@ -18,7 +18,7 @@
 package application
 
 import (
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 )
 
 type localConfig struct {

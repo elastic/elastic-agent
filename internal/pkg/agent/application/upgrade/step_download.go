@@ -21,16 +21,16 @@ import (
 	"context"
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/composed"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/fs"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/http"
-	downloader "github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/localremote"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/snapshot"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/composed"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/fs"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
+	downloader "github.com/elastic/elastic-agent/internal/pkg/artifact/download/localremote"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/snapshot"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string) (string, error) {

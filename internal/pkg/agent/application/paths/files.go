@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/filelock"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 )
 
 // defaultAgentCapabilitiesFile is a name of file used to store agent capabilities

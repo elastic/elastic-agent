@@ -21,12 +21,12 @@ import (
 	"errors"
 	"os"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 )
 
 // Capability provides a way of applying predefined filter to object.

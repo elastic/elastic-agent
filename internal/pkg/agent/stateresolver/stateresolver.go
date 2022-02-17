@@ -20,9 +20,9 @@ package stateresolver
 import (
 	"sync"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	uid "github.com/elastic/elastic-agent-poc/internal/pkg/id"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	uid "github.com/elastic/elastic-agent/internal/pkg/id"
 )
 
 // Acker allow to ack the should state from a converge operation.

@@ -29,9 +29,9 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
 
 // EnrollType is the type of enrollment to do with the elastic-agent.

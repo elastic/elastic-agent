@@ -23,10 +23,10 @@ import (
 	"strings"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/http"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 // NewDownloader creates a downloader which first checks local directory

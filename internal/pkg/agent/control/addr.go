@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 // Address returns the address to connect to Elastic Agent daemon.

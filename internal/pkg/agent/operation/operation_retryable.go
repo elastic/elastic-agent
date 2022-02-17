@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/retry"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 )
 
 // retryableOperations consists of multiple operations which are

@@ -30,8 +30,8 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
 	"github.com/elastic/beats/v7/libbeat/common/kubernetes/metadata"
 	"github.com/elastic/beats/v7/libbeat/logp"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
 )
 
 type pod struct {

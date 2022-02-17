@@ -24,10 +24,10 @@ import (
 	"github.com/spf13/cobra"
 
 	c "github.com/elastic/beats/v7/libbeat/common/cli"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 func newUninstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {

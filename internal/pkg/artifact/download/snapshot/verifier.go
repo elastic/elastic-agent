@@ -18,9 +18,9 @@
 package snapshot
 
 import (
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact/download/http"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
 )
 
 // NewVerifier creates a downloader which first checks local directory

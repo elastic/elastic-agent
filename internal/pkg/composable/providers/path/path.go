@@ -18,12 +18,12 @@
 package path
 
 import (
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/composable"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
-	corecomp "github.com/elastic/elastic-agent-poc/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 func init() {

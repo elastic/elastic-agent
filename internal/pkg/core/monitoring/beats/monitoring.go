@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	monitoringConfig "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )
 
 const (

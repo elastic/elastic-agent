@@ -20,9 +20,9 @@ package configuration
 import (
 	"fmt"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
 // Configuration is a overall agent configuration

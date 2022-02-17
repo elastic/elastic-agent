@@ -26,11 +26,11 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/config"
-	monitoringConfig "github.com/elastic/elastic-agent-poc/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )
 
 const httpPlusPrefix = "http+"

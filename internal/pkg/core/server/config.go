@@ -20,7 +20,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 // Config is a configuration of GRPC server.

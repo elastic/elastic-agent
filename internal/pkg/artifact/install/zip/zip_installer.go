@@ -26,9 +26,9 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 )
 
 // Installer or zip packages

@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/logger"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent-poc/internal/pkg/reporter"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/reporter"
 )
 
 func TestEventsHaveAgentID(t *testing.T) {
