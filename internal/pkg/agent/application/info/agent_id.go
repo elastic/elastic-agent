@@ -20,8 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
 )
 
 // defaultAgentConfigFile is a name of file used to store agent information

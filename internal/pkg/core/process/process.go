@@ -11,9 +11,9 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/elastic/beats/v7/x-pack/libbeat/common/proc"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/libbeat/common/proc"
 )
 
 var (
@@ -45,7 +45,7 @@ func Start(logger *logger.Logger, path string, config *Config, uid, gid int, arg
 // - network address of child process
 // - process id
 // - error
-func StartContext(ctx context.Context, logger *logger.Logger, path string, config *Config, uid, gid int, args []string, opts ...Option) (proc *Info, err error) {
+func StartContext(ctx context.Context, logger *logger.Logger, path string, config *Config, uid, gid int, args []string, opts ...Option) (*Info, error) {
 	cmd := getCmd(ctx, logger, path, []string{}, uid, gid, args...)
 	for _, o := range opts {
 		o(cmd)

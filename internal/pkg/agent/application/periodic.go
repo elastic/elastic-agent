@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/filewatcher"
 )

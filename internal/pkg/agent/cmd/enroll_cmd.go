@@ -17,7 +17,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-poc/internal/pkg/core/backoff"
 	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"

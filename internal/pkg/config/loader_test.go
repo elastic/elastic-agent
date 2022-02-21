@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 )
 
 func TestExternalConfigLoading(t *testing.T) {

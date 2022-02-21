@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
@@ -32,7 +31,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
 )
 
 var diagOutputs = map[string]outputter{

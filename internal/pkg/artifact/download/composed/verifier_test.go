@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/agent/program"
-	"github.com/elastic/elastic-agent-poc/elastic-agent/pkg/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 )
 
 type ErrorVerifier struct {
