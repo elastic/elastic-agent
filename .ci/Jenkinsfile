@@ -110,31 +110,19 @@ pipeline {
               runK8s(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1', context: "K8s-${PLATFORM}")
             }
           }
-        }
-      }
-    }
-    stage('Package') {
-      when {
-        beforeAgent true
-        anyOf {
-          expression { return env.GITHUB_COMMENT?.contains('package') }
-          expression { matchesPrLabel(label: 'ci:package') }
-          not { changeRequest() }
-        }
-      }
-      failFast false
-      matrix {
-        agent {label "${PLATFORM}"}
-        options { skipDefaultCheckout() }
-        axes {
-          axis {
-            name 'PLATFORM'
-            // TODO: 'macosx && x86_64' doesn't work since docker is not available in the internal-ci macosx workers
-            values 'ubuntu-20.04 && immutable', 'aarch64'
-          }
-        }
-        stages {
-          stage('Package'){
+          stage('Package') {
+            when {
+              beforeAgent true
+              allOf {
+                anyOf {
+                  expression { return env.GITHUB_COMMENT?.contains('package') }
+                  expression { matchesPrLabel(label: 'ci:package') }
+                  // not { changeRequest() }
+                }
+                // Run packaging only for the linux specific arch
+                expression { return (PLATFORM.contains('ubuntu') || PLATFORM.contains('aarch64')) }
+              }
+            }
             steps {
               withGithubNotify(context: "Package ${PLATFORM}") {
                 deleteDir()
