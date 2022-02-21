@@ -29,10 +29,10 @@ for the standard variant.
 ### Testing Elastic Agent on Kubernetes
 
 #### Prerequisites
-- create kubernetes cluster using kind, check [here](https://github.com/elastic/beats/blob/master/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
-- deploy kube-state-metrics, check [here](https://github.com/elastic/beats/blob/master/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+- create kubernetes cluster using kind, check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+- deploy kube-state-metrics, check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
 - deploy required infrastructure:
-    - for elastic agent in standalone mode: EK stack or use [elastic cloud](https://cloud.elastic.co), check [here](https://github.com/elastic/beats/blob/master/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+    - for elastic agent in standalone mode: EK stack or use [elastic cloud](https://cloud.elastic.co), check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
     - for managed mode: use [elastic cloud](https://cloud.elastic.co) or bring up the stack on docker and then connect docker network with kubernetes kind nodes:
   ```
   elastic-package stack up -d -v
@@ -41,7 +41,6 @@ for the standard variant.
 
 1. Build elastic-agent:
 ```bash
-cd x-pack/elastic-agent
 DEV=true PLATFORMS=linux/amd64 TYPES=docker mage package
 ```
 2. Build docker image:
