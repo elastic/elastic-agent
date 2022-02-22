@@ -142,7 +142,7 @@ pipeline {
                     withPackageEnv("${PLATFORM}") {
                       cmd(label: 'Go package', script: 'mage package')
                       uploadPackagesToGoogleBucket(
-                        credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
+                        credentialsId: env.JOB_GCS_CREDENTIALS,
                         repo: env.REPO,
                         bucket: env.JOB_GCS_BUCKET,
                         pattern: "build/distributions/**/*")
