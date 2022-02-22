@@ -54,6 +54,7 @@ pipeline {
         withGithubNotify(context: "Lint") {
           withMageEnv(){
            dir("${BASE_DIR}"){
+              setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
               cmd(label: 'check license, lint', script: 'mage check')
               cmd(label: 'update', script: 'mage update')
             }
