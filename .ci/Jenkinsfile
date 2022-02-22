@@ -11,6 +11,8 @@ pipeline {
     PIPELINE_LOG_LEVEL = 'INFO'
     EXTERNAL = true
     SNAPSHOT = true
+    JOB_GCS_BUCKET = 'beats-ci-artifacts'
+    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'
   }
   options {
     timeout(time: 2, unit: 'HOURS')
@@ -138,7 +140,11 @@ pipeline {
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
                       cmd(label: 'Go package', script: 'mage package')
-                      uploadPackagesToGoogleBucket()
+                      uploadPackagesToGoogleBucket(
+                        credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
+                        repo: env.REPO,
+                        bucket: env.JOB_GCS_BUCKET,
+                        pattern: "build/distributions/**/*")
                       pushDockerImages(
                         registry: env.DOCKER_REGISTRY,
                         secret: env.DOCKER_ELASTIC_SECRET,
