@@ -14,6 +14,8 @@ pipeline {
     JOB_GCS_BUCKET = 'beats-ci-artifacts'
     JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
     JOB_GCS_EXT_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'
+    DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
+    DOCKER_REGISTRY = 'docker.elastic.co'
   }
   options {
     timeout(time: 2, unit: 'HOURS')
