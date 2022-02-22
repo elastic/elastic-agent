@@ -49,6 +49,7 @@ var (
 	TestCoverage = false
 	PLATFORMS    = EnvOr("PLATFORMS", "")
 	PACKAGES     = EnvOr("PACKAGES", "")
+	CI           = EnvOr("CI", "")
 
 	// CrossBuildMountModcache CrossBuildMountModcache, if true, mounts $GOPATH/pkg/mod into
 	// the crossbuild images at /go/pkg/mod, read-only.
@@ -171,6 +172,7 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 		"DEV":             DevBuild,
 		"EXTERNAL":        ExternalBuild,
 		"Qualifier":       versionQualifier,
+		"CI":              CI,
 	}
 
 	// Add the extra args to the map.
