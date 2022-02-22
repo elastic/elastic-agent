@@ -134,10 +134,7 @@ pipeline {
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
                       cmd(label: 'Go package', script: 'mage package')
-                      // IMPORTANT:
-                      // As long as we use internal-ci we cannot use the upload bucket without
-                      // debugging what's the problem with the existing credentials.
-                      //uploadPackagesToGoogleBucket()
+                      uploadPackagesToGoogleBucket()
                       pushDockerImages(
                         registry: env.DOCKER_REGISTRY,
                         secret: env.DOCKER_ELASTIC_SECRET,
