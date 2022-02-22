@@ -123,6 +123,9 @@ pipeline {
                 expression { return (PLATFORM.contains('ubuntu') || PLATFORM.contains('aarch64')) }
               }
             }
+            environment {
+              ARCH = "${PLATFORM.equals('aarch64') ? 'arm64' : 'amd64'}"
+            }
             steps {
               withGithubNotify(context: "Package ${PLATFORM}") {
                 deleteDir()
@@ -136,20 +139,17 @@ pipeline {
                       // debugging what's the problem with the existing credentials.
                       //uploadPackagesToGoogleBucket()
                       pushDockerImages(
-                        secret: env.DOCKER_ELASTIC_SECRET,
                         registry: env.DOCKER_REGISTRY,
-                        arch: PLATFORM.equals("aarch64") ? 'arm64' : 'amd64',
-                        version: env.BEAT_VERSION,
+                        secret: env.DOCKER_ELASTIC_SECRET,
                         snapshot: env.SNAPSHOT,
-                        imageName: 'elastic-agent',
-                        variants: [
-                          '' : 'beats',
-                          '-oss' : 'beats',
-                          '-ubi8' : 'beats',
-                          '-complete' : 'beats',
-                          '-cloud' : 'beats-ci'
-                        ],
-                        targetNamespace: 'observability-ci'
+                        version: env.BEAT_VERSION,
+                        images: [
+                          [ source: "beats/elastic-agent", arch: env.ARCH, target: "observability-ci/elastic-agent"],
+                          [ source: "beats/elastic-agent-oss", arch: env.ARCH, target: "observability-ci/elastic-agent-oss"],
+                          [ source: "beats/elastic-agent-ubi8", arch: env.ARCH, target: "observability-ci/elastic-agent-ubi8"],
+                          [ source: "beats/elastic-agent-complete", arch: env.ARCH, target: "observability-ci/elastic-agent-complete"],
+                          [ source: "beats-ci/elastic-agent-cloud", arch: env.ARCH, target: "observability-ci/elastic-agent-cloud"]
+                        ]
                       )
                     }
                   }
