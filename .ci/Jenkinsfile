@@ -12,7 +12,8 @@ pipeline {
     EXTERNAL = true
     SNAPSHOT = true
     JOB_GCS_BUCKET = 'beats-ci-artifacts'
-    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'
+    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
+    JOB_GCS_EXT_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'
   }
   options {
     timeout(time: 2, unit: 'HOURS')
@@ -139,7 +140,7 @@ pipeline {
                     withPackageEnv("${PLATFORM}") {
                       cmd(label: 'Go package', script: 'mage package')
                       uploadPackagesToGoogleBucket(
-                        credentialsId: env.JOB_GCS_CREDENTIALS,
+                        credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
                         repo: env.REPO,
                         bucket: env.JOB_GCS_BUCKET,
                         pattern: "build/distributions/**/*")
