@@ -134,14 +134,13 @@ func CrossBuild(options ...CrossBuildOption) error {
 			if platform.GOOS() == "aix" {
 				if len(params.Platforms) != 1 {
 					return errors.New("AIX cannot be crossbuilt with other platforms. Set PLATFORMS='aix/ppc64'")
-				} else {
-					// This is basically a short-out so we can attempt to build on AIX in a relatively generic way
-					log.Printf("Target is building for AIX, skipping normal crossbuild process")
-					args := DefaultBuildArgs()
-					args.OutputDir = filepath.Join("build", "golang-crossbuild")
-					args.Name += "-" + Platform.GOOS + "-" + Platform.Arch
-					return Build(args)
 				}
+				// This is basically a short-out so we can attempt to build on AIX in a relatively generic way
+				log.Printf("Target is building for AIX, skipping normal crossbuild process")
+				args := DefaultBuildArgs()
+				args.OutputDir = filepath.Join("build", "golang-crossbuild")
+				args.Name += "-" + Platform.GOOS + "-" + Platform.Arch
+				return Build(args)
 			}
 		}
 		// If we're here, something isn't set.
@@ -202,6 +201,7 @@ func buildMage() error {
 		"-compile", CreateDir(filepath.Join("build", "mage-linux-"+arch)))
 }
 
+// CrossBuildImage fucntions build the docker image
 func CrossBuildImage(platform string) (string, error) {
 	tagSuffix := "main"
 

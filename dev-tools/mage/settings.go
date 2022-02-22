@@ -54,7 +54,7 @@ var (
 	// the crossbuild images at /go/pkg/mod, read-only.
 	CrossBuildMountModcache = true
 
-	BeatName        = EnvOr("BEAT_NAME", "elastic-agent")
+	BeatName        = EnvOr("BEAT_NAME", filepath.Base(CWD()))
 	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
 	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
