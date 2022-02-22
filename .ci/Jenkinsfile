@@ -46,6 +46,10 @@ pipeline {
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: true)
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
+        dir("${BASE_DIR}"){
+          setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
+          setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
+        }
       }
     }
     stage('Lint'){
@@ -66,6 +70,17 @@ pipeline {
       }
     }
     stage('Test') {
+      when {
+        // Always when running builds on branches/tags
+        // On a PR basis, skip if changes are only related to docs.
+        anyOf {
+          not { changeRequest() }                           // If no PR
+          allOf {                                           // If PR and no docs changes
+            expression { return env.ONLY_DOCS == "false" }
+            changeRequest()
+          }
+        }
+      }
       failFast false
       matrix {
         agent {label "${PLATFORM}"}
@@ -124,7 +139,8 @@ pipeline {
                 anyOf {
                   expression { return env.GITHUB_COMMENT?.contains('package') }
                   expression { matchesPrLabel(label: 'ci:package') }
-                  // not { changeRequest() }
+                  not { changeRequest() }
+                  expression { return env.PACKAGING_CHANGES == "true" }
                 }
                 // Run packaging only for the linux specific arch
                 expression { return (PLATFORM.contains('ubuntu') || PLATFORM.contains('aarch64')) }
@@ -170,10 +186,18 @@ pipeline {
     }
     stage('K8s') {
       when {
-        // TODO: Run only if changes in
-        //  - "^deploy/kubernetes/.*"
-        //  - "^version/docs/version.asciidoc"
-        not { changeRequest() }
+        // Always when running builds on branches/tags
+        // On a PR basis, skip if changes are only related to docs.
+        anyOf {
+          // TODO: Run only if changes in
+          //  - "^deploy/kubernetes/.*"
+          //  - "^version/docs/version.asciidoc"
+          not { changeRequest() }                           // If no PR
+          allOf {                                           // If PR and no docs changes
+            expression { return env.ONLY_DOCS == "false" }
+            changeRequest()
+          }
+        }
       }
       steps {
         runAllK8s(["v1.23.0", "v1.22.0", "v1.21.1", "v1.20.7", "v1.19.11", "v1.18.19"])
