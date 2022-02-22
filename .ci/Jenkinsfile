@@ -49,6 +49,7 @@ pipeline {
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
+          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc)' ], shouldMatchAll: false).toString())
         }
       }
     }
@@ -188,15 +189,14 @@ pipeline {
       when {
         // Always when running builds on branches/tags
         // On a PR basis, skip if changes are only related to docs.
+        // Enable if k8s related changes.
         anyOf {
-          // TODO: Run only if changes in
-          //  - "^deploy/kubernetes/.*"
-          //  - "^version/docs/version.asciidoc"
           not { changeRequest() }                           // If no PR
           allOf {                                           // If PR and no docs changes
             expression { return env.ONLY_DOCS == "false" }
             changeRequest()
           }
+          expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
       }
       steps {
