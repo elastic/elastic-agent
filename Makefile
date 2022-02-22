@@ -81,3 +81,7 @@ release-manager-snapshot:
 release-manager-release:
 	GO_VERSION=$(shell cat ./.go-version) ./dev-tools/run_with_go_ver $(MAKE) release
 
+## get-version : Get the libbeat version
+.PHONY: get-version
+get-version:
+	@mage dumpVariables | grep 'beat_version' | cut -d"=" -f 2 | tr -d " "

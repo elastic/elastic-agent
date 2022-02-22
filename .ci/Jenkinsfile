@@ -11,6 +11,11 @@ pipeline {
     PIPELINE_LOG_LEVEL = 'INFO'
     EXTERNAL = true
     SNAPSHOT = true
+    JOB_GCS_BUCKET = 'beats-ci-artifacts'
+    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
+    JOB_GCS_EXT_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'
+    DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
+    DOCKER_REGISTRY = 'docker.elastic.co'
   }
   options {
     timeout(time: 2, unit: 'HOURS')
@@ -48,6 +53,8 @@ pipeline {
         withGithubNotify(context: "Lint") {
           withMageEnv(){
            dir("${BASE_DIR}"){
+              setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
+              log(level: 'INFO', text: "env.BEAT_VERSION=${env.BEAT_VERSION}")
               cmd(label: 'check license, lint', script: 'mage check')
               cmd(label: 'update', script: 'mage update')
             }
@@ -110,31 +117,22 @@ pipeline {
               runK8s(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1', context: "K8s-${PLATFORM}")
             }
           }
-        }
-      }
-    }
-    stage('Package') {
-      when {
-        beforeAgent true
-        anyOf {
-          expression { return env.GITHUB_COMMENT?.contains('package') }
-          expression { matchesPrLabel(label: 'ci:package') }
-          not { changeRequest() }
-        }
-      }
-      failFast false
-      matrix {
-        agent {label "${PLATFORM}"}
-        options { skipDefaultCheckout() }
-        axes {
-          axis {
-            name 'PLATFORM'
-            // TODO: 'macosx && x86_64' doesn't work since docker is not available in the internal-ci macosx workers
-            values 'ubuntu-20.04 && immutable', 'aarch64'
-          }
-        }
-        stages {
-          stage('Package'){
+          stage('Package') {
+            when {
+              beforeAgent true
+              allOf {
+                anyOf {
+                  expression { return env.GITHUB_COMMENT?.contains('package') }
+                  expression { matchesPrLabel(label: 'ci:package') }
+                  // not { changeRequest() }
+                }
+                // Run packaging only for the linux specific arch
+                expression { return (PLATFORM.contains('ubuntu') || PLATFORM.contains('aarch64')) }
+              }
+            }
+            environment {
+              ARCH = "${PLATFORM.equals('aarch64') ? 'arm64' : 'amd64'}"
+            }
             steps {
               withGithubNotify(context: "Package ${PLATFORM}") {
                 deleteDir()
@@ -143,6 +141,24 @@ pipeline {
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
                       cmd(label: 'Go package', script: 'mage package')
+                      uploadPackagesToGoogleBucket(
+                        credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
+                        repo: env.REPO,
+                        bucket: env.JOB_GCS_BUCKET,
+                        pattern: "build/distributions/**/*")
+                      pushDockerImages(
+                        registry: env.DOCKER_REGISTRY,
+                        secret: env.DOCKER_ELASTIC_SECRET,
+                        snapshot: env.SNAPSHOT,
+                        version: env.BEAT_VERSION,
+                        images: [
+                          [ source: "beats/elastic-agent", arch: env.ARCH, target: "observability-ci/elastic-agent"],
+                          [ source: "beats/elastic-agent-oss", arch: env.ARCH, target: "observability-ci/elastic-agent-oss"],
+                          [ source: "beats/elastic-agent-ubi8", arch: env.ARCH, target: "observability-ci/elastic-agent-ubi8"],
+                          [ source: "beats/elastic-agent-complete", arch: env.ARCH, target: "observability-ci/elastic-agent-complete"],
+                          [ source: "beats-ci/elastic-agent-cloud", arch: env.ARCH, target: "observability-ci/elastic-agent-cloud"]
+                        ]
+                      )
                     }
                   }
                 }
