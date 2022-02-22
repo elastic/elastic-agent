@@ -124,10 +124,15 @@ pipeline {
           }
           stage('K8s') {
             when {
-              // TODO: Run only if changes in
-              //  - "^deploy/kubernetes/.*"
-              //  - "^version/docs/version.asciidoc"
-              expression { return env.PLATFORM == 'ubuntu-20.04 && immutable' }
+              // Always when running builds on branches/tags
+              // Enable if k8s related changes.
+              allOf {
+                expression { return env.PLATFORM == 'ubuntu-20.04 && immutable' }
+                anyOf {
+                  not { changeRequest() }                           // If no PR
+                  expression { return env.K8S_CHANGES == "true" }
+                }
+              }
             }
             steps {
               runK8s(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1', context: "K8s-${PLATFORM}")
