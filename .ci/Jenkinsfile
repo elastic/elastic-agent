@@ -11,6 +11,8 @@ pipeline {
     PIPELINE_LOG_LEVEL = 'INFO'
     EXTERNAL = true
     SNAPSHOT = true
+    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'  // Support stash/unstash v2
+    JOB_GCS_BUCKET = 'beats-ci-temp'             // Support stash/unstash v2
   }
   options {
     timeout(time: 2, unit: 'HOURS')
@@ -40,7 +42,7 @@ pipeline {
         pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: true)
-        stash allowEmpty: true, name: 'source', useDefaultExcludes: false
+        stashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
       }
     }
     stage('Lint'){
@@ -74,7 +76,7 @@ pipeline {
             steps {
               withGithubNotify(context: "Build-${PLATFORM}") {
                 deleteDir()
-                unstash 'source'
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                 withMageEnv(){
                   dir("${BASE_DIR}"){
                     cmd(label: 'Go build', script: 'mage build')
@@ -138,7 +140,7 @@ pipeline {
             steps {
               withGithubNotify(context: "Package ${PLATFORM}") {
                 deleteDir()
-                unstash 'source'
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                 withMageEnv(){
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
@@ -273,7 +275,7 @@ def runAllK8s(versions) {
   versions.each { version ->
     node('ubuntu-20.04 && immutable') {
       deleteDir()
-      unstash 'source'
+      unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
       runK8s(k8sVersion: version, kindVersion: 'v0.11.1', context: "K8s-${version}")
     }
   }
