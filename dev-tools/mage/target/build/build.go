@@ -12,4 +12,3 @@ import (
 func Build() error {
 	return devtools.Build(devtools.DefaultBuildArgs())
 }
-
