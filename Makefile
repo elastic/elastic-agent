@@ -47,7 +47,7 @@ notice:
 		-noticeOut NOTICE.txt \
 		-depsOut ""
 
-## check-ci: Run all the check under the ci, this doesn't include the linter which is run via a github action.
+## check-ci: Run all the checks under the ci, this doesn't include the linter which is run via a github action.
 .PHONY: check-ci
 check-ci:
 	@mage update
@@ -55,7 +55,7 @@ check-ci:
 	@$(MAKE) notice
 	@$(MAKE) check-no-changes
 
-## check: run all the check including linting using golangci-lint.
+## check: run all the checks including linting using golangci-lint.
 .PHONY: check
 check:
 	@$(MAKE) check-ci
