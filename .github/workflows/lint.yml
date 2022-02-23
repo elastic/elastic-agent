@@ -25,3 +25,7 @@ jobs:
       run: mage update
     - name: Run no changes
       run: make check-no-changes
+    - name: Run build
+      run: mage build
+    - name: Run test
+      run: mage unitTest
