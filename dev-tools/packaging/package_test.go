@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package packaging
+package dev_tools
 
 // This file contains tests that can be run on the generated packages.
 // To run these tests use `go test package_test.go`.
