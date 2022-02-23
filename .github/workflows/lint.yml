@@ -8,7 +8,7 @@ on:
       - 8.*
 
 jobs:
-  macos:
+  lint:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -18,7 +18,7 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
     - name: Install dependencies
-      run:  go get -u github.com/magefile/mage
+      run:  go install github.com/magefile/mage@latest
     - name: Run check
       run: mage check
     - name: Run update
