@@ -54,23 +54,6 @@ pipeline {
         }
       }
     }
-    stage('Lint'){
-      steps {
-        withGithubNotify(context: "Lint") {
-          withMageEnv(){
-           dir("${BASE_DIR}"){
-              setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
-              log(level: 'INFO', text: "env.BEAT_VERSION=${env.BEAT_VERSION}")
-              cmd(label: 'check license, lint', script: 'mage check')
-              cmd(label: 'update', script: 'mage update')
-            }
-            dir("${BASE_DIR}"){
-              cmd(label: 'check no changes', script: 'make check-no-changes')
-            }
-          }
-        }
-      }
-    }
     stage('Test') {
       when {
         // Always when running builds on branches/tags
@@ -162,6 +145,7 @@ pipeline {
                 unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                 withMageEnv(){
                   dir("${BASE_DIR}"){
+                    setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
                     withPackageEnv("${PLATFORM}") {
                       cmd(label: 'Go package', script: 'mage package')
                       uploadPackagesToGoogleBucket(
