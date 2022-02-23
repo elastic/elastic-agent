@@ -56,12 +56,12 @@ pipeline {
     }
     stage('Check'){
       steps {
-        withGithubNotify(context: "Lint") {
+        withGithubNotify(context: "Check") {
           withMageEnv(){
            dir("${BASE_DIR}"){
               setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
               log(level: 'INFO', text: "env.BEAT_VERSION=${env.BEAT_VERSION}")
-              cmd(label: 'check, lint', script: 'make check-ci')
+              cmd(label: 'check', script: 'make check-ci')
             }
           }
         }
