@@ -11,9 +11,10 @@ pipeline {
     PIPELINE_LOG_LEVEL = 'INFO'
     EXTERNAL = true
     SNAPSHOT = true
-    JOB_GCS_BUCKET = 'beats-ci-artifacts'
-    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
-    JOB_GCS_EXT_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'
+    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'  // Support stash/unstash v2
+    JOB_GCS_BUCKET = 'beats-ci-temp'             // Support stash/unstash v2
+    JOB_GCS_EXT_BUCKET = 'beats-ci-artifacts'    // Support uploadPackagesToGoogleBucket
+    JOB_GCS_EXT_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'  // Support uploadPackagesToGoogleBucket
     DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
   }
@@ -45,7 +46,7 @@ pipeline {
         pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: true)
-        stash allowEmpty: true, name: 'source', useDefaultExcludes: false
+        stashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
@@ -97,7 +98,7 @@ pipeline {
             steps {
               withGithubNotify(context: "Build-${PLATFORM}") {
                 deleteDir()
-                unstash 'source'
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                 withMageEnv(){
                   dir("${BASE_DIR}"){
                     cmd(label: 'Go build', script: 'mage build')
@@ -158,7 +159,7 @@ pipeline {
             steps {
               withGithubNotify(context: "Package ${PLATFORM}") {
                 deleteDir()
-                unstash 'source'
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                 withMageEnv(){
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
@@ -166,7 +167,7 @@ pipeline {
                       uploadPackagesToGoogleBucket(
                         credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
                         repo: env.REPO,
-                        bucket: env.JOB_GCS_BUCKET,
+                        bucket: env.JOB_GCS_EXT_BUCKET,
                         pattern: "build/distributions/**/*")
                       pushDockerImages(
                         registry: env.DOCKER_REGISTRY,
@@ -318,7 +319,7 @@ def runAllK8s(versions) {
   versions.each { version ->
     node('ubuntu-20.04 && immutable') {
       deleteDir()
-      unstash 'source'
+      unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
       runK8s(k8sVersion: version, kindVersion: 'v0.11.1', context: "K8s-${version}")
     }
   }
