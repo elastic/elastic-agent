@@ -57,7 +57,7 @@ kind load docker-image custom-agent-image:latest
 ```
 ELASTIC_AGENT_VERSION="8.0"
 ELASTIC_AGENT_MODE="standalone"     # ELASTIC_AGENT_MODE="managed"
-curl -L -O https://raw.githubusercontent.com/elastic/beats/${ELASTIC_AGENT_VERSION}/deploy/kubernetes/elastic-agent-${ELASTIC_AGENT_MODE}-kubernetes.yaml
+curl -L -O https://raw.githubusercontent.com/elastic/elastic-agent/${ELASTIC_AGENT_VERSION}/deploy/kubernetes/elastic-agent-${ELASTIC_AGENT_MODE}-kubernetes.yaml
 ```
 - Modify downloaded manifest:
     - change image name to the one, that was created in the previous step and add `imagePullPolicy: Never`:
