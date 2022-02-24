@@ -47,6 +47,26 @@ notice:
 		-noticeOut NOTICE.txt \
 		-depsOut ""
 
+## check-ci: Run all the checks under the ci, this doesn't include the linter which is run via a github action.
+.PHONY: check-ci
+check-ci:
+	@mage update
+	@mage check
+	@$(MAKE) notice
+	@$(MAKE) check-no-changes
+
+## check: run all the checks including linting using golangci-lint.
+.PHONY: check
+check:
+	@$(MAKE) check-ci
+	@$(MAKE) check-go
+
+## check-go: download and run the go linter.
+.PHONY: check-go
+check-go: ## - Run golangci-lint
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.44.2
+	@./bin/golangci-lint run -v
+
 ## check-no-changes : Check there is no local changes.
 .PHONY: check-no-changes
 check-no-changes:
