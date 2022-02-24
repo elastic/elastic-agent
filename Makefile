@@ -66,10 +66,9 @@ snapshot:
 .PHONY: release
 release:
 	@mage dumpVariables
-	@$(foreach var,$(BEATS) ,$(MAKE) -C $(var) release || exit 1;)
-	@$(foreach var,$(BEATS), \
-      test -d $(var)/build/distributions && test -n "$$(ls $(var)/build/distributions)" || exit 0; \
-      mkdir -p build/distributions/$(subst $(XPACK_SUFFIX),'',$(var)) && mv -f $(var)/build/distributions/* build/distributions/$(subst $(XPACK_SUFFIX),'',$(var))/ || exit 1;)
+	@$($(MAKE) -C $(BEATS) release || exit 1;)
+	@$(test -d $(BEATS)/build/distributions && test -n "$$(ls $(BEATS)/build/distributions)" || exit 0; \
+      mkdir -p build/distributions/$(subst '', '',$(BEATS)) && mv -f $(BEATS)/build/distributions/* build/distributions/$(subst '','',$(BEATS))/ || exit 1;)
 
 ## release-manager-snapshot : Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.
 .PHONY: release-manager-snapshot
