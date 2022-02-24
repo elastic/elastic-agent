@@ -28,7 +28,7 @@ pipeline {
     quietPeriod(10)
   }
   triggers {
-    issueCommentTrigger("(${obltGitHubComments()}|^run ((integration|end-to-end) tests|package)")
+    issueCommentTrigger("(${obltGitHubComments()}|^run (integration|end-to-end) tests|/package)")
   }
   parameters {
     // disabled by default, but required for merge, there are two GH checks:
