@@ -1,12 +1,9 @@
 name: golangci-lint
 on:
   push:
-    tags:
-      - v*
     branches:
       - main
-      - 8.0
-      - 8.1
+      - 8.*
       - 7.17
   pull_request:
 permissions:
