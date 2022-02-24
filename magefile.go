@@ -34,13 +34,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 
 	// mage:import
-	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/docs"
-	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
-
-	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
 const (
@@ -64,7 +60,7 @@ var Aliases = map[string]interface{}{
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
 	test.RegisterDeps(UnitTest)
-
+	devtools.BeatLicense = "Elastic License"
 	devtools.BeatDescription = "Agent manages other beats based on configuration provided."
 
 	devtools.Platforms = devtools.Platforms.Filter("!linux/386")
@@ -315,17 +311,10 @@ func (Check) GoLint() error {
 // License makes sure that all the Golang files have the appropriate license header.
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-
-	fmt.Println(">> fmt - go-licenser: Checking for missing headers")
-
-	mg.Deps(devtools.InstallGoLicenser)
-
-	licenser := gotool.Licenser
-	return licenser(
-		licenser.Check(),
-		licenser.License("Elastic"),
+	// exclude copied files until we come up with a better option
+	return combineErr(
+		sh.RunV("go-licenser", "-d", "-license", "Elastic"),
 	)
-
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
