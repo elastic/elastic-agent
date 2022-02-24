@@ -11,10 +11,10 @@ pipeline {
     PIPELINE_LOG_LEVEL = 'INFO'
     EXTERNAL = true
     SNAPSHOT = true
-    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'  // Support stash/unstash v2
-    JOB_GCS_BUCKET = 'beats-ci-temp'             // Support stash/unstash v2
-    JOB_GCS_EXT_BUCKET = 'beats-ci-artifacts'    // Support uploadPackagesToGoogleBucket
-    JOB_GCS_EXT_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'  // Support uploadPackagesToGoogleBucket
+    JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin'  // Support stash/unstash v2
+    JOB_GCS_BUCKET = 'fleet-ci-temp'             // Support stash/unstash v2
+    JOB_GCS_EXT_BUCKET = 'fleet-ci-artifacts'    // Support uploadPackagesToGoogleBucket
+    JOB_GCS_EXT_CREDENTIALS = 'fleet-ci-gcs-plugin-file-credentials'  // Support uploadPackagesToGoogleBucket
     DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
   }
@@ -90,7 +90,9 @@ pipeline {
         axes {
           axis {
             name 'PLATFORM'
-            values 'macosx && x86_64', 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2019 && windows-immutable'
+            // TODO: 'macosx && x86_64' to be added once macosx is available in fleet-ci
+            //       for the time being we use macos
+            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2019 && windows-immutable'
           }
         }
         stages {
