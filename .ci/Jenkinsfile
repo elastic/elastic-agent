@@ -12,7 +12,7 @@ pipeline {
     EXTERNAL = true
     SNAPSHOT = true
     JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin'  // Support stash/unstash v2
-    JOB_GCS_BUCKET = 'fleet-ci-temp'             // Support stash/unstash v2
+    JOB_GCS_BUCKET = 'beats-ci-temp'             // Support stash/unstash v2
     JOB_GCS_EXT_BUCKET = 'fleet-ci-artifacts'    // Support uploadPackagesToGoogleBucket
     JOB_GCS_EXT_CREDENTIALS = 'fleet-ci-gcs-plugin-file-credentials'  // Support uploadPackagesToGoogleBucket
     DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
