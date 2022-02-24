@@ -24,4 +24,4 @@ jobs:
     - name: Run test
       run: mage unitTest
     - name: Run package
-      run: PLATFORMS="+all darwin/amd64" mage package
+      run: PLATFORMS="+all darwin/amd64" EXTERNAL=true SNAPSHOT=true mage package
