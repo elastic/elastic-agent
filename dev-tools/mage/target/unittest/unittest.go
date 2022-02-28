@@ -18,7 +18,7 @@ func init() {
 }
 
 var (
-	goTestDeps, pythonTestDeps []interface{}
+	goTestDeps []interface{}
 )
 
 // RegisterGoTestDeps registers dependencies of the GoUnitTest target.
@@ -26,12 +26,7 @@ func RegisterGoTestDeps(deps ...interface{}) {
 	goTestDeps = append(goTestDeps, deps...)
 }
 
-// RegisterPythonTestDeps registers dependencies of the PythonUnitTest target.
-func RegisterPythonTestDeps(deps ...interface{}) {
-	pythonTestDeps = append(pythonTestDeps, deps...)
-}
-
-// UnitTest executes the unit tests (Go and Python).
+// UnitTest executes the unit tests (Go).
 func UnitTest() {
 	mg.SerialDeps(GoUnitTest)
 }

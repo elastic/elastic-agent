@@ -18,18 +18,13 @@ func init() {
 }
 
 var (
-	goTestDeps, pythonTestDeps []interface{}
-	whitelistedEnvVars         []string
+	goTestDeps         []interface{}
+	whitelistedEnvVars []string
 )
 
 // RegisterGoTestDeps registers dependencies of the GoIntegTest target.
 func RegisterGoTestDeps(deps ...interface{}) {
 	goTestDeps = append(goTestDeps, deps...)
-}
-
-// RegisterPythonTestDeps registers dependencies of the PythonIntegTest target.
-func RegisterPythonTestDeps(deps ...interface{}) {
-	pythonTestDeps = append(pythonTestDeps, deps...)
 }
 
 // WhitelistEnvVar whitelists an environment variable to enabled it to be

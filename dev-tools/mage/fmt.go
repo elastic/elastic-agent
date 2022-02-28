@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -34,7 +33,7 @@ func Format() {
 	if BeatProjectType != CommunityProject {
 		mg.Deps(AddLicenseHeaders)
 	}
-	mg.Deps(GoImports, PythonAutopep8)
+	mg.Deps(GoImports)
 }
 
 // GoImports executes goimports against all .go files in and below the CWD.
@@ -62,38 +61,6 @@ func GoImports() error {
 	)
 
 	return sh.RunV("goimports", args...)
-}
-
-// PythonAutopep8 executes autopep8 on all .py files in and below the CWD. It
-// ignores build/ directories.
-func PythonAutopep8() error {
-	pyFiles, err := FindFilesRecursive(func(path string, _ os.FileInfo) bool {
-		return filepath.Ext(path) == ".py" && !strings.Contains(path, "build/")
-	})
-	if err != nil {
-		return err
-	}
-	if len(pyFiles) == 0 {
-		return nil
-	}
-
-	fmt.Println(">> fmt - autopep8: Formatting Python code")
-	ve, err := PythonVirtualenv()
-	if err != nil {
-		return err
-	}
-
-	autopep8, err := LookVirtualenvPath(ve, "autopep8")
-	if err != nil {
-		return err
-	}
-
-	args := append(
-		[]string{"--in-place", "--max-line-length", "120"},
-		pyFiles...,
-	)
-
-	return sh.RunV(autopep8, args...)
 }
 
 // AddLicenseHeaders adds license headers to .go files. It applies the
