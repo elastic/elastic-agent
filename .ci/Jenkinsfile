@@ -193,14 +193,9 @@ pipeline {
     stage('Full K8s') {
       when {
         // Always when running builds on branches/tags
-        // On a PR basis, skip if changes are only related to docs.
         // Enable if k8s related changes.
         anyOf {
           not { changeRequest() }                           // If no PR
-          allOf {                                           // If PR and no docs changes
-            expression { return env.ONLY_DOCS == "false" }
-            changeRequest()
-          }
           expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
       }
