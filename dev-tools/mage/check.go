@@ -32,7 +32,7 @@ import (
 func Check() error {
 	fmt.Println(">> check: Checking source code for common problems")
 
-	mg.Deps(GoVet, CheckPythonTestNotExecutable, CheckYAMLNotExecutable)
+	mg.Deps(GoVet, CheckYAMLNotExecutable)
 
 	changes, err := GitDiffIndex()
 	if err != nil {
@@ -106,38 +106,6 @@ func GitDiff() error {
 	log.Println("exec:", strings.Join(c.Args, " "))
 	err := c.Run()
 	return err
-}
-
-// CheckPythonTestNotExecutable checks that none of the python test files are
-// executable. They are silently skipped and we don't want this to happen.
-func CheckPythonTestNotExecutable() error {
-	if runtime.GOOS == "windows" {
-		// Skip windows because it doesn't have POSIX permissions.
-		return nil
-	}
-
-	tests, err := FindFiles(pythonTestFiles...)
-	if err != nil {
-		return err
-	}
-
-	var executableTestFiles []string
-	for _, file := range tests {
-		info, err := os.Stat(file)
-		if err != nil {
-			return err
-		}
-
-		if info.Mode().Perm()&0111 > 0 {
-			executableTestFiles = append(executableTestFiles, file)
-		}
-	}
-
-	if len(executableTestFiles) > 0 {
-		return errors.Errorf("python test files cannot be executable because "+
-			"they will be skipped. Fix permissions of %v", executableTestFiles)
-	}
-	return nil
 }
 
 // CheckYAMLNotExecutable checks that no .yml or .yaml files are executable.
