@@ -141,10 +141,9 @@ pipeline {
               beforeAgent true
               allOf {
                 anyOf {
-                  expression { return env.GITHUB_COMMENT?.contains('package') }
-                  expression { matchesPrLabel(label: 'ci:package') }
+                  expression { return isE2eEnabled() }
+                  expression { return isPackageEnabled() }
                   not { changeRequest() }
-                  expression { return env.PACKAGING_CHANGES == "true" }
                 }
                 // Run packaging only for the linux specific arch
                 expression { return (PLATFORM.contains('ubuntu') || PLATFORM.contains('aarch64')) }
@@ -211,11 +210,7 @@ pipeline {
     stage('e2e tests') {
       when {
         beforeAgent true
-        anyOf {
-          expression { return params.end_to_end_tests_ci }
-          expression { return env.GITHUB_COMMENT?.contains('e2e tests') }
-          expression { matchesPrLabel(label: 'ci:end-to-end') }
-        }
+        expression { return isE2eEnabled() }
       }
       steps {
         // TODO: what's the testMatrixFile to be used if any
@@ -341,4 +336,18 @@ def runK8s(Map args=[:]) {
       }
     }
   }
+}
+
+/**
+* Wrapper to know if the build should enalbe the e2e stage
+*/
+def isE2eEnabled() {
+  return params.end_to_end_tests_ci || env.GITHUB_COMMENT?.contains('e2e tests') || matchesPrLabel(label: 'ci:end-to-end')
+}
+
+/**
+* Wrapper to know if the build should enalbe the package stage
+*/
+def isPackageEnabled() {
+  return env.PACKAGING_CHANGES == "true" || env.GITHUB_COMMENT?.contains('package') || matchesPrLabel(label: 'ci:package')
 }
