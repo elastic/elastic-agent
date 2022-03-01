@@ -81,6 +81,16 @@ pipeline {
       failFast false
       matrix {
         agent {label "${PLATFORM}"}
+        when {
+          beforeAgent true
+          anyOf {
+            allOf {
+              expression { return env.PLATFORM == 'windows-2022 && windows-immutable' }
+              not { changeRequest() }
+            }
+            expression { return env.PLATFORM != 'windows-2022 && windows-immutable' }
+          }
+        }
         options { skipDefaultCheckout() }
         axes {
           axis {
@@ -92,13 +102,6 @@ pipeline {
         }
         stages {
           stage('build'){
-            when {
-              beforeAgent true
-              allOf {
-                expression { return env.PLATFORM != 'windows-2022 && windows-immutable' }
-                not { changeRequest() }
-              }
-            }
             steps {
               withGithubNotify(context: "Build-${PLATFORM}") {
                 deleteDir()
@@ -112,13 +115,6 @@ pipeline {
             }
           }
           stage('Test') {
-            when {
-              beforeAgent true
-              allOf {
-                expression { return env.PLATFORM != 'windows-2022 && windows-immutable' }
-                not { changeRequest() }
-              }
-            }
             steps {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
