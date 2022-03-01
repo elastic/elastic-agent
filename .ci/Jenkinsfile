@@ -95,7 +95,7 @@ pipeline {
             when {
               beforeAgent true
               allOf {
-                expression { return env.PLATFORM == 'windows-2022 && windows-immutable' }
+                expression { return env.PLATFORM != 'windows-2022 && windows-immutable' }
                 not { changeRequest() }
               }
             }
@@ -115,7 +115,7 @@ pipeline {
             when {
               beforeAgent true
               allOf {
-                expression { return env.PLATFORM == 'windows-2022 && windows-immutable' }
+                expression { return env.PLATFORM != 'windows-2022 && windows-immutable' }
                 not { changeRequest() }
               }
             }
