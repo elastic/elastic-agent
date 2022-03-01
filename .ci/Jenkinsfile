@@ -221,6 +221,7 @@ pipeline {
         // TODO: what's the testMatrixFile to be used if any
         runE2E(testMatrixFile: '',
                beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
+               elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                gitHubCheckName: "e2e-tests",
                gitHubCheckRepo: env.REPO,
                gitHubCheckSha1: env.GIT_BASE_COMMIT)
