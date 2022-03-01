@@ -190,7 +190,7 @@ pipeline {
         }
       }
     }
-    stage('K8s') {
+    stage('Full K8s') {
       when {
         // Always when running builds on branches/tags
         // On a PR basis, skip if changes are only related to docs.
