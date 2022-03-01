@@ -204,8 +204,25 @@ pipeline {
           expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
       }
-      steps {
-        runAllK8s(["v1.23.0", "v1.22.0", "v1.21.1", "v1.20.7", "v1.19.11", "v1.18.19"])
+      failFast false
+      matrix {
+        agent {label 'ubuntu-20.04 && immutable'}
+        options { skipDefaultCheckout() }
+        axes {
+          axis {
+            name 'K8S_VERSION'
+            values "v1.23.0", "v1.22.0", "v1.21.1", "v1.20.7", "v1.19.11", "v1.18.19"
+          }
+        }
+        stages {
+          stage('K8s') {
+            steps {
+              deleteDir()
+              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.11.1', context: "K8s-${K8S_VERSION}")
+            }
+          }
+        }
       }
     }
     stage('e2e tests') {
@@ -311,18 +328,6 @@ def withPackageDarwinEnv(Closure body) {
   ]) {
     body()
   }
-}
-
-def runAllK8s(versions) {
-  def parallelTasks = [:]
-  versions.each { version ->
-    node('ubuntu-20.04 && immutable') {
-      deleteDir()
-      unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-      runK8s(k8sVersion: version, kindVersion: 'v0.11.1', context: "K8s-${version}")
-    }
-  }
-  parallel(parallelTasks)
 }
 
 def runK8s(Map args=[:]) {
