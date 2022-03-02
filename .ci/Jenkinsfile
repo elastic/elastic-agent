@@ -86,12 +86,14 @@ pipeline {
         stages {
           stage('build'){
             steps {
-              withGithubNotify(context: "Build-${PLATFORM}") {
-                deleteDir()
-                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-                withMageEnv(){
-                  dir("${BASE_DIR}"){
-                    cmd(label: 'Go build', script: 'mage build')
+              stageStatusCache(id: "Build-${PLATFORM}") {
+                withGithubNotify(context: "Build-${PLATFORM}") {
+                  deleteDir()
+                  unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+                  withMageEnv(){
+                    dir("${BASE_DIR}"){
+                      cmd(label: 'Go build', script: 'mage build')
+                    }
                   }
                 }
               }
@@ -99,10 +101,12 @@ pipeline {
           }
           stage('Test') {
             steps {
-              withGithubNotify(context: "Test-${PLATFORM}") {
-                withMageEnv(){
-                  dir("${BASE_DIR}"){
-                    cmd(label: 'Go unitTest', script: 'mage unitTest')
+              stageStatusCache(id: "Test-${PLATFORM}") {
+                withGithubNotify(context: "Test-${PLATFORM}") {
+                  withMageEnv(){
+                    dir("${BASE_DIR}"){
+                      cmd(label: 'Go unitTest', script: 'mage unitTest')
+                    }
                   }
                 }
               }
@@ -143,7 +147,9 @@ pipeline {
               }
             }
             steps {
-              runK8s(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1', context: "K8s-${PLATFORM}")
+              stageStatusCache(id: "K8s-${PLATFORM}") {
+                runK8s(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1', context: "K8s-${PLATFORM}")
+              }
             }
           }
           stage('Package') {
@@ -165,31 +171,33 @@ pipeline {
               EXTERNAL = true
             }
             steps {
-              withGithubNotify(context: "Package ${PLATFORM}") {
-                deleteDir()
-                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-                withMageEnv(){
-                  dir("${BASE_DIR}"){
-                    withPackageEnv("${PLATFORM}") {
-                      cmd(label: 'Go package', script: 'mage package')
-                      uploadPackagesToGoogleBucket(
-                        credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
-                        repo: env.REPO,
-                        bucket: env.JOB_GCS_EXT_BUCKET,
-                        pattern: "build/distributions/**/*")
-                      pushDockerImages(
-                        registry: env.DOCKER_REGISTRY,
-                        secret: env.DOCKER_ELASTIC_SECRET,
-                        snapshot: env.SNAPSHOT,
-                        version: env.BEAT_VERSION,
-                        images: [
-                          [ source: "beats/elastic-agent", arch: env.ARCH, target: "observability-ci/elastic-agent"],
-                          [ source: "beats/elastic-agent-oss", arch: env.ARCH, target: "observability-ci/elastic-agent-oss"],
-                          [ source: "beats/elastic-agent-ubi8", arch: env.ARCH, target: "observability-ci/elastic-agent-ubi8"],
-                          [ source: "beats/elastic-agent-complete", arch: env.ARCH, target: "observability-ci/elastic-agent-complete"],
-                          [ source: "beats-ci/elastic-agent-cloud", arch: env.ARCH, target: "observability-ci/elastic-agent-cloud"]
-                        ]
-                      )
+              stageStatusCache(id: "Package-${PLATFORM}") {
+                withGithubNotify(context: "Package ${PLATFORM}") {
+                  deleteDir()
+                  unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+                  withMageEnv(){
+                    dir("${BASE_DIR}"){
+                      withPackageEnv("${PLATFORM}") {
+                        cmd(label: 'Go package', script: 'mage package')
+                        uploadPackagesToGoogleBucket(
+                          credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
+                          repo: env.REPO,
+                          bucket: env.JOB_GCS_EXT_BUCKET,
+                          pattern: "build/distributions/**/*")
+                        pushDockerImages(
+                          registry: env.DOCKER_REGISTRY,
+                          secret: env.DOCKER_ELASTIC_SECRET,
+                          snapshot: env.SNAPSHOT,
+                          version: env.BEAT_VERSION,
+                          images: [
+                            [ source: "beats/elastic-agent", arch: env.ARCH, target: "observability-ci/elastic-agent"],
+                            [ source: "beats/elastic-agent-oss", arch: env.ARCH, target: "observability-ci/elastic-agent-oss"],
+                            [ source: "beats/elastic-agent-ubi8", arch: env.ARCH, target: "observability-ci/elastic-agent-ubi8"],
+                            [ source: "beats/elastic-agent-complete", arch: env.ARCH, target: "observability-ci/elastic-agent-complete"],
+                            [ source: "beats-ci/elastic-agent-cloud", arch: env.ARCH, target: "observability-ci/elastic-agent-cloud"]
+                          ]
+                        )
+                      }
                     }
                   }
                 }
@@ -221,9 +229,11 @@ pipeline {
         stages {
           stage('K8s') {
             steps {
-              deleteDir()
-              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.11.1', context: "K8s-${K8S_VERSION}")
+              stageStatusCache(id: "K8s-${K8S_VERSION}") {
+                deleteDir()
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+                runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.11.1', context: "K8s-${K8S_VERSION}")
+              }
             }
           }
         }
