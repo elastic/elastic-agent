@@ -114,18 +114,21 @@ pipeline {
             }
           }
           stage('Integration tests') {
-                when {
-                  beforeAgent true
-                  anyOf {
-                    expression { return params.integration_tests_ci }
-                    expression { return env.GITHUB_COMMENT?.contains('integration tests') }
-                    expression { matchesPrLabel(label: 'ci:integration') }
-                  }
-                }
-                steps {
-                  echo 'TBD'
-                }
+            when {
+              // Always when running builds on branches/tags
+              // Enable if integration test related changes.
+              beforeAgent true
+              anyOf {
+                not { changeRequest() }
+                expression { return params.integration_tests_ci }
+                expression { return env.GITHUB_COMMENT?.contains('integration tests') }
+                expression { matchesPrLabel(label: 'ci:integration') }
               }
+            }
+            steps {
+              echo 'TBD'
+            }
+          }
           stage('K8s') {
             when {
               beforeAgent true
@@ -228,8 +231,13 @@ pipeline {
     }
     stage('e2e tests') {
       when {
+        // Always when running builds on branches/tags
+        // Enable if e2e related changes.
         beforeAgent true
-        expression { return isE2eEnabled() }
+        anyOf {
+          not { changeRequest() }
+          expression { return isE2eEnabled() }
+        }
       }
       steps {
         // TODO: what's the testMatrixFile to be used if any
