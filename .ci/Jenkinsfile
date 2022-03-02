@@ -68,36 +68,19 @@ pipeline {
     }
     stage('Test') {
       when {
-        // Always when running builds on branches/tags
-        // On a PR basis, skip if changes are only related to docs.
-        anyOf {
-          not { changeRequest() }                           // If no PR
-          allOf {                                           // If PR and no docs changes
-            expression { return env.ONLY_DOCS == "false" }
-            changeRequest()
-          }
-        }
+        beforeAgent true
+        expression { return env.ONLY_DOCS == "false" }
       }
       failFast false
       matrix {
         agent {label "${PLATFORM}"}
-        when {
-          beforeAgent true
-          anyOf {
-            allOf {
-              expression { return env.PLATFORM == 'windows-2022 && windows-immutable' }
-              not { changeRequest() }
-            }
-            expression { return env.PLATFORM != 'windows-2022 && windows-immutable' }
-          }
-        }
         options { skipDefaultCheckout() }
         axes {
           axis {
             name 'PLATFORM'
             // TODO: 'macosx && x86_64' to be added once macosx is available in fleet-ci
             //       for the time being we use macos
-            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2019 && windows-immutable', 'windows-2022 && windows-immutable'
+            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable'
           }
         }
         stages {
