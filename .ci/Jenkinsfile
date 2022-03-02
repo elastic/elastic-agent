@@ -130,6 +130,19 @@ pipeline {
               }
             }
           }
+          stage('Integration tests') {
+                when {
+                  beforeAgent true
+                  anyOf {
+                    expression { return params.integration_tests_ci }
+                    expression { return env.GITHUB_COMMENT?.contains('integration tests') }
+                    expression { matchesPrLabel(label: 'ci:integration') }
+                  }
+                }
+                steps {
+                  echo 'TBD'
+                }
+              }
           stage('K8s') {
             when {
               beforeAgent true
@@ -243,19 +256,6 @@ pipeline {
                gitHubCheckName: "e2e-tests",
                gitHubCheckRepo: env.REPO,
                gitHubCheckSha1: env.GIT_BASE_COMMIT)
-      }
-    }
-    stage('Integration tests') {
-      when {
-        beforeAgent true
-        anyOf {
-          expression { return params.integration_tests_ci }
-          expression { return env.GITHUB_COMMENT?.contains('integration tests') }
-          expression { matchesPrLabel(label: 'ci:integration') }
-        }
-      }
-      steps {
-        echo 'TBD'
       }
     }
   }
