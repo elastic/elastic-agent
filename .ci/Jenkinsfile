@@ -81,13 +81,23 @@ pipeline {
       failFast false
       matrix {
         agent {label "${PLATFORM}"}
+        when {
+          beforeAgent true
+          anyOf {
+            allOf {
+              expression { return env.PLATFORM == 'windows-2022 && windows-immutable' }
+              not { changeRequest() }
+            }
+            expression { return env.PLATFORM != 'windows-2022 && windows-immutable' }
+          }
+        }
         options { skipDefaultCheckout() }
         axes {
           axis {
             name 'PLATFORM'
             // TODO: 'macosx && x86_64' to be added once macosx is available in fleet-ci
             //       for the time being we use macos
-            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2019 && windows-immutable'
+            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2019 && windows-immutable', 'windows-2022 && windows-immutable'
           }
         }
         stages {
@@ -122,6 +132,7 @@ pipeline {
           }
           stage('K8s') {
             when {
+              beforeAgent true
               // Always when running builds on branches/tags
               // Enable if k8s related changes.
               allOf {
