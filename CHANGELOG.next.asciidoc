@@ -162,3 +162,5 @@
 - Add results of inspect output command into archive produced by diagnostics collect. {pull}29902[29902]
 - Add support for loading input configuration from external configuration files in standalone mode. You can load inputs from YAML configuration files under the folder `{path.config}/inputs.d`. {pull}30087[30087]
 - Install command will skip install/uninstall steps when installation via package is detected on Linux distros. {pull}30289[30289]
+- Add action_input_type for the .fleet-actions-results {pull}30562[30562]
+- Update docker/distribution dependency library to fix a security issues concerning OCI Manifest Type Confusion Issue. {pull}30462[30462]
