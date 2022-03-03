@@ -26,7 +26,9 @@ var (
 
 func init() {
 	flag.StringVar(&input, "in", "", "config to embed")
-	//flag.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
+	if flag.Lookup("out") == nil {
+		flag.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
+	}
 	flag.StringVar(&license, "license", "Elastic", "License header for generated file.")
 }
 

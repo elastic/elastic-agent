@@ -138,7 +138,7 @@ require (
 )
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220221094258-452d447372aa
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220303073437-a28c413604b8
 	github.com/hashicorp/go-version v1.2.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	k8s.io/klog/v2 v2.30.0 // indirect
