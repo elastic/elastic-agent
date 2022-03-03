@@ -520,8 +520,8 @@ github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFP
 github.com/eclipse/paho.mqtt.golang v1.2.0/go.mod h1:H9keYFcgq3Qr5OUJm/JZI/i6U7joQ8SYLhZwfeOo6Ts=
 github.com/eclipse/paho.mqtt.golang v1.3.5/go.mod h1:eTzb4gxwwyWpqBUHGQZ4ABAV7+Jgm1PklsYT/eo8Hcc=
 github.com/edsrzf/mmap-go v1.0.0/go.mod h1:YO35OhQPt3KJa3ryjFM5Bs14WD66h8eGKpfaBNrHW5M=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220221094258-452d447372aa h1:lpB7vWWHCvVQ67rPY2RNKmV7zlXVcj9yVF3PLaoAKZA=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220221094258-452d447372aa/go.mod h1:nIUr4ewVszjAUThVPkQWOqduMF9VViWt6NzOYfFIgBQ=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220303073437-a28c413604b8 h1:JVruc6Ry0g0qSdnl/X8jh5Kn98BahsozHi6/urS4skg=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220303073437-a28c413604b8/go.mod h1:deRXxthy5Roatme8Gj9Udv+oOGGy7y0ay6QV2+6ITXA=
 github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4 h1:uYT+Krd8dsvnhnLK9pe/JHZkYtXEGPfbV4Wt1JPPol0=
 github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4/go.mod h1:UcNuf4pX/qDVNQr0zybm1NL2YoWik+jKBaINZqQCA40=
 github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6 h1:nFvXHBjYK3e9+xF0WKDeAKK4aOO51uC28s+L9rBmilo=

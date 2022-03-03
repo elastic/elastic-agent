@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 // postInstall performs post installation for unix-based systems.

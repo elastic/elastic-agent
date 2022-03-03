@@ -141,6 +141,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 				args.OutputDir = filepath.Join("build", "golang-crossbuild")
 				args.Name += "-" + Platform.GOOS + "-" + Platform.Arch
 				return Build(args)
+
 			}
 		}
 		// If we're here, something isn't set.
