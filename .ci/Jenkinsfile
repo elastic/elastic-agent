@@ -55,12 +55,14 @@ pipeline {
     }
     stage('Check'){
       steps {
-        withGithubNotify(context: "Check") {
-          withMageEnv(){
-           dir("${BASE_DIR}"){
-              setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
-              log(level: 'INFO', text: "env.BEAT_VERSION=${env.BEAT_VERSION}")
-              cmd(label: 'check', script: 'make check-ci')
+        stageStatusCache(id: "Check", bucket: env.JOB_GCS_BUCKET, credentialsId: env.JOB_GCS_EXT_CREDENTIALS) {
+          withGithubNotify(context: "Check") {
+            withMageEnv(){
+             dir("${BASE_DIR}"){
+                setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
+                log(level: 'INFO', text: "env.BEAT_VERSION=${env.BEAT_VERSION}")
+                cmd(label: 'check', script: 'make check-ci')
+              }
             }
           }
         }
@@ -86,7 +88,7 @@ pipeline {
         stages {
           stage('build'){
             steps {
-              stageStatusCache(id: "Build-${PLATFORM}") {
+              stageStatusCache(id: "Build-${PLATFORM}", bucket: env.JOB_GCS_BUCKET, credentialsId: env.JOB_GCS_EXT_CREDENTIALS) {
                 withGithubNotify(context: "Build-${PLATFORM}") {
                   deleteDir()
                   unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
@@ -101,7 +103,7 @@ pipeline {
           }
           stage('Test') {
             steps {
-              stageStatusCache(id: "Test-${PLATFORM}") {
+              stageStatusCache(id: "Test-${PLATFORM}", bucket: env.JOB_GCS_BUCKET, credentialsId: env.JOB_GCS_EXT_CREDENTIALS) {
                 withGithubNotify(context: "Test-${PLATFORM}") {
                   withMageEnv(){
                     dir("${BASE_DIR}"){
@@ -147,7 +149,7 @@ pipeline {
               }
             }
             steps {
-              stageStatusCache(id: "K8s-${PLATFORM}") {
+              stageStatusCache(id: "K8s-${PLATFORM}", bucket: env.JOB_GCS_BUCKET, credentialsId: env.JOB_GCS_EXT_CREDENTIALS) {
                 runK8s(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1', context: "K8s-${PLATFORM}")
               }
             }
@@ -171,7 +173,7 @@ pipeline {
               EXTERNAL = true
             }
             steps {
-              stageStatusCache(id: "Package-${PLATFORM}") {
+              stageStatusCache(id: "Package-${PLATFORM}", bucket: env.JOB_GCS_BUCKET, credentialsId: env.JOB_GCS_EXT_CREDENTIALS) {
                 withGithubNotify(context: "Package ${PLATFORM}") {
                   deleteDir()
                   unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
@@ -229,7 +231,7 @@ pipeline {
         stages {
           stage('K8s') {
             steps {
-              stageStatusCache(id: "K8s-${K8S_VERSION}") {
+              stageStatusCache(id: "K8s-${K8S_VERSION}", bucket: env.JOB_GCS_BUCKET, credentialsId: env.JOB_GCS_EXT_CREDENTIALS) {
                 deleteDir()
                 unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                 runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.11.1', context: "K8s-${K8S_VERSION}")
