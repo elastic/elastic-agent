@@ -33,10 +33,10 @@ jobs:
           headers: '{"GraphQL-Features": "projects_next_graphql"}'
           query: |
             mutation add_to_project($projectid:String!,$contentid:String!) {
-              updateIssue(input: {id:$contentid, projectIds:$projectid}) {
+              updateIssue(input: {id:${{ github.event.issue.node_id) }}, projectIds:$projectid}) {
                clientMutationId
              }
             }
           projectid: "PRO_kwDOAGc3Zs4AzG9E"
-          contentid: ${{ toJSON(github.event.issue.node_id) }}
+          contentid: ${{ github.event.issue.node_id) }}
           GITHUB_TOKEN: ${{ secrets.ELASTIC_AGENT_PROJECT_BOARD_TOKEN }}
