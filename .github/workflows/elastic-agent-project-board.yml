@@ -19,10 +19,8 @@ jobs:
                 clientMutationId
               }
              }
-          projectid: ${{ env.PROJECT_ID }}
+          projectid: "PRO_kwDOAGc3Zs4AzG8z"
           contentid: ${{ github.event.issue.node_id }}
-        env:
-          PROJECT_ID: "PRO_kwDOAGc3Zs4AzG8z"
           GITHUB_TOKEN: ${{ secrets.ELASTIC_AGENT_PROJECT_BOARD_TOKEN }}
   add_to_control_plane-project:
     runs-on: ubuntu-latest
@@ -39,8 +37,6 @@ jobs:
                clientMutationId
              }
             }
-          projectid: ${{ env.PROJECT_ID }}
+          projectid: "PRO_kwDOAGc3Zs4AzG9E"
           contentid: ${{ github.event.issue.node_id }}
-        env:
-          PROJECT_ID: "PRO_kwDOAGc3Zs4AzG9E"
           GITHUB_TOKEN: ${{ secrets.ELASTIC_AGENT_PROJECT_BOARD_TOKEN }}
