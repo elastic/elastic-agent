@@ -162,7 +162,6 @@ func (o *Operator) Close() error {
 
 // HandleConfig handles configuration for a pipeline and performs actions to achieve this configuration.
 func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) (err error) {
-	// TODO: double check `route` as name
 	span, ctx := apm.StartSpan(ctx, "route", "app.internal")
 	defer func() {
 		if err = filterContextCancelled(err); err != nil {
