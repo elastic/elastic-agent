@@ -35,6 +35,7 @@ would like the Agent to operate.
 	}
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
+	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode")
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -59,6 +60,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		return fmt.Errorf("already installed at: %s", paths.InstallPath)
 	}
 
+	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+	if nonInteractive {
+		fmt.Fprintf(streams.Out, "installing in non-interactive mode")
+	}
+
 	if status == install.PackageInstall {
 		fmt.Fprintf(streams.Out, "Installed as a system package, installation will not be altered.\n")
 	}
@@ -74,7 +80,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	locker.Unlock()
 
 	if status == install.Broken {
-		if !force {
+		if !force && !nonInteractive {
 			fmt.Fprintf(streams.Out, "Elastic Agent is installed but currently broken: %s\n", reason)
 			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will re-install Elastic Agent over the current installation at %s. Do you want to continue?", paths.InstallPath), true)
 			if err != nil {
@@ -85,7 +91,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 			}
 		}
 	} else if status != install.PackageInstall {
-		if !force {
+		if !force && !nonInteractive {
 			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be installed at %s and will run as a service. Do you want to continue?", paths.InstallPath), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
@@ -108,6 +114,9 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	if fleetServer != "" || force || delayEnroll {
 		askEnroll = false
 	}
+	if nonInteractive {
+		askEnroll = false
+	}
 	if askEnroll {
 		confirm, err := cli.Confirm("Do you want to enroll this Agent into Fleet?", true)
 		if err != nil {
@@ -125,6 +134,9 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 	if enroll && fleetServer == "" {
 		if url == "" {
+			if nonInteractive {
+				return fmt.Errorf("missing URL")
+			}
 			url, err = cli.ReadInput("URL you want to enroll this Agent into:")
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
@@ -135,6 +147,9 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 			}
 		}
 		if token == "" {
+			if nonInteractive {
+				return fmt.Errorf("missing enrollment token")
+			}
 			token, err = cli.ReadInput("Fleet enrollment token:")
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
