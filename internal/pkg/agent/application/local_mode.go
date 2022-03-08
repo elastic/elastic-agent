@@ -66,6 +66,7 @@ func newLocal(
 	statusCtrl status.Controller,
 	uc upgraderControl,
 	agentInfo *info.AgentInfo,
+	tracer *apm.Tracer,
 ) (*Local, error) {
 	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, statusCtrl)
 	if err != nil {
@@ -92,7 +93,7 @@ func newLocal(
 	}
 
 	localApplication.bgContext, localApplication.cancelCtxFn = context.WithCancel(ctx)
-	localApplication.srv, err = server.NewFromConfig(log, cfg.Settings.GRPC, &operation.ApplicationStatusHandler{})
+	localApplication.srv, err = server.NewFromConfig(log, cfg.Settings.GRPC, &operation.ApplicationStatusHandler{}, tracer)
 	if err != nil {
 		return nil, errors.New(err, "initialize GRPC listener")
 	}

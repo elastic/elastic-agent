@@ -7,20 +7,20 @@ package store
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 type dispatcher interface {
-	Dispatch(acker FleetAcker, actions ...action) error
+	Dispatch(context.Context, FleetAcker, ...action) error
 }
 
 type store interface {
@@ -319,6 +319,7 @@ func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 
 // ReplayActions replays list of actions.
 func ReplayActions(
+	ctx context.Context,
 	log *logger.Logger,
 	dispatcher dispatcher,
 	acker FleetAcker,
@@ -326,7 +327,7 @@ func ReplayActions(
 ) error {
 	log.Info("restoring current policy from disk")
 
-	if err := dispatcher.Dispatch(acker, actions...); err != nil {
+	if err := dispatcher.Dispatch(ctx, acker, actions...); err != nil {
 		return err
 	}
 

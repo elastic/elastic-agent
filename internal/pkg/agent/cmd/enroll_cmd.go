@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"time"
 
+	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
@@ -184,6 +185,11 @@ func newEnrollCmdWithStore(
 func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	var err error
 	defer c.stopAgent() // ensure its stopped no matter what
+	span, ctx := apm.StartSpan(ctx, "enroll", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
 
 	persistentConfig, err := getPersistentConfig(c.configPath)
 	if err != nil {
