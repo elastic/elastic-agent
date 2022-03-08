@@ -14,7 +14,7 @@ import (
 
 	"github.com/hectane/go-acl"
 
-	"github.com/elastic/beats/v7/libbeat/common/file"
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 

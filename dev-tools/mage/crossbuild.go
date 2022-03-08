@@ -19,7 +19,7 @@ import (
 	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/v7/libbeat/common/file"
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
