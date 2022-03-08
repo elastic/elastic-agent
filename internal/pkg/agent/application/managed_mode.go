@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"

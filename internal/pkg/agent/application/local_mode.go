@@ -8,6 +8,8 @@ import (
 	"context"
 	"path/filepath"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
