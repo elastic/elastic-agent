@@ -97,6 +97,7 @@
 - Fix issue where a failing artifact verification does not remove the bad artifact. {pull}30281[30281]
 - Reduce Elastic Agent shut down time by stopping processes concurrently {pull}29650[29650]
 - Move `context cancelled` error from fleet gateway into debug level. {pull}187[187]
+- Update library containerd to 1.5.10. {pull}186[186]
 
 ==== New features
 
