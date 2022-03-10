@@ -93,7 +93,7 @@ func main() {
 		os.Stdout.Write(data)
 		return
 	} else {
-		if err = ioutil.WriteFile(output, data, 0o640); err != nil {
+		if err = ioutil.WriteFile(output, data, 0o600); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing data to file %q: %v\n", output, data)
 			os.Exit(1)
 		}
