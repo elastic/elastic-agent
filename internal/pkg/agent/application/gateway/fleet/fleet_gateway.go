@@ -222,8 +222,8 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 		return resp, nil
 	}
 
-	// This mean that the next loop was cancelled throught the context, we should return the error
-	// but we should not log it, we are in the process of shutting down.
+	// This mean that the next loop was cancelled because of the context, we should return the error
+	// but we should not log it, because we are in the process of shutting down.
 	return nil, f.bgContext.Err()
 }
 
