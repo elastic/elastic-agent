@@ -31,7 +31,7 @@ func init() {
 	for f, v := range unpacked {
 		s, err := NewSpecFromBytes(v)
 		if err != nil {
-			panic("Cannot read spec from " + f)
+			panic("Cannot read spec from " + f + ": " + err.Error())
 		}
 		Supported = append(Supported, s)
 		SupportedMap[strings.ToLower(s.Cmd)] = s
