@@ -83,7 +83,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	data, err := gen(input, l)
+	data, err := gen(l)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error while generating the file, err: %+v\n", err)
 		os.Exit(1)
@@ -102,7 +102,7 @@ func main() {
 	return
 }
 
-func gen(path, l string) ([]byte, error) {
+func gen(l string) ([]byte, error) {
 	pack, files, err := packer.Pack(input)
 	if err != nil {
 		return nil, err
