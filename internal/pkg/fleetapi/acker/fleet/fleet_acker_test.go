@@ -158,7 +158,7 @@ func TestAcker_Ack(t *testing.T) {
 			if len(tc.actions) == 1 {
 				err = acker.Ack(context.Background(), tc.actions[0])
 			} else {
-				err = acker.AckBatch(context.Background(), tc.actions)
+				_, err = acker.AckBatch(context.Background(), tc.actions)
 			}
 
 			if err != nil {
