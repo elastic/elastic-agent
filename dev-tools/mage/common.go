@@ -229,6 +229,8 @@ func HaveKubectl() error {
 // to perform this check on the fly.
 func IsDarwinUniversal() bool {
 	var darwinAMD64, darwinARM64 bool
+
+	//nolint:goconst // Consistency: there are constants for platforms.
 	for _, p := range Platforms {
 		if p.Name == "darwin/arm64" {
 			darwinARM64 = true
