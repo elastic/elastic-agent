@@ -98,7 +98,7 @@ func (r *Retrier) Run(ctx context.Context) {
 		case <-r.kickCh:
 			r.runRetries(ctx)
 		case <-ctx.Done():
-			r.log.Debug("ack retrier: exit on context cancelled")
+			r.log.Debug("ack retrier: exit on %w", ctx.Error())
 			return
 		}
 	}
