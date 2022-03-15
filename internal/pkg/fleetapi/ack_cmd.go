@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"io/ioutil"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
@@ -112,22 +112,24 @@ func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (*AckResponse, erro
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, client.ExtractError(resp.Body)
+	// Read ack response always it can be sent with any status code.
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	ackResponse := &AckResponse{}
-	decoder := json.NewDecoder(resp.Body)
-	if err := decoder.Decode(ackResponse); err != nil {
+	var ackResponse AckResponse
+	if err := json.Unmarshal(body, &ackResponse); err != nil {
 		return nil, errors.New(err,
 			"fail to decode ack response",
 			errors.TypeNetwork,
 			errors.M(errors.MetaKeyURI, ap))
 	}
 
-	if err := ackResponse.Validate(); err != nil {
-		return nil, err
+	// if action is not "acks", try to extract the error
+	if ackResponse.Action != "acks" {
+		return nil, client.ExtractError(bytes.NewReader(body))
 	}
 
-	return ackResponse, nil
+	return &ackResponse, nil
 }
