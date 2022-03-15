@@ -98,7 +98,7 @@ func (r *Retrier) Run(ctx context.Context) {
 		case <-r.kickCh:
 			r.runRetries(ctx)
 		case <-ctx.Done():
-			r.log.Debug("ack retrier: exit on %w", ctx.Error())
+			r.log.Debug("ack retrier: exit on %v", ctx.Err())
 			return
 		}
 	}
@@ -150,7 +150,6 @@ func (r *Retrier) runRetries(ctx context.Context) {
 		}
 
 		r.log.Debugf("ack retrier: failed actions: %#v", failed)
-		exit := false
 		// Combine actions for the next retry
 		r.mx.Lock()
 		if len(r.actions) > 0 {
@@ -159,9 +158,7 @@ func (r *Retrier) runRetries(ctx context.Context) {
 		}
 		r.actions = append(failed, r.actions...)
 		r.log.Debugf("ack retrier: total actions: %#v", r.actions)
-		if len(r.actions) == 0 {
-			exit = true
-		}
+		exit := (len(r.actions) == 0)
 
 		r.mx.Unlock()
 
