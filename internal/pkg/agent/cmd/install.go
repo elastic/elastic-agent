@@ -148,7 +148,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		}
 		if token == "" {
 			if nonInteractive {
-				return fmt.Errorf("missing enrollment token")
+				return fmt.Errorf("missing required --enrollment-token")
 			}
 			token, err = cli.ReadInput("Fleet enrollment token:")
 			if err != nil {
