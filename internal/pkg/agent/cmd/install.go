@@ -135,7 +135,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	if enroll && fleetServer == "" {
 		if url == "" {
 			if nonInteractive {
-				return fmt.Errorf("missing URL")
+				return fmt.Errorf("missing required --url argument")
 			}
 			url, err = cli.ReadInput("URL you want to enroll this Agent into:")
 			if err != nil {
