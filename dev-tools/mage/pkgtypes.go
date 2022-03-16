@@ -412,6 +412,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 			}
 
 			f.Source = filepath.Join(s.packageDir, filepath.Base(f.Target))
+			//nolint:gosec,G306 // 0644 is fine.
 			if err = ioutil.WriteFile(CreateDir(f.Source), []byte(content), 0644); err != nil {
 				panic(errors.Wrapf(err, "failed to write file containing content for target=%v", target))
 			}
@@ -555,6 +556,7 @@ func PackageZip(spec PackageSpec) error {
 	spec.OutputFile = Zip.AddFileExtension(spec.OutputFile)
 
 	// Write the zip file.
+	//nolint:gosec,G306 // 0644 is fine.
 	if err := ioutil.WriteFile(CreateDir(spec.OutputFile), buf.Bytes(), 0644); err != nil {
 		return errors.Wrap(err, "failed to write zip file")
 	}
