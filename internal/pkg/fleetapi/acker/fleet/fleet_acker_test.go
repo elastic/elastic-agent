@@ -48,7 +48,7 @@ func (s *testSender) Send(
 		return nil, err
 	}
 	s.req = &req
-	return wrapStrToResp(http.StatusOK, `{ "actions": [] }`), nil
+	return wrapStrToResp(http.StatusOK, `{ "action": "acks" }`), nil
 }
 
 func (s *testSender) URI() string {
