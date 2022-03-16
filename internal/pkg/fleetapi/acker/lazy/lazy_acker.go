@@ -28,6 +28,7 @@ type Acker struct {
 	retrier retrier
 }
 
+// Option Acker option function
 type Option func(f *Acker)
 
 // NewAcker creates a new lazy acker.
@@ -45,6 +46,7 @@ func NewAcker(baseAcker batchAcker, log *logger.Logger, opts ...Option) *Acker {
 	return f
 }
 
+// WithRetrier option allows to specify the Retrier for acking
 func WithRetrier(r retrier) Option {
 	return func(f *Acker) {
 		f.retrier = r

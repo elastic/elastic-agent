@@ -50,6 +50,7 @@ func (e *AckRequest) Validate() error {
 	return nil
 }
 
+// AckResponseItem the status items for individual acks
 type AckResponseItem struct {
 	Status  int    `json:"status"`
 	Message string `json:"message,omitempty"`
