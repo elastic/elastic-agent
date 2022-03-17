@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
 	"github.com/elastic/beats/v7/libbeat/monitoring"
 	"github.com/elastic/beats/v7/libbeat/service"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -46,10 +47,6 @@ import (
 const (
 	agentName = "elastic-agent"
 )
-
-func init() {
-	apm.DefaultTracer.Close()
-}
 
 type cfgOverrider func(cfg *configuration.Configuration)
 
@@ -402,6 +399,8 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 }
 
 func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig) (*apm.Tracer, error) {
+	apm.DefaultTracer.Close()
+
 	if !mcfg.Enabled || !mcfg.MonitorTraces {
 		return nil, nil
 	}
