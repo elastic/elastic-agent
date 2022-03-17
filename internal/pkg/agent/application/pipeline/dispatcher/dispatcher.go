@@ -84,15 +84,11 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
+
 	// Creating a child context that carries both the ad.ctx cancelation and
 	// the span from ctx.
-	ctx, cancel := context.WithCancel(ad.ctx)
-	// golint disallows us from discarding the cancel func, even
-	// though we know that the resources for ctx will be released
-	// when ad.ctx is canceled.
-	// ctx is no longer needed after calling acker.Commit(ctx), so we can
-	// safely call cancel().
-	defer cancel()
+	//nolint:golint // we just want this context to be cancelled whenever ad.ctx is cancelled.
+	ctx, _ = context.WithCancel(ad.ctx)
 	ctx = apm.ContextWithSpan(ctx, span)
 
 	if len(actions) == 0 {

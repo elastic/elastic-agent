@@ -329,7 +329,7 @@ func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMe
 		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
 		client := newSocketRequester(si.app, si.rk, endpoint)
 
-		s.logger.Infof("GATHER METRICS FROM %s", endpoint)
+		s.logger.Infof("gather metrics from %s", endpoint)
 		metrics := client.procMetrics(ctx)
 		resp.Result = append(resp.Result, metrics)
 	}

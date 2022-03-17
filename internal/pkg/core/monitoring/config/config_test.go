@@ -56,11 +56,9 @@ func TestAPMConfig(t *testing.T) {
 
 			cfg := DefaultConfig()
 			require.NoError(t, in.Unpack(cfg))
-
-			require.NoError(t, err)
 			require.NotNil(t, cfg)
-			instCfg := cfg.APM
-			assert.DeepEqual(t, tc.out, instCfg)
+
+			assert.DeepEqual(t, tc.out, cfg.APM)
 		})
 	}
 }

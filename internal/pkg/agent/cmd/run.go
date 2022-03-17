@@ -141,13 +141,16 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not initiate APM tracer: %w", err)
 	}
 	if tracer != nil {
+		logger.Info("APM instrumentation enabled")
 		defer func() {
 			tracer.Flush(nil)
 			tracer.Close()
 		}()
+	} else {
+		logger.Info("APM instrumentation disabled")
 	}
 
 	control := server.New(logger.Named("control"), rex, statusCtrl, nil, tracer)
