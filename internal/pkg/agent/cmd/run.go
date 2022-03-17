@@ -14,15 +14,13 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/spf13/cobra"
-	"go.elastic.co/apm"
-	apmtransport "go.elastic.co/apm/transport"
-	"gopkg.in/yaml.v2"
-
 	"github.com/elastic/beats/v7/libbeat/api"
 	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
 	"github.com/elastic/beats/v7/libbeat/monitoring"
 	"github.com/elastic/beats/v7/libbeat/service"
+	"github.com/spf13/cobra"
+	"go.elastic.co/apm"
+	apmtransport "go.elastic.co/apm/transport"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -315,7 +313,7 @@ func defaultLogLevel(cfg *configuration.Configuration) string {
 }
 
 func setupMetrics(
-	agentInfo *info.AgentInfo,
+	_ *info.AgentInfo,
 	logger *logger.Logger,
 	operatingSystem string,
 	cfg *monitoringCfg.MonitoringConfig,
@@ -410,6 +408,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 	cfg := mcfg.APM
 
+	// nolint:godox // the TODO is intentional
 	// TODO(stn): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
 	// but it doesn't exist today. Update this code once we have something
 	// available via the APM Go agent.

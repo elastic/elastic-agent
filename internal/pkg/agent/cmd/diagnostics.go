@@ -18,9 +18,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -632,6 +630,7 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 }
 
 func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse) error {
+	//nolint:staticcheck,SA4006 // false positive
 	zf, err := zw.Create("metrics/")
 	if err != nil {
 		return err

@@ -164,7 +164,7 @@ func TestRouter(t *testing.T) {
 
 		recorder.reset()
 
-		r.Route(ctx, "hello-2", map[pipeline.RoutingKey][]program.Program{})
+		_ = r.Route(ctx, "hello-2", map[pipeline.RoutingKey][]program.Program{})
 
 		assertOps(t, []event{
 			e(k1, closeOp),
