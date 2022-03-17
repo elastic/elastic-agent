@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
