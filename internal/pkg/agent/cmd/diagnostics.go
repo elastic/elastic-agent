@@ -631,7 +631,7 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 }
 
 func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse) error {
-	//nolint:staticcheck,SA4006 // false positive
+	//nolint:staticcheck,wastedassign // false positive
 	zf, err := zw.Create("metrics/")
 	if err != nil {
 		return err
