@@ -87,8 +87,8 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 
 	// Creating a child context that carries both the ad.ctx cancelation and
 	// the span from ctx.
-	//nolint:govet,lostcancel // we just want this context to be cancelled whenever ad.ctx is cancelled.
-	ctx, _ = context.WithCancel(ad.ctx)
+	ctx, cancel := context.WithCancel(ad.ctx)
+	defer cancel()
 	ctx = apm.ContextWithSpan(ctx, span)
 
 	if len(actions) == 0 {
