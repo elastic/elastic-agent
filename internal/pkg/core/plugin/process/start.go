@@ -6,6 +6,7 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 
@@ -62,7 +63,7 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 
 	cfgStr, err := yaml.Marshal(cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("%q could not unmarshal config from ymal: %w", a.Name(), err)
 	}
 
 	a.startContext = ctx
@@ -105,7 +106,8 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 	}()
 
 	if err := a.monitor.Prepare(a.desc.Spec(), a.pipelineID, a.uid, a.gid); err != nil {
-		return err
+		return fmt.Errorf("%q failed to prepare monitor for %q: %w",
+			a.Name(), a.desc.Spec().Name, err)
 	}
 
 	if a.limiter != nil {
@@ -132,7 +134,8 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 		a.gid,
 		spec.Args)
 	if err != nil {
-		return err
+		return fmt.Errorf("%q failed to start %q: %w",
+			a.Name(), spec.BinaryPath, err)
 	}
 
 	// write connect info to stdin
@@ -151,7 +154,8 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 func (a *Application) writeToStdin(as *server.ApplicationState, wc io.WriteCloser) {
 	err := as.WriteConnInfo(wc)
 	if err != nil {
-		a.logger.Errorf("failed writing connection info to spawned application: %s", err)
+		err = errors.New(err, errors.M(errors.MetaKeyAppName, a.name), errors.M(errors.MetaKeyAppName, a.id))
+		a.logger.Errorf("%q failed writing connection info to spawned application: %v", a.Name(), err)
 	}
 	_ = wc.Close()
 }
