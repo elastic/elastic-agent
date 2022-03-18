@@ -164,4 +164,5 @@
 - Install command will skip install/uninstall steps when installation via package is detected on Linux distros. {pull}30289[30289]
 - Update docker/distribution dependency library to fix a security issues concerning OCI Manifest Type Confusion Issue. {pull}30462[30462]
 - Add action_input_type for the .fleet-actions-results {pull}30562[30562]
+- Enhance error messages and logs for process start {pull}225[225]
 

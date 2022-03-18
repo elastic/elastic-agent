@@ -63,7 +63,7 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 
 	cfgStr, err := yaml.Marshal(cfg)
 	if err != nil {
-		return fmt.Errorf("%q could not unmarshal config from ymal: %w", a.Name(), err)
+		return fmt.Errorf("%q could not unmarshal config from yaml: %w", a.Name(), err)
 	}
 
 	a.startContext = ctx
