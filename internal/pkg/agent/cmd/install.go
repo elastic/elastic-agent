@@ -35,7 +35,7 @@ would like the Agent to operate.
 	}
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
-	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode")
+	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	addEnrollFlags(cmd)
 
 	return cmd
