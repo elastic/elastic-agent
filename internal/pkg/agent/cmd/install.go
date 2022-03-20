@@ -111,10 +111,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		askEnroll = false
 	}
 	fleetServer, _ := cmd.Flags().GetString("fleet-server-es")
-	if fleetServer != "" || force || delayEnroll {
-		askEnroll = false
-	}
-	if nonInteractive {
+	if fleetServer != "" || force || delayEnroll || nonInteractive {
 		askEnroll = false
 	}
 	if askEnroll {
@@ -135,7 +132,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	if enroll && fleetServer == "" {
 		if url == "" {
 			if nonInteractive {
-				return fmt.Errorf("missing required --url argument")
+				return fmt.Errorf("missing required --url argument used to enroll the agent")
 			}
 			url, err = cli.ReadInput("URL you want to enroll this Agent into:")
 			if err != nil {
@@ -148,7 +145,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		}
 		if token == "" {
 			if nonInteractive {
-				return fmt.Errorf("missing required --enrollment-token")
+				return fmt.Errorf("missing required --enrollment-token argument used to enroll the agent")
 			}
 			token, err = cli.ReadInput("Fleet enrollment token:")
 			if err != nil {
