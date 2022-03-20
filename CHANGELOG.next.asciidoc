@@ -16,6 +16,7 @@
 - The `/processes/<subprocess>` endpoint proxies to the subprocess's monitoring endpoint, instead of querying its `/stats` endpoint {pull}28165[28165]
 - Remove username/password for fleet-server authentication. {pull}29458[29458]
 
+
 ==== Bugfixes
 - Fix rename *ConfigChange to *PolicyChange to align on changes in the UI. {pull}20779[20779]
 - Thread safe sorted set {pull}21290[21290]
@@ -167,4 +168,5 @@
 - Update docker/distribution dependency library to fix a security issues concerning OCI Manifest Type Confusion Issue. {pull}30462[30462]
 - Add action_input_type for the .fleet-actions-results {pull}30562[30562]
 - Enhance error messages and logs for process start {pull}225[225]
+- Changed the default policy selection logic. When the agent has no policy id or name defined, it will fall back to defaults (defined by $FLEET_SERVER_POLICY_ID and $DEFAULT_FLEET_TOKEN_POLICY_NAME environment variables respectively). {issue}29774[29774] {pull}226[226]
 
