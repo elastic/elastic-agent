@@ -383,57 +383,76 @@ func TestConfiguration(t *testing.T) {
 	defer os.Remove("fleet.yml")
 
 	testcases := map[string]struct {
-		programs []string
-		expected int
-		empty    bool
+		programs map[string][]string
 		err      bool
 	}{
 		"namespace": {
-			programs: []string{"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
-			expected: 6,
+			programs: map[string][]string{
+				"default": {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
+			},
+		},
+		"logstash_config": {
+			programs: map[string][]string{
+				"default":       {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
+				"elasticsearch": {"filebeat"},
+			},
 		},
 		"single_config": {
-			programs: []string{"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
-			expected: 6,
+			programs: map[string][]string{
+				"default": {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
+			},
 		},
 		// "audit_config": {
 		// 	programs: []string{"auditbeat"},
 		// 	expected: 1,
 		// },
 		"fleet_server": {
-			programs: []string{"fleet-server"},
-			expected: 1,
+			programs: map[string][]string{
+				"default": {"fleet-server"},
+			},
 		},
 		"synthetics_config": {
-			programs: []string{"heartbeat"},
-			expected: 1,
+			programs: map[string][]string{
+				"default": {"heartbeat"},
+			},
 		},
 		"enabled_true": {
-			programs: []string{"filebeat"},
-			expected: 1,
+			programs: map[string][]string{
+				"default": {"filebeat"},
+			},
 		},
 		"enabled_false": {
-			expected: 0,
+			programs: map[string][]string{
+				"default": {},
+			},
 		},
 		"enabled_output_true": {
-			programs: []string{"filebeat"},
-			expected: 1,
+			programs: map[string][]string{
+				"default": {"filebeat"},
+			},
 		},
 		"enabled_output_false": {
-			empty: true,
+			programs: map[string][]string{},
 		},
 		"endpoint_basic": {
-			programs: []string{"endpoint"},
-			expected: 1,
+			programs: map[string][]string{
+				"default": {"endpoint"},
+			},
 		},
 		"endpoint_no_fleet": {
-			expected: 0,
+			programs: map[string][]string{
+				"default": {},
+			},
 		},
 		"endpoint_unknown_output": {
-			expected: 0,
+			programs: map[string][]string{
+				"default": {},
+			},
 		},
 		"endpoint_arm": {
-			expected: 0,
+			programs: map[string][]string{
+				"default": {},
+			},
 		},
 	}
 
@@ -455,38 +474,45 @@ func TestConfiguration(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			if test.empty {
-				require.Equal(t, 0, len(programs))
-				return
+			require.Equal(t, len(test.programs), len(programs))
+
+			if len(programs) > 0 {
+				_, containsDefault := programs["default"]
+				require.True(t, containsDefault)
 			}
 
-			require.Equal(t, 1, len(programs))
+			for progKey, progs := range programs {
+				testPrograms, isExpectedProgram := test.programs[progKey]
+				require.True(t, isExpectedProgram)
+				require.Equal(t, len(testPrograms), len(progs))
 
-			defPrograms, ok := programs["default"]
-			require.True(t, ok)
-			require.Equal(t, test.expected, len(defPrograms))
+				for _, program := range progs {
+					filename := name + "-" + strings.ToLower(program.Spec.Cmd)
+					if progKey != "default" {
+						filename += "-" + progKey
+					}
+					programConfig, err := ioutil.ReadFile(filepath.Join(
+						"testdata",
+						filename+".yml",
+					))
 
-			for _, program := range defPrograms {
-				programConfig, err := ioutil.ReadFile(filepath.Join(
-					"testdata",
-					name+"-"+strings.ToLower(program.Spec.Cmd)+".yml",
-				))
+					require.NoError(t, err)
+					var m map[string]interface{}
+					err = yamltest.FromYAML(programConfig, &m)
+					require.NoError(t, errors.Wrap(err, program.Cmd()))
 
-				require.NoError(t, err)
-				var m map[string]interface{}
-				err = yamltest.FromYAML(programConfig, &m)
-				require.NoError(t, errors.Wrap(err, program.Cmd()))
+					compareMap := &transpiler.MapVisitor{}
+					program.Config.Accept(compareMap)
 
-				compareMap := &transpiler.MapVisitor{}
-				program.Config.Accept(compareMap)
-
-				if !assert.True(t, cmp.Equal(m, compareMap.Content)) {
-					diff := cmp.Diff(m, compareMap.Content)
-					if diff != "" {
-						t.Errorf("%s-%s mismatch (-want +got):\n%s", name, program.Spec.Name, diff)
+					if !assert.True(t, cmp.Equal(m, compareMap.Content)) {
+						diff := cmp.Diff(m, compareMap.Content)
+						if diff != "" {
+							t.Errorf("%s-%s mismatch (-want +got):\n%s", name, program.Spec.Name, diff)
+						}
 					}
 				}
 			}
+
 		})
 	}
 }

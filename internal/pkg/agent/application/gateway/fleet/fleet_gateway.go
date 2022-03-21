@@ -165,8 +165,6 @@ func (f *fleetGateway) worker() {
 			// jitter to help better distribute the load from a fleet of agents.
 			resp, err := f.doExecute()
 			if err != nil {
-				f.log.Error(err)
-				f.statusReporter.Update(state.Failed, err.Error(), nil)
 				continue
 			}
 
@@ -198,24 +196,34 @@ func (f *fleetGateway) worker() {
 
 func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 	f.backoff.Reset()
+
+	// Guard if the context is stopped by a out of bound call,
+	// this mean we are rebooting to change the log level or the system is shutting us down.
 	for f.bgContext.Err() == nil {
-		// TODO: wrap with timeout context
 		f.log.Debugf("Checking started")
 		resp, err := f.execute(f.bgContext)
 		if err != nil {
 			f.log.Errorf("Could not communicate with fleet-server Checking API will retry, error: %s", err)
 			if !f.backoff.Wait() {
-				return nil, errors.New(
+				// Something bad has happened and we log it and we should update our current state.
+				err := errors.New(
 					"execute retry loop was stopped",
 					errors.TypeNetwork,
 					errors.M(errors.MetaKeyURI, f.client.URI()),
 				)
+
+				f.log.Error(err)
+				f.statusReporter.Update(state.Failed, err.Error(), nil)
+				return nil, err
 			}
 			continue
 		}
+		// Request was successful, return the collected actions.
 		return resp, nil
 	}
 
+	// This mean that the next loop was cancelled because of the context, we should return the error
+	// but we should not log it, because we are in the process of shutting down.
 	return nil, f.bgContext.Err()
 }
 

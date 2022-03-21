@@ -19,8 +19,17 @@ fleet:
 
 outputs:
   default:
+    type: logstash
+    ssl.certificate: abcert
+    ssl.key: abckey
+    hosts: [127.0.0.1:5044]
+    ssl.certificate_authorities: 
+      - abc1
+      - abc2
+
+  elasticsearch:
     type: elasticsearch
-    hosts: [127.0.0.1:9200, 127.0.0.1:9300]
+    hosts: [127.0.0.1:9201, 127.0.0.1:9301]
     bulk_max_size: 23
     worker: 10
     username: elastic
@@ -53,7 +62,6 @@ inputs:
         dataset: ""
   hosts: ["http://127.0.0.1:8080"]
 - type: logfile
-  id: logfile-1
   use_output: default
   streams:
     - paths:
@@ -62,10 +70,9 @@ inputs:
   vars:
     var: value
 - type: logfile
-  id: logfile-2
   data_stream:
     type: testtype
-  use_output: default
+  use_output: elasticsearch
   streams:
     - paths:
       - /var/log/hello3.log
@@ -110,6 +117,7 @@ inputs:
   type: endpoint
   name: endpoint-1
   enabled: true
+  use_input: default
   package:
     name: endpoint
     version: 0.3.0

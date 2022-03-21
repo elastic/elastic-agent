@@ -5,7 +5,7 @@ args: [
   "-E", "setup.template.enabled=false",
   "-E", "management.enabled=true",
   "-E", "logging.level=debug",
-  "-E", "gc_percent=${FILEBEAT_GOGC:100}"
+  "-E", "gc_percent=${FILEBEAT_GOGC:100}",
   "-E", "filebeat.config.modules.enabled=false"
 ]
 artifact: beats/filebeat
@@ -25,7 +25,7 @@ rules:
     - copy_all_to_list:
         to: streams
         on_conflict: noop
-        except: ["streams", "id", "enabled", "processors"]
+        except: ["streams", "enabled", "processors"]
     - copy_to_list:
         item: processors
         to: streams
