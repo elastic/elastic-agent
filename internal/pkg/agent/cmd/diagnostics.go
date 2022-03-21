@@ -630,28 +630,28 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 }
 
 func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse) error {
-	zf, err := zw.Create("metrics/")
+	_, err := zw.Create("metrics/")
 	if err != nil {
 		return err
 	}
 
 	for _, m := range metrics.Result {
 		if m.Error != "" {
-			zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt")
+			zfe, err := zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt")
 			if err != nil {
 				return err
 			}
-			_, err = zf.Write([]byte(m.Error))
+			_, err = zfe.Write([]byte(m.Error))
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + ".json")
+		zfj, err := zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + ".json")
 		if err != nil {
 			return err
 		}
-		_, err = zf.Write(m.Result)
+		_, err = zfj.Write(m.Result)
 		if err != nil {
 			return err
 		}
