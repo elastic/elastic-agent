@@ -207,9 +207,9 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 	}
 
 	metrics, err := gatherMetrics(innerCtx)
-	if err == context.DeadlineExceeded {
+	if stderrors.Is(err, context.DeadlineExceeded) {
 		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if err == context.Canceled {
+	} else if stderrors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
