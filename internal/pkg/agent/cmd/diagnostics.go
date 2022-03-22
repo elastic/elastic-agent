@@ -501,14 +501,7 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 			return closeHandlers(err, zw, f)
 		}
 	}
-
-	if metrics != nil && len(metrics.Result) > 0 {
-		err := zipMetrics(zw, metrics)
-		if err != nil {
-			return closeHandlers(err, zw, f)
-		}
-	}
-
+	
 	return closeHandlers(nil, zw, f)
 }
 

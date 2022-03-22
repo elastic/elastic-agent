@@ -12,8 +12,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/beats/v7/libbeat/monitoring/report/buffer"
-
 	"github.com/gorilla/mux"
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgorilla"
