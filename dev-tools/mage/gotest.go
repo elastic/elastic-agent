@@ -320,6 +320,7 @@ func makeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 }
 
 // BuildSystemTestBinary runs BuildSystemTestGoBinary with default values.
+// envirment is important.
 func BuildSystemTestBinary() error {
 	return BuildSystemTestGoBinary(DefaultTestBinaryArgs())
 }
