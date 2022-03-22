@@ -30,7 +30,7 @@ var (
 // generate.
 type ConfigFileType uint8
 
-// Config file types.
+// Config file types should be a longer comment.
 const (
 	ShortConfigType ConfigFileType = 1 << iota
 	ReferenceConfigType
