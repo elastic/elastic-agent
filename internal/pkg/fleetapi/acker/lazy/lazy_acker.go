@@ -8,6 +8,8 @@ import (
 	"context"
 	"net/http"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
@@ -54,13 +56,23 @@ func WithRetrier(r retrier) Option {
 }
 
 // Ack acknowledges action.
-func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) error {
+func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
+	span, ctx := apm.StartSpan(ctx, "ack", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
 	f.enqueue(action)
 	return nil
 }
 
 // Commit commits ack actions.
-func (f *Acker) Commit(ctx context.Context) error {
+func (f *Acker) Commit(ctx context.Context) (err error) {
+	span, ctx := apm.StartSpan(ctx, "commit", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
 	if len(f.queue) == 0 {
 		return nil
 	}
@@ -69,7 +81,8 @@ func (f *Acker) Commit(ctx context.Context) error {
 	f.queue = make([]fleetapi.Action, 0)
 
 	f.log.Debugf("lazy acker: ackbatch: %#v", actions)
-	resp, err := f.acker.AckBatch(ctx, actions)
+	var resp *fleetapi.AckResponse
+	resp, err = f.acker.AckBatch(ctx, actions)
 
 	// If request failed enqueue all actions with retrier if it is set
 	if err != nil {

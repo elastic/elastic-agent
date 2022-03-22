@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
@@ -29,8 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 )
 
 var diagOutputs = map[string]outputter{
@@ -205,6 +204,18 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
 	}
 
+	metrics, err := gatherMetrics(innerCtx)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("timed out after %s trying to connect to Elastic Agent daemon", cmdTimeout)
+		}
+		if errors.Is(err, context.Canceled) {
+			return nil
+		}
+
+		return fmt.Errorf("failed to communicate with Elastic Agent daemon when gathering metrics: %w", err)
+	}
+
 	cfg, err := gatherConfig()
 	if err != nil {
 		return fmt.Errorf("unable to gather config data: %w", err)
@@ -218,7 +229,7 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 		}
 	}
 
-	err = createZip(fileName, outputFormat, diag, cfg, pprofData)
+	err = createZip(fileName, outputFormat, diag, cfg, pprofData, metrics)
 	if err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
 	}
@@ -313,6 +324,17 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 	return diag, nil
 }
 
+func gatherMetrics(ctx context.Context) (*proto.ProcMetricsResponse, error) {
+	daemon := client.New()
+	err := daemon.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer daemon.Disconnect()
+
+	return daemon.ProcMetrics(ctx)
+}
+
 func humanDiagnosticsOutput(w io.Writer, obj interface{}) error {
 	diag, ok := obj.(DiagnosticsInfo)
 	if !ok {
@@ -400,7 +422,7 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf) error {
+func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse) error {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
@@ -467,6 +489,13 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 
 	if pprof != nil {
 		err := zipProfs(zw, pprof)
+		if err != nil {
+			return closeHandlers(err, zw, f)
+		}
+	}
+
+	if metrics != nil && len(metrics.Result) > 0 {
+		err := zipMetrics(zw, metrics)
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -596,6 +625,37 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 			if err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse) error {
+	//nolint:staticcheck,wastedassign // false positive
+	zf, err := zw.Create("metrics/")
+	if err != nil {
+		return err
+	}
+
+	for _, m := range metrics.Result {
+		if m.Error != "" {
+			zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt")
+			if err != nil {
+				return err
+			}
+			_, err = zf.Write([]byte(m.Error))
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + ".json")
+		if err != nil {
+			return err
+		}
+		_, err = zf.Write(m.Result)
+		if err != nil {
+			return err
 		}
 	}
 	return nil

@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
@@ -91,7 +93,12 @@ func NewAckCmd(info agentInfo, client client.Sender) *AckCmd {
 }
 
 // Execute ACK of actions to the Fleet.
-func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (*AckResponse, error) {
+func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (_ *AckResponse, err error) {
+	span, ctx := apm.StartSpan(ctx, "execute", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}

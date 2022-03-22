@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
@@ -79,6 +81,7 @@ func newManaged(
 	reexec reexecManager,
 	statusCtrl status.Controller,
 	agentInfo *info.AgentInfo,
+	tracer *apm.Tracer,
 ) (*Managed, error) {
 	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, statusCtrl)
 	if err != nil {
@@ -106,7 +109,7 @@ func newManaged(
 	}
 
 	managedApplication.bgContext, managedApplication.cancelCtxFn = context.WithCancel(ctx)
-	managedApplication.srv, err = server.NewFromConfig(log, cfg.Settings.GRPC, &operation.ApplicationStatusHandler{})
+	managedApplication.srv, err = server.NewFromConfig(log, cfg.Settings.GRPC, &operation.ApplicationStatusHandler{}, tracer)
 	if err != nil {
 		return nil, errors.New(err, "initialize GRPC listener", errors.TypeNetwork)
 	}
@@ -250,7 +253,7 @@ func newManaged(
 		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
-		if err := store.ReplayActions(log, actionDispatcher, actionAcker, actions...); err != nil {
+		if err := store.ReplayActions(ctx, log, actionDispatcher, actionAcker, actions...); err != nil {
 			log.Errorf("could not recover state, error %+v, skipping...", err)
 		}
 		stateRestored = true
