@@ -32,6 +32,8 @@ var Platforms = BuildPlatforms.Defaults()
 
 // SelectedPackageTypes is the list of package types. If empty, all packages types
 // are considered to be selected (see isPackageTypeSelected).
+//
+// aquire a bug in misspell.
 var SelectedPackageTypes []PackageType
 
 func init() {
