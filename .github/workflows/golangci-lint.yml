@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Echo details
         env:
-          - GOOS: ${{ matrix.GOOS }}
+           GOOS: ${{ matrix.GOOS }}
         run: echo Go GOOS=$GOOS
 
       - uses: actions/checkout@v2
@@ -39,7 +39,7 @@ jobs:
 
       - name: golangci-lint
         env:
-          - GOOS: ${{ matrix.GOOS }}
+          GOOS: ${{ matrix.GOOS }}
         uses: golangci/golangci-lint-action@v2
         with:
           # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
