@@ -207,12 +207,14 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 	}
 
 	metrics, err := gatherMetrics(innerCtx)
-	if stderrors.Is(err, context.DeadlineExceeded) {
-		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if stderrors.Is(err, context.Canceled) {
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("timed out after %s trying to connect to Elastic Agent daemon", cmdTimeout)
+		}
+		if errors.Is(err, context.Canceled) {
+			return nil
+		}
+		return fmt.Errorf("failed to communicate with Elastic Agent daemon when gathering metrics: %w", err)
 	}
 
 	cfg, err := gatherConfig()
@@ -500,6 +502,13 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		}
 	}
 
+	if metrics != nil && len(metrics.Result) > 0 {
+		err := zipMetrics(zw, metrics)
+		if err != nil {
+			return closeHandlers(err, zw, f)
+		}
+	}
+
 	return closeHandlers(nil, zw, f)
 }
 
@@ -630,28 +639,29 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 }
 
 func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse) error {
-	_, err := zw.Create("metrics/")
+	//nolint:staticcheck,wastedassign // false positive
+	zf, err := zw.Create("metrics/")
 	if err != nil {
 		return err
 	}
 
 	for _, m := range metrics.Result {
 		if m.Error != "" {
-			zfe, err := zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt")
+			zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt")
 			if err != nil {
 				return err
 			}
-			_, err = zfe.Write([]byte(m.Error))
+			_, err = zf.Write([]byte(m.Error))
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		zfj, err := zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + ".json")
+		zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + ".json")
 		if err != nil {
 			return err
 		}
-		_, err = zfj.Write(m.Result)
+		_, err = zf.Write(m.Result)
 		if err != nil {
 			return err
 		}

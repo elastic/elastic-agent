@@ -15,11 +15,14 @@ import (
 	"github.com/elastic/beats/v7/libbeat/monitoring/report/buffer"
 
 	"github.com/gorilla/mux"
+	"go.elastic.co/apm"
+	"go.elastic.co/apm/module/apmgorilla"
 
 	"github.com/elastic/beats/v7/libbeat/api"
 	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/monitoring"
+	"github.com/elastic/beats/v7/libbeat/monitoring/report/buffer"
 	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 )
@@ -32,6 +35,7 @@ func New(
 	routesFetchFn func() *sorted.Set,
 	enableProcessStats bool,
 	enableBuffer bool,
+	tracer *apm.Tracer,
 ) (*api.Server, error) {
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
@@ -43,11 +47,22 @@ func New(
 		return nil, err
 	}
 
-	return exposeMetricsEndpoint(log, cfg, ns, routesFetchFn, enableProcessStats, enableBuffer)
+	return exposeMetricsEndpoint(log, cfg, ns, routesFetchFn, enableProcessStats, enableBuffer, tracer)
 }
 
-func exposeMetricsEndpoint(log *logger.Logger, config *common.Config, ns func(string) *monitoring.Namespace, routesFetchFn func() *sorted.Set, enableProcessStats bool, enableBuffer bool) (*api.Server, error) {
+func exposeMetricsEndpoint(
+	log *logger.Logger,
+	config *common.Config,
+	ns func(string) *monitoring.Namespace,
+	routesFetchFn func() *sorted.Set,
+	enableProcessStats bool,
+	enableBuffer bool,
+	tracer *apm.Tracer,
+) (*api.Server, error) {
 	r := mux.NewRouter()
+	if tracer != nil {
+		r.Use(apmgorilla.Middleware(apmgorilla.WithTracer(tracer)))
+	}
 	statsHandler := statsHandler(ns("stats"))
 	r.Handle("/stats", createHandler(statsHandler))
 

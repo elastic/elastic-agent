@@ -16,6 +16,10 @@ import (
 	"sync"
 	"time"
 
+	"go.elastic.co/apm"
+	"go.elastic.co/apm/module/apmgrpc"
+	"google.golang.org/grpc"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
@@ -31,8 +35,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-
-	"google.golang.org/grpc"
 )
 
 // Server is the daemon side of the control protocol.
@@ -45,6 +47,7 @@ type Server struct {
 	monitoringCfg *monitoringCfg.MonitoringConfig
 	listener      net.Listener
 	server        *grpc.Server
+	tracer        *apm.Tracer
 	lock          sync.RWMutex
 }
 
@@ -59,11 +62,12 @@ type specInfo struct {
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, rex reexec.ExecManager, statusCtrl status.Controller, up *upgrade.Upgrader) *Server {
+func New(log *logger.Logger, rex reexec.ExecManager, statusCtrl status.Controller, up *upgrade.Upgrader, tracer *apm.Tracer) *Server {
 	return &Server{
 		logger:     log,
 		rex:        rex,
 		statusCtrl: statusCtrl,
+		tracer:     tracer,
 		up:         up,
 	}
 }
@@ -103,7 +107,12 @@ func (s *Server) Start() error {
 		return err
 	}
 	s.listener = lis
-	s.server = grpc.NewServer()
+	if s.tracer != nil {
+		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(s.tracer))
+		s.server = grpc.NewServer(grpc.UnaryInterceptor(apmInterceptor))
+	} else {
+		s.server = grpc.NewServer()
+	}
 	proto.RegisterElasticAgentControlServer(s.server, s)
 
 	// start serving GRPC connections
@@ -321,6 +330,39 @@ func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMe
 		client := newSocketRequester(si.app, si.rk, endpoint)
 
 		s.logger.Infof("GATHER METRICS FROM %s", endpoint)
+		metrics := client.procMetrics(ctx)
+		resp.Result = append(resp.Result, metrics)
+	}
+	return resp, nil
+}
+
+// ProcMetrics returns all buffered metrics data for the agent and running processes.
+// If the agent.monitoring.http.buffer variable is not set, or set to false, a nil result attribute is returned
+func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMetricsResponse, error) {
+	if s.monitoringCfg == nil || s.monitoringCfg.HTTP == nil || s.monitoringCfg.HTTP.Buffer == nil || !s.monitoringCfg.HTTP.Buffer.Enabled {
+		return &proto.ProcMetricsResponse{}, nil
+	}
+
+	if s.routeFn == nil {
+		return nil, errors.New("route function is nil")
+	}
+
+	// gather metrics buffer data from the elastic-agent
+	endpoint := beats.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
+	c := newSocketRequester("elastic-agent", "", endpoint)
+	metrics := c.procMetrics(ctx)
+
+	resp := &proto.ProcMetricsResponse{
+		Result: []*proto.MetricsResponse{metrics},
+	}
+
+	// gather metrics buffer data from all other processes
+	specs := s.getSpecInfo("", "")
+	for _, si := range specs {
+		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
+		client := newSocketRequester(si.app, si.rk, endpoint)
+
+		s.logger.Infof("gather metrics from %s", endpoint)
 		metrics := client.procMetrics(ctx)
 		resp.Result = append(resp.Result, metrics)
 	}

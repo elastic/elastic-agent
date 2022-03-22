@@ -8,6 +8,9 @@ import (
 	"context"
 	"testing"
 
+	"go.elastic.co/apm"
+	"go.elastic.co/apm/apmtest"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
@@ -45,12 +48,48 @@ func (m *mockActionOther) ID() string     { return "mockActionOther" }
 func (m *mockActionOther) Type() string   { return "mockActionOther" }
 func (m *mockActionOther) String() string { return "mockActionOther" }
 
+type mockAcker struct {
+	CommitFn func(ctx context.Context) error
+}
+
+func (m mockAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	panic("implement me")
+}
+
+func (m mockAcker) Commit(ctx context.Context) error {
+	return m.CommitFn(ctx)
+}
+
 func TestActionDispatcher(t *testing.T) {
 	ack := noopacker.NewAcker()
 
-	t.Run("Success to dispatch multiples events", func(t *testing.T) {
+	t.Run("Merges ActionDispatcher ctx cancel and Dispatch ctx value", func(t *testing.T) {
+		action1 := &mockAction{}
 		def := &mockHandler{}
-		d, err := New(context.Background(), nil, def)
+		span := apmtest.NewRecordingTracer().
+			StartTransaction("ignore", "ignore").
+			StartSpan("ignore", "ignore", nil)
+		ctx1, cancel := context.WithCancel(context.Background())
+		ack := mockAcker{CommitFn: func(ctx context.Context) error {
+			// ctx1 not cancelled yet
+			require.NoError(t, ctx.Err())
+			got := apm.SpanFromContext(ctx)
+			require.Equal(t, span.TraceContext().Span, got.ParentID())
+			cancel() // cancel function from ctx1
+			require.Equal(t, ctx.Err(), context.Canceled)
+			return nil
+		}}
+		d, err := New(ctx1, nil, def)
+		require.NoError(t, err)
+		ctx2 := apm.ContextWithSpan(context.Background(), span)
+		err = d.Dispatch(ctx2, ack, action1)
+		require.NoError(t, err)
+	})
+
+	t.Run("Success to dispatch multiples events", func(t *testing.T) {
+		ctx := context.Background()
+		def := &mockHandler{}
+		d, err := New(ctx, nil, def)
 		require.NoError(t, err)
 
 		success1 := &mockHandler{}
@@ -62,7 +101,7 @@ func TestActionDispatcher(t *testing.T) {
 		action1 := &mockAction{}
 		action2 := &mockActionOther{}
 
-		err = d.Dispatch(ack, action1, action2)
+		err = d.Dispatch(ctx, ack, action1, action2)
 
 		require.NoError(t, err)
 
@@ -78,11 +117,12 @@ func TestActionDispatcher(t *testing.T) {
 
 	t.Run("Unknown action are caught by the unknown handler", func(t *testing.T) {
 		def := &mockHandler{}
-		d, err := New(context.Background(), nil, def)
+		ctx := context.Background()
+		d, err := New(ctx, nil, def)
 		require.NoError(t, err)
 
 		action := &mockActionUnknown{}
-		err = d.Dispatch(ack, action)
+		err = d.Dispatch(ctx, ack, action)
 
 		require.NoError(t, err)
 		require.True(t, def.called)
