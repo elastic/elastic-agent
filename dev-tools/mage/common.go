@@ -594,11 +594,6 @@ func ParallelCtx(ctx context.Context, fns ...interface{}) {
 // Parallel runs the given functions in parallel with an upper limit set based
 // on GOMAXPROCS.
 func Parallel(fns ...interface{}) {
-	// Question: if Parallel is just hiding the need for a context, does it mean
-	// ParallelCtx should be used instead and a refactor is need to remove calls
-	// Parallel? If so, context.TODO() is more appropriated as it makes explicit
-	// a context should came from the caller and the current context is just a
-	// temporary solution until the needed refactor is made.
 	ParallelCtx(context.TODO(), fns...)
 }
 
