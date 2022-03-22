@@ -76,7 +76,8 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 }
 
 // AckBatch acknowledges multiple actions at once.
-func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (err error) {
+func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *fleetapi.AckResponse, err error) {
+	f.log.Debugf("fleet acker: ackbatch, actions: %#v", actions)
 	span, ctx := apm.StartSpan(ctx, "ackBatch", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -91,9 +92,10 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (err er
 		ids = append(ids, action.ID())
 	}
 
+	f.log.Debugf("fleet acker: ackbatch, events: %#v", events)
 	if len(events) == 0 {
 		// no events to send (nothing to do)
-		return nil
+		return &fleetapi.AckResponse{}, nil
 	}
 
 	cmd := fleetapi.NewAckCmd(f.agentInfo, f.client)
@@ -103,11 +105,11 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (err er
 
 	f.log.Debugf("%d actions with ids '%s' acknowledging", len(ids), strings.Join(ids, ","))
 
-	_, err = cmd.Execute(ctx, req)
+	res, err = cmd.Execute(ctx, req)
 	if err != nil {
-		return errors.New(err, fmt.Sprintf("acknowledge %d actions '%v' for elastic-agent '%s' failed", len(actions), actions, agentID), errors.TypeNetwork)
+		return nil, errors.New(err, fmt.Sprintf("acknowledge %d actions '%v' for elastic-agent '%s' failed", len(actions), actions, agentID), errors.TypeNetwork)
 	}
-	return nil
+	return res, nil
 }
 
 // Commit commits ack actions.
