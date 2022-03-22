@@ -18,8 +18,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
-
 	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -28,7 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
@@ -501,7 +499,7 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 			return closeHandlers(err, zw, f)
 		}
 	}
-	
+
 	return closeHandlers(nil, zw, f)
 }
 
