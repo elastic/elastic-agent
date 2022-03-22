@@ -76,10 +76,7 @@ func (t *CopyTask) fileCopy(src, dest string, info os.FileInfo) error {
 		return nil
 	}
 
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
+	srcFile, _ := os.Open(src)
 	defer srcFile.Close()
 
 	if !info.Mode().IsRegular() {
