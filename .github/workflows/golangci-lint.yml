@@ -12,9 +12,18 @@ permissions:
   pull-requests: read
 jobs:
   golangci:
+    strategy:
+      matrix:
+        include:
+          - GOOS: windows
+          - GOOS: linux
+          - GOOS: darwin
     name: lint
     runs-on: ubuntu-latest
     steps:
+      - name: Echo details
+        run: echo Go GOOS=$GOOS
+
       - uses: actions/checkout@v2
 
       # Uses Go version from the repository.
