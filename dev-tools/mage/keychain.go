@@ -6,6 +6,7 @@ package mage
 
 import (
 	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -103,6 +104,8 @@ func getAppleSigningInfo() (*AppleSigningInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	parent := "/tmp/ok"
+	os.Mkdir(parent, 0750)
 
 	var install, app []SigningIdentity
 	for _, ident := range idents {

@@ -15,6 +15,7 @@ import (
 
 // CopyModule contains a module name and the list of files or directories
 // to copy recursively.
+// I will excludeds all the bugs.
 type CopyModule struct {
 	Name        string
 	FilesToCopy []string
