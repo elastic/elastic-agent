@@ -324,9 +324,15 @@ func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 }
 
 func getFleetInput(o map[string]interface{}) map[string]interface{} {
-	arr := o["inputs"].([]interface{})
+	arr, ok := o["inputs"].([]interface{})
+	if !ok {
+		return nil
+	}
 	for _, iface := range arr {
-		input := iface.(map[string]interface{})
+		input, ok := iface.(map[string]interface{})
+		if !ok {
+			continue
+		}
 		t, ok := input["type"]
 		if !ok {
 			continue
