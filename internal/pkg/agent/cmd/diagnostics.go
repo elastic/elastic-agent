@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 )
@@ -511,6 +513,10 @@ func zipLogs(zw *zip.Writer) error {
 		return err
 	}
 
+	if err := collectEndpointSecurityLogs(zw, program.SupportedMap); err != nil {
+		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
+	}
+
 	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
 	logPath := filepath.Join(paths.Home(), "logs") + string(filepath.Separator)
 	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
@@ -534,21 +540,59 @@ func zipLogs(zw *zip.Writer) error {
 			return nil
 		}
 
-		lf, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("unable to open log file: %w", err)
-		}
-		zf, err := zw.Create("logs/" + name)
-		if err != nil {
-			return closeHandlers(fmt.Errorf("unable to create log file in archive: %w", err), lf)
-		}
-		_, err = io.Copy(zf, lf)
-		if err != nil {
-			return closeHandlers(fmt.Errorf("log file copy failed: %w", err), lf)
+		return saveLogs(name, path, zw)
+	})
+}
+
+func collectEndpointSecurityLogs(zw *zip.Writer, specs map[string]program.Spec) error {
+	spec, ok := specs["endpoint-security"]
+	if !ok {
+		return nil
+	}
+
+	logs, ok := spec.LogPaths[runtime.GOOS]
+	if !ok {
+		return nil
+	}
+
+	logPath := filepath.Dir(logs) + string(filepath.Separator)
+	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+		if fErr != nil {
+			if stderrors.Is(fErr, fs.ErrNotExist) {
+				return nil
+			}
+
+			return fmt.Errorf("unable to walk log dir: %w", fErr)
 		}
 
-		return lf.Close()
+		name := strings.TrimPrefix(path, logPath)
+		if name == "" {
+			return nil
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		return saveLogs(name, path, zw)
 	})
+}
+
+func saveLogs(name string, logPath string, zw *zip.Writer) error {
+	lf, err := os.Open(logPath)
+	if err != nil {
+		return fmt.Errorf("unable to open log file: %w", err)
+	}
+	zf, err := zw.Create("logs/" + name)
+	if err != nil {
+		return closeHandlers(fmt.Errorf("unable to create log file in archive: %w", err), lf)
+	}
+	_, err = io.Copy(zf, lf)
+	if err != nil {
+		return closeHandlers(fmt.Errorf("log file copy failed: %w", err), lf)
+	}
+
+	return lf.Close()
 }
 
 // writeFile writes json or yaml data from the interface to the writer.

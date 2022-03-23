@@ -5,10 +5,20 @@
 package cmd
 
 import (
+	"archive/zip"
+	"bytes"
+	"io"
 	"os"
+	"path/filepath"
+	"strings"
+	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 var testDiagnostics = DiagnosticsInfo{
@@ -71,4 +81,42 @@ func Example_humanDiagnosticsOutput() {
 	//      hostname: test-host                   username: test-user                 user_id: 1000                                   user_gid: 1000
 	//   *  name: metricbeat                      route_key: test
 	//      error: failed to get metricbeat data
+}
+
+func Test_collectEndpointSecurityLogs(t *testing.T) {
+	root := filepath.Join("testdata", "diagnostics", "endpoint-security", "logs")
+
+	specs := program.SupportedMap
+	specs["endpoint-security"].LogPaths["linux"] =
+		filepath.Join(root, "endpoint-*.log")
+	
+	buff := bytes.Buffer{}
+
+	zw := zip.NewWriter(&buff)
+	err := collectEndpointSecurityLogs(zw, specs)
+	assert.NoError(t, err)
+
+	err = zw.Close()
+	require.NoError(t, err)
+
+	zr, err := zip.NewReader(
+		bytes.NewReader(buff.Bytes()), int64(len(buff.Bytes())))
+	require.NoError(t, err)
+
+	assert.NotEmpty(t, zr.File, "zip file shouldn't be empty")
+	for _, f := range zr.File {
+		split := strings.Split(f.Name, "/")
+		name := split[len(split)-1]
+
+		wantf, err := os.Open(filepath.Join(root, name))
+		require.NoError(t, err)
+		want, err := io.ReadAll(wantf)
+		require.NoError(t, err)
+
+		r, err := f.Open()
+		require.NoError(t, err)
+		got, err := io.ReadAll(r)
+
+		assert.Equal(t, got, want)
+	}
 }
