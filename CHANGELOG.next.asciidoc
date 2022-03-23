@@ -167,5 +167,7 @@
 - Update docker/distribution dependency library to fix a security issues concerning OCI Manifest Type Confusion Issue. {pull}30462[30462]
 - Add action_input_type for the .fleet-actions-results {pull}30562[30562]
 - Add support for enabling the metrics buffer endpoint in the elastic-agent and beats it runs. diagnostics collect command will gather metrics-buffer data if enabled. {pull}30471[30471]
+- Update ack response schema and processing, add retrier for acks {pull}200[200]
 - Enhance error messages and logs for process start {pull}225[225]
+- Add Elastic APM instrumentation {pull}180[180]
 

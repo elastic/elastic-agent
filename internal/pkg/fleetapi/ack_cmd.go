@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"io/ioutil"
 
 	"go.elastic.co/apm"
 
@@ -52,13 +52,25 @@ func (e *AckRequest) Validate() error {
 	return nil
 }
 
+// AckResponseItem the status items for individual acks
+type AckResponseItem struct {
+	Status  int    `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
 // AckResponse is the response send back from the server.
 // 200
 // {
 // 	 "action": "acks"
+//   "items": [
+//	    {"status": 200},
+//	    {"status": 404},
+//   ]
 // }
 type AckResponse struct {
-	Action string `json:"action"`
+	Action string            `json:"action"`
+	Errors bool              `json:"errors,omitempty"` // indicates that some of the events in the ack request failed
+	Items  []AckResponseItem `json:"items,omitempty"`
 }
 
 // Validate validates the response send from the server.
@@ -108,22 +120,24 @@ func (e *AckCmd) Execute(ctx context.Context, r *AckRequest) (_ *AckResponse, er
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, client.ExtractError(resp.Body)
+	// Read ack response always it can be sent with any status code.
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	ackResponse := &AckResponse{}
-	decoder := json.NewDecoder(resp.Body)
-	if err := decoder.Decode(ackResponse); err != nil {
+	var ackResponse AckResponse
+	if err := json.Unmarshal(body, &ackResponse); err != nil {
 		return nil, errors.New(err,
 			"fail to decode ack response",
 			errors.TypeNetwork,
 			errors.M(errors.MetaKeyURI, ap))
 	}
 
-	if err := ackResponse.Validate(); err != nil {
-		return nil, err
+	// if action is not "acks", try to extract the error
+	if ackResponse.Action != "acks" {
+		return nil, client.ExtractError(bytes.NewReader(body))
 	}
 
-	return ackResponse, nil
+	return &ackResponse, nil
 }

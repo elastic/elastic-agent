@@ -6,6 +6,7 @@ package lazy
 
 import (
 	"context"
+	"net/http"
 
 	"go.elastic.co/apm"
 
@@ -14,26 +15,43 @@ import (
 )
 
 type batchAcker interface {
-	AckBatch(ctx context.Context, actions []fleetapi.Action) error
+	AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetapi.AckResponse, error)
 }
 
-type ackForcer interface {
-	ForceAck()
+type retrier interface {
+	Enqueue([]fleetapi.Action)
 }
 
 // Acker is a lazy acker which performs HTTP communication on commit.
 type Acker struct {
-	log   *logger.Logger
-	acker batchAcker
-	queue []fleetapi.Action
+	log     *logger.Logger
+	acker   batchAcker
+	queue   []fleetapi.Action
+	retrier retrier
 }
 
+// Option Acker option function
+type Option func(f *Acker)
+
 // NewAcker creates a new lazy acker.
-func NewAcker(baseAcker batchAcker, log *logger.Logger) *Acker {
-	return &Acker{
+func NewAcker(baseAcker batchAcker, log *logger.Logger, opts ...Option) *Acker {
+	f := &Acker{
 		acker: baseAcker,
 		queue: make([]fleetapi.Action, 0),
 		log:   log,
+	}
+
+	for _, opt := range opts {
+		opt(f)
+	}
+
+	return f
+}
+
+// WithRetrier option allows to specify the Retrier for acking
+func WithRetrier(r retrier) Option {
+	return func(f *Acker) {
+		f.retrier = r
 	}
 }
 
@@ -45,11 +63,6 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 		span.End()
 	}()
 	f.enqueue(action)
-
-	if _, isAckForced := action.(ackForcer); isAckForced {
-		return f.Commit(ctx)
-	}
-
 	return nil
 }
 
@@ -60,13 +73,45 @@ func (f *Acker) Commit(ctx context.Context) (err error) {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
-	err = f.acker.AckBatch(ctx, f.queue)
+	if len(f.queue) == 0 {
+		return nil
+	}
+
+	actions := f.queue
+	f.queue = make([]fleetapi.Action, 0)
+
+	f.log.Debugf("lazy acker: ackbatch: %#v", actions)
+	var resp *fleetapi.AckResponse
+	resp, err = f.acker.AckBatch(ctx, actions)
+
+	// If request failed enqueue all actions with retrier if it is set
 	if err != nil {
-		// do not cleanup on error
+		if f.retrier != nil {
+			f.log.Errorf("lazy acker: failed ack batch, enqueue for retry: %#v", actions)
+			f.retrier.Enqueue(actions)
+			return nil
+		}
+		f.log.Errorf("lazy acker: failed ack batch, no retrier set, fail with err: %v", err)
 		return err
 	}
 
-	f.queue = make([]fleetapi.Action, 0)
+	// If request succeeded check the errors on individual items
+	if f.retrier != nil && resp != nil && resp.Errors {
+		f.log.Error("lazy acker: partially failed ack batch")
+		failed := make([]fleetapi.Action, 0)
+		for i, res := range resp.Items {
+			if res.Status >= http.StatusBadRequest {
+				if i < len(actions) {
+					failed = append(failed, actions[i])
+				}
+			}
+		}
+		if len(failed) > 0 {
+			f.log.Infof("lazy acker: partially failed ack batch, enqueue for retry: %#v", failed)
+			f.retrier.Enqueue(failed)
+		}
+	}
+
 	return nil
 }
 
