@@ -212,7 +212,6 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}
-
 		return fmt.Errorf("failed to communicate with Elastic Agent daemon when gathering metrics: %w", err)
 	}
 
