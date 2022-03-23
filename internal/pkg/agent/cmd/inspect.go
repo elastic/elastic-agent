@@ -299,7 +299,43 @@ func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 		return nil, err
 	}
 	composableWaiter.Wait()
+
+	// add the fleet-server input to default programs list
+	// this does not correspond to the actual config that fleet-server uses as it's in fleet.yml and not part of the assembled config (cfg)
+	fleetCFG, err := cfg.ToMapStr()
+	if err != nil {
+		return nil, err
+	}
+	if fleetInput := getFleetInput(fleetCFG); fleetInput != nil {
+		ast, err := transpiler.NewAST(fleetInput)
+		if err != nil {
+			return nil, err
+		}
+		router.programs["default"] = append(router.programs["default"], program.Program{
+			Spec: program.Spec{
+				Name: "fleet-server",
+				Cmd:  "fleet-server",
+			},
+			Config: ast,
+		})
+	}
+
 	return router.programs, nil
+}
+
+func getFleetInput(o map[string]interface{}) map[string]interface{} {
+	arr := o["inputs"].([]interface{})
+	for _, iface := range arr {
+		input := iface.(map[string]interface{})
+		t, ok := input["type"]
+		if !ok {
+			continue
+		}
+		if t.(string) == "fleet-server" {
+			return input
+		}
+	}
+	return nil
 }
 
 type inmemRouter struct {
