@@ -7,8 +7,6 @@ package composed
 import (
 	"context"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 )

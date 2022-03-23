@@ -14,8 +14,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
