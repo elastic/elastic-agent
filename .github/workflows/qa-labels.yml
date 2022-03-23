@@ -1,5 +1,12 @@
 name: Add QA labels to Elastic Agent issues
 on:
+  # pull_request_target allows running actions on PRs from forks with a read/write GITHUB_TOKEN, but it will not allow
+  # running workflows defined in the PRs itself, only workflows already merged into the target branch. This avoids
+  # potential vulnerabilities that could allow someone to open a PR and retrieve secrets.
+  # It's important that this workflow never runs any checkout actions which could be used to circumvent this protection.
+  # See these links for more information:
+  # - https://github.blog/2020-08-03-github-actions-improvements-for-fork-and-pull-request-workflows/ 
+  # - https://nathandavison.com/blog/github-actions-and-the-threat-of-malicious-pull-requests
   pull_request_target:
     types:
       - closed
@@ -16,7 +23,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'Team:Elastic-Agent-Control-Plane')
       )
     outputs:
-      matrix: ${{ steps.issues_to_label.outputs.value }}
+      issue_ids: ${{ steps.issues_to_label.outputs.value }}
       label_ids: ${{ steps.label_ids.outputs.value }}
     steps:
       - uses: octokit/graphql-action@v2.x
@@ -65,18 +72,19 @@ jobs:
     # For each issue closed by the PR run this job
     strategy:
       matrix:
-        issueNodeId: ${{ fromJSON(needs.fetch_issues_to_label.outputs.matrix) }}
+        issueNodeId: ${{ fromJSON(needs.fetch_issues_to_label.outputs.issue_ids) }}
+        labelId: ${{ needs.fetch_issues_to_label.outputs.label_ids }}
     name: Label issue ${{ matrix.issueNodeId }}
     steps:
       - uses: octokit/graphql-action@v2.x
         id: add_labels_to_closed_issue
         with:
           query: |
-            mutation add_label($issueid:String!, $labelids:[String!]!) {
+            mutation add_label($issueid:ID!, $labelids:[String!]!) {
               addLabelsToLabelable(input: {labelableId: $issueid, labelIds: $labelids}) {
                 clientMutationId
               }
             }
           issueid: ${{ matrix.issueNodeId }}
-          labelids: ${{ needs.fetch_issues_to_label.outputs.label_ids }}
+          labelids: ${{ matrix.labelId }}
           token: ${{ secrets.GITHUB_TOKEN }}
