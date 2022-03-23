@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-
 	"go/format"
 	"io/ioutil"
 	"os"
@@ -19,17 +18,18 @@ import (
 )
 
 var (
+	flagSet *flag.FlagSet
 	input   string
 	output  string
 	license string
 )
 
 func init() {
-	flag.StringVar(&input, "in", "", "Source of input. \"-\" means reading from stdin")
-	if flag.Lookup("out") == nil {
-		flag.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
-	}
-	flag.StringVar(&license, "license", "Elastic", "License header for generated file.")
+	// NOTE: This uses its own flagSet because dev-tools/licenses sets flags.
+	flagSet = flag.NewFlagSet("buildspec", flag.ExitOnError)
+	flagSet.StringVar(&input, "in", "", "Source of input. \"-\" means reading from stdin")
+	flagSet.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
+	flagSet.StringVar(&license, "license", "Elastic", "License header for generated file.")
 }
 
 var tmpl = template.Must(template.New("specs").Parse(`
@@ -58,7 +58,7 @@ func init() {
 	for f, v := range unpacked {
 	s, err:= NewSpecFromBytes(v)
 		if err != nil {
-			panic("Cannot read spec from " + f)
+			panic("Cannot read spec from " + f + ": " + err.Error())
 		}
 		Supported = append(Supported, s)
 		SupportedMap[strings.ToLower(s.Cmd)] = s
@@ -67,7 +67,10 @@ func init() {
 `))
 
 func main() {
-	flag.Parse()
+	if err := flagSet.Parse(os.Args[1:]); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v", err)
+		os.Exit(1)
+	}
 
 	if len(input) == 0 {
 		fmt.Fprintln(os.Stderr, "Invalid input source")
@@ -78,10 +81,9 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "problem to retrieve the license, error: %+v", err)
 		os.Exit(1)
-		return
 	}
 
-	data, err := gen(input, l)
+	data, err := gen(l)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error while generating the file, err: %+v\n", err)
 		os.Exit(1)
@@ -91,20 +93,23 @@ func main() {
 		os.Stdout.Write(data)
 		return
 	} else {
-		ioutil.WriteFile(output, data, 0640)
+		if err = ioutil.WriteFile(output, data, 0o600); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing data to file %q: %v\n", output, data)
+			os.Exit(1)
+		}
 	}
 
 	return
 }
 
-func gen(path string, l string) ([]byte, error) {
+func gen(l string) ([]byte, error) {
 	pack, files, err := packer.Pack(input)
 	if err != nil {
 		return nil, err
 	}
 
 	var buf bytes.Buffer
-	tmpl.Execute(&buf, struct {
+	err = tmpl.Execute(&buf, struct {
 		Pack    string
 		Files   []string
 		License string
@@ -113,6 +118,9 @@ func gen(path string, l string) ([]byte, error) {
 		Files:   files,
 		License: l,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {

@@ -7,6 +7,8 @@ package composed
 import (
 	"context"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 )
@@ -33,6 +35,8 @@ func NewDownloader(downloaders ...download.Downloader) *Downloader {
 // Returns absolute path to downloaded package and an error.
 func (e *Downloader) Download(ctx context.Context, spec program.Spec, version string) (string, error) {
 	var err error
+	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
+	defer span.End()
 
 	for _, d := range e.dd {
 		s, e := d.Download(ctx, spec, version)
