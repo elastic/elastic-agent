@@ -89,7 +89,7 @@ func Test_collectEndpointSecurityLogs(t *testing.T) {
 	specs := program.SupportedMap
 	specs["endpoint-security"].LogPaths["linux"] =
 		filepath.Join(root, "endpoint-*.log")
-	
+
 	buff := bytes.Buffer{}
 
 	zw := zip.NewWriter(&buff)
@@ -119,4 +119,18 @@ func Test_collectEndpointSecurityLogs(t *testing.T) {
 
 		assert.Equal(t, got, want)
 	}
+}
+
+func Test_collectEndpointSecurityLogs_noEndpointSecurity(t *testing.T) {
+	root := filepath.Join("doesNotExist")
+
+	specs := program.SupportedMap
+	specs["endpoint-security"].LogPaths["linux"] =
+		filepath.Join(root, "endpoint-*.log")
+
+	buff := bytes.Buffer{}
+
+	zw := zip.NewWriter(&buff)
+	err := collectEndpointSecurityLogs(zw, specs)
+	assert.NoError(t, err, "collectEndpointSecurityLogs should not return an error")
 }
