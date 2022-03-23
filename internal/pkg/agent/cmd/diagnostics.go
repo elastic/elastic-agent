@@ -195,13 +195,15 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 	innerCtx, cancel := context.WithTimeout(ctx, cmdTimeout)
 	defer cancel()
 
+	errs := make([]error, 0)
 	diag, err := getDiagnostics(innerCtx)
-	if err == context.DeadlineExceeded {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if err == context.Canceled {
+	} else if errors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather diagnostics data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather diagnostics data from elastic-agent: %v\n", err)
 	}
 
 	metrics, err := gatherMetrics(innerCtx)
@@ -212,23 +214,26 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon when gathering metrics: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather metrics data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather metrics data from elastic-agent: %v\n", err)
 	}
 
 	cfg, err := gatherConfig()
 	if err != nil {
-		return fmt.Errorf("unable to gather config data: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather config data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather config data from elastic-agent: %v\n", err)
 	}
 
 	var pprofData map[string][]client.ProcPProf
 	if pprof {
 		pprofData, err = getAllPprof(innerCtx, pprofDur)
 		if err != nil {
-			return fmt.Errorf("unable to gather pprof data: %w", err)
+			errs = append(errs, fmt.Errorf("unable to gather pprof data: %w", err))
+			fmt.Fprintf(streams.Err, "Failed to gather pprof data from elastic-agent: %v\n", err)
 		}
 	}
 
-	err = createZip(fileName, outputFormat, diag, cfg, pprofData, metrics)
+	err = createZip(fileName, outputFormat, diag, cfg, pprofData, metrics, errs)
 	if err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
 	}
@@ -421,12 +426,22 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse) error {
+func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse, errs []error) error {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
 	zw := zip.NewWriter(f)
+
+	if len(errs) > 0 {
+		zf, err := zw.Create("errors.txt")
+		if err != nil {
+			return closeHandlers(err, zw, f)
+		}
+		for i, e := range errs {
+			fmt.Fprintf(zf, "Error %d: %v\n", i+1, e)
+		}
+	}
 
 	zf, err := zw.Create("meta/")
 	if err != nil {
