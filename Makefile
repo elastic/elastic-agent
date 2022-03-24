@@ -6,7 +6,8 @@ PYTHON_ENV?=$(BUILD_DIR)/python-env
 MAGE_VERSION     ?= v1.11.0
 MAGE_PRESENT     := $(shell mage --version 2> /dev/null | grep $(MAGE_VERSION))
 MAGE_IMPORT_PATH ?= github.com/magefile/mage
-
+NOTICE_TEMPLATE  ?= NOTICE.txt.tmpl
+NOTICE_FILE      ?= NOTICE.txt
 ELASTIC_AGENT_VERSION=$(shell grep defaultBeatVersion version/version.go | cut -d'=' -f2 | tr -d '" ')
 
 export MAGE_IMPORT_PATH
@@ -39,8 +40,8 @@ notice:
 		-includeIndirect \
 		-rules dev-tools/notice/rules.json \
 		-overrides dev-tools/notice/overrides.json \
-		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
-		-noticeOut NOTICE.txt \
+		-noticeTemplate dev-tools/notice/$(NOTICE_TEMPLATE) \
+		-noticeOut $(NOTICE_FILE) \
 		-depsOut ""
 
 ## check-ci: Run all the checks under the ci, this doesn't include the linter which is run via a github action.
@@ -75,3 +76,18 @@ check-no-changes:
 .PHONY: get-version
 get-version:
 	@echo $(ELASTIC_AGENT_VERSION)
+
+## release-manager-dependencies : Prepares the dependencies file
+.PHONY: release-manager-dependencies
+release-manager-dependencies:
+	@mkdir -p build/distributions
+	@$(MAKE) NOTICE_TEMPLATE=dependencies.csv.tmpl NOTICE_FILE=build/distributions/dependencies.csv notice
+	@cd build/distributions && shasum -a 512 dependencies.csv > dependencies.csv.sha512
+
+.PHONY: release-manager-dependencies-snapshot
+release-manager-dependencies-snapshot: ## - Prepares the dependencies file for a snapshot.
+	@$(MAKE) SNAPSHOT=true release-manager-dependencies
+
+.PHONY: release-manager-dependencies-release
+release-manager-dependencies-release: ## - Prepares the dependencies file for a release.
+	@$(MAKE) release-manager-dependencies
