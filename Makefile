@@ -6,6 +6,9 @@ PYTHON_ENV?=$(BUILD_DIR)/python-env
 MAGE_VERSION     ?= v1.11.0
 MAGE_PRESENT     := $(shell mage --version 2> /dev/null | grep $(MAGE_VERSION))
 MAGE_IMPORT_PATH ?= github.com/magefile/mage
+
+ELASTIC_AGENT_VERSION=$(shell grep defaultBeatVersion version/version.go | cut -d'=' -f2 | tr -d '" ')
+
 export MAGE_IMPORT_PATH
 
 ## mage : Sets mage
@@ -68,7 +71,7 @@ check-no-changes:
 	@git update-index --refresh
 	@git diff-index --exit-code HEAD --
 
-## get-version : Get the libbeat version
+## get-version : Get the Elastic Agent Version
 .PHONY: get-version
 get-version:
-	@mage dumpVariables | grep 'beat_version' | cut -d"=" -f 2 | tr -d " "
+	@echo $(ELASTIC_AGENT_VERSION)

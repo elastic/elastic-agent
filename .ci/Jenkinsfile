@@ -50,6 +50,7 @@ pipeline {
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc)' ], shouldMatchAll: false).toString())
+          setEnvVar('BEAT_VERSION', sh(label: 'Get elastic agent version', script: 'make get-version', returnStdout: true)?.trim())
         }
       }
     }
@@ -58,8 +59,6 @@ pipeline {
         withGithubNotify(context: "Check") {
           withMageEnv(){
            dir("${BASE_DIR}"){
-              setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
-              log(level: 'INFO', text: "env.BEAT_VERSION=${env.BEAT_VERSION}")
               cmd(label: 'check', script: 'make check-ci')
             }
           }
