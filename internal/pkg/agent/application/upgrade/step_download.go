@@ -8,6 +8,8 @@ import (
 	"context"
 	"strings"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
@@ -20,7 +22,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
-func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string) (string, error) {
+func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string) (_ string, err error) {
+	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
 	// do not update source config
 	settings := *u.settings
 	if sourceURI != "" {

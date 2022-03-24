@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"go.elastic.co/apm"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -155,13 +157,17 @@ func (o *Operator) Close() error {
 	o.monitor.Close()
 	o.statusReporter.Unregister()
 
-	return o.HandleConfig(configrequest.New("", time.Now(), nil))
+	return o.HandleConfig(context.Background(), configrequest.New("", time.Now(), nil))
 }
 
 // HandleConfig handles configuration for a pipeline and performs actions to achieve this configuration.
-func (o *Operator) HandleConfig(cfg configrequest.Request) (err error) {
+func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) (err error) {
+	span, ctx := apm.StartSpan(ctx, "route", "app.internal")
 	defer func() {
-		err = filterContextCancelled(err)
+		if err = filterContextCancelled(err); err != nil {
+			apm.CaptureError(ctx, err).Send()
+		}
+		span.End()
 	}()
 
 	_, stateID, steps, ack, err := o.stateResolver.Resolve(cfg)
