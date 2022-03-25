@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
