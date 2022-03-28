@@ -21,7 +21,7 @@ var (
 
 // CreateJobObject returns a job object.
 func CreateJobObject() (pj Job, err error) {
-	return
+	return pj, err
 }
 
 // NewJob is noop on unix
