@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/v7/libbeat/common/file"
+
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
@@ -182,10 +183,10 @@ func CrossBuild(options ...CrossBuildOption) error {
 	// Each build runs in parallel.
 	Parallel(deps...)
 
-	// It needs to run after all the builds, as it needs the darwin binaries.
-	if err := assembleDarwinUniversal(params); err != nil {
-		return err
-	}
+	// // It needs to run after all the builds, as it needs the darwin binaries.
+	// if err := assembleDarwinUniversal(params); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }

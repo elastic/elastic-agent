@@ -98,6 +98,7 @@
 - Reduce Elastic Agent shut down time by stopping processes concurrently {pull}29650[29650]
 - Move `context cancelled` error from fleet gateway into debug level. {pull}187[187]
 - Update library containerd to 1.5.10. {pull}186[186]
+- Add fleet-server to output of elastic-agent inspect output command (and diagnostic bundle). {pull}243[243]
 
 ==== New features
 
