@@ -529,8 +529,8 @@ github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4 h1:uYT+Krd8
 github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4/go.mod h1:UcNuf4pX/qDVNQr0zybm1NL2YoWik+jKBaINZqQCA40=
 github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6 h1:nFvXHBjYK3e9+xF0WKDeAKK4aOO51uC28s+L9rBmilo=
 github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6/go.mod h1:uh/Gj9a0XEbYoM4NYz4LvaBVARz3QXLmlNjsrKY9fTc=
-github.com/elastic/elastic-agent-libs v0.0.0-20220304151722-afdf7dc0220a h1:XDelbodzgeYQhIqnVfo965KGUHB/blvLh9w9WCpJYjw=
-github.com/elastic/elastic-agent-libs v0.0.0-20220304151722-afdf7dc0220a/go.mod h1:h8K/f7RcdxM2f19VahcS1jeco170ItqV9N7HyYsn9Ss=
+github.com/elastic/elastic-agent-libs v0.1.1 h1:13Y268vfgkZK99Ql1X2WdT8jjpd01stln2wLvlewkbo=
+github.com/elastic/elastic-agent-libs v0.1.1/go.mod h1:h8K/f7RcdxM2f19VahcS1jeco170ItqV9N7HyYsn9Ss=
 github.com/elastic/elastic-package v0.32.1/go.mod h1:l1fEnF52XRBL6a5h6uAemtdViz2bjtjUtgdQcuRhEAY=
 github.com/elastic/go-concert v0.2.0/go.mod h1:HWjpO3IAEJUxOeaJOWXWEp7imKd27foxz9V5vegC/38=
 github.com/elastic/go-elasticsearch/v7 v7.16.0/go.mod h1:OJ4wdbtDNk5g503kvlHLyErCgQwwzmDtaFC4XyOxXA4=
@@ -1167,8 +1167,9 @@ github.com/lyft/protoc-gen-star v0.5.3/go.mod h1:V0xaHgaf5oCCqmcxYcWiDfTiKsZsRc8
 github.com/lyft/protoc-gen-validate v0.0.13/go.mod h1:XbGvPuh87YZc5TdIa2/I4pLk0QoUACkjt2znoq26NVQ=
 github.com/magefile/mage v1.9.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
 github.com/magefile/mage v1.11.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
-github.com/magefile/mage v1.12.1 h1:oGdAbhIUd6iKamKlDGVtU6XGdy5SgNuCWn7gCTgHDtU=
 github.com/magefile/mage v1.12.1/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
+github.com/magefile/mage v1.13.0 h1:XtLJl8bcCM7EFoO8FyH8XK3t7G5hQAeK+i4tq+veT9M=
+github.com/magefile/mage v1.13.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/magiconair/properties v1.8.1/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/magiconair/properties v1.8.5/go.mod h1:y3VJvCyxH9uVvJTWEGAELF3aiYNyPKd5NZ3oSwXrF60=

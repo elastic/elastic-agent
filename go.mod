@@ -10,7 +10,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
-	github.com/elastic/elastic-agent-libs v0.0.0-20220304151722-afdf7dc0220a
+	github.com/elastic/elastic-agent-libs v0.1.1
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
 	github.com/elastic/go-ucfg v0.8.4
@@ -25,7 +25,7 @@ require (
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901
 	github.com/josephspurrier/goversioninfo v0.0.0-20190209210621-63e6d1acd3dd
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
-	github.com/magefile/mage v1.12.1
+	github.com/magefile/mage v1.13.0
 	github.com/mitchellh/gox v1.0.1
 	github.com/mitchellh/hashstructure v0.0.0-20170116052023-ab25296c0f51
 	github.com/mitchellh/mapstructure v1.4.3
