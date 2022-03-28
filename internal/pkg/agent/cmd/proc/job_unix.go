@@ -15,10 +15,11 @@ import (
 type Job int
 
 var (
-	// Public global JobObject, 0 value on linux
+	// JobObject is public global JobObject, 0 value on linux
 	JobObject Job
 )
 
+// CreateJobObject returns a job object.
 func CreateJobObject() (pj Job, err error) {
 	return
 }

@@ -15,6 +15,9 @@ import (
 	"github.com/shirou/gopsutil/v3/host"
 )
 
+// CheckNativePlatformCompat checks if the binary is running
+// on an appropriate system. 32-bit binaries can only run on
+// 32-bit systems and 64-bit binaries only run on 64-bit systems.
 func CheckNativePlatformCompat() error {
 	const compiledArchBits = bits.UintSize // 32 if the binary was compiled for 32 bit architecture.
 
