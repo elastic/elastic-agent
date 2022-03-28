@@ -236,7 +236,7 @@ pipeline {
         beforeAgent true
         anyOf {
           not { changeRequest() }
-          expression { return isE2eEnabled() }
+          expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
         }
       }
       steps {
