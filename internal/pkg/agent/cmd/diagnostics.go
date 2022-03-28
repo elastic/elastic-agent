@@ -535,7 +535,9 @@ func zipLogs(zw *zip.Writer) error {
 			return fmt.Errorf("unable to walk log dir: %w", fErr)
 		}
 
-		name := strings.TrimPrefix(path, logPath)
+		// name is the relative dir/file name replacing any filepath seperators with /
+		// this will clean log names on windows machines and will nop on *nix
+		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
 		if name == "" {
 			return nil
 		}
