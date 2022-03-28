@@ -5,188 +5,194 @@
 package lazy
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
+	"errors"
 	"net/http"
-	"net/url"
-	"strings"
-	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 )
 
-func TestLazyAcker(t *testing.T) {
-	type ackRequest struct {
-		Events []fleetapi.AckEvent `json:"events"`
+var (
+	errFoo = errors.New("error foo")
+)
+
+type testRetrier struct {
+	enqueuedActions []fleetapi.Action
+	expectedActions []fleetapi.Action
+}
+
+func (r *testRetrier) Enqueue(actions []fleetapi.Action) {
+	r.enqueuedActions = actions
+}
+
+type testAcker struct {
+	ackResponse *fleetapi.AckResponse
+	errResponse error
+
+	receivedActions []fleetapi.Action
+	isCalled        bool
+}
+
+func (a *testAcker) AckBatch(ctx context.Context, actions []fleetapi.Action) (*fleetapi.AckResponse, error) {
+	a.isCalled = true
+	a.receivedActions = actions
+	return a.ackResponse, a.errResponse
+}
+
+// Custom test comparer for actions slices
+func actionsComparer(a, b []fleetapi.Action) bool {
+	if len(a) != len(b) {
+		return false
 	}
+
+	if (a == nil && b != nil) || (a != nil && b == nil) {
+		return false
+	}
+
+	for i := 0; i < len(a); i++ {
+		if a[i].ID() != b[i].ID() {
+			return false
+		}
+		if a[i].Type() != b[i].Type() {
+			return false
+		}
+	}
+	return true
+}
+
+func dedupeActions(actions []fleetapi.Action) []fleetapi.Action {
+	set := make(map[string]struct{})
+
+	var deduped []fleetapi.Action
+	for _, action := range actions {
+		if _, ok := set[action.ID()]; !ok {
+			set[action.ID()] = struct{}{}
+			deduped = append(deduped, action)
+		}
+
+	}
+	return deduped
+}
+
+func TestLazyAcker(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
 
 	log, _ := logger.New("", false)
-	client := newTestingClient()
-	agentInfo := &testAgentInfo{}
-	acker, err := fleet.NewAcker(log, agentInfo, client)
-	if err != nil {
-		t.Fatal(err)
+
+	// Tests
+	tests := []struct {
+		name        string
+		actions     []fleetapi.Action
+		expectedErr error
+
+		acker   *testAcker
+		retrier *testRetrier
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name:    "no retrier",
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
+		},
+		{
+			name:        "no retrier with error",
+			actions:     []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
+			expectedErr: errFoo,
+		},
+		{
+			name:    "with retrier, no error",
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
+			acker:   &testAcker{ackResponse: &fleetapi.AckResponse{Items: []fleetapi.AckResponseItem{{Status: http.StatusOK}}}},
+			retrier: &testRetrier{},
+		},
+		{
+			name:    "with retrier, error",
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
+			acker:   &testAcker{errResponse: errFoo},
+			retrier: &testRetrier{expectedActions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}}},
+		},
+		{
+			name:    "with retrier, item not found",
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
+			acker:   &testAcker{ackResponse: &fleetapi.AckResponse{Errors: true, Items: []fleetapi.AckResponseItem{{Status: http.StatusNotFound}}}},
+			retrier: &testRetrier{expectedActions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}}},
+		},
+		{
+			name:    "with retrier, one item not found",
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}, &fleetapi.ActionUnknown{ActionID: "2"}, &fleetapi.ActionUnknown{ActionID: "3"}},
+			acker: &testAcker{ackResponse: &fleetapi.AckResponse{Errors: true, Items: []fleetapi.AckResponseItem{
+				{Status: http.StatusOK},
+				{Status: http.StatusNotFound},
+				{Status: http.StatusOK},
+			}}},
+			retrier: &testRetrier{expectedActions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "2"}}},
+		},
+		{
+			name:    "with retrier, duplicated item with item not found",
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}, &fleetapi.ActionUnknown{ActionID: "1"}, &fleetapi.ActionUnknown{ActionID: "2"}, &fleetapi.ActionUnknown{ActionID: "3"}},
+			acker: &testAcker{ackResponse: &fleetapi.AckResponse{Errors: true, Items: []fleetapi.AckResponseItem{
+				{Status: http.StatusOK},
+				{Status: http.StatusNotFound},
+				{Status: http.StatusOK},
+			}}},
+			retrier: &testRetrier{expectedActions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "2"}}},
+		},
 	}
 
-	lacker := NewAcker(acker, log)
+	// Iterate through tests
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var opts []Option
+			if tc.retrier != nil {
+				opts = append(opts, WithRetrier(tc.retrier))
+			}
+			batchAcker := tc.acker
+			if batchAcker == nil {
+				batchAcker = &testAcker{errResponse: tc.expectedErr}
+			}
+			acker := NewAcker(batchAcker, log, opts...)
+			for _, action := range tc.actions {
+				err := acker.Ack(ctx, action)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := acker.Commit(ctx)
+			if err != nil {
+				if !errors.Is(err, tc.expectedErr) {
+					t.Fatalf("expected error: %v, got: %v", tc.expectedErr, err)
+				}
+			} else {
+				if tc.expectedErr != nil {
+					t.Fatalf("expected error: %v, got: %v", tc.expectedErr, err)
+				}
+			}
 
-	if acker == nil {
-		t.Fatal("acker not initialized")
-	}
+			// Check that AckBatch is called if actions are not empty
+			diff := cmp.Diff(batchAcker.isCalled, len(tc.actions) > 0)
+			if diff != "" {
+				t.Fatal(diff)
+			}
 
-	testID1 := "ack-test-action-id"
-	testID2 := testID1 + "2"
-	testID3 := testID1 + "3"
-	testAction1 := &fleetapi.ActionUnknown{ActionID: testID1}
-	testAction2 := &actionImmediate{ActionID: testID2}
-	testAction3 := &fleetapi.ActionUnknown{ActionID: testID3}
+			// Compare AckBatch received actions
+			diff = cmp.Diff(dedupeActions(tc.actions), batchAcker.receivedActions, cmp.Comparer(actionsComparer))
+			if diff != "" {
+				t.Fatal(diff)
+			}
 
-	ch := client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
-		content, err := ioutil.ReadAll(body)
-		assert.NoError(t, err)
-		cr := &ackRequest{}
-		err = json.Unmarshal(content, &cr)
-		assert.NoError(t, err)
-
-		if len(cr.Events) == 0 {
-			t.Fatal("expected events but got none")
-		}
-		if cr.Events[0].ActionID == testID1 {
-			assert.EqualValues(t, 2, len(cr.Events))
-			assert.EqualValues(t, testID1, cr.Events[0].ActionID)
-			assert.EqualValues(t, testID2, cr.Events[1].ActionID)
-
-		} else {
-			assert.EqualValues(t, 1, len(cr.Events))
-		}
-
-		resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
-		return resp, nil
-	})
-
-	go func() {
-		for range ch {
-		}
-	}()
-	c := context.Background()
-
-	if err := lacker.Ack(c, testAction1); err != nil {
-		t.Fatal(err)
-	}
-	if err := lacker.Ack(c, testAction1); err != nil {
-		t.Fatal(err)
-	}
-	if err := lacker.Ack(c, testAction2); err != nil {
-		t.Fatal(err)
-	}
-	if err := lacker.Ack(c, testAction2); err != nil {
-		t.Fatal(err)
-	}
-	if err := lacker.Ack(c, testAction3); err != nil {
-		t.Fatal(err)
-	}
-	if err := lacker.Ack(c, testAction3); err != nil {
-		t.Fatal(err)
-	}
-	if err := lacker.Commit(c); err != nil {
-		t.Fatal(err)
-	}
-
-}
-
-type actionImmediate struct {
-	ActionID     string
-	ActionType   string
-	originalType string
-}
-
-// Type returns the type of the Action.
-func (a *actionImmediate) Type() string {
-	return "IMMEDIATE"
-}
-
-func (a *actionImmediate) ID() string {
-	return a.ActionID
-}
-
-func (a *actionImmediate) ForceAck() {}
-
-func (a *actionImmediate) String() string {
-	var s strings.Builder
-	s.WriteString("action_id: ")
-	s.WriteString(a.ID())
-	s.WriteString(", type: ")
-	s.WriteString(a.Type())
-	s.WriteString(" (original type: ")
-	s.WriteString(a.OriginalType())
-	s.WriteString(")")
-	return s.String()
-}
-
-// OriginalType returns the original type of the action as returned by the API.
-func (a *actionImmediate) OriginalType() string {
-	return a.originalType
-}
-
-type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)
-
-type testingClient struct {
-	sync.Mutex
-	callback clientCallbackFunc
-	received chan struct{}
-}
-
-func (t *testingClient) Send(
-	_ context.Context,
-	method string,
-	path string,
-	params url.Values,
-	headers http.Header,
-	body io.Reader,
-) (*http.Response, error) {
-	t.Lock()
-	defer t.Unlock()
-	defer func() { t.received <- struct{}{} }()
-	return t.callback(headers, body)
-}
-
-func (t *testingClient) URI() string {
-	return "http://localhost"
-}
-
-func (t *testingClient) Answer(fn clientCallbackFunc) <-chan struct{} {
-	t.Lock()
-	defer t.Unlock()
-	t.callback = fn
-	return t.received
-}
-
-func newTestingClient() *testingClient {
-	return &testingClient{received: make(chan struct{}, 1)}
-}
-
-type testAgentInfo struct{}
-
-func (testAgentInfo) AgentID() string { return "agent-secret" }
-
-func wrapStrToResp(code int, body string) *http.Response {
-	return &http.Response{
-		Status:        fmt.Sprintf("%d %s", code, http.StatusText(code)),
-		StatusCode:    code,
-		Proto:         "HTTP/1.1",
-		ProtoMajor:    1,
-		ProtoMinor:    1,
-		Body:          ioutil.NopCloser(bytes.NewBufferString(body)),
-		ContentLength: int64(len(body)),
-		Header:        make(http.Header),
+			// If retrier is not nil check the actions are retried
+			if tc.retrier != nil {
+				diff = cmp.Diff(tc.retrier.expectedActions, tc.retrier.enqueuedActions, cmp.Comparer(actionsComparer))
+				if diff != "" {
+					t.Fatal(diff)
+				}
+			}
+		})
 	}
 }

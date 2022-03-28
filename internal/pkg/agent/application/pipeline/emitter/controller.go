@@ -5,7 +5,10 @@
 package emitter
 
 import (
+	"context"
 	"sync"
+
+	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
@@ -65,7 +68,13 @@ func NewController(
 }
 
 // Update applies config change and performes all steps necessary to apply it.
-func (e *Controller) Update(c *config.Config) error {
+func (e *Controller) Update(ctx context.Context, c *config.Config) (err error) {
+	span, ctx := apm.StartSpan(ctx, "update", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
+
 	if err := info.InjectAgentConfig(c); err != nil {
 		return err
 	}
@@ -105,25 +114,39 @@ func (e *Controller) Update(c *config.Config) error {
 	e.ast = rawAst
 	e.lock.Unlock()
 
-	return e.update()
+	return e.update(ctx)
 }
 
 // Set sets the transpiler vars for dynamic inputs resolution.
-func (e *Controller) Set(vars []*transpiler.Vars) {
+func (e *Controller) Set(ctx context.Context, vars []*transpiler.Vars) {
+	if err := e.set(ctx, vars); err != nil {
+		e.logger.Errorf("Failed to render configuration with latest context from composable controller: %s", err)
+	}
+}
+
+func (e *Controller) set(ctx context.Context, vars []*transpiler.Vars) (err error) {
+	span, ctx := apm.StartSpan(ctx, "set", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
 	e.lock.Lock()
 	ast := e.ast
 	e.vars = vars
 	e.lock.Unlock()
 
 	if ast != nil {
-		err := e.update()
-		if err != nil {
-			e.logger.Errorf("Failed to render configuration with latest context from composable controller: %s", err)
-		}
+		return e.update(ctx)
 	}
+	return nil
 }
 
-func (e *Controller) update() error {
+func (e *Controller) update(ctx context.Context) (err error) {
+	span, ctx := apm.StartSpan(ctx, "update", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
 	// locking whole update because it can be called concurrently via Set and Update method
 	e.updateLock.Lock()
 	defer e.updateLock.Unlock()
@@ -169,5 +192,5 @@ func (e *Controller) update() error {
 		}
 	}
 
-	return e.router.Route(ast.HashStr(), programsToRun)
+	return e.router.Route(ctx, ast.HashStr(), programsToRun)
 }
