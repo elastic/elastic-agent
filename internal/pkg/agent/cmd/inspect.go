@@ -295,11 +295,53 @@ func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 		return nil, err
 	}
 
-	if err := emit(cfg); err != nil {
+	if err := emit(ctx, cfg); err != nil {
 		return nil, err
 	}
 	composableWaiter.Wait()
+
+	// add the fleet-server input to default programs list
+	// this does not correspond to the actual config that fleet-server uses as it's in fleet.yml and not part of the assembled config (cfg)
+	fleetCFG, err := cfg.ToMapStr()
+	if err != nil {
+		return nil, err
+	}
+	if fleetInput := getFleetInput(fleetCFG); fleetInput != nil {
+		ast, err := transpiler.NewAST(fleetInput)
+		if err != nil {
+			return nil, err
+		}
+		router.programs["default"] = append(router.programs["default"], program.Program{
+			Spec: program.Spec{
+				Name: "fleet-server",
+				Cmd:  "fleet-server",
+			},
+			Config: ast,
+		})
+	}
+
 	return router.programs, nil
+}
+
+func getFleetInput(o map[string]interface{}) map[string]interface{} {
+	arr, ok := o["inputs"].([]interface{})
+	if !ok {
+		return nil
+	}
+	for _, iface := range arr {
+		input, ok := iface.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		t, ok := input["type"]
+		if !ok {
+			continue
+		}
+		if t.(string) == "fleet-server" {
+			return input
+		}
+	}
+	return nil
 }
 
 type inmemRouter struct {
@@ -310,7 +352,7 @@ func (r *inmemRouter) Routes() *sorted.Set {
 	return nil
 }
 
-func (r *inmemRouter) Route(id string, grpProg map[pipeline.RoutingKey][]program.Program) error {
+func (r *inmemRouter) Route(_ context.Context, _ string, grpProg map[pipeline.RoutingKey][]program.Program) error {
 	r.programs = grpProg
 	return nil
 }

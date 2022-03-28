@@ -22,7 +22,7 @@ func TestAck(t *testing.T) {
 
 	t.Run("Test ack roundtrip", withServerWithAuthClient(
 		func(t *testing.T) *http.ServeMux {
-			raw := `{"action": "ack"}`
+			raw := `{"action": "acks"}` // The expected action from fleet server is "acks"
 			mux := http.NewServeMux()
 			path := fmt.Sprintf("/api/fleet/agents/%s/acks", agentInfo.AgentID())
 			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +70,7 @@ func TestAck(t *testing.T) {
 
 			r, err := cmd.Execute(context.Background(), &request)
 			require.NoError(t, err)
-			require.Equal(t, "ack", r.Action)
+			require.Equal(t, "acks", r.Action)
 		},
 	))
 }
