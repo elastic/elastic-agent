@@ -81,7 +81,7 @@ The following actions are possible and grouped based on the actions.
   KIBANA_FLEET_HOST - kibana host to enable create enrollment token on [$KIBANA_HOST]
   FLEET_TOKEN_NAME - token name to use for fetching token from Kibana. This requires Kibana configs to be set.
   FLEET_TOKEN_POLICY_NAME - token policy name to use for fetching token from Kibana. This requires Kibana configs to be set.
-  DEFAULT_FLEET_TOKEN_POLICY_NAME - token policy name to use when [$FLEET_TOKEN_POLICY_NAME] is not set. Defaults to "Default policy".
+  FLEET_DEFAULT_TOKEN_POLICY_NAME - token policy name to use when [$FLEET_TOKEN_POLICY_NAME] is not set. Defaults to "Default policy".
 
 * Bootstrapping Fleet Server
   This bootstraps the Fleet Server to be run by this Elastic Agent. At least one Fleet Server is required in a Fleet
@@ -96,8 +96,8 @@ The following actions are possible and grouped based on the actions.
   FLEET_SERVER_ELASTICSEARCH_CA_TRUSTED_FINGERPRINT - The sha-256 fingerprint value of the certificate authority to trust
   FLEET_SERVER_ELASTICSEARCH_INSECURE - disables cert validation for communication with Elasticsearch
   FLEET_SERVER_SERVICE_TOKEN - service token to use for communication with elasticsearch
-  FLEET_SERVER_POLICY_ID - policy ID for Fleet Server to use for itself ([$DEFAULT_FLEET_SERVER_POLICY_ID] used when undefined)
-  DEFAULT_FLEET_SERVER_POLICY_ID - policy ID for Fleet Server to use for itself when none is specified. (defaults to "fleet-server-policy")
+  FLEET_SERVER_POLICY_ID - policy ID for Fleet Server to use for itself ([$FLEET_DEFAULT_SERVER_POLICY_ID] used when undefined)
+  FLEET_DEFAULT_SERVER_POLICY_ID - policy ID for Fleet Server to use for itself when none is specified. (defaults to "fleet-server-policy")
   FLEET_SERVER_HOST - binding host for Fleet Server HTTP (overrides the policy). By default this is 0.0.0.0.
   FLEET_SERVER_PORT - binding port for Fleet Server HTTP (overrides the policy)
   FLEET_SERVER_CERT - path to certificate to use for HTTPS endpoint

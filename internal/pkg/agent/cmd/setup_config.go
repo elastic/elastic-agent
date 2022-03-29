@@ -85,7 +85,7 @@ func defaultAccessConfig() (setupConfig, error) {
 			Insecure:               envBool("FLEET_INSECURE"),
 			TokenName:              envWithDefault("Default", "FLEET_TOKEN_NAME"),
 			TokenPolicyName:        envWithDefault("", "FLEET_TOKEN_POLICY_NAME"),
-			DefaultTokenPolicyName: envWithDefault("Default policy", "DEFAULT_FLEET_TOKEN_POLICY_NAME"),
+			DefaultTokenPolicyName: envWithDefault("Default policy", "_TOKEN_POLICY_NAME"),
 			URL:                    envWithDefault("", "FLEET_URL"),
 			DaemonTimeout:          envTimeout("FLEET_DAEMON_TIMEOUT"),
 		},
@@ -106,7 +106,7 @@ func defaultAccessConfig() (setupConfig, error) {
 			Port:            envWithDefault("", "FLEET_SERVER_PORT"),
 			Headers:         envMap("FLEET_HEADER"),
 			Timeout:         envTimeout("FLEET_SERVER_TIMEOUT"),
-			DefaultPolicyID: envWithDefault("fleet-server-policy", "DEFAULT_FLEET_SERVER_POLICY_ID", "DEFAULT_FLEET_SERVER_POLICY"),
+			DefaultPolicyID: envWithDefault("fleet-server-policy", "_SERVER_POLICY_ID", "FLEET_DEFAULT_SERVER_POLICY"),
 		},
 		Kibana: kibanaConfig{
 			Fleet: kibanaFleetConfig{
