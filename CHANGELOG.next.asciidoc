@@ -101,6 +101,7 @@
 - Update library containerd to 1.5.10. {pull}186[186]
 - Add fleet-server to output of elastic-agent inspect output command (and diagnostic bundle). {pull}243[243]
 - Update API calls that the agent makes to Kibana when running the container command. {pull}253[253]
+- diagnostics collect log names are fixed on Windows machines, command will ignore failures. AgentID is included in diagnostics(and diagnostics collect) output. {issue}81[81] {issue}92[92] {issue}190[190] {pull}262[262]
 
 ==== New features
 
