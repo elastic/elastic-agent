@@ -366,7 +366,7 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 	if err != nil {
 		return err
 	}
-	code, r, err := client.Connection.Request("POST", "/api/fleet/service-tokens", nil, nil, nil)
+	code, r, err := client.Connection.Request("POST", "/api/fleet/service_tokens", nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("request to get security token from Kibana failed: %w", err)
 	}
@@ -512,7 +512,7 @@ func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOSt
 
 func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPolicy, streams *cli.IOStreams, tokenName string) (string, error) {
 	var keys kibanaAPIKeys
-	err := performGET(cfg, client, "/api/fleet/enrollment-api-keys", &keys, streams.Err, "Kibana fetch token")
+	err := performGET(cfg, client, "/api/fleet/enrollment_api_keys", &keys, streams.Err, "Kibana fetch token")
 	if err != nil {
 		return "", err
 	}
@@ -521,7 +521,7 @@ func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPoli
 		return "", err
 	}
 	var keyDetail kibanaAPIKeyDetail
-	err = performGET(cfg, client, fmt.Sprintf("/api/fleet/enrollment-api-keys/%s", key.ID), &keyDetail, streams.Err, "Kibana fetch token detail")
+	err = performGET(cfg, client, fmt.Sprintf("/api/fleet/enrollment_api_keys/%s", key.ID), &keyDetail, streams.Err, "Kibana fetch token detail")
 	if err != nil {
 		return "", err
 	}
