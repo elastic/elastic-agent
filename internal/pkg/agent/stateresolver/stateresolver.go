@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	uid "github.com/elastic/elastic-agent/internal/pkg/id"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // Acker allow to ack the should state from a converge operation.
