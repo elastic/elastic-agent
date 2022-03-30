@@ -175,7 +175,7 @@ func (Dev) Build() {
 	mg.Deps(Build.All)
 }
 
-// Package packages the agent binary with DEV flag set.
+// Package bundles the agent binary with DEV flag set.
 func (Dev) Package() {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
