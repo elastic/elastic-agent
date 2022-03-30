@@ -236,7 +236,8 @@ pipeline {
         beforeAgent true
         anyOf {
           not { changeRequest() }
-          expression { return isE2eEnabled() }
+          // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
+          expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
         }
       }
       steps {
