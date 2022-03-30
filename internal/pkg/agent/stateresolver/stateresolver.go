@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	uid "github.com/elastic/elastic-agent/internal/pkg/id"
 )
 
