@@ -12,7 +12,7 @@ import (
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 // ExternalInputsPattern is a glob that matches the paths of external configuration files.

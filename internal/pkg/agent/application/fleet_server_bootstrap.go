@@ -27,7 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"

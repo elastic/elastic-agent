@@ -28,7 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 )
 

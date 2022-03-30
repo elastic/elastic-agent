@@ -14,7 +14,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 )
 
