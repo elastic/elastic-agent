@@ -18,8 +18,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
 	downloader "github.com/elastic/elastic-agent/internal/pkg/artifact/download/localremote"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/snapshot"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string) (_ string, err error) {

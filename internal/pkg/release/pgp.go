@@ -7,7 +7,7 @@
 package release
 
 import (
-	"github.com/elastic/elastic-agent/internal/pkg/packer"
+	"github.com/elastic/elastic-agent/pkg/packer"
 )
 
 // pgp bytes is a packed in public gpg key

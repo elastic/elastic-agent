@@ -7,6 +7,9 @@
 
 package cmd
 
+// CheckNativePlatformCompat verifies is the platform is compatible
+// with the current system. This is used to check if you are trying to run a 32bits
+// binary on a 64 bits system.
 func CheckNativePlatformCompat() error {
 	return nil
 }

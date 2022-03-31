@@ -8,8 +8,8 @@ import (
 	"context"
 
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // operationUninstall uninstalls a artifact from predefined location
