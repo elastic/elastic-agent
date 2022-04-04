@@ -6,7 +6,7 @@ args: [
   "-E", "management.enabled=true",
 ]
 restart_on_output_change: true
-artifact: beats/cloudbeat
+artifact: cloudbeat
 action_input_types:
   - cloudbeat
 
