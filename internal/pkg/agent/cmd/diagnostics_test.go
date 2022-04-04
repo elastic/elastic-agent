@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func Test_collectEndpointSecurityLogs(t *testing.T) {
 	root := filepath.Join("testdata", "diagnostics", "endpoint-security", "logs")
 
 	specs := program.SupportedMap
-	specs["endpoint-security"].LogPaths["linux"] =
+	specs["endpoint-security"].LogPaths[runtime.GOOS] =
 		filepath.Join(root, "endpoint-*.log")
 
 	buff := bytes.Buffer{}
