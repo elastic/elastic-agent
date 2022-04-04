@@ -117,6 +117,7 @@ func Test_collectEndpointSecurityLogs(t *testing.T) {
 		r, err := f.Open()
 		require.NoError(t, err)
 		got, err := io.ReadAll(r)
+		require.NoError(t, err)
 
 		assert.Equal(t, got, want)
 	}
