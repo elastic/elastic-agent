@@ -13,6 +13,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 )
 
@@ -45,7 +47,8 @@ func TestDownloadBodyError(t *testing.T) {
 		Architecture:    "64",
 	}
 
-	testClient := NewDownloaderWithClient(config, *client)
+	log, _ := logger.New("", false)
+	testClient := NewDownloaderWithClient(log, config, *client)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	if err == nil {
 		os.Remove(artifactPath)
