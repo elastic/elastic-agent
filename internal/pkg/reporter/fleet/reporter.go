@@ -129,7 +129,7 @@ OUTER:
 }
 
 // Close stops all the background jobs reporter is running.
-// Guards agains panic of closing channel multiple times.
+// Guards against panic of closing channel multiple times.
 func (r *Reporter) Close() error {
 	return nil
 }
