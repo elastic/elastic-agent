@@ -25,7 +25,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -47,13 +46,13 @@ var headers = map[string]string{
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
-	log    *logger.Logger
+	log    progressLogger
 	config *artifact.Config
 	client http.Client
 }
 
 // NewDownloader creates and configures Elastic Downloader
-func NewDownloader(log *logger.Logger, config *artifact.Config) (*Downloader, error) {
+func NewDownloader(log progressLogger, config *artifact.Config) (*Downloader, error) {
 	client, err := config.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 	)
@@ -66,7 +65,7 @@ func NewDownloader(log *logger.Logger, config *artifact.Config) (*Downloader, er
 }
 
 // NewDownloaderWithClient creates Elastic Downloader with specific client used
-func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client) *Downloader {
+func NewDownloaderWithClient(log progressLogger, config *artifact.Config, client http.Client) *Downloader {
 	return &Downloader{
 		log:    log,
 		config: config,
@@ -175,7 +174,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 
 	fileSize := -1
 	if contentLength := resp.Header.Get("Content-Length"); contentLength != "" {
-		if length, err := strconv.Atoi(contentLength); err != nil {
+		if length, err := strconv.Atoi(contentLength); err == nil {
 			fileSize = length
 		}
 	}
@@ -196,7 +195,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 }
 
 type downloadProgressReporter struct {
-	log         *logger.Logger
+	log         progressLogger
 	sourceURI   string
 	timeout     time.Duration
 	interval    time.Duration
@@ -207,7 +206,7 @@ type downloadProgressReporter struct {
 	started    time.Time
 }
 
-func newDownloadProgressReporter(log *logger.Logger, sourceURI string, timeout time.Duration, length int) *downloadProgressReporter {
+func newDownloadProgressReporter(log progressLogger, sourceURI string, timeout time.Duration, length int) *downloadProgressReporter {
 	return &downloadProgressReporter{
 		log:         log,
 		sourceURI:   sourceURI,
@@ -231,9 +230,10 @@ func (dp *downloadProgressReporter) Report(ctx context.Context) {
 	log := dp.log
 	length := dp.length
 	warnTimeout := dp.warnTimeout
+	interval := dp.interval
 
 	go func() {
-		t := time.NewTimer(dp.interval)
+		t := time.NewTimer(interval)
 		defer t.Stop()
 		for {
 			select {
@@ -316,4 +316,11 @@ func (dp *downloadProgressReporter) ReportFailed(err error) {
 		// see reason in `Report`
 		dp.log.Warnf(msg, args...)
 	}
+}
+
+// progressLogger is a logger that only needs to implement Infof and Warnf, as those are the only functions
+// that the downloadProgressReporter uses.
+type progressLogger interface {
+	Infof(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
 }
