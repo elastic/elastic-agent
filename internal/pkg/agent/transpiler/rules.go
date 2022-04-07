@@ -1075,7 +1075,7 @@ func (r *TranslateWithRegexpRule) Apply(_ AgentInfo, ast *AST) (err error) {
 	return nil
 }
 
-// MapRule allow to apply mutliples rules on a subset of a Tree based on a provided selector.
+// MapRule allow to apply multiple rules on a subset of a Tree based on a provided selector.
 type MapRule struct {
 	Path  Selector
 	Rules []Rule
