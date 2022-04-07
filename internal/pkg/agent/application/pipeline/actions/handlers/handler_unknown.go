@@ -24,7 +24,7 @@ func NewUnknown(log *logger.Logger) *Unknown {
 	}
 }
 
-// Handle handles unkown actions, no action is taken.
+// Handle handles unknown actions, no action is taken.
 func (h *Unknown) Handle(_ context.Context, a fleetapi.Action, acker store.FleetAcker) error {
 	h.log.Errorf("HandlerUnknown: action '%+v' received", a)
 	return nil
