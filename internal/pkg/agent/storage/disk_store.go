@@ -68,7 +68,7 @@ func (d *DiskStore) Save(in io.Reader) error {
 
 	if err := fd.Sync(); err != nil {
 		return errors.New(err,
-			fmt.Sprintf("could not sync target file %s", d.target),
+			fmt.Sprintf("could not sync temporary file %s", d.target),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
