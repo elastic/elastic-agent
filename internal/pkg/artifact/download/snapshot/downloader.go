@@ -30,7 +30,7 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride 
 func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.Config, error) {
 	snapshotURI, err := snapshotURI(versionOverride, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to detect remote snapshot repo, proceeding with configured: %v", err)
+		return nil, fmt.Errorf("failed to detect remote snapshot repo, proceeding with configured: %w", err)
 	}
 
 	return &artifact.Config{
@@ -47,9 +47,7 @@ func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.
 func snapshotURI(versionOverride string, config *artifact.Config) (string, error) {
 	version := release.Version()
 	if versionOverride != "" {
-		if strings.HasSuffix(versionOverride, "-SNAPSHOT") {
-			versionOverride = strings.TrimSuffix(versionOverride, "-SNAPSHOT")
-		}
+		versionOverride = strings.TrimSuffix(versionOverride, "-SNAPSHOT")
 		version = versionOverride
 	}
 
