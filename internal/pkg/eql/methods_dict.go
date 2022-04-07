@@ -9,7 +9,7 @@ import "fmt"
 // hasKey check if dict has anyone of the provided keys.
 func hasKey(args []interface{}) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, fmt.Errorf("hasKey: accepts minimum 2 arguments; recieved %d", len(args))
+		return nil, fmt.Errorf("hasKey: accepts minimum 2 arguments; received %d", len(args))
 	}
 	switch d := args[0].(type) {
 	case *null:
@@ -23,10 +23,10 @@ func hasKey(args []interface{}) (interface{}, error) {
 					return true, nil
 				}
 			default:
-				return nil, fmt.Errorf("hasKey: %d argument must be a string; recieved %T", i+1, check)
+				return nil, fmt.Errorf("hasKey: %d argument must be a string; received %T", i+1, check)
 			}
 		}
 		return false, nil
 	}
-	return nil, fmt.Errorf("hasKey: first argument must be a dictionary; recieved %T", args[0])
+	return nil, fmt.Errorf("hasKey: first argument must be a dictionary; received %T", args[0])
 }
