@@ -68,7 +68,7 @@ func TestServer_InitialCheckIn(t *testing.T) {
 	// client should get initial check-in
 	require.NoError(t, waitFor(func() error {
 		if cImpl.Config() != initConfig {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
@@ -108,13 +108,13 @@ func TestServer_MultiClients(t *testing.T) {
 	// clients should get initial check-ins
 	require.NoError(t, waitFor(func() error {
 		if cImpl1.Config() != initConfig1 {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
 	require.NoError(t, waitFor(func() error {
 		if cImpl2.Config() != initConfig2 {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
@@ -240,7 +240,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 	// clients should get initial check-ins then set as healthy
 	require.NoError(t, waitFor(func() error {
 		if cImpl.Config() != initConfig {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
@@ -284,7 +284,7 @@ func TestServer_UpdateConfigDisconnected(t *testing.T) {
 	// clients should get initial check-ins then set as healthy
 	require.NoError(t, waitFor(func() error {
 		if cImpl.Config() != initConfig {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
@@ -326,7 +326,7 @@ func TestServer_UpdateConfigStopping(t *testing.T) {
 	// clients should get initial check-ins then set as healthy
 	require.NoError(t, waitFor(func() error {
 		if cImpl.Config() != initConfig {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
@@ -364,7 +364,7 @@ func TestServer_Stop(t *testing.T) {
 	// clients should get initial check-ins then set as healthy
 	require.NoError(t, waitFor(func() error {
 		if cImpl.Config() != initConfig {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
@@ -432,7 +432,7 @@ func TestServer_StopJustDisconnect(t *testing.T) {
 	// clients should get initial check-ins then set as healthy
 	require.NoError(t, waitFor(func() error {
 		if cImpl.Config() != initConfig {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
@@ -483,7 +483,7 @@ func TestServer_StopTimeout(t *testing.T) {
 	// clients should get initial check-ins then set as healthy
 	require.NoError(t, waitFor(func() error {
 		if cImpl.Config() != initConfig {
-			return fmt.Errorf("client never got intial config")
+			return fmt.Errorf("client never got initial config")
 		}
 		return nil
 	}))
