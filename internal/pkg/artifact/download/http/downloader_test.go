@@ -33,8 +33,10 @@ func TestDownloadBodyError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.(http.Flusher).Flush()
-		conn := r.Context().Value(connKey{}).(net.Conn)
-		conn.Close()
+		conn, ok := r.Context().Value(connKey{}).(net.Conn)
+		if ok {
+			conn.Close()
+		}
 	}))
 	defer srv.Close()
 	client := srv.Client()
@@ -79,7 +81,10 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 		w.Header().Set("Content-Length", strconv.Itoa(fileSize))
 		w.WriteHeader(http.StatusOK)
 		for i := 0; i < chunks; i++ {
-			w.Write(chunk)
+			_, err := w.Write(chunk)
+			if err != nil {
+				panic(err)
+			}
 			w.(http.Flusher).Flush()
 			<-time.After(delayBetweenChunks)
 		}
@@ -130,7 +135,10 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		for i := 0; i < chunks; i++ {
-			w.Write(chunk)
+			_, err := w.Write(chunk)
+			if err != nil {
+				panic(err)
+			}
 			w.(http.Flusher).Flush()
 			<-time.After(delayBetweenChunks)
 		}

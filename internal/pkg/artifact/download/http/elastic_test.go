@@ -150,6 +150,7 @@ func getTestCases() []testCase {
 	}
 }
 
+//nolint:gosec,G404
 func getRandomTestCases() []testCase {
 	tt := getTestCases()
 
@@ -189,9 +190,15 @@ func getElasticCoClient() http.Client {
 		content := []byte(packageName)
 		if isShaReq {
 			hash := sha512.Sum512(content)
-			w.Write([]byte(fmt.Sprintf("%x %s", hash, packageName)))
+			_, err := w.Write([]byte(fmt.Sprintf("%x %s", hash, packageName)))
+			if err != nil {
+				panic(err)
+			}
 		} else {
-			w.Write(content)
+			_, err := w.Write(content)
+			if err != nil {
+				panic(err)
+			}
 		}
 	})
 	server := httptest.NewServer(handler)

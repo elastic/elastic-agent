@@ -13,6 +13,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
+const (
+	osDarwin  = "darwin"
+	osLinux   = "linux"
+	osWindows = "windows"
+)
+
 // Config is a configuration used for verifier and downloader
 type Config struct {
 	// OperatingSystem: operating system [linux, windows, darwin]
@@ -64,12 +70,12 @@ func (c *Config) OS() string {
 	}
 
 	switch runtime.GOOS {
-	case "windows":
-		c.OperatingSystem = "windows"
-	case "darwin":
-		c.OperatingSystem = "darwin"
+	case osWindows:
+		c.OperatingSystem = osWindows
+	case osDarwin:
+		c.OperatingSystem = osDarwin
 	default:
-		c.OperatingSystem = "linux"
+		c.OperatingSystem = osLinux
 	}
 
 	return c.OperatingSystem

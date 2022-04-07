@@ -245,7 +245,7 @@ func (dp *downloadProgressReporter) Report(ctx context.Context) {
 				downloaded := float64(dp.downloaded.Load())
 				bytesPerSecond := downloaded / float64(timePast/time.Second)
 
-				msg := ""
+				var msg string
 				var args []interface{}
 				if length > 0 {
 					// length of the download is known, so more detail can be provided
@@ -295,7 +295,7 @@ func (dp *downloadProgressReporter) ReportFailed(err error) {
 	timePast := now.Sub(dp.started)
 	downloaded := float64(dp.downloaded.Load())
 	bytesPerSecond := downloaded / float64(timePast/time.Second)
-	msg := ""
+	var msg string
 	var args []interface{}
 	if dp.length > 0 {
 		// length of the download is known, so more detail can be provided
