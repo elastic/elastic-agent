@@ -63,7 +63,7 @@ var DefaultOptions = &Option{
 	BlockSize:       bytes.MinRead,
 }
 
-// versionMagicHeader is the format version that will be added at the begining of the header and
+// versionMagicHeader is the format version that will be added at the beginning of the header and
 // can be used to change how the decryption work in future version.
 var versionMagicHeader = []byte("v2")
 
