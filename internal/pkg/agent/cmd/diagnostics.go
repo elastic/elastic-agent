@@ -287,7 +287,7 @@ func diagnosticsPprofCmd(streams *cli.IOStreams, dur, cmdTimeout time.Duration, 
 		return fmt.Errorf("route key %q not found in response data (map length: %d)", rk, len(pprofData))
 	}
 	if len(pArr) != 1 {
-		return fmt.Errorf("pprof type length 1 expected, recieved %d", len(pArr))
+		return fmt.Errorf("pprof type length 1 expected, received %d", len(pArr))
 	}
 	res := pArr[0]
 
