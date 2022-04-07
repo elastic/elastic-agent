@@ -236,7 +236,7 @@ func TestInput(t *testing.T) {
 		runInputTest(t, l, r, expectedInputs, initialInputs)
 	})
 
-	t.Run("valid action - multiple inputs 1 explicitely allowed", func(t *testing.T) {
+	t.Run("valid action - multiple inputs 1 explicitly allowed", func(t *testing.T) {
 		r := &inputCapability{
 			Type:  "allow",
 			Input: "system/metrics",
