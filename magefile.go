@@ -10,14 +10,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -29,15 +27,18 @@ import (
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
+	"github.com/elastic/elastic-agent/internal/pkg/release"
+
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
-
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
+
+	// mage:import
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/notice"
 )
 
 const (
@@ -92,77 +93,11 @@ type Demo mg.Namespace
 // Dev runs package and build for dev purposes.
 type Dev mg.Namespace
 
-// Notice regenerates the NOTICE.txt file.
-func Notice() error {
-	fmt.Println(">> Generating NOTICE")
-	fmt.Println(">> fmt - go mod tidy")
-	err := sh.RunV("go", "mod", "tidy", "-v")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go mod download")
-	err = sh.RunV("go", "mod", "download")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod download, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go list")
-	str, err := sh.Output("go", "list", "-m", "-json", "all")
-	if err != nil {
-		return errors.Wrap(err, "failed running go list, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go run")
-	cmd := exec.Command("go", "run", "go.elastic.co/go-licence-detector", "-includeIndirect", "-rules", "dev-tools/notice/rules.json", "-overrides", "dev-tools/notice/overrides.json", "-noticeTemplate", "dev-tools/notice/NOTICE.txt.tmpl",
-		"-noticeOut", "NOTICE.txt", "-depsOut", "\"\"")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return errors.Wrap(err, "failed running go run, please fix the issues reported")
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer stdin.Close()
-		defer wg.Done()
-		if _, err := io.WriteString(stdin, str); err != nil {
-			fmt.Println(err)
-		}
-	}()
-	wg.Wait()
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		return errors.Wrap(err, "failed combined output, please fix the issues reported")
-	}
-	return nil
-}
-
-func CheckNoChanges() error {
-	fmt.Println(">> fmt - go run")
-	err := sh.RunV("go", "mod", "tidy", "-v")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - git diff")
-	err = sh.RunV("git", "diff")
-	if err != nil {
-		return errors.Wrap(err, "failed running git diff, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - git update-index")
-	err = sh.RunV("git", "update-index", "--refresh")
-	if err != nil {
-		return errors.Wrap(err, "failed running git update-index --refresh, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - git diff-index")
-	err = sh.RunV("git", "diff-index", "--exit-code", "HEAD", " --")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
-	}
-	return nil
-}
-
 // Env returns information about the environment.
 func (Prepare) Env() {
-	mg.Deps(Mkdir("build"), Build.GenerateConfig)
-	RunGo("version")
-	RunGo("env")
+	mg.Deps(devtools.Mkdir("build"), Build.GenerateConfig)
+	devtools.RunGo("version")
+	devtools.RunGo("env")
 }
 
 // Build builds the agent binary with DEV flag set.
@@ -187,12 +122,12 @@ func (Dev) Package() {
 
 // InstallGoLicenser install go-licenser to check license of the files.
 func (Prepare) InstallGoLicenser() error {
-	return GoGet(goLicenserRepo)
+	return devtools.GoGet(goLicenserRepo)
 }
 
 // InstallGoLint for the code.
 func (Prepare) InstallGoLint() error {
-	return GoGet(goLintRepo)
+	return devtools.GoGet(goLintRepo)
 }
 
 // All build all the things for the current projects.
@@ -202,7 +137,7 @@ func (Build) All() {
 
 // GenerateConfig generates the configuration from _meta/elastic-agent.yml
 func (Build) GenerateConfig() error {
-	mg.Deps(Mkdir(buildDir))
+	mg.Deps(devtools.Mkdir(buildDir))
 	return sh.Copy(filepath.Join(buildDir, configFile), filepath.Join(metaDir, configFile))
 }
 
@@ -276,9 +211,9 @@ func (Build) TestBinaries() error {
 		execName += ".exe"
 	}
 	return combineErr(
-		RunGo("build", "-o", filepath.Join(p, "configurable-1.0-darwin-x86_64", configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p, "serviceable-1.0-darwin-x86_64", serviceableName), filepath.Join(p, "serviceable-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p2, "exec-1.0-darwin-x86_64", execName), filepath.Join(p2, "exec-1.0-darwin-x86_64", "main.go")),
+		devtools.RunGo("build", "-o", filepath.Join(p, "configurable-1.0-darwin-x86_64", configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
+		devtools.RunGo("build", "-o", filepath.Join(p, "serviceable-1.0-darwin-x86_64", serviceableName), filepath.Join(p, "serviceable-1.0-darwin-x86_64", "main.go")),
+		devtools.RunGo("build", "-o", filepath.Join(p2, "exec-1.0-darwin-x86_64", execName), filepath.Join(p2, "exec-1.0-darwin-x86_64", "main.go")),
 	)
 }
 
@@ -348,7 +283,7 @@ func (Test) Unit(ctx context.Context) error {
 // Coverage takes the coverages report from running all the tests and display the results in the browser.
 func (Test) Coverage() error {
 	mg.Deps(Prepare.Env, Build.TestBinaries)
-	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
+	return devtools.RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 
 // All format automatically all the codes.
@@ -445,27 +380,6 @@ func TestPackages() error {
 	return devtools.TestPackages()
 }
 
-// RunGo runs go command and output the feedback to the stdout and the stderr.
-func RunGo(args ...string) error {
-	return sh.RunV(mg.GoCmd(), args...)
-}
-
-// GoGet fetch a remote dependencies.
-func GoGet(link string) error {
-	_, err := sh.Exec(map[string]string{"GO111MODULE": "off"}, os.Stdout, os.Stderr, "go", "get", link)
-	return err
-}
-
-// Mkdir returns a function that create a directory.
-func Mkdir(dir string) func() error {
-	return func() error {
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return fmt.Errorf("failed to create directory: %v, error: %+v", dir, err)
-		}
-		return nil
-	}
-}
-
 func commitID() string {
 	commitID, err := sh.Output("git", "rev-parse", "--short", "HEAD")
 	if err != nil {
@@ -507,7 +421,7 @@ func BuildSpec() error {
 	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
 
 	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
 func BuildPGP() error {
@@ -517,7 +431,7 @@ func BuildPGP() error {
 	out := filepath.Join("internal", "pkg", "release", "pgp.go")
 
 	fmt.Printf(">> BuildPGP from %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
 func configYML() error {
@@ -564,7 +478,7 @@ func BuildFleetCfg() error {
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 
 	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
 // Enroll runs agent which enrolls before running.

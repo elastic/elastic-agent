@@ -309,6 +309,27 @@ func Extract(sourceFile, destinationDir string) error {
 	}
 }
 
+// Mkdir returns a function that create a directory.
+func Mkdir(dir string) func() error {
+	return func() error {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return fmt.Errorf("failed to create directory: %v, error: %+v", dir, err)
+		}
+		return nil
+	}
+}
+
+// RunGo runs go command and output the feedback to the stdout and the stderr.
+func RunGo(args ...string) error {
+	return sh.RunV(mg.GoCmd(), args...)
+}
+
+// GoGet fetch a remote dependencies.
+func GoGet(link string) error {
+	_, err := sh.Exec(map[string]string{"GO111MODULE": "off"}, os.Stdout, os.Stderr, "go", "get", link)
+	return err
+}
+
 func unzip(sourceFile, destinationDir string) error {
 	r, err := zip.OpenReader(sourceFile)
 	if err != nil {

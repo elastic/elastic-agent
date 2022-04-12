@@ -5,7 +5,10 @@
 package common
 
 import (
+	"fmt"
+
 	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
@@ -30,4 +33,29 @@ func Check() {
 // CheckLicenseHeaders checks license headers
 func CheckLicenseHeaders() {
 	mg.Deps(devtools.CheckLicenseHeaders)
+}
+
+// CheckNoChanges runs the linters and checks for changes in git
+func CheckNoChanges() error {
+	fmt.Println(">> fmt - go run")
+	err := sh.RunV("go", "mod", "tidy", "-v")
+	if err != nil {
+		return fmt.Errorf("failed running go mod tidy, please fix the issues reported: %w", err)
+	}
+	fmt.Println(">> fmt - git diff")
+	err = sh.RunV("git", "diff")
+	if err != nil {
+		return fmt.Errorf("failed running git diff, please fix the issues reported: %w", err)
+	}
+	fmt.Println(">> fmt - git update-index")
+	err = sh.RunV("git", "update-index", "--refresh")
+	if err != nil {
+		return fmt.Errorf("failed running git update-index --refresh, please fix the issues reported: %w", err)
+	}
+	fmt.Println(">> fmt - git diff-index")
+	err = sh.RunV("git", "diff-index", "--exit-code", "HEAD", " --")
+	if err != nil {
+		return fmt.Errorf("failed running go mod tidy, please fix the issues reported: %w", err)
+	}
+	return nil
 }
