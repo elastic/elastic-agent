@@ -275,7 +275,7 @@ func (k *Key) Apply(vars *Vars) (Node, error) {
 			}
 			return &Key{k.name, NewBoolVal(cond)}, nil
 		}
-		return nil, fmt.Errorf("condition key's value must be a string; recieved %T", k.value)
+		return nil, fmt.Errorf("condition key's value must be a string; received %T", k.value)
 	}
 	v, err := k.value.Apply(vars)
 	if err != nil {

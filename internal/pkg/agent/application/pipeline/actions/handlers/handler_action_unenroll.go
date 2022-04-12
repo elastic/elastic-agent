@@ -63,7 +63,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker store.Fl
 	_ = h.dispatcher.Route(ctx, a.ID(), noPrograms)
 
 	if !action.IsDetected {
-		// ACK only events comming from fleet
+		// ACK only events received from fleet.
 		if err := acker.Ack(ctx, action); err != nil {
 			return err
 		}

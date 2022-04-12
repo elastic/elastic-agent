@@ -218,7 +218,7 @@ func TestOutput(t *testing.T) {
 		runOutputTest(t, l, r, expectedOutputs, initialOutputs)
 	})
 
-	t.Run("valid action - multiple outputs 1 explicitely allowed", func(t *testing.T) {
+	t.Run("valid action - multiple outputs 1 explicitly allowed", func(t *testing.T) {
 		r := &outputCapability{
 			Type:   "allow",
 			Output: "logstash",

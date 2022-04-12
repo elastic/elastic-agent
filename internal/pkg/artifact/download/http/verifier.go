@@ -34,7 +34,7 @@ type Verifier struct {
 }
 
 // NewVerifier create a verifier checking downloaded package on preconfigured
-// location agains a key stored on elastic.co website.
+// location against a key stored on elastic.co website.
 func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
 	if len(pgp) == 0 && !allowEmptyPgp {
 		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)

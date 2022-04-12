@@ -384,7 +384,7 @@ func TestFleetGateway(t *testing.T) {
 			}
 		}()
 
-		// Make sure that all API calls to the checkin API are successfull, the following will happen:
+		// Make sure that all API calls to the checkin API are successful, the following will happen:
 
 		// block on the first call.
 		<-ch2
