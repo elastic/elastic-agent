@@ -42,19 +42,18 @@ import (
 )
 
 const (
-	goLintRepo        = "golang.org/x/lint/golint"
-	goLicenserRepo    = "github.com/elastic/go-licenser"
-	buildDir          = "build"
-	metaDir           = "_meta"
-	snapshotEnv       = "SNAPSHOT"
-	devEnv            = "DEV"
-	externalArtifacts = "EXTERNAL"
-	configFile        = "elastic-agent.yml"
-	agentDropPath     = "AGENT_DROP_PATH"
+	goLintRepo     = "golang.org/x/lint/golint"
+	goLicenserRepo = "github.com/elastic/go-licenser"
+	buildDir       = "build"
+	metaDir        = "_meta"
+	snapshotEnv    = "SNAPSHOT"
+	devEnv         = "DEV"
+	configFile     = "elastic-agent.yml"
+	agentDropPath  = "AGENT_DROP_PATH"
 )
 
 // Aliases for commands required by master makefile
-var Aliases = map[string]interface{}{
+var Aliases = map[string]interface{}{ //nolint:deadcode // used by mage
 	"build": Build.All,
 	"demo":  Demo.Enroll,
 }
@@ -70,7 +69,7 @@ func init() {
 }
 
 // Default set to build everything by default.
-var Default = Build.All
+var Default = Build.All //nolint:deadcode // used by mage
 
 // Build namespace used to build binaries.
 type Build mg.Namespace
@@ -96,8 +95,16 @@ type Dev mg.Namespace
 // Env returns information about the environment.
 func (Prepare) Env() {
 	mg.Deps(devtools.Mkdir("build"), Build.GenerateConfig)
-	devtools.RunGo("version")
-	devtools.RunGo("env")
+	err := devtools.RunGo("version")
+	if err != nil {
+		fmt.Printf("Error fetching version: %s\n", err) //nolint:forbidigo // we may not want to import the logging libraries here
+		return
+	}
+	err = devtools.RunGo("env")
+	if err != nil {
+		fmt.Printf("Error fetching env: %s\n", err) //nolint:forbidigo // we may not want to import the logging libraries here
+		return
+	}
 }
 
 // Build builds the agent binary with DEV flag set.
@@ -143,7 +150,7 @@ func (Build) GenerateConfig() error {
 
 // GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
-func GolangCrossBuildOSS() error {
+func GolangCrossBuildOSS() error { //nolint:deadcode // used by mage
 	params := devtools.DefaultGolangCrossBuildArgs()
 	injectBuildVars(params.Vars)
 	return devtools.GolangCrossBuild(params)
@@ -151,7 +158,7 @@ func GolangCrossBuildOSS() error {
 
 // GolangCrossBuild build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
-func GolangCrossBuild() error {
+func GolangCrossBuild() error { //nolint:deadcode // used by mage
 	params := devtools.DefaultGolangCrossBuildArgs()
 	params.OutputDir = "build/golang-crossbuild"
 	injectBuildVars(params.Vars)
@@ -160,14 +167,11 @@ func GolangCrossBuild() error {
 		return err
 	}
 
-	// TODO: no OSS bits just yet
-	// return GolangCrossBuildOSS()
-
 	return nil
 }
 
 // BuildGoDaemon builds the go-daemon binary (use crossBuildGoDaemon).
-func BuildGoDaemon() error {
+func BuildGoDaemon() error { //nolint:deadcode // used by mage
 	return devtools.BuildGoDaemon()
 }
 
@@ -205,10 +209,11 @@ func (Build) TestBinaries() error {
 	configurableName := "configurable"
 	serviceableName := "serviceable"
 	execName := "exec"
-	if runtime.GOOS == "windows" {
-		configurableName += ".exe"
-		serviceableName += ".exe"
-		execName += ".exe"
+	execExt := ".ext"
+	if runtime.GOOS == "windows" { //nolint:goconst // we probably don't need to const this
+		configurableName += execExt
+		serviceableName += execExt
+		execName += execExt
 	}
 	return combineErr(
 		devtools.RunGo("build", "-o", filepath.Join(p, "configurable-1.0-darwin-x86_64", configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
@@ -263,7 +268,7 @@ func (Check) Changes() error {
 	if len(out) != 0 {
 		fmt.Fprintln(os.Stderr, "Changes:")
 		fmt.Fprintln(os.Stderr, out)
-		return fmt.Errorf("uncommited changes")
+		return fmt.Errorf("uncommitted changes")
 	}
 	return nil
 }
@@ -302,7 +307,7 @@ func (Format) License() error {
 // AssembleDarwinUniversal merges the darwin/amd64 and darwin/arm64 into a single
 // universal binary using `lipo`. It's automatically invoked by CrossBuild whenever
 // the darwin/amd64 and darwin/arm64 are present.
-func AssembleDarwinUniversal() error {
+func AssembleDarwinUniversal() error { //nolint:deadcode // used by mage
 	cmd := "lipo"
 
 	if _, err := exec.LookPath(cmd); err != nil {
@@ -310,7 +315,7 @@ func AssembleDarwinUniversal() error {
 			cmd, err)
 	}
 
-	var lipoArgs []string
+	lipoArgs := []string{}
 	args := []string{
 		"build/golang-crossbuild/%s-darwin-universal",
 		"build/golang-crossbuild/%s-darwin-arm64",
@@ -330,7 +335,7 @@ func AssembleDarwinUniversal() error {
 // Use VERSION_QUALIFIER to control the version qualifier.
 func Package() {
 	start := time.Now()
-	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+	defer func() { fmt.Println("package ran for", time.Since(start)) }() //nolint:forbidigo // I don't think we want to import the logger here
 
 	platformPackages := []struct {
 		platform string
@@ -368,7 +373,7 @@ func requiredPackagesPresent(basePath, beat, version string, requiredPackages []
 		path := filepath.Join(basePath, "build", "distributions", packageName)
 
 		if _, err := os.Stat(path); err != nil {
-			fmt.Printf("Package '%s' does not exist on path: %s\n", packageName, path)
+			fmt.Printf("Package '%s' does not exist on path: %s\n", packageName, path) //nolint:forbidigo // I don't think we want to import the logger here
 			return false
 		}
 	}
@@ -378,14 +383,6 @@ func requiredPackagesPresent(basePath, beat, version string, requiredPackages []
 // TestPackages tests the generated packages (i.e. file modes, owners, groups).
 func TestPackages() error {
 	return devtools.TestPackages()
-}
-
-func commitID() string {
-	commitID, err := sh.Output("git", "rev-parse", "--short", "HEAD")
-	if err != nil {
-		return "cannot retrieve hash"
-	}
-	return commitID
 }
 
 // Update is an alias for executing control protocol, configs, and specs.
@@ -409,7 +406,7 @@ func Config() {
 }
 
 // ControlProto generates pkg/agent/control/proto module.
-func ControlProto() error {
+func ControlProto() error { //nolint:deadcode // used by mage
 	return sh.RunV("protoc", "--go_out=plugins=grpc:.", "control.proto")
 }
 
@@ -420,7 +417,7 @@ func BuildSpec() error {
 	in := filepath.Join("internal", "spec", "*.yml")
 	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
 
-	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
+	fmt.Printf(">> Buildspec from %s to %s\n", in, out) //nolint:forbidigo // I don't think we want to import the logger here
 	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
@@ -430,7 +427,7 @@ func BuildPGP() error {
 	in := "GPG-KEY-elasticsearch"
 	out := filepath.Join("internal", "pkg", "release", "pgp.go")
 
-	fmt.Printf(">> BuildPGP from %s to %s\n", in, out)
+	fmt.Printf(">> BuildPGP from %s to %s\n", in, out) //nolint:forbidigo // I don't think we want to import the logger here
 	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
@@ -477,7 +474,7 @@ func BuildFleetCfg() error {
 	in := filepath.Join("_meta", "elastic-agent.fleet.yml")
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 
-	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out)
+	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out) //nolint:forbidigo // I don't think we want to import the logger here
 	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
@@ -527,9 +524,9 @@ func runAgent(env map[string]string) error {
 
 		// build docker image
 		if err := dockerBuild(tag); err != nil {
-			fmt.Println(">> Building docker images again (after 10 seconds)")
+			fmt.Println(">> Building docker images again (after 10 seconds)") //nolint:forbidigo // I don't think we want to import the logger here
 			// This sleep is to avoid hitting the docker build issues when resources are not available.
-			time.Sleep(10)
+			time.Sleep(10 * time.Millisecond)
 			if err := dockerBuild(tag); err != nil {
 				return err
 			}
@@ -601,14 +598,14 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		defer os.Unsetenv(agentDropPath)
 
 		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
-		if devtools.ExternalBuild == true {
+		if devtools.ExternalBuild {
 			ctx := context.Background()
 			for _, beat := range packedBeats {
 				for _, reqPackage := range requiredPackages {
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
-					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, dropPath)
+					err := fetchBinaryFromArtifactsAPI(ctx, packageName, beat, newVersion, dropPath)
 					if err != nil {
-						panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
+						panic(fmt.Sprintf("fetchBinaryFromArtifactsAPI failed: %v", err))
 					}
 				}
 			}
@@ -652,7 +649,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 	mg.SerialDeps(devtools.Package, TestPackages)
 }
 
-func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
+func fetchBinaryFromArtifactsAPI(ctx context.Context, packageName, artifact, version, downloadPath string) error {
 	location, err := downloads.FetchBeatsBinary(
 		ctx,
 		packageName,
@@ -662,7 +659,7 @@ func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, ver
 		false,
 		downloadPath,
 		true)
-	fmt.Println("downloaded binaries on location:", location)
+	fmt.Println("downloaded binaries on location:", location) //nolint:forbidigo //no logger here
 
 	return err
 }
@@ -722,14 +719,14 @@ func fixOsEnv(k, v string) string {
 
 func buildVars() map[string]string {
 	vars := make(map[string]string)
-
+	trueval := "true"
 	isSnapshot, _ := os.LookupEnv(snapshotEnv)
 	vars["github.com/elastic/elastic-agent/internal/pkg/release.snapshot"] = isSnapshot
 
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {
-			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowEmptyPgp"] = "true"
-			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowUpgrade"] = "true"
+			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowEmptyPgp"] = trueval
+			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowUpgrade"] = trueval
 		}
 	}
 
