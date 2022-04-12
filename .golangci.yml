@@ -16,6 +16,16 @@ issues:
 output:
   sort-results: true
 
+# Let the mage files run printf. As far as I can tell, most of our magefiles use Printf as opposed to starting up a logger, as the logger is a tad heavy and can bring in needless dependencies for a magefile.
+issues:
+  exclude-rules:
+    - path: dev-tools/mage
+      linters:
+        - forbidigo
+    - path: magefile.go
+      linters:
+        - forbidigo
+
 # Uncomment and add a path if needed to exclude
 # skip-dirs:
 #   - some/path

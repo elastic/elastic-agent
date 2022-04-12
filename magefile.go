@@ -97,12 +97,12 @@ func (Prepare) Env() {
 	mg.Deps(devtools.Mkdir("build"), Build.GenerateConfig)
 	err := devtools.RunGo("version")
 	if err != nil {
-		fmt.Printf("Error fetching version: %s\n", err) //nolint:forbidigo // we may not want to import the logging libraries here
+		fmt.Printf("Error fetching version: %s\n", err)
 		return
 	}
 	err = devtools.RunGo("env")
 	if err != nil {
-		fmt.Printf("Error fetching env: %s\n", err) //nolint:forbidigo // we may not want to import the logging libraries here
+		fmt.Printf("Error fetching env: %s\n", err)
 		return
 	}
 }
@@ -335,7 +335,7 @@ func AssembleDarwinUniversal() error { //nolint:deadcode // used by mage
 // Use VERSION_QUALIFIER to control the version qualifier.
 func Package() {
 	start := time.Now()
-	defer func() { fmt.Println("package ran for", time.Since(start)) }() //nolint:forbidigo // I don't think we want to import the logger here
+	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
 	platformPackages := []struct {
 		platform string
@@ -373,7 +373,7 @@ func requiredPackagesPresent(basePath, beat, version string, requiredPackages []
 		path := filepath.Join(basePath, "build", "distributions", packageName)
 
 		if _, err := os.Stat(path); err != nil {
-			fmt.Printf("Package '%s' does not exist on path: %s\n", packageName, path) //nolint:forbidigo // I don't think we want to import the logger here
+			fmt.Printf("Package '%s' does not exist on path: %s\n", packageName, path)
 			return false
 		}
 	}
@@ -417,7 +417,7 @@ func BuildSpec() error {
 	in := filepath.Join("internal", "spec", "*.yml")
 	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
 
-	fmt.Printf(">> Buildspec from %s to %s\n", in, out) //nolint:forbidigo // I don't think we want to import the logger here
+	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
 	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
@@ -427,7 +427,7 @@ func BuildPGP() error {
 	in := "GPG-KEY-elasticsearch"
 	out := filepath.Join("internal", "pkg", "release", "pgp.go")
 
-	fmt.Printf(">> BuildPGP from %s to %s\n", in, out) //nolint:forbidigo // I don't think we want to import the logger here
+	fmt.Printf(">> BuildPGP from %s to %s\n", in, out)
 	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
@@ -474,7 +474,7 @@ func BuildFleetCfg() error {
 	in := filepath.Join("_meta", "elastic-agent.fleet.yml")
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 
-	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out) //nolint:forbidigo // I don't think we want to import the logger here
+	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out)
 	return devtools.RunGo("run", goF, "--in", in, "--out", out)
 }
 
@@ -524,7 +524,7 @@ func runAgent(env map[string]string) error {
 
 		// build docker image
 		if err := dockerBuild(tag); err != nil {
-			fmt.Println(">> Building docker images again (after 10 seconds)") //nolint:forbidigo // I don't think we want to import the logger here
+			fmt.Println(">> Building docker images again (after 10 seconds)")
 			// This sleep is to avoid hitting the docker build issues when resources are not available.
 			time.Sleep(10 * time.Millisecond)
 			if err := dockerBuild(tag); err != nil {
@@ -659,7 +659,7 @@ func fetchBinaryFromArtifactsAPI(ctx context.Context, packageName, artifact, ver
 		false,
 		downloadPath,
 		true)
-	fmt.Println("downloaded binaries on location:", location) //nolint:forbidigo //no logger here
+	fmt.Println("downloaded binaries on location:", location)
 
 	return err
 }
