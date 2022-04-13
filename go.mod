@@ -10,7 +10,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
-	github.com/elastic/elastic-agent-libs v0.1.1
+	github.com/elastic/elastic-agent-libs v0.1.2
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
 	github.com/elastic/go-ucfg v0.8.4
@@ -43,7 +43,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
-	golang.org/x/tools v0.1.8
+	golang.org/x/tools v0.1.9
 	google.golang.org/grpc v1.42.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -130,7 +130,7 @@ require (
 	google.golang.org/grpc/examples v0.0.0-20220304170021-431ea809a767 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	howett.net/plist v0.0.0-20201203080718-1454fab16a06 // indirect
+	howett.net/plist v1.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b // indirect
 	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 // indirect
