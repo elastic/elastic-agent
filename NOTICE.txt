@@ -641,11 +641,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.1.1
+Version: v0.1.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.1.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.1.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4643,11 +4643,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/tools
-Version: v0.1.8
+Version: v0.1.9
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/tools@v0.1.8/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/tools@v0.1.9/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -15573,11 +15573,11 @@ limitations under the License.
 
 --------------------------------------------------------------------------------
 Dependency : howett.net/plist
-Version: v0.0.0-20201203080718-1454fab16a06
+Version: v1.0.0
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/howett.net/plist@v0.0.0-20201203080718-1454fab16a06/LICENSE:
+Contents of probable licence file $GOMODCACHE/howett.net/plist@v1.0.0/LICENSE:
 
 Copyright (c) 2013, Dustin L. Howett. All rights reserved.
 
