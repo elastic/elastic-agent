@@ -402,10 +402,11 @@ func TestConfiguration(t *testing.T) {
 				"default": {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
 			},
 		},
-		// "audit_config": {
-		// 	programs: []string{"auditbeat"},
-		// 	expected: 1,
-		// },
+		"audit_config": {
+			programs: map[string][]string{
+				"default": {"auditbeat"},
+			},
+		},
 		"fleet_server": {
 			programs: map[string][]string{
 				"default": {"fleet-server"},

@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
+
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
 	// mage:import
@@ -174,7 +175,7 @@ func (Dev) Build() {
 	mg.Deps(Build.All)
 }
 
-// Package packages the agent binary with DEV flag set.
+// Package bundles the agent binary with DEV flag set.
 func (Dev) Package() {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
@@ -363,6 +364,31 @@ func (Format) License() error {
 	)
 }
 
+// AssembleDarwinUniversal merges the darwin/amd64 and darwin/arm64 into a single
+// universal binary using `lipo`. It's automatically invoked by CrossBuild whenever
+// the darwin/amd64 and darwin/arm64 are present.
+func AssembleDarwinUniversal() error {
+	cmd := "lipo"
+
+	if _, err := exec.LookPath(cmd); err != nil {
+		return fmt.Errorf("'%s' is required to assemble the universal binary: %w",
+			cmd, err)
+	}
+
+	var lipoArgs []string
+	args := []string{
+		"build/golang-crossbuild/%s-darwin-universal",
+		"build/golang-crossbuild/%s-darwin-arm64",
+		"build/golang-crossbuild/%s-darwin-amd64"}
+
+	for _, arg := range args {
+		lipoArgs = append(lipoArgs, fmt.Sprintf(arg, devtools.BeatName))
+	}
+
+	lipo := sh.RunCmd(cmd, "-create", "-output")
+	return lipo(lipoArgs...)
+}
+
 // Package packages the Beat for distribution.
 // Use SNAPSHOT=true to build snapshots.
 // Use PLATFORMS to control the target platforms.
@@ -376,6 +402,7 @@ func Package() {
 		packages string
 	}{
 		{"darwin/amd64", "darwin-x86_64.tar.gz"},
+		{"darwin/arm64", "darwin-aarch64.tar.gz"},
 		{"linux/amd64", "linux-x86_64.tar.gz"},
 		{"linux/arm64", "linux-arm64.tar.gz"},
 		{"windows/amd64", "windows-x86_64.zip"},
@@ -548,7 +575,7 @@ func (Demo) Enroll() error {
 	return runAgent(env)
 }
 
-// Enroll runs agent which does not enroll before running.
+// NoEnroll runs agent which does not enroll before running.
 func (Demo) NoEnroll() error {
 	env := map[string]string{
 		"FLEET_ENROLL": "0",
@@ -667,12 +694,12 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
 					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, dropPath)
 					if err != nil {
-						panic(err)
+						panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
 					}
 				}
 			}
 		} else {
-			//build from local repo, will assume beats repo is located on the same root level
+			// build from local repo, will assume beats repo is located on the same root level
 			for _, b := range packedBeats {
 				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
 				if err != nil {
@@ -701,7 +728,6 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				}
 			}
 		}
-
 	}
 
 	// package agent
@@ -713,12 +739,18 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 }
 
 func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
-	location, err := downloads.FetchBeatsBinary(ctx, packageName, artifact, version, 3, false, downloadPath, true)
-	fmt.Println("downloaded binaries on location ", location)
-	if err != nil {
-		panic(err)
-	}
-	return nil
+	location, err := downloads.FetchBeatsBinary(
+		ctx,
+		packageName,
+		artifact,
+		version,
+		3,
+		false,
+		downloadPath,
+		true)
+	fmt.Println("downloaded binaries on location:", location)
+
+	return err
 }
 
 func selectedPackageTypes() string {

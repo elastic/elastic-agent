@@ -18,8 +18,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
 	downloader "github.com/elastic/elastic-agent/internal/pkg/artifact/download/localremote"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/snapshot"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string) (_ string, err error) {
@@ -55,12 +55,8 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, "failed upgrade of agent binary")
 	}
 
-	matches, err := verifier.Verify(agentSpec, version, true)
-	if err != nil {
+	if err := verifier.Verify(agentSpec, version); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
-	}
-	if !matches {
-		return "", errors.New("failed verification of agent binary, hash does not match", errors.TypeSecurity)
 	}
 
 	return path, nil

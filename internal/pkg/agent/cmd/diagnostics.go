@@ -42,8 +42,17 @@ var diagOutputs = map[string]outputter{
 
 // DiagnosticsInfo a struct to track all information related to diagnostics for the agent.
 type DiagnosticsInfo struct {
-	ProcMeta     []client.ProcMeta
-	AgentVersion client.Version
+	ProcMeta  []client.ProcMeta
+	AgentInfo AgentInfo
+}
+
+// AgentInfo contains all information about the running Agent.
+type AgentInfo struct {
+	ID        string
+	Version   string
+	Commit    string
+	BuildTime time.Time
+	Snapshot  bool
 }
 
 // AgentConfig tracks all configuration that the agent uses, local files, rendered policies, beat inputs etc.
@@ -197,13 +206,15 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 	innerCtx, cancel := context.WithTimeout(ctx, cmdTimeout)
 	defer cancel()
 
+	errs := make([]error, 0)
 	diag, err := getDiagnostics(innerCtx)
-	if err == context.DeadlineExceeded {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if err == context.Canceled {
+	} else if errors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather diagnostics data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather diagnostics data from elastic-agent: %v\n", err)
 	}
 
 	metrics, err := gatherMetrics(innerCtx)
@@ -214,24 +225,26 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}
-
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon when gathering metrics: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather metrics data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather metrics data from elastic-agent: %v\n", err)
 	}
 
 	cfg, err := gatherConfig()
 	if err != nil {
-		return fmt.Errorf("unable to gather config data: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather config data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather config data from elastic-agent: %v\n", err)
 	}
 
 	var pprofData map[string][]client.ProcPProf
 	if pprof {
 		pprofData, err = getAllPprof(innerCtx, pprofDur)
 		if err != nil {
-			return fmt.Errorf("unable to gather pprof data: %w", err)
+			errs = append(errs, fmt.Errorf("unable to gather pprof data: %w", err))
+			fmt.Fprintf(streams.Err, "Failed to gather pprof data from elastic-agent: %v\n", err)
 		}
 	}
 
-	err = createZip(fileName, outputFormat, diag, cfg, pprofData, metrics)
+	err = createZip(fileName, outputFormat, diag, cfg, pprofData, metrics, errs)
 	if err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
 	}
@@ -321,7 +334,18 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 	if err != nil {
 		return diag, err
 	}
-	diag.AgentVersion = version
+	diag.AgentInfo = AgentInfo{
+		Version:   version.Version,
+		Commit:    version.Commit,
+		BuildTime: version.BuildTime,
+		Snapshot:  version.Snapshot,
+	}
+
+	agentInfo, err := info.NewAgentInfo(false)
+	if err != nil {
+		return diag, err
+	}
+	diag.AgentInfo.ID = agentInfo.AgentID()
 
 	return diag, nil
 }
@@ -347,8 +371,8 @@ func humanDiagnosticsOutput(w io.Writer, obj interface{}) error {
 
 func outputDiagnostics(w io.Writer, d DiagnosticsInfo) error {
 	tw := tabwriter.NewWriter(w, 4, 1, 2, ' ', 0)
-	fmt.Fprintf(tw, "elastic-agent\tversion: %s\n", d.AgentVersion.Version)
-	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", d.AgentVersion.Commit, d.AgentVersion.BuildTime, d.AgentVersion.Snapshot)
+	fmt.Fprintf(tw, "elastic-agent\tid: %s\tversion: %s\n", d.AgentInfo.ID, d.AgentInfo.Version)
+	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
 	if len(d.ProcMeta) == 0 {
 		fmt.Fprintf(tw, "Applications: (none)\n")
 	} else {
@@ -381,6 +405,16 @@ func gatherConfig() (AgentConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+
+	agentInfo, err := info.NewAgentInfo(false)
+	if err != nil {
+		return cfg, err
+	}
+
+	if cfg.ConfigLocal.Fleet.Info.ID == "" {
+		cfg.ConfigLocal.Fleet.Info.ID = agentInfo.AgentID()
+	}
+
 	// Must force *config.Config to map[string]interface{} in order to write to a file.
 	mapCFG, err := renderedCFG.ToMapStr()
 	if err != nil {
@@ -390,11 +424,6 @@ func gatherConfig() (AgentConfig, error) {
 
 	// Gather vars to render process config
 	isStandalone, err := isStandalone(renderedCFG)
-	if err != nil {
-		return AgentConfig{}, err
-	}
-
-	agentInfo, err := info.NewAgentInfo(false)
 	if err != nil {
 		return AgentConfig{}, err
 	}
@@ -424,12 +453,22 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse) error {
+func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse, errs []error) error {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
 	zw := zip.NewWriter(f)
+
+	if len(errs) > 0 {
+		zf, err := zw.Create("errors.txt")
+		if err != nil {
+			return closeHandlers(err, zw, f)
+		}
+		for i, e := range errs {
+			fmt.Fprintf(zf, "Error %d: %v\n", i+1, e)
+		}
+	}
 
 	zf, err := zw.Create("meta/")
 	if err != nil {
@@ -440,7 +479,7 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
-	if err := writeFile(zf, outputFormat, diag.AgentVersion); err != nil {
+	if err := writeFile(zf, outputFormat, diag.AgentInfo); err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
@@ -527,7 +566,9 @@ func zipLogs(zw *zip.Writer) error {
 			return fmt.Errorf("unable to walk log dir: %w", fErr)
 		}
 
-		name := strings.TrimPrefix(path, logPath)
+		// name is the relative dir/file name replacing any filepath seperators with /
+		// this will clean log names on windows machines and will nop on *nix
+		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
 		if name == "" {
 			return nil
 		}

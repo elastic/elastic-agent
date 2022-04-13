@@ -34,18 +34,19 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 type stateStore interface {
@@ -163,7 +164,12 @@ func newManaged(
 		return nil, err
 	}
 
-	batchedAcker := lazy.NewAcker(acker, log)
+	// Create ack retrier that is used by lazyAcker to enqueue/retry failed acks
+	retrier := retrier.New(acker, log)
+	// Run acking retrier. The lazy acker sends failed actions acks to retrier.
+	go retrier.Run(ctx)
+
+	batchedAcker := lazy.NewAcker(acker, log, lazy.WithRetrier(retrier))
 
 	// Create the state store that will persist the last good policy change on disk.
 	stateStore, err := store.NewStateStoreWithMigration(log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())

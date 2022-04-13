@@ -237,7 +237,8 @@ pipeline {
         beforeAgent true
         anyOf {
           not { changeRequest() }
-          expression { return isE2eEnabled() }
+          // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
+          expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
         }
       }
       steps {
@@ -320,7 +321,8 @@ def withPackageArmEnv(Closure body) {
 def withPackageDarwinEnv(Closure body) {
   // Copied from https://github.com/elastic/beats/blob/e6e65aa92fe355c95789691ebf5a3bcecaf5b4ea/.ci/packaging.groovy#L126-L142
   def PLATFORMS = [ '+all',
-                    'darwin/amd64'
+                    'darwin/amd64',
+                    'darwin/arm64',
   ].join(' ')
   withEnv([
     "PLATFORMS=${PLATFORMS}"

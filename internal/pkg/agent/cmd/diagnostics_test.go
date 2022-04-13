@@ -23,7 +23,8 @@ import (
 )
 
 var testDiagnostics = DiagnosticsInfo{
-	AgentVersion: client.Version{
+	AgentInfo: AgentInfo{
+		ID:        "test-id",
 		Version:   "test-version",
 		Commit:    "test-commit",
 		BuildTime: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -69,7 +70,7 @@ var testDiagnostics = DiagnosticsInfo{
 func Example_humanDiagnosticsOutput() {
 	humanDiagnosticsOutput(os.Stdout, testDiagnostics)
 	// Output:
-	// elastic-agent  version: test-version
+	// elastic-agent  id: test-id                version: test-version
 	//                build_commit: test-commit  build_time: 2021-01-01 00:00:00 +0000 UTC  snapshot_build: false
 	// Applications:
 	//   *  name: filebeat                        route_key: test
