@@ -30,13 +30,13 @@ import (
 const (
 	packagePermissions = 0660
 
-	// Reports the current download progress when percentage of time has passed in the overall interval for the
-	// complete download to complete. 5% is a good default, as the default timeout is 10 minutes and this will have it
-	// log every 30 seconds.
+	// downloadProgressIntervalPercentage defines how often to report the current download progress when percentage
+	// of time has passed in the overall interval for the complete download to complete. 5% is a good default, as
+	// the default timeout is 10 minutes and this will have it log every 30 seconds.
 	downloadProgressIntervalPercentage = 0.05
 
-	// Reports the log messages as a warning once the amount of time passed is this percentage or more of the total
-	// allotted time to download.
+	// warningProgressIntervalPercentage defines how often to log messages as a warning once the amount of time
+	// passed is this percentage or more of the total allotted time to download.
 	warningProgressIntervalPercentage = 0.75
 )
 
@@ -300,13 +300,13 @@ func (dp *downloadProgressReporter) ReportFailed(err error) {
 	if dp.length > 0 {
 		// length of the download is known, so more detail can be provided
 		percentComplete := downloaded / dp.length * 100.0
-		msg = "download from %s failed at %s/%s (%.2f%% complete) @ %sps - %s"
+		msg = "download from %s failed at %s/%s (%.2f%% complete) @ %sps: %s"
 		args = []interface{}{
 			dp.sourceURI, units.HumanSize(downloaded), units.HumanSize(dp.length), percentComplete, units.HumanSize(bytesPerSecond), err,
 		}
 	} else {
 		// length unknown so provide the amount downloaded and the speed
-		msg = "download from %s failed at %s @ %sps - %s"
+		msg = "download from %s failed at %s @ %sps: %s"
 		args = []interface{}{
 			dp.sourceURI, units.HumanSize(downloaded), units.HumanSize(bytesPerSecond), err,
 		}

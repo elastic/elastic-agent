@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	osDarwin  = "darwin"
-	osLinux   = "linux"
-	osWindows = "windows"
+	darwin  = "darwin"
+	linux   = "linux"
+	windows = "windows"
 )
 
 // Config is a configuration used for verifier and downloader
@@ -70,12 +70,12 @@ func (c *Config) OS() string {
 	}
 
 	switch runtime.GOOS {
-	case osWindows:
-		c.OperatingSystem = osWindows
-	case osDarwin:
-		c.OperatingSystem = osDarwin
+	case windows:
+		c.OperatingSystem = windows
+	case darwin:
+		c.OperatingSystem = darwin
 	default:
-		c.OperatingSystem = osLinux
+		c.OperatingSystem = linux
 	}
 
 	return c.OperatingSystem
