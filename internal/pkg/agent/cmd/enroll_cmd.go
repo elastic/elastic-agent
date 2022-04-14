@@ -499,7 +499,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: c.options.UserProvidedMetadata,
-			Tags: c.options.Tags,
+			Tags:         c.options.Tags,
 		},
 	}
 
