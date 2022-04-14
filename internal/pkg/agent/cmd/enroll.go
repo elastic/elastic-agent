@@ -73,6 +73,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolP("delay-enroll", "", false, "Delays enrollment to occur on first start of the Elastic Agent service")
 	cmd.Flags().DurationP("daemon-timeout", "", 0, "Timeout waiting for Elastic Agent daemon")
 	cmd.Flags().DurationP("fleet-server-timeout", "", 0, "Timeout waiting for Fleet Server to be ready to start enrollment")
+	cmd.Flags().StringSliceP("tag", "", []string{}, "User set tags")
 }
 
 func validateEnrollFlags(cmd *cobra.Command) error {
@@ -124,7 +125,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	delayEnroll, _ := cmd.Flags().GetBool("delay-enroll")
 	daemonTimeout, _ := cmd.Flags().GetDuration("daemon-timeout")
 	fTimeout, _ := cmd.Flags().GetDuration("fleet-server-timeout")
-
+	fTags, _ := cmd.Flags().GetStringSlice("tag")
 	args := []string{}
 	if url != "" {
 		args = append(args, "--url")
@@ -224,6 +225,10 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 		args = append(args, "--fleet-server-es-insecure")
 	}
 
+	for k, v := range mapFromEnvList(fTags) {
+		args = append(args, "--tag")
+		args = append(args, k+"="+v)
+	}
 	return args
 }
 
@@ -308,6 +313,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 	delayEnroll, _ := cmd.Flags().GetBool("delay-enroll")
 	daemonTimeout, _ := cmd.Flags().GetDuration("daemon-timeout")
 	fTimeout, _ := cmd.Flags().GetDuration("fleet-server-timeout")
+	tags, _ := cmd.Flags().GetStringSlice("tag")
 
 	caStr, _ := cmd.Flags().GetString("certificate-authorities")
 	CAs := cli.StringToSlice(caStr)
@@ -330,6 +336,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 		ProxyHeaders:         mapFromEnvList(proxyHeaders),
 		DelayEnroll:          delayEnroll,
 		DaemonTimeout:        daemonTimeout,
+		Tags:                 tags,
 		FleetServer: enrollCmdFleetServerOption{
 			ConnStr:               fServer,
 			ElasticsearchCA:       fElasticSearchCA,

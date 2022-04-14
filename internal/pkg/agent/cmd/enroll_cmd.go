@@ -109,6 +109,7 @@ type enrollCmdOption struct {
 	FixPermissions       bool                       `yaml:"-"`
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
+	Tags                 []string                   `yaml:"omitempty"`
 }
 
 // remoteConfig returns the configuration used to connect the agent to a fleet process.
@@ -498,6 +499,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: c.options.UserProvidedMetadata,
+			Tags: c.options.Tags,
 		},
 	}
 
