@@ -606,7 +606,7 @@ func collectEndpointSecurityLogs(zw *zip.Writer, specs map[string]program.Spec) 
 			return fmt.Errorf("unable to walk log dir: %w", fErr)
 		}
 
-		name := strings.TrimPrefix(path, logPath)
+		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
 		if name == "" {
 			return nil
 		}
