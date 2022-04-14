@@ -160,7 +160,7 @@ func newDiagnosticsPprofCommandWithArgs(_ []string, streams *cli.IOStreams) *cob
 	return cmd
 }
 
-func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command, _ []string) error {
 	err := tryContainerLoadPaths()
 	if err != nil {
 		return err
@@ -177,12 +177,12 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) er
 	defer cancel()
 
 	diag, err := getDiagnostics(innerCtx)
-	if err == context.DeadlineExceeded {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if err == context.Canceled {
+	} else if errors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %s", err)
+		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
 	}
 
 	return outputFunc(streams.Out, diag)
@@ -470,15 +470,16 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		}
 	}
 
-	zf, err := zw.Create("meta/")
+	_, err = zw.Create("meta/")
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
-	zf, err = zw.Create("meta/elastic-agent-version." + outputFormat)
+	zf, err := zw.Create("meta/elastic-agent-version." + outputFormat)
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
+
 	if err := writeFile(zf, outputFormat, diag.AgentInfo); err != nil {
 		return closeHandlers(err, zw, f)
 	}
@@ -494,7 +495,7 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		}
 	}
 
-	zf, err = zw.Create("config/")
+	_, err = zw.Create("config/")
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
@@ -681,18 +682,19 @@ func getAllPprof(ctx context.Context, d time.Duration) (map[string][]client.Proc
 }
 
 func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
-	zf, err := zw.Create("pprof/")
+	_, err := zw.Create("pprof/")
 	if err != nil {
 		return err
 	}
+
 	for pType, profs := range pprof {
-		zf, err = zw.Create("pprof/" + pType + "/")
+		_, err := zw.Create("pprof/" + pType + "/")
 		if err != nil {
 			return err
 		}
 		for _, p := range profs {
 			if p.Error != "" {
-				zf, err = zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + "_error.txt")
+				zf, err := zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + "_error.txt")
 				if err != nil {
 					return err
 				}
@@ -702,7 +704,7 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 				}
 				continue
 			}
-			zf, err = zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + ".pprof")
+			zf, err := zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + ".pprof")
 			if err != nil {
 				return err
 			}

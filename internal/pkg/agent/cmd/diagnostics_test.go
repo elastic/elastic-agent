@@ -68,7 +68,7 @@ var testDiagnostics = DiagnosticsInfo{
 }
 
 func Example_humanDiagnosticsOutput() {
-	humanDiagnosticsOutput(os.Stdout, testDiagnostics)
+	_ = humanDiagnosticsOutput(os.Stdout, testDiagnostics)
 	// Output:
 	// elastic-agent  id: test-id                version: test-version
 	//                build_commit: test-commit  build_time: 2021-01-01 00:00:00 +0000 UTC  snapshot_build: false
