@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
@@ -50,6 +52,7 @@ func TestDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	log, _ := logger.New("", false)
 	timeout := 30 * time.Second
 	testCases := getTestCases()
 	elasticClient := getElasticCoClient()
@@ -68,7 +71,7 @@ func TestDownload(t *testing.T) {
 			config.OperatingSystem = testCase.system
 			config.Architecture = testCase.arch
 
-			testClient := NewDownloaderWithClient(config, elasticClient)
+			testClient := NewDownloaderWithClient(log, config, elasticClient)
 			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
@@ -90,6 +93,7 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	log, _ := logger.New("", false)
 	timeout := 30 * time.Second
 	testCases := getRandomTestCases()
 	elasticClient := getElasticCoClient()
@@ -108,7 +112,7 @@ func TestVerify(t *testing.T) {
 			config.OperatingSystem = testCase.system
 			config.Architecture = testCase.arch
 
-			testClient := NewDownloaderWithClient(config, elasticClient)
+			testClient := NewDownloaderWithClient(log, config, elasticClient)
 			artifact, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
@@ -146,6 +150,7 @@ func getTestCases() []testCase {
 	}
 }
 
+//nolint:gosec,G404 // this is just for unit tests secure random number is not needed
 func getRandomTestCases() []testCase {
 	tt := getTestCases()
 
@@ -185,9 +190,15 @@ func getElasticCoClient() http.Client {
 		content := []byte(packageName)
 		if isShaReq {
 			hash := sha512.Sum512(content)
-			w.Write([]byte(fmt.Sprintf("%x %s", hash, packageName)))
+			_, err := w.Write([]byte(fmt.Sprintf("%x %s", hash, packageName)))
+			if err != nil {
+				panic(err)
+			}
 		} else {
-			w.Write(content)
+			_, err := w.Write(content)
+			if err != nil {
+				panic(err)
+			}
 		}
 	})
 	server := httptest.NewServer(handler)
