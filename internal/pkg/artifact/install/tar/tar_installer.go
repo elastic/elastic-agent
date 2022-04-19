@@ -72,7 +72,7 @@ func unpack(ctx context.Context, r io.Reader, dir string) error {
 		}
 
 		f, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
