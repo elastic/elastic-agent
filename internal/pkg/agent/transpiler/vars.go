@@ -10,9 +10,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/core/composable"
-
-	"github.com/elastic/beats/v7/libbeat/common"
 )
 
 var varsRegex = regexp.MustCompile(`\${([\p{L}\d\s\\\-_|.'"]*)}`)
@@ -25,16 +24,16 @@ type Vars struct {
 	tree                  *AST
 	processorsKey         string
 	processors            Processors
-	fetchContextProviders common.MapStr
+	fetchContextProviders mapstr.M
 }
 
 // NewVars returns a new instance of vars.
-func NewVars(mapping map[string]interface{}, fetchContextProviders common.MapStr) (*Vars, error) {
+func NewVars(mapping map[string]interface{}, fetchContextProviders mapstr.M) (*Vars, error) {
 	return NewVarsWithProcessors(mapping, "", nil, fetchContextProviders)
 }
 
 // NewVarsWithProcessors returns a new instance of vars with attachment of processors.
-func NewVarsWithProcessors(mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders common.MapStr) (*Vars, error) {
+func NewVarsWithProcessors(mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders mapstr.M) (*Vars, error) {
 	tree, err := NewAST(mapping)
 	if err != nil {
 		return nil, err
@@ -55,7 +54,7 @@ func (v *Vars) Replace(value string) (Node, error) {
 		for i := 0; i < len(r); i += 4 {
 			vars, err := extractVars(value[r[i+2]:r[i+3]])
 			if err != nil {
-				return nil, fmt.Errorf(`error parsing variable "%s": %s`, value[r[i]:r[i+1]], err)
+				return nil, fmt.Errorf(`error parsing variable "%s": %w`, value[r[i]:r[i+1]], err)
 			}
 			set := false
 			for _, val := range vars {
@@ -105,7 +104,10 @@ func (v *Vars) lookupNode(name string) (Node, bool) {
 	// check if the value can be retrieved from a FetchContextProvider
 	for providerName, provider := range v.fetchContextProviders {
 		if varPrefixMatched(name, providerName) {
-			fetchProvider := provider.(composable.FetchContextProvider)
+			fetchProvider, ok := provider.(composable.FetchContextProvider)
+			if !ok {
+				return &StrVal{value: ""}, false
+			}
 			fval, found := fetchProvider.Fetch(name)
 			if found {
 				return &StrVal{value: fval}, true

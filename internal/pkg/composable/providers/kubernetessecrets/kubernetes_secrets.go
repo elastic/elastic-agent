@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -23,7 +23,7 @@ var _ corecomp.FetchContextProvider = (*contextProviderK8sSecrets)(nil)
 var getK8sClientFunc = getK8sClient
 
 func init() {
-	composable.Providers.AddContextProvider("kubernetes_secrets", ContextProviderBuilder)
+	_ = composable.Providers.AddContextProvider("kubernetes_secrets", ContextProviderBuilder)
 }
 
 type contextProviderK8sSecrets struct {

@@ -9,27 +9,22 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
+	urlutil "github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/id"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
-	defaultPort = 8220
-
 	retryOnBadConnTimeout = 5 * time.Minute
 )
-
-var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 type requestFunc func(string, string, url.Values, io.Reader) (*http.Request, error)
 type wrapperFunc func(rt http.RoundTripper) (http.RoundTripper, error)
@@ -104,7 +99,7 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 	hosts := cfg.GetHosts()
 	clients := make([]*requestClient, len(hosts))
 	for i, host := range cfg.GetHosts() {
-		connStr, err := common.MakeURL(string(cfg.Protocol), p, host, 0)
+		connStr, err := urlutil.MakeURL(string(cfg.Protocol), p, host, 0)
 		if err != nil {
 			return nil, errors.Wrap(err, "invalid fleet-server endpoint")
 		}
@@ -173,7 +168,7 @@ func (c *Client) Send(
 	// Content-Type / Accepted type can be override from the called.
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
-	// TODO: Make this header specific to fleet-server or remove it
+	// This header should be specific to fleet-server or remove it
 	req.Header.Set("kbn-xsrf", "1") // Without this Kibana will refuse to answer the request.
 
 	// If available, add the request id as an HTTP header
@@ -268,6 +263,6 @@ func prefixRequestFactory(URL string) requestFunc {
 	return func(method, path string, params url.Values, body io.Reader) (*http.Request, error) {
 		path = strings.TrimPrefix(path, "/")
 		newPath := strings.Join([]string{URL, path, "?", params.Encode()}, "")
-		return http.NewRequest(method, newPath, body)
+		return http.NewRequest(method, newPath, body) //nolint:noctx // keep old behaviour
 	}
 }

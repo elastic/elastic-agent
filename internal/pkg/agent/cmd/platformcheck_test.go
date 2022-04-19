@@ -15,8 +15,8 @@ import (
 )
 
 func TestCheckPlatformCompat(t *testing.T) {
-	if !(runtime.GOARCH == "amd64" && (runtime.GOOS == "linux" ||
-		runtime.GOOS == "windows")) {
+	if !(runtime.GOARCH == "amd64" && (isLinux() ||
+		isWindows())) {
 		t.Skip("Test not support on current platform")
 	}
 

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -49,12 +49,12 @@ func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Comman
 		},
 	}
 
-	cmd.AddCommand(newInspectOutputCommandWithArgs(s, streams))
+	cmd.AddCommand(newInspectOutputCommandWithArgs(s))
 
 	return cmd
 }
 
-func newInspectOutputCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
+func newInspectOutputCommandWithArgs(_ []string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "output",
 		Short: "Displays configuration generated for output",
@@ -121,8 +121,8 @@ func printMapStringConfig(mapStr map[string]interface{}) error {
 		return errors.New(err, "could not marshal to YAML")
 	}
 
-	fmt.Println(string(data))
-	return nil
+	_, err = os.Stdout.WriteString(string(data))
+	return err
 }
 
 func printConfig(cfg *config.Config) error {
@@ -170,7 +170,7 @@ func listOutputsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 	}
 
 	for k := range programsGroup {
-		fmt.Println(k)
+		_, _ = os.Stdout.WriteString(k)
 	}
 
 	return nil
@@ -223,9 +223,12 @@ func printOutputFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, output
 			}
 
 			programFound = true
-			fmt.Printf("[%s] %s:\n", k, p.Spec.Cmd)
-			printMapStringConfig(p.Configuration())
-			fmt.Println("---")
+			_, _ = os.Stdout.WriteString(fmt.Sprintf("[%s] %s:\n", k, p.Spec.Cmd))
+			err = printMapStringConfig(p.Configuration())
+			if err != nil {
+				return fmt.Errorf("cannot print configuration of program '%s': %w", programName, err)
+			}
+			_, _ = os.Stdout.WriteString("---")
 		}
 
 		if !programFound {

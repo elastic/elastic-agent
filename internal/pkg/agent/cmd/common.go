@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	// import logp flags
-	_ "github.com/elastic/beats/v7/libbeat/logp/configure"
+	_ "github.com/elastic/elastic-agent-libs/logp/configure"
 
 	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -40,7 +40,8 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	// path flags
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home.unversioned"))
-	cmd.PersistentFlags().MarkHidden("path.home.unversioned") // hidden used internally by container subcommand
+	// hidden used internally by container subcommand
+	cmd.PersistentFlags().MarkHidden("path.home.unversioned") //nolint:errcheck // it's hidden
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.config"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("c"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.logs"))

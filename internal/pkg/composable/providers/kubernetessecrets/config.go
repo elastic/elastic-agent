@@ -4,7 +4,7 @@
 
 package kubernetessecrets
 
-import "github.com/elastic/beats/v7/libbeat/common/kubernetes"
+import "github.com/elastic/elastic-agent-autodiscover/kubernetes"
 
 // Config for kubernetes provider
 type Config struct {
