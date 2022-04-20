@@ -126,6 +126,7 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_FLEET_USERNAME - kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
   KIBANA_FLEET_PASSWORD - kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
+  TAGS - user provided tags [$ELASTIC_AGENT_TAGS]
 
 
 By default when this command starts it will check for an existing fleet.yml. If that file already exists then
@@ -248,14 +249,14 @@ func containerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	if runAgent {
 		// run the main elastic-agent container command
-		err = runContainerCmd(streams, cmd, cfg)
+		err = runContainerCmd(streams, cfg)
 	}
 	// wait until APM Server shut down
 	wg.Wait()
 	return err
 }
 
-func runContainerCmd(streams *cli.IOStreams, cmd *cobra.Command, cfg setupConfig) error {
+func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	var err error
 	var client *kibana.Client
 	executable, err := os.Executable()
@@ -394,6 +395,9 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 	}
 	if !paths.IsVersionHome() {
 		args = append(args, "--path.home.unversioned")
+	}
+	if tags := envWithDefault("", "ELASTIC_AGENT_TAGS"); tags != "" {
+		args = append(args, "--tags", tags)
 	}
 	if cfg.FleetServer.Enable {
 		connStr, err := buildFleetServerConnStr(cfg.FleetServer)
