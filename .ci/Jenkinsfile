@@ -16,6 +16,7 @@ pipeline {
     JOB_GCS_EXT_CREDENTIALS = 'fleet-ci-gcs-plugin-file-credentials'  // Support uploadPackagesToGoogleBucket
     DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
+    DEVELOPER_MODE=true
   }
   options {
     timeout(time: 2, unit: 'HOURS')
