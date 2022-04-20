@@ -11,7 +11,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/elastic/beats/v7/x-pack/libbeat/common/proc"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/proc"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
