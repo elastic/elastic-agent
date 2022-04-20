@@ -37,7 +37,7 @@ type Option func(c *exec.Cmd)
 // - process id
 // - error
 func Start(logger *logger.Logger, path string, config *Config, uid, gid int, args []string, opts ...Option) (proc *Info, err error) {
-	return StartContext(nil, logger, path, config, uid, gid, args, opts...)
+	return StartContext(nil, logger, path, config, uid, gid, args, opts...) //nolint:staticcheck // calls a different function if no ctx
 }
 
 // StartContext starts a new process with context.
