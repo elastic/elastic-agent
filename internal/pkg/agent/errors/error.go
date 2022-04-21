@@ -4,7 +4,7 @@
 //
 // nolint:errorlint // Postpone the change here until we refactor error handling.
 //
-// Packages errors provides a small api to manager hierarchy or errors.
+// Package errors provides a small api to manage hierarchy of errors.
 package errors
 
 import (
