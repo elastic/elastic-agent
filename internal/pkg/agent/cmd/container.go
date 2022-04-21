@@ -155,12 +155,12 @@ func logContainerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
 		if err := os.MkdirAll(logsPath, 0755); err != nil {
-			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %s", logsPath, err)
+			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 		logPath := filepath.Join(logsPath, "elastic-agent-startup.log")
 		w, err := os.Create(logPath)
 		if err != nil {
-			return fmt.Errorf("opening startup log(%s) failed: %s", logPath, err)
+			return fmt.Errorf("opening startup log(%s) failed: %w", logPath, err)
 		}
 		defer w.Close()
 		streams.Out = io.MultiWriter(streams.Out, w)
@@ -187,12 +187,12 @@ func containerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	for _, f := range []string{"fleet-setup.yml", "credentials.yml"} {
 		c, err := config.LoadFile(filepath.Join(paths.Config(), f))
 		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("parsing config file(%s): %s", f, err)
+			return fmt.Errorf("parsing config file(%s): %w", f, err)
 		}
 		if c != nil {
 			err = c.Unpack(&cfg)
 			if err != nil {
-				return fmt.Errorf("unpacking config file(%s): %s", f, err)
+				return fmt.Errorf("unpacking config file(%s): %w", f, err)
 			}
 			// if in elastic cloud mode, only run the agent when configured
 			runAgent = true
@@ -649,7 +649,7 @@ func performGET(cfg setupConfig, client *kibana.Client, path string, response in
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
 		code, result, err := client.Connection.Request("GET", path, nil, nil, nil)
 		if err != nil || code != 200 {
-			err = fmt.Errorf("http GET request to %s%s fails: %v. Response: %s",
+			err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
 				client.Connection.URL, path, err, truncateString(result))
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
@@ -668,7 +668,7 @@ func performPOST(cfg setupConfig, client *kibana.Client, path string, writer io.
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
 		code, result, err := client.Connection.Request("POST", path, nil, nil, nil)
 		if err != nil || code >= 400 {
-			err = fmt.Errorf("http POST request to %s%s fails: %v. Response: %s",
+			err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
 				client.Connection.URL, path, err, truncateString(result))
 			lastErr = err
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
@@ -771,7 +771,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	}
 	// ensure that the directory and sub-directory data exists
 	if err := os.MkdirAll(topPath, 0755); err != nil {
-		return fmt.Errorf("preparing STATE_PATH(%s) failed: %s", statePath, err)
+		return fmt.Errorf("preparing STATE_PATH(%s) failed: %w", statePath, err)
 	}
 	// ensure that the elastic-agent.yml exists in the state directory or if given in the config directory
 	baseConfig := filepath.Join(configPath, paths.DefaultConfigName)
@@ -783,7 +783,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	// sync the downloads to the data directory
 	destDownloads := filepath.Join(statePath, "data", "downloads")
 	if err := syncDir(paths.Downloads(), destDownloads); err != nil {
-		return fmt.Errorf("syncing download directory to STATE_PATH(%s) failed: %s", statePath, err)
+		return fmt.Errorf("syncing download directory to STATE_PATH(%s) failed: %w", statePath, err)
 	}
 	originalInstall := paths.Install()
 	originalTop := paths.Top()
@@ -799,7 +799,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 		paths.SetLogs(logsPath)
 		// ensure that the logs directory exists
 		if err := os.MkdirAll(filepath.Join(logsPath), 0755); err != nil {
-			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %s", logsPath, err)
+			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 	}
 	// persist the paths so other commands in the container will use the correct paths
@@ -821,7 +821,7 @@ func writeContainerPaths(original, statePath, configPath, logsPath string) error
 	pathFile := filepath.Join(original, "container-paths.yml")
 	fp, err := os.Create(pathFile)
 	if err != nil {
-		return fmt.Errorf("failed creating %s: %s", pathFile, err)
+		return fmt.Errorf("failed creating %s: %w", pathFile, err)
 	}
 	b, err := yaml.Marshal(containerPaths{
 		StatePath:  statePath,
@@ -829,11 +829,11 @@ func writeContainerPaths(original, statePath, configPath, logsPath string) error
 		LogsPath:   logsPath,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal for %s: %s", pathFile, err)
+		return fmt.Errorf("failed to marshal for %s: %w", pathFile, err)
 	}
 	_, err = fp.Write(b)
 	if err != nil {
-		return fmt.Errorf("failed to write %s: %s", pathFile, err)
+		return fmt.Errorf("failed to write %s: %w", pathFile, err)
 	}
 	return nil
 }
@@ -847,12 +847,12 @@ func tryContainerLoadPaths() error {
 	}
 	cfg, err := config.LoadFile(pathFile)
 	if err != nil {
-		return fmt.Errorf("failed to load %s: %s", pathFile, err)
+		return fmt.Errorf("failed to load %s: %w", pathFile, err)
 	}
 	var paths containerPaths
 	err = cfg.Unpack(&paths)
 	if err != nil {
-		return fmt.Errorf("failed to unpack %s: %s", pathFile, err)
+		return fmt.Errorf("failed to unpack %s: %w", pathFile, err)
 	}
 	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, false)
 }

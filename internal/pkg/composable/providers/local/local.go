@@ -37,7 +37,7 @@ func ContextProviderBuilder(_ *logger.Logger, c *config.Config) (corecomp.Contex
 	if c != nil {
 		err := c.Unpack(p)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unpack vars: %s", err)
+			return nil, fmt.Errorf("failed to unpack vars: %w", err)
 		}
 	}
 	if p.Mapping == nil {

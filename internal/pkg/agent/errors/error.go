@@ -1,7 +1,8 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
-
+//
+// nolint:errorlint // Postpone the change here until we refactor error handling.
 package errors
 
 import (
@@ -132,6 +133,7 @@ func (e agentError) Meta() map[string]interface{} {
 // do the heavy lifting ourselves.
 func (e agentError) Equal(target error) bool {
 	targetErr, ok := target.(agentError)
+
 	if !ok {
 		return false
 	}

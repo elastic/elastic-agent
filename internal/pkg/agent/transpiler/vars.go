@@ -55,7 +55,7 @@ func (v *Vars) Replace(value string) (Node, error) {
 		for i := 0; i < len(r); i += 4 {
 			vars, err := extractVars(value[r[i+2]:r[i+3]])
 			if err != nil {
-				return nil, fmt.Errorf(`error parsing variable "%s": %s`, value[r[i]:r[i+1]], err)
+				return nil, fmt.Errorf(`error parsing variable "%s": %w`, value[r[i]:r[i+1]], err)
 			}
 			set := false
 			for _, val := range vars {

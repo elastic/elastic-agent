@@ -698,7 +698,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 
 	if err := HaveDocker(); err != nil {
-		return fmt.Errorf("packaging %v files requires docker: %v", fpmPackageType, err)
+		return fmt.Errorf("packaging %v files requires docker: %w", fpmPackageType, err)
 	}
 
 	// Build a tar file as the input to FPM.

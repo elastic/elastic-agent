@@ -334,12 +334,12 @@ func cloneMapArray(source []map[string]interface{}) ([]map[string]interface{}, e
 	}
 	bytes, err := json.Marshal(source)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %s", err)
+		return nil, fmt.Errorf("failed to clone: %w", err)
 	}
 	var dest []map[string]interface{}
 	err = json.Unmarshal(bytes, &dest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %s", err)
+		return nil, fmt.Errorf("failed to clone: %w", err)
 	}
 	return dest, nil
 }

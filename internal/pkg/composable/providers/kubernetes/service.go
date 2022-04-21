@@ -59,7 +59,7 @@ func NewServiceEventer(
 		Namespace:   cfg.Namespace,
 	}, nil)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
+		return nil, fmt.Errorf("couldn't create watcher for %T due to error %w", &kubernetes.Namespace{}, err)
 	}
 	namespaceMeta := metadata.NewNamespaceMetadataGenerator(metaConf.Namespace, namespaceWatcher.Store(), client)
 

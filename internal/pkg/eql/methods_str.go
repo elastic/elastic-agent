@@ -57,7 +57,7 @@ func match(args []interface{}) (interface{}, error) {
 		case string:
 			exp, err := regexp.Compile(r)
 			if err != nil {
-				return nil, fmt.Errorf("match: failed to compile regexp: %s", err)
+				return nil, fmt.Errorf("match: failed to compile regexp: %w", err)
 			}
 			if exp.Match([]byte(input)) {
 				return true, nil

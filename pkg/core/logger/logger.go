@@ -72,7 +72,7 @@ func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 	}
 
 	if err := configure.LoggingWithOutputs("", commonCfg, outputs...); err != nil {
-		return nil, fmt.Errorf("error initializing logging: %v", err)
+		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
 	return logp.NewLogger(name), nil
 }

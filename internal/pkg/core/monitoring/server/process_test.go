@@ -45,7 +45,7 @@ func TestParseID(t *testing.T) {
 			}
 
 			if tc.ExpectedStatusCode > 0 && tc.ExpectedError {
-				statErr, ok := err.(apiError)
+				statErr, ok := err.(apiError) // nolint:errorlint // will need refactor.
 				require.True(t, ok)
 				require.Equal(t, tc.ExpectedStatusCode, statErr.Status())
 			}

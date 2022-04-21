@@ -46,7 +46,7 @@ func DynamicProviderBuilder(_ *logger.Logger, c *config.Config) (composable.Dyna
 	if c != nil {
 		err := c.Unpack(p)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unpack vars: %s", err)
+			return nil, fmt.Errorf("failed to unpack vars: %w", err)
 		}
 	}
 	if p.Items == nil {

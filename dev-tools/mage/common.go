@@ -451,7 +451,7 @@ func untar(sourceFile, destinationDir string) error {
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return err

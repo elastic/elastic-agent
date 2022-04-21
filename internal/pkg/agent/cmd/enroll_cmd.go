@@ -671,7 +671,7 @@ func waitForAgent(ctx context.Context, timeout time.Duration) error {
 		for {
 			backOff.Wait()
 			_, err := getDaemonStatus(innerCtx)
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				resChan <- waitResult{err: err}
 				return
 			}
@@ -721,7 +721,7 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 		for {
 			backExp.Wait()
 			status, err := getDaemonStatus(innerCtx)
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				resChan <- waitResult{err: err}
 				return
 			}
@@ -834,7 +834,7 @@ func safelyStoreAgentInfo(s saver, reader io.Reader) error {
 	for i := 0; i <= maxRetriesstoreAgentInfo; i++ {
 		backExp.Wait()
 		err = storeAgentInfo(s, reader)
-		if err != filelock.ErrAppAlreadyRunning {
+		if !errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			break
 		}
 	}
