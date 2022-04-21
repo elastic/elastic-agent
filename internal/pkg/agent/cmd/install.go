@@ -203,7 +203,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 			if status != install.PackageInstall {
 				var exitErr *exec.ExitError
 				install.Uninstall(cfgFile)
-				if errors.As(err, exitErr) {
+				if err != nil && errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}
 			}
