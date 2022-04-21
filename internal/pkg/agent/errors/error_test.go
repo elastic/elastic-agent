@@ -3,6 +3,8 @@
 // you may not use this file except in compliance with the Elastic License.
 //
 // nolint:errorlint // Postpone the change here until we refactor error handling.
+//
+// Packages errors provides a small api to manager hierarchy or errors.
 package errors
 
 import (
