@@ -5,7 +5,6 @@
 package id
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/oklog/ulid"
@@ -21,6 +20,5 @@ func TestGenerate(t *testing.T) {
 		require.NotNil(t, id)
 		require.NotEqual(t, id, pre)
 		pre = id
-		fmt.Printf("%s--- %s\n", id, pre)
 	}
 }
