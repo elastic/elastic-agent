@@ -5,6 +5,7 @@
     "BSD-2-Clause",
     "BSD-2-Clause-FreeBSD",
     "BSD-3-Clause",
+    "CC0",
     "Elastic",
     "ISC",
     "MIT",
@@ -14,6 +15,7 @@
   ],
   "maybelist": [
     "EPL-1.0",
-    "GPL-3.0"
+    "GPL-3.0",
+    "LGPL-3.0"
   ]
 }
