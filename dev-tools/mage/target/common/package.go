@@ -36,7 +36,7 @@ func PackageSystemTests() error {
 	}
 
 	if len(files) == 0 {
-		fmt.Printf(">> there are no system test files under %s", systemTestsDir)
+		fmt.Printf(">> there are no system test files under %s", systemTestsDir) // nolint:forbidigo // This is used as feedback during the build system.
 		return nil
 	}
 
@@ -47,13 +47,13 @@ func PackageSystemTests() error {
 	targetFile := devtools.MustExpand("{{ elastic_beats_dir }}/build/system-tests-" + beat + ".tar.gz")
 	parent := filepath.Dir(targetFile)
 	if !fileExists(parent) {
-		fmt.Printf(">> creating parent dir: %s", parent)
+		fmt.Printf(">> creating parent dir: %s", parent) // nolint:forbidigo // This is used as feedback during the build system.
 		os.Mkdir(parent, 0750)
 	}
 
 	err = devtools.Tar(systemTestsDir, targetFile)
 	if err != nil {
-		fmt.Printf(">> %s", err)
+		fmt.Printf(">> %s", err) // nolint:forbidigo // This is used as feedback during the build system.
 		return err
 	}
 

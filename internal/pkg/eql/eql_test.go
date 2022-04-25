@@ -352,8 +352,7 @@ func debug(expression string) {
 		if t.GetTokenType() == antlr.TokenEOF {
 			break
 		}
-		fmt.Printf("%s (%q)\n",
-			lexer.SymbolicNames[t.GetTokenType()], t.GetText())
+		fmt.Printf("%s (%q)\n", lexer.SymbolicNames[t.GetTokenType()], t.GetText()) // nolint:forbidigo // used for debugging.
 	}
 }
 

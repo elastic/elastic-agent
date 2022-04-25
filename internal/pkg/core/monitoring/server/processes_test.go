@@ -157,14 +157,12 @@ func (w *testWriter) WriteHeader(statusCode int) {
 func jsonComparer(expected string, candidate interface{}) bool {
 	candidateJSON, err := json.Marshal(&candidate)
 	if err != nil {
-		fmt.Println(err)
 		return false
 	}
 
 	cbytes := make([]byte, 0, len(candidateJSON))
 	bbuf := bytes.NewBuffer(cbytes)
 	if err := json.Compact(bbuf, candidateJSON); err != nil {
-		fmt.Println(err)
 		return false
 	}
 

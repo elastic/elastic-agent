@@ -163,7 +163,7 @@ func uninstallPrograms(ctx context.Context, cfgFile string) error {
 	for _, p := range pp {
 		descriptor := app.NewDescriptor(p.Spec, currentVersion, artifactConfig, nil)
 		if err := uninstaller.Uninstall(ctx, p.Spec, currentVersion, descriptor.Directory()); err != nil {
-			fmt.Printf("failed to uninstall '%s': %v\n", p.Spec.Name, err)
+			fmt.Printf("failed to uninstall '%s': %v\n", p.Spec.Name, err) // nolint:forbidigo // This need to be change for error handling, but I am unsure about the scope.
 		}
 	}
 

@@ -220,11 +220,7 @@ func TestHTTPClient(t *testing.T) {
 			defer resp.Body.Close()
 			assert.Equal(t, `{ "message": "hello" }`, string(body))
 
-			for _, m := range debugger.messages {
-				fmt.Println(m)
-			}
-
-			assert.Equal(t, 1, len(debugger.messages))
+			assert.Equal(t, 1, len(debugger.messages), debugger.messages)
 		},
 	))
 
