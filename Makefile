@@ -44,7 +44,6 @@ notice:
 .PHONY: check-ci
 check-ci:
 	@mage update
-	@mage check
 	@$(MAKE) notice
 	@$(MAKE) check-no-changes
 
