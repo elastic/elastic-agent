@@ -10,6 +10,7 @@
 package tools
 
 import (
+	_ "github.com/boumenot/gocover-cobertura" // code coverage format conversion tool for inline code coverage in MRs
 	_ "github.com/magefile/mage"
 	_ "github.com/pierrre/gotestcover"
 	_ "github.com/stretchr/testify/assert"
