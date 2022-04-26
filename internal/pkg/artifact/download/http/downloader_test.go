@@ -63,10 +63,10 @@ func TestDownloadBodyError(t *testing.T) {
 		t.Fatal("expected Download to return an error")
 	}
 
-	require.Len(t, log.info, 1, "download error not logged at info level")
-	assert.Equal(t, log.info[0].record, "download from %s failed at %s @ %sps: %s")
-	require.Len(t, log.warn, 1, "download error not logged at warn level")
-	assert.Equal(t, log.warn[0].record, "download from %s failed at %s @ %sps: %s")
+	require.GreaterOrEqual(t, len(log.info), 1, "download error not logged at info level")
+	assert.Equal(t, log.info[len(log.info)-1].record, "download from %s failed at %s @ %sps: %s")
+	require.GreaterOrEqual(t, len(log.warn), 1, "download error not logged at warn level")
+	assert.Equal(t, log.warn[len(log.warn)-1].record, "download from %s failed at %s @ %sps: %s")
 }
 
 func TestDownloadLogProgressWithLength(t *testing.T) {
