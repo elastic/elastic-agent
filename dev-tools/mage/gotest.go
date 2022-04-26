@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -290,6 +291,34 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		if err = coverToHTML(); err != nil {
 			return errors.Wrap(err, "failed to write HTML code coverage report")
 		}
+	}
+
+	// Generate an XML code coverage report.
+	var codecovReport string
+	if params.CoverageProfileFile != "" {
+		fmt.Println(">> go run gocover-cobertura:", params.CoverageProfileFile, "Started")
+		codecovReport = strings.TrimSuffix(params.CoverageProfileFile,
+			filepath.Ext(params.CoverageProfileFile)) + "-cov.xml"
+
+		coverage, err := ioutil.ReadFile(params.CoverageProfileFile)
+		if err != nil {
+			return errors.Wrap(err, "failed to read code coverage report")
+		}
+
+		coberturaFile, err := os.Create(codecovReport)
+		if err != nil {
+			return err
+		}
+		defer coberturaFile.Close()
+
+		coverToXML := exec.Command("go run github.com/boumenot/gocover-cobertura")
+		coverToXML.Stdout = coberturaFile
+		coverToXML.Stderr = os.Stderr
+		coverToXML.Stdin = bytes.NewReader(coverage)
+		if err = coverToXML.Run(); err != nil {
+			return errors.Wrap(err, "failed to write XML code coverage report")
+		}
+		fmt.Println(">> go run gocover-cobertura:", params.CoverageProfileFile, "Created")
 	}
 
 	// Return an error indicating that testing failed.
