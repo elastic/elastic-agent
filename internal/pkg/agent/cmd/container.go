@@ -134,7 +134,7 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams, c); err != nil {
+			if err := logContainerCmd(streams); err != nil {
 				logError(streams, err)
 				os.Exit(1)
 			}
@@ -151,26 +151,26 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
-func logContainerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
+func logContainerCmd(streams *cli.IOStreams) error {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
 		if err := os.MkdirAll(logsPath, 0755); err != nil {
-			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %s", logsPath, err)
+			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 		logPath := filepath.Join(logsPath, "elastic-agent-startup.log")
 		w, err := os.Create(logPath)
 		if err != nil {
-			return fmt.Errorf("opening startup log(%s) failed: %s", logPath, err)
+			return fmt.Errorf("opening startup log(%s) failed: %w", logPath, err)
 		}
 		defer w.Close()
 		streams.Out = io.MultiWriter(streams.Out, w)
 		streams.Err = io.MultiWriter(streams.Out, w)
 	}
-	return containerCmd(streams, cmd)
+	return containerCmd(streams)
 }
 
-func containerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
+func containerCmd(streams *cli.IOStreams) error {
 	// set paths early so all action below use the defined paths
 	if err := setPaths("", "", "", true); err != nil {
 		return err
@@ -188,12 +188,12 @@ func containerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	for _, f := range []string{"fleet-setup.yml", "credentials.yml"} {
 		c, err := config.LoadFile(filepath.Join(paths.Config(), f))
 		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("parsing config file(%s): %s", f, err)
+			return fmt.Errorf("parsing config file(%s): %w", f, err)
 		}
 		if c != nil {
 			err = c.Unpack(&cfg)
 			if err != nil {
-				return fmt.Errorf("unpacking config file(%s): %s", f, err)
+				return fmt.Errorf("unpacking config file(%s): %w", f, err)
 			}
 			// if in elastic cloud mode, only run the agent when configured
 			runAgent = true
@@ -653,7 +653,7 @@ func performGET(cfg setupConfig, client *kibana.Client, path string, response in
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
 		code, result, err := client.Connection.Request("GET", path, nil, nil, nil)
 		if err != nil || code != 200 {
-			err = fmt.Errorf("http GET request to %s%s fails: %v. Response: %s",
+			err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
 				client.Connection.URL, path, err, truncateString(result))
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
@@ -672,7 +672,7 @@ func performPOST(cfg setupConfig, client *kibana.Client, path string, writer io.
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
 		code, result, err := client.Connection.Request("POST", path, nil, nil, nil)
 		if err != nil || code >= 400 {
-			err = fmt.Errorf("http POST request to %s%s fails: %v. Response: %s",
+			err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
 				client.Connection.URL, path, err, truncateString(result))
 			lastErr = err
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
@@ -775,7 +775,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	}
 	// ensure that the directory and sub-directory data exists
 	if err := os.MkdirAll(topPath, 0755); err != nil {
-		return fmt.Errorf("preparing STATE_PATH(%s) failed: %s", statePath, err)
+		return fmt.Errorf("preparing STATE_PATH(%s) failed: %w", statePath, err)
 	}
 	// ensure that the elastic-agent.yml exists in the state directory or if given in the config directory
 	baseConfig := filepath.Join(configPath, paths.DefaultConfigName)
