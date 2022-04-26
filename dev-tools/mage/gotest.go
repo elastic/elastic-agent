@@ -297,6 +297,14 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	var codecovReport string
 	if params.CoverageProfileFile != "" {
 		fmt.Println(">> go run gocover-cobertura:", params.CoverageProfileFile, "Started")
+
+		// execute gocover-cobertura in order to create cobertura report
+		// install pre-requisites
+		installCobertura := sh.RunCmd("go", "install", "github.com/boumenot/gocover-cobertura@latest")
+		if err = installCobertura(); err != nil {
+			return errors.Wrap(err, "failed to install gocover-cobertura")
+		}
+
 		codecovReport = strings.TrimSuffix(params.CoverageProfileFile,
 			filepath.Ext(params.CoverageProfileFile)) + "-cov.xml"
 
@@ -311,7 +319,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		}
 		defer coberturaFile.Close()
 
-		coverToXML := exec.Command("go run github.com/boumenot/gocover-cobertura")
+		coverToXML := exec.Command("gocover-cobertura")
 		coverToXML.Stdout = coberturaFile
 		coverToXML.Stderr = os.Stderr
 		coverToXML.Stdin = bytes.NewReader(coverage)

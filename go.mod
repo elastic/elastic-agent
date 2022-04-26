@@ -6,7 +6,6 @@ require (
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/antlr/antlr4 v0.0.0-20200820155224-be881fa6b91d
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
-	github.com/boumenot/gocover-cobertura v1.2.0
 	github.com/cavaliercoder/go-rpm v0.0.0-20190131055624-7a9c54e3d83e
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/docker/go-units v0.4.0
