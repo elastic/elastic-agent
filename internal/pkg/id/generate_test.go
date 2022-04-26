@@ -7,18 +7,11 @@ package id
 import (
 	"testing"
 
-	"github.com/oklog/ulid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGenerate(t *testing.T) {
-	var pre ulid.ULID
-
-	for i := 0; i < 1000; i++ {
-		id, err := Generate()
-		require.NoError(t, err)
-		require.NotNil(t, id)
-		require.NotEqual(t, id, pre)
-		pre = id
-	}
+	id, err := Generate()
+	require.NoError(t, err)
+	require.NotNil(t, id)
 }
