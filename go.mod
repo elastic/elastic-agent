@@ -11,7 +11,7 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
-	github.com/elastic/elastic-agent-libs v0.1.2
+	github.com/elastic/elastic-agent-libs v0.2.1
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
 	github.com/elastic/go-ucfg v0.8.4
@@ -115,8 +115,8 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.elastic.co/apm/module/apmhttp v1.15.0 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
-	go.uber.org/atomic v1.8.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/mod v0.5.1 // indirect
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect

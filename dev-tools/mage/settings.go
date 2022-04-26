@@ -21,7 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/tools/go/vcs"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 )
 
 const (

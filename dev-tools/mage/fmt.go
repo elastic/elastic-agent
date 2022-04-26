@@ -13,7 +13,7 @@ import (
 	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 )
 
 var (

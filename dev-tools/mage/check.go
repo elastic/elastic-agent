@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/v7/libbeat/processors/dissect"
-	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
+	"github.com/elastic/elastic-agent-libs/dev-tools/mage/gotool"
 )
 
 // Check looks for created/modified/deleted/renamed files and returns an error
