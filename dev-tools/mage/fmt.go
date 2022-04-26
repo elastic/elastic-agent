@@ -48,7 +48,7 @@ func GoImports() error {
 		return nil
 	}
 
-	fmt.Println(">> fmt - goimports: Formatting Go code")
+	fmt.Println(">> fmt - goimports: Formatting Go code") //nolint:forbidigo // it's ok to use fmt.println in mage
 	if err := gotool.Install(
 		gotool.Install.Package(filepath.Join(GoImportsImportPath)),
 	); err != nil {
@@ -70,7 +70,7 @@ func AddLicenseHeaders() error {
 		return nil
 	}
 
-	fmt.Println(">> fmt - go-licenser: Adding missing headers")
+	fmt.Println(">> fmt - go-licenser: Adding missing headers") //nolint:forbidigo // it's ok to use fmt.println in mage
 
 	mg.Deps(InstallGoLicenser)
 
