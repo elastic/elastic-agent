@@ -126,7 +126,7 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_FLEET_USERNAME - kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
   KIBANA_FLEET_PASSWORD - kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
-  TAGS - user provided tags [$ELASTIC_AGENT_TAGS]
+  ELASTIC_AGENT_TAGS - user provided tags for the agent
 
 
 By default when this command starts it will check for an existing fleet.yml. If that file already exists then
@@ -397,7 +397,7 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		args = append(args, "--path.home.unversioned")
 	}
 	if tags := envWithDefault("", "ELASTIC_AGENT_TAGS"); tags != "" {
-		args = append(args, "--tags", tags)
+		args = append(args, "--tag", tags)
 	}
 	if cfg.FleetServer.Enable {
 		connStr, err := buildFleetServerConnStr(cfg.FleetServer)
