@@ -112,6 +112,13 @@ pipeline {
             post {
               always {
                 junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+                // TODO: move to the mage
+                withMageEnv(){
+                  dir("${BASE_DIR}"){
+                    cmd(label: 'gocover-cobertura', script: 'go run github.com/boumenot/gocover-cobertura < TEST-go-unit.out > TEST-go-unit-cov.xml')
+                  }
+                }
+                coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
               }
             }
           }
