@@ -13,7 +13,7 @@ on:
 jobs:
   golangci:
     runs-on: macos-latest
-    name: lint-darwin
+    name: lint
     steps:
      - uses: actions/checkout@v2
      - name: Fetch Go version from .go-version
