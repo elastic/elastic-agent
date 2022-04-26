@@ -235,12 +235,12 @@ func containerCmd(streams *cli.IOStreams) error {
 				wg.Done()
 				// sending kill signal to current process (elastic-agent)
 				logInfo(streams, "Initiate shutdown elastic-agent.")
-				mainProc.Signal(syscall.SIGTERM)
+				mainProc.Signal(syscall.SIGTERM) // nolint:errcheck
 			}()
 
 			defer func() {
 				if apmProc != nil {
-					apmProc.Stop()
+					apmProc.Stop() // nolint:errcheck
 					logInfo(streams, "Initiate shutdown legacy apm-server.")
 				}
 			}()
@@ -787,7 +787,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	// sync the downloads to the data directory
 	destDownloads := filepath.Join(statePath, "data", "downloads")
 	if err := syncDir(paths.Downloads(), destDownloads); err != nil {
-		return fmt.Errorf("syncing download directory to STATE_PATH(%s) failed: %s", statePath, err)
+		return fmt.Errorf("syncing download directory to STATE_PATH(%s) failed: %w", statePath, err)
 	}
 	originalInstall := paths.Install()
 	originalTop := paths.Top()
@@ -803,7 +803,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 		paths.SetLogs(logsPath)
 		// ensure that the logs directory exists
 		if err := os.MkdirAll(filepath.Join(logsPath), 0755); err != nil {
-			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %s", logsPath, err)
+			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 	}
 	// persist the paths so other commands in the container will use the correct paths
@@ -825,7 +825,7 @@ func writeContainerPaths(original, statePath, configPath, logsPath string) error
 	pathFile := filepath.Join(original, "container-paths.yml")
 	fp, err := os.Create(pathFile)
 	if err != nil {
-		return fmt.Errorf("failed creating %s: %s", pathFile, err)
+		return fmt.Errorf("failed creating %s: %w", pathFile, err)
 	}
 	b, err := yaml.Marshal(containerPaths{
 		StatePath:  statePath,
@@ -833,11 +833,11 @@ func writeContainerPaths(original, statePath, configPath, logsPath string) error
 		LogsPath:   logsPath,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal for %s: %s", pathFile, err)
+		return fmt.Errorf("failed to marshal for %s: %w", pathFile, err)
 	}
 	_, err = fp.Write(b)
 	if err != nil {
-		return fmt.Errorf("failed to write %s: %s", pathFile, err)
+		return fmt.Errorf("failed to write %s: %w", pathFile, err)
 	}
 	return nil
 }
@@ -851,12 +851,12 @@ func tryContainerLoadPaths() error {
 	}
 	cfg, err := config.LoadFile(pathFile)
 	if err != nil {
-		return fmt.Errorf("failed to load %s: %s", pathFile, err)
+		return fmt.Errorf("failed to load %s: %w", pathFile, err)
 	}
 	var paths containerPaths
 	err = cfg.Unpack(&paths)
 	if err != nil {
-		return fmt.Errorf("failed to unpack %s: %s", pathFile, err)
+		return fmt.Errorf("failed to unpack %s: %w", pathFile, err)
 	}
 	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, false)
 }

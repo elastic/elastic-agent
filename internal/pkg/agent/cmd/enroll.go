@@ -43,7 +43,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 
 	// used by install command
 	cmd.Flags().BoolP("from-install", "", false, "Set by install command to signal this was executed from install")
-	cmd.Flags().MarkHidden("from-install")
+	cmd.Flags().MarkHidden("from-install") // nolint:errcheck
 
 	return cmd
 }
