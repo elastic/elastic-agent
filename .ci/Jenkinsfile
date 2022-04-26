@@ -17,6 +17,7 @@ pipeline {
     DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
     DEVELOPER_MODE=true
+    TEST_COVERAGE = true
   }
   options {
     timeout(time: 2, unit: 'HOURS')
