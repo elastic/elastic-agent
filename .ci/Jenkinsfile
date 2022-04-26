@@ -115,7 +115,7 @@ pipeline {
                 // TODO: move to the mage
                 withMageEnv(){
                   dir("${BASE_DIR}"){
-                    cmd(label: 'gocover-cobertura', script: 'go run github.com/boumenot/gocover-cobertura < TEST-go-unit.out > TEST-go-unit-cov.xml')
+                    cmd(label: 'gocover-cobertura', script: 'go run github.com/boumenot/gocover-cobertura < build/TEST-go-unit.cov > build/TEST-go-unit-cov.xml')
                   }
                 }
                 coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
