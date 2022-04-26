@@ -164,7 +164,7 @@ func (o *Operator) Close() error {
 func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) (err error) {
 	span, ctx := apm.StartSpan(ctx, "route", "app.internal")
 	defer func() {
-		if errors.Is(err, context.Canceled) {
+		if !errors.Is(err, context.Canceled) {
 			apm.CaptureError(ctx, err).Send()
 		}
 		span.End()
