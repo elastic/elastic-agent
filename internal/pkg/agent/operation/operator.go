@@ -164,7 +164,7 @@ func (o *Operator) Close() error {
 func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) (err error) {
 	span, ctx := apm.StartSpan(ctx, "route", "app.internal")
 	defer func() {
-		if err = filterContextCancelled(err); err != nil {
+		if !errors.Is(err, context.Canceled) {
 			apm.CaptureError(ctx, err).Send()
 		}
 		span.End()
@@ -172,7 +172,7 @@ func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) 
 
 	_, stateID, steps, ack, err := o.stateResolver.Resolve(cfg)
 	if err != nil {
-		if err == filterContextCancelled(err) {
+		if !errors.Is(err, context.Canceled) {
 			// error is not filtered and should be reported
 			o.statusReporter.Update(state.Failed, err.Error(), nil)
 			err = errors.New(err, errors.TypeConfig, fmt.Sprintf("operator: failed to resolve configuration %s, error: %v", cfg, err))
@@ -400,11 +400,4 @@ func (o *Operator) deleteApp(p Descriptor) {
 
 	o.logger.Debugf("operator is removing %s from app collection: %v", p.ID(), o.apps)
 	delete(o.apps, id)
-}
-
-func filterContextCancelled(err error) error {
-	if errors.Is(err, context.Canceled) {
-		return nil
-	}
-	return err
 }

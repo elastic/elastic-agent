@@ -65,12 +65,12 @@ func statusCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error 
 	defer cancel()
 
 	status, err := getDaemonStatus(innerCtx)
-	if err == context.DeadlineExceeded {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if err == context.Canceled {
+	} else if errors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %s", err)
+		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
 	}
 
 	err = outputFunc(streams.Out, status)

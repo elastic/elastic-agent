@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -49,7 +50,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 	isAdmin, err := install.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform install command while checking for administrator rights, %v", err)
+		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", install.PermissionUser)
@@ -72,7 +73,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	// check the lock to ensure that elastic-agent is not already running in this directory
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	if err := locker.TryLock(); err != nil {
-		if err == filelock.ErrAppAlreadyRunning {
+		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			return fmt.Errorf("cannot perform installation as Elastic Agent is already running from this directory")
 		}
 		return err
@@ -195,18 +196,18 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		enrollCmd.Stderr = os.Stderr
 		err = enrollCmd.Start()
 		if err != nil {
-			return fmt.Errorf("failed to execute enroll command: %s", err)
+			return fmt.Errorf("failed to execute enroll command: %w", err)
 		}
 		err = enrollCmd.Wait()
 		if err != nil {
 			if status != install.PackageInstall {
+				var exitErr *exec.ExitError
 				install.Uninstall(cfgFile)
-				exitErr, ok := err.(*exec.ExitError)
-				if ok {
+				if err != nil && errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}
 			}
-			return fmt.Errorf("enroll command failed for unknown reason: %s", err)
+			return fmt.Errorf("enroll command failed for unknown reason: %w", err)
 		}
 	}
 

@@ -69,7 +69,7 @@ func watchCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 
 	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
 	if err := locker.TryLock(); err != nil {
-		if err == filelock.ErrAppAlreadyRunning {
+		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			log.Debugf("exiting, lock already exists")
 			return nil
 		}

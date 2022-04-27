@@ -41,7 +41,7 @@ Unless -f is used this command will ask confirmation before performing removal.
 func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 	isAdmin, err := install.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform command while checking for administrator rights, %v", err)
+		return fmt.Errorf("unable to perform command while checking for administrator rights, %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform command, not executed with %s permissions", install.PermissionUser)

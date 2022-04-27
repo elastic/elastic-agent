@@ -4,7 +4,10 @@
 
 package transpiler
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // RenderInputs renders dynamic inputs section
 func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
@@ -21,7 +24,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 				continue
 			}
 			n, err := dict.Apply(vars)
-			if err == ErrNoMatch {
+			if errors.Is(err, ErrNoMatch) {
 				// has a variable that didn't exist, so we ignore it
 				continue
 			}

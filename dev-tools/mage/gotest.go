@@ -265,8 +265,8 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	var goTestErr *exec.ExitError
 	if err != nil {
 		// Command ran.
-		exitErr, ok := err.(*exec.ExitError)
-		if !ok {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
 			return errors.Wrap(err, "failed to execute go")
 		}
 
