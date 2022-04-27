@@ -13,8 +13,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
+	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // NewDownloader creates a downloader which first checks local directory
