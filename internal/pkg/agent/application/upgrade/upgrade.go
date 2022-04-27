@@ -127,7 +127,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	}
 
 	if u.caps != nil {
-		if _, err := u.caps.Apply(a); err == capabilities.ErrBlocked {
+		if _, err := u.caps.Apply(a); errors.Is(err, capabilities.ErrBlocked) {
 			return nil, nil
 		}
 	}

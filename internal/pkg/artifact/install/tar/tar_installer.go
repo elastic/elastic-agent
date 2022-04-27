@@ -72,7 +72,7 @@ func unpack(ctx context.Context, r io.Reader, dir string) error {
 		}
 
 		f, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -119,7 +119,7 @@ func unpack(ctx context.Context, r io.Reader, dir string) error {
 			}
 
 			if err != nil {
-				return fmt.Errorf("TarInstaller: error writing to %s: %v", abs, err)
+				return fmt.Errorf("TarInstaller: error writing to %s: %w", abs, err)
 			}
 		case mode.IsDir():
 			if err := os.MkdirAll(abs, 0755); err != nil {

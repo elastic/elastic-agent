@@ -120,7 +120,7 @@ func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, er
 	if err != nil {
 		return nil, 0, errorWithStatus(
 			http.StatusInternalServerError,
-			fmt.Errorf("fetching metrics failed: %v", err.Error()),
+			fmt.Errorf("fetching metrics failed: %w", err),
 		)
 	}
 

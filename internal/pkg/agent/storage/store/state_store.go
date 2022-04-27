@@ -7,13 +7,13 @@ package store
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -103,7 +103,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 
 	dec := yaml.NewDecoder(reader)
 	err = dec.Decode(&sr)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return &StateStore{
 			log:   log,
 			store: store,
@@ -337,7 +337,7 @@ func ReplayActions(
 func yamlToReader(in interface{}) (io.Reader, error) {
 	data, err := yaml.Marshal(in)
 	if err != nil {
-		return nil, errors.New(err, "could not marshal to YAML")
+		return nil, fmt.Errorf("could not marshal to YAML: %w", err)
 	}
 	return bytes.NewReader(data), nil
 }

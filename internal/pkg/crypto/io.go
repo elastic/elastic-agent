@@ -296,7 +296,7 @@ func (r *Reader) readTo(b []byte) (int, error) {
 	if !r.eof {
 		if err := r.consumeBlock(); err != nil {
 			// We read all the blocks
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				r.eof = true
 			} else {
 				r.err = err

@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -201,9 +202,9 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		err = enrollCmd.Wait()
 		if err != nil {
 			if status != install.PackageInstall {
-				_ = install.Uninstall(cfgFile)
 				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
+				install.Uninstall(cfgFile)
+				if err != nil && errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}
 			}

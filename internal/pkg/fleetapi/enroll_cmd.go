@@ -192,15 +192,16 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 
 	resp, err := e.client.Send(ctx, "POST", p, nil, headers, bytes.NewBuffer(b))
 	if err != nil {
-		// connection refused is returned as a clean type
-		switch et := err.(type) {
-		case *url.Error:
-			err = et.Err
+		var et *url.Error
+		if errors.As(err, et) {
+			return nil, et.Err
 		}
-		switch err.(type) {
-		case *net.OpError:
+
+		var netOp *net.OpError
+		if errors.As(err, netOp) {
 			return nil, ErrConnRefused
 		}
+
 		return nil, err
 	}
 	defer resp.Body.Close()
