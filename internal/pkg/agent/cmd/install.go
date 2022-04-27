@@ -14,7 +14,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
@@ -202,9 +201,9 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		err = enrollCmd.Wait()
 		if err != nil {
 			if status != install.PackageInstall {
-				var exitErr *exec.ExitError
 				install.Uninstall(cfgFile)
-				if err != nil && errors.As(err, &exitErr) {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}
 			}
