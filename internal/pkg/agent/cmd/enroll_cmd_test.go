@@ -313,6 +313,25 @@ func TestEnroll(t *testing.T) {
 	))
 }
 
+func TestValidateArgs(t *testing.T) {
+	url := "http://localhost:8220"
+	enrolmentToken := "my-enrollment-token"
+	streams, _, _, _ := cli.NewTestingIOStreams()
+	cmd := newEnrollCommandWithArgs([]string{}, streams)
+	err := cmd.Flags().Set("tag", "windows,production")
+	err = cmd.Flags().Set("insecure", "true")
+	require.NoError(t, err)
+	args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+	require.NotNil(t, args)
+	require.Equal(t, len(args), 9)
+	require.Contains(t, args, "--tag")
+	require.Contains(t, args, "windows")
+	require.Contains(t, args, "production")
+	require.Contains(t, args, "--insecure")
+	require.Contains(t, args, enrolmentToken)
+	require.Contains(t, args, url)
+}
+
 func withServer(
 	m func(t *testing.T) *http.ServeMux,
 	test func(t *testing.T, host string),

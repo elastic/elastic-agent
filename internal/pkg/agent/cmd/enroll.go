@@ -42,7 +42,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 
 	// used by install command
 	cmd.Flags().BoolP("from-install", "", false, "Set by install command to signal this was executed from install")
-	cmd.Flags().MarkHidden("from-install") // nolint:errcheck
+	cmd.Flags().MarkHidden("from-install") // nolint:errcheck //not required
 
 	return cmd
 }
@@ -224,9 +224,9 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 		args = append(args, "--fleet-server-es-insecure")
 	}
 
-	for k, v := range mapFromEnvList(fTags) {
+	for _, v := range fTags {
 		args = append(args, "--tag")
-		args = append(args, k+"="+v)
+		args = append(args, v)
 	}
 	return args
 }
