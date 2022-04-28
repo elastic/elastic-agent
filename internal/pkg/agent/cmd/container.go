@@ -126,7 +126,7 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_FLEET_USERNAME - kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
   KIBANA_FLEET_PASSWORD - kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
-  ELASTIC_AGENT_TAGS - user provided tags for the agent
+  ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
 
 
 By default when this command starts it will check for an existing fleet.yml. If that file already exists then

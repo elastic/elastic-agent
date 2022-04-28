@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"go.elastic.co/apm"
@@ -497,7 +498,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: c.options.UserProvidedMetadata,
-			Tags:         c.options.Tags,
+			Tags:         cleanTags(c.options.Tags),
 		},
 	}
 
@@ -1028,4 +1029,14 @@ func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff
 		close(signal)
 	}()
 	return bo
+}
+
+func cleanTags(tags []string) []string {
+	var r []string
+	for _, str := range tags {
+		if str != "" {
+			r = append(r, strings.TrimSpace(str))
+		}
+	}
+	return r
 }
