@@ -102,7 +102,9 @@ pipeline {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
                   dir("${BASE_DIR}"){
-                    cmd(label: 'Go unitTest', script: 'mage unitTest')
+                    withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                      cmd(label: 'Go unitTest', script: 'mage unitTest')
+                    }
                   }
                 }
               }
@@ -110,6 +112,9 @@ pipeline {
             post {
               always {
                 junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+                whenTrue(isCodeCoverageEnabled()) {
+                  coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
+                }
               }
             }
           }
@@ -261,6 +266,11 @@ pipeline {
       notifyBuildResult(prComment: true)
     }
   }
+}
+
+// As agreed let's report the code coverage for Linux but no ARM only.
+def isCodeCoverageEnabled() {
+  return (isUnix() && !isArm())
 }
 
 def withPackageEnv(platform, Closure body) {
