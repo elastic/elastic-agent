@@ -16,6 +16,7 @@ pipeline {
     JOB_GCS_EXT_CREDENTIALS = 'fleet-ci-gcs-plugin-file-credentials'  // Support uploadPackagesToGoogleBucket
     DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
+    DEVELOPER_MODE=true
   }
   options {
     timeout(time: 2, unit: 'HOURS')
@@ -109,7 +110,7 @@ pipeline {
             }
             post {
               always {
-                junit(allowEmptyResults: true, keepLongStdio: true, testResults: '**/junit-report.xml')
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
               }
             }
           }
@@ -224,6 +225,11 @@ pipeline {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
               runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.11.1', context: "K8s-${K8S_VERSION}")
+            }
+            post {
+              always {
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+              }
             }
           }
         }

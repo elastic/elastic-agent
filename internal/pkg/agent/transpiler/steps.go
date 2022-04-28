@@ -6,6 +6,7 @@ package transpiler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -248,11 +249,11 @@ func (r *ExecFileStep) Execute(ctx context.Context, rootDir string) error {
 	cmd.Env = nil
 	cmd.Dir = rootDir
 	output, err := cmd.Output()
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return fmt.Errorf("operation 'Exec' timed out after %d seconds", r.Timeout)
 	}
 	if err != nil {
-		exitErr, ok := err.(*exec.ExitError)
+		exitErr, ok := err.(*exec.ExitError) // nolint:errorlint // Require more logic changes.
 		if ok && exitErr.Stderr != nil {
 			errStr := strings.TrimSpace(string(exitErr.Stderr))
 			if len(errStr) > 0 {

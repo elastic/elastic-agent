@@ -22,15 +22,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/elastic/beats/v7/libbeat/kibana"
+	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
@@ -40,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -267,7 +267,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(streams, logToStderr)
+		return run(logToStderr)
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -332,7 +332,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(streams, logToStderr)
+	return run(logToStderr)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -542,7 +542,7 @@ func kibanaClient(cfg kibanaConfig, headers map[string]string) (*kibana.Client, 
 		IgnoreVersion: true,
 		Transport:     transport,
 		Headers:       headers,
-	}, 0, "Elastic-Agent")
+	}, 0, "Elastic-Agent", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
 }
 
 func findPolicy(cfg setupConfig, policies []kibanaPolicy) (*kibanaPolicy, error) {

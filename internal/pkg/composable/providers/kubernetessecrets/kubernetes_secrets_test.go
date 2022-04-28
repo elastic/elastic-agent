@@ -8,8 +8,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,15 +16,19 @@ import (
 	k8sclient "k8s.io/client-go/kubernetes"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
+const (
+	ns   = "test_namespace"
+	pass = "testing_passpass"
+)
+
 func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 	client := k8sfake.NewSimpleClientset()
-	ns := "test_namespace"
-	pass := "testing_passpass"
 	secret := &v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -50,13 +52,13 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 	p, err := ContextProviderBuilder(logger, cfg)
 	require.NoError(t, err)
 
-	fp := p.(corecomp.FetchContextProvider)
+	fp, _ := p.(corecomp.FetchContextProvider)
 
 	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
 		return client, nil
 	}
 	require.NoError(t, err)
-	fp.Run(nil)
+	_ = fp.Run(nil)
 	val, found := fp.Fetch("kubernetes_secrets.test_namespace.testing_secret.secret_value")
 	assert.True(t, found)
 	assert.Equal(t, val, pass)
@@ -64,8 +66,6 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 
 func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	client := k8sfake.NewSimpleClientset()
-	ns := "test_namespace"
-	pass := "testing_passpass"
 	secret := &v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -89,13 +89,13 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	p, err := ContextProviderBuilder(logger, cfg)
 	require.NoError(t, err)
 
-	fp := p.(corecomp.FetchContextProvider)
+	fp, _ := p.(corecomp.FetchContextProvider)
 
 	getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
 		return client, nil
 	}
 	require.NoError(t, err)
-	fp.Run(nil)
+	_ = fp.Run(nil)
 	val, found := fp.Fetch("kubernetes_secrets.test_namespace.testing_secretHACK.secret_value")
 	assert.False(t, found)
 	assert.EqualValues(t, val, "")

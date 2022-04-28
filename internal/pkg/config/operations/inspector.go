@@ -7,7 +7,7 @@ package operations
 import (
 	"fmt"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -41,7 +41,7 @@ func LoadFullAgentConfig(cfgPath string, failOnFleetMissing bool) (*config.Confi
 		return rawConfig, nil
 	}
 
-	fleetConfig, err := loadFleetConfig(rawConfig)
+	fleetConfig, err := loadFleetConfig()
 	if err != nil {
 		return nil, err
 	} else if fleetConfig == nil {
@@ -81,7 +81,7 @@ func loadConfig(configPath string) (*config.Config, error) {
 	}
 
 	// merge local configuration and configuration persisted from fleet.
-	rawConfig.Merge(config)
+	_ = rawConfig.Merge(config)
 
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func loadConfig(configPath string) (*config.Config, error) {
 	return rawConfig, nil
 }
 
-func loadFleetConfig(cfg *config.Config) (map[string]interface{}, error) {
+func loadFleetConfig() (map[string]interface{}, error) {
 	log, err := newErrorLogger()
 	if err != nil {
 		return nil, err

@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
@@ -167,7 +167,7 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 	}
 
 	corruptedHash := append([]byte{1, 2, 3, 4, 5, 6}, hashContent[6:]...)
-	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666)
+	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666) //nolint:gosec // no sweat, it's a test
 }
 
 func TestVerify(t *testing.T) {
@@ -230,11 +230,11 @@ func prepareTestCase(beatSpec program.Spec, version string, cfg *artifact.Config
 	hash := sha512.Sum512(content)
 	hashContent := fmt.Sprintf("%x %s", hash, filename)
 
-	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), []byte(content), 0644); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), content, 0644); err != nil { //nolint:gosec // no sweat, it's a test
 		return err
 	}
 
-	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644)
+	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644) //nolint:gosec // no sweat, it's a test
 }
 
 func assertFileExists(t testing.TB, path string) {

@@ -16,7 +16,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	c "github.com/elastic/beats/v7/libbeat/common/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -31,7 +30,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 		Short: "Enroll the Agent into Fleet",
 		Long:  "This will enroll the Agent into Fleet.",
 		Run: func(c *cobra.Command, args []string) {
-			if err := enroll(streams, c, args); err != nil {
+			if err := enroll(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
@@ -232,7 +231,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
-func enroll(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
 		return err
@@ -271,7 +270,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 
 	// prompt only when it is not forced and is already enrolled
 	if !force && (cfg.Fleet != nil && cfg.Fleet.Enabled) {
-		confirm, err := c.Confirm("This will replace your current settings. Do you want to continue?", true)
+		confirm, err := cli.Confirm("This will replace your current settings. Do you want to continue?", true)
 		if err != nil {
 			return errors.New(err, "problem reading prompt response")
 		}
@@ -373,7 +372,7 @@ func handleSignal(ctx context.Context) context.Context {
 	ctx, cfunc := context.WithCancel(ctx)
 
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	go func() {
 		select {

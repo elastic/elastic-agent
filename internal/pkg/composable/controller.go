@@ -14,8 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -99,7 +98,7 @@ func (c *controller) Run(ctx context.Context, cb VarsCallback) error {
 	notify := make(chan bool, 5000)
 	localCtx, cancel := context.WithCancel(ctx)
 
-	fetchContextProviders := common.MapStr{}
+	fetchContextProviders := mapstr.M{}
 
 	// run all the enabled context providers
 	for name, state := range c.contextProviders {
@@ -111,7 +110,7 @@ func (c *controller) Run(ctx context.Context, cb VarsCallback) error {
 			return errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}
 		if p, ok := state.provider.(corecomp.FetchContextProvider); ok {
-			fetchContextProviders.Put(name, p)
+			_, _ = fetchContextProviders.Put(name, p)
 		}
 	}
 
@@ -318,12 +317,12 @@ func cloneMap(source map[string]interface{}) (map[string]interface{}, error) {
 	}
 	bytes, err := json.Marshal(source)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %s", err)
+		return nil, fmt.Errorf("failed to clone: %w", err)
 	}
 	var dest map[string]interface{}
 	err = json.Unmarshal(bytes, &dest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %s", err)
+		return nil, fmt.Errorf("failed to clone: %w", err)
 	}
 	return dest, nil
 }
@@ -334,12 +333,12 @@ func cloneMapArray(source []map[string]interface{}) ([]map[string]interface{}, e
 	}
 	bytes, err := json.Marshal(source)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %s", err)
+		return nil, fmt.Errorf("failed to clone: %w", err)
 	}
 	var dest []map[string]interface{}
 	err = json.Unmarshal(bytes, &dest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %s", err)
+		return nil, fmt.Errorf("failed to clone: %w", err)
 	}
 	return dest, nil
 }

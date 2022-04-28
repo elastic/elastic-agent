@@ -89,7 +89,7 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config) (corecomp.Cont
 	if c != nil {
 		err := c.Unpack(p)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unpack config: %s", err)
+			return nil, fmt.Errorf("failed to unpack config: %w", err)
 		}
 	}
 	if p.CheckInterval <= 0 {

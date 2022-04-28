@@ -61,7 +61,7 @@ func updateLogLevel(level string) error {
 func generateAgentID() (string, error) {
 	uid, err := uuid.NewV4()
 	if err != nil {
-		return "", fmt.Errorf("error while generating UUID for agent: %v", err)
+		return "", fmt.Errorf("error while generating UUID for agent: %w", err)
 	}
 
 	return uid.String(), nil
@@ -175,7 +175,7 @@ func loadAgentInfoWithBackoff(forceUpdate bool, logLevel string, createAgentID b
 	for i := 0; i <= maxRetriesloadAgentInfo; i++ {
 		backExp.Wait()
 		ai, err = loadAgentInfo(forceUpdate, logLevel, createAgentID)
-		if err != filelock.ErrAppAlreadyRunning {
+		if !errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			break
 		}
 	}

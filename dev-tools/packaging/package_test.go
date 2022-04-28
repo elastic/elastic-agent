@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -586,7 +587,7 @@ func readDeb(debFile string, dataBuffer *bytes.Buffer) (*packageFile, error) {
 	for {
 		header, err := arReader.Next()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, err
@@ -637,7 +638,7 @@ func readTarContents(tarName string, data io.Reader) (*packageFile, error) {
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, err
@@ -709,7 +710,7 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, nil, err

@@ -353,7 +353,7 @@ func (a *Application) startCredsListener() error {
 			}
 			if err := srvState.WriteConnInfo(conn); err != nil {
 				_ = conn.Close()
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					a.logger.Errorf("failed to write connection credentials: %s", err)
 				}
 				continue
