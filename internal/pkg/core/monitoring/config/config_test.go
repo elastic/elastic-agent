@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
 func TestAPMConfig(t *testing.T) {
