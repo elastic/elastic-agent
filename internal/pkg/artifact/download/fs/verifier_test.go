@@ -58,7 +58,7 @@ func TestFetchVerify(t *testing.T) {
 		},
 	}
 
-	err := prepareFetchVerifyTests(dropPath, targetPath, targetFilePath, hashTargetFilePath)
+	err := prepareFetchVerifyTests(dropPath, version, targetPath, targetFilePath, hashTargetFilePath)
 	assert.NoError(t, err)
 
 	downloader := NewDownloader(config)
@@ -137,9 +137,114 @@ func TestFetchVerify(t *testing.T) {
 	}
 }
 
-func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFilePath string) error {
-	sourceFilePath := filepath.Join(dropPath, "beat-8.0.0-darwin-x86_64.tar.gz")
-	hashSourceFilePath := filepath.Join(dropPath, "beat-8.0.0-darwin-x86_64.tar.gz.sha512")
+func TestFetchVerifyIncludingSnapshot(t *testing.T) {
+	timeout := 15 * time.Second
+	dropPath := filepath.Join("testdata", "drop")
+	installPath := filepath.Join("testdata", "install")
+	targetPath := filepath.Join("testdata", "download")
+	ctx := context.Background()
+	s := program.Spec{Name: "Beat", Cmd: "beat", Artifact: "beats/filebeat"}
+	version := "8.0.0-abcdef-SNAPSHOT"
+
+	targetFilePath := filepath.Join(targetPath, "beat-8.0.0-abcdef-SNAPSHOT-darwin-x86_64.tar.gz")
+	hashTargetFilePath := filepath.Join(targetPath, "beat-8.0.0-abcdef-SNAPSHOT-darwin-x86_64.tar.gz.sha512")
+
+	// cleanup
+	defer os.RemoveAll(targetPath)
+
+	config := &artifact.Config{
+		TargetDirectory: targetPath,
+		DropPath:        dropPath,
+		InstallPath:     installPath,
+		OperatingSystem: "darwin",
+		Architecture:    "32",
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			Timeout: timeout,
+		},
+	}
+
+	err := prepareFetchVerifyTests(dropPath, version, targetPath, targetFilePath, hashTargetFilePath)
+	assert.NoError(t, err)
+
+	downloader := NewDownloader(config)
+	verifier, err := NewVerifier(config, true, nil)
+	assert.NoError(t, err)
+
+	// first download verify should fail:
+	// download skipped, as invalid package is prepared upfront
+	// verify fails and cleans download
+	err = verifier.Verify(s, version)
+	var checksumErr *download.ChecksumMismatchError
+	assert.ErrorAs(t, err, &checksumErr)
+
+	_, err = os.Stat(targetFilePath)
+	assert.True(t, os.IsNotExist(err))
+
+	_, err = os.Stat(hashTargetFilePath)
+	assert.True(t, os.IsNotExist(err))
+
+	// second one should pass
+	// download not skipped: package missing
+	// verify passes because hash is not correct
+	_, err = downloader.Download(ctx, s, version)
+	assert.NoError(t, err)
+
+	// file downloaded ok
+	_, err = os.Stat(targetFilePath)
+	assert.NoError(t, err)
+
+	_, err = os.Stat(hashTargetFilePath)
+	assert.NoError(t, err)
+
+	err = verifier.Verify(s, version)
+	assert.NoError(t, err)
+
+	// Enable GPG signature validation.
+	verifier.allowEmptyPgp = false
+
+	// Bad GPG public key.
+	{
+		verifier.pgpBytes = []byte("garbage")
+
+		// Don't delete anything.
+		assertFileExists(t, targetFilePath)
+		assertFileExists(t, targetFilePath+".sha512")
+	}
+
+	// Setup proper GPG public key.
+	_, verifier.pgpBytes = release.PGP()
+
+	// Missing .asc file.
+	{
+		err = verifier.Verify(s, version)
+		require.Error(t, err)
+
+		// Don't delete these files when GPG validation failure.
+		assertFileExists(t, targetFilePath)
+		assertFileExists(t, targetFilePath+".sha512")
+	}
+
+	// Invalid signature.
+	{
+		err = ioutil.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
+		require.NoError(t, err)
+
+		err = verifier.Verify(s, version)
+		var invalidSigErr *download.InvalidSignatureError
+		assert.ErrorAs(t, err, &invalidSigErr)
+
+		// Don't delete these files when GPG validation failure.
+		assertFileExists(t, targetFilePath)
+		assertFileExists(t, targetFilePath+".sha512")
+
+		// Bad .asc file should be removed.
+		assertFileNotExists(t, targetFilePath+".asc")
+	}
+}
+
+func prepareFetchVerifyTests(dropPath, version, targetDir, targetFilePath, hashTargetFilePath string) error {
+	sourceFilePath := filepath.Join(dropPath, "beat-"+version+"-darwin-x86_64.tar.gz")
+	hashSourceFilePath := filepath.Join(dropPath, "beat-"+version+"-darwin-x86_64.tar.gz.sha512")
 
 	// clean targets
 	os.Remove(targetFilePath)
