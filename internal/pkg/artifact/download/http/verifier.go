@@ -13,7 +13,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
@@ -138,7 +138,7 @@ func (v *Verifier) composeURI(filename, artifactName string) (string, error) {
 }
 
 func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
-	resp, err := v.client.Get(sourceURI)
+	resp, err := v.client.Get(sourceURI) //nolint:noctx // keep previous behaviour
 	if err != nil {
 		return nil, errors.New(err, "failed loading public key", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}

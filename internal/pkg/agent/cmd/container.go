@@ -22,15 +22,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/elastic/beats/v7/libbeat/kibana"
+	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
@@ -40,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -133,7 +133,7 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams, c); err != nil {
+			if err := logContainerCmd(streams); err != nil {
 				logError(streams, err)
 				os.Exit(1)
 			}
@@ -150,7 +150,7 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
-func logContainerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
+func logContainerCmd(streams *cli.IOStreams) error {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
@@ -166,10 +166,10 @@ func logContainerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		streams.Out = io.MultiWriter(streams.Out, w)
 		streams.Err = io.MultiWriter(streams.Out, w)
 	}
-	return containerCmd(streams, cmd)
+	return containerCmd(streams)
 }
 
-func containerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
+func containerCmd(streams *cli.IOStreams) error {
 	// set paths early so all action below use the defined paths
 	if err := setPaths("", "", "", true); err != nil {
 		return err
@@ -234,12 +234,12 @@ func containerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 				wg.Done()
 				// sending kill signal to current process (elastic-agent)
 				logInfo(streams, "Initiate shutdown elastic-agent.")
-				mainProc.Signal(syscall.SIGTERM)
+				_ = mainProc.Signal(syscall.SIGTERM)
 			}()
 
 			defer func() {
 				if apmProc != nil {
-					apmProc.Stop()
+					_ = apmProc.Stop()
 					logInfo(streams, "Initiate shutdown legacy apm-server.")
 				}
 			}()
@@ -248,14 +248,14 @@ func containerCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	if runAgent {
 		// run the main elastic-agent container command
-		err = runContainerCmd(streams, cmd, cfg)
+		err = runContainerCmd(streams, cfg)
 	}
 	// wait until APM Server shut down
 	wg.Wait()
 	return err
 }
 
-func runContainerCmd(streams *cli.IOStreams, cmd *cobra.Command, cfg setupConfig) error {
+func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	var err error
 	var client *kibana.Client
 	executable, err := os.Executable()
@@ -266,7 +266,7 @@ func runContainerCmd(streams *cli.IOStreams, cmd *cobra.Command, cfg setupConfig
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(streams, logToStderr)
+		return run(logToStderr)
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -331,7 +331,7 @@ func runContainerCmd(streams *cli.IOStreams, cmd *cobra.Command, cfg setupConfig
 		}
 	}
 
-	return run(streams, logToStderr)
+	return run(logToStderr)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -538,7 +538,7 @@ func kibanaClient(cfg kibanaConfig, headers map[string]string) (*kibana.Client, 
 		IgnoreVersion: true,
 		Transport:     transport,
 		Headers:       headers,
-	}, 0, "Elastic-Agent")
+	}, 0, "Elastic-Agent", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
 }
 
 func findPolicy(cfg setupConfig, policies []kibanaPolicy) (*kibanaPolicy, error) {

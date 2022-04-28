@@ -19,10 +19,9 @@ import (
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/api"
-	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
-	"github.com/elastic/beats/v7/libbeat/monitoring"
-	"github.com/elastic/beats/v7/libbeat/service"
+	"github.com/elastic/elastic-agent-libs/api"
+	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/elastic-agent-libs/service"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -42,6 +41,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -55,7 +55,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Use:   "run",
 		Short: "Start the elastic-agent.",
 		Run: func(_ *cobra.Command, _ []string) {
-			if err := run(streams, nil); err != nil {
+			if err := run(nil); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
@@ -63,7 +63,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	}
 }
 
-func run(streams *cli.IOStreams, override cfgOverrider) error {
+func run(override cfgOverrider) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -76,7 +76,9 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 	if err := locker.TryLock(); err != nil {
 		return err
 	}
-	defer locker.Unlock()
+	defer func() {
+		_ = locker.Unlock()
+	}()
 
 	service.BeforeRun()
 	defer service.Cleanup()
@@ -172,7 +174,9 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 	if err != nil {
 		return err
 	}
-	defer serverStopFn()
+	defer func() {
+		_ = serverStopFn()
+	}()
 
 	if err := app.Start(); err != nil {
 		return err
@@ -180,7 +184,7 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 
 	// listen for signals
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 	reexecing := false
 	for {
 		breakout := false
@@ -322,8 +326,7 @@ func setupMetrics(
 	app application.Application,
 	tracer *apm.Tracer,
 ) (func() error, error) {
-	// use libbeat to setup metrics
-	if err := metrics.SetupMetrics(agentName); err != nil {
+	if err := initMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
 	}
 
@@ -356,7 +359,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		// no enrollment file exists or failed to stat it; nothing to do
-		return cfg, nil
+		return cfg, nil //nolint:nilerr // there is nothing to do
 	}
 	contents, err := ioutil.ReadFile(enrollPath)
 	if err != nil {

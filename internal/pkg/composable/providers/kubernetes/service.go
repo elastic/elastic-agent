@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes/metadata"
-	"github.com/elastic/beats/v7/libbeat/common/safemapstr"
-
 	k8s "k8s.io/client-go/kubernetes"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-libs/safemapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 )
@@ -63,7 +63,7 @@ func NewServiceEventer(
 	}
 	namespaceMeta := metadata.NewNamespaceMetadataGenerator(metaConf.Namespace, namespaceWatcher.Store(), client)
 
-	rawConfig, err := common.NewConfigFrom(cfg)
+	rawConfig, err := config.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
@@ -105,18 +105,18 @@ func (s *service) Stop() {
 
 func (s *service) emitRunning(service *kubernetes.Service) {
 	namespaceAnnotations := svcNamespaceAnnotations(service, s.namespaceWatcher)
-	data := generateServiceData(service, s.config, s.metagen, namespaceAnnotations)
+	data := generateServiceData(service, s.metagen, namespaceAnnotations)
 	if data == nil {
 		return
 	}
 	data.mapping["scope"] = s.scope
 
 	// Emit the service
-	s.comm.AddOrUpdate(string(service.GetUID()), ServicePriority, data.mapping, data.processors)
+	_ = s.comm.AddOrUpdate(string(service.GetUID()), ServicePriority, data.mapping, data.processors)
 }
 
 // svcNamespaceAnnotations returns the annotations of the namespace of the service
-func svcNamespaceAnnotations(svc *kubernetes.Service, watcher kubernetes.Watcher) common.MapStr {
+func svcNamespaceAnnotations(svc *kubernetes.Service, watcher kubernetes.Watcher) mapstr.M {
 	if watcher == nil {
 		return nil
 	}
@@ -131,9 +131,9 @@ func svcNamespaceAnnotations(svc *kubernetes.Service, watcher kubernetes.Watcher
 		return nil
 	}
 
-	annotations := common.MapStr{}
+	annotations := mapstr.M{}
 	for k, v := range namespace.GetAnnotations() {
-		safemapstr.Put(annotations, k, v)
+		_ = safemapstr.Put(annotations, k, v)
 	}
 	return annotations
 }
@@ -150,7 +150,7 @@ func (s *service) OnAdd(obj interface{}) {
 
 // OnUpdate ensures processing of service objects that are updated
 func (s *service) OnUpdate(obj interface{}) {
-	service := obj.(*kubernetes.Service)
+	service, _ := obj.(*kubernetes.Service)
 	// Once service is in terminated state, mark it for deletion
 	if service.GetObjectMeta().GetDeletionTimestamp() != nil {
 		s.logger.Debugf("Watcher Service update (terminating): %+v", obj)
@@ -164,15 +164,14 @@ func (s *service) OnUpdate(obj interface{}) {
 // OnDelete ensures processing of service objects that are deleted
 func (s *service) OnDelete(obj interface{}) {
 	s.logger.Debugf("Watcher Service delete: %+v", obj)
-	service := obj.(*kubernetes.Service)
+	service, _ := obj.(*kubernetes.Service)
 	time.AfterFunc(s.cleanupTimeout, func() { s.emitStopped(service) })
 }
 
 func generateServiceData(
 	service *kubernetes.Service,
-	cfg *Config,
 	kubeMetaGen metadata.MetaGen,
-	namespaceAnnotations common.MapStr) *serviceData {
+	namespaceAnnotations mapstr.M) *serviceData {
 	host := service.Spec.ClusterIP
 
 	// If a service doesn't have an IP then dont monitor it
@@ -188,15 +187,15 @@ func generateServiceData(
 
 	// k8sMapping includes only the metadata that fall under kubernetes.*
 	// and these are available as dynamic vars through the provider
-	k8sMapping := map[string]interface{}(kubemetaMap.(common.MapStr).Clone())
+	k8sMapping := map[string]interface{}(kubemetaMap.(mapstr.M).Clone())
 
 	if len(namespaceAnnotations) != 0 {
 		k8sMapping["namespace_annotations"] = namespaceAnnotations
 	}
 	// Pass annotations to all events so that it can be used in templating and by annotation builders.
-	annotations := common.MapStr{}
+	annotations := mapstr.M{}
 	for k, v := range service.GetObjectMeta().GetAnnotations() {
-		safemapstr.Put(annotations, k, v)
+		_ = safemapstr.Put(annotations, k, v)
 	}
 
 	// add annotations to be discoverable by templates

@@ -18,8 +18,8 @@ import (
 	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -309,11 +309,9 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 		return "", err
 	}
 
-	agentConfig, err := c.createAgentConfig("", persistentConfig, c.options.FleetServer.Headers)
-	if err != nil {
-		return "", err
-	}
+	agentConfig := c.createAgentConfig("", persistentConfig, c.options.FleetServer.Headers)
 
+	//nolint:dupl // duplicate because same params are passed
 	fleetConfig, err := createFleetServerBootstrapConfig(
 		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken,
 		c.options.FleetServer.PolicyID,
@@ -367,7 +365,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 func (c *enrollCmd) prepareFleetTLS() error {
 	host := c.options.FleetServer.Host
 	if host == "" {
-		host = "localhost"
+		host = defaultFleetServerInternalHost
 	}
 	port := c.options.FleetServer.Port
 	if port == 0 {
@@ -383,7 +381,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		if c.options.FleetServer.Insecure {
 			// running insecure, force the binding to localhost (unless specified)
 			if c.options.FleetServer.Host == "" {
-				c.options.FleetServer.Host = "localhost"
+				c.options.FleetServer.Host = defaultFleetServerInternalHost
 			}
 			c.options.URL = fmt.Sprintf("http://%s:%d", host, port)
 			c.options.Insecure = true
@@ -513,13 +511,11 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		return err
 	}
 
-	agentConfig, err := c.createAgentConfig(resp.Item.ID, persistentConfig, c.options.FleetServer.Headers)
-	if err != nil {
-		return err
-	}
+	agentConfig := c.createAgentConfig(resp.Item.ID, persistentConfig, c.options.FleetServer.Headers)
 
 	localFleetServer := c.options.FleetServer.ConnStr != ""
 	if localFleetServer {
+		//nolint:dupl // not duplicates, just similar params are passed
 		serverConfig, err := createFleetServerBootstrapConfig(
 			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken,
 			c.options.FleetServer.PolicyID,
@@ -609,7 +605,7 @@ func (c *enrollCmd) startAgent(ctx context.Context) (<-chan *os.ProcessState, er
 
 func (c *enrollCmd) stopAgent() {
 	if c.agentProc != nil {
-		c.agentProc.StopWait()
+		_ = c.agentProc.StopWait()
 		c.agentProc = nil
 	}
 }
@@ -623,7 +619,7 @@ func yamlToReader(in interface{}) (io.Reader, error) {
 }
 
 func delay(ctx context.Context, d time.Duration) {
-	t := time.NewTimer(time.Duration(rand.Int63n(int64(d))))
+	t := time.NewTimer(time.Duration(rand.Int63n(int64(d)))) //nolint:gosec // the RNG is allowed to be weak
 	defer t.Stop()
 	select {
 	case <-ctx.Done():
@@ -848,7 +844,9 @@ func storeAgentInfo(s saver, reader io.Reader) error {
 	if err := fileLock.TryLock(); err != nil {
 		return err
 	}
-	defer fileLock.Unlock()
+	defer func() {
+		_ = fileLock.Unlock()
+	}()
 
 	if err := s.Save(reader); err != nil {
 		return errors.New(err, "could not save enrollment information", errors.TypeFilesystem)
@@ -962,7 +960,7 @@ func createFleetConfigFromEnroll(accessAPIKey string, cli remote.Config) (*confi
 	return cfg, nil
 }
 
-func (c *enrollCmd) createAgentConfig(agentID string, pc map[string]interface{}, headers map[string]string) (map[string]interface{}, error) {
+func (c *enrollCmd) createAgentConfig(agentID string, pc map[string]interface{}, headers map[string]string) map[string]interface{} {
 	agentConfig := map[string]interface{}{
 		"id": agentID,
 	}
@@ -982,7 +980,7 @@ func (c *enrollCmd) createAgentConfig(agentID string, pc map[string]interface{},
 		agentConfig[k] = v
 	}
 
-	return agentConfig, nil
+	return agentConfig
 }
 
 func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) {

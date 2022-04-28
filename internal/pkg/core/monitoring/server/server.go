@@ -16,11 +16,10 @@ import (
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgorilla"
 
-	"github.com/elastic/beats/v7/libbeat/api"
-	"github.com/elastic/beats/v7/libbeat/beat"
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/monitoring"
-	"github.com/elastic/beats/v7/libbeat/monitoring/report/buffer"
+	"github.com/elastic/elastic-agent-libs/api"
+	"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/elastic-agent-libs/monitoring/report/buffer"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -40,7 +39,7 @@ func New(
 		log.Errorf("failed to create monitoring drop: %v", err)
 	}
 
-	cfg, err := common.NewConfigFrom(endpointConfig)
+	cfg, err := config.NewConfigFrom(endpointConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +49,7 @@ func New(
 
 func exposeMetricsEndpoint(
 	log *logger.Logger,
-	config *common.Config,
+	config *config.C,
 	ns func(string) *monitoring.Namespace,
 	routesFetchFn func() *sorted.Set,
 	enableProcessStats bool,
@@ -72,7 +71,7 @@ func exposeMetricsEndpoint(
 	}
 
 	if enableBuffer {
-		bufferReporter, err := buffer.MakeReporter(beat.Info{}, config) // beat.Info is not used by buffer reporter
+		bufferReporter, err := buffer.MakeReporter(config) // beat.Info is not used by buffer reporter
 		if err != nil {
 			return nil, fmt.Errorf("unable to create buffer reporter for elastic-agent: %w", err)
 		}

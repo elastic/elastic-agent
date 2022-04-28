@@ -27,8 +27,8 @@ func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 Unless all the require command-line parameters are provided or -f is used this command will ask questions on how you
 would like the Agent to operate.
 `,
-		Run: func(c *cobra.Command, args []string) {
-			if err := installCmd(streams, c, args); err != nil {
+		Run: func(c *cobra.Command, _ []string) {
+			if err := installCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
@@ -42,7 +42,7 @@ would like the Agent to operate.
 	return cmd
 }
 
-func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		}
 		return err
 	}
-	locker.Unlock()
+	_ = locker.Unlock()
 
 	if status == install.Broken {
 		if !force && !nonInteractive {
@@ -168,7 +168,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 		defer func() {
 			if err != nil {
-				install.Uninstall(cfgFile)
+				_ = install.Uninstall(cfgFile)
 			}
 		}()
 
@@ -181,7 +181,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 			defer func() {
 				if err != nil {
-					install.StopService()
+					_ = install.StopService()
 				}
 			}()
 		}
@@ -190,7 +190,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	if enroll {
 		enrollArgs := []string{"enroll", "--from-install"}
 		enrollArgs = append(enrollArgs, buildEnrollmentFlags(cmd, url, token)...)
-		enrollCmd := exec.Command(install.ExecutablePath(), enrollArgs...)
+		enrollCmd := exec.Command(install.ExecutablePath(), enrollArgs...) //nolint:gosec // it's not tainted
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
@@ -202,7 +202,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		if err != nil {
 			if status != install.PackageInstall {
 				var exitErr *exec.ExitError
-				install.Uninstall(cfgFile)
+				_ = install.Uninstall(cfgFile)
 				if err != nil && errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}

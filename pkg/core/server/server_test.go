@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // tests are equivalent
 package server
 
 import (
@@ -17,19 +18,22 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+const (
+	initConfig = "initial_config"
+	newConfig  = "new_config"
+)
+
 func TestServer_Register(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -40,7 +44,6 @@ func TestServer_Register(t *testing.T) {
 }
 
 func TestServer_Get(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -54,7 +57,6 @@ func TestServer_Get(t *testing.T) {
 }
 
 func TestServer_InitialCheckIn(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -74,7 +76,8 @@ func TestServer_InitialCheckIn(t *testing.T) {
 	}))
 
 	// set status as healthy and running
-	c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	err = c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	require.NoError(t, err)
 
 	// application state should be updated
 	assert.NoError(t, waitFor(func() error {
@@ -120,8 +123,10 @@ func TestServer_MultiClients(t *testing.T) {
 	}))
 
 	// set status differently
-	c1.Status(proto.StateObserved_HEALTHY, "Running", nil)
-	c2.Status(proto.StateObserved_DEGRADED, "No upstream connection", nil)
+	err = c1.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	require.NoError(t, err)
+	err = c2.Status(proto.StateObserved_DEGRADED, "No upstream connection", nil)
+	require.NoError(t, err)
 
 	// application states should be updated
 	assert.NoError(t, waitFor(func() error {
@@ -139,7 +144,6 @@ func TestServer_MultiClients(t *testing.T) {
 }
 
 func TestServer_PreventCheckinStream(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -167,7 +171,6 @@ func TestServer_PreventCheckinStream(t *testing.T) {
 }
 
 func TestServer_PreventActionsStream(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -195,7 +198,6 @@ func TestServer_PreventActionsStream(t *testing.T) {
 }
 
 func TestServer_DestroyPreventConnectAtTLS(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -226,7 +228,6 @@ func TestServer_DestroyPreventConnectAtTLS(t *testing.T) {
 }
 
 func TestServer_UpdateConfig(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -244,7 +245,8 @@ func TestServer_UpdateConfig(t *testing.T) {
 		}
 		return nil
 	}))
-	c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	err = c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	require.NoError(t, err)
 	assert.NoError(t, waitFor(func() error {
 		if app.Status() != proto.StateObserved_HEALTHY {
 			return fmt.Errorf("server never updated currect application state")
@@ -258,7 +260,6 @@ func TestServer_UpdateConfig(t *testing.T) {
 	assert.Equal(t, preIdx, as.expectedConfigIdx)
 
 	// push new config; should update the client
-	newConfig := "new_config"
 	require.NoError(t, as.UpdateConfig(newConfig))
 	assert.Equal(t, preIdx+1, as.expectedConfigIdx)
 	assert.NoError(t, waitFor(func() error {
@@ -270,7 +271,6 @@ func TestServer_UpdateConfig(t *testing.T) {
 }
 
 func TestServer_UpdateConfigDisconnected(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -288,7 +288,8 @@ func TestServer_UpdateConfigDisconnected(t *testing.T) {
 		}
 		return nil
 	}))
-	c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	err = c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	require.NoError(t, err)
 	assert.NoError(t, waitFor(func() error {
 		if app.Status() != proto.StateObserved_HEALTHY {
 			return fmt.Errorf("server never updated currect application state")
@@ -298,7 +299,6 @@ func TestServer_UpdateConfigDisconnected(t *testing.T) {
 
 	// stop the client, then update the config
 	c.Stop()
-	newConfig := "new_config"
 	require.NoError(t, as.UpdateConfig(newConfig))
 
 	// reconnect, client should get latest config
@@ -312,7 +312,6 @@ func TestServer_UpdateConfigDisconnected(t *testing.T) {
 }
 
 func TestServer_UpdateConfigStopping(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -330,7 +329,8 @@ func TestServer_UpdateConfigStopping(t *testing.T) {
 		}
 		return nil
 	}))
-	c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	err = c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	require.NoError(t, err)
 	assert.NoError(t, waitFor(func() error {
 		if app.Status() != proto.StateObserved_HEALTHY {
 			return fmt.Errorf("server never updated currect application state")
@@ -344,13 +344,12 @@ func TestServer_UpdateConfigStopping(t *testing.T) {
 		_ = as.Stop(500 * time.Millisecond)
 		close(done)
 	}()
-	err = as.UpdateConfig("new_config")
+	err = as.UpdateConfig(newConfig)
 	assert.Error(t, ErrApplicationStopping, err)
 	<-done
 }
 
 func TestServer_Stop(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -368,7 +367,8 @@ func TestServer_Stop(t *testing.T) {
 		}
 		return nil
 	}))
-	c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	err = c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	require.NoError(t, err)
 	assert.NoError(t, waitFor(func() error {
 		if app.Status() != proto.StateObserved_HEALTHY {
 			return fmt.Errorf("server never updated currect application state")
@@ -396,14 +396,16 @@ func TestServer_Stop(t *testing.T) {
 		}
 		return nil
 	}))
-	c.Status(proto.StateObserved_CONFIGURING, "Configuring", nil)
+	err = c.Status(proto.StateObserved_CONFIGURING, "Configuring", nil)
+	require.NoError(t, err)
 	require.NoError(t, waitFor(func() error {
 		if cImpl.Stop() < 1 {
 			return fmt.Errorf("client never got expected stop again")
 		}
 		return nil
 	}))
-	c.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+	err = c.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+	require.NoError(t, err)
 	require.NoError(t, waitFor(func() error {
 		if app.Status() != proto.StateObserved_STOPPING {
 			return fmt.Errorf("server never updated to stopping")
@@ -418,7 +420,6 @@ func TestServer_Stop(t *testing.T) {
 }
 
 func TestServer_StopJustDisconnect(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -436,7 +437,8 @@ func TestServer_StopJustDisconnect(t *testing.T) {
 		}
 		return nil
 	}))
-	c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	err = c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	require.NoError(t, err)
 	assert.NoError(t, waitFor(func() error {
 		if app.Status() != proto.StateObserved_HEALTHY {
 			return fmt.Errorf("server never updated currect application state")
@@ -469,7 +471,6 @@ func TestServer_StopJustDisconnect(t *testing.T) {
 }
 
 func TestServer_StopTimeout(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{})
 	defer srv.Stop()
@@ -487,7 +488,8 @@ func TestServer_StopTimeout(t *testing.T) {
 		}
 		return nil
 	}))
-	c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	err = c.Status(proto.StateObserved_HEALTHY, "Running", nil)
+	require.NoError(t, err)
 	assert.NoError(t, waitFor(func() error {
 		if app.Status() != proto.StateObserved_HEALTHY {
 			return fmt.Errorf("server never updated currect application state")
@@ -511,7 +513,6 @@ func TestServer_StopTimeout(t *testing.T) {
 }
 
 func TestServer_WatchdogFailApp(t *testing.T) {
-	initConfig := "initial_config"
 	checkMinTimeout := 300 * time.Millisecond
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{}, func(s *Server) {
@@ -538,7 +539,6 @@ func TestServer_WatchdogFailApp(t *testing.T) {
 }
 
 func TestServer_PerformAction(t *testing.T) {
-	initConfig := "initial_config"
 	app := &StubApp{}
 	srv := createAndStartServer(t, &StubHandler{}, func(s *Server) {
 		s.watchdogCheckInterval = 50 * time.Millisecond
@@ -685,7 +685,7 @@ func (a *StubApp) Message() string {
 type StubHandler struct{}
 
 func (h *StubHandler) OnStatusChange(as *ApplicationState, status proto.StateObserved_Status, message string, payload map[string]interface{}) {
-	stub := as.app.(*StubApp)
+	stub, _ := as.app.(*StubApp)
 	stub.lock.Lock()
 	defer stub.lock.Unlock()
 	stub.status = status

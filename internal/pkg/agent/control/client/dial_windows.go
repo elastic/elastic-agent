@@ -13,8 +13,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/elastic/beats/v7/libbeat/api/npipe"
-
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 )
 
