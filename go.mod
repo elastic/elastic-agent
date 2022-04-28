@@ -12,7 +12,7 @@ require (
 	github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4
 	github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
-	github.com/elastic/elastic-agent-libs v0.2.1
+	github.com/elastic/elastic-agent-libs v0.2.2
 	github.com/elastic/elastic-agent-system-metrics v0.1.0
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
@@ -61,6 +61,7 @@ require (
 	github.com/Jeffail/gabs/v2 v2.6.0 // indirect
 	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
+	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
 	github.com/cenkalti/backoff/v4 v4.1.1 // indirect
 	github.com/containerd/containerd v1.5.10 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
@@ -138,7 +139,6 @@ require (
 )
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220303073437-a28c413604b8
 	github.com/hashicorp/go-version v1.2.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	go.elastic.co/apm v1.15.0
