@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
@@ -110,6 +111,29 @@ func newTestingDispatcher() *testingDispatcher {
 	return &testingDispatcher{received: make(chan struct{}, 1)}
 }
 
+type mockQueue struct {
+	mock.Mock
+}
+
+func (m *mockQueue) Add(action fleetapi.Action, n int64) {
+	m.Called(action, n)
+}
+
+func (m *mockQueue) DequeueActions() []fleetapi.Action {
+	args := m.Called()
+	return args.Get(0).([]fleetapi.Action)
+}
+
+func (m *mockQueue) Cancel(id string) int {
+	args := m.Called(id)
+	return args.Int(0)
+}
+
+func (m *mockQueue) Actions() []fleetapi.Action {
+	args := m.Called()
+	return args.Get(0).([]fleetapi.Action)
+}
+
 type withGatewayFunc func(*testing.T, gateway.FleetGateway, *testingClient, *testingDispatcher, *scheduler.Stepper, repo.Backend)
 
 func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
@@ -128,6 +152,10 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 		stateStore, err := store.NewStateStore(log, diskStore)
 		require.NoError(t, err)
 
+		queue := &mockQueue{}
+		queue.On("DequeueActions").Return([]fleetapi.Action{})
+		queue.On("Actions").Return([]fleetapi.Action{})
+
 		gateway, err := newFleetGatewayWithScheduler(
 			ctx,
 			log,
@@ -140,6 +168,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
+			queue,
 		)
 
 		require.NoError(t, err)
@@ -234,7 +263,7 @@ func TestFleetGateway(t *testing.T) {
 				return resp, nil
 			}),
 			dispatcher.Answer(func(actions ...fleetapi.Action) error {
-				require.Equal(t, 2, len(actions))
+				require.Len(t, actions, 2)
 				return nil
 			}),
 		)
@@ -259,6 +288,10 @@ func TestFleetGateway(t *testing.T) {
 		stateStore, err := store.NewStateStore(log, diskStore)
 		require.NoError(t, err)
 
+		queue := &mockQueue{}
+		queue.On("DequeueActions").Return([]fleetapi.Action{})
+		queue.On("Actions").Return([]fleetapi.Action{})
+
 		gateway, err := newFleetGatewayWithScheduler(
 			ctx,
 			log,
@@ -271,6 +304,7 @@ func TestFleetGateway(t *testing.T) {
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
+			queue,
 		)
 
 		require.NoError(t, err)
@@ -351,6 +385,10 @@ func TestFleetGateway(t *testing.T) {
 		stateStore, err := store.NewStateStore(log, diskStore)
 		require.NoError(t, err)
 
+		queue := &mockQueue{}
+		queue.On("DequeueActions").Return([]fleetapi.Action{})
+		queue.On("Actions").Return([]fleetapi.Action{})
+
 		gateway, err := newFleetGatewayWithScheduler(
 			ctx,
 			log,
@@ -366,6 +404,7 @@ func TestFleetGateway(t *testing.T) {
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
+			queue,
 		)
 
 		require.NoError(t, err)

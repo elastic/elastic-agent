@@ -179,3 +179,4 @@
 - Fix download verification in snapshot builds. {issue}252[252]
 - Add support for kubernetes cronjobs {pull}279[279]
 - Increase the download artifact timeout to 10mins and add log download statistics. {pull}308[308]
+- Support scheduled actions and cancellation of pending actions. {issue}393[393]
