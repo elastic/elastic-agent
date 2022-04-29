@@ -53,7 +53,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
     "action": "created",
     "item": {
@@ -72,7 +72,7 @@ func TestEnroll(t *testing.T) {
         "actions": [],
         "access_api_key": "my-access-token"
     }
-}`)) // nolint:errcheck //not required
+}`))
 			})
 			return mux
 		}, func(t *testing.T, caBytes []byte, host string) {
@@ -106,7 +106,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
     "action": "created",
     "item": {
@@ -125,7 +125,7 @@ func TestEnroll(t *testing.T) {
         "actions": [],
         "access_api_key": "my-access-api-key"
     }
-}`)) // nolint:errcheck //not required
+}`))
 			})
 			return mux
 		}, func(t *testing.T, caBytes []byte, host string) {
@@ -165,7 +165,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
     "action": "created",
     "item": {
@@ -184,7 +184,7 @@ func TestEnroll(t *testing.T) {
         "actions": [],
         "access_api_key": "my-access-api-key"
     }
-}`)) // nolint:errcheck //not required
+}`))
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -223,7 +223,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
     "action": "created",
     "item": {
@@ -242,7 +242,7 @@ func TestEnroll(t *testing.T) {
         "actions": [],
         "access_api_key": "my-access-api-key"
     }
-}`)) // nolint:errcheck //not required
+}`))
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -281,11 +281,11 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
 		"statusCode": 500,
 		"error": "Internal Server Error"
-}`)) // nolint:errcheck //not required
+}`))
 			})
 			return mux
 		}, func(t *testing.T, host string) {
