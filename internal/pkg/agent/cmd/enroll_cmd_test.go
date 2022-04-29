@@ -40,7 +40,7 @@ func (m *mockStore) Save(in io.Reader) error {
 	}
 
 	buf := new(bytes.Buffer)
-	io.Copy(buf, in)
+	io.Copy(buf, in) // nolint:errcheck //not required
 	m.Content = buf.Bytes()
 	return nil
 }
@@ -72,7 +72,7 @@ func TestEnroll(t *testing.T) {
         "actions": [],
         "access_api_key": "my-access-token"
     }
-}`))
+}`)) // nolint:errcheck //not required
 			})
 			return mux
 		}, func(t *testing.T, caBytes []byte, host string) {
@@ -125,7 +125,7 @@ func TestEnroll(t *testing.T) {
         "actions": [],
         "access_api_key": "my-access-api-key"
     }
-}`))
+}`)) // nolint:errcheck //not required
 			})
 			return mux
 		}, func(t *testing.T, caBytes []byte, host string) {
@@ -184,7 +184,7 @@ func TestEnroll(t *testing.T) {
         "actions": [],
         "access_api_key": "my-access-api-key"
     }
-}`))
+}`)) // nolint:errcheck //not required
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -242,7 +242,7 @@ func TestEnroll(t *testing.T) {
         "actions": [],
         "access_api_key": "my-access-api-key"
     }
-}`))
+}`)) // nolint:errcheck //not required
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -285,7 +285,7 @@ func TestEnroll(t *testing.T) {
 {
 		"statusCode": 500,
 		"error": "Internal Server Error"
-}`))
+}`)) // nolint:errcheck //not required
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -319,6 +319,7 @@ func TestValidateArgs(t *testing.T) {
 	streams, _, _, _ := cli.NewTestingIOStreams()
 	cmd := newEnrollCommandWithArgs([]string{}, streams)
 	err := cmd.Flags().Set("tag", "windows,production")
+	require.NoError(t, err)
 	err = cmd.Flags().Set("insecure", "true")
 	require.NoError(t, err)
 	args := buildEnrollmentFlags(cmd, url, enrolmentToken)
@@ -365,12 +366,12 @@ func withTLSServer(
 		s := http.Server{
 			Handler: m(t),
 			TLSConfig: &tls.Config{
-				Certificates: []tls.Certificate{serverCert},
+				Certificates: []tls.Certificate{serverCert}, MinVersion: tls.VersionTLS12,
 			},
 		}
 
 		// Uses the X509KeyPair pair defined in the TLSConfig struct instead of file on disk.
-		go s.ServeTLS(listener, "", "")
+		go s.ServeTLS(listener, "", "") // nolint:errcheck //not required
 
 		test(t, ca.Crt(), "localhost:"+strconv.Itoa(port))
 	}
@@ -381,7 +382,7 @@ func bytesToTMPFile(b []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	f.Write(b)
+	f.Write(b) // nolint:errcheck //not required
 	if err := f.Close(); err != nil {
 		return "", err
 	}
