@@ -64,15 +64,15 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
+	// Always clean up the temporary file and ignore errors.
+	defer os.Remove(tmpFile)
+
 	// Wrap into crypto writer, reusing already existing crypto writer, open to other suggestions
 	w, err := crypto.NewWriterWithDefaults(fd, d.key)
 	if err != nil {
 		fd.Close()
 		return err
 	}
-
-	// Always clean up the temporary file and ignore errors.
-	defer os.Remove(tmpFile)
 
 	if _, err := io.Copy(w, in); err != nil {
 		if err := fd.Close(); err != nil {

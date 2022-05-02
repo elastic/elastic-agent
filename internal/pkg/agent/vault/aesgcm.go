@@ -54,6 +54,8 @@ func Encrypt(key, data []byte) ([]byte, error) {
 	if _, err = rand.Read(nonce); err != nil {
 		return nil, err
 	}
+
+	// The first parameter is nonce in order to get the ciphertext as concatenation of nonce and encrypted data
 	ciphertext := aesGCM.Seal(nonce, nonce, data, nil)
 
 	return ciphertext, nil
