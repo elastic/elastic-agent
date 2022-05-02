@@ -89,7 +89,7 @@ func (v *Vault) Exists(key string) (ok bool, err error) {
 	} else if os.IsNotExist(err) {
 		err = nil
 	}
-	return
+	return ok, err
 }
 
 // Remove removes the key
@@ -111,7 +111,7 @@ func (v *Vault) encrypt(data []byte) ([]byte, error) {
 
 func (v *Vault) decrypt(data []byte) ([]byte, error) {
 	if len(data) < saltSize {
-		return nil, syscall.Errno(syscall.EINVAL)
+		return nil, syscall.EINVAL
 	}
 	salt, data := data[:saltSize], data[saltSize:]
 	key, _, err := deriveKey(v.key, salt)

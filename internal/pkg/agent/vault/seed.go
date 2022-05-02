@@ -21,9 +21,7 @@ func getSeed(path string) ([]byte, error) {
 	b, err := ioutil.ReadFile(fp)
 
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			err = nil
-		} else {
+		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 	}
