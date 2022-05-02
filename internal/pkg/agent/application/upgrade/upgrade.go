@@ -162,6 +162,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
+	if err := copyVault(newHash); err != nil {
+		return nil, errors.New(err, "failed to copy vault")
+	}
+
 	if err := ChangeSymlink(ctx, newHash); err != nil {
 		rollbackInstall(ctx, newHash)
 		return nil, err
@@ -286,6 +290,11 @@ func copyActionStore(newHash string) error {
 		}
 	}
 
+	return nil
+}
+
+func copyVault(newHash string) error {
+	// TODO (AM): implement copy vault for windows and linux
 	return nil
 }
 

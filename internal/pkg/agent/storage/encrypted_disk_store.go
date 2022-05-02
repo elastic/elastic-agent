@@ -1,0 +1,135 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+package storage
+
+import (
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/crypto"
+	"github.com/hectane/go-acl"
+)
+
+// NewEncryptedDiskStore creates an encrypted disk store.
+// Drop-in replacement for NewDiskStorage
+func NewEncryptedDiskStore(target string) *EncryptedDiskStore {
+	return &EncryptedDiskStore{
+		target: target,
+	}
+}
+
+func (d *EncryptedDiskStore) Exists() (bool, error) {
+	_, err := os.Stat(d.target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (d *EncryptedDiskStore) ensureKey() error {
+	if d.key == nil {
+		key, err := secret.Get()
+		if err != nil {
+			return err
+		}
+		d.key = key
+	}
+	return nil
+}
+
+func (d *EncryptedDiskStore) Save(in io.Reader) error {
+
+	// Ensure has agent key
+	err := d.ensureKey()
+	if err != nil {
+		return err
+	}
+
+	tmpFile := d.target + ".tmp"
+
+	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perms)
+	if err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not save to %s", tmpFile),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
+
+	// Wrap into crypto writer, reusing already existing crypto writer, open to other suggestions
+	w, err := crypto.NewWriterWithDefaults(fd, d.key)
+	if err != nil {
+		fd.Close()
+		return err
+	}
+
+	// Always clean up the temporary file and ignore errors.
+	defer os.Remove(tmpFile)
+
+	if _, err := io.Copy(w, in); err != nil {
+		if err := fd.Close(); err != nil {
+			return errors.New(err, "could not close temporary file",
+				errors.TypeFilesystem,
+				errors.M(errors.MetaKeyPath, tmpFile))
+		}
+
+		return errors.New(err, "could not save content on disk",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
+
+	if err := fd.Sync(); err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not sync temporary file %s", d.target),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
+
+	if err := fd.Close(); err != nil {
+		return errors.New(err, "could not close temporary file",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
+
+	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not replace target file %s", d.target),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, d.target))
+	}
+
+	if err := acl.Chmod(d.target, perms); err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not set permissions target file %s", d.target),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, d.target))
+	}
+
+	return nil
+}
+
+func (d *EncryptedDiskStore) Load() (io.ReadCloser, error) {
+	// Ensure has agent key
+	err := d.ensureKey()
+	if err != nil {
+		return nil, err
+	}
+
+	fd, err := os.OpenFile(d.target, os.O_RDONLY|os.O_CREATE, perms)
+	if err != nil {
+		return nil, errors.New(err,
+			fmt.Sprintf("could not open %s", d.target),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, d.target))
+	}
+	// The crypto.Reader is closing the underlying reader, in this case fd
+	return crypto.NewReaderWithDefaults(fd, d.key)
+}

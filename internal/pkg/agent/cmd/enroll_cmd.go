@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
@@ -155,7 +156,7 @@ func newEnrollCmd(
 	store := storage.NewReplaceOnSuccessStore(
 		configPath,
 		application.DefaultAgentFleetConfig,
-		storage.NewDiskStore(paths.AgentConfigFile()),
+		storage.NewEncryptedDiskStore(paths.AgentConfigFile()),
 	)
 
 	return newEnrollCmdWithStore(
@@ -190,6 +191,13 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
+
+	// Create encryption key from the agent before touching configuration
+	// TODO (AM): There might a better place to do this in the agent.
+	err = secret.Create()
+	if err != nil {
+		return err
+	}
 
 	persistentConfig, err := getPersistentConfig(c.configPath)
 	if err != nil {

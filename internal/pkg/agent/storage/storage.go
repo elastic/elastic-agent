@@ -21,3 +21,8 @@ type Store interface {
 type DiskStore struct {
 	target string
 }
+
+type EncryptedDiskStore struct {
+	target string
+	key    []byte
+}
