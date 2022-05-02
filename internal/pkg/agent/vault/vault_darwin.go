@@ -65,7 +65,7 @@ func (v *Vault) Set(key string, data []byte) error {
 	defer C.free(unsafe.Pointer(ckey))
 
 	cdata := C.CBytes(data)
-	defer C.free(unsafe.Pointer(cdata))
+	defer C.free(cdata)
 
 	return statusToError(C.SetKeychainItem(v.keychain, cname, ckey, cdata, C.size_t(len(data))))
 }

@@ -189,7 +189,9 @@ func loadAgentInfo(forceUpdate bool, logLevel string, createAgentID bool) (*pers
 	if err := idLock.TryLock(); err != nil {
 		return nil, err
 	}
-	defer idLock.Unlock()
+	defer func() {
+		_ = idLock.Unlock()
+	}()
 
 	agentConfigFile := paths.AgentConfigFile()
 	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)

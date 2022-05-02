@@ -30,6 +30,7 @@
  */
 
 // +build cgo
+//go:build darwin
 // +build darwin
 
 #include <stdio.h>

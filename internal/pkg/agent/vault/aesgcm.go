@@ -86,7 +86,7 @@ func Decrypt(key, data []byte) ([]byte, error) {
 
 	nonceSize := aesGCM.NonceSize()
 	if len(data) < nonceSize {
-		return nil, syscall.Errno(syscall.EINVAL)
+		return nil, syscall.EINVAL
 	}
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 
