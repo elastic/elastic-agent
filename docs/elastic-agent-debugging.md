@@ -50,7 +50,7 @@ the elastic-agent artifact will be placed on `build/distributions`.
 
 There is a [Vagrantfile](https://github.com/elastic/elastic-agent/blob/main/Vagrantfile)
 on the repository root. A `dev` VM is defined there, it forwards the port `4242` to
-the hosts `4242` port.
+the hosts `4242` port and mounts the repository's root to `/vagrant`.
 
 To spin up and connect to the VM:
 
