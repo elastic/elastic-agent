@@ -132,6 +132,26 @@ c # continues the execution until the code hits any breakpoint
 sudo /opt/Elastic/Agent/elastic-agent status
 ```
 
+### Elastic Stack
+
+In order to enroll an elastic-agent with Fleet a Elastic Stack is needed. The
+easiest way is to spin up one in [Cloud](https://cloud.elastic.co). Anyway
+[`elastic-package`](https://github.com/elastic/elastic-package/releases) works too.
+The elastic-package uses docker and docker compose to spin up the stack.
+
+Download and run `elastic-package` on your machine:
+
+```shell
+curl -s https://api.github.com/repos/elastic/elastic-package/releases/latest \
+| grep "browser_download_url.*linux_amd64.tar.gz" \
+| cut -d : -f 2,3 \
+| tr -d \" \
+| wget -i -
+tar -xf elastic-package*.tar.gz
+
+eval "$(elastic-package stack shellinit)"
+./elastic-package ... TODO: continue here
+```
 
 ## tl;dr
 
