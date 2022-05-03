@@ -192,10 +192,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		span.End()
 	}()
 
-	//nolint:godox  // TODO
 	// Create encryption key from the agent before touching configuration
-	// TODO (AM): There might a better place to do this in the agent.
-	err = secret.Create()
+	err = secret.CreateAgentSecret()
 	if err != nil {
 		return err
 	}

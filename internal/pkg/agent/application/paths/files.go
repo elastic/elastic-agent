@@ -68,5 +68,5 @@ func AgentVaultPath() string {
 	if runtime.GOOS == "darwin" {
 		return defaultAgentVaultPath
 	}
-	return filepath.Join(Home(), defaultAgentVaultPath)
+	return filepath.Join(Home(), "vault", defaultAgentVaultPath)
 }

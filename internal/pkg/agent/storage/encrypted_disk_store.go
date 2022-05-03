@@ -37,11 +37,11 @@ func (d *EncryptedDiskStore) Exists() (bool, error) {
 
 func (d *EncryptedDiskStore) ensureKey() error {
 	if d.key == nil {
-		key, err := secret.Get()
+		key, err := secret.GetAgentSecret()
 		if err != nil {
 			return err
 		}
-		d.key = key
+		d.key = key.Value
 	}
 	return nil
 }
