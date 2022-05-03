@@ -129,9 +129,18 @@ Vagrant.configure("2") do |config|
     end
   end
 
-    config.vm.define "debug" do |nodeconfig|
+    config.vm.define "dev" do |nodeconfig|
       nodeconfig.vm.box = "ubuntu/impish64"
-      nodeconfig.vm.network "public_network"
+
+      nodeconfig.vm.hostname = "elastic-agent-dev"
+
+      nodeconfig.vm.network "private_network",
+        hostname: true,
+        ip: "192.168.56.42" # only 192.168.56.0/21 range allowed: https://www.virtualbox.org/manual/ch06.html#network_hostonly
+      nodeconfig.vm.network "forwarded_port",
+        guest: 4242,
+        host: 4242,
+        id: "delve"
 
       nodeconfig.vm.provider "virtualbox" do |vb|
         # Display the VirtualBox GUI when booting the machine
@@ -143,11 +152,12 @@ Vagrant.configure("2") do |config|
 
       nodeconfig.vm.provision "shell", inline: <<-SHELL
          apt-get update
-         apt-get install -y vim wget curl
-         wget https://go.dev/dl/go#{GO_VERSION}.linux-amd64.tar.gz
-         tar -C /usr/local -xzf go#{GO_VERSION}.linux-amd64.tar.gz
+         apt-get install -y vim wget curl build-essential make delve
+         curl -sL -o /tmp/go#{GO_VERSION}.linux-amd64.tar.gz https://go.dev/dl/go#{GO_VERSION}.linux-amd64.tar.gz
+         tar -C /usr/local -xzf /tmp/go#{GO_VERSION}.linux-amd64.tar.gz
          echo "alias ll='ls -la'" > /etc/profile.d/ll.sh
-         echo "export PATH=$PATH:/usr/local/go/bin" > /etc/profile.d/go.sh
+         echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh
+         echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> /etc/profile.d/go.sh
       SHELL
     end
 
