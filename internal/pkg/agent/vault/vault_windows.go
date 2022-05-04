@@ -91,7 +91,7 @@ func (v *Vault) Exists(key string) (ok bool, err error) {
 	} else if os.IsNotExist(err) {
 		err = nil
 	}
-	return
+	return ok, err
 }
 
 // Remove removes the key
