@@ -23,6 +23,7 @@ type DiskStore struct {
 }
 
 type EncryptedDiskStore struct {
-	target string
-	key    []byte
+	target    string
+	vaultPath string
+	key       []byte
 }

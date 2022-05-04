@@ -45,9 +45,10 @@ func getSeed(path string) ([]byte, error) {
 
 	isOwnerRoot, err := isFileOwnerRoot(fp)
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
+		if !os.IsNotExist(err) {
 			return nil, err
 		}
+		isOwnerRoot = true
 	}
 
 	if !isOwnerRoot {

@@ -5,11 +5,13 @@
 package upgrade
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/otiai10/copy"
@@ -18,8 +20,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
@@ -158,12 +162,17 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		return nil, nil
 	}
 
+	// Copy vault directory for linux/windows only
+	if err := copyVault(newHash); err != nil {
+		return nil, errors.New(err, "failed to copy vault")
+	}
+
 	if err := copyActionStore(newHash); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
-	if err := copyVault(newHash); err != nil {
-		return nil, errors.New(err, "failed to copy vault")
+	if err := encryptConfigIfNeeded(newHash); err != nil {
+		return nil, errors.New(err, "failed to encrypt the configuration")
 	}
 
 	if err := ChangeSymlink(ctx, newHash); err != nil {
@@ -270,7 +279,8 @@ func rollbackInstall(ctx context.Context, hash string) {
 }
 
 func copyActionStore(newHash string) error {
-	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreFile()}
+	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
+	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
 
 	for _, currentActionStorePath := range storePaths {
 		newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
@@ -293,10 +303,95 @@ func copyActionStore(newHash string) error {
 	return nil
 }
 
+func getVaultPath(newHash string) string {
+	vaultPath := paths.AgentVaultPath()
+	if runtime.GOOS == "darwin" {
+		return vaultPath
+	}
+	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
+	return filepath.Join(newHome, filepath.Base(vaultPath))
+}
+
+// Copies the vault files for windows and linux
 func copyVault(newHash string) error {
-	//nolint:godox  // TODO
-	// TODO (AM): Implement copy vault for windows and linux
+	// No vault files to copy on darwin
+	if runtime.GOOS == "darwin" {
+		return nil
+	}
+
+	vaultPath := paths.AgentVaultPath()
+	newVaultPath := getVaultPath(newHash)
+
+	err := copyDir(vaultPath, newVaultPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
 	return nil
+}
+
+// Create the key if it doesn't exists and encrypt the fleet.yml and state.yml
+func encryptConfigIfNeeded(newHash string) (err error) {
+	vaultPath := getVaultPath(newHash)
+
+	err = secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
+
+	if err != nil {
+		return err
+	}
+
+	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
+	ymlActionStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreYmlFile()))
+	actionStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreFile()))
+
+	files := []struct {
+		Src string
+		Dst string
+	}{
+		{
+			Src: ymlActionStorePath,
+			Dst: actionStorePath,
+		},
+		{
+			Src: paths.AgentConfigYmlFile(),
+			Dst: paths.AgentConfigFile(),
+		},
+	}
+	for _, f := range files {
+		b, err := ioutil.ReadFile(f.Src)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+
+		// Encrypt yml file
+		store := storage.NewEncryptedDiskStore(f.Dst, storage.WithVaultPath(vaultPath))
+		err = store.Save(bytes.NewReader(b))
+		if err != nil {
+			return err
+		}
+
+		// Remove yml file if no errors
+		defer func(fp string) {
+			if err != nil {
+				return
+			}
+			_ = os.Remove(fp)
+		}(f.Src)
+	}
+
+	// Remove fleet.yml.lock file if no errors
+	if err != nil {
+		return
+	}
+	_ = os.Remove(paths.AgentConfigYmlFile() + ".lock")
+
+	return err
 }
 
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.

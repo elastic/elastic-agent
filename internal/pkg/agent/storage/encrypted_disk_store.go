@@ -8,19 +8,37 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 
 	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/hectane/go-acl"
 )
 
+type OptionFunc func(s *EncryptedDiskStore)
+
 // NewEncryptedDiskStore creates an encrypted disk store.
 // Drop-in replacement for NewDiskStorage
-func NewEncryptedDiskStore(target string) *EncryptedDiskStore {
-	return &EncryptedDiskStore{
-		target: target,
+func NewEncryptedDiskStore(target string, opts ...OptionFunc) *EncryptedDiskStore {
+	s := &EncryptedDiskStore{
+		target:    target,
+		vaultPath: paths.AgentVaultPath(),
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+func WithVaultPath(vaultPath string) OptionFunc {
+	return func(s *EncryptedDiskStore) {
+		if runtime.GOOS == "darwin" {
+			return
+		}
+		s.vaultPath = vaultPath
 	}
 }
 
@@ -37,7 +55,7 @@ func (d *EncryptedDiskStore) Exists() (bool, error) {
 
 func (d *EncryptedDiskStore) ensureKey() error {
 	if d.key == nil {
-		key, err := secret.GetAgentSecret()
+		key, err := secret.GetAgentSecret(secret.WithVaultPath(d.vaultPath))
 		if err != nil {
 			return err
 		}
