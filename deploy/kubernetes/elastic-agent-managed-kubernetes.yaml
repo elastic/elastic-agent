@@ -210,11 +210,6 @@ rules:
       - rolebindings
       - roles
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["networking.k8s.io"]
-    resources:
-      - ingressclasses
-      - ingresses
-    verbs: ["get", "list", "watch"]
   - apiGroups: ["policy"]
     resources:
       - podsecuritypolicies
