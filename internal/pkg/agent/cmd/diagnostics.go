@@ -371,25 +371,32 @@ func humanDiagnosticsOutput(w io.Writer, obj interface{}) error {
 
 func outputDiagnostics(w io.Writer, d DiagnosticsInfo) error {
 	tw := tabwriter.NewWriter(w, 4, 1, 2, ' ', 0)
-	fmt.Fprintf(tw, "elastic-agent\tid: %s\tversion: %s\n", d.AgentInfo.ID, d.AgentInfo.Version)
-	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
+	defer tw.Flush()
+	fmt.Fprintf(tw, "elastic-agent\tid: %s\tversion: %s\n",
+		d.AgentInfo.ID, d.AgentInfo.Version)
+	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n",
+		d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
+	fmt.Fprintf(tw, "\tPID: %d\n", os.Getpid())
+
 	if len(d.ProcMeta) == 0 {
 		fmt.Fprintf(tw, "Applications: (none)\n")
-	} else {
-		fmt.Fprintf(tw, "Applications:\n")
-		for _, app := range d.ProcMeta {
-			fmt.Fprintf(tw, "  *\tname: %s\troute_key: %s\n", app.Name, app.RouteKey)
-			if app.Error != "" {
-				fmt.Fprintf(tw, "\terror: %s\n", app.Error)
-			} else {
-				fmt.Fprintf(tw, "\tprocess: %s\tid: %s\tephemeral_id: %s\telastic_license: %v\n", app.Process, app.ID, app.EphemeralID, app.ElasticLicensed)
-				fmt.Fprintf(tw, "\tversion: %s\tcommit: %s\tbuild_time: %s\tbinary_arch: %v\n", app.Version, app.BuildCommit, app.BuildTime, app.BinaryArchitecture)
-				fmt.Fprintf(tw, "\thostname: %s\tusername: %s\tuser_id: %s\tuser_gid: %s\n", app.Hostname, app.Username, app.UserID, app.UserGID)
-			}
-
-		}
+		return nil
 	}
-	tw.Flush()
+
+	fmt.Fprintf(tw, "Applications:\n")
+	for _, app := range d.ProcMeta {
+		fmt.Fprintf(tw, "  *\tname: %s\troute_key: %s\n", app.Name, app.RouteKey)
+		if app.Error != "" {
+			fmt.Fprintf(tw, "\terror: %s\n", app.Error)
+			continue
+		}
+
+		fmt.Fprintf(tw,
+			"\tprocess: %s\tid: %s\tephemeral_id: %s\telastic_license: %v\n", app.Process, app.ID, app.EphemeralID, app.ElasticLicensed)
+		fmt.Fprintf(tw, "\thostname: %s\tusername: %s\tuser_id: %s\tuser_gid: %s\n", app.Hostname, app.Username, app.UserID, app.UserGID)
+		fmt.Fprintf(tw, "\tPID: %d\n\n", app.PID)
+
+	}
 	return nil
 }
 

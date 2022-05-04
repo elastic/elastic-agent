@@ -41,6 +41,7 @@ import (
 )
 
 const (
+	delveRepo         = ""
 	goLintRepo        = "golang.org/x/lint/golint"
 	goLicenserRepo    = "github.com/elastic/go-licenser"
 	buildDir          = "build"
@@ -193,6 +194,15 @@ func (Prepare) InstallGoLicenser() error {
 // InstallGoLint for the code.
 func (Prepare) InstallGoLint() error {
 	return GoGet(goLintRepo)
+}
+
+func InstallDelve() error {
+	if err := sh.Run("go", "install",
+		"github.com/go-delve/delve/cmd/dlv@latest"); err != nil {
+		return fmt.Errorf("could not install delve: %w", err)
+	}
+
+	return nil
 }
 
 // All build all the things for the current projects.

@@ -124,6 +124,7 @@ message ProcMeta {
   string route_key = 13;
   bool elastic_licensed = 14;
   string error = 15;
+  int64 pid = 16;
 }
 
 // Status is the current status of Elastic Agent.

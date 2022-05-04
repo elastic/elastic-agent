@@ -212,7 +212,7 @@ type BeatInfo struct {
 	ElasticLicensed bool   `json:"elastic_licensed"`
 }
 
-// ProcMeta returns version and beat inforation for all running processes.
+// ProcMeta returns version and beat information for all running processes.
 func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaResponse, error) {
 	if s.routeFn == nil {
 		return nil, errors.New("route function is nil")
@@ -221,9 +221,10 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 	resp := &proto.ProcMetaResponse{
 		Procs: []*proto.ProcMeta{},
 	}
-
+	// here?
 	// gather spec data for all rk/apps running
 	specs := s.getSpecInfo("", "")
+	_ = specs
 	for _, si := range specs {
 		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
 		client := newSocketRequester(si.app, si.rk, endpoint)
@@ -232,6 +233,9 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 		resp.Procs = append(resp.Procs, procMeta)
 	}
 
+	a := resp
+	_ = a
+	_ = resp
 	return resp, nil
 }
 
@@ -360,7 +364,7 @@ func (s *Server) getSpecInfo(matchRK, matchApp string) []specInfo {
 			s.logger.With("route_key", matchRK, "application_name", matchApp).Debug("No matching route key/application name found.")
 			return []specInfo{}
 		}
-		return []specInfo{specInfo{spec: spec, app: matchApp, rk: matchRK}}
+		return []specInfo{{spec: spec, app: matchApp, rk: matchRK}}
 	}
 
 	// gather specInfo for all rk/app values

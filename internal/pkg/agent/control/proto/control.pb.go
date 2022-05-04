@@ -606,6 +606,7 @@ type ProcMeta struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	PID int
 	Process         string `protobuf:"bytes,1,opt,name=process,proto3" json:"process,omitempty"`
 	Name            string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Hostname        string `protobuf:"bytes,3,opt,name=hostname,proto3" json:"hostname,omitempty"`

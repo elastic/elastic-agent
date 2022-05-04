@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"sync"
 	"time"
 
@@ -44,9 +43,10 @@ type Version struct {
 	Snapshot  bool
 }
 
-// ApplicationStatus is a status of an application inside of Elastic Agent.
+// ApplicationStatus is the status of an application managed by the Elastic Agent.
 type ApplicationStatus struct {
 	ID      string
+	PID     int
 	Name    string
 	Status  Status
 	Message string
@@ -55,6 +55,7 @@ type ApplicationStatus struct {
 
 // ProcMeta is the running version and ID information for a running process.
 type ProcMeta struct {
+	PID                int
 	Process            string
 	Name               string
 	Hostname           string
@@ -181,6 +182,7 @@ func (c *client) Status(ctx context.Context) (*AgentStatus, error) {
 			}
 		}
 		s.Applications[i] = &ApplicationStatus{
+			// PID: appRes.
 			ID:      appRes.Id,
 			Name:    appRes.Name,
 			Status:  appRes.Status,
@@ -224,10 +226,11 @@ func (c *client) ProcMeta(ctx context.Context) ([]ProcMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	procMeta := []ProcMeta{}
-
+	var procMeta []ProcMeta
+	// HERE??
 	for _, proc := range resp.Procs {
 		meta := ProcMeta{
+			PID:                proc.PID,
 			Process:            proc.Process,
 			Name:               proc.Name,
 			Hostname:           proc.Hostname,

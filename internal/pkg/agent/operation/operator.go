@@ -146,9 +146,14 @@ func (o *Operator) Specs() map[string]program.Spec {
 
 	for _, app := range o.apps {
 		// use app.Name() instead of the (map) key so we can easy find the "_monitoring" processes
-		r[app.Name()] = app.Spec()
+		spec := app.Spec()
+		// spec.PID = app.
+		r[app.Name()] = spec
 	}
 
+	a := r
+	_ = a
+	_ = r
 	return r
 }
 

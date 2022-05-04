@@ -64,6 +64,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 
 func newDownloader(version string, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
 	if !strings.HasSuffix(version, "-SNAPSHOT") {
+		// F**** downloader.NewDownloader has got a snapshot.NewDownloader already!
 		return downloader.NewDownloader(log, settings)
 	}
 
