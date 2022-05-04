@@ -152,7 +152,14 @@ Vagrant.configure("2") do |config|
 
       nodeconfig.vm.provision "shell", inline: <<-SHELL
          apt-get update
-         apt-get install -y vim wget curl build-essential make delve
+         apt-get install -y \
+          build-essential \
+          curl \
+          delve \
+          make \
+          unzip
+          vim \
+          wget
          curl -sL -o /tmp/go#{GO_VERSION}.linux-amd64.tar.gz https://go.dev/dl/go#{GO_VERSION}.linux-amd64.tar.gz
          tar -C /usr/local -xzf /tmp/go#{GO_VERSION}.linux-amd64.tar.gz
          echo "alias ll='ls -la'" > /etc/profile.d/ll.sh
