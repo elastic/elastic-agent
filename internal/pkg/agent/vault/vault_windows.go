@@ -54,7 +54,7 @@ func New(path string) (*Vault, error) {
 
 	return &Vault{
 		path:    path,
-		entropy: []byte(entropy),
+		entropy: entropy,
 	}, nil
 }
 
