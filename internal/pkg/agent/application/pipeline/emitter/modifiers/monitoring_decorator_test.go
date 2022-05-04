@@ -15,94 +15,38 @@ import (
 )
 
 func TestMonitoringInjection(t *testing.T) {
-	storage.DisableEncryptionDarwin()
-
-	agentInfo, err := info.NewAgentInfo(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ast, err := transpiler.NewAST(inputConfigMap)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	programsToRun, err := program.Programs(agentInfo, ast)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(programsToRun) != 1 {
-		t.Fatal(fmt.Errorf("programsToRun expected to have %d entries", 1))
+	tests := []struct {
+		name        string
+		inputConfig map[string]interface{}
+		uname       string
+	}{
+		{
+			name:        "testMonitoringInjection",
+			inputConfig: inputConfigMap,
+			uname:       "monitoring-uname",
+		},
+		{
+			name:        "testMonitoringInjectionDefaults",
+			inputConfig: inputConfigMapDefaults,
+			uname:       "xxx",
+		},
 	}
 
-GROUPLOOP:
-	for group, ptr := range programsToRun {
-		programsCount := len(ptr)
-		newPtr, err := InjectMonitoring(agentInfo, group, ast, ptr)
-		if err != nil {
-			t.Error(err)
-			continue GROUPLOOP
-		}
-
-		if programsCount+1 != len(newPtr) {
-			t.Errorf("incorrect programs to run count, expected: %d, got %d", programsCount+1, len(newPtr))
-			continue GROUPLOOP
-		}
-
-		for _, p := range newPtr {
-			if p.Spec.Name != MonitoringName {
-				continue
-			}
-
-			cm, err := p.Config.Map()
-			if err != nil {
-				t.Error(err)
-				continue GROUPLOOP
-			}
-
-			outputCfg, found := cm[outputKey]
-			if !found {
-				t.Errorf("output not found for '%s'", group)
-				continue GROUPLOOP
-			}
-
-			outputMap, ok := outputCfg.(map[string]interface{})
-			if !ok {
-				t.Errorf("output is not a map  for '%s'", group)
-				continue GROUPLOOP
-			}
-
-			esCfg, found := outputMap["elasticsearch"]
-			if !found {
-				t.Errorf("elasticsearch output not found for '%s'", group)
-				continue GROUPLOOP
-			}
-
-			esMap, ok := esCfg.(map[string]interface{})
-			if !ok {
-				t.Errorf("output.elasticsearch is not a map  for '%s'", group)
-				continue GROUPLOOP
-			}
-
-			if uname, found := esMap["username"]; !found {
-				t.Errorf("output.elasticsearch.username output not found for '%s'", group)
-				continue GROUPLOOP
-			} else if uname != "monitoring-uname" {
-				t.Errorf("output.elasticsearch.username has incorrect value expected '%s', got '%s for %s", "monitoring-uname", uname, group)
-				continue GROUPLOOP
-			}
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testMonitoringInjection(t, tc.inputConfig, tc.uname)
+		})
 	}
 }
 
-func TestMonitoringInjectionDefaults(t *testing.T) {
+func testMonitoringInjection(t *testing.T, inputConfig map[string]interface{}, testUname string) {
 	storage.DisableEncryptionDarwin()
 
 	agentInfo, err := info.NewAgentInfo(true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ast, err := transpiler.NewAST(inputConfigMapDefaults)
+	ast, err := transpiler.NewAST(inputConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +112,7 @@ GROUPLOOP:
 			if uname, found := esMap["username"]; !found {
 				t.Errorf("output.elasticsearch.username output not found for '%s'", group)
 				continue GROUPLOOP
-			} else if uname != "xxx" {
+			} else if uname != testUname {
 				t.Errorf("output.elasticsearch.username has incorrect value expected '%s', got '%s for %s", "monitoring-uname", uname, group)
 				continue GROUPLOOP
 			}

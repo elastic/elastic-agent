@@ -41,9 +41,9 @@ func (m *mockStore) Save(in io.Reader) error {
 	}
 
 	buf := new(bytes.Buffer)
-	io.Copy(buf, in)
+	_, err := io.Copy(buf, in)
 	m.Content = buf.Bytes()
-	return nil
+	return err
 }
 
 func TestEnroll(t *testing.T) {
@@ -56,7 +56,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
     "action": "created",
     "item": {
@@ -109,7 +109,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
     "action": "created",
     "item": {
@@ -168,7 +168,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
     "action": "created",
     "item": {
@@ -226,7 +226,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
     "action": "created",
     "item": {
@@ -284,7 +284,7 @@ func TestEnroll(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(`
+				_, _ = w.Write([]byte(`
 {
 		"statusCode": 500,
 		"error": "Internal Server Error"
@@ -350,11 +350,14 @@ func withTLSServer(
 			Handler: m(t),
 			TLSConfig: &tls.Config{
 				Certificates: []tls.Certificate{serverCert},
+				MinVersion:   tls.VersionTLS12,
 			},
 		}
 
 		// Uses the X509KeyPair pair defined in the TLSConfig struct instead of file on disk.
-		go s.ServeTLS(listener, "", "")
+		go func() {
+			_ = s.ServeTLS(listener, "", "")
+		}()
 
 		test(t, ca.Crt(), "localhost:"+strconv.Itoa(port))
 	}
@@ -365,7 +368,10 @@ func bytesToTMPFile(b []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	f.Write(b)
+	_, err = f.Write(b)
+	if err != nil {
+		return "", err
+	}
 	if err := f.Close(); err != nil {
 		return "", err
 	}

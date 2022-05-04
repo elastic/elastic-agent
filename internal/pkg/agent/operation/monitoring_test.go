@@ -225,13 +225,15 @@ func (b *testMonitor) Close() {}
 // Prepare executes steps in order for monitoring to work correctly
 func (b *testMonitor) Prepare(program.Spec, string, int, int) error { return nil }
 
+const testPath = "path"
+
 // LogPath describes a path where application stores logs. Empty if
 // application is not monitorable
 func (b *testMonitor) LogPath(program.Spec, string) string {
 	if !b.monitorLogs {
 		return ""
 	}
-	return "path"
+	return testPath
 }
 
 // MetricsPath describes a location where application exposes metrics
@@ -240,7 +242,7 @@ func (b *testMonitor) MetricsPath(program.Spec, string) string {
 	if !b.monitorMetrics {
 		return ""
 	}
-	return "path"
+	return testPath
 }
 
 // MetricsPathPrefixed return metrics path prefixed with http+ prefix.
