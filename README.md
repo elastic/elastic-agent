@@ -3,10 +3,32 @@
 The source files for the general Elastic Agent documentation are currently stored
 in the [observability-docs](https://github.com/elastic/observability-docs) repo. The following docs are only focused on getting developers started building code for Elastic Agent.
 
-## Testing
-
 Prerequisites:
-- installed [mage](https://github.com/magefile/mage)
+- [Mage](https://github.com/magefile/mage)
+- [Go](https://go.dev/dl/)
+- [Make](https://www.gnu.org/software/make/)
+
+## Building
+
+To build and package (generate the tar/zip/whatever with the agent, beats and everything else it needs):
+```shell
+DEV=true SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="tar.gz" mage -v clean package
+```
+Where:
+ - `PLATFORMS` defines to which platform to build and package
+ - `PACKAGES` defines which packages to generate.
+ - `EXTERNAL` if set to true, the beats will be downloaded, they'll be built otherwise.
+ - `SNAPSHOT` if set to true the agent will not verify the beats/applications signatures
+and will use the staging artifacts API to download them.
+ - `DEV` if set to true will build the agent with debug symbols and disable inlining and optimizations
+
+the elastic-agent artifact will be placed on `build/distributions`.
+
+## Debugging
+
+See [Debugging the Elastic-Agent](docs/elastic-agent-debugging.md)
+
+## Testing
 
 ### Testing docker container
 
