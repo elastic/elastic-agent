@@ -14,6 +14,7 @@ import (
 	"go.elastic.co/apm/apmtest"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
@@ -66,6 +67,8 @@ func TestExportedMetrics(t *testing.T) {
 }
 
 func TestGenerateSteps(t *testing.T) {
+	storage.DisableEncryptionDarwin()
+
 	const sampleOutput = "sample-output"
 	const outputType = "logstash"
 

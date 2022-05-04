@@ -11,11 +11,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 )
 
 func TestContextProvider(t *testing.T) {
+	storage.DisableEncryptionDarwin()
+
 	builder, _ := composable.Providers.GetContextProvider("agent")
 	provider, err := builder(nil, nil)
 	require.NoError(t, err)

@@ -18,11 +18,26 @@ import (
 	"github.com/hectane/go-acl"
 )
 
+const darwin = "darwin"
+
+var encryptionDisabled bool
+
+// DisableEncryption disables storage encryption.
+// Is needed for existing unit tests on Mac OS, because the system keychain requires sudo
+func DisableEncryptionDarwin() {
+	if runtime.GOOS == darwin {
+		encryptionDisabled = true
+	}
+}
+
 type OptionFunc func(s *EncryptedDiskStore)
 
 // NewEncryptedDiskStore creates an encrypted disk store.
 // Drop-in replacement for NewDiskStorage
-func NewEncryptedDiskStore(target string, opts ...OptionFunc) *EncryptedDiskStore {
+func NewEncryptedDiskStore(target string, opts ...OptionFunc) Storage {
+	if encryptionDisabled {
+		return NewDiskStore(target)
+	}
 	s := &EncryptedDiskStore{
 		target:    target,
 		vaultPath: paths.AgentVaultPath(),
@@ -35,7 +50,7 @@ func NewEncryptedDiskStore(target string, opts ...OptionFunc) *EncryptedDiskStor
 
 func WithVaultPath(vaultPath string) OptionFunc {
 	return func(s *EncryptedDiskStore) {
-		if runtime.GOOS == "darwin" {
+		if runtime.GOOS == darwin {
 			return
 		}
 		s.vaultPath = vaultPath

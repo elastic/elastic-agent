@@ -10,10 +10,13 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 )
 
 func TestMonitoringInjection(t *testing.T) {
+	storage.DisableEncryptionDarwin()
+
 	agentInfo, err := info.NewAgentInfo(true)
 	if err != nil {
 		t.Fatal(err)
@@ -93,6 +96,8 @@ GROUPLOOP:
 }
 
 func TestMonitoringInjectionDefaults(t *testing.T) {
+	storage.DisableEncryptionDarwin()
+
 	agentInfo, err := info.NewAgentInfo(true)
 	if err != nil {
 		t.Fatal(err)
@@ -172,6 +177,8 @@ GROUPLOOP:
 }
 
 func TestMonitoringToLogstashInjection(t *testing.T) {
+	storage.DisableEncryptionDarwin()
+
 	agentInfo, err := info.NewAgentInfo(true)
 	if err != nil {
 		t.Fatal(err)
@@ -251,6 +258,8 @@ GROUPLOOP:
 }
 
 func TestMonitoringInjectionDisabled(t *testing.T) {
+	storage.DisableEncryptionDarwin()
+
 	agentInfo, err := info.NewAgentInfo(true)
 	if err != nil {
 		t.Fatal(err)
@@ -340,6 +349,8 @@ GROUPLOOP:
 }
 
 func TestChangeInMonitoringWithChangeInInput(t *testing.T) {
+	storage.DisableEncryptionDarwin()
+
 	agentInfo, err := info.NewAgentInfo(true)
 	if err != nil {
 		t.Fatal(err)
