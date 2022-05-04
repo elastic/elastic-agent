@@ -12,8 +12,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-
-	"github.com/elastic/elastic-agent-libs/file"
 )
 
 const seedFile = ".seed"
