@@ -36,6 +36,7 @@ const (
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
+	darwin          = "darwin"
 )
 
 var (
@@ -305,7 +306,7 @@ func copyActionStore(newHash string) error {
 
 func getVaultPath(newHash string) string {
 	vaultPath := paths.AgentVaultPath()
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == darwin {
 		return vaultPath
 	}
 	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
@@ -315,7 +316,7 @@ func getVaultPath(newHash string) string {
 // Copies the vault files for windows and linux
 func copyVault(newHash string) error {
 	// No vault files to copy on darwin
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == darwin {
 		return nil
 	}
 
