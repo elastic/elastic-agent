@@ -23,9 +23,9 @@ var ErrNonRootFileOwner = errors.New("non-root file owner")
 
 var skipRootCheck bool
 
-// DisableRootCheckLinux is a hook to disable root owner check for .seed file
+// DisableRootCheck is a hook to disable root owner check for .seed file
 // This is needed for linux unit tests
-func DisableRootCheckLinux() {
+func DisableRootCheck() {
 	skipRootCheck = true
 }
 

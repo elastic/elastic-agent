@@ -30,7 +30,7 @@ func getTestOptions() []OptionFunc {
 }
 
 func TestCreate(t *testing.T) {
-	vault.DisableRootCheckLinux()
+	vault.DisableRootCheck()
 
 	opts := getTestOptions()
 

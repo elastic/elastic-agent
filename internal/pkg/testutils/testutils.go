@@ -14,7 +14,7 @@ import (
 )
 
 func InitStorage(t *testing.T) {
-	vault.DisableRootCheckLinux()
+	vault.DisableRootCheck()
 	storage.DisableEncryptionDarwin()
 	if runtime.GOOS != "darwin" {
 		err := secret.CreateAgentSecret()
