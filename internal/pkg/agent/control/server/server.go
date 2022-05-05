@@ -49,6 +49,7 @@ type Server struct {
 	server        *grpc.Server
 	tracer        *apm.Tracer
 	lock          sync.RWMutex
+	proto.UnimplementedElasticAgentControlServer
 }
 
 type specer interface {
@@ -230,6 +231,7 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 		client := newSocketRequester(si.app, si.rk, endpoint)
 
 		procMeta := client.procMeta(ctx)
+		procMeta.Pid = int64(si.spec.PID)
 		resp.Procs = append(resp.Procs, procMeta)
 	}
 

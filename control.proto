@@ -7,7 +7,7 @@ syntax = "proto3";
 package proto;
 
 option cc_enable_arenas = true;
-option go_package = "pkg/agent/control/proto;proto";
+option go_package = "internal/pkg/agent/control/proto;proto";
 
 // Status codes for the current state.
 enum Status {

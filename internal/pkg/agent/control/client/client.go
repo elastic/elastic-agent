@@ -55,7 +55,7 @@ type ApplicationStatus struct {
 
 // ProcMeta is the running version and ID information for a running process.
 type ProcMeta struct {
-	PID                int
+	PID                int64
 	Process            string
 	Name               string
 	Hostname           string
@@ -230,7 +230,7 @@ func (c *client) ProcMeta(ctx context.Context) ([]ProcMeta, error) {
 	// HERE??
 	for _, proc := range resp.Procs {
 		meta := ProcMeta{
-			PID:                proc.PID,
+			PID:                proc.Pid,
 			Process:            proc.Process,
 			Name:               proc.Name,
 			Hostname:           proc.Hostname,
