@@ -110,6 +110,7 @@ type enrollCmdOption struct {
 	FixPermissions       bool                       `yaml:"-"`
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
+	SkipCreateSecret     bool                       `yaml:"-"`
 }
 
 // remoteConfig returns the configuration used to connect the agent to a fleet process.
@@ -193,9 +194,11 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}()
 
 	// Create encryption key from the agent before touching configuration
-	err = secret.CreateAgentSecret()
-	if err != nil {
-		return err
+	if !c.options.SkipCreateSecret {
+		err = secret.CreateAgentSecret()
+		if err != nil {
+			return err
+		}
 	}
 
 	persistentConfig, err := getPersistentConfig(c.configPath)
