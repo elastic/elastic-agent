@@ -21,10 +21,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -47,7 +47,7 @@ func (m *mockStore) Save(in io.Reader) error {
 }
 
 func TestEnroll(t *testing.T) {
-	storage.DisableEncryptionDarwin()
+	testutils.InitStorage(t)
 
 	log, _ := logger.New("tst", false)
 

@@ -29,10 +29,6 @@
  * @APPLE_LICENSE_HEADER_END@
  */
 
-// +build cgo
-//go:build darwin
-// +build darwin
-
 #include <stdio.h>
 #include <errno.h>
 

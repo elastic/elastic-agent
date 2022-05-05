@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 )
 
 func TestMergeFleetConfig(t *testing.T) {
-	storage.DisableEncryptionDarwin()
+	testutils.InitStorage(t)
 
 	cfg := map[string]interface{}{
 		"fleet": map[string]interface{}{
