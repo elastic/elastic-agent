@@ -42,7 +42,7 @@ var diagOutputs = map[string]outputter{
 
 // DiagnosticsInfo a struct to track all information related to diagnostics for the agent.
 type DiagnosticsInfo struct {
-	ProcMeta  []client.ProcMeta
+	ProcMetas []client.ProcMeta
 	AgentInfo AgentInfo
 }
 
@@ -329,7 +329,7 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 	if err != nil {
 		return DiagnosticsInfo{}, err
 	}
-	diag.ProcMeta = bv
+	diag.ProcMetas = bv
 
 	version, err := daemon.Version(ctx)
 	if err != nil {
@@ -380,13 +380,13 @@ func outputDiagnostics(w io.Writer, d DiagnosticsInfo) error {
 		d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
 	fmt.Fprintf(tw, "\tPID: %d\n", d.AgentInfo.PID)
 
-	if len(d.ProcMeta) == 0 {
+	if len(d.ProcMetas) == 0 {
 		fmt.Fprintf(tw, "Applications: (none)\n")
 		return nil
 	}
 
 	fmt.Fprintf(tw, "Applications:\n")
-	for _, app := range d.ProcMeta {
+	for _, app := range d.ProcMetas {
 		fmt.Fprintf(tw, "  *\tname: %s\troute_key: %s\n", app.Name, app.RouteKey)
 		if app.Error != "" {
 			fmt.Fprintf(tw, "\terror: %s\n", app.Error)
@@ -493,7 +493,7 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		return closeHandlers(err, zw, f)
 	}
 
-	for _, m := range diag.ProcMeta {
+	for _, m := range diag.ProcMetas {
 		zf, err = zw.Create("meta/" + m.Name + "-" + m.RouteKey + "." + outputFormat)
 		if err != nil {
 			return closeHandlers(err, zw, f)

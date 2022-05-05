@@ -30,7 +30,7 @@ var testDiagnostics = DiagnosticsInfo{
 		BuildTime: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
 		Snapshot:  false,
 	},
-	ProcMeta: []client.ProcMeta{client.ProcMeta{
+	ProcMetas: []client.ProcMeta{client.ProcMeta{
 		Process:            "filebeat",
 		Name:               "filebeat",
 		Hostname:           "test-host",
