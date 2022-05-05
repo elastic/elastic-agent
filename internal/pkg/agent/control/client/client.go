@@ -55,9 +55,9 @@ type ApplicationStatus struct {
 
 // ProcMeta is the running version and ID information for a running process.
 type ProcMeta struct {
-	PID                int64
 	Process            string
 	Name               string
+	PID                int64
 	Hostname           string
 	ID                 string
 	EphemeralID        string

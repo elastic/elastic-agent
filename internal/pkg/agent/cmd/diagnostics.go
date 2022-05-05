@@ -49,6 +49,7 @@ type DiagnosticsInfo struct {
 // AgentInfo contains all information about the running Agent.
 type AgentInfo struct {
 	ID        string
+	PID       int64
 	Version   string
 	Commit    string
 	BuildTime time.Time
@@ -346,6 +347,7 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 		return diag, err
 	}
 	diag.AgentInfo.ID = agentInfo.AgentID()
+	diag.AgentInfo.PID = int64(os.Getpid())
 
 	return diag, nil
 }
@@ -376,7 +378,7 @@ func outputDiagnostics(w io.Writer, d DiagnosticsInfo) error {
 		d.AgentInfo.ID, d.AgentInfo.Version)
 	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n",
 		d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
-	fmt.Fprintf(tw, "\tPID: %d\n", os.Getpid())
+	fmt.Fprintf(tw, "\tPID: %d\n", d.AgentInfo.PID)
 
 	if len(d.ProcMeta) == 0 {
 		fmt.Fprintf(tw, "Applications: (none)\n")
