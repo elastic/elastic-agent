@@ -30,6 +30,8 @@ func getTestOptions() []OptionFunc {
 }
 
 func TestCreate(t *testing.T) {
+	vault.DisableRootCheckLinux()
+
 	opts := getTestOptions()
 
 	start := time.Now().UTC()
