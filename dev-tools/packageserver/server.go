@@ -25,14 +25,40 @@ import (
 // StartServer starts the HTTP server to serve the beats, it accepts 3 arguments:
 // Beats source directory, a folder to store/serve the packaged Beats and a port to run
 func StartServer(sourceDir, storageDir string, httpPort int) {
-	// Build from x-pack by default, we can make it configurable later
-	sourceDir = filepath.Join(sourceDir, "x-pack")
-
-	logger := zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	logger := zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr}).
+		With().
+		Caller().
+		Logger()
 
 	// Replace the global logger
 	log.SetFlags(0)
 	log.SetOutput(logger)
+
+	// Build from x-pack by default, we can make it configurable later
+	sourceDir = filepath.Join(sourceDir, "x-pack")
+	sourceDir, err := filepath.Abs(sourceDir)
+	if err != nil {
+		logger.Panic().Err(err).Msg("getting absolute path of sourceDir")
+	}
+
+	storageDir, err = filepath.Abs(storageDir)
+	if err != nil {
+		logger.Panic().Err(err).Msg("getting absolute path of storageDir")
+	}
+
+	sourceDirInfo, err := os.Stat(storageDir)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.Panic().Err(err).Msg("creating storageDir")
+		}
+
+		logger.Info().Msgf("%s does not exist, creating it", storageDir)
+		os.MkdirAll(storageDir, 0750)
+	}
+
+	if sourceDirInfo != nil && !sourceDirInfo.IsDir() {
+		logger.Panic().Err(err).Msgf("is not a directory: %s", sourceDir)
+	}
 
 	r := chi.NewRouter()
 
@@ -82,7 +108,7 @@ func handleBeats(sourceDir, storageDir string) http.HandlerFunc {
 	}
 }
 
-func handlerPackageBeats(sourceDir, storageDir, filename string) http.HandlerFunc {
+func handlerPackageBeats(sourceDir, storageDir, requestedFile string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		logger := zerolog.Ctx(r.Context())
@@ -95,7 +121,7 @@ func handlerPackageBeats(sourceDir, storageDir, filename string) http.HandlerFun
 			return c
 		})
 
-		files, err := packageBeats(ctx, sourceDir)
+		fullPath, err := packageBeats(ctx, sourceDir)
 		if err != nil {
 			logger.Error().Err(err).Msg("packing Beats")
 			fmt.Fprintln(w, err.Error())
@@ -103,26 +129,55 @@ func handlerPackageBeats(sourceDir, storageDir, filename string) http.HandlerFun
 			return
 		}
 
-		for _, fullPath := range files {
-			dstName := filepath.Join(storageDir, filename)
-			if strings.HasSuffix(fullPath, ".sha512") {
-				dstName += ".sha512"
-			}
+		dstName := filepath.Join(storageDir, requestedFile)
 
-			// CREATE THE CHECK SUM MANUALLY!!!!
-
-			if err := os.Rename(fullPath, dstName); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
-				return
-			}
-
-			logger.Debug().Msgf("moving: %s -> %s", fullPath, dstName)
+		logger.Debug().Msgf("moving %s -> %s", fullPath, dstName)
+		if err := os.Rename(fullPath, dstName); err != nil {
+			logger.Error().Err(err).Msg("renaming file")
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
 		}
 
-		fullPath := path.Join("/files", filename)
-		http.Redirect(w, r, fullPath, http.StatusTemporaryRedirect)
+		// CREATE THE CHECK SUM MANUALLY!!!!
+		if err := generateSha512(ctx, storageDir, filepath.Base(dstName)); err != nil {
+			logger.Error().Err(err).Msg("generating sha512")
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		fileURL := path.Join("/files", filepath.Base(fullPath))
+		http.Redirect(w, r, fileURL, http.StatusTemporaryRedirect)
 	}
+}
+
+func generateSha512(ctx context.Context, storageDir, filename string) error {
+	logger := zerolog.Ctx(ctx)
+	out, err := runCmd(ctx, storageDir, nil, []string{
+		"sha512sum",
+		filename,
+	}...)
+	if err != nil {
+		return err
+	}
+
+	sha512File := filepath.Join(storageDir, filename+".sha512")
+	f, err := os.Create(sha512File)
+	if err != nil {
+		return fmt.Errorf("creating sha512 file: %w", err)
+	}
+
+	if _, err := f.WriteString(out); err != nil {
+		return fmt.Errorf("writting data to sha512 file: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("closing sha512 file: %w", err)
+	}
+
+	logger.Debug().Msgf("generated sha512: %s", filename)
+	return nil
 }
 
 func copyFiles(ctx context.Context, sourceDir, storageDir string) error {
@@ -151,8 +206,8 @@ func copyFiles(ctx context.Context, sourceDir, storageDir string) error {
 }
 
 // packageBeats generates the tar.gz and sha512sum of the package.
-// It returns the full path of the generated files and an error, if any
-func packageBeats(ctx context.Context, sourceDir string) ([]string, error) {
+// It returns the full path of the generated file and an error, if any
+func packageBeats(ctx context.Context, sourceDir string) (string, error) {
 	logger := zerolog.Ctx(ctx)
 
 	goos := runtime.GOOS
@@ -179,7 +234,7 @@ func packageBeats(ctx context.Context, sourceDir string) ([]string, error) {
 
 	out, err := runCmd(ctx, sourceDir, envs, args...)
 	if err != nil {
-		return []string{}, err
+		return "", err
 	}
 
 	filename := ""
@@ -193,16 +248,10 @@ func packageBeats(ctx context.Context, sourceDir string) ([]string, error) {
 	}
 
 	if filename == "" {
-		return []string{}, errors.New("could not get the generated filenames ")
+		return "", errors.New("could not get the generated filenames ")
 	}
 
-	packagePath := filepath.Join(sourceDir, filename)
-	files := []string{
-		packagePath,
-		packagePath + ".sha512",
-	}
-
-	return files, nil
+	return filepath.Join(sourceDir, filename), nil
 }
 
 // runCmd runs a command and returns its combined output and an error, if any.
