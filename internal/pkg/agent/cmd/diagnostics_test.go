@@ -30,7 +30,7 @@ var testDiagnostics = DiagnosticsInfo{
 		BuildTime: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
 		Snapshot:  false,
 	},
-	ProcMetas: []client.ProcMeta{client.ProcMeta{
+	ProcMetas: []client.ProcMeta{{
 		Process:            "filebeat",
 		Name:               "filebeat",
 		Hostname:           "test-host",
@@ -45,7 +45,7 @@ var testDiagnostics = DiagnosticsInfo{
 		BinaryArchitecture: "test-architecture",
 		RouteKey:           "test",
 		ElasticLicensed:    true,
-	}, client.ProcMeta{
+	}, {
 		Process:            "filebeat",
 		Name:               "filebeat_monitoring",
 		Hostname:           "test-host",
@@ -60,7 +60,7 @@ var testDiagnostics = DiagnosticsInfo{
 		BinaryArchitecture: "test-architecture",
 		RouteKey:           "test",
 		ElasticLicensed:    true,
-	}, client.ProcMeta{
+	}, {
 		Name:     "metricbeat",
 		RouteKey: "test",
 		Error:    "failed to get metricbeat data",
