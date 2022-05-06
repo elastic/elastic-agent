@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -50,9 +51,9 @@ func Test_debugCmd_errors(t *testing.T) {
 }
 
 func Test_debugCmd_table(t *testing.T) {
-	streams, _, bOut, bErr := cli.NewTestingIOStreams()
+	streams, bIn, bOut, bErr := cli.NewTestingIOStreams()
 
-	type args struct {
+	type callArgs struct {
 		streams        *cli.IOStreams
 		flags          []string
 		args           []string
@@ -81,21 +82,20 @@ func Test_debugCmd_table(t *testing.T) {
 	}
 
 	var tests = []struct {
-		name string
-		args args
-		want string
+		name     string
+		callArgs callArgs
+		bIn      *bytes.Buffer
+		want     string
 	}{
 		{
 			name: "only agent",
-			args: args{
+			callArgs: callArgs{
 				streams:        streams,
-				flags:          nil,
-				args:           nil,
 				getDiagnostics: diagAgent,
 			},
 			want: `
 PIDs:
-    elastic-agent: 4242
+    elastic-agent:   4242
 
 Delve commands:
     elastic-agent:  dlv --listen=:4242 --headless=true --api-version=2 --accept-multiclient attach 4242
@@ -103,15 +103,14 @@ Delve commands:
 		},
 		{
 			name: "only agent with port",
-			args: args{
+			callArgs: callArgs{
 				streams:        streams,
 				flags:          []string{"--" + flagPort, "31416"},
-				args:           nil,
 				getDiagnostics: diagAgent,
 			},
 			want: `
 PIDs:
-    elastic-agent: 4242
+    elastic-agent:   4242
 
 Delve commands:
     elastic-agent:  dlv --listen=:31416 --headless=true --api-version=2 --accept-multiclient attach 4242
@@ -119,16 +118,15 @@ Delve commands:
 		},
 		{
 			name: "agent and others applications",
-			args: args{
+			callArgs: callArgs{
 				streams:        streams,
-				args:           nil,
 				getDiagnostics: diagMulti,
 			},
 			want: `
 PIDs:
-    elastic-agent: 4242
-    beat-1: 31416
-    beat-2: 1618
+    elastic-agent:   4242
+    beat-1:          31416
+    beat-2:          1618
 
 Delve commands:
     elastic-agent:  dlv --listen=:4242 --headless=true --api-version=2 --accept-multiclient attach 4242
@@ -136,13 +134,32 @@ Delve commands:
     beat-2:         dlv --listen=:4242 --headless=true --api-version=2 --accept-multiclient attach 1618
 `,
 		},
+		{
+			name: "local flag: agent and others applications",
+			callArgs: callArgs{
+				streams:        streams,
+				flags:          []string{"--" + flagLocal},
+				getDiagnostics: diagMulti,
+			},
+			want: `
+PIDs:
+    elastic-agent:   4242
+    beat-1:          31416
+    beat-2:          1618
+
+Delve commands:
+    elastic-agent:  dlv attach 4242
+    beat-1:         dlv attach 31416
+    beat-2:         dlv attach 1618
+`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			cmd := newDebugCommand(tt.args.streams, tt.args.getDiagnostics)
-			cmd.SetArgs(tt.args.flags)
+			cmd := newDebugCommand(tt.callArgs.streams, tt.callArgs.getDiagnostics)
+			cmd.SetArgs(tt.callArgs.flags)
 
 			err := cmd.Execute()
 			require.NoError(t, err)
@@ -151,6 +168,7 @@ Delve commands:
 			assert.Empty(t, bErr)
 
 			bOut.Reset()
+			bIn.Reset()
 		})
 	}
 
