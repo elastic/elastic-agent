@@ -10,6 +10,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/dev-tools/mage/stack"
 	"io"
 	"os"
 	"os/exec"
@@ -363,6 +364,60 @@ func (Format) License() error {
 		sh.RunV("go-licenser", "-license", "Elastic"),
 	)
 }
+func StackUpOnlyImage() error {
+	start := time.Now()
+	defer func() { fmt.Println("stack up ran for", time.Since(start)) }()
+	version, found := os.LookupEnv("BEAT_VERSION")
+	if !found {
+		version = release.Version()
+	}
+	ctx := context.Background()
+	fmt.Println("starting stack up")
+	stack.Up(ctx, version, "elastic-agent-752c699")
+	return nil
+}
+
+// StackUp packages the Beat for distribution
+func StackUp() error {
+	start := time.Now()
+	defer func() { fmt.Println("stack up ran for", time.Since(start)) }()
+	//ctx := context.Background()
+	fmt.Println("starting stack up")
+	version, found := os.LookupEnv("BEAT_VERSION")
+	if !found {
+		version = release.Version()
+	}
+	fmt.Println("Found version ", version)
+	fmt.Println("Set default env variables")
+	os.Setenv("PLATFORMS", "+all linux/amd64")
+	devtools.Platforms = devtools.NewPlatformList("+all linux/amd64")
+	os.Setenv("PACKAGES", "DOCKER")
+	devtools.PACKAGES = "DOCKER"
+	os.Setenv(snapshotEnv, "true")
+	devtools.Snapshot = true
+	os.Setenv(externalArtifacts, "true")
+	devtools.ExternalBuild = true
+	os.Setenv(devEnv, "true")
+	devtools.DevBuild = true
+
+	// produce docker package
+	packageAgent([]string{
+		"linux-x86_64.tar.gz",
+	}, devtools.UseElasticAgentDemoPackaging, true)
+
+	fmt.Println("docker image created")
+	//stack.Up(ctx, version, tag)
+	return nil
+}
+
+// StackDown packages the Beat for distribution.
+func StackDown() error {
+	start := time.Now()
+	defer func() { fmt.Println("stack down ran for", time.Since(start)) }()
+	ctx := context.Background()
+	stack.Down(ctx)
+	return nil
+}
 
 // AssembleDarwinUniversal merges the darwin/amd64 and darwin/arm64 into a single
 // universal binary using `lipo`. It's automatically invoked by CrossBuild whenever
@@ -419,7 +474,7 @@ func Package() {
 		panic("elastic-agent package is expected to include other packages")
 	}
 
-	packageAgent(requiredPackages, devtools.UseElasticAgentPackaging)
+	packageAgent(requiredPackages, devtools.UseElasticAgentPackaging, false)
 }
 func getPackageName(beat, version, pkg string) (string, string) {
 	if _, ok := os.LookupEnv(snapshotEnv); ok {
@@ -604,7 +659,7 @@ func runAgent(env map[string]string) error {
 		// produce docker package
 		packageAgent([]string{
 			"linux-x86_64.tar.gz",
-		}, devtools.UseElasticAgentDemoPackaging)
+		}, devtools.UseElasticAgentDemoPackaging, false)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -651,12 +706,12 @@ func runAgent(env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(requiredPackages []string, packagingFn func()) {
+func packageAgent(requiredPackages []string, packagingFn func(), runFleet bool) {
 	version, found := os.LookupEnv("BEAT_VERSION")
 	if !found {
 		version = release.Version()
 	}
-
+	packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
 	// build deps only when drop is not provided
 	if dropPathEnv, found := os.LookupEnv(agentDropPath); !found || len(dropPathEnv) == 0 {
 		// prepare new drop
@@ -685,10 +740,9 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		// cleanup after build
 		defer os.RemoveAll(dropPath)
 		defer os.Unsetenv(agentDropPath)
-
-		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
 		if devtools.ExternalBuild == true {
 			ctx := context.Background()
+			fmt.Println(packedBeats)
 			for _, beat := range packedBeats {
 				for _, reqPackage := range requiredPackages {
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
@@ -728,6 +782,33 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				}
 			}
 		}
+		if runFleet {
+			pwd, err := filepath.Abs("../fleet-server")
+			if err != nil {
+				panic(err)
+			}
+			if !requiredPackagesPresent(pwd, "fleet-server", version, requiredPackages) {
+				cmd := exec.Command("make", "release")
+				cmd.Dir = pwd
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				cmd.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", pwd), "AGENT_PACKAGING=on")
+				if envVar := selectedPackageTypes(); envVar != "" {
+					cmd.Env = append(cmd.Env, envVar)
+				}
+				cmd.Env = append(cmd.Env, "PLATFORMS=linux/amd64")
+				if err := cmd.Run(); err != nil {
+					panic(err)
+				}
+			}
+
+			// copy to new drop
+			sourcePath := filepath.Join(pwd, "build", "distributions")
+			if err := copyAll(sourcePath, dropPath); err != nil {
+				panic(err)
+			}
+		}
+
 	}
 
 	// package agent

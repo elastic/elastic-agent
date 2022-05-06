@@ -32,3 +32,8 @@ func TestSystem(t *testing.T) {
 		main()
 	}
 }
+
+func TestMahe(t *testing.T) {
+err:= StackUpOnlyImage()
+_= err
+}
