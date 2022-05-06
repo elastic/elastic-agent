@@ -1,9 +1,8 @@
-package main
+package packageserver
 
 import (
 	"bytes"
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -23,15 +22,8 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
-func main() {
-	baseDir, _ := os.Getwd()
-	sourceDir := filepath.Join(baseDir, "beats")
-	storageDir := filepath.Join(baseDir, "storage")
-
-	flag.StringVar(&sourceDir, "source-dir", sourceDir, "Folder containing the Beats source code")
-	flag.StringVar(&storageDir, "storag-dir", storageDir, "Folder to keep and serve the packed beats")
-	flag.Parse()
-
+// StartServer starts the server
+func StartServer(sourceDir, storageDir string, httpPort int) {
 	// Build from x-pack by default, we can make it configurable later
 	sourceDir = filepath.Join(sourceDir, "x-pack")
 
@@ -45,7 +37,7 @@ func main() {
 
 	r.Use(hlog.NewHandler(logger))
 	r.Use(hlog.RequestIDHandler("req_id", "Request-Id"))
-	r.Use(RequestFields)
+	r.Use(requestFields)
 	r.Use(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
 		zerolog.Ctx(r.Context()).Info().
 			Int("status", status).
@@ -59,10 +51,11 @@ func main() {
 	// Create a route along /files that will serve contents from
 	// the ./data/ folder.
 	filesDir := http.Dir(storageDir)
-	FileServer(r, "/files", filesDir)
+	fileServer(r, "/files", filesDir)
 
-	logger.Info().Msg("starting server on port 8000")
-	if err := http.ListenAndServe(":8000", r); err != nil {
+	addr := fmt.Sprintf(":%d", httpPort)
+	logger.Info().Msgf("starting server on %s", addr)
+	if err := http.ListenAndServe(addr, r); err != nil {
 		panic(err)
 	}
 }
@@ -204,49 +197,9 @@ func runCmd(ctx context.Context, pwd string, env map[string]string, command ...s
 	return nil
 }
 
-// func packageBeats(ctx context.Context, beatName, sourceDir, storageDir, binaryName string) (string, error) {
-// 	logger := zerolog.Ctx(ctx)
-
-// 	workDir, err := os.MkdirTemp("", "beats-build-")
-// 	if err != nil {
-// 		logger.Error().Err(err).Msg("cannot creat temp directory")
-// 		return "", fmt.Errorf("creaging temp directory: %w", err)
-// 	}
-// 	defer func() {
-// 		logger.Debug().Msgf("removing temp dir: %s", workDir)
-// 		if err := os.RemoveAll(workDir); err != nil {
-// 			logger.Error().Err(err).Msgf("could not remove temp folder: %q", workDir)
-// 		}
-// 	}()
-// 	logger.Debug().Msgf("temp dir: %s", workDir)
-
-// 	binaryFullPath := filepath.Join(workDir, binaryName)
-// 	buildDir := filepath.Join(sourceDir, beatName)
-
-// 	logger.Debug().Msgf("buildDir: %s, binaryFullPath: %s", buildDir, binaryFullPath)
-
-// 	if err := buildBinary(buildDir, binaryFullPath); err != nil {
-// 		return "", err
-// 	}
-
-// 	return tarName, nil
-// }
-
-// func buildBinary(buildDir, binaryFullPath string) error {
-// 	args := []string{
-// 		"go",
-// 		"build",
-// 		"-o",
-// 		binaryFullPath,
-// 		".",
-// 	}
-
-// 	return runCmd(buildDir, args...)
-// }
-
-// FileServer conveniently sets up a http.FileServer handler to serve
+// fileServer conveniently sets up a http.fileServer handler to serve
 // static files from a http.FileSystem.
-func FileServer(r chi.Router, path string, root http.FileSystem) {
+func fileServer(r chi.Router, path string, root http.FileSystem) {
 	if strings.ContainsAny(path, "{}*") {
 		panic("FileServer does not permit any URL parameters.")
 	}
@@ -265,7 +218,7 @@ func FileServer(r chi.Router, path string, root http.FileSystem) {
 	})
 }
 
-func RequestID(next http.Handler) http.Handler {
+func requestID(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		requestID := r.Header.Get(middleware.RequestIDHeader)
@@ -275,5 +228,23 @@ func RequestID(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, middleware.RequestIDKey, requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
+	return http.HandlerFunc(fn)
+}
+
+func requestFields(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		logger := zerolog.Ctx(r.Context())
+
+		logger.UpdateContext(func(c zerolog.Context) zerolog.Context {
+			c = c.Stringer("url", r.URL)
+			c = c.Str("method", r.Method)
+			c = c.Str("ip", r.RemoteAddr)
+			// c = c.Str("user_agent", r.UserAgent())
+			return c
+		})
+
+		next.ServeHTTP(w, r)
+	}
+
 	return http.HandlerFunc(fn)
 }
