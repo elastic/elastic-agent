@@ -72,17 +72,21 @@ func Example_humanDiagnosticsOutput() {
 	// Output:
 	// elastic-agent  id: test-id                version: test-version
 	//                build_commit: test-commit  build_time: 2021-01-01 00:00:00 +0000 UTC  snapshot_build: false
+	//                PID: 0
 	// Applications:
-	//   *  name: filebeat                        route_key: test
-	//      process: filebeat                     id: filebeat-id          ephemeral_id: filebeat-ephemeral-id        elastic_license: true
-	//      version: filebeat-version             commit: filebeat-commit  build_time: 2021-01-01 00:00:00 +0000 UTC  binary_arch: test-architecture
-	//      hostname: test-host                   username: test-user      user_id: 1000                              user_gid: 1000
-	//   *  name: filebeat_monitoring             route_key: test
-	//      process: filebeat                     id: filebeat_monitoring-id          ephemeral_id: filebeat_monitoring-ephemeral-id  elastic_license: true
-	//      version: filebeat_monitoring-version  commit: filebeat_monitoring-commit  build_time: 2021-01-01 00:00:00 +0000 UTC       binary_arch: test-architecture
-	//      hostname: test-host                   username: test-user                 user_id: 1000                                   user_gid: 1000
-	//   *  name: metricbeat                      route_key: test
+	//   *  name: filebeat       route_key: test
+	//      process: filebeat    id: filebeat-id      ephemeral_id: filebeat-ephemeral-id  elastic_license: true
+	//      hostname: test-host  username: test-user  user_id: 1000                        user_gid: 1000
+	//      PID: 0
+	//
+	//   *  name: filebeat_monitoring  route_key: test
+	//      process: filebeat          id: filebeat_monitoring-id  ephemeral_id: filebeat_monitoring-ephemeral-id  elastic_license: true
+	//      hostname: test-host        username: test-user         user_id: 1000                                   user_gid: 1000
+	//      PID: 0
+	//
+	//   *  name: metricbeat  route_key: test
 	//      error: failed to get metricbeat data
+
 }
 
 func Test_collectEndpointSecurityLogs(t *testing.T) {
