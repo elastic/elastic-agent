@@ -1,8 +1,8 @@
 package packageserver
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,7 +22,8 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
-// StartServer starts the server
+// StartServer starts the HTTP server to serve the beats, it accepts 3 arguments:
+// Beats source directory, a folder to store/serve the packaged Beats and a port to run
 func StartServer(sourceDir, storageDir string, httpPort int) {
 	// Build from x-pack by default, we can make it configurable later
 	sourceDir = filepath.Join(sourceDir, "x-pack")
@@ -94,17 +95,29 @@ func handlerPackageBeats(sourceDir, storageDir, filename string) http.HandlerFun
 			return c
 		})
 
-		if err := packageBeats(ctx, sourceDir); err != nil {
+		files, err := packageBeats(ctx, sourceDir)
+		if err != nil {
 			logger.Error().Err(err).Msg("packing Beats")
 			fmt.Fprintln(w, err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		if err := copyFiles(ctx, sourceDir, storageDir); err != nil {
-			logger.Error().Err(err).Msg("copying files")
-			fmt.Fprintln(w, err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
+		for _, fullPath := range files {
+			dstName := filepath.Join(storageDir, filename)
+			if strings.HasSuffix(fullPath, ".sha512") {
+				dstName += ".sha512"
+			}
+
+			// CREATE THE CHECK SUM MANUALLY!!!!
+
+			if err := os.Rename(fullPath, dstName); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
+
+			logger.Debug().Msgf("moving: %s -> %s", fullPath, dstName)
 		}
 
 		fullPath := path.Join("/files", filename)
@@ -137,13 +150,26 @@ func copyFiles(ctx context.Context, sourceDir, storageDir string) error {
 	return nil
 }
 
-// packageBeats generates the tar.gz and sha512sum of the package
+// packageBeats generates the tar.gz and sha512sum of the package.
+// It returns the full path of the generated files and an error, if any
+func packageBeats(ctx context.Context, sourceDir string) ([]string, error) {
+	logger := zerolog.Ctx(ctx)
 
-func packageBeats(ctx context.Context, sourceDir string) error {
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+
+	if v, ok := os.LookupEnv("OS"); ok {
+		goos = v
+	}
+
+	if v, ok := os.LookupEnv("ARCH"); ok {
+		goarch = v
+	}
+
 	envs := map[string]string{
 		"DEV":       "1",
 		"PACKAGES":  "tar.gz",
-		"PLATFORMS": fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		"PLATFORMS": fmt.Sprintf("%s/%s", goos, goarch),
 	}
 	args := []string{
 		"mage",
@@ -151,14 +177,36 @@ func packageBeats(ctx context.Context, sourceDir string) error {
 		"package",
 	}
 
-	if err := runCmd(ctx, sourceDir, envs, args...); err != nil {
-		return err
+	out, err := runCmd(ctx, sourceDir, envs, args...)
+	if err != nil {
+		return []string{}, err
 	}
 
-	return nil
+	filename := ""
+	lines := strings.Split(out, "\n")
+	for _, l := range lines {
+		if strings.HasPrefix(l, "Creating output file at") {
+			filename = strings.TrimPrefix(l, "Creating output file at")
+			filename = strings.TrimSpace(filename)
+			logger.Info().Msgf("generated file: %q", filename)
+		}
+	}
+
+	if filename == "" {
+		return []string{}, errors.New("could not get the generated filenames ")
+	}
+
+	packagePath := filepath.Join(sourceDir, filename)
+	files := []string{
+		packagePath,
+		packagePath + ".sha512",
+	}
+
+	return files, nil
 }
 
-func runCmd(ctx context.Context, pwd string, env map[string]string, command ...string) error {
+// runCmd runs a command and returns its combined output and an error, if any.
+func runCmd(ctx context.Context, pwd string, env map[string]string, command ...string) (string, error) {
 	logger := zerolog.Ctx(ctx)
 
 	envList := append([]string{}, os.Environ()...)
@@ -172,29 +220,22 @@ func runCmd(ctx context.Context, pwd string, env map[string]string, command ...s
 	args := command[1:]
 
 	cmd := exec.Command(c, args...)
-	stdErr := bytes.Buffer{}
-	stdOut := bytes.Buffer{}
 	cmd.Dir = pwd
-	cmd.Stderr = &stdErr
-	cmd.Stdout = &stdOut
 	cmd.Env = envList
 
+	logger.Debug().Msgf("entering folder: %s", cmd.Dir)
 	logger.Debug().Msgf("running: %s %s", c, strings.Join(args, " "))
-	logger.Debug().Msgf("from: %s", cmd.Dir)
 
-	if err := cmd.Run(); err != nil {
-		logger.Debug().Msg(stdErr.String())
-		logger.Debug().Msg(stdOut.String())
-		return err
+	combOut, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(combOut), err
 	}
 
 	if code := cmd.ProcessState.ExitCode(); code != 0 {
-		logger.Debug().Msg(stdErr.String())
-		logger.Debug().Msg(stdOut.String())
-		return fmt.Errorf("exit code: %d", code)
+		return string(combOut), fmt.Errorf("exit code: %d", code)
 	}
 
-	return nil
+	return string(combOut), nil
 }
 
 // fileServer conveniently sets up a http.fileServer handler to serve
