@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -50,7 +51,7 @@ func Test_debugCmd_errors(t *testing.T) {
 	}
 }
 
-func Test_debugCmd_table(t *testing.T) {
+func Test_debugCmd(t *testing.T) {
 	streams, bIn, bOut, bErr := cli.NewTestingIOStreams()
 
 	type callArgs struct {
@@ -172,4 +173,23 @@ Delve commands:
 		})
 	}
 
+}
+
+func Test_debugRunCmd(t *testing.T) {
+	streams, _, bOut, bErr := cli.NewTestingIOStreams()
+
+	diagAgent := func(_ context.Context) (DiagnosticsInfo, error) {
+		return DiagnosticsInfo{
+			AgentInfo: AgentInfo{PID: 4242},
+		}, nil
+	}
+
+	cmd := newDebugCommand(streams, diagAgent)
+	cmd.SetArgs([]string{"run", "elastic-agent"})
+	cmd.Execute()
+	cmd.SetArgs([]string{"run", "--local", "elastic-agent"})
+	cmd.Execute()
+
+	fmt.Println(bOut.String())
+	fmt.Println(bErr.String())
 }
