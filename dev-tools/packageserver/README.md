@@ -1,4 +1,4 @@
-# Beats hot reloading for dev mode
+# Beats "hot reloading" for dev mode
 
 ## The problem
 
@@ -64,6 +64,72 @@ consists of:
    details).
 4. It's assumed the HTTP server is running on the same OS/Architecture
    as the Elastic-Agent/Beats.
+5. Everything can be run unsing `mage`
+
+## How it all works
+### Requirements
+* Beats source code: https://github.com/elastic/beats
+* Elastic-Agent source code: https://github.com/elastic/elastic-agent
+* All the required tools/stup to develop Beats and Elastic-Agent
+* A direct network connection between where the Elastic-Agent is
+  running and where the Beats will be compiled/served.
+* The Beats and Elastic-Agent are on the same version.
 
 
+### Step by step
+It's assumed the host and environment being debugged are the same OS
+and architecture.
 
+1. Start the HTTP server
+   Go to Elastic-Agent's source code and run
+
+   ```
+   mage wip:startServer <beats_source_path> <storage_pat> <http_port>
+   ```
+   This will start the 'local artifacts API' on the given port
+
+2. Open `internal/pkg/artifact/config.go`from Elastic-Agent and edit
+   the default value for
+   [`SourceURI`](https://github.com/elastic/elastic-agent/blob/ca211516c908bcd4cc01b6130f2e5e9205ecbe84/internal/pkg/artifact/config.go#L59)
+   so it points to your local artifacts API, e.g:
+   `http://192.188.42.42:8000`.
+3. Recompile the Elastic-Agent in dev mode:
+
+   ```
+   mage dev:build
+   ```
+   This will generate a `elastic-agent` binary into the `build` folder.
+4. Copy this binary to the host being debugged
+5. Start the Elastic-Agent
+6. Profit! The Elastic-Agent will re-download all beats from the local
+   artifacts API.
+
+### Tips
+* On Linux hosts, when the Elastic-Agent is installed using the tar.gz
+  package it creates a system service and puts all it's files on
+  `/opt/Elastic/Agent`. For easy debugging you can run the
+  Elastic-Agent directly from that folder instead of using the
+  service, that way you can easily see the logs and change the log
+  level. To run the Elastic-Agent with log level debug and printing
+  the logs to stdout run (as root):
+  
+  ```
+  cd /opt/Elastic/Agent
+  ./elastic-agnet run -e -v -d "*"
+  ```
+* You can run an Elastic-Agent managed by fleet from any
+* To run the Elastic-Agent with Delve and all the development build
+  flags, the command is:
+
+  ```
+  dlv debug . --build-flags="-ldflags='-X github.com/elastic/elastic-agent/internal/pkg/release.devInsecure=true -X github.com/elastic/elastic-agent/internal/pkg/release.allowEmptyPgp=true -X github.com/elastic/elastic-agent/internal/pkg/release.allowUpgrade=true'" -- run -e -v -d "*"
+  ```
+
+## Next steps
+* Integrate with @AndersonQ's work on [debugging the
+  Elastic-Agent](https://github.com/elastic/elastic-agent/pull/403) so
+  we can easily connect a debugger to a running Beat.
+* Integrate with @ph's work on making the build of Elastic-Agent
+  simpler and faster.
+* Discussion on whether it is worht investing more time on this
+  approach.

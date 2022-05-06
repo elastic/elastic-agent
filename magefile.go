@@ -38,6 +38,9 @@ import (
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
+
+	// mage:import wip
+	_ "github.com/elastic/elastic-agent/dev-tools/packageserver"
 )
 
 const (
@@ -815,7 +818,7 @@ func buildVars() map[string]string {
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {
 			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowEmptyPgp"] = "true"
-			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowUpgradee"] = "true"
+			vars["github.com/elastic/elastic-agent/internal/pkg/release.allowUpgrade"] = "true"
 			vars["github.com/elastic/elastic-agent/internal/pkg/release.devInsecure"] = "true"
 		}
 	}
