@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -20,11 +22,6 @@ const (
 	formatRemote = "\t%s:\t" + cmdRemote + "\n"
 	formatLocal  = "\t%s:\t" + cmdLocal + "\n"
 )
-
-type debugData struct {
-	name string
-	pid  int64
-}
 
 func newDebugCommand(streams *cli.IOStreams, getDiagnostics func(ctx context.Context) (DiagnosticsInfo, error)) *cobra.Command {
 	cmd := &cobra.Command{
@@ -98,14 +95,14 @@ func getFormatStr(fmtRemote, fmtLocal string, flags *pflag.FlagSet) (func(name s
 	}, nil
 }
 
-func getFormatCmdStr(fmtRemote, fmtLocal string, flags *pflag.FlagSet) (func(pid int64) string, error) {
+func getFormatCmdStr(flags *pflag.FlagSet) (func(pid int64) string, error) {
 	local, err := flags.GetBool(flagLocal)
 	if err != nil {
 		return nil, fmt.Errorf("could not get flag %q error: %v", flagLocal, err)
 	}
 	if local {
 		return func(pid int64) string {
-			return fmt.Sprintf(fmtLocal, pid)
+			return fmt.Sprintf(cmdLocal, pid)
 		}, nil
 	}
 
@@ -114,7 +111,7 @@ func getFormatCmdStr(fmtRemote, fmtLocal string, flags *pflag.FlagSet) (func(pid
 		return nil, fmt.Errorf("could not get flag %q error: %v", flagPort, err)
 	}
 	return func(pid int64) string {
-		return fmt.Sprintf(fmtRemote, port, pid)
+		return fmt.Sprintf(cmdRemote, port, pid)
 	}, nil
 }
 
@@ -123,6 +120,7 @@ func newDebugRunCommand(streams *cli.IOStreams, getDiagnostics func(ctx context.
 		Use:   "run [application]",
 		Short: "runs Delve for an application.",
 		Long:  "runs Delve for an application.",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			err := debugRunCmd(streams, c, args, getDiagnostics)
 			if err != nil {
@@ -135,44 +133,61 @@ func newDebugRunCommand(streams *cli.IOStreams, getDiagnostics func(ctx context.
 	return cmd
 }
 
-func debugRunCmd(s *cli.IOStreams, c *cobra.Command, args []string, getDiagnostics func(ctx context.Context) (DiagnosticsInfo, error)) error {
-	fmt.Fprintf(s.Out, "inside run cmg\n\n")
+func debugRunCmd(
+	s *cli.IOStreams,
+	c *cobra.Command,
+	args []string,
+	getDiagnostics func(ctx context.Context) (DiagnosticsInfo, error)) error {
+	name := args[0]
+
+	_, err := exec.LookPath("dlv")
+	if err != nil {
+		return fmt.Errorf("delve (dlv) isn't present on your PATH: %w", err)
+	}
+
 	diag, err := getDiagnostics(context.Background())
 	if err != nil {
 		return fmt.Errorf("could not get debug (diagnostics) info: %w", err)
 	}
 
-	sprintCMD, err := getFormatCmdStr(cmdRemote, cmdLocal, c.Flags())
+	sprintCMD, err := getFormatCmdStr(c.Flags())
 	if err != nil {
 		return fmt.Errorf("debug command failed: %w", err)
 	}
 
 	pdiag := parseDiagnostics(diag)
 
-	for _, app := range pdiag {
-		for _, arg := range args {
-			if app.name == arg {
-				fmt.Fprintf(s.Out, sprintCMD(app.pid))
-				return nil
-			}
+	for app, pid := range pdiag {
+		if app == name {
+
+			ss := strings.Split(sprintCMD(pid), " ")
+			cmd := exec.Command(ss[0], ss[1:]...)
+
+			cmd.Stdin = s.In
+			cmd.Stdout = s.Out
+			cmd.Stderr = s.Err
+			return cmd.Run()
 		}
 	}
 
-	fmt.Fprintf(s.Out, "choose an application!\n")
+	var names []string
+	for name, _ := range pdiag {
+		names = append(names, name)
+	}
+
+	fmt.Fprintf(s.Out,
+		"%q not running, choose one of [%s] applications!\n",
+		name, strings.Join(names, ", "))
 	return nil
 }
 
-func parseDiagnostics(d DiagnosticsInfo) []debugData {
-	parsed := []debugData{{
-		name: "elastic-agent",
-		pid:  d.AgentInfo.PID,
-	}}
+func parseDiagnostics(d DiagnosticsInfo) map[string]int64 {
+	parsed := map[string]int64{
+		"elastic-agent": d.AgentInfo.PID,
+	}
 
 	for _, p := range d.ProcMetas {
-		parsed = append(parsed, debugData{
-			name: p.Name,
-			pid:  p.PID,
-		})
+		parsed[p.Name] = p.PID
 	}
 
 	return parsed

@@ -137,9 +137,10 @@ message StatusResponse {
   repeated ApplicationStatus applications = 3;
 }
 
-// ProcMetaResponse is the current running version infomation for all processes.
+// ProcMetaResponse is the current running version information for all processes.
 message ProcMetaResponse {
   repeated ProcMeta procs = 1;
+  ProcMeta agent = 2;
 }
 
 // PprofRequest is a request for pprof data from and http/pprof endpoint.

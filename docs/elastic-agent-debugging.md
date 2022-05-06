@@ -256,3 +256,26 @@ vagrant ssh dev
 ```shell
 sudo /opt/Elastic/Agent/elastic-agent status
 ```
+
+
+## Troubleshooting
+
+### (dlv) no such file or directory
+Probably the source code path at compile time differs from the one you have.
+Use [`config substitute-path`](https://github.com/go-delve/delve/tree/master/Documentation/cli#config) to
+adjust it. The error below
+
+```text
+> github.com/elastic/elastic-agent/internal/pkg/agent/control/server.(*Server).ProcMeta() /go/src/github.com/elastic/elastic-agent/internal/pkg/agent/control/server/server.go:240 (hits goroutine(894):1 total:1) (PC: 0x56424d219d19)
+Command failed: open /go/src/github.com/elastic/elastic-agent/internal/pkg/agent/control/server/server.go: no such file or directory
+```
+can be fixed with
+
+```text
+(dlv) config substitute-path /go/src/github.com/elastic/elastic-agent /vagrant
+```
+
+### (dlv) Warning: debugging optimized function
+
+Ensure optimizations and inlining are disabled. Build the elastic-agent and beats with
+`DEV=true` so `-gcflags=all=-N -l` will be passed to the Go compiler.

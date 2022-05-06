@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -221,8 +222,9 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 
 	resp := &proto.ProcMetaResponse{
 		Procs: []*proto.ProcMeta{},
+		Agent: &proto.ProcMeta{Pid: int64(os.Getpid())},
 	}
-	// here?
+
 	// gather spec data for all rk/apps running
 	specs := s.getSpecInfo("", "")
 	_ = specs
@@ -235,13 +237,11 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 		resp.Procs = append(resp.Procs, procMeta)
 	}
 
-	a := resp
-	_ = a
-	_ = resp
 	return resp, nil
 }
 
-// Pprof returns /debug/pprof data for the requested applicaiont-route_key or all running applications.
+// b internal/pkg/agent/control/server/server.go:240
+// Pprof returns /debug/pprof data for the requested application-route_key or all running applications.
 func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.PprofResponse, error) {
 	if s.monitoringCfg == nil || s.monitoringCfg.Pprof == nil || !s.monitoringCfg.Pprof.Enabled {
 		return nil, fmt.Errorf("agent.monitoring.pprof disabled")

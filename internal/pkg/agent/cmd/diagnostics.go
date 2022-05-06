@@ -325,21 +325,22 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 	}
 	defer daemon.Disconnect()
 
-	bv, err := daemon.ProcMeta(ctx)
+	pms, err := daemon.ProcMeta(ctx)
 	if err != nil {
 		return DiagnosticsInfo{}, err
 	}
-	diag.ProcMetas = bv
+	diag.ProcMetas = pms.Procs
 
 	version, err := daemon.Version(ctx)
 	if err != nil {
 		return diag, err
 	}
 	diag.AgentInfo = AgentInfo{
-		Version:   version.Version,
-		Commit:    version.Commit,
 		BuildTime: version.BuildTime,
+		Commit:    version.Commit,
+		PID:       pms.Agent.PID,
 		Snapshot:  version.Snapshot,
+		Version:   version.Version,
 	}
 
 	agentInfo, err := info.NewAgentInfo(false)
@@ -347,7 +348,6 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 		return diag, err
 	}
 	diag.AgentInfo.ID = agentInfo.AgentID()
-	diag.AgentInfo.PID = int64(os.Getpid())
 
 	return diag, nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -92,6 +93,7 @@ func Test_debugCmd(t *testing.T) {
 			name: "only agent",
 			callArgs: callArgs{
 				streams:        streams,
+				flags:          []string{},
 				getDiagnostics: diagAgent,
 			},
 			want: `
@@ -121,6 +123,7 @@ Delve commands:
 			name: "agent and others applications",
 			callArgs: callArgs{
 				streams:        streams,
+				flags:          []string{},
 				getDiagnostics: diagMulti,
 			},
 			want: `
@@ -158,8 +161,11 @@ Delve commands:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			bOut.Reset()
+			bIn.Reset()
 
 			cmd := newDebugCommand(tt.callArgs.streams, tt.callArgs.getDiagnostics)
+			// If nil is passed to cmd.SetArgs, it'll use os.Args[1:] which will be mixed to the args passed to go test
 			cmd.SetArgs(tt.callArgs.flags)
 
 			err := cmd.Execute()
@@ -167,29 +173,51 @@ Delve commands:
 
 			assert.Equal(t, tt.want, bOut.String())
 			assert.Empty(t, bErr)
-
-			bOut.Reset()
-			bIn.Reset()
 		})
 	}
 
 }
 
-func Test_debugRunCmd(t *testing.T) {
-	streams, _, bOut, bErr := cli.NewTestingIOStreams()
+func Example_debugRunCmd() {
+	streams := &cli.IOStreams{
+		In:  os.Stdin,
+		Out: os.Stdout,
+		Err: os.Stderr,
+	}
 
 	diagAgent := func(_ context.Context) (DiagnosticsInfo, error) {
 		return DiagnosticsInfo{
 			AgentInfo: AgentInfo{PID: 4242},
+			ProcMetas: []client.ProcMeta{
+				{
+					Name: "beat-1",
+					PID:  31416,
+				},
+				{
+					Name: "beat-2",
+					PID:  1618,
+				},
+			},
 		}, nil
 	}
 
 	cmd := newDebugCommand(streams, diagAgent)
 	cmd.SetArgs([]string{"run", "elastic-agent"})
 	cmd.Execute()
-	cmd.SetArgs([]string{"run", "--local", "elastic-agent"})
+
+	fmt.Println("")
+	cmd.SetArgs([]string{"run", "--local", "beat-1"})
 	cmd.Execute()
 
-	fmt.Println(bOut.String())
-	fmt.Println(bErr.String())
+	fmt.Println("")
+	cmd.SetArgs([]string{"run", "wrong"})
+	cmd.Execute()
+
+	fmt.Println("")
+	cmd.SetArgs([]string{"run", "wrong", "too many args"})
+	cmd.Execute()
+
+	// Output:
+	// dlv --listen=:4242 --headless=true --api-version=2 --accept-multiclient attach 4242
+	// dlv attach 4242
 }
