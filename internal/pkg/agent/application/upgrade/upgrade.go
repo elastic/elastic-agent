@@ -157,7 +157,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	if strings.HasPrefix(release.Commit(), newHash) {
 		// not an error
 		if action := a.FleetAction(); action != nil {
-			_ = u.ackAction(ctx, action)
+			//nolint:errcheck // keeping the same behavior, and making linter happy
+			u.ackAction(ctx, action)
 		}
 		u.log.Warn("upgrading to same version")
 		return nil, nil
@@ -345,16 +346,16 @@ func encryptConfigIfNeeded(newHash string) (err error) {
 	}
 
 	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	ymlActionStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreYmlFile()))
-	actionStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreFile()))
+	ymlStateStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreYmlFile()))
+	stateStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreFile()))
 
 	files := []struct {
 		Src string
 		Dst string
 	}{
 		{
-			Src: ymlActionStorePath,
-			Dst: actionStorePath,
+			Src: ymlStateStorePath,
+			Dst: stateStorePath,
 		},
 		{
 			Src: paths.AgentConfigYmlFile(),

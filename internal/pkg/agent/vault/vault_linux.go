@@ -57,7 +57,7 @@ func New(path string) (*Vault, error) {
 }
 
 // Close closes the valut store
-// Noop on windows
+// Noop on linux
 func (v *Vault) Close() error {
 	return nil
 }

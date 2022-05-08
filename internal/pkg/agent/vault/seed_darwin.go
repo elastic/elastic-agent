@@ -8,6 +8,6 @@
 package vault
 
 // DisableRootCheck noop on darwin to allow to compile the common code
+// Noop on darwin
 func DisableRootCheck() {
-	// Noop on darwin
 }

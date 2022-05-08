@@ -17,22 +17,21 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func getTestVaultPath() string {
-	exe, _ := os.Executable()
-	dir := filepath.Dir(exe)
+func getTestVaultPath(t *testing.T) string {
+	dir := t.TempDir()
 	return filepath.Join(dir, "vault", "co.elastic.agent")
 }
 
-func getTestOptions() []OptionFunc {
+func getTestOptions(t *testing.T) []OptionFunc {
 	return []OptionFunc{
-		WithVaultPath(getTestVaultPath()),
+		WithVaultPath(getTestVaultPath(t)),
 	}
 }
 
 func TestCreate(t *testing.T) {
 	vault.DisableRootCheck()
 
-	opts := getTestOptions()
+	opts := getTestOptions(t)
 
 	start := time.Now().UTC()
 	keys := []string{"secret1", "secret2", "secret3"}
@@ -67,5 +66,5 @@ func TestCreate(t *testing.T) {
 		}
 	}
 
-	os.RemoveAll(filepath.Dir(getTestVaultPath()))
+	os.RemoveAll(filepath.Dir(getTestVaultPath(t)))
 }
