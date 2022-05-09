@@ -173,7 +173,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
-	if err := encryptConfigIfNeeded(newHash); err != nil {
+	if err := encryptConfigIfNeeded(u.log, newHash); err != nil {
 		return nil, errors.New(err, "failed to encrypt the configuration")
 	}
 
@@ -336,11 +336,10 @@ func copyVault(newHash string) error {
 }
 
 // Create the key if it doesn't exists and encrypt the fleet.yml and state.yml
-func encryptConfigIfNeeded(newHash string) (err error) {
+func encryptConfigIfNeeded(log *logger.Logger, newHash string) (err error) {
 	vaultPath := getVaultPath(newHash)
 
 	err = secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
-
 	if err != nil {
 		return err
 	}
@@ -363,7 +362,8 @@ func encryptConfigIfNeeded(newHash string) (err error) {
 		},
 	}
 	for _, f := range files {
-		b, err := ioutil.ReadFile(f.Src)
+		var b []byte
+		b, err = ioutil.ReadFile(f.Src)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
@@ -383,15 +383,21 @@ func encryptConfigIfNeeded(newHash string) (err error) {
 			if err != nil {
 				return
 			}
-			_ = os.Remove(fp)
+			if rerr := os.Remove(fp); rerr != nil {
+				log.Warnf("failed to remove file: %s, err: %v", fp, rerr)
+			}
 		}(f.Src)
 	}
 
 	// Remove fleet.yml.lock file if no errors
 	if err != nil {
-		return
+		return err
 	}
-	_ = os.Remove(paths.AgentConfigYmlFile() + ".lock")
+
+	lockFp := paths.AgentConfigYmlFile() + ".lock"
+	if rerr := os.Remove(lockFp); rerr != nil {
+		log.Warnf("failed to remove file: %s, err: %v", lockFp, rerr)
+	}
 
 	return err
 }

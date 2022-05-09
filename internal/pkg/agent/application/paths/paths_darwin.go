@@ -33,3 +33,8 @@ exec /Library/Elastic/Agent/elastic-agent $@
 func ArePathsEqual(expected, actual string) bool {
 	return expected == actual
 }
+
+// AgentVaultPath is keychain name on Mac OS
+func AgentVaultPath() string {
+	return defaultAgentVaultName
+}

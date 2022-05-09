@@ -23,7 +23,7 @@ const darwin = "darwin"
 
 var encryptionDisabled bool
 
-// DisableEncryption disables storage encryption.
+// DisableEncryptionDarwin disables storage encryption.
 // Is needed for existing unit tests on Mac OS, because the system keychain requires sudo
 func DisableEncryptionDarwin() {
 	if runtime.GOOS == darwin {
@@ -81,7 +81,6 @@ func (d *EncryptedDiskStore) ensureKey() error {
 }
 
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
-
 	// Ensure has agent key
 	err := d.ensureKey()
 	if err != nil {

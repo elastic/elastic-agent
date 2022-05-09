@@ -7,7 +7,6 @@ package paths
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 )
@@ -35,9 +34,6 @@ const defaultAgentStateStoreFile = "state.enc"
 
 // defaultAgentVaultName is keychain item name for mac
 const defaultAgentVaultName = "co.elastic.agent"
-
-// defaultAgentVaultPath is the directory for windows and linux where the vault store is located or the
-const defaultAgentVaultPath = "vault"
 
 // AgentConfigYmlFile is a name of file used to store agent information
 func AgentConfigYmlFile() string {
@@ -88,12 +84,4 @@ func AgentStateStoreYmlFile() string {
 // AgentStateStoreFile is the file that contains the persisted state of the agent including the action that can be replayed after restart encrypted.
 func AgentStateStoreFile() string {
 	return filepath.Join(Home(), defaultAgentStateStoreFile)
-}
-
-// AgentVaultPath is the directory that contains all the files for the value for windows and linux
-func AgentVaultPath() string {
-	if runtime.GOOS == "darwin" {
-		return defaultAgentVaultName
-	}
-	return filepath.Join(Home(), defaultAgentVaultPath)
 }
