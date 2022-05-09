@@ -10,6 +10,8 @@ package vault
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
