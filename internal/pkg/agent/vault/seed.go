@@ -9,6 +9,7 @@ package vault
 
 import (
 	"errors"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -57,7 +58,7 @@ func getSeed(path string) ([]byte, error) {
 
 	isOwnerRoot, err := isFileOwnerRoot(fp)
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 		isOwnerRoot = true

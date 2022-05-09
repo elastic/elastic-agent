@@ -7,6 +7,7 @@ package storage
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"runtime"
 
@@ -60,7 +61,7 @@ func WithVaultPath(vaultPath string) OptionFunc {
 func (d *EncryptedDiskStore) Exists() (bool, error) {
 	_, err := os.Stat(d.target)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return false, nil
 		}
 		return false, err

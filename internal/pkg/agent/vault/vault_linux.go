@@ -11,6 +11,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -86,7 +88,7 @@ func (v *Vault) Get(key string) ([]byte, error) {
 func (v *Vault) Exists(key string) (ok bool, err error) {
 	if _, err = os.Stat(v.filepathFromKey(key)); err == nil {
 		ok = true
-	} else if os.IsNotExist(err) {
+	} else if errors.Is(err, fs.ErrNotExist) {
 		err = nil
 	}
 	return ok, err
