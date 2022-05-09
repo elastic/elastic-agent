@@ -32,9 +32,6 @@ const defaultAgentStateStoreYmlFile = "state.yml"
 // defaultAgentStateStoreFile is the file that will contain the action that can be replayed after restart encrypted.
 const defaultAgentStateStoreFile = "state.enc"
 
-// defaultAgentVaultName is keychain item name for mac
-const defaultAgentVaultName = "co.elastic.agent"
-
 // AgentConfigYmlFile is a name of file used to store agent information
 func AgentConfigYmlFile() string {
 	return filepath.Join(Config(), defaultAgentFleetYmlFile)
