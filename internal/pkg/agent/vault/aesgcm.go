@@ -20,6 +20,18 @@ const (
 	AES256 AESKeyType = 32
 )
 
+func (kt AESKeyType) String() string {
+	switch kt {
+	case AES128:
+		return "AES128"
+	case AES192:
+		return "AES192"
+	case AES256:
+		return "AES256"
+	}
+	return ""
+}
+
 // NewKey generates new AES key as bytes
 func NewKey(kt AESKeyType) ([]byte, error) {
 	key := make([]byte, kt)
