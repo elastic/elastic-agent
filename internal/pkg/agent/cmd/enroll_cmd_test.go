@@ -42,9 +42,9 @@ func (m *mockStore) Save(in io.Reader) error {
 	}
 
 	buf := new(bytes.Buffer)
-	_, err := io.Copy(buf, in)
+	io.Copy(buf, in) // nolint:errcheck //not required
 	m.Content = buf.Bytes()
-	return err
+	return nil
 }
 
 func TestEnroll(t *testing.T) {
@@ -326,6 +326,52 @@ func TestEnroll(t *testing.T) {
 	))
 }
 
+func TestValidateArgs(t *testing.T) {
+	url := "http://localhost:8220"
+	enrolmentToken := "my-enrollment-token"
+	streams, _, _, _ := cli.NewTestingIOStreams()
+	cmd := newEnrollCommandWithArgs([]string{}, streams)
+	err := cmd.Flags().Set("tag", "windows,production")
+	require.NoError(t, err)
+	err = cmd.Flags().Set("insecure", "true")
+	require.NoError(t, err)
+	args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+	require.NotNil(t, args)
+	require.Equal(t, len(args), 9)
+	require.Contains(t, args, "--tag")
+	require.Contains(t, args, "windows")
+	require.Contains(t, args, "production")
+	require.Contains(t, args, "--insecure")
+	require.Contains(t, args, enrolmentToken)
+	require.Contains(t, args, url)
+	cleanedTags := cleanTags(args)
+	require.Contains(t, cleanedTags, "windows")
+	require.Contains(t, cleanedTags, "production")
+
+	cmdNew := newEnrollCommandWithArgs([]string{}, streams)
+	err = cmdNew.Flags().Set("tag", "windows, production")
+	require.NoError(t, err)
+	args = buildEnrollmentFlags(cmdNew, url, enrolmentToken)
+	require.Contains(t, args, "--tag")
+	require.Contains(t, args, "windows")
+	require.Contains(t, args, " production")
+	cleanedTags = cleanTags(args)
+	require.Contains(t, cleanedTags, "windows")
+	require.Contains(t, cleanedTags, "production")
+
+	cmdEmpty := newEnrollCommandWithArgs([]string{}, streams)
+	err = cmdEmpty.Flags().Set("tag", "windows, ")
+	require.NoError(t, err)
+	argsEmpty := buildEnrollmentFlags(cmdEmpty, url, enrolmentToken)
+	require.Contains(t, argsEmpty, "--tag")
+	require.Contains(t, argsEmpty, "windows")
+	require.Contains(t, argsEmpty, " ")
+	cleanedTags = cleanTags(argsEmpty)
+	require.Contains(t, cleanedTags, "windows")
+	require.NotContains(t, cleanedTags, " ")
+	require.NotContains(t, cleanedTags, "")
+}
+
 func withServer(
 	m func(t *testing.T) *http.ServeMux,
 	test func(t *testing.T, host string),
@@ -365,9 +411,7 @@ func withTLSServer(
 		}
 
 		// Uses the X509KeyPair pair defined in the TLSConfig struct instead of file on disk.
-		go func() {
-			_ = s.ServeTLS(listener, "", "")
-		}()
+		go s.ServeTLS(listener, "", "") // nolint:errcheck //not required
 
 		test(t, ca.Crt(), "localhost:"+strconv.Itoa(port))
 	}
@@ -378,10 +422,7 @@ func bytesToTMPFile(b []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = f.Write(b)
-	if err != nil {
-		return "", err
-	}
+	f.Write(b) // nolint:errcheck //not required
 	if err := f.Close(); err != nil {
 		return "", err
 	}

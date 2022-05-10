@@ -45,6 +45,7 @@ notice:
 check-ci:
 	@mage update
 	@$(MAKE) notice
+	@$(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) check-no-changes
 
 ## check: run all the checks including linting using golangci-lint.

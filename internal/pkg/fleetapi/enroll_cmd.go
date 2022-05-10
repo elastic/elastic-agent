@@ -95,6 +95,7 @@ type EnrollRequest struct {
 type Metadata struct {
 	Local        *info.ECSMeta          `json:"local"`
 	UserProvided map[string]interface{} `json:"user_provided"`
+	Tags         []string               `json:"tags"`
 }
 
 // Validate validates the enrollment request before sending it to the API.
@@ -145,6 +146,7 @@ type EnrollItemResponse struct {
 	LocalMetadata        map[string]interface{} `json:"local_metadata"`
 	Actions              []interface{}          `json:"actions"`
 	AccessAPIKey         string                 `json:"access_api_key"`
+	Tags                 []string               `json:"tags"`
 }
 
 // Validate validates the response send from the server.

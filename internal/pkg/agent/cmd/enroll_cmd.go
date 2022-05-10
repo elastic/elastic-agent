@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"go.elastic.co/apm"
@@ -111,6 +112,7 @@ type enrollCmdOption struct {
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
 	SkipCreateSecret     bool                       `yaml:"-"`
+	Tags                 []string                   `yaml:"omitempty"`
 }
 
 // remoteConfig returns the configuration used to connect the agent to a fleet process.
@@ -506,6 +508,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: c.options.UserProvidedMetadata,
+			Tags:         cleanTags(c.options.Tags),
 		},
 	}
 
@@ -1036,4 +1039,15 @@ func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff
 		close(signal)
 	}()
 	return bo
+}
+
+func cleanTags(tags []string) []string {
+	var r []string
+	for _, str := range tags {
+		tag := strings.TrimSpace(str)
+		if tag != "" {
+			r = append(r, tag)
+		}
+	}
+	return r
 }
