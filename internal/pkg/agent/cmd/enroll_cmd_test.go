@@ -331,6 +331,20 @@ func TestValidateArgs(t *testing.T) {
 	require.Contains(t, args, "--insecure")
 	require.Contains(t, args, enrolmentToken)
 	require.Contains(t, args, url)
+	cleanedTags := cleanTags(args)
+	require.Contains(t, cleanedTags, "windows")
+	require.Contains(t, cleanedTags, "production")
+
+	cmdNew := newEnrollCommandWithArgs([]string{}, streams)
+	err = cmdNew.Flags().Set("tag", "windows, production")
+	require.NoError(t, err)
+	args = buildEnrollmentFlags(cmdNew, url, enrolmentToken)
+	require.Contains(t, args, "--tag")
+	require.Contains(t, args, "windows")
+	require.Contains(t, args, " production")
+	cleanedTags = cleanTags(args)
+	require.Contains(t, cleanedTags, "windows")
+	require.Contains(t, cleanedTags, "production")
 }
 
 func withServer(

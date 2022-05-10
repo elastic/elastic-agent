@@ -225,7 +225,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	}
 
 	for _, v := range fTags {
-                args = append(args, "--tag", v)
+		args = append(args, "--tag", v)
 	}
 	return args
 }
