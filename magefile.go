@@ -373,7 +373,7 @@ func StackUpOnlyImage() error {
 	}
 	ctx := context.Background()
 	fmt.Println("starting stack up")
-	stack.Up(ctx, version, "elastic-agent-752c699")
+	stack.Up(ctx, version, "elastic-agent-8.3.0-SNAPSHOT-linux-amd64.docker.tar.gz")
 	return nil
 }
 
@@ -381,7 +381,7 @@ func StackUpOnlyImage() error {
 func StackUp() error {
 	start := time.Now()
 	defer func() { fmt.Println("stack up ran for", time.Since(start)) }()
-	//ctx := context.Background()
+	ctx := context.Background()
 	fmt.Println("starting stack up")
 	version, found := os.LookupEnv("BEAT_VERSION")
 	if !found {
@@ -389,8 +389,8 @@ func StackUp() error {
 	}
 	fmt.Println("Found version ", version)
 	fmt.Println("Set default env variables")
-	os.Setenv("PLATFORMS", "+all linux/amd64")
-	devtools.Platforms = devtools.NewPlatformList("+all linux/amd64")
+	os.Setenv("PLATFORMS", "linux/amd64")
+	devtools.Platforms = devtools.NewPlatformList("linux/amd64")
 	os.Setenv("PACKAGES", "DOCKER")
 	devtools.PACKAGES = "DOCKER"
 	os.Setenv(snapshotEnv, "true")
@@ -403,10 +403,10 @@ func StackUp() error {
 	// produce docker package
 	packageAgent([]string{
 		"linux-x86_64.tar.gz",
-	}, devtools.UseElasticAgentDemoPackaging, true)
+	}, devtools.UseElasticAgentDockerTestPackaging, true)
 
 	fmt.Println("docker image created")
-	//stack.Up(ctx, version, tag)
+	stack.Up(ctx, version, "elastic-agent-complete-8.3.0-SNAPSHOT-linux-amd64.docker.tar.gz")
 	return nil
 }
 
