@@ -46,7 +46,6 @@ check-ci:
 	@mage update
 	@$(MAKE) notice
 	@$(MAKE) check-no-changes
-	@$(MAKE) -C deploy/kubernetes all
 
 ## check: run all the checks including linting using golangci-lint.
 .PHONY: check
