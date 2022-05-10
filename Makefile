@@ -40,11 +40,18 @@ notice:
 		-noticeOut NOTICE.txt \
 		-depsOut ""
 
+
+## generate-k8s: Regenerates all k8s templates.
+.PHONY: generate-k8s
+generate-k8s:
+	@$(MAKE) -C deploy/kubernetes all
+
 ## check-ci: Run all the checks under the ci, this doesn't include the linter which is run via a github action.
 .PHONY: check-ci
 check-ci:
 	@mage update
 	@$(MAKE) notice
+	@$(MAKE) generate-k8s
 	@$(MAKE) check-no-changes
 
 ## check: run all the checks including linting using golangci-lint.
