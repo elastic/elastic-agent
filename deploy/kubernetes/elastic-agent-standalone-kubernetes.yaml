@@ -565,7 +565,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent-standalone
-          image: docker.elastic.co/beats/elastic-agent:8.2.0
+          image: docker.elastic.co/beats/elastic-agent:8.3.0
           args: [
             "-c", "/etc/agent.yml",
             "-e",
