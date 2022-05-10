@@ -1034,8 +1034,9 @@ func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff
 func cleanTags(tags []string) []string {
 	var r []string
 	for _, str := range tags {
-		if str != "" {
-			r = append(r, strings.TrimSpace(str))
+		tag := strings.TrimSpace(str)
+		if tag != "" {
+			r = append(r, tag)
 		}
 	}
 	return r
