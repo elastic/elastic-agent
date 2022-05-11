@@ -1,9 +1,8 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
-//
-// nolint:errorlint // Postpone the change here until we refactor error handling.
-//
+
+//nolint:errorlint,errcheck // Postpone the change here until we refactor error handling.
 // Package errors provides a small api to manage hierarchy of errors.
 package errors
 

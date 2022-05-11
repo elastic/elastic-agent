@@ -31,7 +31,7 @@ func TestStateStore(t *testing.T) {
 
 func runTestStateStore(t *testing.T, ackToken string) {
 	log, _ := logger.New("state_store", false)
-	withFile := func(fn func(t *testing.T, file string)) func(*testing.T) {
+	withFile := func(fn func(t *testing.T, file string)) func(*testing.T) { //nolint:unparam // false positive
 		return func(t *testing.T) {
 			dir := t.TempDir()
 			file := filepath.Join(dir, "state.yml")

@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package handlers
 
 import (
@@ -13,11 +17,13 @@ type queueCanceler interface {
 	Cancel(id string) int
 }
 
+// Cancel is a handler for CANCEL actions.
 type Cancel struct {
 	log *logger.Logger
 	c   queueCanceler
 }
 
+// NewCancel creates a new Cancel handler that uses the passed queue canceller.
 func NewCancel(log *logger.Logger, cancel queueCanceler) *Cancel {
 	return &Cancel{
 		log: log,
@@ -25,6 +31,7 @@ func NewCancel(log *logger.Logger, cancel queueCanceler) *Cancel {
 	}
 }
 
+// Handle will cancel any actions in the queue that match target_id.
 func (h *Cancel) Handle(ctx context.Context, a fleetapi.Action, acker store.FleetAcker) error {
 	action, ok := a.(*fleetapi.ActionCancel)
 	if !ok {

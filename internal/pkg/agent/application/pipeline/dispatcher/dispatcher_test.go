@@ -88,7 +88,7 @@ func TestActionDispatcher(t *testing.T) {
 		ctx1, cancel := context.WithCancel(context.Background())
 		ack := &mockAcker{}
 		ack.On("Commit", mock.Anything).Run(func(args mock.Arguments) {
-			ctx := args.Get(0).(context.Context)
+			ctx, _ := args.Get(0).(context.Context)
 			require.NoError(t, ctx.Err())
 			got := apm.SpanFromContext(ctx)
 			require.Equal(t, span.TraceContext().Span, got.ParentID())
@@ -112,8 +112,10 @@ func TestActionDispatcher(t *testing.T) {
 		success1 := &mockHandler{}
 		success2 := &mockHandler{}
 
-		d.Register(&mockAction{}, success1)
-		d.Register(&mockOtherAction{}, success2)
+		err = d.Register(&mockAction{}, success1)
+		require.NoError(t, err)
+		err = d.Register(&mockOtherAction{}, success2)
+		require.NoError(t, err)
 
 		action1 := &mockAction{}
 		action2 := &mockOtherAction{}

@@ -1,3 +1,8 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+//nolint:errcheck,dupl // lots of casting in test cases
 package queue
 
 import (
@@ -6,10 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 type mockAction struct {
@@ -99,9 +105,9 @@ func TestNewActionQueue(t *testing.T) {
 
 	t.Run("start time error", func(t *testing.T) {
 		a := &mockAction{}
-		a.On("StartTime").Return(time.Time{}, errors.New("oh no!"))
+		a.On("StartTime").Return(time.Time{}, errors.New("oh no"))
 		q, err := NewActionQueue([]fleetapi.Action{a})
-		assert.EqualError(t, err, "oh no!")
+		assert.EqualError(t, err, "oh no")
 		assert.Nil(t, q)
 	})
 }

@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package queue
 
 import (
@@ -40,7 +44,7 @@ func (q ActionQueue) Swap(i, j int) {
 // When using the queue, the Add method should be used instead.
 func (q *ActionQueue) Push(x interface{}) {
 	n := len(*q)
-	e := x.(*item)
+	e := x.(*item) //nolint:errcheck // should be an *item
 	e.index = n
 	*q = append(*q, e)
 }
@@ -96,7 +100,7 @@ func (q *ActionQueue) DequeueActions() []fleetapi.Action {
 		if (*q)[0].priority > ts {
 			break
 		}
-		item := heap.Pop(q).(*item)
+		item := heap.Pop(q).(*item) //nolint:errcheck // should be an *item
 		actions = append(actions, item.action)
 	}
 	return actions
