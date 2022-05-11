@@ -31,21 +31,38 @@ type Info struct {
 // Option is an option func to change the underlying command
 type Option func(c *exec.Cmd)
 
-// Start starts a new process
+// Start starts a new process. Pass in opts to change the underlying command.
 // Returns:
 // - network address of child process
 // - process id
 // - error
-func Start(logger *logger.Logger, path string, config *Config, uid, gid int, args []string, opts ...Option) (proc *Info, err error) {
+func Start(
+	logger *logger.Logger,
+	path string,
+	config *Config,
+	uid,
+	gid int,
+	args []string,
+	opts ...Option) (proc *Info, err error) {
 	return StartContext(nil, logger, path, config, uid, gid, args, opts...) //nolint:staticcheck // calls a different function if no ctx
 }
 
-// StartContext starts a new process with context.
+// StartContext starts a new process with context. Pass in opts to change
+// the underlying command.
 // Returns:
 // - network address of child process
 // - process id
 // - error
-func StartContext(ctx context.Context, logger *logger.Logger, path string, config *Config, uid, gid int, args []string, opts ...Option) (*Info, error) {
+func StartContext(
+	ctx context.Context,
+	logger *logger.Logger,
+	path string,
+	config *Config,
+	uid,
+	gid int,
+	args []string,
+	opts ...Option) (*Info, error) {
+
 	cmd := getCmd(ctx, logger, path, []string{}, uid, gid, args...)
 	for _, o := range opts {
 		o(cmd)
