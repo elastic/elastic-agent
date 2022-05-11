@@ -163,6 +163,5 @@ func (d *EncryptedDiskStore) Load() (io.ReadCloser, error) {
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, d.target))
 	}
-	// The crypto.Reader is closing the underlying reader, in this case fd
 	return crypto.NewReaderWithDefaults(fd, d.key)
 }

@@ -108,10 +108,10 @@ func TestEncryptDecryptDifferentLengths(t *testing.T) {
 				t.Error(err)
 			}
 			for i := 0; i < maxDataSize; i++ {
-				data := make([]byte, 0)
+				data := make([]byte, i)
 				_, err := rand.Read(data)
 				if err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
 				name := strconv.Itoa(i)
 				t.Run(name, func(t *testing.T) {
@@ -142,7 +142,6 @@ func TestEncryptDecryptDifferentLengths(t *testing.T) {
 }
 
 func TestEncryptDecryptHex(t *testing.T) {
-
 	aes256Key, err := NewKeyHexString(AES256)
 	if err != nil {
 		t.Fatal(err)
@@ -170,29 +169,17 @@ func TestEncryptDecryptHex(t *testing.T) {
 		},
 	}
 
-	checkError := func(wantErr, gotErr error) {
-		if gotErr != nil {
-			if wantErr == nil {
-				t.Fatalf("want err: nil, got: %v", gotErr)
-			}
-			if wantErr != nil {
-				if !errors.Is(gotErr, wantErr) {
-					t.Fatalf("want err: %v, got: %v", wantErr, gotErr)
-				}
-			}
-		} else {
-			if wantErr != nil {
-				t.Fatalf("want err: %v, got: nil", wantErr)
-			}
-		}
-	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			enc, err := EncryptHex(tc.key, tc.data)
-			checkError(tc.err, err)
+			if !errors.Is(tc.err, err) {
+				t.Fatalf(cmp.Diff(tc.err, err))
+			}
 
 			dec, err := DecryptHex(tc.key, enc)
-			checkError(tc.err, err)
+			if !errors.Is(tc.err, err) {
+				t.Fatalf(cmp.Diff(tc.err, err))
+			}
 
 			if len(tc.data) == 0 {
 				diff := cmp.Diff(len(tc.data), len(dec))

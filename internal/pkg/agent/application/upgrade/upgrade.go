@@ -335,7 +335,7 @@ func copyVault(newHash string) error {
 	return nil
 }
 
-// Create the key if it doesn't exists and encrypt the fleet.yml and state.yml
+// Create the key if it doesn't exist and encrypt the fleet.yml and state.yml
 func encryptConfigIfNeeded(log *logger.Logger, newHash string) (err error) {
 	vaultPath := getVaultPath(newHash)
 
@@ -389,7 +389,7 @@ func encryptConfigIfNeeded(log *logger.Logger, newHash string) (err error) {
 		}(f.Src)
 	}
 
-	// Remove fleet.yml.lock file if no errors
+	// Do not remove AgentConfigYmlFile lock file if any error happened.
 	if err != nil {
 		return err
 	}
