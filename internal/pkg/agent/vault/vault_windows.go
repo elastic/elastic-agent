@@ -44,7 +44,7 @@ func New(path string) (*Vault, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = systemAdministratorsOnly(path, true)
+	err = systemAdministratorsOnly(path, false)
 	if err != nil {
 		return nil, err
 	}
