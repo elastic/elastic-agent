@@ -106,7 +106,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 	t.Run("can save a queue with one upgrade action",
 		withFile(func(t *testing.T, file string) {
-			ts := time.Now().Round(time.Second)
+			ts := time.Now().UTC().Round(time.Second)
 			queue := []action{&fleetapi.ActionUpgrade{
 				ActionID:        "test",
 				ActionType:      fleetapi.ActionTypeUpgrade,
@@ -139,7 +139,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 
 	t.Run("can save a queue with two actions",
 		withFile(func(t *testing.T, file string) {
-			ts := time.Now().Round(time.Second)
+			ts := time.Now().UTC().Round(time.Second)
 			queue := []action{&fleetapi.ActionUpgrade{
 				ActionID:        "test",
 				ActionType:      fleetapi.ActionTypeUpgrade,

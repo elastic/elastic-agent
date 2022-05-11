@@ -350,7 +350,7 @@ func TestFleetGateway(t *testing.T) {
 		stateStore, err := store.NewStateStore(log, diskStore)
 		require.NoError(t, err)
 
-		ts := time.Now().Round(time.Second)
+		ts := time.Now().UTC().Round(time.Second)
 		queue := &mockQueue{}
 		queue.On("Add", mock.Anything, ts.Add(time.Hour).Unix()).Return().Once()
 		queue.On("DequeueActions").Return([]fleetapi.Action{})
@@ -417,7 +417,7 @@ func TestFleetGateway(t *testing.T) {
 		stateStore, err := store.NewStateStore(log, diskStore)
 		require.NoError(t, err)
 
-		ts := time.Now().Round(time.Second)
+		ts := time.Now().UTC().Round(time.Second)
 		queue := &mockQueue{}
 		queue.On("DequeueActions").Return([]fleetapi.Action{&fleetapi.ActionUpgrade{ActionID: "id1", ActionType: "UPGRADE", ActionStartTime: ts.Add(-1 * time.Hour).Format(time.RFC3339), ActionExpiration: ts.Add(time.Hour).Format(time.RFC3339)}}).Once()
 		queue.On("Actions").Return([]fleetapi.Action{})
@@ -472,7 +472,7 @@ func TestFleetGateway(t *testing.T) {
 		stateStore, err := store.NewStateStore(log, diskStore)
 		require.NoError(t, err)
 
-		ts := time.Now().Round(time.Second)
+		ts := time.Now().UTC().Round(time.Second)
 		queue := &mockQueue{}
 		queue.On("DequeueActions").Return([]fleetapi.Action{&fleetapi.ActionUpgrade{ActionID: "id1", ActionType: "UPGRADE", ActionStartTime: ts.Add(-2 * time.Hour).Format(time.RFC3339), ActionExpiration: ts.Add(-1 * time.Hour).Format(time.RFC3339)}}).Once()
 		queue.On("Actions").Return([]fleetapi.Action{})
@@ -527,7 +527,7 @@ func TestFleetGateway(t *testing.T) {
 		stateStore, err := store.NewStateStore(log, diskStore)
 		require.NoError(t, err)
 
-		ts := time.Now().Round(time.Second)
+		ts := time.Now().UTC().Round(time.Second)
 		queue := &mockQueue{}
 		queue.On("Add", mock.Anything, ts.Add(-1*time.Hour).Unix()).Return().Once()
 		queue.On("DequeueActions").Return([]fleetapi.Action{})

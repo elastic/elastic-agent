@@ -189,7 +189,7 @@ func (f *fleetGateway) worker() {
 				// TODO set errMsg? update status?
 			}
 
-			queued, expired := f.gatherQueuedActions(ts)
+			queued, expired := f.gatherQueuedActions(ts.UTC())
 			f.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
 
 			// TODO update all actions in expired as aborted?

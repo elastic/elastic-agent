@@ -218,20 +218,28 @@ func (a *ActionUpgrade) ID() string {
 	return a.ActionID
 }
 
-// StartTime returns the start_time as a time.Time or ErrNoStartTime if there is no start time
+// StartTime returns the start_time as a UTC time.Time or ErrNoStartTime if there is no start time
 func (a *ActionUpgrade) StartTime() (time.Time, error) {
 	if a.ActionStartTime == "" {
 		return time.Time{}, ErrNoStartTime
 	}
-	return time.Parse(time.RFC3339, a.ActionStartTime)
+	ts, err := time.Parse(time.RFC3339, a.ActionStartTime)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
 }
 
-// Expiration returns the expiration as a time.Time or ErrExpiration if there is no expiration
+// Expiration returns the expiration as a UTC time.Time or ErrExpiration if there is no expiration
 func (a *ActionUpgrade) Expiration() (time.Time, error) {
 	if a.ActionExpiration == "" {
 		return time.Time{}, ErrNoExpiration
 	}
-	return time.Parse(time.RFC3339, a.ActionExpiration)
+	ts, err := time.Parse(time.RFC3339, a.ActionExpiration)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
 }
 
 // ActionUnenroll is a request for agent to unhook from fleet.
