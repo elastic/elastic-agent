@@ -15,7 +15,7 @@ To build and package (generate the tar/zip/whatever with the agent, beats and ev
 DEV=true SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="tar.gz" mage -v clean package
 ```
 Where:
- - `PLATFORMS` defines to which platform to build and package. See [`magefile.go`](magefile.go#410)
+ - `PLATFORMS` defines to which platform to build and package. See [`magefile.go`](magefile.go#L410)
 for the supported platforms.
  - `PACKAGES` defines which packages to generate.
  - `EXTERNAL` if set to true, the beats will be downloaded, they'll be built otherwise.
