@@ -15,12 +15,14 @@ To build and package (generate the tar/zip/whatever with the agent, beats and ev
 DEV=true SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="tar.gz" mage -v clean package
 ```
 Where:
- - `PLATFORMS` defines to which platform to build and package
+ - `PLATFORMS` defines to which platform to build and package. See [`magefile.go`](magefile.go#410)
+for the supported platforms.
  - `PACKAGES` defines which packages to generate.
  - `EXTERNAL` if set to true, the beats will be downloaded, they'll be built otherwise.
- - `SNAPSHOT` if set to true the agent will not verify the beats/applications signatures
-and will use the staging artifacts API to download them.
- - `DEV` if set to true will build the agent with debug symbols and disable inlining and optimizations
+ - `SNAPSHOT` if set to true the agent will use the staging artifacts API to download them.
+ - `DEV` if set to true the agent will not verify the beats/applications GPG signatures and
+will build the agent with debug symbols and disable inlining and optimizations. Using
+`dev:package` or `dev:buiid` automatically set `DEV=true`.
 
 the elastic-agent artifact will be placed on `build/distributions`.
 
