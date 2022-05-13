@@ -51,7 +51,7 @@ func (a *Application) Configure(ctx context.Context, config map[string]interface
 		a.appLock.Unlock()
 		a.Stop()
 		err = a.Start(ctx, a.desc, config)
-		// lock back so it wont panic on deferred unlock
+		// lock back so it won't panic on deferred unlock
 		a.appLock.Lock()
 	}
 
