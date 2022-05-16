@@ -29,6 +29,9 @@ const iso8601Format = "2006-01-02T15:04:05.000Z0700"
 // DefaultLogLevel used in agent and its processes.
 const DefaultLogLevel = logp.InfoLevel
 
+// DefaultLogDirectory used in agent and its processes.
+const DefaultLogDirectory = "logs"
+
 // Logger alias ecslog.Logger with Logger.
 type Logger = logp.Logger
 
@@ -114,7 +117,7 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Home(), "logs", cfg.Beat)
+	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
 
 	rotator, err := file.NewFileRotator(filename,
 		file.MaxSizeBytes(defaultCfg.Files.MaxSize),
