@@ -60,10 +60,21 @@ func (a *Application) startFailedTimer(cfg map[string]interface{}, proc *process
 		return
 	}
 
+	// (AndersonQ) the context is getting cancelled, a.restart is never called.
+	// After putting the log below I can see it being logged on the 2nd failure.
+	// This context is cancelled, it should not be reused. However, I'm not seeing
+	// a.restartCanceller() being called. I added a log before it and the log does not appear.
+	// Perhaps a.startContext parent's context gets cancelled...
+	if err := a.startContext.Err(); err != nil {
+		a.logger.Warnf("a.startContext is done: %v. %s will never restart",
+			err, a.Name())
+	}
 	ctx, cancel := context.WithCancel(a.startContext)
 	a.restartCanceller = cancel
 	a.restartConfig = cfg
 	t := time.NewTimer(a.processConfig.FailureTimeout)
+	a.logger.Warnf("started a %s failed timer for %s, PID: %d",
+		a.processConfig.FailureTimeout, a.name, proc.PID)
 	go func() {
 		defer func() {
 			a.appLock.Lock()
@@ -72,10 +83,15 @@ func (a *Application) startFailedTimer(cfg map[string]interface{}, proc *process
 			a.appLock.Unlock()
 		}()
 
+		a.logger.Infof("waiting on failed timer for %s, PID: %d", a.name, proc.PID)
 		select {
 		case <-ctx.Done():
+			a.logger.Infof("%s: failed timer cancelled, PID: %d. ctx: %v",
+				a.name, proc.PID, ctx.Err())
 			return
 		case <-t.C:
+			a.logger.Warnf("invoking a.restart for %s, PID: %d",
+				a.name, proc.PID)
 			a.restart(proc)
 		}
 	}()
@@ -88,6 +104,7 @@ func (a *Application) stopFailedTimer() {
 	if a.restartCanceller == nil {
 		return
 	}
+	a.logger.Infof("cancelling %s failed timer", a.Name())
 	a.restartCanceller()
 	a.restartCanceller = nil
 }
@@ -97,12 +114,15 @@ func (a *Application) restart(proc *process.Info) {
 	a.appLock.Lock()
 	defer a.appLock.Unlock()
 
+	a.logger.Warnf("restarting %s, PID %d", a.Name(), proc.PID)
 	// stop the watcher
 	a.stopWatcher(proc)
 
 	// kill the process
 	if proc != nil && proc.Process != nil {
-		_ = proc.Process.Kill()
+		if err := proc.Process.Kill(); err != nil {
+			a.logger.Infof("could not kill %s:%d: %v", a.name, proc.PID, err)
+		}
 	}
 
 	if proc != a.state.ProcessInfo {
