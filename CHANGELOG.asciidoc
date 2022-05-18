@@ -67,6 +67,10 @@
 - Agent supports capabilities definition {pull}23848[23848]
 - Restart process on output change {pull}24907[24907]
 
+=== Docs
+
+- Minor updates on README.md for pre-requisities of build process
+
 [[release-notes-7.8.0]]
 === Elastic Agent version 7.8.0
 
