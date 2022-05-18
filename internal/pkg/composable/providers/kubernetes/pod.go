@@ -9,14 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/safemapstr"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	c "github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-libs/safemapstr"
 
 	k8s "k8s.io/client-go/kubernetes"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes/metadata"
-	"github.com/elastic/beats/v7/libbeat/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 )
@@ -78,7 +79,7 @@ func NewPodEventer(
 		logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 	}
 
-	rawConfig, err := common.NewConfigFrom(cfg)
+	rawConfig, err := c.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
@@ -146,20 +147,20 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 
 	namespaceAnnotations := kubernetes.PodNamespaceAnnotations(pod, p.namespaceWatcher)
 
-	data := generatePodData(pod, p.config, p.metagen, namespaceAnnotations)
+	data := generatePodData(pod, p.metagen, namespaceAnnotations)
 	data.mapping["scope"] = p.scope
 	// Emit the pod
 	// We emit Pod + containers to ensure that configs matching Pod only
 	// get Pod metadata (not specific to any container)
-	p.comm.AddOrUpdate(data.uid, PodPriority, data.mapping, data.processors)
+	_ = p.comm.AddOrUpdate(data.uid, PodPriority, data.mapping, data.processors)
 
 	// Emit all containers in the pod
-	// TODO: deal with init containers stopping after initialization
+	// We should deal with init containers stopping after initialization
 	p.emitContainers(pod, namespaceAnnotations)
 }
 
-func (p *pod) emitContainers(pod *kubernetes.Pod, namespaceAnnotations common.MapStr) {
-	generateContainerData(p.comm, pod, p.config, p.metagen, namespaceAnnotations)
+func (p *pod) emitContainers(pod *kubernetes.Pod, namespaceAnnotations mapstr.M) {
+	generateContainerData(p.comm, pod, p.metagen, namespaceAnnotations)
 }
 
 func (p *pod) emitStopped(pod *kubernetes.Pod) {
@@ -199,7 +200,7 @@ func (p *pod) OnUpdate(obj interface{}) {
 
 func (p *pod) unlockedUpdate(obj interface{}) {
 	p.logger.Debugf("Watcher Pod update: %+v", obj)
-	pod := obj.(*kubernetes.Pod)
+	pod, _ := obj.(*kubernetes.Pod)
 	p.emitRunning(pod)
 }
 
@@ -209,7 +210,7 @@ func (p *pod) OnDelete(obj interface{}) {
 	defer p.crossUpdate.RUnlock()
 
 	p.logger.Debugf("pod delete: %+v", obj)
-	pod := obj.(*kubernetes.Pod)
+	pod, _ := obj.(*kubernetes.Pod)
 	time.AfterFunc(p.cleanupTimeout, func() {
 		p.emitStopped(pod)
 	})
@@ -217,9 +218,8 @@ func (p *pod) OnDelete(obj interface{}) {
 
 func generatePodData(
 	pod *kubernetes.Pod,
-	cfg *Config,
 	kubeMetaGen metadata.MetaGen,
-	namespaceAnnotations common.MapStr) providerData {
+	namespaceAnnotations mapstr.M) providerData {
 
 	meta := kubeMetaGen.Generate(pod)
 	kubemetaMap, err := meta.GetValue("kubernetes")
@@ -229,15 +229,15 @@ func generatePodData(
 
 	// k8sMapping includes only the metadata that fall under kubernetes.*
 	// and these are available as dynamic vars through the provider
-	k8sMapping := map[string]interface{}(kubemetaMap.(common.MapStr).Clone())
+	k8sMapping := map[string]interface{}(kubemetaMap.(mapstr.M).Clone())
 
 	if len(namespaceAnnotations) != 0 {
 		k8sMapping["namespace_annotations"] = namespaceAnnotations
 	}
 	// Pass annotations to all events so that it can be used in templating and by annotation builders.
-	annotations := common.MapStr{}
+	annotations := mapstr.M{}
 	for k, v := range pod.GetObjectMeta().GetAnnotations() {
-		safemapstr.Put(annotations, k, v)
+		_ = safemapstr.Put(annotations, k, v)
 	}
 	k8sMapping["annotations"] = annotations
 
@@ -264,16 +264,15 @@ func generatePodData(
 func generateContainerData(
 	comm composable.DynamicProviderComm,
 	pod *kubernetes.Pod,
-	cfg *Config,
 	kubeMetaGen metadata.MetaGen,
-	namespaceAnnotations common.MapStr) {
+	namespaceAnnotations mapstr.M) {
 
 	containers := kubernetes.GetContainersInPod(pod)
 
 	// Pass annotations to all events so that it can be used in templating and by annotation builders.
-	annotations := common.MapStr{}
+	annotations := mapstr.M{}
 	for k, v := range pod.GetObjectMeta().GetAnnotations() {
-		safemapstr.Put(annotations, k, v)
+		_ = safemapstr.Put(annotations, k, v)
 	}
 
 	for _, c := range containers {
@@ -295,7 +294,7 @@ func generateContainerData(
 
 		// k8sMapping includes only the metadata that fall under kubernetes.*
 		// and these are available as dynamic vars through the provider
-		k8sMapping := map[string]interface{}(kubemetaMap.(common.MapStr).Clone())
+		k8sMapping := map[string]interface{}(kubemetaMap.(mapstr.M).Clone())
 
 		if len(namespaceAnnotations) != 0 {
 			k8sMapping["namespace_annotations"] = namespaceAnnotations
@@ -304,10 +303,10 @@ func generateContainerData(
 		k8sMapping["annotations"] = annotations
 
 		//container ECS fields
-		cmeta := common.MapStr{
+		cmeta := mapstr.M{
 			"id":      c.ID,
 			"runtime": c.Runtime,
-			"image": common.MapStr{
+			"image": mapstr.M{
 				"name": c.Spec.Image,
 			},
 		}
@@ -334,7 +333,7 @@ func generateContainerData(
 
 		// add container metadata under kubernetes.container.* to
 		// make them available to dynamic var resolution
-		containerMeta := common.MapStr{
+		containerMeta := mapstr.M{
 			"id":      c.ID,
 			"name":    c.Spec.Name,
 			"image":   c.Spec.Image,
@@ -342,14 +341,14 @@ func generateContainerData(
 		}
 		if len(c.Spec.Ports) > 0 {
 			for _, port := range c.Spec.Ports {
-				containerMeta.Put("port", fmt.Sprintf("%v", port.ContainerPort))
-				containerMeta.Put("port_name", port.Name)
+				_, _ = containerMeta.Put("port", fmt.Sprintf("%v", port.ContainerPort))
+				_, _ = containerMeta.Put("port_name", port.Name)
 				k8sMapping["container"] = containerMeta
-				comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+				_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
 			}
 		} else {
 			k8sMapping["container"] = containerMeta
-			comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+			_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
 		}
 	}
 }

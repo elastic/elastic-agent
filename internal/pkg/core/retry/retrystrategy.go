@@ -6,6 +6,7 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
@@ -107,12 +108,12 @@ func getDelayDuration(config *Config, retryNo int) time.Duration {
 // Error is fatal either if it implements Error interface and says so
 // or if it is equal to one of the fatal values provided
 func isFatal(err error, fatalErrors ...error) bool {
-	if fatalerr, ok := err.(Fatal); ok {
+	if fatalerr, ok := err.(Fatal); ok { // nolint:errorlint // Non obvious handling, we will refactor that module for v2.
 		return fatalerr.Fatal()
 	}
 
 	for _, e := range fatalErrors {
-		if e == err {
+		if errors.Is(e, err) {
 			return true
 		}
 	}

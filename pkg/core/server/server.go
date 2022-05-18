@@ -976,7 +976,7 @@ type actionResult struct {
 }
 
 func reportableErr(err error) bool {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return false
 	}
 	s, ok := status.FromError(err)

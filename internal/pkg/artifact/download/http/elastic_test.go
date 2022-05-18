@@ -18,13 +18,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (

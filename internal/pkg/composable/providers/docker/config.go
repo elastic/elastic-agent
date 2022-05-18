@@ -7,7 +7,7 @@ package docker
 import (
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common/docker"
+	"github.com/elastic/elastic-agent-autodiscover/docker"
 )
 
 // Config for docker provider

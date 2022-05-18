@@ -18,8 +18,8 @@ import (
 
 	"github.com/docker/go-units"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/atomic"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"

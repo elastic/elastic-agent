@@ -36,6 +36,7 @@ linters:
     # 'replace' is used in go.mod for many dependencies that come from libbeat. We should work to remove those,
     # so we can re-enable this linter.
     # - gomoddirectives # manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
+    - gomodguard
     - gosimple # linter for Go source code that specializes in simplifying a code
     - misspell # finds commonly misspelled English words in comments
     - nakedret # finds naked returns in functions greater than a specified function length
@@ -99,6 +100,14 @@ linters-settings:
   gomoddirectives:
     # Allow local `replace` directives. Default is false.
     replace-local: false
+
+  gomodguard:
+    blocked:
+      # List of blocked modules.
+      modules:
+        - github.com/elastic/beats/v7:
+            reason: "There must be no Beats dependency, use elastic-agent-libs instead."
+
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.

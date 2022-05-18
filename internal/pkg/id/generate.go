@@ -5,8 +5,7 @@
 package id
 
 import (
-	"math/rand"
-	"sync"
+	"crypto/rand"
 	"time"
 
 	"github.com/oklog/ulid"
@@ -15,20 +14,9 @@ import (
 // ID represents a unique ID.
 type ID = ulid.ULID
 
-// rand.New is not threadsafe, so we create a pool of rand to speed up the id generation.
-var randPool = sync.Pool{
-	New: func() interface{} {
-		t := time.Now()
-		return rand.New(rand.NewSource(t.UnixNano()))
-	},
-}
-
 // Generate returns and ID or an error if we cannot generate an ID.
 func Generate() (ID, error) {
-	r := randPool.Get().(*rand.Rand)
-	defer randPool.Put(r)
-
 	t := time.Now()
-	entropy := ulid.Monotonic(r, 0)
+	entropy := ulid.Monotonic(rand.Reader, 0)
 	return ulid.New(ulid.Timestamp(t), entropy)
 }

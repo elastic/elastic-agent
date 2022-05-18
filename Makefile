@@ -44,8 +44,8 @@ notice:
 .PHONY: check-ci
 check-ci:
 	@mage update
-	@mage check
 	@$(MAKE) notice
+	@$(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) check-no-changes
 
 ## check: run all the checks including linting using golangci-lint.

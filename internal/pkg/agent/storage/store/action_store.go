@@ -5,6 +5,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -40,7 +41,7 @@ func NewActionStore(log *logger.Logger, store storeLoad) (*ActionStore, error) {
 
 	dec := yaml.NewDecoder(reader)
 	err = dec.Decode(&action)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return &ActionStore{
 			log:   log,
 			store: store,
