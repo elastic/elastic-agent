@@ -386,8 +386,12 @@ github.com/elastic/elastic-agent-libs v0.0.0-20220303160015-5b4e674da3dd/go.mod 
 github.com/elastic/elastic-agent-libs v0.1.3-0.20220413130536-4b45f2742994/go.mod h1:1xDLBhIqBIjhJ7lr2s+xRFFkQHpitSp8q2zzv1Dqg+s=
 github.com/elastic/elastic-agent-libs v0.2.2 h1:1WNptQB9GVx3aQRnRncBP/vTxD+gWxkObFRCk6DMN5U=
 github.com/elastic/elastic-agent-libs v0.2.2/go.mod h1:1xDLBhIqBIjhJ7lr2s+xRFFkQHpitSp8q2zzv1Dqg+s=
+github.com/elastic/elastic-agent-libs v0.2.3 h1:GY8M0fxOs/GBY2nIB+JOB91aoD72S87iEcm2qVGFUqI=
+github.com/elastic/elastic-agent-libs v0.2.3/go.mod h1:1xDLBhIqBIjhJ7lr2s+xRFFkQHpitSp8q2zzv1Dqg+s=
 github.com/elastic/elastic-agent-system-metrics v0.1.0 h1:7zMcA4ai+5mqnJQDL+JdztawsnCHfgi80X9COKukgPY=
 github.com/elastic/elastic-agent-system-metrics v0.1.0/go.mod h1:YUsjilmJSuMGt1iG0fSF/5uJPWsl+qf+8gndtPEsWEA=
+github.com/elastic/elastic-agent-system-metrics v0.3.0 h1:W8L0E8lWJmdguH+oIR7OzuFgopvw8ucZAE9w6iqVlpE=
+github.com/elastic/elastic-agent-system-metrics v0.3.0/go.mod h1:RIYhJOS7mUeyIthfOSqmmbEILYSzaDWLi5zQ70bQo+o=
 github.com/elastic/elastic-package v0.32.1/go.mod h1:l1fEnF52XRBL6a5h6uAemtdViz2bjtjUtgdQcuRhEAY=
 github.com/elastic/go-elasticsearch/v7 v7.16.0/go.mod h1:OJ4wdbtDNk5g503kvlHLyErCgQwwzmDtaFC4XyOxXA4=
 github.com/elastic/go-elasticsearch/v8 v8.0.0-20210317102009-a9d74cec0186/go.mod h1:xe9a/L2aeOgFKKgrO3ibQTnMdpAeL0GC+5/HpGScSa4=
@@ -401,6 +405,8 @@ github.com/elastic/go-sysinfo v1.7.1 h1:Wx4DSARcKLllpKT2TnFVdSUJOsybqMYCNQZq1/wO
 github.com/elastic/go-sysinfo v1.7.1/go.mod h1:i1ZYdU10oLNfRzq4vq62BEwD2fH8KaWh6eh0ikPT9F0=
 github.com/elastic/go-ucfg v0.8.4 h1:OAHTnubzXKsYYYWVzl8psLcS5mCbNKjXxtMY41itthk=
 github.com/elastic/go-ucfg v0.8.4/go.mod h1:4E8mPOLSUV9hQ7sgLEJ4bvt0KhMuDJa8joDT2QGAEKA=
+github.com/elastic/go-ucfg v0.8.5 h1:4GB/rMpuh7qTcSFaxJUk97a/JyvFzhi6t+kaskTTLdM=
+github.com/elastic/go-ucfg v0.8.5/go.mod h1:4E8mPOLSUV9hQ7sgLEJ4bvt0KhMuDJa8joDT2QGAEKA=
 github.com/elastic/go-windows v1.0.0/go.mod h1:TsU0Nrp7/y3+VwE82FoZF8gC/XFg/Elz6CcloAxnPgU=
 github.com/elastic/go-windows v1.0.1 h1:AlYZOldA+UJ0/2nBuqWdo90GFCgG9xuyw9SYzGUtJm0=
 github.com/elastic/go-windows v1.0.1/go.mod h1:FoVvqWSun28vaDQPbj2Elfc0JahhPB7WQEGa3c814Ss=
@@ -532,6 +538,7 @@ github.com/gofrs/uuid v3.2.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRx
 github.com/gofrs/uuid v3.3.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/gofrs/uuid v4.0.0+incompatible h1:1SD/1F5pU8p29ybwgQSwpQk+mwdRrXCYuPhW6m+TnJw=
 github.com/gofrs/uuid v4.0.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
+github.com/gofrs/uuid v4.2.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/gogo/googleapis v1.2.0/go.mod h1:Njal3psf3qN6dwBtQfUmBZh2ybovJ0tlu3o/AC7HYjU=
 github.com/gogo/googleapis v1.4.0/go.mod h1:5YRNX2z1oM5gXdAkurHa942MDgEJyk02w4OecKY87+c=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=

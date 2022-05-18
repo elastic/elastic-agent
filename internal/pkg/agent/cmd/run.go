@@ -326,7 +326,7 @@ func setupMetrics(
 	app application.Application,
 	tracer *apm.Tracer,
 ) (func() error, error) {
-	if err := initMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
 	}
 
