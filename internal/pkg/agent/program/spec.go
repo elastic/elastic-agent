@@ -25,6 +25,7 @@ var ErrMissingWhen = errors.New("program must define a 'When' expression")
 // NOTE: Current spec are build at compile time, we want to revisit that to allow other program
 // to register their spec in a secure way.
 type Spec struct {
+	PID                   int                  `yaml:"-"`
 	Name                  string               `yaml:"name"`
 	ServicePort           int                  `yaml:"service,omitempty"`
 	Cmd                   string               `yaml:"cmd"`

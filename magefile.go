@@ -41,6 +41,7 @@ import (
 )
 
 const (
+	delveRepo         = ""
 	goLintRepo        = "golang.org/x/lint/golint"
 	goLicenserRepo    = "github.com/elastic/go-licenser"
 	buildDir          = "build"
@@ -193,6 +194,15 @@ func (Prepare) InstallGoLicenser() error {
 // InstallGoLint for the code.
 func (Prepare) InstallGoLint() error {
 	return GoGet(goLintRepo)
+}
+
+func InstallDelve() error {
+	if err := sh.Run("go", "install",
+		"github.com/go-delve/delve/cmd/dlv@latest"); err != nil {
+		return fmt.Errorf("could not install delve: %w", err)
+	}
+
+	return nil
 }
 
 // All build all the things for the current projects.
@@ -496,7 +506,12 @@ func Config() {
 
 // ControlProto generates pkg/agent/control/proto module.
 func ControlProto() error {
-	return sh.RunV("protoc", "--go_out=plugins=grpc:.", "control.proto")
+	// TODO: add doc on how to install protoc and the needed deps
+	// https://grpc.io/docs/protoc-installation/
+	// $ go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
+	// $ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
+	// https://github.com/golang/protobuf/issues/1070#issuecomment-607465055
+	return sh.RunV("protoc", "--go_out=.", "--go-grpc_out=.", "control.proto")
 }
 
 // BuildSpec make sure that all the suppported program spec are built into the binary.

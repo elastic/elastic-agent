@@ -40,6 +40,7 @@ type AgentApplicationStatus struct {
 	Status  state.Status
 	Message string
 	Payload map[string]interface{}
+	PID     int
 }
 
 // AgentStatus returns the overall status of the Elastic Agent.
@@ -108,12 +109,12 @@ func (r *controller) UpdateStateID(stateID string) {
 	r.updateStatus()
 }
 
-// Register registers new component for status updates.
+// RegisterComponent registers new component for status updates.
 func (r *controller) RegisterComponent(componentIdentifier string) Reporter {
 	return r.RegisterComponentWithPersistance(componentIdentifier, false)
 }
 
-// Register registers new component for status updates.
+// RegisterComponentWithPersistance registers new component for status updates.
 func (r *controller) RegisterComponentWithPersistance(componentIdentifier string, persistent bool) Reporter {
 	id := componentIdentifier + "-" + uuid.New().String()[:8]
 	rep := &reporter{

@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"sync"
 	"time"
 
@@ -44,19 +43,27 @@ type Version struct {
 	Snapshot  bool
 }
 
-// ApplicationStatus is a status of an application inside of Elastic Agent.
+// ApplicationStatus is the status of an application managed by the Elastic Agent.
 type ApplicationStatus struct {
 	ID      string
+	PID     int
 	Name    string
 	Status  Status
 	Message string
 	Payload map[string]interface{}
 }
 
+// ProcMetas is similar as ProcMeta, but including the agent.
+type ProcMetas struct {
+	Agent ProcMeta
+	Procs []ProcMeta
+}
+
 // ProcMeta is the running version and ID information for a running process.
 type ProcMeta struct {
 	Process            string
 	Name               string
+	PID                int64
 	Hostname           string
 	ID                 string
 	EphemeralID        string
@@ -102,7 +109,7 @@ type Client interface {
 	// Upgrade triggers upgrade of the current running daemon.
 	Upgrade(ctx context.Context, version string, sourceURI string) (string, error)
 	// ProcMeta gathers running process meta-data.
-	ProcMeta(ctx context.Context) ([]ProcMeta, error)
+	ProcMeta(ctx context.Context) (*ProcMetas, error)
 	// Pprof gathers data from the /debug/pprof/ endpoints specified.
 	Pprof(ctx context.Context, d time.Duration, pprofTypes []proto.PprofOption, appName, routeKey string) (map[string][]ProcPProf, error)
 	// ProcMetrics gathers /buffer data and from the agent and each running process and returns the result.
@@ -181,6 +188,7 @@ func (c *client) Status(ctx context.Context) (*AgentStatus, error) {
 			}
 		}
 		s.Applications[i] = &ApplicationStatus{
+			// PID: appRes.
 			ID:      appRes.Id,
 			Name:    appRes.Name,
 			Status:  appRes.Status,
@@ -219,15 +227,16 @@ func (c *client) Upgrade(ctx context.Context, version string, sourceURI string) 
 }
 
 // ProcMeta gathers running beat metadata.
-func (c *client) ProcMeta(ctx context.Context) ([]ProcMeta, error) {
+func (c *client) ProcMeta(ctx context.Context) (*ProcMetas, error) {
 	resp, err := c.client.ProcMeta(ctx, &proto.Empty{})
 	if err != nil {
 		return nil, err
 	}
-	procMeta := []ProcMeta{}
 
+	var procMeta []ProcMeta
 	for _, proc := range resp.Procs {
 		meta := ProcMeta{
+			PID:                proc.Pid,
 			Process:            proc.Process,
 			Name:               proc.Name,
 			Hostname:           proc.Hostname,
@@ -257,7 +266,11 @@ func (c *client) ProcMeta(ctx context.Context) ([]ProcMeta, error) {
 		}
 		procMeta = append(procMeta, meta)
 	}
-	return procMeta, nil
+
+	return &ProcMetas{
+		Agent: ProcMeta{PID: resp.Agent.Pid},
+		Procs: procMeta,
+	}, nil
 }
 
 // Pprof gathers /debug/pprof data and returns a map of pprof-type: ProcPProf data

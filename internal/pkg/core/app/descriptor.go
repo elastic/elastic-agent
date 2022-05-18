@@ -64,6 +64,7 @@ func (p *Descriptor) ExecutionContext() ExecutionContext { return p.executionCtx
 
 // Spec returns a program specification with resolved binary path.
 func (p *Descriptor) Spec() program.Spec {
+	// p.process.
 	return p.spec
 }
 

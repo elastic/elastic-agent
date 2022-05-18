@@ -42,13 +42,14 @@ var diagOutputs = map[string]outputter{
 
 // DiagnosticsInfo a struct to track all information related to diagnostics for the agent.
 type DiagnosticsInfo struct {
-	ProcMeta  []client.ProcMeta
+	ProcMetas []client.ProcMeta
 	AgentInfo AgentInfo
 }
 
 // AgentInfo contains all information about the running Agent.
 type AgentInfo struct {
 	ID        string
+	PID       int64
 	Version   string
 	Commit    string
 	BuildTime time.Time
@@ -324,21 +325,22 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 	}
 	defer daemon.Disconnect()
 
-	bv, err := daemon.ProcMeta(ctx)
+	pms, err := daemon.ProcMeta(ctx)
 	if err != nil {
 		return DiagnosticsInfo{}, err
 	}
-	diag.ProcMeta = bv
+	diag.ProcMetas = pms.Procs
 
 	version, err := daemon.Version(ctx)
 	if err != nil {
 		return diag, err
 	}
 	diag.AgentInfo = AgentInfo{
-		Version:   version.Version,
-		Commit:    version.Commit,
 		BuildTime: version.BuildTime,
+		Commit:    version.Commit,
+		PID:       pms.Agent.PID,
 		Snapshot:  version.Snapshot,
+		Version:   version.Version,
 	}
 
 	agentInfo, err := info.NewAgentInfo(false)
@@ -371,25 +373,32 @@ func humanDiagnosticsOutput(w io.Writer, obj interface{}) error {
 
 func outputDiagnostics(w io.Writer, d DiagnosticsInfo) error {
 	tw := tabwriter.NewWriter(w, 4, 1, 2, ' ', 0)
-	fmt.Fprintf(tw, "elastic-agent\tid: %s\tversion: %s\n", d.AgentInfo.ID, d.AgentInfo.Version)
-	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
-	if len(d.ProcMeta) == 0 {
-		fmt.Fprintf(tw, "Applications: (none)\n")
-	} else {
-		fmt.Fprintf(tw, "Applications:\n")
-		for _, app := range d.ProcMeta {
-			fmt.Fprintf(tw, "  *\tname: %s\troute_key: %s\n", app.Name, app.RouteKey)
-			if app.Error != "" {
-				fmt.Fprintf(tw, "\terror: %s\n", app.Error)
-			} else {
-				fmt.Fprintf(tw, "\tprocess: %s\tid: %s\tephemeral_id: %s\telastic_license: %v\n", app.Process, app.ID, app.EphemeralID, app.ElasticLicensed)
-				fmt.Fprintf(tw, "\tversion: %s\tcommit: %s\tbuild_time: %s\tbinary_arch: %v\n", app.Version, app.BuildCommit, app.BuildTime, app.BinaryArchitecture)
-				fmt.Fprintf(tw, "\thostname: %s\tusername: %s\tuser_id: %s\tuser_gid: %s\n", app.Hostname, app.Username, app.UserID, app.UserGID)
-			}
+	defer tw.Flush()
+	fmt.Fprintf(tw, "elastic-agent\tid: %s\tversion: %s\n",
+		d.AgentInfo.ID, d.AgentInfo.Version)
+	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n",
+		d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
+	fmt.Fprintf(tw, "\tPID: %d\n", d.AgentInfo.PID)
 
-		}
+	if len(d.ProcMetas) == 0 {
+		fmt.Fprintf(tw, "Applications: (none)\n")
+		return nil
 	}
-	tw.Flush()
+
+	fmt.Fprintf(tw, "Applications:\n")
+	for _, app := range d.ProcMetas {
+		fmt.Fprintf(tw, "  *\tname: %s\troute_key: %s\n", app.Name, app.RouteKey)
+		if app.Error != "" {
+			fmt.Fprintf(tw, "\terror: %s\n", app.Error)
+			continue
+		}
+
+		fmt.Fprintf(tw,
+			"\tprocess: %s\tid: %s\tephemeral_id: %s\telastic_license: %v\n", app.Process, app.ID, app.EphemeralID, app.ElasticLicensed)
+		fmt.Fprintf(tw, "\thostname: %s\tusername: %s\tuser_id: %s\tuser_gid: %s\n", app.Hostname, app.Username, app.UserID, app.UserGID)
+		fmt.Fprintf(tw, "\tPID: %d\n\n", app.PID)
+
+	}
 	return nil
 }
 
@@ -484,7 +493,7 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		return closeHandlers(err, zw, f)
 	}
 
-	for _, m := range diag.ProcMeta {
+	for _, m := range diag.ProcMetas {
 		zf, err = zw.Create("meta/" + m.Name + "-" + m.RouteKey + "." + outputFormat)
 		if err != nil {
 			return closeHandlers(err, zw, f)

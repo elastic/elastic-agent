@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -49,6 +50,7 @@ type Server struct {
 	server        *grpc.Server
 	tracer        *apm.Tracer
 	lock          sync.RWMutex
+	proto.UnimplementedElasticAgentControlServer
 }
 
 type specer interface {
@@ -212,7 +214,7 @@ type BeatInfo struct {
 	ElasticLicensed bool   `json:"elastic_licensed"`
 }
 
-// ProcMeta returns version and beat inforation for all running processes.
+// ProcMeta returns version and beat information for all running processes.
 func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaResponse, error) {
 	if s.routeFn == nil {
 		return nil, errors.New("route function is nil")
@@ -220,22 +222,26 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 
 	resp := &proto.ProcMetaResponse{
 		Procs: []*proto.ProcMeta{},
+		Agent: &proto.ProcMeta{Pid: int64(os.Getpid())},
 	}
 
 	// gather spec data for all rk/apps running
 	specs := s.getSpecInfo("", "")
+	_ = specs
 	for _, si := range specs {
 		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
 		client := newSocketRequester(si.app, si.rk, endpoint)
 
 		procMeta := client.procMeta(ctx)
+		procMeta.Pid = int64(si.spec.PID)
 		resp.Procs = append(resp.Procs, procMeta)
 	}
 
 	return resp, nil
 }
 
-// Pprof returns /debug/pprof data for the requested applicaiont-route_key or all running applications.
+// b internal/pkg/agent/control/server/server.go:240
+// Pprof returns /debug/pprof data for the requested application-route_key or all running applications.
 func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.PprofResponse, error) {
 	if s.monitoringCfg == nil || s.monitoringCfg.Pprof == nil || !s.monitoringCfg.Pprof.Enabled {
 		return nil, fmt.Errorf("agent.monitoring.pprof disabled")
@@ -360,7 +366,7 @@ func (s *Server) getSpecInfo(matchRK, matchApp string) []specInfo {
 			s.logger.With("route_key", matchRK, "application_name", matchApp).Debug("No matching route key/application name found.")
 			return []specInfo{}
 		}
-		return []specInfo{specInfo{spec: spec, app: matchApp, rk: matchRK}}
+		return []specInfo{{spec: spec, app: matchApp, rk: matchRK}}
 	}
 
 	// gather specInfo for all rk/app values

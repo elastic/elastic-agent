@@ -118,7 +118,9 @@ func (a *Application) Monitor() monitoring.Monitor {
 
 // Spec returns the program spec of this app.
 func (a *Application) Spec() program.Spec {
-	return a.desc.Spec()
+	spec := a.desc.Spec()
+	spec.PID = a.state.ProcessInfo.PID
+	return spec
 }
 
 // State returns the application state.

@@ -58,6 +58,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	run := newRunCommandWithArgs(args, streams)
 	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(args, streams)...)
 	cmd.AddCommand(run)
+	cmd.AddCommand(newDebugCommand(streams, getDiagnostics))
 	cmd.AddCommand(newInstallCommandWithArgs(args, streams))
 	cmd.AddCommand(newUninstallCommandWithArgs(args, streams))
 	cmd.AddCommand(newUpgradeCommandWithArgs(args, streams))
