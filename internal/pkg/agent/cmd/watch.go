@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -113,6 +114,10 @@ func watchCmd() error {
 		log.Error("rollback failed", err)
 	}
 	return err
+}
+
+func isWindows() bool {
+	return runtime.GOOS == "windows"
 }
 
 func watch(ctx context.Context, tilGrace time.Duration, log *logger.Logger) error {
