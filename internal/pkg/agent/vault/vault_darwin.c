@@ -3,30 +3,25 @@
 // you may not use this file except in compliance with the Elastic License.
 
 // The CreateAccessWithUid is borrowed from
-// http://www.opensource.apple.com/source/eap8021x/eap8021x-100/EAP8021X.fproj/EAPKeychainUtil.c
-// Thus including the copyright header here
+// https://opensource.apple.com/source/mDNSResponder/mDNSResponder-1310.80.1/mDNSMacOSX/PreferencePane/BonjourPrefTool/BonjourPrefTool.m
+// The original name was MyMakeUidAccess and the function signature was slightly different
+// Including the original copyright header here from that file
 
 /*
- * Copyright (c) 2006-2008 Apple Inc. All rights reserved.
  *
- * @APPLE_LICENSE_HEADER_START@
- * 
- * This file contains Original Code and/or Modifications of Original Code
- * as defined in and that are subject to the Apple Public Source License
- * Version 2.0 (the 'License'). You may not use this file except in
- * compliance with the License. Please obtain a copy of the License at
- * http://www.opensource.apple.com/apsl/ and read it before using this
- * file.
- * 
- * The Original Code and all software distributed under the License are
- * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
- * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
- * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
- * Please see the License for the specific language governing rights and
+ * Copyright (c) 2016 Apple Inc. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
- * @APPLE_LICENSE_HEADER_END@
  */
 
 #include <stdio.h>
@@ -35,82 +30,54 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <Security/Security.h>
 
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-/*
- * Create a SecAccessRef with a custom form.
- * Both the owner and the ACL set allow free access to root,
- * but nothing to anyone else.
- * NOTE: This is not the easiest way to build up CSSM data structures.
- * But it's a way that does not depend on any outside software layers
- * (other than CSSM and Security's Sec* layer, of course).
- */
 OSStatus CreateAccessWithUid(uid_t uid, SecAccessRef * ret_access) {
-    /* make the "uid/gid" ACL subject, this is a CSSM_LIST_ELEMENT chain */
-    CSSM_ACL_PROCESS_SUBJECT_SELECTOR   selector = {
-        CSSM_ACL_PROCESS_SELECTOR_CURRENT_VERSION,
-        CSSM_ACL_MATCH_UID, /* active fields mask: match uids (only) */
-        uid,                /* effective user id to match */
-        0                   /* effective group id to match */
+    // make the "uid/gid" ACL subject
+    // this is a CSSM_LIST_ELEMENT chain
+    CSSM_ACL_PROCESS_SUBJECT_SELECTOR selector = {
+        CSSM_ACL_PROCESS_SELECTOR_CURRENT_VERSION,	// selector version
+        CSSM_ACL_MATCH_UID,	// set mask: match uids (only)
+        uid,				// uid to match
+        0					// gid (not matched here)
     };
-    CSSM_LIST_ELEMENT       subject2 = {
-        NULL,       /* NextElement */
-        0,          /* WordID */
-        CSSM_LIST_ELEMENT_DATUM /* ElementType */
-    };
-    CSSM_LIST_ELEMENT       subject1 = {
-        &subject2,                      /* NextElement */
-        CSSM_ACL_SUBJECT_TYPE_PROCESS,  /* WordID */
-        CSSM_LIST_ELEMENT_WORDID        /* ElementType */
-    };
-    /* rights granted (replace with individual list if desired) */
-    CSSM_ACL_AUTHORIZATION_TAG  rights[] = {
-        CSSM_ACL_AUTHORIZATION_ANY
-    };
-    /* owner component (right to change ACL) */
-    CSSM_ACL_OWNER_PROTOTYPE    owner = {
-        {   // TypedSubject
-            CSSM_LIST_TYPE_UNKNOWN, /* type of this list */
-            &subject1,              /* head of the list */
-            &subject2               /* tail of the list */
-        },
-        FALSE                       /* Delegate */
-    };
-    /* ACL entry */
-    CSSM_ACL_ENTRY_INFO     acls[] = {
-        {
-            { /* EntryPublicInfo */
-                { /* TypedSubject */
-                    CSSM_LIST_TYPE_UNKNOWN, /* type of this list */
-                    &subject1,              /* head of the list */
-                    &subject2               /* tail of the list */
-                },
-                FALSE,          /* Delegate */
-                {               /* Authorization */
-                    sizeof(rights) / sizeof(rights[0]), /* NumberOfAuthTags */
-                    rights      /* AuthTags */
-                },
-                {               /* TimeRange */
-                },
-                {               /* EntryTag */
-                }
-            },
-            0               /* EntryHandle */
-        }
-    };
-
+    CSSM_LIST_ELEMENT subject2 = { NULL, 0, 0, {{0,0,0}} };
     subject2.Element.Word.Data = (UInt8 *)&selector;
     subject2.Element.Word.Length = sizeof(selector);
-    return (SecAccessCreateFromOwnerAndACL(&owner,
-                                           sizeof(acls) / sizeof(acls[0]),
-                                           acls,
-                                           ret_access));
+    CSSM_LIST_ELEMENT subject1 = { &subject2, CSSM_ACL_SUBJECT_TYPE_PROCESS, CSSM_LIST_ELEMENT_WORDID, {{0,0,0}} };
+    
+    
+    // rights granted (replace with individual list if desired)
+    CSSM_ACL_AUTHORIZATION_TAG rights[] = {
+        CSSM_ACL_AUTHORIZATION_ANY	// everything
+    };
+    // owner component (right to change ACL)
+    CSSM_ACL_OWNER_PROTOTYPE owner = {
+        // TypedSubject
+        { CSSM_LIST_TYPE_UNKNOWN, &subject1, &subject2 },
+        // Delegate
+        false
+    };
+    // ACL entries (any number, just one here)
+    CSSM_ACL_ENTRY_INFO acls =
+    {
+        // CSSM_ACL_ENTRY_PROTOTYPE
+        {
+            { CSSM_LIST_TYPE_UNKNOWN, &subject1, &subject2 }, // TypedSubject
+            false,	// Delegate
+            { sizeof(rights) / sizeof(rights[0]), rights }, // Authorization rights for this entry
+            { { 0, 0 }, { 0, 0 } }, // CSSM_ACL_VALIDITY_PERIOD
+            "" // CSSM_STRING EntryTag
+        },
+        // CSSM_ACL_HANDLE
+        0
+    };
+    
+    return SecAccessCreateFromOwnerAndACL(&owner, 1, &acls, ret_access);
 }
 
 #pragma clang diagnostic pop
-
 
 OSStatus OpenKeychain(SecKeychainRef keychain) {
     OSStatus status = SecKeychainSetPreferenceDomain(kSecPreferencesDomainSystem);

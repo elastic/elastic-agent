@@ -29,7 +29,7 @@ exec /Library/Elastic/Agent/elastic-agent $@
 `
 
 	// defaultAgentVaultName is keychain item name for mac
-	defaultAgentVaultName = "co.elastic.agent"
+	defaultAgentVaultName = "co.elastic.elastic-agent"
 )
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
