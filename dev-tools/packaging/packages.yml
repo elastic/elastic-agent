@@ -1198,3 +1198,20 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
+  # Elastic Beat with Elastic License and binary taken from the x-pack dir.
+  elastic_beat_agent_docker_test_binaries:
+    ###
+    # Elastic Licensed Packages
+    ###
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *agent_docker_spec
+        <<: *agent_docker_complete_spec
+        <<: *elastic_docker_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}

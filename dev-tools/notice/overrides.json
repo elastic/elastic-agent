@@ -1,6 +1,12 @@
 {"name": "github.com/elastic/beats/v7", "licenceType": "Elastic"}
 {"name": "github.com/elastic/elastic-agent-client/v7", "licenceType": "Elastic"}
 {"name": "github.com/elastic/e2e-testing", "licenceType": "Elastic"}
+{"name": "github.com/narph/e2e-testing", "licenceType": "Elastic"}
+{"name": "github.com/acomagu/bufpipe", "licenceType": "Elastic"}
+{"name": "github.com/go-errors/errors", "licenceType": "MIT"}
+{"name": "github.com/elastic/package-spec", "licenceType": "Elastic"}
+{"name": "github.com/xi2/xz", "licenceType": "Public Domain"}
+{"name": "github.com/elastic/elastic-package", "licenceType": "Elastic"}
 {"name": "github.com/gorhill/cronexpr", "licenceType": "Apache-2.0", "licenceFile":"APLv2"}
 {"name": "github.com/hashicorp/cronexpr", "licenceType": "Apache-2.0", "licenceFile":"APLv2"}
 {"name": "github.com/miekg/dns", "licenceType": "BSD"}

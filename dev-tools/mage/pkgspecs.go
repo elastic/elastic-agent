@@ -33,6 +33,13 @@ func UseElasticAgentPackaging() {
 	MustUsePackaging("elastic_beat_agent_binaries", packageSpecFile)
 }
 
+// UseElasticAgentPackaging configures the package target to build packages for
+// an Elastic Agent.
+func UseElasticAgentDockerTestPackaging() {
+	// Prepare binaries so they can be packed into agent
+	MustUsePackaging("elastic_beat_agent_docker_test_binaries", packageSpecFile)
+}
+
 // UseElasticAgentDemoPackaging configures the package target to build packages for
 // an Elastic Agent demo purposes.
 func UseElasticAgentDemoPackaging() {
