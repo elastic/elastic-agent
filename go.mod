@@ -13,13 +13,13 @@ require (
 	github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4
 	github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
-	github.com/elastic/elastic-agent-libs v0.2.2
-	github.com/elastic/elastic-agent-system-metrics v0.1.0
+	github.com/elastic/elastic-agent-libs v0.2.3
+	github.com/elastic/elastic-agent-system-metrics v0.3.0
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
-	github.com/elastic/go-ucfg v0.8.4
+	github.com/elastic/go-ucfg v0.8.5
 	github.com/gofrs/flock v0.8.1
-	github.com/gofrs/uuid v4.0.0+incompatible
+	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0

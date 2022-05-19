@@ -7,6 +7,10 @@ in the [observability-docs](https://github.com/elastic/observability-docs) repo.
 
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
+- [Docker](https://docs.docker.com/get-docker/)
+- [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
+
+In Linux operating systems that you can not run docker as a root user you need to follow [linux-postinstall steps](https://docs.docker.com/engine/install/linux-postinstall/)
 
 ### Testing docker container
 
@@ -43,6 +47,15 @@ for the standard variant.
 ```bash
 DEV=true PLATFORMS=linux/amd64 TYPES=docker mage package
 ```
+
+Use environmental variables `GOHOSTOS` and `GOHOSTARCH` to specify PLATFORMS variable accordingly. eg.
+```bash
+❯ go env GOHOSTOS
+darwin
+❯ go env GOHOSTARCH
+amd64
+```
+
 2. Build docker image:
 ```bash
 cd build/package/elastic-agent/elastic-agent-linux-amd64.docker/docker-build

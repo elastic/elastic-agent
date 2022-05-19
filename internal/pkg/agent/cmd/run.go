@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
+	"github.com/elastic/elastic-agent-system-metrics/report"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -326,7 +327,7 @@ func setupMetrics(
 	app application.Application,
 	tracer *apm.Tracer,
 ) (func() error, error) {
-	if err := initMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
 	}
 
