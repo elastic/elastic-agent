@@ -27,6 +27,21 @@ var allowEmptyPgp string
 // with upgrade without requiring Agent to be installed correctly
 var allowUpgrade string
 
+// devInsecure is used as a debug flag and allows building and
+// running Beats at runtime
+var devInsecure string
+
+// DevInsecure insecure returns true when it's a dev build.
+// If there is an error parsing devInsecure, false is returned
+func DevInsecure() bool {
+	devMode, err := strconv.ParseBool(devInsecure)
+	if err != nil {
+		return false
+	}
+
+	return devMode
+}
+
 // TrimCommit trims commit up to 6 characters.
 func TrimCommit(commit string) string {
 	hash := commit

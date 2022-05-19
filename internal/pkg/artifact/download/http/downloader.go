@@ -145,7 +145,7 @@ func (e *Downloader) downloadHash(ctx context.Context, operatingSystem string, s
 	return e.downloadFile(ctx, spec.Artifact, filename, fullPath)
 }
 
-func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, fullPath string) (string, error) {
+func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, fullPath string) (_ string, err error) {
 	sourceURI, err := e.composeURI(artifactName, filename)
 	if err != nil {
 		return "", err
@@ -160,7 +160,14 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	if err != nil {
 		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}
-	defer destinationFile.Close()
+	defer func() {
+		destinationFile.Close()
+		if err != nil {
+			if err := os.Remove(fullPath); err != nil {
+				logp.L().Named("http_downloader").Error("could not remove failed download file:", fullPath)
+			}
+		}
+	}()
 
 	resp, err := e.client.Do(req.WithContext(ctx))
 	if err != nil {

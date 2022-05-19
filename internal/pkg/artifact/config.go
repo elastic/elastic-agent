@@ -55,6 +55,8 @@ func DefaultConfig() *Config {
 	// The HTTP download will log progress in the case that it is taking a while to download.
 	transport.Timeout = 10 * time.Minute
 
+	// Those configurations are not being overriden, see
+	// https://github.com/elastic/elastic-agent/issues/408
 	return &Config{
 		SourceURI:             "https://artifacts.elastic.co/downloads/",
 		TargetDirectory:       paths.Downloads(),
