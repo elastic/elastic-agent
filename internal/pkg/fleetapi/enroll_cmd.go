@@ -195,12 +195,12 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 	resp, err := e.client.Send(ctx, "POST", p, nil, headers, bytes.NewBuffer(b))
 	if err != nil {
 		var et *url.Error
-		if errors.As(err, et) {
+		if errors.As(err, &et) {
 			return nil, et.Err
 		}
 
 		var netOp *net.OpError
-		if errors.As(err, netOp) {
+		if errors.As(err, &netOp) {
 			return nil, ErrConnRefused
 		}
 
