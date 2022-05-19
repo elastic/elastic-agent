@@ -30,7 +30,6 @@ pipeline {
   }
   triggers {
     issueCommentTrigger("(${obltGitHubComments()}|^run (integration|end-to-end) tests|/package)")
-    cron '@hourly'
   }
   parameters {
     // disabled by default, but required for merge, there are two GH checks:
@@ -44,7 +43,7 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        //pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
+        pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: true)
         stashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
@@ -80,8 +79,7 @@ pipeline {
         axes {
           axis {
             name 'PLATFORM'
-            //values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable',
-            values 'darwin && orka && x86_64'
+            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable', 'darwin && orka && x86_64'
           }
         }
         stages {
