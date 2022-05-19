@@ -802,6 +802,13 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %s", logsPath, err)
 		}
 	}
+
+	// ensure that the internal logger directory exists
+	loggerPath := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	if err := os.MkdirAll(loggerPath, 0755); err != nil {
+		return fmt.Errorf("preparing internal log path(%s) failed: %w", loggerPath, err)
+	}
+
 	// persist the paths so other commands in the container will use the correct paths
 	if writePaths {
 		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath); err != nil {
