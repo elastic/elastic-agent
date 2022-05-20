@@ -20,7 +20,8 @@ func Test_loggerWriter(t *testing.T) {
 		logMsg   string
 		logLevel zapcore.Level
 	}{
-		{name: "capture stdout",
+		{
+			name: "capture stdout",
 			args: struct {
 				appName string
 				logTo   logStd
@@ -31,7 +32,8 @@ func Test_loggerWriter(t *testing.T) {
 			logMsg:   "stdout log",
 			logLevel: zapcore.InfoLevel,
 		},
-		{name: "capture stderr",
+		{
+			name: "capture stderr",
 			args: struct {
 				appName string
 				logTo   logStd
