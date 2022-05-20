@@ -57,7 +57,7 @@ type Action interface {
 // FleetAction represents an action from fleet-server.
 // should copy the action definition in fleet-server/model/schema.json
 type FleetAction struct {
-	ActionID         string          `yaml:"action_id" json:"id"` // NOTE the schema defines this as action_id, not sure what in the agent maps it to id...
+	ActionID         string          `yaml:"action_id" json:"id"` // NOTE schema defines this as action_id, but fleet-server remaps it to id in the json response to agent check-in.
 	ActionType       string          `yaml:"type,omitempty" json:"type,omitempty"`
 	InputType        string          `yaml:"input_type,omitempty" json:"input_type,omitempty"`
 	ActionExpiration string          `yaml:"expiration,omitempty" json:"expiration,omitempty"`

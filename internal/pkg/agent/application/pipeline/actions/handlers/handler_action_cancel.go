@@ -39,10 +39,9 @@ func (h *Cancel) Handle(ctx context.Context, a fleetapi.Action, acker store.Flee
 	}
 	n := h.c.Cancel(action.TargetID)
 	if n == 0 {
-		h.log.Debug("Cancel action id: %s target id: %s found no actions in queue.", action.ActionID, action.TargetID)
+		h.log.Debugf("Cancel action id: %s target id: %s found no actions in queue.", action.ActionID, action.TargetID)
 		return nil
 	}
-	h.log.Info("Cancel action id: %s target id: %s removed %d action(s) from queue.", action.ActionID, action.TargetID, n)
-	// TODO ack action.TargetID as failed
+	h.log.Infof("Cancel action id: %s target id: %s removed %d action(s) from queue.", action.ActionID, action.TargetID, n)
 	return nil
 }

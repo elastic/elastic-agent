@@ -186,13 +186,11 @@ func (f *fleetGateway) worker() {
 			actions, err = f.dispatchCancelActions(actions)
 			if err != nil {
 				f.log.Error(err.Error())
-				// TODO set errMsg? update status?
 			}
 
 			queued, expired := f.gatherQueuedActions(ts.UTC())
 			f.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
-
-			// TODO update all actions in expired as aborted?
+			f.log.Debugf("Expired actions: %v", expired)
 
 			actions = append(actions, queued...)
 
@@ -203,7 +201,6 @@ func (f *fleetGateway) worker() {
 				errMsg = fmt.Sprintf("failed to persist action_queue, error: %s", err)
 				f.log.Error(errMsg)
 				f.statusReporter.Update(state.Failed, errMsg, nil)
-				// TODO should we handle this failure differently?
 			}
 
 			if err := f.dispatcher.Dispatch(context.Background(), f.acker, actions...); err != nil {
@@ -236,9 +233,6 @@ func (f *fleetGateway) queueScheduledActions(input fleetapi.Actions) []fleetapi.
 			f.log.Debugf("Adding action id: %s to queue.", action.ID())
 			f.queue.Add(action, start.Unix())
 			continue
-			// TODO persist queue here?
-			// f.stateStore.SetQueue(f.queue.Actions())
-			// f.stateStore.Save()
 		}
 		if !stderr.Is(err, fleetapi.ErrNoStartTime) {
 			f.log.Warnf("Issue gathering start time from action id %s: %v", action.ID(), err)
