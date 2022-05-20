@@ -13,8 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 )
 
 func getTestVaultPath(t *testing.T) string {

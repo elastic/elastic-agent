@@ -11,12 +11,13 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/hectane/go-acl"
+
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
-	"github.com/hectane/go-acl"
 )
 
 const darwin = "darwin"
