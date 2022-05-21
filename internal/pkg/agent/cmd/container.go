@@ -126,6 +126,7 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_FLEET_USERNAME - kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
   KIBANA_FLEET_PASSWORD - kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
+  ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
 
 
 By default when this command starts it will check for an existing fleet.yml. If that file already exists then
@@ -234,12 +235,12 @@ func containerCmd(streams *cli.IOStreams) error {
 				wg.Done()
 				// sending kill signal to current process (elastic-agent)
 				logInfo(streams, "Initiate shutdown elastic-agent.")
-				_ = mainProc.Signal(syscall.SIGTERM)
+				mainProc.Signal(syscall.SIGTERM) // nolint:errcheck //not required
 			}()
 
 			defer func() {
 				if apmProc != nil {
-					_ = apmProc.Stop()
+					apmProc.Stop() // nolint:errcheck //not required
 					logInfo(streams, "Initiate shutdown legacy apm-server.")
 				}
 			}()
@@ -394,6 +395,9 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 	}
 	if !paths.IsVersionHome() {
 		args = append(args, "--path.home.unversioned")
+	}
+	if tags := envWithDefault("", "ELASTIC_AGENT_TAGS"); tags != "" {
+		args = append(args, "--tag", tags)
 	}
 	if cfg.FleetServer.Enable {
 		connStr, err := buildFleetServerConnStr(cfg.FleetServer)
@@ -802,6 +806,13 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 	}
+
+	// ensure that the internal logger directory exists
+	loggerPath := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	if err := os.MkdirAll(loggerPath, 0755); err != nil {
+		return fmt.Errorf("preparing internal log path(%s) failed: %w", loggerPath, err)
+	}
+
 	// persist the paths so other commands in the container will use the correct paths
 	if writePaths {
 		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath); err != nil {

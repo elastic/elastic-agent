@@ -95,6 +95,7 @@ type EnrollRequest struct {
 type Metadata struct {
 	Local        *info.ECSMeta          `json:"local"`
 	UserProvided map[string]interface{} `json:"user_provided"`
+	Tags         []string               `json:"tags"`
 }
 
 // Validate validates the enrollment request before sending it to the API.
@@ -145,6 +146,7 @@ type EnrollItemResponse struct {
 	LocalMetadata        map[string]interface{} `json:"local_metadata"`
 	Actions              []interface{}          `json:"actions"`
 	AccessAPIKey         string                 `json:"access_api_key"`
+	Tags                 []string               `json:"tags"`
 }
 
 // Validate validates the response send from the server.
@@ -193,12 +195,12 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 	resp, err := e.client.Send(ctx, "POST", p, nil, headers, bytes.NewBuffer(b))
 	if err != nil {
 		var et *url.Error
-		if errors.As(err, et) {
+		if errors.As(err, &et) {
 			return nil, et.Err
 		}
 
 		var netOp *net.OpError
-		if errors.As(err, netOp) {
+		if errors.As(err, &netOp) {
 			return nil, ErrConnRefused
 		}
 

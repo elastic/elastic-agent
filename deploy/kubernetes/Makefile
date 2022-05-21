@@ -1,11 +1,11 @@
 ALL=elastic-agent-standalone elastic-agent-managed
 BEAT_VERSION=$(shell head -n 1 ../../version/docs/version.asciidoc | cut -c 17- )
 
-.PHONY: all $(ALL)
+.PHONY: generate-k8s $(ALL)
 
-all: $(ALL)
+generate-k8s: $(ALL)
 
-test: all
+test: generate-k8s
 	for FILE in $(shell ls *-kubernetes.yaml); do \
 		BEAT=$$(echo $$FILE | cut -d \- -f 1); \
 		kubectl create -f $$FILE; \
