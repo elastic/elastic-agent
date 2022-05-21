@@ -5,6 +5,7 @@
 package storage
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/fs"
@@ -150,19 +151,33 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	return nil
 }
 
-func (d *EncryptedDiskStore) Load() (io.ReadCloser, error) {
+func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
+
+	fd, err := os.OpenFile(d.target, os.O_RDONLY, perms)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, errors.New(err,
+				fmt.Sprintf("could not open %s", d.target),
+				errors.TypeFilesystem,
+				errors.M(errors.MetaKeyPath, d.target))
+		}
+
+		// If file doesn't exists, return empty reader closer
+		return io.NopCloser(bytes.NewReader([]byte{})), nil
+	}
+
+	// Close fd if there is an error upon return
+	defer func() {
+		if err != nil && fd != nil {
+			_ = fd.Close()
+		}
+	}()
+
 	// Ensure has agent key
-	err := d.ensureKey()
+	err = d.ensureKey()
 	if err != nil {
 		return nil, err
 	}
 
-	fd, err := os.OpenFile(d.target, os.O_RDONLY|os.O_CREATE, perms)
-	if err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("could not open %s", d.target),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, d.target))
-	}
 	return crypto.NewReaderWithDefaults(fd, d.key)
 }
