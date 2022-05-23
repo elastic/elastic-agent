@@ -27,7 +27,6 @@ const (
 )
 
 func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
-
 	// Disable root permissions check
 	vault.DisableRootCheck()
 
@@ -54,7 +53,7 @@ func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
 		t.Error(diff)
 	}
 
-	// Expect no vault directory was not created
+	// Expect no vault directory was created
 	vdir := filepath.Join(dir, vaultDir)
 	if _, err := os.Stat(vdir); !os.IsNotExist(err) {
 		t.Fatal(err)

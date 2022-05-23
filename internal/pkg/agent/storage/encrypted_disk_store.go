@@ -152,18 +152,16 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 }
 
 func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
-
 	fd, err := os.OpenFile(d.target, os.O_RDONLY, perms)
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return nil, errors.New(err,
-				fmt.Sprintf("could not open %s", d.target),
-				errors.TypeFilesystem,
-				errors.M(errors.MetaKeyPath, d.target))
+		if errors.Is(err, os.ErrNotExist) {
+			// If file doesn't exists, return empty reader closer
+			return io.NopCloser(bytes.NewReader([]byte{})), nil
 		}
-
-		// If file doesn't exists, return empty reader closer
-		return io.NopCloser(bytes.NewReader([]byte{})), nil
+		return nil, errors.New(err,
+			fmt.Sprintf("could not open %s", d.target),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, d.target))
 	}
 
 	// Close fd if there is an error upon return
