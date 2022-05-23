@@ -180,3 +180,4 @@
 - Add support for kubernetes cronjobs {pull}279[279]
 - Increase the download artifact timeout to 10mins and add log download statistics. {pull}308[308]
 - Save the agent configuration an state encrypted on the disk. {issue}535[535] {pull}398[398]
+- Bump node.js version for heartbeat/synthetics to 16.15.0
