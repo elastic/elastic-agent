@@ -101,6 +101,7 @@
 - Add fleet-server to output of elastic-agent inspect output command (and diagnostic bundle). {pull}243[243]
 - Update API calls that the agent makes to Kibana when running the container command. {pull}253[253]
 - diagnostics collect log names are fixed on Windows machines, command will ignore failures. AgentID is included in diagnostics(and diagnostics collect) output. {issue}81[81] {issue}92[92] {issue}190[190] {pull}262[262]
+- Collects stdout and stderr of applications run as a process and logs them. {issue}[88]
 
 ==== New features
 
@@ -179,5 +180,6 @@
 - Fix download verification in snapshot builds. {issue}252[252]
 - Add support for kubernetes cronjobs {pull}279[279]
 - Increase the download artifact timeout to 10mins and add log download statistics. {pull}308[308]
+- Save the agent configuration and the state encrypted on the disk. {issue}535[535] {pull}398[398]
 - Bump node.js version for heartbeat/synthetics to 16.15.0
 - Support scheduled actions and cancellation of pending actions. {issue}393[393] {pull}419[419]

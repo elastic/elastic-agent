@@ -17,7 +17,23 @@ type Store interface {
 	Save(io.Reader) error
 }
 
+type Storage interface {
+	Store
+
+	// Load return an io.ReadCloser for the target store.
+	Load() (io.ReadCloser, error)
+
+	// Exists checks if the store exists.
+	Exists() (bool, error)
+}
+
 // DiskStore takes a persistedConfig and save it to a temporary files and replace the target file.
 type DiskStore struct {
 	target string
+}
+
+type EncryptedDiskStore struct {
+	target    string
+	vaultPath string
+	key       []byte
 }

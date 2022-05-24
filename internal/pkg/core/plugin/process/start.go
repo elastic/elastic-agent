@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
@@ -132,7 +133,10 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 		a.processConfig,
 		a.uid,
 		a.gid,
-		spec.Args)
+		spec.Args, func(c *exec.Cmd) {
+			c.Stdout = newLoggerWriter(a.Name(), logStdOut, a.logger)
+			c.Stderr = newLoggerWriter(a.Name(), logStdErr, a.logger)
+		})
 	if err != nil {
 		return fmt.Errorf("%q failed to start %q: %w",
 			a.Name(), spec.BinaryPath, err)

@@ -5,10 +5,7 @@
 package configuration
 
 import (
-	"fmt"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
@@ -34,27 +31,6 @@ func NewFromConfig(cfg *config.Config) (*Configuration, error) {
 	}
 
 	return c, nil
-}
-
-// NewFromFile uses unencrypted disk store to load a configuration.
-func NewFromFile(path string) (*Configuration, error) {
-	store := storage.NewDiskStore(path)
-	reader, err := store.Load()
-	if err != nil {
-		return nil, errors.New(err, "could not initialize config store",
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	config, err := config.NewConfigFrom(reader)
-	if err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("fail to read configuration %s for the elastic-agent", path),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, path))
-	}
-
-	return NewFromConfig(config)
 }
 
 // AgentInfo is a set of agent information.

@@ -2,10 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package logger
+//go:build darwin
+// +build darwin
 
-import "testing"
+package vault
 
-func TestLogger(t *testing.T) {
-	t.Skip("only checking if test works")
+// DisableRootCheck noop on darwin to allow to compile the common code
+// Noop on darwin
+func DisableRootCheck() {
 }
