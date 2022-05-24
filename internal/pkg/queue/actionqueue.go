@@ -50,7 +50,7 @@ func (q *ActionQueue) Push(x interface{}) {
 }
 
 // Pop will return the last item from the queue
-// When using the queue DequeuActions should be used instead
+// When using the queue, DequeueActions should be used instead
 func (q *ActionQueue) Pop() interface{} {
 	old := *q
 	n := len(old)
@@ -81,8 +81,8 @@ func NewActionQueue(actions []fleetapi.Action) (*ActionQueue, error) {
 }
 
 // Add will add an action to the queue with the associated priority.
-// The priority is meant to be the start-time of the action as a unix epoch time
-// O(logn)
+// The priority is meant to be the start-time of the action as a unix epoch time.
+// Complexity: O(log n)
 func (q *ActionQueue) Add(action fleetapi.Action, priority int64) {
 	e := &item{
 		action:   action,
@@ -91,8 +91,8 @@ func (q *ActionQueue) Add(action fleetapi.Action, priority int64) {
 	heap.Push(q, e)
 }
 
-// DequeueActions will dequeue all actions that have a priority less then time.Now()
-// O(n*logn)
+// DequeueActions will dequeue all actions that have a priority less then time.Now().
+// Complexity: O(n*log n)
 func (q *ActionQueue) DequeueActions() []fleetapi.Action {
 	ts := time.Now().Unix()
 	actions := make([]fleetapi.Action, 0)
@@ -106,8 +106,8 @@ func (q *ActionQueue) DequeueActions() []fleetapi.Action {
 	return actions
 }
 
-// Cancel will remove any actions in the queue with a matching actionID and return the number of entries cancelled
-// O(n*logn)
+// Cancel will remove any actions in the queue with a matching actionID and return the number of entries cancelled.
+// Complexity: O(n*log n)
 func (q *ActionQueue) Cancel(actionID string) int {
 	items := make([]*item, 0)
 	for _, item := range *q {
