@@ -33,7 +33,9 @@ linters:
     - goconst # finds repeated strings that could be replaced by a constant
     - dupl # tool for code clone detection
     - forbidigo # forbids identifiers	matched by reg exps
-    - gomoddirectives # manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
+    # 'replace' is used in go.mod for many dependencies that come from libbeat. We should work to remove those,
+    # so we can re-enable this linter.
+    # - gomoddirectives # manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
     - gosimple # linter for Go source code that specializes in simplifying a code
     - misspell # finds commonly misspelled English words in comments
     - nakedret # finds naked returns in functions greater than a specified function length
