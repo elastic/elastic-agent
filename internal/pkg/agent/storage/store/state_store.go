@@ -59,9 +59,12 @@ type StateStore struct {
 type stateT struct {
 	action   action
 	ackToken string
+	queue    []action
 }
 
-// Combined yml serializer for the ActionPolicyChange and ActionUnenroll
+// actionSerializer is a combined yml serializer for the ActionPolicyChange and ActionUnenroll
+// it is used to read the yaml file and assign the action to stateT.action as we must provide the
+// underlying struct that provides the action interface.
 type actionSerializer struct {
 	ID         string                 `yaml:"action_id"`
 	Type       string                 `yaml:"action_type"`
@@ -69,9 +72,14 @@ type actionSerializer struct {
 	IsDetected *bool                  `yaml:"is_detected,omitempty"`
 }
 
+// stateSerializer is used to serialize the state to yaml.
+// action serialization is handled through the actionSerializer struct
+// queue serialization is handled through yaml struct tags or the actions unmarshaller defined in fleetapi
+// TODO clean up action serialization (have it be part of the fleetapi?)
 type stateSerializer struct {
 	Action   *actionSerializer `yaml:"action,omitempty"`
 	AckToken string            `yaml:"ack_token,omitempty"`
+	Queue    fleetapi.Actions  `yaml:"action_queue,omitempty"`
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
@@ -95,8 +103,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	// persisted and we return an empty store.
 	reader, err := store.Load()
 	if err != nil {
-		//nolint:nilerr // wad
-		return &StateStore{log: log, store: store}, nil
+		return &StateStore{log: log, store: store}, nil //nolint:nilerr // expected results
 	}
 	defer reader.Close()
 
@@ -117,6 +124,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 
 	state := stateT{
 		ackToken: sr.AckToken,
+		queue:    sr.Queue,
 	}
 
 	if sr.Action != nil {
@@ -238,6 +246,15 @@ func (s *StateStore) SetAckToken(ackToken string) {
 	s.state.ackToken = ackToken
 }
 
+// SetQueue sets the action_queue to agent state
+func (s *StateStore) SetQueue(q []action) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	s.state.queue = q
+	s.dirty = true
+
+}
+
 // Save saves the actions into a state store.
 func (s *StateStore) Save() error {
 	s.mx.Lock()
@@ -251,6 +268,7 @@ func (s *StateStore) Save() error {
 	var reader io.Reader
 	serialize := stateSerializer{
 		AckToken: s.state.ackToken,
+		Queue:    s.state.queue,
 	}
 
 	if s.state.action != nil {
@@ -273,6 +291,15 @@ func (s *StateStore) Save() error {
 	}
 	s.log.Debugf("save state on disk : %+v", s.state)
 	return nil
+}
+
+// Queue returns a copy of the queue
+func (s *StateStore) Queue() []action {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+	q := make([]action, len(s.state.queue))
+	copy(q, s.state.queue)
+	return q
 }
 
 // Actions returns a slice of action to execute in order, currently only a action policy change is

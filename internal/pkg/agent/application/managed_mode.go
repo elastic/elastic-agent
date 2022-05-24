@@ -41,6 +41,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
@@ -55,6 +56,7 @@ type stateStore interface {
 	SetAckToken(ackToken string)
 	Save() error
 	Actions() []fleetapi.Action
+	Queue() []fleetapi.Action
 }
 
 // Managed application, when the application is run in managed mode, most of the configuration are
@@ -179,6 +181,11 @@ func newManaged(
 	managedApplication.stateStore = stateStore
 	actionAcker := store.NewStateStoreActionAcker(batchedAcker, stateStore)
 
+	actionQueue, err := queue.NewActionQueue(stateStore.Queue())
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
+	}
+
 	actionDispatcher, err := dispatcher.New(managedApplication.bgContext, log, handlers.NewDefault(log))
 	if err != nil {
 		return nil, err
@@ -238,6 +245,14 @@ func newManaged(
 	)
 
 	actionDispatcher.MustRegister(
+		&fleetapi.ActionCancel{},
+		handlers.NewCancel(
+			log,
+			actionQueue,
+		),
+	)
+
+	actionDispatcher.MustRegister(
 		&fleetapi.ActionApp{},
 		handlers.NewAppAction(log, managedApplication.srv),
 	)
@@ -269,6 +284,7 @@ func newManaged(
 		actionAcker,
 		statusCtrl,
 		stateStore,
+		actionQueue,
 	)
 	if err != nil {
 		return nil, err
