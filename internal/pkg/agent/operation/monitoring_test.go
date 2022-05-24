@@ -14,6 +14,7 @@ import (
 	"go.elastic.co/apm/apmtest"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
@@ -66,6 +67,8 @@ func TestExportedMetrics(t *testing.T) {
 }
 
 func TestGenerateSteps(t *testing.T) {
+	testutils.InitStorage(t)
+
 	const sampleOutput = "sample-output"
 	const outputType = "logstash"
 
@@ -222,13 +225,15 @@ func (b *testMonitor) Close() {}
 // Prepare executes steps in order for monitoring to work correctly
 func (b *testMonitor) Prepare(program.Spec, string, int, int) error { return nil }
 
+const testPath = "path"
+
 // LogPath describes a path where application stores logs. Empty if
 // application is not monitorable
 func (b *testMonitor) LogPath(program.Spec, string) string {
 	if !b.monitorLogs {
 		return ""
 	}
-	return "path"
+	return testPath
 }
 
 // MetricsPath describes a location where application exposes metrics
@@ -237,7 +242,7 @@ func (b *testMonitor) MetricsPath(program.Spec, string) string {
 	if !b.monitorMetrics {
 		return ""
 	}
-	return "path"
+	return testPath
 }
 
 // MetricsPathPrefixed return metrics path prefixed with http+ prefix.

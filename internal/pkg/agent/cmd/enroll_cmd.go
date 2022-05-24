@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
@@ -110,6 +111,7 @@ type enrollCmdOption struct {
 	FixPermissions       bool                       `yaml:"-"`
 	DelayEnroll          bool                       `yaml:"-"`
 	FleetServer          enrollCmdFleetServerOption `yaml:"-"`
+	SkipCreateSecret     bool                       `yaml:"-"`
 	Tags                 []string                   `yaml:"omitempty"`
 }
 
@@ -157,7 +159,7 @@ func newEnrollCmd(
 	store := storage.NewReplaceOnSuccessStore(
 		configPath,
 		application.DefaultAgentFleetConfig,
-		storage.NewDiskStore(paths.AgentConfigFile()),
+		storage.NewEncryptedDiskStore(paths.AgentConfigFile()),
 	)
 
 	return newEnrollCmdWithStore(
@@ -192,6 +194,14 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
+
+	// Create encryption key from the agent before touching configuration
+	if !c.options.SkipCreateSecret {
+		err = secret.CreateAgentSecret()
+		if err != nil {
+			return err
+		}
+	}
 
 	persistentConfig, err := getPersistentConfig(c.configPath)
 	if err != nil {

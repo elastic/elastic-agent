@@ -81,7 +81,7 @@ func NewStateStoreWithMigration(log *logger.Logger, actionStorePath, stateStoreP
 		return nil, err
 	}
 
-	return NewStateStore(log, storage.NewDiskStore(stateStorePath))
+	return NewStateStore(log, storage.NewEncryptedDiskStore(stateStorePath))
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
@@ -95,6 +95,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	// persisted and we return an empty store.
 	reader, err := store.Load()
 	if err != nil {
+		//nolint:nilerr // wad
 		return &StateStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
@@ -144,7 +145,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath string) (err error) {
 	log = log.Named("state_migration")
 	actionDiskStore := storage.NewDiskStore(actionStorePath)
-	stateDiskStore := storage.NewDiskStore(stateStorePath)
+	stateDiskStore := storage.NewEncryptedDiskStore(stateStorePath)
 
 	stateStoreExits, err := stateDiskStore.Exists()
 	if err != nil {

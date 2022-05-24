@@ -39,7 +39,7 @@ type UpdateMarker struct {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func (h *Upgrader) markUpgrade(ctx context.Context, hash string, action Action) error {
+func (u *Upgrader) markUpgrade(_ context.Context, hash string, action Action) error {
 	prevVersion := release.Version()
 	prevHash := release.Commit()
 	if len(prevHash) > hashLen {
@@ -74,7 +74,7 @@ func (h *Upgrader) markUpgrade(ctx context.Context, hash string, action Action) 
 // UpdateActiveCommit updates active.commit file to point to active version.
 func UpdateActiveCommit(hash string) error {
 	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
-	if err := ioutil.WriteFile(activeCommitPath, []byte(hash), 0644); err != nil {
+	if err := ioutil.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath))
 	}
 

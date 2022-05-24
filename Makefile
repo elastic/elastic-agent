@@ -39,6 +39,7 @@ notice:
 		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
 		-noticeOut NOTICE.txt \
 		-depsOut ""
+	cat dev-tools/notice/NOTICE.txt.append >> NOTICE.txt
 
 ## check-ci: Run all the checks under the ci, this doesn't include the linter which is run via a github action.
 .PHONY: check-ci

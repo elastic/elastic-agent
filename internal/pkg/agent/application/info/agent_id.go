@@ -52,7 +52,7 @@ func updateLogLevel(level string) error {
 	}
 
 	agentConfigFile := paths.AgentConfigFile()
-	diskStore := storage.NewDiskStore(agentConfigFile)
+	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)
 
 	ai.LogLevel = level
 	return updateAgentInfo(diskStore, ai)
@@ -189,10 +189,11 @@ func loadAgentInfo(forceUpdate bool, logLevel string, createAgentID bool) (*pers
 	if err := idLock.TryLock(); err != nil {
 		return nil, err
 	}
+	//nolint:errcheck // keeping the same behavior, and making linter happy
 	defer idLock.Unlock()
 
 	agentConfigFile := paths.AgentConfigFile()
-	diskStore := storage.NewDiskStore(agentConfigFile)
+	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)
 
 	agentinfo, err := getInfoFromStore(diskStore, logLevel)
 	if err != nil {
