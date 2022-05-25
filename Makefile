@@ -13,7 +13,7 @@ export MAGE_IMPORT_PATH
 mage:
 ifndef MAGE_PRESENT
 	@echo Installing mage $(MAGE_VERSION).
-	@go get -d -ldflags="-X $(MAGE_IMPORT_PATH)/mage.gitTag=$(MAGE_VERSION)" ${MAGE_IMPORT_PATH}@$(MAGE_VERSION)
+	@go get -ldflags="-X $(MAGE_IMPORT_PATH)/mage.gitTag=$(MAGE_VERSION)" ${MAGE_IMPORT_PATH}@$(MAGE_VERSION)
 	@-mage -clean
 endif
 	@true
@@ -46,6 +46,7 @@ check-ci:
 	@mage update
 	@mage check
 	@$(MAKE) notice
+	@$(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) check-no-changes
 
 ## check: run all the checks including linting using golangci-lint.
