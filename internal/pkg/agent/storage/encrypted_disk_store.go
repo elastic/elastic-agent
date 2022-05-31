@@ -33,6 +33,7 @@ func DisableEncryptionDarwin() {
 	}
 }
 
+// OptionFunc is the functional configuration type.
 type OptionFunc func(s *EncryptedDiskStore)
 
 // NewEncryptedDiskStore creates an encrypted disk store.
@@ -51,6 +52,7 @@ func NewEncryptedDiskStore(target string, opts ...OptionFunc) Storage {
 	return s
 }
 
+// WithVaultPath sets the path of the vault.
 func WithVaultPath(vaultPath string) OptionFunc {
 	return func(s *EncryptedDiskStore) {
 		if runtime.GOOS == darwin {
@@ -60,6 +62,7 @@ func WithVaultPath(vaultPath string) OptionFunc {
 	}
 }
 
+// Exists will check if the encrypted disk store exists.
 func (d *EncryptedDiskStore) Exists() (bool, error) {
 	_, err := os.Stat(d.target)
 	if err != nil {
@@ -82,6 +85,8 @@ func (d *EncryptedDiskStore) ensureKey() error {
 	return nil
 }
 
+// Save will write the encrypted storage to disk.
+// Specifically it will write to a .tmp file then rotate the file to the target name to ensure that an error does not get rid ov the previously written file.
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	// Ensure has agent key
 	err := d.ensureKey()
@@ -151,6 +156,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	return nil
 }
 
+// Load returns an io.ReadCloser for the target.
 func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 	fd, err := os.OpenFile(d.target, os.O_RDONLY, perms)
 	if err != nil {

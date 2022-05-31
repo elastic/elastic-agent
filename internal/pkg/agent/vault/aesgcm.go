@@ -12,14 +12,19 @@ import (
 	"syscall"
 )
 
+// AESKeyType indicates the AES key length.
 type AESKeyType int
 
 const (
+	// AES128 represents a 128 bit key length
 	AES128 AESKeyType = 16
+	// AES192 represents a 192 bit key length
 	AES192 AESKeyType = 24
+	// AES256 represents a 256 bit key length
 	AES256 AESKeyType = 32
 )
 
+// String returns the AES key length as a string.
 func (kt AESKeyType) String() string {
 	switch kt {
 	case AES128:
@@ -86,7 +91,7 @@ func EncryptHex(key string, data []byte) (string, error) {
 	return hex.EncodeToString(enc), nil
 }
 
-// Decrypts decrypts the data with AES-GCM
+// Decrypt decrypts the data with AES-GCM
 func Decrypt(key, data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {

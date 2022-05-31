@@ -13,6 +13,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 )
 
+// InitStorage prepares storage for testing.
+// disabled on Darwin.
 func InitStorage(t *testing.T) {
 	vault.DisableRootCheck()
 	storage.DisableEncryptionDarwin()

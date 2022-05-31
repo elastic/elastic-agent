@@ -28,6 +28,7 @@ import (
 	"unsafe"
 )
 
+// Vault represents encrypted storage using the Darwin keychain.
 type Vault struct {
 	name     string
 	keychain C.SecKeychainRef
@@ -112,6 +113,7 @@ func (v *Vault) Exists(key string) (bool, error) {
 	return false, statusToError(status)
 }
 
+// Remove will remove a key from the keychain.
 func (v *Vault) Remove(key string) error {
 	cname := C.CString(v.name)
 	defer C.free(unsafe.Pointer(cname))
@@ -136,6 +138,7 @@ func statusToError(status C.OSStatus) error {
 	return nil
 }
 
+// OSStatusError is an error type that can be returned by Darwin systems when interacting with the keychain.
 type OSStatusError struct {
 	status  int
 	message string

@@ -25,6 +25,7 @@ type options struct {
 	vaultPath string
 }
 
+// OptionFunc is the functional configuration type.
 type OptionFunc func(o *options)
 
 // WithVaultPath allows to specify the vault path, doesn't apply for darwin
