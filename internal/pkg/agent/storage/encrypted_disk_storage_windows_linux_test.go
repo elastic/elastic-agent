@@ -19,7 +19,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/google/go-cmp/cmp"
 )
 
 const (
@@ -28,9 +28,6 @@ const (
 )
 
 func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
-	// Disable root permissions check
-	vault.DisableRootCheck()
-
 	dir := t.TempDir()
 
 	fp := filepath.Join(dir, testConfigFile)

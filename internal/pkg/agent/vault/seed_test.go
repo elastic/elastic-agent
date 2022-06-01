@@ -16,7 +16,6 @@ import (
 )
 
 func TestGetSeed(t *testing.T) {
-	DisableRootCheck()
 
 	dir := t.TempDir()
 
