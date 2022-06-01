@@ -17,7 +17,6 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/google/go-cmp/cmp"
 )
 
