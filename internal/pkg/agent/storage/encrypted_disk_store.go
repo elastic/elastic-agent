@@ -86,7 +86,7 @@ func (d *EncryptedDiskStore) ensureKey() error {
 }
 
 // Save will write the encrypted storage to disk.
-// Specifically it will write to a .tmp file then rotate the file to the target name to ensure that an error does not get rid ov the previously written file.
+// Specifically it will write to a .tmp file then rotate the file to the target name to ensure that an error does not corrupt the previously written file.
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	// Ensure has agent key
 	err := d.ensureKey()
