@@ -27,9 +27,6 @@ const (
 )
 
 func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
-	// Disable root permissions check
-	vault.DisableRootCheck()
-
 	dir := t.TempDir()
 
 	fp := filepath.Join(dir, testConfigFile)

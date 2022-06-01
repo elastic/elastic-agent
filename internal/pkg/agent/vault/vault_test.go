@@ -22,9 +22,6 @@ func getTestVaultPath(t *testing.T) string {
 
 func TestVault(t *testing.T) {
 
-	// Disable root check, because the tests are not running as sudo
-	DisableRootCheck()
-
 	vaultPath := getTestVaultPath(t)
 
 	v, err := New(vaultPath)
