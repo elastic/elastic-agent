@@ -51,13 +51,14 @@ pipeline {
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc)' ], shouldMatchAll: false).toString())
+          setEnvVar('GO_VERSION', readFile(".go-version").trim())
         }
       }
     }
     stage('Check'){
       steps {
         withGithubNotify(context: "Check") {
-          withMageEnv(){
+          withMageEnv(version: "${env.GO_VERSION}"){
            dir("${BASE_DIR}"){
               setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
               log(level: 'INFO', text: "env.BEAT_VERSION=${env.BEAT_VERSION}")
@@ -88,7 +89,7 @@ pipeline {
               withGithubNotify(context: "Build-${PLATFORM}") {
                 deleteDir()
                 unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-                withMageEnv(){
+         j      withMageEnv(version: "${env.GO_VERSION}"){
                   dir("${BASE_DIR}"){
                     cmd(label: 'Go build', script: 'mage build')
                   }
@@ -99,7 +100,7 @@ pipeline {
           stage('Test') {
             steps {
               withGithubNotify(context: "Test-${PLATFORM}") {
-                withMageEnv(){
+         j      withMageEnv(version: "${env.GO_VERSION}"){
                   dir("${BASE_DIR}"){
                     withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
                       cmd(label: 'Go unitTest', script: 'mage unitTest')
