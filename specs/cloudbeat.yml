@@ -1,0 +1,31 @@
+version: 2
+inputs:
+  - name: cloudbeat
+    description: "Cloudbeat"
+    platforms:
+      - linux/386
+      - linux/amd64
+      - linux/arm64
+      - linux/ppc64le
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - windows/arm64
+      - container/386
+      - container/amd64
+      - container/arm64
+    outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+    command:
+      args:
+        - "-E"
+        - "management.enabled=true"
+        - "-E"
+        - "setup.ilm.enabled=false"
+        - "-E"
+        - "setup.template.enabled=false"
+        - "-E"
+        - "gc_percent=${CLOUDBEAT_GOGC:100}"

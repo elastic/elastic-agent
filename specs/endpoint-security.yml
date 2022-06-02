@@ -1,0 +1,42 @@
+version: 2
+inputs:
+  - name: endpoint
+    description: "Endpoint Security"
+    platforms:
+      - linux/386
+      - linux/amd64
+      - linux/arm64
+      - linux/ppc64le
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - windows/arm64
+    outputs:
+      - elasticsearch
+    runtime:
+      preventions:
+        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
+          message: "No support for RHEL7 on arm64"
+    service:
+      operations:
+        check:
+          args:
+            - "verify"
+            - "--log"
+            - "stderr"
+          timeout: 30
+        install:
+          args:
+            - "install"
+            - "--log"
+            - "stderr"
+            - "--upgrade"
+            - "--resources"
+            - "endpoint-security-resources.zip"
+          timeout: 600
+        uninstall:
+          args:
+            - "uninstall"
+            - "--log"
+            - "stderr"
+          timeout: 600

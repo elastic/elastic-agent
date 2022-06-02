@@ -1,0 +1,175 @@
+$schema: "file://../schemas/component.spec.yml"
+version: 2
+inputs:
+  - name: aws-cloudwatch
+    description: "AWS Cloudwatch"
+    platforms: &platforms
+      - linux/386
+      - linux/amd64
+      - linux/arm64
+      - linux/ppc64le
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - windows/arm64
+      - container/386
+      - container/amd64
+      - container/arm64
+    outputs: &outputs
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+    command:
+      args: &args
+        - "-E"
+        - "setup.ilm.enabled=false"
+        - "-E"
+        - "setup.template.enabled=false"
+        - "-E"
+        - "management.enabled=true"
+        - "-E"
+        - "logging.level=debug"
+        - "-E"
+        - "gc_percent=${FILEBEAT_GOGC:100}"
+        - "-E"
+        - "filebeat.config.modules.enabled=false"
+  - name: aws-s3
+    description: "AWS S3"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: azure-eventhub
+    description: "Azure Eventhub"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: cloudfoundry
+    description: "PCF Cloudfoundry"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: container
+    description: "Container logs"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: docker
+    aliases:
+      - log/docker
+    description: "Docker logs"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: gcp-pubsub
+    description: "GCP Pub-Sub"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: http_endpoint
+    description: "HTTP Endpoint"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: httpjson
+    description: "HTTP JSON Endpoint"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: journald
+    description: "Journald"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: kafka
+    description: "Kafka"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: log
+    aliases:
+      - logfile
+      - event/file
+    description: "Logfile"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: mqtt
+    description: "MQTT"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: netflow
+    description: "Netflow"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: o365audit
+    description: "Office 365 Audit"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: redis
+    aliases:
+      - log/redis_slowlog
+    description: "Redis"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: syslog
+    aliases:
+      - log/syslog
+    description: "Syslog"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: tcp
+    aliases:
+      - event/tcp
+    description: "TCP"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: udp
+    aliases:
+      - event/udp
+    description: "UDP"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: unix
+    description: "Unix Socket"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: winlog
+    description: "Winlog"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: filestream
+    description: "Filestream"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args

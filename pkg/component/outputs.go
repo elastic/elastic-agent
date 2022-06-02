@@ -1,0 +1,17 @@
+package component
+
+const (
+	// Elasticsearch represents the elasticsearch output
+	Elasticsearch = "elasticsearch"
+	// Kafka represents the kafka output
+	Kafka = "kafka"
+	// Logstash represents the logstash output
+	Logstash = "logstash"
+	// Redis represents the redis output
+	Redis = "redis"
+	// Shipper represents support for using the elastic-agent-shipper
+	Shipper = "shipper"
+)
+
+// Outputs defines the outputs that a component can support
+var Outputs = []string{Elasticsearch, Kafka, Logstash, Redis, Shipper}
