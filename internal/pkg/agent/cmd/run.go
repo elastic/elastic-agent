@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
@@ -115,6 +116,16 @@ func run(override cfgOverrider) error {
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
 	}
+
+	// Ensure we have the agent secret created.
+	// The secret is not created here if it exists already from the previous enrollment.
+	// This is needed for compatibility with agent running in standalone mode,
+	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
+	err = secret.CreateAgentSecret()
+	if err != nil {
+		return err
+	}
+
 	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)
 	if err != nil {
 		return errors.New(err,
