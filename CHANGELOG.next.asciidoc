@@ -183,3 +183,4 @@
 - Save the agent configuration and the state encrypted on the disk. {issue}535[535] {pull}398[398]
 - Bump node.js version for heartbeat/synthetics to 16.15.0
 - Support scheduled actions and cancellation of pending actions. {issue}393[393] {pull}419[419]
+- Add liveness endpoint, allow fleet-gateway component to report degraded state, add update time and messages to status output. {issue}390[390] {pull}569[569]
