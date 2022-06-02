@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package component
 
 const (
@@ -12,14 +16,10 @@ const (
 )
 
 const (
-	// I386 represents the i386 architecture
-	I386 = "386"
 	// AMD64 represents the amd64 architecture
 	AMD64 = "amd64"
 	// ARM64 represents the arm64 architecture
 	ARM64 = "arm64"
-	// PPC64 represents the ppc64el architecture
-	PPC64 = "ppc64el"
 )
 
 // Platforms defines the platforms that a component can support
@@ -39,11 +39,6 @@ var Platforms = []struct {
 		GOOS: Linux,
 	},
 	{
-		OS:   Container,
-		Arch: PPC64,
-		GOOS: Linux,
-	},
-	{
 		OS:   Darwin,
 		Arch: AMD64,
 		GOOS: Darwin,
@@ -55,11 +50,6 @@ var Platforms = []struct {
 	},
 	{
 		OS:   Linux,
-		Arch: I386,
-		GOOS: Linux,
-	},
-	{
-		OS:   Linux,
 		Arch: AMD64,
 		GOOS: Linux,
 	},
@@ -67,16 +57,6 @@ var Platforms = []struct {
 		OS:   Linux,
 		Arch: ARM64,
 		GOOS: Linux,
-	},
-	{
-		OS:   Linux,
-		Arch: PPC64,
-		GOOS: Linux,
-	},
-	{
-		OS:   Windows,
-		Arch: I386,
-		GOOS: Windows,
 	},
 	{
 		OS:   Windows,

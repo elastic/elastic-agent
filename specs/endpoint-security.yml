@@ -3,10 +3,8 @@ inputs:
   - name: endpoint
     description: "Endpoint Security"
     platforms:
-      - linux/386
       - linux/amd64
       - linux/arm64
-      - linux/ppc64le
       - darwin/amd64
       - darwin/arm64
       - windows/amd64
