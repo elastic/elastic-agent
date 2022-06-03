@@ -284,7 +284,7 @@ func getOverwrites(rawConfig *config.Config) error {
 		return nil
 	}
 	path := paths.AgentConfigFile()
-	store := storage.NewEncryptedDiskStore(path)
+	store := storage.NewDiskStore(path)
 
 	reader, err := store.Load()
 	if err != nil && errors.Is(err, os.ErrNotExist) {

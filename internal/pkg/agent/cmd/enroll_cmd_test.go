@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"runtime"
 	"strconv"
 	"testing"
 
@@ -25,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -48,12 +46,6 @@ func (m *mockStore) Save(in io.Reader) error {
 }
 
 func TestEnroll(t *testing.T) {
-	testutils.InitStorage(t)
-	skipCreateSecret := false
-	if runtime.GOOS == "darwin" {
-		skipCreateSecret = true
-	}
-
 	log, _ := logger.New("tst", false)
 
 	t.Run("fail to save is propagated", withTLSServer(
@@ -97,7 +89,6 @@ func TestEnroll(t *testing.T) {
 					CAs:                  []string{caFile},
 					EnrollAPIKey:         "my-enrollment-token",
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
-					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -151,7 +142,6 @@ func TestEnroll(t *testing.T) {
 					CAs:                  []string{caFile},
 					EnrollAPIKey:         "my-enrollment-api-key",
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
-					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -208,7 +198,6 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-api-key",
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
-					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -267,7 +256,6 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-api-key",
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
-					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -311,7 +299,6 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-token",
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
-					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -405,8 +392,7 @@ func withTLSServer(
 		s := http.Server{
 			Handler: m(t),
 			TLSConfig: &tls.Config{
-				Certificates: []tls.Certificate{serverCert},
-				MinVersion:   tls.VersionTLS12,
+				Certificates: []tls.Certificate{serverCert}, MinVersion: tls.VersionTLS12,
 			},
 		}
 

@@ -64,7 +64,7 @@ func loadConfig(configPath string) (*config.Config, error) {
 
 	path := paths.AgentConfigFile()
 
-	store := storage.NewEncryptedDiskStore(path)
+	store := storage.NewDiskStore(path)
 	reader, err := store.Load()
 	if err != nil {
 		return nil, errors.New(err, "could not initialize config store",

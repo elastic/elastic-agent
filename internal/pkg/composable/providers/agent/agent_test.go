@@ -13,12 +13,9 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 )
 
 func TestContextProvider(t *testing.T) {
-	testutils.InitStorage(t)
-
 	builder, _ := composable.Providers.GetContextProvider("agent")
 	provider, err := builder(nil, nil)
 	require.NoError(t, err)
