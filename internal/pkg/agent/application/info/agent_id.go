@@ -189,7 +189,7 @@ func loadAgentInfo(forceUpdate bool, logLevel string, createAgentID bool) (*pers
 	if err := idLock.TryLock(); err != nil {
 		return nil, err
 	}
-	defer idLock.Unlock()
+	defer idLock.Unlock() //nolint:errcheck // not changing this code for linter
 
 	agentConfigFile := paths.AgentConfigFile()
 	diskStore := storage.NewDiskStore(agentConfigFile)

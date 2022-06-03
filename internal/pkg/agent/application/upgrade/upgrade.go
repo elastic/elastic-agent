@@ -134,7 +134,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 
 	u.reportUpdating(a.Version())
 
-	sourceURI, err := u.sourceURI(a.Version(), a.SourceURI())
+	sourceURI := u.sourceURI(a.Version(), a.SourceURI())
 	archivePath, err := u.downloadArtifact(ctx, a.Version(), sourceURI)
 	if err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	if strings.HasPrefix(release.Commit(), newHash) {
 		// not an error
 		if action := a.FleetAction(); action != nil {
-			u.ackAction(ctx, action)
+			_ = u.ackAction(ctx, action)
 		}
 		u.log.Warn("upgrading to same version")
 		return nil, nil
@@ -208,12 +208,12 @@ func (u *Upgrader) Ack(ctx context.Context) error {
 	return saveMarker(marker)
 }
 
-func (u *Upgrader) sourceURI(version, retrievedURI string) (string, error) {
+func (u *Upgrader) sourceURI(_, retrievedURI string) string {
 	if retrievedURI != "" {
-		return retrievedURI, nil
+		return retrievedURI
 	}
 
-	return u.settings.SourceURI, nil
+	return u.settings.SourceURI
 }
 
 // ackAction is used for successful updates, it was either updated successfully or to the same version
@@ -240,7 +240,7 @@ func (u *Upgrader) ackAction(ctx context.Context, action fleetapi.Action) error 
 // and state is changed to FAILED
 func (u *Upgrader) reportFailure(ctx context.Context, action fleetapi.Action, err error) {
 	// ack action
-	u.acker.Ack(ctx, action)
+	_ = u.acker.Ack(ctx, action)
 
 	// report failure
 	u.reporter.OnStateChange(
@@ -261,8 +261,8 @@ func (u *Upgrader) reportUpdating(version string) {
 }
 
 func rollbackInstall(ctx context.Context, hash string) {
-	os.RemoveAll(filepath.Join(paths.Data(), fmt.Sprintf("%s-%s", agentName, hash)))
-	ChangeSymlink(ctx, release.ShortCommit())
+	_ = os.RemoveAll(filepath.Join(paths.Data(), fmt.Sprintf("%s-%s", agentName, hash)))
+	_ = ChangeSymlink(ctx, release.ShortCommit())
 }
 
 func copyActionStore(newHash string) error {
@@ -338,7 +338,7 @@ func readProcessDirs(log *logger.Logger, runtimeDir string) ([]string, error) {
 }
 
 // readDirs returns list of absolute paths to directories inside specified path.
-func readDirs(log *logger.Logger, dir string) ([]string, error) {
+func readDirs(_ *logger.Logger, dir string) ([]string, error) {
 	dirEntries, err := os.ReadDir(dir)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err

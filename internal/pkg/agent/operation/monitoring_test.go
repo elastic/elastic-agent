@@ -33,6 +33,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
+const (
+	pathString = "path"
+)
+
 func TestExportedMetrics(t *testing.T) {
 	programName := "testing"
 	expectedMetricsName := "metric_name"
@@ -228,7 +232,7 @@ func (b *testMonitor) LogPath(program.Spec, string) string {
 	if !b.monitorLogs {
 		return ""
 	}
-	return "path"
+	return pathString
 }
 
 // MetricsPath describes a location where application exposes metrics
@@ -237,7 +241,7 @@ func (b *testMonitor) MetricsPath(program.Spec, string) string {
 	if !b.monitorMetrics {
 		return ""
 	}
-	return "path"
+	return pathString
 }
 
 // MetricsPathPrefixed return metrics path prefixed with http+ prefix.
