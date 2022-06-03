@@ -1,0 +1,157 @@
+version: 2
+inputs:
+  - name: beat/metrics
+    description: "Beat metrics"
+    platforms: &platforms
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+    outputs: &outputs
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+    command:
+      args: &args
+        - "-E"
+        - "setup.ilm.enabled=false"
+        - "-E"
+        - "setup.template.enabled=false"
+        - "-E"
+        - "management.enabled=true"
+        - "-E"
+        - "logging.level=debug"
+        - "-E"
+        - "gc_percent=${METRICBEAT_GOGC:100}"
+        - "-E"
+        - "metricbeat.config.modules.enabled=false"
+  - name: docker/metrics
+    description: "Docker metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: elasticsearch/metrics
+    description: "Elasticsearch metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: kibana/metrics
+    description: "Kibana metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: kubernetes/metrics
+    description: "Kubernetes metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: linux/metrics
+    description: "Linux metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: logstash/metrics
+    description: "Logstash metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: mongodb/metrics
+    description: "Mongodb metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: mysql/metrics
+    description: "MySQL metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: postgresql/metrics
+    description: "PostgreSQL metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: redis/metrics
+    description: "Redis metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: system/metrics
+    description: "System metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: uwsgi/metrics
+    description: "UWSGI metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: windows/metrics
+    description: "Windows metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: aws/metrics
+    description: "AWS metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: awsfargate/metrics
+    description: "AWS Fargate metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: azure/metrics
+    description: "Azure metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: cloudfoundry/metrics
+    description: "PCF Cloudfoundry metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: containerd/metrics
+    description: "Containerd metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: mssql/metrics
+    description: "Microsoft SQL Server metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: oracle/metrics
+    description: "Oracle Database metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: syncgateway/metrics
+    description: "Couchbase Sync Gateway metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
