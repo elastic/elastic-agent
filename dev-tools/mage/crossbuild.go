@@ -206,12 +206,11 @@ func buildMage() error {
 // CrossBuildImage build the docker image.
 func CrossBuildImage(platform string) (string, error) {
 	tagSuffix := "main"
-	const
 
 	switch {
 	case platform == "darwin/amd64":
 		tagSuffix = "darwin-debian10"
-	case platform == "darwin/arm64" || platform == "darwin/universal" :
+	case platform == "darwin/arm64" || platform == "darwin/universal":
 		tagSuffix = "darwin-arm64-debian10"
 	case platform == "linux/arm64":
 		tagSuffix = "arm"
