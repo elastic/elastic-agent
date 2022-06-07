@@ -102,6 +102,7 @@
 - Update API calls that the agent makes to Kibana when running the container command. {pull}253[253]
 - diagnostics collect log names are fixed on Windows machines, command will ignore failures. AgentID is included in diagnostics(and diagnostics collect) output. {issue}81[81] {issue}92[92] {issue}190[190] {pull}262[262]
 - Collects stdout and stderr of applications run as a process and logs them. {issue}[88]
+- Remove VerificationMode option to empty string. Default will be `full`. {issue}[184]
 
 ==== New features
 
