@@ -1060,12 +1060,12 @@ SOFTWARE
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.2.3
+Dependency : github.com/narph/elastic-agent-libs
+Version: v0.1.2-0.20220607113917-554c78c54c7c
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.2.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/narph/elastic-agent-libs@v0.1.2-0.20220607113917-554c78c54c7c/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -16187,11 +16187,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : gopkg.in/yaml.v3
-Version: v3.0.0-20210107192922-496545a6307b
+Version: v3.0.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/gopkg.in/yaml.v3@v3.0.0-20210107192922-496545a6307b/LICENSE:
+Contents of probable licence file $GOMODCACHE/gopkg.in/yaml.v3@v3.0.1/LICENSE:
 
 
 This project is covered by two different licenses: MIT and Apache.
