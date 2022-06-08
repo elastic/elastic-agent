@@ -85,6 +85,9 @@ spec:
             - name: etcsysmd
               mountPath: /hostfs/etc/systemd
               readOnly: true
+            - name: etc-mid
+              mountPath: /etc/machine-id
+              readOnly: true
       volumes:
         - name: proc
           hostPath:
@@ -113,6 +116,10 @@ spec:
         - name: etcsysmd
           hostPath:
             path: /etc/systemd
+        - name: etc-mid
+          hostPath:
+            path: /etc/machine-id
+            type: File
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
