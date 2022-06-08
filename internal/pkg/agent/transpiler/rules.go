@@ -669,6 +669,42 @@ func (r *InjectStreamProcessorRule) Apply(_ AgentInfo, ast *AST) (err error) {
 		namespace := datastreamNamespaceFromInputNode(inputNode)
 		datastreamType := datastreamTypeFromInputNode(inputNode, r.Type)
 
+		var inputID *StrVal
+		inputIDNode, found := inputNode.Find("id")
+		if found {
+			inputID, _ = inputIDNode.Value().(*StrVal)
+		}
+
+		if inputID != nil {
+			// get input-level processors node
+			processorsNode, found := inputNode.Find("processors")
+			if !found {
+				processorsNode = &Key{
+					name:  "processors",
+					value: &List{value: make([]Node, 0)},
+				}
+
+				inputMap, ok := inputNode.(*Dict)
+				if ok {
+					inputMap.value = append(inputMap.value, processorsNode)
+				}
+			}
+
+			processorsList, ok := processorsNode.Value().(*List)
+			if !ok {
+				return errors.New("InjectStreamProcessorRule: input processors is not a list")
+			}
+
+			// inject `input_id` on the input level
+			processorMap := &Dict{value: make([]Node, 0)}
+			processorMap.value = append(processorMap.value, &Key{name: "target", value: &StrVal{value: "source"}})
+			processorMap.value = append(processorMap.value, &Key{name: "fields", value: &Dict{value: []Node{
+				&Key{name: "input_id", value: inputID},
+			}}})
+			addFieldsMap := &Dict{value: []Node{&Key{"add_fields", processorMap}}}
+			processorsList.value = mergeStrategy(r.OnConflict).InjectItem(processorsList.value, addFieldsMap)
+		}
+
 		streamsNode, ok := inputNode.Find("streams")
 		if !ok {
 			continue
@@ -680,6 +716,12 @@ func (r *InjectStreamProcessorRule) Apply(_ AgentInfo, ast *AST) (err error) {
 		}
 
 		for _, streamNode := range streamsList.value {
+			var streamID *StrVal
+			streamIDNode, ok := streamNode.Find("id")
+			if ok {
+				streamID, _ = streamIDNode.Value().(*StrVal)
+			}
+
 			streamMap, ok := streamNode.(*Dict)
 			if !ok {
 				continue
@@ -722,6 +764,17 @@ func (r *InjectStreamProcessorRule) Apply(_ AgentInfo, ast *AST) (err error) {
 			}}})
 			addFieldsMap = &Dict{value: []Node{&Key{"add_fields", processorMap}}}
 			processorsList.value = mergeStrategy(r.OnConflict).InjectItem(processorsList.value, addFieldsMap)
+
+			if streamID != nil {
+				// source stream
+				processorMap = &Dict{value: make([]Node, 0)}
+				processorMap.value = append(processorMap.value, &Key{name: "target", value: &StrVal{value: "source"}})
+				processorMap.value = append(processorMap.value, &Key{name: "fields", value: &Dict{value: []Node{
+					&Key{name: "stream_id", value: streamID.Clone()},
+				}}})
+				addFieldsMap = &Dict{value: []Node{&Key{"add_fields", processorMap}}}
+				processorsList.value = mergeStrategy(r.OnConflict).InjectItem(processorsList.value, addFieldsMap)
+			}
 		}
 	}
 

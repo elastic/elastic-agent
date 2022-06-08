@@ -165,6 +165,114 @@ inputs:
 			},
 		},
 
+		"inject stream": {
+			givenYAML: `
+inputs:
+  - name: No streams, no IDs
+    type: file
+  - name: With streams and IDs
+    id: input-id
+    type: file
+    data_stream.namespace: nsns
+    streams:
+      - paths: /var/log/mysql/error.log
+        id: stream-id
+        data_stream.dataset: dsds
+  - name: With processors
+    id: input-id
+    type: file
+    data_stream.namespace: nsns
+    processors:
+      - add_fields:
+          target: some
+          fields:
+            dataset: value
+    streams:
+      - paths: /var/log/mysql/error.log
+        id: stream-id
+        data_stream.dataset: dsds
+        processors:
+          - add_fields:
+              target: another
+              fields:
+                dataset: value
+`,
+			expectedYAML: `
+inputs:
+  - name: No streams, no IDs
+    type: file
+  - name: With streams and IDs
+    id: input-id
+    type: file
+    data_stream.namespace: nsns
+    processors:
+      - add_fields:
+          target: source
+          fields:
+            input_id: input-id
+    streams:
+      - paths: /var/log/mysql/error.log
+        id: stream-id
+        data_stream.dataset: dsds
+        processors:
+          - add_fields:
+              target: data_stream
+              fields:
+                type: stream-type
+                namespace: nsns
+                dataset: dsds
+          - add_fields:
+              target: event
+              fields:
+                dataset: dsds
+          - add_fields:
+              target: source
+              fields:
+                stream_id: stream-id
+  - name: With processors
+    id: input-id
+    type: file
+    data_stream.namespace: nsns
+    processors:
+      - add_fields:
+          target: some
+          fields:
+            dataset: value
+      - add_fields:
+          target: source
+          fields:
+            input_id: input-id
+    streams:
+      - paths: /var/log/mysql/error.log
+        id: stream-id
+        data_stream.dataset: dsds
+        processors:
+          - add_fields:
+              target: another
+              fields:
+                dataset: value
+          - add_fields:
+              target: data_stream
+              fields:
+                type: stream-type
+                namespace: nsns
+                dataset: dsds
+          - add_fields:
+              target: event
+              fields:
+                dataset: dsds
+          - add_fields:
+              target: source
+              fields:
+                stream_id: stream-id
+`,
+			rule: &RuleList{
+				Rules: []Rule{
+					InjectStreamProcessor("insert_after", "stream-type"),
+				},
+			},
+		},
+
 		"inject agent info": {
 			givenYAML: `
 inputs:
