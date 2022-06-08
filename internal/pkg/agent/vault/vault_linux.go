@@ -10,7 +10,6 @@ package vault
 import (
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io/fs"
 	"io/ioutil"
@@ -134,10 +133,5 @@ func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
 }
 
 func (v *Vault) filepathFromKey(key string) string {
-	return filepath.Join(v.path, fileNameFromKey(key))
-}
-
-func fileNameFromKey(key string) string {
-	hash := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(hash[:])
+	return filepath.Join(v.path, fileNameFromKey(v.key, key))
 }
