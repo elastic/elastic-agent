@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"golang.org/x/crypto/pbkdf2"
@@ -25,6 +26,7 @@ const saltSize = 8
 type Vault struct {
 	path string
 	key  []byte
+	mx   sync.Mutex
 }
 
 // Open initializes the vault store
@@ -70,11 +72,17 @@ func (v *Vault) Set(key string, data []byte) error {
 		return err
 	}
 
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	return ioutil.WriteFile(v.filepathFromKey(key), enc, 0600)
 }
 
 // Get retrieves the key from the vault store
 func (v *Vault) Get(key string) ([]byte, error) {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	enc, err := ioutil.ReadFile(v.filepathFromKey(key))
 	if err != nil {
 		return nil, err
@@ -85,6 +93,9 @@ func (v *Vault) Get(key string) ([]byte, error) {
 
 // Exists checks if the key exists
 func (v *Vault) Exists(key string) (ok bool, err error) {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	if _, err = os.Stat(v.filepathFromKey(key)); err == nil {
 		ok = true
 	} else if errors.Is(err, fs.ErrNotExist) {
