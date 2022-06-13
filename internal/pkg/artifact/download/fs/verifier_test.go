@@ -81,7 +81,7 @@ func TestFetchVerify(t *testing.T) {
 	// second one should pass
 	// download not skipped: package missing
 	// verify passes because hash is not correct
-	_, err = downloader.Download(ctx, s, version)
+	_, err = downloader.Download(ctx, "beat/beat", s, version)
 	assert.NoError(t, err)
 
 	// file downloaded ok
@@ -193,7 +193,7 @@ func TestVerify(t *testing.T) {
 	}
 
 	testClient := NewDownloader(config)
-	artifact, err := testClient.Download(context.Background(), beatSpec, version)
+	artifact, err := testClient.Download(context.Background(), "beat/filebeat", beatSpec, version)
 	if err != nil {
 		t.Fatal(err)
 	}

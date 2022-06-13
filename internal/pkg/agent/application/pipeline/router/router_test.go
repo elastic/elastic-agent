@@ -26,6 +26,10 @@ const (
 	closeOp
 )
 
+func init() {
+	componenttest.LoadComponents()
+}
+
 func (r *rOp) String() string {
 	m := map[rOp]string{
 		1: "create",
@@ -82,7 +86,7 @@ func TestRouter(t *testing.T) {
 		k2 := "KEY_2"
 
 		recorder := &recorder{}
-		r, err := New(nil, componenttest.TestSet, recorder.factory)
+		r, err := New(nil, component.Supported, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -120,7 +124,7 @@ func TestRouter(t *testing.T) {
 
 	t.Run("create new and delegate program to existing stream", func(t *testing.T) {
 		recorder := &recorder{}
-		r, err := New(nil, componenttest.TestSet, recorder.factory)
+		r, err := New(nil, component.Supported, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -147,7 +151,7 @@ func TestRouter(t *testing.T) {
 		k2 := "KEY_2"
 
 		recorder := &recorder{}
-		r, err := New(nil, componenttest.TestSet, recorder.factory)
+		r, err := New(nil, component.Supported, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,

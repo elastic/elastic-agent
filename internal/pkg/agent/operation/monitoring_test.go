@@ -39,7 +39,7 @@ func TestExportedMetrics(t *testing.T) {
 	programName := "testing"
 	expectedMetricsName := "metric_name"
 	component.SupportedMap[programName] = component.Spec{
-		ProgramSpec: &spec.Spec{
+		ProgramSpec: spec.Spec{
 			ExportedMetrics: []string{expectedMetricsName},
 		},
 	}
@@ -104,13 +104,13 @@ func TestGenerateSteps(t *testing.T) {
 			var fbFound, mbFound bool
 			for _, s := range steps {
 				// Filebeat step check
-				if s.ProgramSpec.Command() == "filebeat" {
+				if s.ProgramSpec.CommandName() == "filebeat" {
 					fbFound = true
 					checkStep(t, "filebeat", outputType, sampleOutput, s)
 				}
 
 				// Metricbeat step check
-				if s.ProgramSpec.Command() == "metricbeat" {
+				if s.ProgramSpec.CommandName() == "metricbeat" {
 					mbFound = true
 					checkStep(t, "metricbeat", outputType, sampleOutput, s)
 				}

@@ -31,7 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -197,7 +197,7 @@ func programsFromConfig(cfg *config.Config) ([]program.Program, error) {
 		return nil, errors.New("failed to get an agent info", err)
 	}
 
-	ppMap, err := program.Programs(agentInfo, componenttest.TestSet, ast)
+	ppMap, err := program.Programs(agentInfo, component.Supported, ast)
 	if err != nil {
 		return nil, errors.New("failed to get programs from config", err)
 	}
@@ -207,12 +207,12 @@ func programsFromConfig(cfg *config.Config) ([]program.Program, error) {
 
 	for _, v := range ppMap {
 		for _, p := range v {
-			if _, found := check[p.Spec.Command()]; found {
+			if _, found := check[p.Spec.CommandName()]; found {
 				continue
 			}
 
 			pp = append(pp, p)
-			check[p.Spec.Command()] = true
+			check[p.Spec.CommandName()] = true
 		}
 	}
 

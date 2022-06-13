@@ -75,7 +75,7 @@ func NewDownloaderWithClient(log progressLogger, config *artifact.Config, client
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, spec component.Spec, version string) (_ string, err error) {
+func (e *Downloader) Download(ctx context.Context, remoteArtifact string, spec component.Spec, version string) (_ string, err error) {
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
@@ -86,13 +86,13 @@ func (e *Downloader) Download(ctx context.Context, spec component.Spec, version 
 	}()
 
 	// download from source to dest
-	path, err := e.download(ctx, e.config.OS(), spec, version)
+	path, err := e.download(ctx, remoteArtifact, e.config.OS(), spec, version)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	hashPath, err := e.downloadHash(ctx, e.config.OS(), spec, version)
+	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), spec, version)
 	downloadedFiles = append(downloadedFiles, hashPath)
 	return path, err
 }
@@ -114,7 +114,7 @@ func (e *Downloader) composeURI(artifactName, packageName string) (string, error
 	return uri.String(), nil
 }
 
-func (e *Downloader) download(ctx context.Context, operatingSystem string, spec component.Spec, version string) (string, error) {
+func (e *Downloader) download(ctx context.Context, remoteArtifact string, operatingSystem string, spec component.Spec, version string) (string, error) {
 	filename, err := artifact.GetArtifactName(spec, version, operatingSystem, e.config.Arch())
 	if err != nil {
 		return "", errors.New(err, "generating package name failed")
@@ -125,10 +125,10 @@ func (e *Downloader) download(ctx context.Context, operatingSystem string, spec 
 		return "", errors.New(err, "generating package path failed")
 	}
 
-	return e.downloadFile(ctx, "REMOVE", filename, fullPath)
+	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
 }
 
-func (e *Downloader) downloadHash(ctx context.Context, operatingSystem string, spec component.Spec, version string) (string, error) {
+func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, operatingSystem string, spec component.Spec, version string) (string, error) {
 	filename, err := artifact.GetArtifactName(spec, version, operatingSystem, e.config.Arch())
 	if err != nil {
 		return "", errors.New(err, "generating package name failed")
@@ -142,7 +142,7 @@ func (e *Downloader) downloadHash(ctx context.Context, operatingSystem string, s
 	filename = filename + ".sha512"
 	fullPath = fullPath + ".sha512"
 
-	return e.downloadFile(ctx, "REMOVE", filename, fullPath)
+	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
 }
 
 func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, fullPath string) (string, error) {

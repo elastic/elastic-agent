@@ -24,11 +24,21 @@ type Descriptor struct {
 // NewDescriptor creates a program which satisfies Program interface and can be used with Operator.
 func NewDescriptor(spec component.Spec, version string, config *artifact.Config, tags map[Tag]string) *Descriptor {
 	dir := paths.Components()
+	return NewDescriptorWithPath(dir, spec, version, config, tags)
+}
+
+// NewDescriptorOnPath creates a program which satisfies Program interface and can be used with Operator.
+func NewDescriptorWithPath(path string, spec component.Spec, version string, config *artifact.Config, tags map[Tag]string) *Descriptor {
+	servicePort := 0
+	if spec.ProgramSpec.ServicePort > 0 {
+		servicePort = spec.ProgramSpec.ServicePort
+	}
+
 	return &Descriptor{
 		spec:         spec,
-		directory:    dir,
-		executionCtx: NewExecutionContext(spec.ProgramSpec.ServicePort, spec.Command(), version, tags),
-		process:      specification(dir, spec),
+		directory:    path,
+		executionCtx: NewExecutionContext(servicePort, spec.CommandName(), version, tags),
+		process:      specification(path, spec),
 	}
 }
 

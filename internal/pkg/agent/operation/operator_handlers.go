@@ -27,7 +27,7 @@ func (o *Operator) initHandlerMap() {
 }
 
 func (o *Operator) handleRun(step configrequest.Step) error {
-	if strings.EqualFold(step.ProgramSpec.Command(), monitoringName) {
+	if strings.EqualFold(step.ProgramSpec.CommandName(), monitoringName) {
 		return o.handleStartSidecar(step)
 	}
 
@@ -36,15 +36,15 @@ func (o *Operator) handleRun(step configrequest.Step) error {
 		return errors.New(err,
 			"operator.handleStart failed to create program",
 			errors.TypeApplication,
-			errors.M(errors.MetaKeyAppName, step.ProgramSpec.Command()))
+			errors.M(errors.MetaKeyAppName, step.ProgramSpec.CommandName()))
 	}
 
 	return o.start(p, cfg)
 }
 
 func (o *Operator) handleRemove(step configrequest.Step) error {
-	o.logger.Debugf("stopping process %s: %s", step.ProgramSpec.Command(), step.ID)
-	if strings.EqualFold(step.ProgramSpec.Command(), monitoringName) {
+	o.logger.Debugf("stopping process %s: %s", step.ProgramSpec.CommandName(), step.ID)
+	if strings.EqualFold(step.ProgramSpec.CommandName(), monitoringName) {
 		return o.handleStopSidecar(step)
 	}
 
@@ -53,7 +53,7 @@ func (o *Operator) handleRemove(step configrequest.Step) error {
 		return errors.New(err,
 			"operator.handleRemove failed to stop program",
 			errors.TypeApplication,
-			errors.M(errors.MetaKeyAppName, step.ProgramSpec.Command()))
+			errors.M(errors.MetaKeyAppName, step.ProgramSpec.CommandName()))
 	}
 
 	return o.stop(p)

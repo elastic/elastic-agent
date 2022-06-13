@@ -183,14 +183,14 @@ func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) 
 	o.statusController.UpdateStateID(stateID)
 
 	for _, step := range steps {
-		if !strings.EqualFold(step.ProgramSpec.Command(), monitoringName) {
-			if _, isSupported := component.SupportedMap[strings.ToLower(step.ProgramSpec.Command())]; !isSupported {
+		if !strings.EqualFold(step.ProgramSpec.CommandName(), monitoringName) {
+			if _, isSupported := component.SupportedMap[step.ProgramSpec.CommandName()]; !isSupported {
 				// mark failed, new config cannot be run
-				msg := fmt.Sprintf("program '%s' is not supported", step.ProgramSpec.Command())
+				msg := fmt.Sprintf("program '%s' is not supported", step.ProgramSpec.CommandName())
 				o.statusReporter.Update(state.Failed, msg, nil)
 				return errors.New(msg,
 					errors.TypeApplication,
-					errors.M(errors.MetaKeyAppName, step.ProgramSpec.Command()))
+					errors.M(errors.MetaKeyAppName, step.ProgramSpec.CommandName()))
 			}
 		}
 

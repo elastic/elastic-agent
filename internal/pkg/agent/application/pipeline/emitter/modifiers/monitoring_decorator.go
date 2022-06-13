@@ -79,7 +79,7 @@ func InjectMonitoring(agentInfo *info.AgentInfo, outputGroup string, rootAst *tr
 	programList := make([]string, 0, len(programsToRun))
 	cfgHash := md5.New()
 	for _, p := range programsToRun {
-		programList = append(programList, p.Spec.Command())
+		programList = append(programList, p.Spec.CommandName())
 		cfgHash.Write(p.Config.Hash())
 	}
 	// making program list and their hashes part of the config

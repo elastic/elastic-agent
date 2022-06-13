@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
 
 var testDiagnostics = DiagnosticsInfo{
@@ -83,6 +84,12 @@ func Example_humanDiagnosticsOutput() {
 	//      hostname: test-host                   username: test-user                 user_id: 1000                                   user_gid: 1000
 	//   *  name: metricbeat                      route_key: test
 	//      error: failed to get metricbeat data
+}
+
+func init() {
+	if _, err := componenttest.LoadComponents(); err != nil {
+		panic(err)
+	}
 }
 
 func Test_collectEndpointSecurityLogs(t *testing.T) {

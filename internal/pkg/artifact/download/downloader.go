@@ -12,5 +12,5 @@ import (
 
 // Downloader is an interface allowing download of an artifact
 type Downloader interface {
-	Download(ctx context.Context, spec component.Spec, version string) (string, error)
+	Download(ctx context.Context, artifact string, spec component.Spec, version string) (string, error)
 }

@@ -22,7 +22,7 @@ type Spec struct {
 	Outputs []OutputSpec `config:"outputs,omitempty" yaml:"outputs,omitempty"`
 
 	// TODO: For backward comp, removed later
-	ProgramSpec *spec.Spec `config:",inline" yaml:",inline"`
+	ProgramSpec spec.Spec `config:",inline" yaml:",inline"`
 }
 
 // Validate ensures correctness of component specification.
@@ -49,6 +49,11 @@ func (s *Spec) Validate() error {
 		}
 	}
 	return nil
+}
+
+// CommandName is a command but without any OS specific suffixes.
+func (s *Spec) CommandName() string {
+	return strings.ToLower(s.Name)
 }
 
 func (s *Spec) Command() string {

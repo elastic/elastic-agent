@@ -46,7 +46,7 @@ func LoadComponents(path string) (ComponentSet, error) {
 	SupportedMap = make(map[string]Spec)
 	for _, dt := range dps {
 		for _, dp := range dt {
-			SupportedMap[dp.Spec.Command()] = dp.Spec
+			SupportedMap[dp.Spec.Name] = dp.Spec
 		}
 	}
 	return dps, nil

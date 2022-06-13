@@ -107,7 +107,7 @@ func getProgram(binary, version string) *app.Descriptor {
 		OperatingSystem: "darwin",
 		Architecture:    "64",
 	}
-	return app.NewDescriptor(spec, version, downloadCfg, nil)
+	return app.NewDescriptorWithPath(installPath, spec, version, downloadCfg, nil)
 }
 
 func getAbsPath(path string) string {
@@ -142,7 +142,7 @@ func waitFor(t *testing.T, check func() error) {
 
 type DummyDownloader struct{}
 
-func (*DummyDownloader) Download(_ context.Context, _ component.Spec, _ string) (string, error) {
+func (*DummyDownloader) Download(_ context.Context, _ string, _ component.Spec, _ string) (string, error) {
 	return "", nil
 }
 

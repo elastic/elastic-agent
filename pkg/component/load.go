@@ -11,17 +11,18 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/go-ucfg/yaml"
+	ucfg "github.com/elastic/go-ucfg/yaml"
+	"gopkg.in/yaml.v2"
 )
 
-const SpecSuffix = ".spec.yml" // TODO: change after beat ignores yml config
+var SpecSuffix = ".spec.yml" // TODO: change after beat ignores yml config
 
 // LoadSpec loads the component specification.
 //
 // Will error in the case that the specification is not valid. Only valid specifications are allowed.
 func LoadSpec(data []byte) (Spec, error) {
 	var spec Spec
-	cfg, err := yaml.NewConfig(data)
+	cfg, err := ucfg.NewConfig(data)
 	if err != nil {
 		return spec, err
 	}
@@ -35,16 +36,12 @@ func LoadSpec(data []byte) (Spec, error) {
 // ReadSpecs reads all the specs that match the provided globbing path.
 func ReadSpecs(path string) ([]Spec, error) {
 	var specs []Spec
-	files, err := filepath.Glob(path)
+	files, err := filepath.Glob(filepath.Join(path, "*"+SpecSuffix))
 	if err != nil {
 		return []Spec{}, errors.New(err, "could not include spec", errors.TypeConfig)
 	}
 
 	for _, f := range files {
-		if !strings.HasSuffix(f, SpecSuffix) {
-			continue
-		}
-
 		data, err := ioutil.ReadFile(f)
 		if err != nil {
 			return []Spec{}, errors.New(err, fmt.Sprintf("could not read spec %s", f), errors.TypeConfig)
@@ -52,13 +49,8 @@ func ReadSpecs(path string) ([]Spec, error) {
 
 		name := strings.TrimSuffix(filepath.Base(f), SpecSuffix)
 		spec := Spec{Name: name}
-		cfg, err := yaml.NewConfig(data)
-		if err != nil {
-			return []Spec{}, err
-		}
-		err = cfg.Unpack(&spec)
-		if err != nil {
-			return []Spec{}, err
+		if err := yaml.Unmarshal(data, &spec); err != nil {
+			return []Spec{}, errors.New(err, "could not unmarshal YAML", errors.TypeConfig)
 		}
 		specs = append(specs, spec)
 	}
@@ -71,7 +63,7 @@ func ReadSpecs(path string) ([]Spec, error) {
 func FindSpecByName(name string) (Spec, bool) {
 	for _, dt := range Supported {
 		for _, candidate := range dt {
-			if name == candidate.Name {
+			if strings.EqualFold(name, candidate.Name) {
 				return candidate.Spec, true
 			}
 		}

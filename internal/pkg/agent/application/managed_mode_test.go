@@ -22,15 +22,22 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+func init() {
+	componenttest.LoadComponents()
+}
+
 func TestManagedModeRouting(t *testing.T) {
+
 	streams := make(map[pipeline.RoutingKey]pipeline.Stream)
 	streamFn := func(l *logger.Logger, r pipeline.RoutingKey) (pipeline.Stream, error) {
 		m := newMockStreamStore()
@@ -43,11 +50,16 @@ func TestManagedModeRouting(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
-	router, _ := router.New(log, componenttest.TestSet, streamFn)
+	router, _ := router.New(log, component.Supported, streamFn)
+	err := secret.CreateAgentSecret()
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
 	agentInfo, _ := info.NewAgentInfo(true)
 	nullStore := &storage.NullStore{}
 	composableCtrl, _ := composable.New(log, nil)
-	emit, err := emitter.New(ctx, componenttest.TestSet, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
+	emit, err := emitter.New(ctx, component.Supported, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
 	require.NoError(t, err)
 
 	actionDispatcher, err := dispatcher.New(ctx, log, handlers.NewDefault(log))

@@ -12,8 +12,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
+
+func init() {
+	componenttest.LoadComponents()
+}
 
 func TestMonitoringInjection(t *testing.T) {
 	tests := []struct {
@@ -52,7 +57,7 @@ func testMonitoringInjection(t *testing.T, inputConfig map[string]interface{}, t
 		t.Fatal(err)
 	}
 
-	programsToRun, err := program.Programs(agentInfo, componenttest.TestSet, ast)
+	programsToRun, err := program.Programs(agentInfo, component.Supported, ast)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +138,7 @@ func TestMonitoringToLogstashInjection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	programsToRun, err := program.Programs(agentInfo, componenttest.TestSet, ast)
+	programsToRun, err := program.Programs(agentInfo, component.Supported, ast)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +219,7 @@ func TestMonitoringInjectionDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	programsToRun, err := program.Programs(agentInfo, componenttest.TestSet, ast)
+	programsToRun, err := program.Programs(agentInfo, component.Supported, ast)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +311,7 @@ func TestChangeInMonitoringWithChangeInInput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	programsToRunBefore, err := program.Programs(agentInfo, componenttest.TestSet, astBefore)
+	programsToRunBefore, err := program.Programs(agentInfo, component.Supported, astBefore)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +325,7 @@ func TestChangeInMonitoringWithChangeInInput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	programsToRunAfter, err := program.Programs(agentInfo, componenttest.TestSet, astAfter)
+	programsToRunAfter, err := program.Programs(agentInfo, component.Supported, astAfter)
 	if err != nil {
 		t.Fatal(err)
 	}

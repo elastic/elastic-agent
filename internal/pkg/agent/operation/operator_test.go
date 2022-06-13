@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/pkg/component"
+	_ "github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
 
 func TestMain(m *testing.M) {
@@ -34,7 +34,8 @@ func TestMain(m *testing.M) {
 		Type: component.INPUT,
 		Name: "Configurable",
 		Spec: component.Spec{
-			Name: "configurable",
+			ProgramSpec: spec.Spec{},
+			Name:        "configurable",
 		},
 	}
 
@@ -42,7 +43,7 @@ func TestMain(m *testing.M) {
 		Type: component.INPUT,
 		Name: "Service",
 		Spec: component.Spec{
-			ProgramSpec: &spec.Spec{
+			ProgramSpec: spec.Spec{
 				ServicePort: port,
 			},
 			Name: "serviceable",
@@ -53,10 +54,10 @@ func TestMain(m *testing.M) {
 	component.SupportedMap["configurable"] = configurableDpu.Spec
 	component.SupportedMap["serviceable"] = serviceDpu.Spec
 
-	if err := isAvailable("configurable", "1.0"); err != nil {
+	if err := isAvailable("configurable"); err != nil {
 		panic(err)
 	}
-	if err := isAvailable("serviceable", "1.0"); err != nil {
+	if err := isAvailable("serviceable"); err != nil {
 		panic(err)
 	}
 
@@ -471,15 +472,13 @@ func TestConfigurableService(t *testing.T) {
 	}
 }
 
-func isAvailable(name, version string) error {
-	p := getProgram(name, version)
+func isAvailable(name string) error {
+	p := getProgram(name, "version")
 	spec := p.ProcessSpec()
 	path := spec.BinaryPath
-	if runtime.GOOS == "windows" {
-		path += ".exe"
-	}
+
 	if s, err := os.Stat(path); err != nil || s == nil {
-		return fmt.Errorf("binary not available %s", spec.BinaryPath)
+		return fmt.Errorf("binary not available %s: %v", spec.BinaryPath, err)
 	}
 	return nil
 }

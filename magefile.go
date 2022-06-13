@@ -277,8 +277,8 @@ func (Build) TestBinaries() error {
 		execName += ".exe"
 	}
 	return combineErr(
-		RunGo("build", "-o", filepath.Join(p, "configurable-1.0-darwin-x86_64", configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p, "serviceable-1.0-darwin-x86_64", serviceableName), filepath.Join(p, "serviceable-1.0-darwin-x86_64", "main.go")),
+		RunGo("build", "-o", filepath.Join(p, configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
+		RunGo("build", "-o", filepath.Join(p, serviceableName), filepath.Join(p, "serviceable-1.0-darwin-x86_64", "main.go")),
 		RunGo("build", "-o", filepath.Join(p2, "exec-1.0-darwin-x86_64", execName), filepath.Join(p2, "exec-1.0-darwin-x86_64", "main.go")),
 	)
 }
@@ -789,7 +789,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			specName = specName[:idx]
 		}
 
-		if err := devtools.Copy(filepath.Join("internal", "spec", specName+".yml"), filepath.Join(dropPath, specName+".spec.yml")); err != nil {
+		if err := devtools.Copy(filepath.Join("specs", specName+".yml"), filepath.Join(dropPath, specName+".spec.yml")); err != nil {
 			panic(err)
 		}
 	}

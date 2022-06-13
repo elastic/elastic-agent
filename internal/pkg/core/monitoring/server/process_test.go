@@ -9,8 +9,16 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	if _, err := componenttest.LoadComponents(); err != nil {
+		panic(err)
+	}
+
+}
 
 func TestParseID(t *testing.T) {
 	cases := []struct {

@@ -91,7 +91,7 @@ func (f testConfigFetcher) Config() string { return f.cfg }
 
 func testProgramSpec(restartOnOutput bool) component.Spec {
 	return component.Spec{
-		ProgramSpec: &spec.Spec{
+		ProgramSpec: spec.Spec{
 			RestartOnOutputChange: restartOnOutput,
 		},
 	}

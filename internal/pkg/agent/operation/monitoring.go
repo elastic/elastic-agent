@@ -45,7 +45,7 @@ func (o *Operator) handleStartSidecar(s configrequest.Step) (result error) {
 		if err != nil {
 			return errors.New(err,
 				errors.TypeApplication,
-				errors.M(errors.MetaKeyAppName, step.ProgramSpec.Command()),
+				errors.M(errors.MetaKeyAppName, step.ProgramSpec.CommandName()),
 				"operator.handleStartSidecar failed to create program")
 		}
 
@@ -54,13 +54,13 @@ func (o *Operator) handleStartSidecar(s configrequest.Step) (result error) {
 			if err := o.stop(p); err != nil {
 				result = multierror.Append(err, err)
 			} else {
-				o.markStopMonitoring(step.ProgramSpec.Command())
+				o.markStopMonitoring(step.ProgramSpec.CommandName())
 			}
 		} else {
 			if err := o.start(p, cfg); err != nil {
 				result = multierror.Append(err, err)
 			} else {
-				o.markStartMonitoring(step.ProgramSpec.Command())
+				o.markStartMonitoring(step.ProgramSpec.CommandName())
 			}
 		}
 	}
@@ -74,7 +74,7 @@ func (o *Operator) handleStopSidecar(s configrequest.Step) (result error) {
 		if err != nil {
 			return errors.New(err,
 				errors.TypeApplication,
-				errors.M(errors.MetaKeyAppName, step.ProgramSpec.Command()),
+				errors.M(errors.MetaKeyAppName, step.ProgramSpec.CommandName()),
 				"operator.handleStopSidecar failed to create program")
 		}
 
@@ -82,7 +82,7 @@ func (o *Operator) handleStopSidecar(s configrequest.Step) (result error) {
 		if err := o.stop(p); err != nil {
 			result = multierror.Append(err, err)
 		} else {
-			o.markStopMonitoring(step.ProgramSpec.Command())
+			o.markStopMonitoring(step.ProgramSpec.CommandName())
 		}
 	}
 
@@ -105,7 +105,7 @@ func (o *Operator) getMonitoringSteps(step configrequest.Step) []configrequest.S
 
 	outputIface, found := config[outputKey]
 	if !found {
-		o.logger.Errorf("operator.getMonitoringSteps: monitoring configuration not found for sidecar of type %s", step.ProgramSpec.Command())
+		o.logger.Errorf("operator.getMonitoringSteps: monitoring configuration not found for sidecar of type %s", step.ProgramSpec.CommandName())
 		return nil
 	}
 
@@ -116,7 +116,7 @@ func (o *Operator) getMonitoringSteps(step configrequest.Step) []configrequest.S
 	}
 
 	if len(outputMap) == 0 {
-		o.logger.Errorf("operator.getMonitoringSteps: monitoring is missing an output configuration for sidecar of type: %s", step.ProgramSpec.Command())
+		o.logger.Errorf("operator.getMonitoringSteps: monitoring is missing an output configuration for sidecar of type: %s", step.ProgramSpec.CommandName())
 		return nil
 	}
 
@@ -124,7 +124,7 @@ func (o *Operator) getMonitoringSteps(step configrequest.Step) []configrequest.S
 	// since we are folding all the child options as a map we should make sure we have
 	//a unique output.
 	if len(outputMap) > 1 {
-		o.logger.Errorf("operator.getMonitoringSteps: monitoring has too many outputs configuration for sidecar of type: %s", step.ProgramSpec.Command())
+		o.logger.Errorf("operator.getMonitoringSteps: monitoring has too many outputs configuration for sidecar of type: %s", step.ProgramSpec.CommandName())
 		return nil
 	}
 
@@ -144,13 +144,13 @@ func (o *Operator) getMonitoringSteps(step configrequest.Step) []configrequest.S
 
 	t, ok := output["type"]
 	if !ok {
-		o.logger.Errorf("operator.getMonitoringSteps: unknown monitoring output for sidecar of type: %s", step.ProgramSpec.Command())
+		o.logger.Errorf("operator.getMonitoringSteps: unknown monitoring output for sidecar of type: %s", step.ProgramSpec.CommandName())
 		return nil
 	}
 
 	outputType, ok := t.(string)
 	if !ok {
-		o.logger.Errorf("operator.getMonitoringSteps: unexpected monitoring output type: %+v for sidecar of type: %s", t, step.ProgramSpec.Command())
+		o.logger.Errorf("operator.getMonitoringSteps: unexpected monitoring output type: %+v for sidecar of type: %s", t, step.ProgramSpec.CommandName())
 		return nil
 	}
 

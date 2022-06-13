@@ -70,23 +70,25 @@ func Programs(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singl
 // DetectPrograms returns the list of programs detected from the provided configuration.
 func DetectPrograms(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singleConfig *transpiler.AST) ([]Program, error) {
 	programs := make([]Program, 0)
-	// detect inputs
-	for _, dp := range dpus[component.INPUT] {
-		specificAST := singleConfig.Clone()
-		ok, err := DetectProgram(dp.Spec.ProgramSpec.Rules, dp.Spec.ProgramSpec.When, dp.Spec.ProgramSpec.Constraints, agentInfo, specificAST)
-		if err != nil {
-			return nil, err
+	for _, dpu := range dpus {
+		for _, dp := range dpu {
+			specificAST := singleConfig.Clone()
+			ok, err := DetectProgram(dp.Spec.ProgramSpec.Rules, dp.Spec.ProgramSpec.When, dp.Spec.ProgramSpec.Constraints, agentInfo, specificAST)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			program := Program{
+				Spec:   dp.Spec,
+				Config: specificAST,
+			}
+			programs = append(programs, program)
 		}
-		if !ok {
-			continue
-		}
-		program := Program{
-			Spec:   dp.Spec,
-			Config: specificAST,
-		}
-		programs = append(programs, program)
 	}
 	return programs, nil
+
 }
 
 // DetectProgram returns true or false if this program exists in the AST.

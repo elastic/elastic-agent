@@ -27,3 +27,22 @@ inputs:
         - "logging.level=debug"
         - "-E"
         - "gc_percent=${PACKETBEAT_GOGC:100}"
+# backward compatibility, remove with new inputs
+restart_on_output_change: true
+rules:
+  - filter_values:
+      selector: inputs
+      key: type
+      values:
+        - packet
+
+  - inject_agent_info: {}
+
+  - filter:
+      selectors:
+        - inputs
+        - output
+
+when: length(${inputs}) > 0 and hasKey(${output}, 'elasticsearch', 'redis',
+  'kafka', 'logstash')
+

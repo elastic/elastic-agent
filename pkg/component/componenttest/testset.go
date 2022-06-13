@@ -1,6 +1,12 @@
 package componenttest
 
-import "github.com/elastic/elastic-agent/pkg/component"
+import (
+	"path/filepath"
+	"runtime"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
+	"github.com/elastic/elastic-agent/pkg/component"
+)
 
 var TestSet = component.ComponentSet{
 	component.INPUT: []component.Component{
@@ -17,6 +23,7 @@ var TestSet = component.ComponentSet{
 						Outputs:   []string{"shipper"},
 					},
 				},
+				ProgramSpec: spec.Spec{},
 			},
 		},
 	},
@@ -33,6 +40,7 @@ var TestSet = component.ComponentSet{
 						Command:   &component.CommandSpec{},
 					},
 				},
+				ProgramSpec: spec.Spec{},
 			},
 		},
 		{
@@ -47,7 +55,31 @@ var TestSet = component.ComponentSet{
 						Command:   &component.CommandSpec{},
 					},
 				},
+				ProgramSpec: spec.Spec{},
 			},
 		},
 	},
+}
+
+func init() {
+	component.Supported = TestSet
+	component.SupportedMap = make(map[string]component.Spec)
+	for _, dt := range TestSet {
+		for _, dp := range dt {
+			component.SupportedMap[dp.Spec.CommandName()] = dp.Spec
+		}
+	}
+
+}
+
+func LoadComponents() (component.ComponentSet, error) {
+	component.SpecSuffix = ".yml"
+	_, testFile, _, _ := runtime.Caller(0)
+	level := 3
+	rootDir := testFile
+	for i := 0; i <= level; i++ {
+		rootDir = filepath.Dir(rootDir)
+	}
+
+	return component.LoadComponents(filepath.Join(rootDir, "specs"))
 }

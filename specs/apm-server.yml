@@ -21,3 +21,36 @@ inputs:
         - "management.enabled=true"
         - "-E"
         - "gc_percent=${APMSERVER_GOGC:100}"
+
+# backward compatibility, remove with new inputs
+exported_metrics: [
+  "apm-server",
+]
+rules:
+  - copy_to_list:
+      item: fleet
+      to: inputs
+      on_conflict: noop
+  - map:
+      path: fleet
+      rules:
+        - remove_key:
+            key: access_api_key
+        - remove_key:
+            key: reporting
+        - remove_key:
+            key: agent
+  - fix_stream: {}
+  - filter_values:
+      selector: inputs
+      key: type
+      values:
+        - apm
+  - filter:
+      selectors:
+        - inputs
+        - output
+        - fleet
+  - inject_headers: {}
+when: length(${inputs}) > 0 and hasKey(${output}, 'elasticsearch', 'redis',
+  'kafka', 'logstash')

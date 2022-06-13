@@ -69,7 +69,7 @@ func TestDownload(t *testing.T) {
 			config.Architecture = testCase.arch
 
 			testClient := NewDownloaderWithClient(log, config, elasticClient)
-			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+			artifactPath, err := testClient.Download(context.Background(), "beats/filebeat", beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -110,7 +110,7 @@ func TestVerify(t *testing.T) {
 			config.Architecture = testCase.arch
 
 			testClient := NewDownloaderWithClient(log, config, elasticClient)
-			artifact, err := testClient.Download(context.Background(), beatSpec, version)
+			artifact, err := testClient.Download(context.Background(), "beats/filebeat", beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -163,16 +163,16 @@ func getRandomTestCases() []testCase {
 
 func getElasticCoClient() http.Client {
 	correctValues := map[string]struct{}{
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "i386.deb"):             {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "amd64.deb"):            {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "i686.rpm"):             {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "x86_64.rpm"):           {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "linux-x86.tar.gz"):     {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "linux-arm64.tar.gz"):   {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "linux-x86_64.tar.gz"):  {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "windows-x86.zip"):      {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "windows-x86_64.zip"):   {},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Command(), version, "darwin-x86_64.tar.gz"): {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "i386.deb"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "amd64.deb"):            {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "i686.rpm"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "x86_64.rpm"):           {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "linux-x86.tar.gz"):     {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "linux-arm64.tar.gz"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "linux-x86_64.tar.gz"):  {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "windows-x86.zip"):      {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "windows-x86_64.zip"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "darwin-x86_64.tar.gz"): {},
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
