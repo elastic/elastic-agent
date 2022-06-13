@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
@@ -51,12 +50,7 @@ func TestManagedModeRouting(t *testing.T) {
 
 	log, _ := logger.New("", false)
 	router, _ := router.New(log, component.Supported, streamFn)
-	err := secret.CreateAgentSecret()
-	if err != nil {
-		assert.NoError(t, err)
-	}
-
-	agentInfo, _ := info.NewAgentInfo(true)
+	agentInfo, _ := info.NewAgentInfo(false)
 	nullStore := &storage.NullStore{}
 	composableCtrl, _ := composable.New(log, nil)
 	emit, err := emitter.New(ctx, component.Supported, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
