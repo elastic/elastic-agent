@@ -115,6 +115,7 @@ func run(override cfgOverrider) error {
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
 	}
+
 	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)
 	if err != nil {
 		return errors.New(err,

@@ -7,13 +7,22 @@ package component
 import (
 	"errors"
 	"fmt"
+	"runtime"
+	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
 )
 
 // Spec a components specification.
 type Spec struct {
-	Version int         `config:"version" yaml:"version" validate:"required"`
-	Inputs  []InputSpec `config:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Name    string       `yaml:"name,omitempty"`
+	Version int          `config:"version" yaml:"version" validate:"required"`
+	Inputs  []InputSpec  `config:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Outputs []OutputSpec `config:"outputs,omitempty" yaml:"outputs,omitempty"`
+
+	// TODO: For backward comp, removed later
+	ProgramSpec *spec.Spec `config:",inline" yaml:",inline"`
 }
 
 // Validate ensures correctness of component specification.
@@ -42,38 +51,24 @@ func (s *Spec) Validate() error {
 	return nil
 }
 
-// InputSpec is the specification for an input type.
-type InputSpec struct {
-	Name        string      `config:"name" yaml:"name"  validate:"required"`
-	Aliases     []string    `config:"aliases,omitempty" yaml:"aliases,omitempty"`
-	Description string      `config:"description" yaml:"description" validate:"required"`
-	Platforms   []string    `config:"platforms" yaml:"platforms" validate:"required,min=1"`
-	Outputs     []string    `config:"outputs" yaml:"outputs" validate:"required,min=1"`
-	Runtime     RuntimeSpec `config:"runtime" yaml:"runtime"`
+func (s *Spec) Command() string {
+	name := strings.ToLower(s.Name)
+	if runtime.GOOS == "windows" {
+		return name + ".exe"
+	}
 
-	Command *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
-	Service *ServiceSpec `config:"service,omitempty" yaml:"service,omitempty"`
+	return name
 }
 
-// Validate ensures correctness of input specification.
-func (s *InputSpec) Validate() error {
-	if s.Command == nil && s.Service == nil {
-		return fmt.Errorf("input %s must define either command or service", s.Name)
+func (s *Spec) Args() []string {
+	// TODO: once we run input per input:output combination match args to that
+	// meaning load args per input set
+	if len(s.Inputs) > 0 && s.Inputs[0].Command != nil {
+		return s.Inputs[0].Command.Args
+	} else if len(s.Outputs) > 0 {
+		return s.Outputs[0].Command.Args
 	}
-	for i, a := range s.Platforms {
-		for j, b := range s.Platforms {
-			if i != j && a == b {
-				return fmt.Errorf("input %s defines the platform %s more than once", s.Name, a)
-			}
-		}
-	}
-	for i, a := range s.Outputs {
-		for j, b := range s.Outputs {
-			if i != j && a == b {
-				return fmt.Errorf("input %s defines the output %s more than once", s.Name, a)
-			}
-		}
-	}
+
 	return nil
 }
 

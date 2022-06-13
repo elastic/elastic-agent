@@ -8,8 +8,8 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -20,8 +20,8 @@ type configFetcher interface {
 // IsRestartNeeded returns true if
 // - spec is configured to support restart on change
 // - output changes in between configs
-func IsRestartNeeded(log *logger.Logger, spec program.Spec, cfgFetch configFetcher, newCfg map[string]interface{}) bool {
-	if !spec.RestartOnOutputChange {
+func IsRestartNeeded(log *logger.Logger, spec component.Spec, cfgFetch configFetcher, newCfg map[string]interface{}) bool {
+	if !spec.ProgramSpec.RestartOnOutputChange {
 		// early exit if restart is not needed anyway
 		return false
 	}

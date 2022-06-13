@@ -14,9 +14,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -45,7 +45,7 @@ func (o *Operator) handleStartSidecar(s configrequest.Step) (result error) {
 		if err != nil {
 			return errors.New(err,
 				errors.TypeApplication,
-				errors.M(errors.MetaKeyAppName, step.ProgramSpec.Cmd),
+				errors.M(errors.MetaKeyAppName, step.ProgramSpec.Command()),
 				"operator.handleStartSidecar failed to create program")
 		}
 
@@ -54,13 +54,13 @@ func (o *Operator) handleStartSidecar(s configrequest.Step) (result error) {
 			if err := o.stop(p); err != nil {
 				result = multierror.Append(err, err)
 			} else {
-				o.markStopMonitoring(step.ProgramSpec.Cmd)
+				o.markStopMonitoring(step.ProgramSpec.Command())
 			}
 		} else {
 			if err := o.start(p, cfg); err != nil {
 				result = multierror.Append(err, err)
 			} else {
-				o.markStartMonitoring(step.ProgramSpec.Cmd)
+				o.markStartMonitoring(step.ProgramSpec.Command())
 			}
 		}
 	}
@@ -74,7 +74,7 @@ func (o *Operator) handleStopSidecar(s configrequest.Step) (result error) {
 		if err != nil {
 			return errors.New(err,
 				errors.TypeApplication,
-				errors.M(errors.MetaKeyAppName, step.ProgramSpec.Cmd),
+				errors.M(errors.MetaKeyAppName, step.ProgramSpec.Command()),
 				"operator.handleStopSidecar failed to create program")
 		}
 
@@ -82,7 +82,7 @@ func (o *Operator) handleStopSidecar(s configrequest.Step) (result error) {
 		if err := o.stop(p); err != nil {
 			result = multierror.Append(err, err)
 		} else {
-			o.markStopMonitoring(step.ProgramSpec.Cmd)
+			o.markStopMonitoring(step.ProgramSpec.Command())
 		}
 	}
 
@@ -105,7 +105,7 @@ func (o *Operator) getMonitoringSteps(step configrequest.Step) []configrequest.S
 
 	outputIface, found := config[outputKey]
 	if !found {
-		o.logger.Errorf("operator.getMonitoringSteps: monitoring configuration not found for sidecar of type %s", step.ProgramSpec.Cmd)
+		o.logger.Errorf("operator.getMonitoringSteps: monitoring configuration not found for sidecar of type %s", step.ProgramSpec.Command())
 		return nil
 	}
 
@@ -116,7 +116,7 @@ func (o *Operator) getMonitoringSteps(step configrequest.Step) []configrequest.S
 	}
 
 	if len(outputMap) == 0 {
-		o.logger.Errorf("operator.getMonitoringSteps: monitoring is missing an output configuration for sidecar of type: %s", step.ProgramSpec.Cmd)
+		o.logger.Errorf("operator.getMonitoringSteps: monitoring is missing an output configuration for sidecar of type: %s", step.ProgramSpec.Command())
 		return nil
 	}
 
@@ -124,7 +124,7 @@ func (o *Operator) getMonitoringSteps(step configrequest.Step) []configrequest.S
 	// since we are folding all the child options as a map we should make sure we have
 	//a unique output.
 	if len(outputMap) > 1 {
-		o.logger.Errorf("operator.getMonitoringSteps: monitoring has too many outputs configuration for sidecar of type: %s", step.ProgramSpec.Cmd)
+		o.logger.Errorf("operator.getMonitoringSteps: monitoring has too many outputs configuration for sidecar of type: %s", step.ProgramSpec.Command())
 		return nil
 	}
 
@@ -144,13 +144,13 @@ func (o *Operator) getMonitoringSteps(step configrequest.Step) []configrequest.S
 
 	t, ok := output["type"]
 	if !ok {
-		o.logger.Errorf("operator.getMonitoringSteps: unknown monitoring output for sidecar of type: %s", step.ProgramSpec.Cmd)
+		o.logger.Errorf("operator.getMonitoringSteps: unknown monitoring output for sidecar of type: %s", step.ProgramSpec.Command())
 		return nil
 	}
 
 	outputType, ok := t.(string)
 	if !ok {
-		o.logger.Errorf("operator.getMonitoringSteps: unexpected monitoring output type: %+v for sidecar of type: %s", t, step.ProgramSpec.Cmd)
+		o.logger.Errorf("operator.getMonitoringSteps: unexpected monitoring output type: %+v for sidecar of type: %s", t, step.ProgramSpec.Command())
 		return nil
 	}
 
@@ -204,15 +204,13 @@ func (o *Operator) generateMonitoringSteps(version, outputType string, output in
 	return steps
 }
 
-func loadSpecFromSupported(processName string) program.Spec {
-	if loadedSpec, found := program.SupportedMap[strings.ToLower(processName)]; found {
+func loadSpecFromSupported(processName string) component.Spec {
+	if loadedSpec, found := component.SupportedMap[strings.ToLower(processName)]; found {
 		return loadedSpec
 	}
 
-	return program.Spec{
-		Name:     processName,
-		Cmd:      processName,
-		Artifact: fmt.Sprintf("%s/%s", artifactPrefix, processName),
+	return component.Spec{
+		Name: processName,
 	}
 }
 
@@ -663,12 +661,12 @@ func normalizeHTTPCopyRules(name string) []map[string]interface{} {
 		},
 	}
 
-	spec, found := program.SupportedMap[name]
+	spec, found := component.SupportedMap[name]
 	if !found {
 		return fromToMap
 	}
 
-	for _, exportedMetric := range spec.ExprtedMetrics {
+	for _, exportedMetric := range spec.ProgramSpec.ExportedMetrics {
 		fromToMap = append(fromToMap, map[string]interface{}{
 			"from": fmt.Sprintf("http.agent.%s", exportedMetric),
 			"to":   exportedMetric,

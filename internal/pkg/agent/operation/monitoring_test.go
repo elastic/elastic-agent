@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -21,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/stateresolver"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -31,13 +31,18 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 func TestExportedMetrics(t *testing.T) {
 	programName := "testing"
 	expectedMetricsName := "metric_name"
-	program.SupportedMap[programName] = program.Spec{ExprtedMetrics: []string{expectedMetricsName}}
+	component.SupportedMap[programName] = component.Spec{
+		ProgramSpec: &spec.Spec{
+			ExportedMetrics: []string{expectedMetricsName},
+		},
+	}
 
 	exportedMetrics := normalizeHTTPCopyRules(programName)
 
@@ -63,7 +68,7 @@ func TestExportedMetrics(t *testing.T) {
 	}
 
 	require.True(t, exportedMetricFound, "exported metric not found")
-	delete(program.SupportedMap, programName)
+	delete(component.SupportedMap, programName)
 }
 
 func TestGenerateSteps(t *testing.T) {
@@ -99,13 +104,13 @@ func TestGenerateSteps(t *testing.T) {
 			var fbFound, mbFound bool
 			for _, s := range steps {
 				// Filebeat step check
-				if s.ProgramSpec.Cmd == "filebeat" {
+				if s.ProgramSpec.Command() == "filebeat" {
 					fbFound = true
 					checkStep(t, "filebeat", outputType, sampleOutput, s)
 				}
 
 				// Metricbeat step check
-				if s.ProgramSpec.Cmd == "metricbeat" {
+				if s.ProgramSpec.Command() == "metricbeat" {
 					mbFound = true
 					checkStep(t, "metricbeat", outputType, sampleOutput, s)
 				}
@@ -159,10 +164,10 @@ func getMonitorableTestOperator(t *testing.T, installPath string, m monitoring.M
 	l := getLogger()
 	agentInfo, _ := info.NewAgentInfo(true)
 
-	fetcher := &DummyDownloader{}
-	verifier := &DummyVerifier{}
 	installer := &DummyInstallerChecker{}
 	uninstaller := &DummyUninstaller{}
+	fetcher := &DummyDownloader{}
+	verifier := &DummyVerifier{}
 
 	stateResolver, err := stateresolver.NewStateResolver(l)
 	if err != nil {
@@ -198,7 +203,7 @@ func (*testMonitorableApp) Shutdown() {}
 func (*testMonitorableApp) Configure(_ context.Context, config map[string]interface{}) error {
 	return nil
 }
-func (*testMonitorableApp) Spec() program.Spec                                          { return program.Spec{} }
+func (*testMonitorableApp) Spec() component.Spec                                        { return component.Spec{} }
 func (*testMonitorableApp) State() state.State                                          { return state.State{} }
 func (*testMonitorableApp) SetState(_ state.Status, _ string, _ map[string]interface{}) {}
 func (a *testMonitorableApp) Monitor() monitoring.Monitor                               { return a.monitor }
@@ -212,24 +217,24 @@ type testMonitor struct {
 
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
-func (b *testMonitor) EnrichArgs(_ program.Spec, _ string, args []string, _ bool) []string {
+func (b *testMonitor) EnrichArgs(_ component.Spec, _ string, args []string, _ bool) []string {
 	return args
 }
 
 // Cleanup cleans up all drops.
-func (b *testMonitor) Cleanup(program.Spec, string) error { return nil }
+func (b *testMonitor) Cleanup(component.Spec, string) error { return nil }
 
 // Close closes the monitor.
 func (b *testMonitor) Close() {}
 
 // Prepare executes steps in order for monitoring to work correctly
-func (b *testMonitor) Prepare(program.Spec, string, int, int) error { return nil }
+func (b *testMonitor) Prepare(component.Spec, string, int, int) error { return nil }
 
 const testPath = "path"
 
 // LogPath describes a path where application stores logs. Empty if
 // application is not monitorable
-func (b *testMonitor) LogPath(program.Spec, string) string {
+func (b *testMonitor) LogPath(component.Spec, string) string {
 	if !b.monitorLogs {
 		return ""
 	}
@@ -238,7 +243,7 @@ func (b *testMonitor) LogPath(program.Spec, string) string {
 
 // MetricsPath describes a location where application exposes metrics
 // collectable by metricbeat.
-func (b *testMonitor) MetricsPath(program.Spec, string) string {
+func (b *testMonitor) MetricsPath(component.Spec, string) string {
 	if !b.monitorMetrics {
 		return ""
 	}
@@ -246,7 +251,7 @@ func (b *testMonitor) MetricsPath(program.Spec, string) string {
 }
 
 // MetricsPathPrefixed return metrics path prefixed with http+ prefix.
-func (b *testMonitor) MetricsPathPrefixed(program.Spec, string) string {
+func (b *testMonitor) MetricsPathPrefixed(component.Spec, string) string {
 	return "http+path"
 }
 

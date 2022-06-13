@@ -468,6 +468,10 @@ func untar(sourceFile, destinationDir string) error {
 				return err
 			}
 		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return err
+			}
+
 			writer, err := os.Create(path)
 			if err != nil {
 				return err

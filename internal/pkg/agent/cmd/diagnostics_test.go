@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 var testDiagnostics = DiagnosticsInfo{
@@ -88,8 +88,8 @@ func Example_humanDiagnosticsOutput() {
 func Test_collectEndpointSecurityLogs(t *testing.T) {
 	root := filepath.Join("testdata", "diagnostics", "endpoint-security", "logs")
 
-	specs := program.SupportedMap
-	specs["endpoint-security"].LogPaths[runtime.GOOS] =
+	specs := component.SupportedMap
+	specs["endpoint-security"].ProgramSpec.LogPaths[runtime.GOOS] =
 		filepath.Join(root, "endpoint-*.log")
 
 	buff := bytes.Buffer{}
@@ -127,8 +127,8 @@ func Test_collectEndpointSecurityLogs(t *testing.T) {
 func Test_collectEndpointSecurityLogs_noEndpointSecurity(t *testing.T) {
 	root := filepath.Join("doesNotExist")
 
-	specs := program.SupportedMap
-	specs["endpoint-security"].LogPaths["linux"] =
+	specs := component.SupportedMap
+	specs["endpoint-security"].ProgramSpec.LogPaths["linux"] =
 		filepath.Join(root, "endpoint-*.log")
 
 	buff := bytes.Buffer{}

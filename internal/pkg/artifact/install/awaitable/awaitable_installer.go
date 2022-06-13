@@ -8,15 +8,15 @@ import (
 	"context"
 	"sync"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 type embeddedInstaller interface {
-	Install(ctx context.Context, spec program.Spec, version, installDir string) error
+	Install(ctx context.Context, spec component.Spec, version, installDir string) error
 }
 
 type embeddedChecker interface {
-	Check(ctx context.Context, spec program.Spec, version, installDir string) error
+	Check(ctx context.Context, spec component.Spec, version, installDir string) error
 }
 
 // Installer installs into temporary destination and moves to correct one after
@@ -41,7 +41,7 @@ func (i *Installer) Wait() {
 }
 
 // Install performs installation of program in a specific version.
-func (i *Installer) Install(ctx context.Context, spec program.Spec, version, installDir string) error {
+func (i *Installer) Install(ctx context.Context, spec component.Spec, version, installDir string) error {
 	i.wg.Add(1)
 	defer i.wg.Done()
 
@@ -49,7 +49,7 @@ func (i *Installer) Install(ctx context.Context, spec program.Spec, version, ins
 }
 
 // Check performs installation checks
-func (i *Installer) Check(ctx context.Context, spec program.Spec, version, installDir string) error {
+func (i *Installer) Check(ctx context.Context, spec component.Spec, version, installDir string) error {
 	i.wg.Add(1)
 	defer i.wg.Done()
 

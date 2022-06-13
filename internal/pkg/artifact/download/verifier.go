@@ -18,7 +18,7 @@ import (
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // ChecksumMismatchError indicates the expected checksum for a file does not
@@ -54,7 +54,7 @@ type Verifier interface {
 	// *download.ChecksumMismatchError. And if the GPG signature is invalid then
 	// Verify returns a *download.InvalidSignatureError. Use errors.As() to
 	// check error types.
-	Verify(spec program.Spec, version string) error
+	Verify(spec component.Spec, version string) error
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum

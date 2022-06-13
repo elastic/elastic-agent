@@ -11,6 +11,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -36,9 +37,8 @@ const (
 func InjectMonitoring(agentInfo *info.AgentInfo, outputGroup string, rootAst *transpiler.AST, programsToRun []program.Program) ([]program.Program, error) {
 	var err error
 	monitoringProgram := program.Program{
-		Spec: program.Spec{
+		Spec: component.Spec{
 			Name: MonitoringName,
-			Cmd:  MonitoringName,
 		},
 	}
 
@@ -79,7 +79,7 @@ func InjectMonitoring(agentInfo *info.AgentInfo, outputGroup string, rootAst *tr
 	programList := make([]string, 0, len(programsToRun))
 	cfgHash := md5.New()
 	for _, p := range programsToRun {
-		programList = append(programList, p.Spec.Cmd)
+		programList = append(programList, p.Spec.Command())
 		cfgHash.Write(p.Config.Hash())
 	}
 	// making program list and their hashes part of the config

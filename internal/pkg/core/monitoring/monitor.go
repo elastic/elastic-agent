@@ -6,21 +6,21 @@ package monitoring
 
 import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // Monitor is a monitoring interface providing information about the way
 // how application is monitored
 type Monitor interface {
-	LogPath(spec program.Spec, pipelineID string) string
-	MetricsPath(spec program.Spec, pipelineID string) string
-	MetricsPathPrefixed(spec program.Spec, pipelineID string) string
+	LogPath(spec component.Spec, pipelineID string) string
+	MetricsPath(spec component.Spec, pipelineID string) string
+	MetricsPathPrefixed(spec component.Spec, pipelineID string) string
 
-	Prepare(spec program.Spec, pipelineID string, uid, gid int) error
-	EnrichArgs(spec program.Spec, pipelineID string, args []string, isSidecar bool) []string
-	Cleanup(spec program.Spec, pipelineID string) error
+	Prepare(spec component.Spec, pipelineID string, uid, gid int) error
+	EnrichArgs(spec component.Spec, pipelineID string, args []string, isSidecar bool) []string
+	Cleanup(spec component.Spec, pipelineID string) error
 	Reload(cfg *config.Config) error
 	IsMonitoringEnabled() bool
 	MonitoringNamespace() string

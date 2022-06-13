@@ -13,6 +13,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -45,12 +47,12 @@ type event struct {
 type notifyFunc func(pipeline.RoutingKey, rOp, ...interface{})
 
 func TestRouter(t *testing.T) {
-	programs := []program.Program{{Spec: program.Supported[1]}}
+	programs := []program.Program{{Spec: component.Supported[component.INPUT][1].Spec}}
 	ctx := context.Background()
 
 	t.Run("create new and destroy unused stream", func(t *testing.T) {
 		recorder := &recorder{}
-		r, err := New(nil, recorder.factory)
+		r, err := New(nil, nil, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -80,7 +82,7 @@ func TestRouter(t *testing.T) {
 		k2 := "KEY_2"
 
 		recorder := &recorder{}
-		r, err := New(nil, recorder.factory)
+		r, err := New(nil, componenttest.TestSet, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -118,7 +120,7 @@ func TestRouter(t *testing.T) {
 
 	t.Run("create new and delegate program to existing stream", func(t *testing.T) {
 		recorder := &recorder{}
-		r, err := New(nil, recorder.factory)
+		r, err := New(nil, componenttest.TestSet, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -145,7 +147,7 @@ func TestRouter(t *testing.T) {
 		k2 := "KEY_2"
 
 		recorder := &recorder{}
-		r, err := New(nil, recorder.factory)
+		r, err := New(nil, componenttest.TestSet, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,

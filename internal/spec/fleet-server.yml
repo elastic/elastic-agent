@@ -1,6 +1,24 @@
-name: Fleet Server
-cmd: fleet-server
-args: ["--agent-mode"]
+name: fleet-server
+inputs:
+  - name: fleet-server
+    description: "Fleet server"
+    platforms:
+      - linux/386
+      - linux/amd64
+      - linux/arm64
+      - linux/ppc64le
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - windows/arm64
+    command:
+      - args: [
+          "--agent-mode"
+        ]
+    outputs:
+      - elasticsearch
+
+# backward compatibility, remove with new inputs
 artifact: fleet-server
 rules:
   - fix_stream: {}

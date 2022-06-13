@@ -1,10 +1,29 @@
-name: APM-Server
-cmd: apm-server
-artifact: apm-server
-args: [
-  "-E", "management.enabled=true",
-  "-E", "gc_percent=${APMSERVER_GOGC:100}"
-]
+name: apm-server
+inputs:
+  - name: apm-server
+    description: "APM Server"
+    platforms:
+      - linux/386
+      - linux/amd64
+      - linux/arm64
+      - linux/ppc64le
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - windows/arm64
+    command:
+      - args: [
+          "-E", "management.enabled=true",
+          "-E", "gc_percent=${APMSERVER_GOGC:100}"
+        ]
+    outputs:
+      - elasticsearch
+      - redis
+      - kafka
+      - logstash
+
+# backward compatibility, remove with new inputs
+
 exported_metrics: [
   "apm-server",
 ]

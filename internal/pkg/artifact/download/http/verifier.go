@@ -15,9 +15,9 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -62,7 +62,7 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(spec program.Spec, version string) error {
+func (v *Verifier) Verify(spec component.Spec, version string) error {
 	fullPath, err := artifact.GetArtifactPath(spec, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
@@ -88,7 +88,7 @@ func (v *Verifier) Verify(spec program.Spec, version string) error {
 	return nil
 }
 
-func (v *Verifier) verifyAsc(spec program.Spec, version string) error {
+func (v *Verifier) verifyAsc(spec component.Spec, version string) error {
 	if len(v.pgpBytes) == 0 {
 		// no pgp available skip verification process
 		return nil
@@ -104,7 +104,7 @@ func (v *Verifier) verifyAsc(spec program.Spec, version string) error {
 		return errors.New(err, "retrieving package path")
 	}
 
-	ascURI, err := v.composeURI(filename, spec.Artifact)
+	ascURI, err := v.composeURI(filename, "REMOVE")
 	if err != nil {
 		return errors.New(err, "composing URI for fetching asc file", errors.TypeNetwork)
 	}

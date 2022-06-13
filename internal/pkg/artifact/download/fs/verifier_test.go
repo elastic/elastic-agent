@@ -18,10 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	beatSpec = program.Spec{Name: "Filebeat", Cmd: "filebeat", Artifact: "beat/filebeat"}
+	beatSpec = component.Spec{Name: "Filebeat"}
 )
 
 func TestFetchVerify(t *testing.T) {
@@ -38,7 +38,7 @@ func TestFetchVerify(t *testing.T) {
 	installPath := filepath.Join("testdata", "install")
 	targetPath := filepath.Join("testdata", "download")
 	ctx := context.Background()
-	s := program.Spec{Name: "Beat", Cmd: "beat", Artifact: "beats/filebeat"}
+	s := component.Spec{Name: "Beat"}
 	version := "8.0.0"
 
 	targetFilePath := filepath.Join(targetPath, "beat-8.0.0-darwin-x86_64.tar.gz")
@@ -216,7 +216,7 @@ func TestVerify(t *testing.T) {
 	os.RemoveAll(config.DropPath)
 }
 
-func prepareTestCase(beatSpec program.Spec, version string, cfg *artifact.Config) error {
+func prepareTestCase(beatSpec component.Spec, version string, cfg *artifact.Config) error {
 	filename, err := artifact.GetArtifactName(beatSpec, version, cfg.OperatingSystem, cfg.Architecture)
 	if err != nil {
 		return err

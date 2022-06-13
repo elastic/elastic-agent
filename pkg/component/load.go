@@ -5,8 +5,16 @@
 package component
 
 import (
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/go-ucfg/yaml"
 )
+
+const SpecSuffix = ".spec.yml" // TODO: change after beat ignores yml config
 
 // LoadSpec loads the component specification.
 //
@@ -22,4 +30,51 @@ func LoadSpec(data []byte) (Spec, error) {
 		return spec, err
 	}
 	return spec, nil
+}
+
+// ReadSpecs reads all the specs that match the provided globbing path.
+func ReadSpecs(path string) ([]Spec, error) {
+	var specs []Spec
+	files, err := filepath.Glob(path)
+	if err != nil {
+		return []Spec{}, errors.New(err, "could not include spec", errors.TypeConfig)
+	}
+
+	for _, f := range files {
+		if !strings.HasSuffix(f, SpecSuffix) {
+			continue
+		}
+
+		data, err := ioutil.ReadFile(f)
+		if err != nil {
+			return []Spec{}, errors.New(err, fmt.Sprintf("could not read spec %s", f), errors.TypeConfig)
+		}
+
+		name := strings.TrimSuffix(filepath.Base(f), SpecSuffix)
+		spec := Spec{Name: name}
+		cfg, err := yaml.NewConfig(data)
+		if err != nil {
+			return []Spec{}, err
+		}
+		err = cfg.Unpack(&spec)
+		if err != nil {
+			return []Spec{}, err
+		}
+		specs = append(specs, spec)
+	}
+
+	return specs, nil
+}
+
+// FindSpecByName find a spec by name and return it or false if we cannot find it.
+// TODO: remove
+func FindSpecByName(name string) (Spec, bool) {
+	for _, dt := range Supported {
+		for _, candidate := range dt {
+			if name == candidate.Name {
+				return candidate.Spec, true
+			}
+		}
+	}
+	return Spec{}, false
 }

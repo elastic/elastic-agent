@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 func TestResolver(t *testing.T) {
@@ -46,13 +47,13 @@ func TestResolver(t *testing.T) {
 				ID:           "config-1",
 				LastModified: tn,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "filebeat",
 						Program:      fb1,
 					},
-					"metricbeat": active{
+					"metricbeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "metricbeat",
@@ -61,13 +62,13 @@ func TestResolver(t *testing.T) {
 				},
 			},
 			steps: []configrequest.Step{
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRun,
 					ProgramSpec: fb1.Spec,
 					Version:     release.Version(),
 					Meta:        withMeta(fb1),
 				},
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRun,
 					ProgramSpec: mb1.Spec,
 					Version:     release.Version(),
@@ -87,7 +88,7 @@ func TestResolver(t *testing.T) {
 				ID:           "config-1",
 				LastModified: tn,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "filebeat",
@@ -99,13 +100,13 @@ func TestResolver(t *testing.T) {
 				ID:           "config-2",
 				LastModified: tn2,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   unchangedState,
 						LastModified: tn,
 						Identifier:   "filebeat",
 						Program:      fb1,
 					},
-					"metricbeat": active{
+					"metricbeat": {
 						LastChange:   startState,
 						LastModified: tn2,
 						Identifier:   "metricbeat",
@@ -114,7 +115,7 @@ func TestResolver(t *testing.T) {
 				},
 			},
 			steps: []configrequest.Step{
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRun,
 					ProgramSpec: mb1.Spec,
 					Version:     release.Version(),
@@ -134,7 +135,7 @@ func TestResolver(t *testing.T) {
 				ID:           "config-1",
 				LastModified: tn,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "filebeat",
@@ -146,13 +147,13 @@ func TestResolver(t *testing.T) {
 				ID:           "config-2",
 				LastModified: tn2,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   updateState,
 						LastModified: tn2,
 						Identifier:   "filebeat",
 						Program:      fb2,
 					},
-					"metricbeat": active{
+					"metricbeat": {
 						LastChange:   startState,
 						LastModified: tn2,
 						Identifier:   "metricbeat",
@@ -161,13 +162,13 @@ func TestResolver(t *testing.T) {
 				},
 			},
 			steps: []configrequest.Step{
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRun,
 					ProgramSpec: fb2.Spec,
 					Version:     release.Version(),
 					Meta:        withMeta(fb2),
 				},
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRun,
 					ProgramSpec: mb1.Spec,
 					Version:     release.Version(),
@@ -187,7 +188,7 @@ func TestResolver(t *testing.T) {
 				ID:           "config-1",
 				LastModified: tn,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "filebeat",
@@ -199,7 +200,7 @@ func TestResolver(t *testing.T) {
 				ID:           "config-2",
 				LastModified: tn2,
 				Active: map[string]active{
-					"metricbeat": active{
+					"metricbeat": {
 						LastChange:   startState,
 						LastModified: tn2,
 						Identifier:   "metricbeat",
@@ -208,12 +209,12 @@ func TestResolver(t *testing.T) {
 				},
 			},
 			steps: []configrequest.Step{
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRemove,
 					ProgramSpec: fb1.Spec,
 					Version:     release.Version(),
 				},
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRun,
 					ProgramSpec: mb1.Spec,
 					Version:     release.Version(),
@@ -231,13 +232,13 @@ func TestResolver(t *testing.T) {
 				ID:           "config-1",
 				LastModified: tn,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "filebeat",
 						Program:      fb1,
 					},
-					"metricbeat": active{
+					"metricbeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "metricbeat",
@@ -251,12 +252,12 @@ func TestResolver(t *testing.T) {
 				Active:       map[string]active{},
 			},
 			steps: []configrequest.Step{
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRemove,
 					ProgramSpec: fb1.Spec,
 					Version:     release.Version(),
 				},
-				configrequest.Step{
+				{
 					ID:          configrequest.StepRemove,
 					ProgramSpec: mb1.Spec,
 					Version:     release.Version(),
@@ -275,13 +276,13 @@ func TestResolver(t *testing.T) {
 				ID:           "config-1",
 				LastModified: tn,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "filebeat",
 						Program:      fb1,
 					},
-					"metricbeat": active{
+					"metricbeat": {
 						LastChange:   startState,
 						LastModified: tn,
 						Identifier:   "metricbeat",
@@ -293,13 +294,13 @@ func TestResolver(t *testing.T) {
 				ID:           "config-1",
 				LastModified: tn,
 				Active: map[string]active{
-					"filebeat": active{
+					"filebeat": {
 						LastChange:   unchangedState,
 						LastModified: tn,
 						Identifier:   "filebeat",
 						Program:      fb1,
 					},
-					"metricbeat": active{
+					"metricbeat": {
 						LastChange:   unchangedState,
 						LastModified: tn,
 						Identifier:   "metricbeat",
@@ -367,7 +368,7 @@ func (c *cfg) ProgramNames() []string {
 }
 
 func p(identifier, checksum string) program.Program {
-	s, ok := program.FindSpecByName(identifier)
+	s, ok := component.FindSpecByName(identifier)
 	if !ok {
 		panic("can't find spec with identifier " + identifier)
 	}

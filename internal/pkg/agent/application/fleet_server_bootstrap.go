@@ -16,6 +16,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
@@ -29,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
@@ -99,7 +101,12 @@ func newFleetServerBootstrap(
 		return nil, errors.New(err, "failed to initialize monitoring")
 	}
 
-	router, err := router.New(log, stream.Factory(bootstrapApp.bgContext, agentInfo, cfg.Settings, bootstrapApp.srv, reporter, monitor, statusCtrl))
+	components, err := component.LoadComponents(paths.Components())
+	if err != nil {
+		return nil, errors.New(err, "loading processing unit definitions")
+	}
+
+	router, err := router.New(log, components, stream.Factory(bootstrapApp.bgContext, agentInfo, cfg.Settings, bootstrapApp.srv, reporter, monitor, statusCtrl))
 	if err != nil {
 		return nil, errors.New(err, "fail to initialize pipeline router")
 	}
@@ -108,6 +115,7 @@ func newFleetServerBootstrap(
 	emit, err := bootstrapEmitter(
 		bootstrapApp.bgContext,
 		log,
+		components,
 		agentInfo,
 		router,
 		&pipeline.ConfigModifiers{
@@ -158,7 +166,7 @@ func (b *FleetServerBootstrap) AgentInfo() *info.AgentInfo {
 	return b.agentInfo
 }
 
-func bootstrapEmitter(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInfo, router pipeline.Router, modifiers *pipeline.ConfigModifiers) (pipeline.EmitterFunc, error) {
+func bootstrapEmitter(ctx context.Context, log *logger.Logger, components component.ComponentSet, agentInfo transpiler.AgentInfo, router pipeline.Router, modifiers *pipeline.ConfigModifiers) (pipeline.EmitterFunc, error) {
 	ch := make(chan *config.Config)
 
 	go func() {
@@ -170,7 +178,7 @@ func bootstrapEmitter(ctx context.Context, log *logger.Logger, agentInfo transpi
 			case c = <-ch:
 			}
 
-			err := emit(ctx, log, agentInfo, router, modifiers, c)
+			err := emit(ctx, log, components, agentInfo, router, modifiers, c)
 			if err != nil {
 				log.Error(err)
 			}
@@ -185,7 +193,7 @@ func bootstrapEmitter(ctx context.Context, log *logger.Logger, agentInfo transpi
 	}, nil
 }
 
-func emit(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInfo, router pipeline.Router, modifiers *pipeline.ConfigModifiers, c *config.Config) error {
+func emit(ctx context.Context, log *logger.Logger, components component.ComponentSet, agentInfo transpiler.AgentInfo, router pipeline.Router, modifiers *pipeline.ConfigModifiers, c *config.Config) error {
 	if err := info.InjectAgentConfig(c); err != nil {
 		return err
 	}
@@ -212,11 +220,12 @@ func emit(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInf
 		}),
 	}), "inputs")
 
-	spec, ok := program.SupportedMap["fleet-server"]
-	if !ok {
+	if len(components[component.FLEET_SERVER]) == 0 {
 		return errors.New("missing required fleet-server program specification")
 	}
-	ok, err = program.DetectProgram(spec, agentInfo, ast)
+
+	spec := components[component.FLEET_SERVER][0].Spec
+	ok, err := program.DetectProgram(spec.ProgramSpec.Rules, spec.ProgramSpec.When, spec.ProgramSpec.Constraints, agentInfo, ast)
 	if err != nil {
 		return errors.New(err, "failed parsing the configuration")
 	}

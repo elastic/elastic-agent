@@ -19,11 +19,7 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
 {{- range $i, $modulesd := .ModulesDirs }}
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
-{{- end }}
-{{- if contains .image_name "-cloud" }}
-    mkdir -p /opt/filebeat /opt/metricbeat && \
-    tar xf {{ $beatHome }}/data/elastic-agent-*/downloads/metricbeat-*.tar.gz -C /opt/metricbeat --strip-components=1 && \
-    tar xf {{ $beatHome }}/data/elastic-agent-*/downloads/filebeat-*.tar.gz -C /opt/filebeat --strip-components=1 && \
+    find {{ $beatHome }}/{{ $modulesd }} -name "*.yml*" -type f -exec chmod 0644 {} \; && \
 {{- end }}
     true
 
@@ -183,15 +179,13 @@ RUN chown {{ .user }} /app
 {{- end }}
 
 # Unpack beats to default install directory
-RUN mkdir -p {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/{{ .beats_install_path }} && \
-    for beatPath in {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/downloads/*.tar.gz; do \
-    tar xf $beatPath -C {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/{{ .beats_install_path }}; \
-    done && \
-    chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/{{ .beats_install_path }} && \
-    chown -R root:root {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/{{ .beats_install_path }}/*/*.yml && \
-    chmod 0644 {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/{{ .beats_install_path }}/*/*.yml && \
+RUN chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components && \
+    chown -R root:root {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*/*.yml && \
+    chmod 0644 {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*/*.yml && \
+    find {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components -name "*.yml*" -type f -exec chown root:root {} \; && \
+    find {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
     # heartbeat requires cap_net_raw,cap_setuid to run ICMP checks and change npm user
-    setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/{{ .beats_install_path }}/heartbeat-*/heartbeat
+    setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/heartbeat
 
 USER {{ .user }}
 

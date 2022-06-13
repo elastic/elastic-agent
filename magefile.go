@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"github.com/otiai10/copy"
 	"github.com/pkg/errors"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
@@ -502,12 +503,14 @@ func ControlProto() error {
 // BuildSpec make sure that all the suppported program spec are built into the binary.
 func BuildSpec() error {
 	// go run dev-tools/cmd/buildspec/buildspec.go --in internal/agent/spec/*.yml --out internal/pkg/agent/program/supported.go
-	goF := filepath.Join("dev-tools", "cmd", "buildspec", "buildspec.go")
-	in := filepath.Join("internal", "spec", "*.yml")
-	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
+	// goF := filepath.Join("dev-tools", "cmd", "buildspec", "buildspec.go")
+	// in := filepath.Join("internal", "spec", "*.yml")
+	// out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
 
-	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	// fmt.Printf(">> Buildspec from %s to %s\n", in, out)
+	// return RunGo("run", goF, "--in", in, "--out", out)
+
+	return nil
 }
 
 func BuildPGP() error {
@@ -657,10 +660,14 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		version = release.Version()
 	}
 
+	dropPath, found := os.LookupEnv(agentDropPath)
+	archivePath := filepath.Join(dropPath, "archives")
+	os.MkdirAll(archivePath, 0755)
+
 	// build deps only when drop is not provided
-	if dropPathEnv, found := os.LookupEnv(agentDropPath); !found || len(dropPathEnv) == 0 {
+	if !found || len(dropPath) == 0 {
 		// prepare new drop
-		dropPath := filepath.Join("build", "distributions", "elastic-agent-drop")
+		dropPath = filepath.Join("build", "distributions", "elastic-agent-drop")
 		dropPath, err := filepath.Abs(dropPath)
 		if err != nil {
 			panic(err)
@@ -683,7 +690,6 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		}
 
 		// cleanup after build
-		defer os.RemoveAll(dropPath)
 		defer os.Unsetenv(agentDropPath)
 
 		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
@@ -692,7 +698,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			for _, beat := range packedBeats {
 				for _, reqPackage := range requiredPackages {
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
-					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, dropPath)
+					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, archivePath)
 					if err != nil {
 						panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
 					}
@@ -723,12 +729,71 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 
 				// copy to new drop
 				sourcePath := filepath.Join(pwd, "build", "distributions")
-				if err := copyAll(sourcePath, dropPath); err != nil {
+				if err := copyAll(sourcePath, archivePath); err != nil {
 					panic(err)
 				}
 			}
 		}
 	}
+	defer os.RemoveAll(dropPath)
+
+	// create flat dir
+	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
+	os.MkdirAll(flatPath, 0755)
+
+	// untar all
+	matches, err := filepath.Glob(filepath.Join(archivePath, "*tar.gz"))
+	if err != nil {
+		panic(err)
+	}
+	zipMatches, err := filepath.Glob(filepath.Join(archivePath, "*zip"))
+	if err != nil {
+		panic(err)
+	}
+	matches = append(matches, zipMatches...)
+
+	for _, m := range matches {
+		if err := devtools.Extract(m, flatPath); err != nil {
+			panic(err)
+		}
+	}
+
+	os.RemoveAll(archivePath)
+
+	files, err := filepath.Glob(filepath.Join(flatPath, "*"))
+	if err != nil {
+		panic(err)
+	}
+
+	for _, f := range files {
+		options := copy.Options{
+			OnSymlink: func(_ string) copy.SymlinkAction {
+				return copy.Shallow
+			},
+			Sync: true,
+		}
+
+		if strings.HasSuffix(f, ".yml") || strings.HasSuffix(f, ".yml.disabled") {
+			options.AddPermission = 0644
+		}
+
+		err = copy.Copy(f, dropPath, options)
+		if err != nil {
+			panic(err)
+		}
+
+		// cope spec file for match
+		specName := filepath.Base(f)
+		idx := strings.Index(specName, "-"+version)
+		if idx != -1 {
+			specName = specName[:idx]
+		}
+
+		if err := devtools.Copy(filepath.Join("internal", "spec", specName+".yml"), filepath.Join(dropPath, specName+".spec.yml")); err != nil {
+			panic(err)
+		}
+	}
+	os.RemoveAll(flatPath)
 
 	// package agent
 	packagingFn()

@@ -5,8 +5,8 @@
 package noop
 
 import (
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // Monitor is a monitoring interface providing information about the way
@@ -21,12 +21,12 @@ func NewMonitor() *Monitor {
 
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
-func (b *Monitor) EnrichArgs(_ program.Spec, _ string, args []string, _ bool) []string {
+func (b *Monitor) EnrichArgs(_ component.Spec, _ string, args []string, _ bool) []string {
 	return args
 }
 
 // Cleanup cleans up all drops.
-func (b *Monitor) Cleanup(program.Spec, string) error {
+func (b *Monitor) Cleanup(component.Spec, string) error {
 	return nil
 }
 
@@ -34,24 +34,24 @@ func (b *Monitor) Cleanup(program.Spec, string) error {
 func (b *Monitor) Close() {}
 
 // Prepare executes steps in order for monitoring to work correctly
-func (b *Monitor) Prepare(program.Spec, string, int, int) error {
+func (b *Monitor) Prepare(component.Spec, string, int, int) error {
 	return nil
 }
 
 // LogPath describes a path where application stores logs. Empty if
 // application is not monitorable
-func (b *Monitor) LogPath(program.Spec, string) string {
+func (b *Monitor) LogPath(component.Spec, string) string {
 	return ""
 }
 
 // MetricsPath describes a location where application exposes metrics
 // collectable by metricbeat.
-func (b *Monitor) MetricsPath(program.Spec, string) string {
+func (b *Monitor) MetricsPath(component.Spec, string) string {
 	return ""
 }
 
 // MetricsPathPrefixed return metrics path prefixed with http+ prefix.
-func (b *Monitor) MetricsPathPrefixed(program.Spec, string) string {
+func (b *Monitor) MetricsPathPrefixed(component.Spec, string) string {
 	return ""
 }
 

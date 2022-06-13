@@ -18,9 +18,9 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -91,9 +91,9 @@ func processHandler(statsHandler func(http.ResponseWriter, *http.Request) error)
 }
 
 var beatsPathAllowlist = map[string]struct{}{
-	"":      struct{}{},
-	"stats": struct{}{},
-	"state": struct{}{},
+	"":      {},
+	"stats": {},
+	"state": {},
 }
 
 func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, error) {
@@ -178,7 +178,7 @@ type programDetail struct {
 	output       string
 	binaryName   string
 	isMonitoring bool
-	spec         program.Spec
+	spec         component.Spec
 }
 
 func parseID(id string) (programDetail, error) {
@@ -187,7 +187,7 @@ func parseID(id string) (programDetail, error) {
 		return detail, errorfWithStatus(http.StatusBadRequest, "provided ID is not valid")
 	}
 
-	for p, spec := range program.SupportedMap {
+	for p, spec := range component.SupportedMap {
 		if !strings.HasPrefix(id, p+separator) {
 			continue
 		}

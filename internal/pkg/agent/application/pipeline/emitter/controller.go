@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -29,9 +30,10 @@ type reloadable interface {
 type Controller struct {
 	logger      *logger.Logger
 	agentInfo   *info.AgentInfo
+	components  component.ComponentSet
 	controller  composable.Controller
-	router      pipeline.Router
-	modifiers   *pipeline.ConfigModifiers
+	router      pipeline.Router           // TODO: remove when shippers come
+	modifiers   *pipeline.ConfigModifiers // TODO: try remove
 	reloadables []reloadable
 	caps        capabilities.Capability
 
@@ -46,6 +48,7 @@ type Controller struct {
 // NewController creates a new emitter controller.
 func NewController(
 	log *logger.Logger,
+	components component.ComponentSet,
 	agentInfo *info.AgentInfo,
 	controller composable.Controller,
 	router pipeline.Router,
@@ -58,6 +61,7 @@ func NewController(
 	return &Controller{
 		logger:      log,
 		agentInfo:   agentInfo,
+		components:  components,
 		controller:  controller,
 		router:      router,
 		modifiers:   modifiers,
@@ -172,7 +176,7 @@ func (e *Controller) update(ctx context.Context) (err error) {
 
 	e.logger.Debug("Converting single configuration into specific programs configuration")
 
-	programsToRun, err := program.Programs(e.agentInfo, ast)
+	programsToRun, err := program.Programs(e.agentInfo, e.components, ast)
 	if err != nil {
 		return err
 	}

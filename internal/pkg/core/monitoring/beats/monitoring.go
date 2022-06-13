@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -30,15 +30,15 @@ const (
 )
 
 // MonitoringEndpoint is an endpoint where process is exposing its metrics.
-func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string) string {
-	if endpoint, ok := spec.MetricEndpoints[operatingSystem]; ok {
+func MonitoringEndpoint(spec component.Spec, operatingSystem, pipelineID string) string {
+	if endpoint, ok := spec.ProgramSpec.MetricEndpoints[operatingSystem]; ok {
 		return endpoint
 	}
 	if operatingSystem == "windows" {
-		return fmt.Sprintf(mbEndpointFileFormatWin, pipelineID, spec.Cmd)
+		return fmt.Sprintf(mbEndpointFileFormatWin, pipelineID, spec.Command())
 	}
 	// unix socket path must be less than 104 characters
-	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), pipelineID, spec.Cmd, spec.Cmd))
+	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), pipelineID, spec.Command(), spec.Command()))
 	if len(path) < 104 {
 		return path
 	}
@@ -47,14 +47,14 @@ func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string) s
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
 }
 
-func getLoggingFile(spec program.Spec, operatingSystem, installPath, pipelineID string) string {
-	if path, ok := spec.LogPaths[operatingSystem]; ok {
+func getLoggingFile(spec component.Spec, operatingSystem, installPath, pipelineID string) string {
+	if path, ok := spec.ProgramSpec.LogPaths[operatingSystem]; ok {
 		return path
 	}
 	if operatingSystem == "windows" {
-		return fmt.Sprintf(logFileFormatWin, paths.Home(), pipelineID, spec.Cmd)
+		return fmt.Sprintf(logFileFormatWin, paths.Home(), pipelineID, spec.Command())
 	}
-	return fmt.Sprintf(logFileFormat, paths.Home(), pipelineID, spec.Cmd)
+	return fmt.Sprintf(logFileFormat, paths.Home(), pipelineID, spec.Command())
 }
 
 // AgentMonitoringEndpoint returns endpoint with exposed metrics for agent.

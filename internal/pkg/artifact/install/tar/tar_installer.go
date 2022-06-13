@@ -15,8 +15,8 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // Installer or tar packages
@@ -33,7 +33,7 @@ func NewInstaller(config *artifact.Config) (*Installer, error) {
 
 // Install performs installation of program in a specific version.
 // It expects package to be already downloaded.
-func (i *Installer) Install(ctx context.Context, spec program.Spec, version, installDir string) error {
+func (i *Installer) Install(ctx context.Context, spec component.Spec, version, installDir string) error {
 	artifactPath, err := artifact.GetArtifactPath(spec, version, i.config.OS(), i.config.Arch(), i.config.TargetDirectory)
 	if err != nil {
 		return err

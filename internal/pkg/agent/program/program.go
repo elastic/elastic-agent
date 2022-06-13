@@ -9,19 +9,21 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // Program represents a program that must be started or must run.
 type Program struct {
-	Spec   Spec
+	Spec   component.Spec
 	Config *transpiler.AST
 }
 
 // Cmd return the execution command to run.
 func (p *Program) Cmd() string {
-	return p.Spec.Cmd
+	return p.Spec.Command()
 }
 
 // Checksum return the checksum of the current instance of the program.
@@ -47,7 +49,7 @@ func (p *Program) Configuration() map[string]interface{} {
 
 // Programs take a Tree representation of the main configuration and apply all the different
 // programs rules and generate individual configuration from the rules.
-func Programs(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST) (map[string][]Program, error) {
+func Programs(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singleConfig *transpiler.AST) (map[string][]Program, error) {
 	grouped, err := groupByOutputs(singleConfig)
 	if err != nil {
 		return nil, errors.New(err, errors.TypeConfig, "fail to extract program configuration")
@@ -55,7 +57,7 @@ func Programs(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST) (map
 
 	groupedPrograms := make(map[string][]Program)
 	for k, config := range grouped {
-		programs, err := DetectPrograms(agentInfo, config)
+		programs, err := DetectPrograms(agentInfo, dpus, config)
 		if err != nil {
 			return nil, errors.New(err, errors.TypeConfig, "fail to generate program configuration")
 		}
@@ -66,11 +68,12 @@ func Programs(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST) (map
 }
 
 // DetectPrograms returns the list of programs detected from the provided configuration.
-func DetectPrograms(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST) ([]Program, error) {
+func DetectPrograms(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singleConfig *transpiler.AST) ([]Program, error) {
 	programs := make([]Program, 0)
-	for _, spec := range Supported {
+	// detect inputs
+	for _, dp := range dpus[component.INPUT] {
 		specificAST := singleConfig.Clone()
-		ok, err := DetectProgram(spec, agentInfo, specificAST)
+		ok, err := DetectProgram(dp.Spec.ProgramSpec.Rules, dp.Spec.ProgramSpec.When, dp.Spec.ProgramSpec.Constraints, agentInfo, specificAST)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +81,7 @@ func DetectPrograms(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST
 			continue
 		}
 		program := Program{
-			Spec:   spec,
+			Spec:   dp.Spec,
 			Config: specificAST,
 		}
 		programs = append(programs, program)
@@ -90,9 +93,9 @@ func DetectPrograms(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST
 //
 // Note `ast` is modified to match what the program expects. Should clone the AST before passing to
 // this function if you want to still have the original.
-func DetectProgram(spec Spec, info transpiler.AgentInfo, ast *transpiler.AST) (bool, error) {
-	if len(spec.Constraints) > 0 {
-		constraints, err := eql.New(spec.Constraints)
+func DetectProgram(rules *transpiler.RuleList, when string, constraints string, info transpiler.AgentInfo, ast *transpiler.AST) (bool, error) {
+	if len(constraints) > 0 {
+		constraints, err := eql.New(constraints)
 		if err != nil {
 			return false, err
 		}
@@ -105,16 +108,16 @@ func DetectProgram(spec Spec, info transpiler.AgentInfo, ast *transpiler.AST) (b
 		}
 	}
 
-	err := spec.Rules.Apply(info, ast)
+	err := rules.Apply(info, ast)
 	if err != nil {
 		return false, err
 	}
 
-	if len(spec.When) == 0 {
-		return false, ErrMissingWhen
+	if len(when) == 0 {
+		return false, spec.ErrMissingWhen
 	}
 
-	expression, err := eql.New(spec.When)
+	expression, err := eql.New(when)
 	if err != nil {
 		return false, err
 	}
@@ -124,9 +127,11 @@ func DetectProgram(spec Spec, info transpiler.AgentInfo, ast *transpiler.AST) (b
 
 // KnownProgramNames returns a list of runnable programs by the elastic-agent.
 func KnownProgramNames() []string {
-	names := make([]string, len(Supported))
-	for idx, program := range Supported {
-		names[idx] = program.Name
+	names := make([]string, len(component.Supported))
+	for _, d := range component.Supported {
+		for idx, program := range d {
+			names[idx] = program.Name
+		}
 	}
 	return names
 }

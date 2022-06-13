@@ -11,7 +11,8 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -88,8 +89,10 @@ type testConfigFetcher struct {
 
 func (f testConfigFetcher) Config() string { return f.cfg }
 
-func testProgramSpec(restartOnOutput bool) program.Spec {
-	return program.Spec{
-		RestartOnOutputChange: restartOnOutput,
+func testProgramSpec(restartOnOutput bool) component.Spec {
+	return component.Spec{
+		ProgramSpec: &spec.Spec{
+			RestartOnOutputChange: restartOnOutput,
+		},
 	}
 }

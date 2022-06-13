@@ -1,14 +1,32 @@
-name: Filebeat
-cmd: filebeat
-args: [
-  "-E", "setup.ilm.enabled=false",
-  "-E", "setup.template.enabled=false",
-  "-E", "management.enabled=true",
-  "-E", "logging.level=debug",
-  "-E", "gc_percent=${FILEBEAT_GOGC:100}",
-  "-E", "filebeat.config.modules.enabled=false"
-]
-artifact: beats/filebeat
+name: filebeat
+inputs:
+  - name: filebeat
+    description: "Filebeat"
+    platforms:
+      - linux/386
+      - linux/amd64
+      - linux/arm64
+      - linux/ppc64le
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - windows/arm64
+    command:
+      - args: [
+          "-E", "setup.ilm.enabled=false",
+        "-E", "setup.template.enabled=false",
+        "-E", "management.enabled=true",
+        "-E", "logging.level=debug",
+        "-E", "gc_percent=${FILEBEAT_GOGC:100}",
+        "-E", "filebeat.config.modules.enabled=false"
+        ]
+    outputs:
+      - elasticsearch
+      - redis
+      - kafka
+      - logstash
+
+# backward compatibility, remove with new inputs
 restart_on_output_change: true
 rules:
 - fix_stream: {}

@@ -29,9 +29,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 var diagOutputs = map[string]outputter{
@@ -553,7 +553,7 @@ func zipLogs(zw *zip.Writer) error {
 		return err
 	}
 
-	if err := collectEndpointSecurityLogs(zw, program.SupportedMap); err != nil {
+	if err := collectEndpointSecurityLogs(zw, component.SupportedMap); err != nil {
 		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
 	}
 
@@ -586,13 +586,13 @@ func zipLogs(zw *zip.Writer) error {
 	})
 }
 
-func collectEndpointSecurityLogs(zw *zip.Writer, specs map[string]program.Spec) error {
+func collectEndpointSecurityLogs(zw *zip.Writer, specs map[string]component.Spec) error {
 	spec, ok := specs["endpoint-security"]
 	if !ok {
 		return nil
 	}
 
-	logs, ok := spec.LogPaths[runtime.GOOS]
+	logs, ok := spec.ProgramSpec.LogPaths[runtime.GOOS]
 	if !ok {
 		return nil
 	}

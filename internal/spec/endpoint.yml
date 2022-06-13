@@ -1,6 +1,54 @@
 name: Endpoint Security
 cmd: endpoint-security
-artifact: endpoint-dev
+inputs:
+  - name: apm-server
+    description: "APM Server"
+    platforms:
+      - linux/386
+      - linux/amd64
+      - linux/arm64
+      - linux/ppc64le
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - windows/arm64
+    runtime:
+     preventions:
+       - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
+         message: "No support for RHEL7 on arm64"
+    service:
+      operations:
+        check:
+          args:
+          - "verify"
+          - "--log"
+          - "stderr"
+          timeout: 30
+        install:
+          args:
+          - "install"
+          - "--log"
+          - "stderr"
+          - "--upgrade"
+          - "--resources"
+          - "endpoint-security-resources.zip"
+          timeout: 600
+        uninstall:
+          args:
+            - "uninstall"
+            - "--log"
+            - "stderr"
+          timeout: 600
+
+      - args: [
+          "-E", "management.enabled=true",
+          "-E", "gc_percent=${APMSERVER_GOGC:100}"
+        ]
+    outputs:
+      - elasticsearch
+      - logstash
+
+# backward compatibility, remove with new inputs
 service: 6788
 action_input_types:
 - endpoint

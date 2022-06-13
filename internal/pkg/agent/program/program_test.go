@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/internal/yamltest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
 
 var (
@@ -469,7 +470,7 @@ func TestConfiguration(t *testing.T) {
 			ast, err := transpiler.NewAST(m)
 			require.NoError(t, err)
 
-			programs, err := Programs(&fakeAgentInfo{}, ast)
+			programs, err := Programs(&fakeAgentInfo{}, componenttest.TestSet, ast)
 			if test.err {
 				require.Error(t, err)
 				return
@@ -488,7 +489,7 @@ func TestConfiguration(t *testing.T) {
 				require.Equal(t, len(testPrograms), len(progs))
 
 				for _, program := range progs {
-					filename := name + "-" + strings.ToLower(program.Spec.Cmd)
+					filename := name + "-" + strings.ToLower(program.Spec.Command())
 					if progKey != "default" {
 						filename += "-" + progKey
 					}
@@ -547,7 +548,7 @@ func TestUseCases(t *testing.T) {
 			ast, err := transpiler.NewAST(m)
 			require.NoError(t, err)
 
-			programs, err := Programs(&fakeAgentInfo{}, ast)
+			programs, err := Programs(&fakeAgentInfo{}, componenttest.TestSet, ast)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(programs))
@@ -558,7 +559,7 @@ func TestUseCases(t *testing.T) {
 			for _, program := range defPrograms {
 				generatedPath := filepath.Join(
 					useCasesPath, "generated",
-					useCaseName+"."+strings.ToLower(program.Spec.Cmd)+".golden.yml",
+					useCaseName+"."+strings.ToLower(program.Spec.Command())+".golden.yml",
 				)
 
 				compareMap := &transpiler.MapVisitor{}

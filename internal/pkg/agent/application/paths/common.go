@@ -128,6 +128,10 @@ func Data() string {
 	return filepath.Join(Top(), "data")
 }
 
+func Components() string {
+	return filepath.Join(Home(), "components")
+}
+
 // Logs returns a the log directory for Agent
 func Logs() string {
 	return logsPath

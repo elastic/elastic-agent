@@ -16,13 +16,13 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
@@ -117,7 +117,7 @@ func (a *Application) Monitor() monitoring.Monitor {
 }
 
 // Spec returns the program spec of this app.
-func (a *Application) Spec() program.Spec {
+func (a *Application) Spec() component.Spec {
 	return a.desc.Spec()
 }
 
