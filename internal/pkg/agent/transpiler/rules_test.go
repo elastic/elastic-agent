@@ -207,7 +207,7 @@ inputs:
     data_stream.namespace: nsns
     processors:
       - add_fields:
-          target: source
+          target: "@metadata"
           fields:
             input_id: input-id
     streams:
@@ -226,7 +226,7 @@ inputs:
               fields:
                 dataset: dsds
           - add_fields:
-              target: source
+              target: "@metadata"
               fields:
                 stream_id: stream-id
   - name: With processors
@@ -239,7 +239,7 @@ inputs:
           fields:
             dataset: value
       - add_fields:
-          target: source
+          target: "@metadata"
           fields:
             input_id: input-id
     streams:
@@ -262,7 +262,7 @@ inputs:
               fields:
                 dataset: dsds
           - add_fields:
-              target: source
+              target: "@metadata"
               fields:
                 stream_id: stream-id
 `,

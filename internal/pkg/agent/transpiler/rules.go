@@ -697,7 +697,7 @@ func (r *InjectStreamProcessorRule) Apply(_ AgentInfo, ast *AST) (err error) {
 
 			// inject `input_id` on the input level
 			processorMap := &Dict{value: make([]Node, 0)}
-			processorMap.value = append(processorMap.value, &Key{name: "target", value: &StrVal{value: "source"}})
+			processorMap.value = append(processorMap.value, &Key{name: "target", value: &StrVal{value: "@metadata"}})
 			processorMap.value = append(processorMap.value, &Key{name: "fields", value: &Dict{value: []Node{
 				&Key{name: "input_id", value: inputID},
 			}}})
@@ -768,7 +768,7 @@ func (r *InjectStreamProcessorRule) Apply(_ AgentInfo, ast *AST) (err error) {
 			if streamID != nil {
 				// source stream
 				processorMap = &Dict{value: make([]Node, 0)}
-				processorMap.value = append(processorMap.value, &Key{name: "target", value: &StrVal{value: "source"}})
+				processorMap.value = append(processorMap.value, &Key{name: "target", value: &StrVal{value: "@metadata"}})
 				processorMap.value = append(processorMap.value, &Key{name: "fields", value: &Dict{value: []Node{
 					&Key{name: "stream_id", value: streamID.Clone()},
 				}}})
