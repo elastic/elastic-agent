@@ -773,10 +773,6 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			Sync: true,
 		}
 
-		if strings.HasSuffix(f, ".yml") || strings.HasSuffix(f, ".yml.disabled") {
-			options.AddPermission = 0644
-		}
-
 		err = copy.Copy(f, dropPath, options)
 		if err != nil {
 			panic(err)

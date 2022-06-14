@@ -30,14 +30,16 @@ import (
 )
 
 const (
-	expectedConfigMode     = os.FileMode(0600)
-	expectedManifestMode   = os.FileMode(0644)
-	expectedModuleFileMode = expectedManifestMode
-	expectedModuleDirMode  = os.FileMode(0755)
+	expectedAgentConfigMode = os.FileMode(0600)
+	expectedConfigMode      = os.FileMode(0644)
+	expectedManifestMode    = os.FileMode(0644)
+	expectedModuleFileMode  = expectedManifestMode
+	expectedModuleDirMode   = os.FileMode(0755)
 )
 
 var (
-	configFilePattern      = regexp.MustCompile(`.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$`)
+	agentConfigFilePattern = regexp.MustCompile(`elastic-agent\.yml$`)
+	configFilePattern      = regexp.MustCompile(`.*beat\.yml$|apm-server\.yml$`)
 	manifestFilePattern    = regexp.MustCompile(`manifest.yml`)
 	modulesDirPattern      = regexp.MustCompile(`module/.+`)
 	modulesDDirPattern     = regexp.MustCompile(`modules.d/$`)
@@ -225,7 +227,7 @@ func checkDocker(t *testing.T, file string) {
 	checkDockerEntryPoint(t, p, info)
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
-	checkConfigPermissionsWithMode(t, p, os.FileMode(0644))
+	checkConfigPermissionsWithMode(t, p, configFilePattern, os.FileMode(0644))
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
@@ -234,13 +236,14 @@ func checkDocker(t *testing.T, file string) {
 
 // Verify that the main configuration file is installed with a 0600 file mode.
 func checkConfigPermissions(t *testing.T, p *packageFile) {
-	checkConfigPermissionsWithMode(t, p, expectedConfigMode)
+	checkConfigPermissionsWithMode(t, p, configFilePattern, expectedConfigMode)
+	checkConfigPermissionsWithMode(t, p, agentConfigFilePattern, expectedAgentConfigMode)
 }
 
-func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, expectedMode os.FileMode) {
+func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
 	t.Run(p.Name+" config file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
-			if configFilePattern.MatchString(entry.File) {
+			if configPattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
 				if expectedMode != mode {
 					t.Errorf("file %v has wrong permissions: expected=%v actual=%v",
@@ -249,7 +252,7 @@ func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, expectedMode o
 				return
 			}
 		}
-		t.Errorf("no config file found matching %v", configFilePattern)
+		t.Errorf("no config file found matching %v", configPattern)
 	})
 }
 
