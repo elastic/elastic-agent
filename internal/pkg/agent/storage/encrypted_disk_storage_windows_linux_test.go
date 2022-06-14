@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/google/go-cmp/cmp"
 )
 
 const (
