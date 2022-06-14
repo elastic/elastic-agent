@@ -10,11 +10,11 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 )
 
+// InitStorage prepares storage for testing.
+// disabled on Darwin.
 func InitStorage(t *testing.T) {
-	vault.DisableRootCheck()
 	storage.DisableEncryptionDarwin()
 	if runtime.GOOS != "darwin" {
 		err := secret.CreateAgentSecret()
