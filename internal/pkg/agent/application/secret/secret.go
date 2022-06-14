@@ -7,6 +7,7 @@ package secret
 import (
 	"encoding/json"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -14,6 +15,9 @@ import (
 )
 
 const agentSecretKey = "secret"
+
+// mutex for secret create calls
+var mxCreate sync.Mutex
 
 // Secret is the structure that is JSON serialized and stored
 type Secret struct {
@@ -25,6 +29,7 @@ type options struct {
 	vaultPath string
 }
 
+// OptionFunc is the functional configuration type.
 type OptionFunc func(o *options)
 
 // WithVaultPath allows to specify the vault path, doesn't apply for darwin
@@ -50,6 +55,10 @@ func Create(key string, opts ...OptionFunc) error {
 		return err
 	}
 	defer v.Close()
+
+	// Thread-safe key creation
+	mxCreate.Lock()
+	defer mxCreate.Unlock()
 
 	// Check if the key exists
 	exists, err := v.Exists(key)
