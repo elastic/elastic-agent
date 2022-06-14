@@ -12,6 +12,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 )
 
+// InitStorage prepares storage for testing.
+// disabled on Darwin.
 func InitStorage(t *testing.T) {
 	storage.DisableEncryptionDarwin()
 	if runtime.GOOS != "darwin" {
