@@ -89,12 +89,12 @@ func (s *configServer) OnConfig(cfgString string) {
 }
 
 func (s *configServer) OnStop() {
-	s.client.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+	_ = s.client.Status(proto.StateObserved_STOPPING, "Stopping", nil)
 	s.cancel()
 }
 
 func (s *configServer) OnError(err error) {
-	s.f.WriteString(err.Error())
+	_, _ = s.f.WriteString(err.Error())
 }
 
 // TestConfig is a configuration for testing Config calls
@@ -136,6 +136,7 @@ func clientFromNet(port int, impl client.StateInterface, actions ...client.Actio
 		ServerName:   connInfo.ServerName,
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
+		MinVersion:   tls.VersionTLS12,
 	})
 	return client.New(connInfo.Addr, connInfo.Token, impl, actions, grpc.WithTransportCredentials(trans)), nil
 }

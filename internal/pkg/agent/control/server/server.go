@@ -23,7 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
@@ -39,6 +39,8 @@ import (
 
 // Server is the daemon side of the control protocol.
 type Server struct {
+	cproto.UnimplementedElasticAgentControlServer
+
 	logger        *logger.Logger
 	rex           reexec.ExecManager
 	statusCtrl    status.Controller
@@ -113,7 +115,7 @@ func (s *Server) Start() error {
 	} else {
 		s.server = grpc.NewServer()
 	}
-	proto.RegisterElasticAgentControlServer(s.server, s)
+	cproto.RegisterElasticAgentControlServer(s.server, s)
 
 	// start serving GRPC connections
 	go func() {
@@ -137,8 +139,8 @@ func (s *Server) Stop() {
 }
 
 // Version returns the currently running version.
-func (s *Server) Version(_ context.Context, _ *proto.Empty) (*proto.VersionResponse, error) {
-	return &proto.VersionResponse{
+func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionResponse, error) {
+	return &cproto.VersionResponse{
 		Version:   release.Version(),
 		Commit:    release.Commit(),
 		BuildTime: release.BuildTime().Format(control.TimeFormat()),
@@ -147,9 +149,9 @@ func (s *Server) Version(_ context.Context, _ *proto.Empty) (*proto.VersionRespo
 }
 
 // Status returns the overall status of the agent.
-func (s *Server) Status(_ context.Context, _ *proto.Empty) (*proto.StatusResponse, error) {
+func (s *Server) Status(_ context.Context, _ *cproto.Empty) (*cproto.StatusResponse, error) {
 	status := s.statusCtrl.Status()
-	return &proto.StatusResponse{
+	return &cproto.StatusResponse{
 		Status:       agentStatusToProto(status.Status),
 		Message:      status.Message,
 		Applications: agentAppStatusToProto(status.Applications),
@@ -157,29 +159,29 @@ func (s *Server) Status(_ context.Context, _ *proto.Empty) (*proto.StatusRespons
 }
 
 // Restart performs re-exec.
-func (s *Server) Restart(_ context.Context, _ *proto.Empty) (*proto.RestartResponse, error) {
+func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartResponse, error) {
 	s.rex.ReExec(nil)
-	return &proto.RestartResponse{
-		Status: proto.ActionStatus_SUCCESS,
+	return &cproto.RestartResponse{
+		Status: cproto.ActionStatus_SUCCESS,
 	}, nil
 }
 
 // Upgrade performs the upgrade operation.
-func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*proto.UpgradeResponse, error) {
+func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
 	s.lock.RLock()
 	u := s.up
 	s.lock.RUnlock()
 	if u == nil {
 		// not running with upgrader (must be controlled by Fleet)
-		return &proto.UpgradeResponse{
-			Status: proto.ActionStatus_FAILURE,
+		return &cproto.UpgradeResponse{
+			Status: cproto.ActionStatus_FAILURE,
 			Error:  "cannot be upgraded; perform upgrading using Fleet",
 		}, nil
 	}
 	cb, err := u.Upgrade(ctx, &upgradeRequest{request}, false)
 	if err != nil {
-		return &proto.UpgradeResponse{
-			Status: proto.ActionStatus_FAILURE,
+		return &cproto.UpgradeResponse{
+			Status: cproto.ActionStatus_FAILURE,
 			Error:  err.Error(),
 		}, nil
 	}
@@ -189,8 +191,8 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 		<-time.After(time.Second)
 		s.rex.ReExec(cb)
 	}()
-	return &proto.UpgradeResponse{
-		Status:  proto.ActionStatus_SUCCESS,
+	return &cproto.UpgradeResponse{
+		Status:  cproto.ActionStatus_SUCCESS,
 		Version: request.Version,
 	}, nil
 }
@@ -213,13 +215,13 @@ type BeatInfo struct {
 }
 
 // ProcMeta returns version and beat inforation for all running processes.
-func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaResponse, error) {
+func (s *Server) ProcMeta(ctx context.Context, _ *cproto.Empty) (*cproto.ProcMetaResponse, error) {
 	if s.routeFn == nil {
 		return nil, errors.New("route function is nil")
 	}
 
-	resp := &proto.ProcMetaResponse{
-		Procs: []*proto.ProcMeta{},
+	resp := &cproto.ProcMetaResponse{
+		Procs: []*cproto.ProcMeta{},
 	}
 
 	// gather spec data for all rk/apps running
@@ -236,7 +238,7 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 }
 
 // Pprof returns /debug/pprof data for the requested applicaiont-route_key or all running applications.
-func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.PprofResponse, error) {
+func (s *Server) Pprof(ctx context.Context, req *cproto.PprofRequest) (*cproto.PprofResponse, error) {
 	if s.monitoringCfg == nil || s.monitoringCfg.Pprof == nil || !s.monitoringCfg.Pprof.Enabled {
 		return nil, fmt.Errorf("agent.monitoring.pprof disabled")
 	}
@@ -250,12 +252,12 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 		return nil, fmt.Errorf("unable to parse trace duration: %w", err)
 	}
 
-	resp := &proto.PprofResponse{
-		Results: []*proto.PprofResult{},
+	resp := &cproto.PprofResponse{
+		Results: []*cproto.PprofResult{},
 	}
 
 	var wg sync.WaitGroup
-	ch := make(chan *proto.PprofResult, 1)
+	ch := make(chan *cproto.PprofResult, 1)
 
 	// retrieve elastic-agent pprof data if requested or application is unspecified.
 	if req.AppName == "" || req.AppName == "elastic-agent" {
@@ -263,7 +265,7 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 		c := newSocketRequester("elastic-agent", "", endpoint)
 		for _, opt := range req.PprofType {
 			wg.Add(1)
-			go func(opt proto.PprofOption) {
+			go func(opt cproto.PprofOption) {
 				res := c.getPprof(ctx, opt, dur)
 				ch <- res
 				wg.Done()
@@ -282,7 +284,7 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 		// Launch a concurrent goroutine to gather all pprof endpoints from a socket.
 		for _, opt := range req.PprofType {
 			wg.Add(1)
-			go func(opt proto.PprofOption) {
+			go func(opt cproto.PprofOption) {
 				res := c.getPprof(ctx, opt, dur)
 				ch <- res
 				wg.Done()
@@ -305,9 +307,9 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 
 // ProcMetrics returns all buffered metrics data for the agent and running processes.
 // If the agent.monitoring.http.buffer variable is not set, or set to false, a nil result attribute is returned
-func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMetricsResponse, error) {
+func (s *Server) ProcMetrics(ctx context.Context, _ *cproto.Empty) (*cproto.ProcMetricsResponse, error) {
 	if s.monitoringCfg == nil || s.monitoringCfg.HTTP == nil || s.monitoringCfg.HTTP.Buffer == nil || !s.monitoringCfg.HTTP.Buffer.Enabled {
-		return &proto.ProcMetricsResponse{}, nil
+		return &cproto.ProcMetricsResponse{}, nil
 	}
 
 	if s.routeFn == nil {
@@ -319,8 +321,8 @@ func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMe
 	c := newSocketRequester("elastic-agent", "", endpoint)
 	metrics := c.procMetrics(ctx)
 
-	resp := &proto.ProcMetricsResponse{
-		Result: []*proto.MetricsResponse{metrics},
+	resp := &cproto.ProcMetricsResponse{
+		Result: []*cproto.MetricsResponse{metrics},
 	}
 
 	// gather metrics buffer data from all other processes
@@ -442,8 +444,8 @@ func (r *socketRequester) getPath(ctx context.Context, path string) (*http.Respo
 }
 
 // procMeta will return process metadata by querying the "/" path.
-func (r *socketRequester) procMeta(ctx context.Context) *proto.ProcMeta {
-	pm := &proto.ProcMeta{
+func (r *socketRequester) procMeta(ctx context.Context) *cproto.ProcMeta {
+	pm := &cproto.ProcMeta{
 		Name:     r.appName,
 		RouteKey: r.routeKey,
 	}
@@ -478,21 +480,21 @@ func (r *socketRequester) procMeta(ctx context.Context) *proto.ProcMeta {
 	return pm
 }
 
-var pprofEndpoints = map[proto.PprofOption]string{
-	proto.PprofOption_ALLOCS:       "/debug/pprof/allocs",
-	proto.PprofOption_BLOCK:        "/debug/pprof/block",
-	proto.PprofOption_CMDLINE:      "/debug/pprof/cmdline",
-	proto.PprofOption_GOROUTINE:    "/debug/pprof/goroutine",
-	proto.PprofOption_HEAP:         "/debug/pprof/heap",
-	proto.PprofOption_MUTEX:        "/debug/pprof/mutex",
-	proto.PprofOption_PROFILE:      "/debug/pprof/profile",
-	proto.PprofOption_THREADCREATE: "/debug/pprof/threadcreate",
-	proto.PprofOption_TRACE:        "/debug/pprof/trace",
+var pprofEndpoints = map[cproto.PprofOption]string{
+	cproto.PprofOption_ALLOCS:       "/debug/pprof/allocs",
+	cproto.PprofOption_BLOCK:        "/debug/pprof/block",
+	cproto.PprofOption_CMDLINE:      "/debug/pprof/cmdline",
+	cproto.PprofOption_GOROUTINE:    "/debug/pprof/goroutine",
+	cproto.PprofOption_HEAP:         "/debug/pprof/heap",
+	cproto.PprofOption_MUTEX:        "/debug/pprof/mutex",
+	cproto.PprofOption_PROFILE:      "/debug/pprof/profile",
+	cproto.PprofOption_THREADCREATE: "/debug/pprof/threadcreate",
+	cproto.PprofOption_TRACE:        "/debug/pprof/trace",
 }
 
 // getProf will gather pprof data specified by the option.
-func (r *socketRequester) getPprof(ctx context.Context, opt proto.PprofOption, dur time.Duration) *proto.PprofResult {
-	res := &proto.PprofResult{
+func (r *socketRequester) getPprof(ctx context.Context, opt cproto.PprofOption, dur time.Duration) *cproto.PprofResult {
+	res := &cproto.PprofResult{
 		AppName:   r.appName,
 		RouteKey:  r.routeKey,
 		PprofType: opt,
@@ -504,7 +506,7 @@ func (r *socketRequester) getPprof(ctx context.Context, opt proto.PprofOption, d
 		return res
 	}
 
-	if opt == proto.PprofOption_PROFILE || opt == proto.PprofOption_TRACE {
+	if opt == cproto.PprofOption_PROFILE || opt == cproto.PprofOption_TRACE {
 		path += fmt.Sprintf("?seconds=%0.f", dur.Seconds())
 	}
 
@@ -525,8 +527,8 @@ func (r *socketRequester) getPprof(ctx context.Context, opt proto.PprofOption, d
 }
 
 // procMetrics will gather metrics buffer data
-func (r *socketRequester) procMetrics(ctx context.Context) *proto.MetricsResponse {
-	res := &proto.MetricsResponse{
+func (r *socketRequester) procMetrics(ctx context.Context) *cproto.MetricsResponse {
+	res := &cproto.MetricsResponse{
 		AppName:  r.appName,
 		RouteKey: r.routeKey,
 	}
@@ -553,7 +555,7 @@ func (r *socketRequester) procMetrics(ctx context.Context) *proto.MetricsRespons
 }
 
 type upgradeRequest struct {
-	*proto.UpgradeRequest
+	*cproto.UpgradeRequest
 }
 
 func (r *upgradeRequest) Version() string {
@@ -569,27 +571,27 @@ func (r *upgradeRequest) FleetAction() *fleetapi.ActionUpgrade {
 	return nil
 }
 
-func agentStatusToProto(code status.AgentStatusCode) proto.Status {
+func agentStatusToProto(code status.AgentStatusCode) cproto.Status {
 	if code == status.Degraded {
-		return proto.Status_DEGRADED
+		return cproto.Status_DEGRADED
 	}
 	if code == status.Failed {
-		return proto.Status_FAILED
+		return cproto.Status_FAILED
 	}
-	return proto.Status_HEALTHY
+	return cproto.Status_HEALTHY
 }
 
-func agentAppStatusToProto(apps []status.AgentApplicationStatus) []*proto.ApplicationStatus {
-	s := make([]*proto.ApplicationStatus, len(apps))
+func agentAppStatusToProto(apps []status.AgentApplicationStatus) []*cproto.ApplicationStatus {
+	s := make([]*cproto.ApplicationStatus, len(apps))
 	for i, a := range apps {
 		var payload []byte
 		if a.Payload != nil {
 			payload, _ = json.Marshal(a.Payload)
 		}
-		s[i] = &proto.ApplicationStatus{
+		s[i] = &cproto.ApplicationStatus{
 			Id:      a.ID,
 			Name:    a.Name,
-			Status:  proto.Status(a.Status.ToProto()),
+			Status:  cproto.Status(a.Status.ToProto()),
 			Message: a.Message,
 			Payload: string(payload),
 		}

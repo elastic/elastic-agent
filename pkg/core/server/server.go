@@ -99,6 +99,8 @@ type Handler interface {
 
 // Server is the GRPC server that the launched applications connect back to.
 type Server struct {
+	proto.UnimplementedElasticAgentServer
+
 	logger     *logger.Logger
 	ca         *authority.CertificateAuthority
 	listenAddr string
@@ -383,6 +385,11 @@ func (s *Server) Checkin(server proto.ElasticAgent_CheckinServer) error {
 
 	<-sendDone
 	return nil
+}
+
+// CheckinV2 implements the GRPC bi-direction stream connection for v2 check-ins.
+func (s *Server) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
+	return errors.New("not implemented")
 }
 
 // Actions implements the GRPC bi-direction stream connection for actions.
