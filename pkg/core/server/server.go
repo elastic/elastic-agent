@@ -156,7 +156,7 @@ func (s *Server) Start() error {
 		ClientAuth:     tls.RequireAndVerifyClientCert,
 		ClientCAs:      certPool,
 		GetCertificate: s.getCertificate,
-		MinVersion: 	tls.VersionTLS12,
+		MinVersion:     tls.VersionTLS12,
 	})
 	if s.tracer != nil {
 		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(s.tracer))
