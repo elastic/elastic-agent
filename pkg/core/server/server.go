@@ -21,9 +21,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/gofrs/uuid"
-	protobuf "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	protobuf "google.golang.org/protobuf/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"

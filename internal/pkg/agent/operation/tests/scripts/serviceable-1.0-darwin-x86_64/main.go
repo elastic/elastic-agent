@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	protobuf "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	protobuf "google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"

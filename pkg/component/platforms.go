@@ -4,6 +4,11 @@
 
 package component
 
+import (
+	"fmt"
+	"strings"
+)
+
 const (
 	// Container represents running inside a container
 	Container = "container"
@@ -22,12 +27,18 @@ const (
 	ARM64 = "arm64"
 )
 
-// Platforms defines the platforms that a component can support
-var Platforms = []struct {
+// Platform defines the platform that a component can support
+type Platform struct {
 	OS   string
 	Arch string
 	GOOS string
-}{
+}
+
+// Platforms is an array of platforms.
+type Platforms []Platform
+
+// GlobalPlatforms defines the platforms that a component can support
+var GlobalPlatforms = Platforms{
 	{
 		OS:   Container,
 		Arch: AMD64,
@@ -63,4 +74,23 @@ var Platforms = []struct {
 		Arch: AMD64,
 		GOOS: Windows,
 	},
+}
+
+// String returns the platform string identifier.
+func (p *Platform) String() string {
+	return fmt.Sprintf("%s/%s", p.OS, p.Arch)
+}
+
+// Exists returns true if the
+func (p Platforms) Exists(platform string) bool {
+	pieces := strings.SplitN(platform, "/", 2)
+	if len(pieces) != 2 {
+		return false
+	}
+	for _, platform := range p {
+		if platform.OS == pieces[0] && platform.Arch == pieces[1] {
+			return true
+		}
+	}
+	return false
 }
