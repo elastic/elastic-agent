@@ -153,7 +153,7 @@ func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
 
 	r, err := yamlToReader(configMap)
 	if err != nil {
-		return errors.New(err, "failed created yaml reader")
+		return errors.New(err, "failed creating yaml reader")
 	}
 
 	if err := s.Save(r); err != nil {
