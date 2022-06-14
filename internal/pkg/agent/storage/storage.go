@@ -17,6 +17,7 @@ type Store interface {
 	Save(io.Reader) error
 }
 
+// Storage interacts with on-disk data stores.
 type Storage interface {
 	Store
 
@@ -32,6 +33,8 @@ type DiskStore struct {
 	target string
 }
 
+// EncryptedDiskStore encrypts config when saving to disk.
+// When saving it will save to a temporary file then replace the target file.
 type EncryptedDiskStore struct {
 	target    string
 	vaultPath string

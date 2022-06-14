@@ -8,13 +8,12 @@
 package vault
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/billgraziano/dpapi"
 	"github.com/hectane/go-acl"
@@ -24,6 +23,7 @@ import (
 type Vault struct {
 	path    string
 	entropy []byte
+	mx      sync.Mutex
 }
 
 // Open initializes the vault store
@@ -68,26 +68,35 @@ func (v *Vault) Close() error {
 
 // Set stores the key in the vault store
 func (v *Vault) Set(key string, data []byte) error {
-	enc, err := dpapi.EncryptBytesMachineLocalEntropy(data, v.entropy)
+	enc, err := v.encrypt(data)
 	if err != nil {
 		return err
 	}
+
+	v.mx.Lock()
+	defer v.mx.Unlock()
 
 	return ioutil.WriteFile(v.filepathFromKey(key), enc, 0600)
 }
 
 // Get retrieves the key from the vault store
 func (v *Vault) Get(key string) ([]byte, error) {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	enc, err := ioutil.ReadFile(v.filepathFromKey(key))
 	if err != nil {
 		return nil, err
 	}
 
-	return dpapi.DecryptBytesEntropy(enc, v.entropy)
+	return v.decrypt(enc)
 }
 
 // Exists checks if the key exists
 func (v *Vault) Exists(key string) (ok bool, err error) {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	if _, err = os.Stat(v.filepathFromKey(key)); err == nil {
 		ok = true
 	} else if errors.Is(err, fs.ErrNotExist) {
@@ -98,16 +107,22 @@ func (v *Vault) Exists(key string) (ok bool, err error) {
 
 // Remove removes the key
 func (v *Vault) Remove(key string) error {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	return os.RemoveAll(v.filepathFromKey(key))
 }
 
-func (v *Vault) filepathFromKey(key string) string {
-	return filepath.Join(v.path, fileNameFromKey(key))
+func (v *Vault) encrypt(data []byte) ([]byte, error) {
+	return dpapi.EncryptBytesMachineLocalEntropy(data, v.entropy)
 }
 
-func fileNameFromKey(key string) string {
-	hash := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(hash[:])
+func (v *Vault) decrypt(data []byte) ([]byte, error) {
+	return dpapi.DecryptBytesEntropy(data, v.entropy)
+}
+
+func (v *Vault) filepathFromKey(key string) string {
+	return filepath.Join(v.path, fileNameFromKey(v.entropy, key))
 }
 
 func systemAdministratorsOnly(path string, inherit bool) error {

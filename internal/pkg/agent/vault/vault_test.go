@@ -8,6 +8,9 @@
 package vault
 
 import (
+	"errors"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"testing"
@@ -20,11 +23,55 @@ func getTestVaultPath(t *testing.T) string {
 	return filepath.Join(dir, "vault")
 }
 
+func TestVaultRekey(t *testing.T) {
+	const key = "foo"
+
+	vaultPath := getTestVaultPath(t)
+	v, err := New(vaultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer v.Close()
+
+	err = v.Set(key, []byte("bar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Read seed file value
+	seedPath := filepath.Join(vaultPath, ".seed")
+	seedBytes, err := ioutil.ReadFile(seedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diff := cmp.Diff(int(AES256), len(seedBytes))
+	if diff != "" {
+		t.Fatal(diff)
+	}
+
+	// Remove the .seed file.
+	// This will cause the vault seed to be reinitialized for the new vault instance
+	err = os.Remove(seedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The vault with the new seed
+	v2, err := New(vaultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer v2.Close()
+
+	// The key should be not found
+	_, err = v2.Get(key)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+}
+
 func TestVault(t *testing.T) {
-
-	// Disable root check, because the tests are not running as sudo
-	DisableRootCheck()
-
 	vaultPath := getTestVaultPath(t)
 
 	v, err := New(vaultPath)

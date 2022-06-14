@@ -25,12 +25,15 @@ extern char* GetOSStatusMessage(OSStatus status);
 import "C"
 import (
 	"fmt"
+	"sync"
 	"unsafe"
 )
 
+// Vault represents encrypted storage using the Darwin keychain.
 type Vault struct {
 	name     string
 	keychain C.SecKeychainRef
+	mx       sync.Mutex
 }
 
 // New initializes the vault store
@@ -49,6 +52,9 @@ func New(name string) (*Vault, error) {
 
 // Close closes the vault store
 func (v *Vault) Close() error {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	if v.keychain != 0 {
 		C.CFRelease(C.CFTypeRef(v.keychain))
 		v.keychain = 0
@@ -58,6 +64,9 @@ func (v *Vault) Close() error {
 
 // Set sets the key in the vault store
 func (v *Vault) Set(key string, data []byte) error {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	cname := C.CString(v.name)
 	defer C.free(unsafe.Pointer(cname))
 
@@ -77,6 +86,9 @@ func (v *Vault) Get(key string) ([]byte, error) {
 		len  C.size_t
 	)
 
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	cname := C.CString(v.name)
 	defer C.free(unsafe.Pointer(cname))
 
@@ -94,6 +106,8 @@ func (v *Vault) Get(key string) ([]byte, error) {
 
 // Exists checks if the key exists
 func (v *Vault) Exists(key string) (bool, error) {
+	v.mx.Lock()
+	defer v.mx.Unlock()
 
 	cname := C.CString(v.name)
 	defer C.free(unsafe.Pointer(cname))
@@ -112,7 +126,11 @@ func (v *Vault) Exists(key string) (bool, error) {
 	return false, statusToError(status)
 }
 
+// Remove will remove a key from the keychain.
 func (v *Vault) Remove(key string) error {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	cname := C.CString(v.name)
 	defer C.free(unsafe.Pointer(cname))
 
@@ -136,6 +154,7 @@ func statusToError(status C.OSStatus) error {
 	return nil
 }
 
+// OSStatusError is an error type that can be returned by Darwin systems when interacting with the keychain.
 type OSStatusError struct {
 	status  int
 	message string
