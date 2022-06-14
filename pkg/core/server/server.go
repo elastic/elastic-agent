@@ -156,6 +156,7 @@ func (s *Server) Start() error {
 		ClientAuth:     tls.RequireAndVerifyClientCert,
 		ClientCAs:      certPool,
 		GetCertificate: s.getCertificate,
+		MinVersion: 	tls.VersionTLS12,
 	})
 	if s.tracer != nil {
 		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(s.tracer))
@@ -199,7 +200,10 @@ func (s *Server) Stop() {
 func (s *Server) Get(app interface{}) (*ApplicationState, bool) {
 	var foundState *ApplicationState
 	s.apps.Range(func(_ interface{}, val interface{}) bool {
-		as := val.(*ApplicationState)
+		as, ok := val.(*ApplicationState)
+		if !ok {
+			return true
+		}
 		if as.app == app {
 			foundState = as
 			return false
@@ -213,7 +217,10 @@ func (s *Server) Get(app interface{}) (*ApplicationState, bool) {
 func (s *Server) FindByInputType(inputType string) (*ApplicationState, bool) {
 	var foundState *ApplicationState
 	s.apps.Range(func(_ interface{}, val interface{}) bool {
-		as := val.(*ApplicationState)
+		as, ok := val.(*ApplicationState)
+		if !ok {
+			return true
+		}
 		if as.inputTypes == nil {
 			return true
 		}
@@ -890,7 +897,10 @@ func (s *Server) watchdog() {
 
 		now := time.Now().UTC()
 		s.apps.Range(func(_ interface{}, val interface{}) bool {
-			serverApp := val.(*ApplicationState)
+			serverApp, ok := val.(*ApplicationState)
+			if !ok {
+				return true
+			}
 			serverApp.checkinLock.RLock()
 			statusTime := serverApp.statusTime
 			serverApp.checkinLock.RUnlock()
@@ -941,7 +951,10 @@ func (s *Server) getByToken(token string) (*ApplicationState, bool) {
 func (s *Server) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	var cert *tls.Certificate
 	s.apps.Range(func(_ interface{}, val interface{}) bool {
-		sa := val.(*ApplicationState)
+		sa, ok := val.(*ApplicationState)
+		if !ok {
+			return true
+		}
 		if sa.srvName == chi.ServerName {
 			cert = sa.cert.Certificate
 			return false
