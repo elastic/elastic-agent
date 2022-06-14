@@ -686,7 +686,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		defer os.RemoveAll(dropPath)
 		defer os.Unsetenv(agentDropPath)
 
-		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
+		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat", "elastic-agent-shipper"}
 		if devtools.ExternalBuild == true {
 			ctx := context.Background()
 			for _, beat := range packedBeats {
@@ -700,8 +700,15 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			}
 		} else {
 			// build from local repo, will assume beats repo is located on the same root level
+			fmt.Println(">>> Building from local repo")
 			for _, b := range packedBeats {
-				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
+				var pwd string
+				var err error
+				if !strings.Contains(b, "beat") {
+					pwd, err = filepath.Abs(filepath.Join("../", b))
+				} else {
+					pwd, err = filepath.Abs(filepath.Join("../beats/x-pack", b))
+				}
 				if err != nil {
 					panic(err)
 				}

@@ -386,6 +386,14 @@ shared:
         source: '{{.AgentDropPath}}/fleet-server-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz.asc'
         mode: 0644
         skip_on_missing: true
+      'data/{{.BeatName}}-{{ commit_short }}/downloads/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz.sha512':
+        source: '{{.AgentDropPath}}/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz.sha512'
+        mode: 0644
+        skip_on_missing: true
+      'data/{{.BeatName}}-{{ commit_short }}/downloads/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz.asc':
+        source: '{{.AgentDropPath}}/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz.asc'
+        mode: 0644
+        skip_on_missing: true
 
 
   # Binary package spec (zip for windows) for community beats.
@@ -633,11 +641,48 @@ shared:
       source: _meta/kibana.generated
       mode: 0644
 
+  - &binary_component_files
+    '{{.BeatName}}{{.BinaryExt}}':
+      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+      mode: 0755
+    LICENSE.txt:
+      source: '{{ repo.RootDir }}/LICENSE.txt'
+      mode: 0644
+    NOTICE.txt:
+      source: '{{ repo.RootDir }}/NOTICE.txt'
+      mode: 0644
+    .build_hash.txt:
+      content: >
+        {{ commit }}
+      mode: 0644
+    '{{.BeatName}}.yml':
+      source: '{{.BeatName}}.yml'
+      mode: 0600
+      config: true
+
   # Binary package spec (tar.gz for linux/darwin) for community beats.
   - &binary_spec
     <<: *common
     files:
       <<: *binary_files
+
+    # Binary spec for "components" such as the shipper
+  - &binary_component_spec
+    <<: *common
+    files:
+      <<: *binary_component_files
+
+  # Binary package spec (zip for windows) for community beats.
+  - &windows_binary_component_spec
+    <<: *common
+    files:
+      <<: *binary_component_files
+      install-service-{{.BeatName}}.ps1:
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/windows/install-service.ps1.tmpl'
+        mode: 0755
+      uninstall-service-{{.BeatName}}.ps1:
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/windows/uninstall-service.ps1.tmpl'
+        mode: 0755
 
   # Binary package spec (zip for windows) for community beats.
   - &windows_binary_spec
@@ -880,6 +925,24 @@ specs:
       spec:
         <<: *binary_spec
         <<: *elastic_license_for_binaries
+
+  #elastic-agent-shipper packaged for the agent
+  elastic_shipper_agent:
+    - os: windows
+      types: [zip]
+      spec:
+        <<: *windows_binary_component_spec
+
+    - os: darwin
+      types: [tgz]
+      spec:
+        <<: *binary_component_spec
+
+    - os: linux
+      types: [tgz]
+      spec:
+        <<: *binary_component_spec
+
 
   # Elastic Beat with Elastic License and binary taken the current directory.
   elastic_beat_xpack_reduced:

@@ -39,7 +39,7 @@ func BuildGoDaemon() error {
 	input := filepath.Join(godaemonDir, "src", "god.c")
 	output := MustExpand("build/golang-crossbuild/god-{{.Platform.GOOS}}-{{.Platform.Arch}}")
 	if IsUpToDate(output, input) {
-		log.Println(">>> buildGoDaemon is up-to-date for", Platform.Name)
+		log.Println(">>>>> buildGoDaemon is up-to-date for", Platform.Name)
 		return nil
 	}
 
@@ -48,7 +48,7 @@ func BuildGoDaemon() error {
 	if cc == "" {
 		cc = "cc"
 	}
-
+	log.Printf("Generating compile command for output %s\n", output)
 	compileCmd := []string{
 		cc,
 		input,
