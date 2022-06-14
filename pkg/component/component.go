@@ -5,11 +5,35 @@
 package component
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
 )
+
+var (
+	// ErrOutputNotSupported is returned when an input does not support an output type
+	ErrOutputNotSupported = errors.New("input doesn't support output type")
+)
+
+// ErrRuntimeCheckFail error is used when a runtime prevention check passes.
+type ErrRuntimeCheckFail struct {
+	// message is the reason defined in the check
+	message string
+}
+
+// NewErrRuntimeCheckFail creates a ErrRuntimeCheckFail with the message.
+func NewErrRuntimeCheckFail(message string) *ErrRuntimeCheckFail {
+	return &ErrRuntimeCheckFail{message}
+}
+
+// Error returns the message set on the check.
+func (e *ErrRuntimeCheckFail) Error() string {
+	return e.message
+}
 
 // Unit is a single unit that needs to be running inside a component.
 type Unit struct {
@@ -20,7 +44,17 @@ type Unit struct {
 
 // Component is a set of units that needs to run.
 type Component struct {
-	Spec  InputRuntimeSpec
+	// ID is the unique ID of the component.
+	ID string
+
+	// Err used when there is an error with running this input. Used by the runtime to alert
+	// the reason that all of these units are failed.
+	Err error
+
+	// Spec on how the input should run.
+	Spec InputRuntimeSpec
+
+	// Units that should be running inside this component.
 	Units []Unit
 }
 
@@ -33,6 +67,22 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 	if outputsMap == nil {
 		return nil, nil
 	}
+
+	// set the runtime variables that are available in the input specification runtime checks
+	vars, err := transpiler.NewVars(map[string]interface{}{
+		"runtime": map[string]interface{}{
+			"platform": r.platform.String(),
+			"os":       r.platform.OS,
+			"arch":     r.platform.Arch,
+			"family":   r.platform.Family,
+			"major":    r.platform.Major,
+			"minor":    r.platform.Minor,
+		},
+	}, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	var components []Component
 	for outputName, output := range outputsMap {
 		if !output.enabled {
@@ -53,13 +103,18 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 
 		for inputType, inputs := range inputsMap {
 			inputSpec, err := r.GetInput(inputType)
-			if errors.Is(err, ErrNotSupportedOnPlatform) {
-				return nil, fmt.Errorf("invalid 'input.%d' type '%s' is not supported on this platform", inputs[0].idx, inputType)
-			} else if err != nil {
-				return nil, fmt.Errorf("invalid 'input.%d' type '%s' is an unknown input", inputs[0].idx, inputType)
-			}
-			if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
-				return nil, fmt.Errorf("invalid 'input.%d' type '%s' does not support output type '%s'", inputs[0].idx, inputType, output.outputType)
+			if err == nil {
+				// update the inputType to match the spec; as it could have been alias
+				inputType = inputSpec.InputType
+				if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
+					inputSpec = InputRuntimeSpec{} // empty the spec
+					err = ErrOutputNotSupported
+				} else {
+					err = validateRuntimeChecks(&inputSpec.Spec, vars)
+					if err != nil {
+						inputSpec = InputRuntimeSpec{} // empty the spec
+					}
+				}
 			}
 			units := make([]Unit, 0, len(inputs)+1)
 			for _, input := range inputs {
@@ -68,18 +123,21 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 					continue
 				}
 				units = append(units, Unit{
-					ID:     fmt.Sprintf("%s-%s-%s", inputSpec.InputType, outputName, input.id),
+					ID:     fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id),
 					Type:   client.UnitTypeInput,
 					Config: input.input,
 				})
 			}
 			if len(units) > 0 {
+				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
 				units = append(units, Unit{
-					ID:     fmt.Sprintf("%s-%s", inputSpec.InputType, outputName),
+					ID:     componentID,
 					Type:   client.UnitTypeOutput,
 					Config: output.output,
 				})
 				components = append(components, Component{
+					ID:    componentID,
+					Err:   err,
 					Spec:  inputSpec,
 					Units: units,
 				})
@@ -226,4 +284,25 @@ type outputI struct {
 	outputType string
 	output     map[string]interface{}
 	inputs     map[string][]inputI
+}
+
+func validateRuntimeChecks(spec *InputSpec, store eql.VarStore) error {
+	for _, prevention := range spec.Runtime.Preventions {
+		expression, err := eql.New(prevention.Condition)
+		if err != nil {
+			// this should not happen because the specification already validates that this
+			// should never error; but just in-case we consider this a reason to prevent the running of the input
+			return NewErrRuntimeCheckFail(err.Error())
+		}
+		ok, err := expression.Eval(store)
+		if err != nil {
+			// error is considered a failure and reported as a reason
+			return NewErrRuntimeCheckFail(err.Error())
+		}
+		if ok {
+			// true means the prevention valid (so input should not run)
+			return NewErrRuntimeCheckFail(prevention.Message)
+		}
+	}
+	return nil
 }

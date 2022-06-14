@@ -33,13 +33,16 @@ type InputRuntimeSpec struct {
 
 // RuntimeSpecs return all the specifications for inputs that are supported on the current platform.
 type RuntimeSpecs struct {
-	// includes all input types even if that input is not supported on the current platform
+	// platform that was loaded
+	platform PlatformDetail
+
+	// inputTypes all input types even if that input is not supported on the current platform
 	inputTypes []string
 
-	// includes only the input specs for the current platform
+	// inputSpecs only the input specs for the current platform
 	inputSpecs map[string]InputRuntimeSpec
 
-	// maps aliases to real input name
+	// aliasMapping maps aliases to real input name
 	aliasMapping map[string]string
 }
 
@@ -63,7 +66,7 @@ func SkipBinaryCheck() LoadRuntimeOption {
 // are required to be {binary-name} with {binary-name}.spec.yml to be next to it. If a {binary-name}.spec.yml exists
 // but no matching {binary-name} is found that will result in an error. If a {binary-name} exists without a
 // {binary-name}.spec.yml then it will be ignored.
-func LoadRuntimeSpecs(dir string, platform Platform, opts ...LoadRuntimeOption) (RuntimeSpecs, error) {
+func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOption) (RuntimeSpecs, error) {
 	var opt loadRuntimeOpts
 	for _, o := range opts {
 		o(&opt)
@@ -133,6 +136,7 @@ func LoadRuntimeSpecs(dir string, platform Platform, opts ...LoadRuntimeOption) 
 		}
 	}
 	return RuntimeSpecs{
+		platform:     platform,
 		inputTypes:   types,
 		inputSpecs:   mapping,
 		aliasMapping: aliases,

@@ -94,3 +94,12 @@ func (p Platforms) Exists(platform string) bool {
 	}
 	return false
 }
+
+// PlatformDetail is platform that has more detail information about the running platform.
+type PlatformDetail struct {
+	Platform
+
+	Family string
+	Major  string
+	Minor  string
+}

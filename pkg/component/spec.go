@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
 )
 
 // Spec a components specification.
@@ -75,6 +77,12 @@ func (s *InputSpec) Validate() error {
 			if i != j && a == b {
 				return fmt.Errorf("input '%s' defines the output '%s' more than once", s.Name, a)
 			}
+		}
+	}
+	for idx, prevention := range s.Runtime.Preventions {
+		_, err := eql.New(prevention.Condition)
+		if err != nil {
+			return fmt.Errorf("input '%s' defined 'runtime.preventions.%d.condition' failed to compile: %w", s.Name, idx, err)
 		}
 	}
 	return nil

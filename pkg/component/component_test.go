@@ -10,35 +10,38 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestToComponents(t *testing.T) {
 	scenarios := []struct {
 		Name     string
-		Platform Platform
+		Platform PlatformDetail
 		Policy   map[string]interface{}
 		Err      string
 		Result   []Component
 	}{
 		{
 			Name: "Empty policy",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{},
 		},
 		{
 			Name: "Invalid: outputs as an array",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": []string{"should be a map"},
@@ -47,10 +50,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: outputs entry as an array",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -61,10 +66,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: outputs entry missing type",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -75,10 +82,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: outputs entry type not a string",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -91,10 +100,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: outputs entry type not a string",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -108,10 +119,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "No inputs",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -124,10 +137,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs as a map",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -142,10 +157,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs entry as an array",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -162,10 +179,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs entry missing type",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -182,10 +201,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs entry type not a string",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -204,10 +225,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs entry missing id",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -226,10 +249,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs entry id not a string",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -249,10 +274,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs entry use_output not a string",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -273,10 +300,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs entry use_output references unknown output",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -297,10 +326,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs entry enabled not a bool",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -322,10 +353,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Invalid: inputs unknown type",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -343,14 +376,39 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 			},
-			Err: "invalid 'input.0' type 'unknown' is an unknown input",
+			Result: []Component{
+				{
+					ID:   "unknown-default",
+					Spec: InputRuntimeSpec{},
+					Err:  ErrNotSupported,
+					Units: []Unit{
+						{
+							ID:   "unknown-default",
+							Type: client.UnitTypeOutput,
+							Config: map[string]interface{}{
+								"type": "elasticsearch",
+							},
+						},
+						{
+							ID:   "unknown-default-unknown-0",
+							Type: client.UnitTypeInput,
+							Config: map[string]interface{}{
+								"type": "unknown",
+								"id":   "unknown-0",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name: "Invalid: inputs endpoint not support on container platform",
-			Platform: Platform{
-				OS:   Container,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Container,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -368,14 +426,39 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 			},
-			Err: "invalid 'input.0' type 'endpoint' is not supported on this platform",
+			Result: []Component{
+				{
+					ID:   "endpoint-default",
+					Spec: InputRuntimeSpec{},
+					Err:  ErrNotSupportedOnPlatform,
+					Units: []Unit{
+						{
+							ID:   "endpoint-default",
+							Type: client.UnitTypeOutput,
+							Config: map[string]interface{}{
+								"type": "elasticsearch",
+							},
+						},
+						{
+							ID:   "endpoint-default-endpoint-0",
+							Type: client.UnitTypeInput,
+							Config: map[string]interface{}{
+								"type": "endpoint",
+								"id":   "endpoint-0",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name: "Invalid: inputs endpoint doesn't support logstash",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -393,14 +476,92 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 			},
-			Err: "invalid 'input.0' type 'endpoint' does not support output type 'logstash'",
+			Result: []Component{
+				{
+					ID:   "endpoint-default",
+					Spec: InputRuntimeSpec{},
+					Err:  ErrOutputNotSupported,
+					Units: []Unit{
+						{
+							ID:   "endpoint-default",
+							Type: client.UnitTypeOutput,
+							Config: map[string]interface{}{
+								"type": "logstash",
+							},
+						},
+						{
+							ID:   "endpoint-default-endpoint-0",
+							Type: client.UnitTypeInput,
+							Config: map[string]interface{}{
+								"type": "endpoint",
+								"id":   "endpoint-0",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "Invalid: inputs endpoint doesnt support arm64 redhat major 7",
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: ARM64,
+					GOOS: Linux,
+				},
+				Family: "redhat",
+				Major:  "7",
+				Minor:  "2",
+			},
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":       "endpoint",
+						"id":         "endpoint-0",
+						"use_output": "default",
+						"enabled":    true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					ID:   "endpoint-default",
+					Spec: InputRuntimeSpec{},
+					Err:  NewErrRuntimeCheckFail("No support for RHEL7 on arm64"),
+					Units: []Unit{
+						{
+							ID:   "endpoint-default",
+							Type: client.UnitTypeOutput,
+							Config: map[string]interface{}{
+								"type": "elasticsearch",
+							},
+						},
+						{
+							ID:   "endpoint-default-endpoint-0",
+							Type: client.UnitTypeInput,
+							Config: map[string]interface{}{
+								"type": "endpoint",
+								"id":   "endpoint-0",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name: "Output disabled",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -420,10 +581,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Input disabled",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -443,10 +606,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Simple representation",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -497,10 +662,12 @@ func TestToComponents(t *testing.T) {
 		},
 		{
 			Name: "Complex representation",
-			Platform: Platform{
-				OS:   Linux,
-				Arch: AMD64,
-				GOOS: Linux,
+			Platform: PlatformDetail{
+				Platform: Platform{
+					OS:   Linux,
+					Arch: AMD64,
+					GOOS: Linux,
+				},
 			},
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -784,10 +951,15 @@ func TestToComponents(t *testing.T) {
 				sortComponents(result)
 				for i, expected := range scenario.Result {
 					actual := result[i]
-					assert.Equal(t, expected.Spec.InputType, actual.Spec.InputType)
-					assert.Equal(t, expected.Spec.BinaryName, actual.Spec.BinaryName)
-					assert.Equal(t, expected.Spec.BinaryPath, actual.Spec.BinaryPath)
-					assert.EqualValues(t, expected.Units, actual.Units)
+					if expected.Err != nil {
+						assert.Equal(t, expected.Err, actual.Err)
+						assert.EqualValues(t, expected.Units, actual.Units)
+					} else {
+						assert.Equal(t, expected.Spec.InputType, actual.Spec.InputType)
+						assert.Equal(t, expected.Spec.BinaryName, actual.Spec.BinaryName)
+						assert.Equal(t, expected.Spec.BinaryPath, actual.Spec.BinaryPath)
+						assert.EqualValues(t, expected.Units, actual.Units)
+					}
 				}
 			}
 		})
