@@ -37,10 +37,13 @@ const (
 
 	// defaultBinaryName specifies the output file for zip and tar.gz.
 	defaultBinaryName = "{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+
+	componentConfigMode os.FileMode = 0600
 )
 
 var (
-	configFilePattern = regexp.MustCompile(`.*\.yml$|.*\.yml\.disabled$`)
+	configFilePattern          = regexp.MustCompile(`.*\.yml$|.*\.yml\.disabled$`)
+	componentConfigFilePattern = regexp.MustCompile(`.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
 )
 
 // PackageType defines the file format of the package (e.g. zip, rpm, etc).
@@ -830,6 +833,10 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			header.SetMode(pkgFile.ConfigMode & os.ModePerm)
 		}
 
+		if pkgFile.ConfigMode > 0 && componentConfigFilePattern.MatchString(info.Name()) {
+			header.SetMode(componentConfigMode & os.ModePerm)
+		}
+
 		if filepath.IsAbs(pkgFile.Target) {
 			baseDir = ""
 		}
@@ -900,6 +907,10 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		// is config file
 		if pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()) {
 			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
+		}
+
+		if pkgFile.ConfigMode > 0 && componentConfigFilePattern.MatchString(info.Name()) {
+			header.Mode = int64(componentConfigMode & os.ModePerm)
 		}
 
 		if filepath.IsAbs(pkgFile.Target) {
@@ -974,6 +985,10 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		// is config file
 		if pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()) {
 			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
+		}
+
+		if pkgFile.ConfigMode > 0 && componentConfigFilePattern.MatchString(info.Name()) {
+			header.Mode = int64(componentConfigMode & os.ModePerm)
 		}
 
 		header.Name = filepath.Join(baseDir, pkgFile.Target)

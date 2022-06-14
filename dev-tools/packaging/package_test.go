@@ -30,16 +30,14 @@ import (
 )
 
 const (
-	expectedAgentConfigMode = os.FileMode(0600)
-	expectedConfigMode      = os.FileMode(0644)
-	expectedManifestMode    = os.FileMode(0644)
-	expectedModuleFileMode  = expectedManifestMode
-	expectedModuleDirMode   = os.FileMode(0755)
+	expectedConfigMode     = os.FileMode(0600)
+	expectedManifestMode   = os.FileMode(0644)
+	expectedModuleFileMode = expectedManifestMode
+	expectedModuleDirMode  = os.FileMode(0755)
 )
 
 var (
-	agentConfigFilePattern = regexp.MustCompile(`elastic-agent\.yml$`)
-	configFilePattern      = regexp.MustCompile(`.*beat\.yml$|apm-server\.yml$`)
+	configFilePattern      = regexp.MustCompile(`.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
 	manifestFilePattern    = regexp.MustCompile(`manifest.yml`)
 	modulesDirPattern      = regexp.MustCompile(`module/.+`)
 	modulesDDirPattern     = regexp.MustCompile(`modules.d/$`)
@@ -237,7 +235,6 @@ func checkDocker(t *testing.T, file string) {
 // Verify that the main configuration file is installed with a 0600 file mode.
 func checkConfigPermissions(t *testing.T, p *packageFile) {
 	checkConfigPermissionsWithMode(t, p, configFilePattern, expectedConfigMode)
-	checkConfigPermissionsWithMode(t, p, agentConfigFilePattern, expectedAgentConfigMode)
 }
 
 func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
