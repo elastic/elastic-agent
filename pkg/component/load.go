@@ -17,10 +17,10 @@ import (
 const specGlobPattern = "*.spec.yml"
 
 var (
-	// ErrNotSupported is returned when the input is not supported on any platform
-	ErrNotSupported = errors.New("not supported")
-	// ErrNotSupportedOnPlatform is returned when the input is supported but not on this platform
-	ErrNotSupportedOnPlatform = errors.New("not supported on this platform")
+	// ErrInputNotSupported is returned when the input is not supported on any platform
+	ErrInputNotSupported = errors.New("input not supported")
+	// ErrInputNotSupportedOnPlatform is returned when the input is supported but not on this platform
+	ErrInputNotSupportedOnPlatform = errors.New("input not supported on this platform")
 )
 
 // InputRuntimeSpec returns the specification for running this input on the current platform.
@@ -151,10 +151,10 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 	}
 	if containsStr(r.inputTypes, inputType) {
 		// supported but not on this platform
-		return InputRuntimeSpec{}, ErrNotSupportedOnPlatform
+		return InputRuntimeSpec{}, ErrInputNotSupportedOnPlatform
 	}
 	// not supported at all
-	return InputRuntimeSpec{}, ErrNotSupported
+	return InputRuntimeSpec{}, ErrInputNotSupported
 }
 
 // LoadSpec loads the component specification.

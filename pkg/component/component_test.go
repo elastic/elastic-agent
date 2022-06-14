@@ -380,7 +380,7 @@ func TestToComponents(t *testing.T) {
 				{
 					ID:   "unknown-default",
 					Spec: InputRuntimeSpec{},
-					Err:  ErrNotSupported,
+					Err:  ErrInputNotSupported,
 					Units: []Unit{
 						{
 							ID:   "unknown-default",
@@ -430,7 +430,7 @@ func TestToComponents(t *testing.T) {
 				{
 					ID:   "endpoint-default",
 					Spec: InputRuntimeSpec{},
-					Err:  ErrNotSupportedOnPlatform,
+					Err:  ErrInputNotSupportedOnPlatform,
 					Units: []Unit{
 						{
 							ID:   "endpoint-default",
@@ -533,7 +533,7 @@ func TestToComponents(t *testing.T) {
 				{
 					ID:   "endpoint-default",
 					Spec: InputRuntimeSpec{},
-					Err:  NewErrRuntimeCheckFail("No support for RHEL7 on arm64"),
+					Err:  NewErrInputRuntimeCheckFail("No support for RHEL7 on arm64"),
 					Units: []Unit{
 						{
 							ID:   "endpoint-default",
@@ -638,7 +638,7 @@ func TestToComponents(t *testing.T) {
 					Spec: InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
-						BinaryPath: "../../specs/filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
 					},
 					Units: []Unit{
 						{
@@ -744,7 +744,7 @@ func TestToComponents(t *testing.T) {
 					Spec: InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
-						BinaryPath: "../../specs/filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
 					},
 					Units: []Unit{
 						{
@@ -776,7 +776,7 @@ func TestToComponents(t *testing.T) {
 					Spec: InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
-						BinaryPath: "../../specs/filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
 					},
 					Units: []Unit{
 						{
@@ -808,7 +808,7 @@ func TestToComponents(t *testing.T) {
 					Spec: InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
-						BinaryPath: "../../specs/filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
 					},
 					Units: []Unit{
 						{
@@ -840,7 +840,7 @@ func TestToComponents(t *testing.T) {
 					Spec: InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
-						BinaryPath: "../../specs/filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
 					},
 					Units: []Unit{
 						{
@@ -864,7 +864,7 @@ func TestToComponents(t *testing.T) {
 					Spec: InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
-						BinaryPath: "../../specs/filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
 					},
 					Units: []Unit{
 						{
@@ -888,7 +888,7 @@ func TestToComponents(t *testing.T) {
 					Spec: InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
-						BinaryPath: "../../specs/filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
 					},
 					Units: []Unit{
 						{
@@ -912,7 +912,7 @@ func TestToComponents(t *testing.T) {
 					Spec: InputRuntimeSpec{
 						InputType:  "apm",
 						BinaryName: "apm-server",
-						BinaryPath: "../../specs/apm-server",
+						BinaryPath: filepath.Join("..", "..", "specs", "apm-server"),
 					},
 					Units: []Unit{
 						{

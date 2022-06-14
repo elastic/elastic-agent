@@ -19,23 +19,23 @@ var (
 	ErrOutputNotSupported = errors.New("input doesn't support output type")
 )
 
-// ErrRuntimeCheckFail error is used when a runtime prevention check passes.
-type ErrRuntimeCheckFail struct {
+// ErrInputRuntimeCheckFail error is used when an input specification runtime prevention check occurs.
+type ErrInputRuntimeCheckFail struct {
 	// message is the reason defined in the check
 	message string
 }
 
-// NewErrRuntimeCheckFail creates a ErrRuntimeCheckFail with the message.
-func NewErrRuntimeCheckFail(message string) *ErrRuntimeCheckFail {
-	return &ErrRuntimeCheckFail{message}
+// NewErrInputRuntimeCheckFail creates a ErrInputRuntimeCheckFail with the message.
+func NewErrInputRuntimeCheckFail(message string) *ErrInputRuntimeCheckFail {
+	return &ErrInputRuntimeCheckFail{message}
 }
 
 // Error returns the message set on the check.
-func (e *ErrRuntimeCheckFail) Error() string {
+func (e *ErrInputRuntimeCheckFail) Error() string {
 	return e.message
 }
 
-// Unit is a single unit that needs to be running inside a component.
+// Unit is a single input or output that a component must run.
 type Unit struct {
 	ID     string
 	Type   client.UnitType
@@ -292,16 +292,16 @@ func validateRuntimeChecks(spec *InputSpec, store eql.VarStore) error {
 		if err != nil {
 			// this should not happen because the specification already validates that this
 			// should never error; but just in-case we consider this a reason to prevent the running of the input
-			return NewErrRuntimeCheckFail(err.Error())
+			return NewErrInputRuntimeCheckFail(err.Error())
 		}
 		ok, err := expression.Eval(store)
 		if err != nil {
 			// error is considered a failure and reported as a reason
-			return NewErrRuntimeCheckFail(err.Error())
+			return NewErrInputRuntimeCheckFail(err.Error())
 		}
 		if ok {
 			// true means the prevention valid (so input should not run)
-			return NewErrRuntimeCheckFail(prevention.Message)
+			return NewErrInputRuntimeCheckFail(prevention.Message)
 		}
 	}
 	return nil
