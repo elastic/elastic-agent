@@ -57,7 +57,6 @@ func newOperator(
 	}
 
 	allowEmptyPgp, pgp := release.PGP()
-
 	verifier, err := downloader.NewVerifier(log, config.DownloadConfig, allowEmptyPgp, pgp)
 	if err != nil {
 		return nil, errors.New(err, "initiating verifier")

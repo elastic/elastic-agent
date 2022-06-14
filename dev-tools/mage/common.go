@@ -40,9 +40,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	inlineTemplate = "inline"
+)
+
 // Expand expands the given Go text/template string.
 func Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate("inline", in, FuncMap, EnvMap(args...))
+	return expandTemplate(inlineTemplate, in, FuncMap, EnvMap(args...))
 }
 
 // MustExpand expands the given Go text/template string. It panics if there is
@@ -77,7 +81,7 @@ func expandTemplate(name, tmpl string, funcs template.FuncMap, args ...map[strin
 
 	t, err := t.Parse(tmpl)
 	if err != nil {
-		if name == "inline" {
+		if name == inlineTemplate {
 			return "", errors.Wrapf(err, "failed to parse template '%v'", tmpl)
 		}
 		return "", errors.Wrap(err, "failed to parse template")
@@ -85,7 +89,7 @@ func expandTemplate(name, tmpl string, funcs template.FuncMap, args ...map[strin
 
 	buf := new(bytes.Buffer)
 	if err := t.Execute(buf, joinMaps(args...)); err != nil {
-		if name == "inline" {
+		if name == inlineTemplate {
 			return "", errors.Wrapf(err, "failed to expand template '%v'", tmpl)
 		}
 		return "", errors.Wrap(err, "failed to expand template")
@@ -122,7 +126,7 @@ func expandFile(src, dst string, args ...map[string]interface{}) error {
 		return err
 	}
 
-	dst, err = expandTemplate("inline", dst, FuncMap, args...)
+	dst, err = expandTemplate(inlineTemplate, dst, FuncMap, args...)
 	if err != nil {
 		return err
 	}
@@ -378,7 +382,7 @@ func Tar(src string, targetFile string) error {
 	tw := tar.NewWriter(zr)
 
 	// walk through every file in the folder
-	filepath.Walk(src, func(file string, fi os.FileInfo, errFn error) error {
+	err = filepath.Walk(src, func(file string, fi os.FileInfo, errFn error) error {
 		if errFn != nil {
 			return fmt.Errorf("error traversing the file system: %w", errFn)
 		}
@@ -417,6 +421,9 @@ func Tar(src string, targetFile string) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("error walking path '%s': %w", src, err)
+	}
 
 	// produce tar
 	if err := tw.Close(); err != nil {

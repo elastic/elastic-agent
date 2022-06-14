@@ -397,75 +397,75 @@ func TestConfiguration(t *testing.T) {
 		programs map[string][]string
 		err      bool
 	}{
-		// "namespace": {
-		// 	programs: map[string][]string{
-		// 		"default": {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
-		// 	},
-		// },
-		// "logstash_config": {
-		// 	programs: map[string][]string{
-		// 		"default":       {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
-		// 		"elasticsearch": {"filebeat"},
-		// 	},
-		// },
-		// "single_config": {
-		// 	programs: map[string][]string{
-		// 		"default": {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
-		// 	},
-		// },
-		// "audit_config": {
-		// 	programs: map[string][]string{
-		// 		"default": {"auditbeat"},
-		// 	},
-		// },
+		"namespace": {
+			programs: map[string][]string{
+				"default": {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
+			},
+		},
+		"logstash_config": {
+			programs: map[string][]string{
+				"default":       {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
+				"elasticsearch": {"filebeat"},
+			},
+		},
+		"single_config": {
+			programs: map[string][]string{
+				"default": {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
+			},
+		},
+		"audit_config": {
+			programs: map[string][]string{
+				"default": {"auditbeat"},
+			},
+		},
 		"fleet_server": {
 			programs: map[string][]string{
 				"default": {"fleet-server"},
 			},
 		},
-		// "synthetics_config": {
-		// 	programs: map[string][]string{
-		// 		"default": {"heartbeat"},
-		// 	},
-		// },
-		// "enabled_true": {
-		// 	programs: map[string][]string{
-		// 		"default": {"filebeat"},
-		// 	},
-		// },
-		// "enabled_false": {
-		// 	programs: map[string][]string{
-		// 		"default": {},
-		// 	},
-		// },
-		// "enabled_output_true": {
-		// 	programs: map[string][]string{
-		// 		"default": {"filebeat"},
-		// 	},
-		// },
-		// "enabled_output_false": {
-		// 	programs: map[string][]string{},
-		// },
-		// "endpoint_basic": {
-		// 	programs: map[string][]string{
-		// 		"default": {"endpoint"},
-		// 	},
-		// },
-		// "endpoint_no_fleet": {
-		// 	programs: map[string][]string{
-		// 		"default": {},
-		// 	},
-		// },
-		// "endpoint_unknown_output": {
-		// 	programs: map[string][]string{
-		// 		"default": {},
-		// 	},
-		// },
-		// "endpoint_arm": {
-		// 	programs: map[string][]string{
-		// 		"default": {},
-		// 	},
-		// },
+		"synthetics_config": {
+			programs: map[string][]string{
+				"default": {"heartbeat"},
+			},
+		},
+		"enabled_true": {
+			programs: map[string][]string{
+				"default": {"filebeat"},
+			},
+		},
+		"enabled_false": {
+			programs: map[string][]string{
+				"default": {},
+			},
+		},
+		"enabled_output_true": {
+			programs: map[string][]string{
+				"default": {"filebeat"},
+			},
+		},
+		"enabled_output_false": {
+			programs: map[string][]string{},
+		},
+		"endpoint_basic": {
+			programs: map[string][]string{
+				"default": {"endpoint"},
+			},
+		},
+		"endpoint_no_fleet": {
+			programs: map[string][]string{
+				"default": {},
+			},
+		},
+		"endpoint_unknown_output": {
+			programs: map[string][]string{
+				"default": {},
+			},
+		},
+		"endpoint_arm": {
+			programs: map[string][]string{
+				"default": {},
+			},
+		},
 	}
 
 	for name, test := range testcases {
