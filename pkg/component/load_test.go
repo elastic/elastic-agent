@@ -19,43 +19,43 @@ func TestLoadSpec_Components(t *testing.T) {
 	}{
 		{
 			Name: "APM Server",
-			Path: "apm-server.yml",
+			Path: "apm-server.spec.yml",
 		},
 		{
 			Name: "Auditbeat",
-			Path: "auditbeat.yml",
+			Path: "auditbeat.spec.yml",
 		},
 		{
 			Name: "Cloudbeat",
-			Path: "cloudbeat.yml",
+			Path: "cloudbeat.spec.yml",
 		},
 		{
 			Name: "Endpoint Security",
-			Path: "endpoint-security.yml",
+			Path: "endpoint-security.spec.yml",
 		},
 		{
 			Name: "Filebeat",
-			Path: "filebeat.yml",
+			Path: "filebeat.spec.yml",
 		},
 		{
 			Name: "Fleet Server",
-			Path: "fleet-server.yml",
+			Path: "fleet-server.spec.yml",
 		},
 		{
 			Name: "Heartbeat",
-			Path: "heartbeat.yml",
+			Path: "heartbeat.spec.yml",
 		},
 		{
 			Name: "Metricbeat",
-			Path: "metricbeat.yml",
+			Path: "metricbeat.spec.yml",
 		},
 		{
 			Name: "Osquerybeat",
-			Path: "osquerybeat.yml",
+			Path: "osquerybeat.spec.yml",
 		},
 		{
 			Name: "Packetbeat",
-			Path: "packetbeat.yml",
+			Path: "packetbeat.spec.yml",
 		},
 	}
 
