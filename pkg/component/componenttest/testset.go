@@ -73,7 +73,6 @@ func init() {
 }
 
 func LoadComponents() (component.ComponentSet, error) {
-	component.SpecSuffix = ".yml"
 	_, testFile, _, _ := runtime.Caller(0)
 	level := 3
 	rootDir := testFile
