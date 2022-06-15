@@ -34,10 +34,16 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 )
 
+const (
+	outputTypeHuman = "human"
+	outputTypeJSON  = "json"
+	outputTypeYAML  = "yaml"
+)
+
 var diagOutputs = map[string]outputter{
-	"human": humanDiagnosticsOutput,
-	"json":  jsonOutput,
-	"yaml":  yamlOutput,
+	outputTypeHuman: humanDiagnosticsOutput,
+	outputTypeJSON:  jsonOutput,
+	outputTypeYAML:  yamlOutput,
 }
 
 // DiagnosticsInfo a struct to track all information related to diagnostics for the agent.
@@ -98,8 +104,8 @@ func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *c
 
 			output, _ := c.Flags().GetString("output")
 			switch output {
-			case "yaml":
-			case "json":
+			case outputTypeYAML:
+			case outputTypeJSON:
 			default:
 				return fmt.Errorf("unsupported output: %s", output)
 			}
