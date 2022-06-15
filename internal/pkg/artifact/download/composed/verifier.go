@@ -32,13 +32,13 @@ func NewVerifier(verifiers ...download.Verifier) *Verifier {
 }
 
 // Verify checks the package from configured source.
-func (e *Verifier) Verify(spec component.Spec, version string) error {
+func (e *Verifier) Verify(spec component.Spec, remoteArtifact, version string) error {
 	var err error
 	var checksumMismatchErr *download.ChecksumMismatchError
 	var invalidSignatureErr *download.InvalidSignatureError
 
 	for _, v := range e.vv {
-		e := v.Verify(spec, version)
+		e := v.Verify(spec, remoteArtifact, version)
 		if e == nil {
 			// Success
 			return nil

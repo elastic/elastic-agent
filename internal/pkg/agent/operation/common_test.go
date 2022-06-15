@@ -150,7 +150,7 @@ var _ download.Downloader = &DummyDownloader{}
 
 type DummyVerifier struct{}
 
-func (*DummyVerifier) Verify(_ component.Spec, _ string) error {
+func (*DummyVerifier) Verify(_ component.Spec, _, _ string) error {
 	return nil
 }
 

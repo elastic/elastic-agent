@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
 
 const (
@@ -31,6 +32,10 @@ const (
 var (
 	beatSpec = component.Spec{Name: "Filebeat"}
 )
+
+func init() {
+	componenttest.LoadComponents()
+}
 
 func TestFetchVerify(t *testing.T) {
 	timeout := 15 * time.Second
@@ -68,7 +73,7 @@ func TestFetchVerify(t *testing.T) {
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(s, version)
+	err = verifier.Verify(s, "beat/beat", version)
 	var checksumErr *download.ChecksumMismatchError
 	assert.ErrorAs(t, err, &checksumErr)
 
@@ -91,7 +96,7 @@ func TestFetchVerify(t *testing.T) {
 	_, err = os.Stat(hashTargetFilePath)
 	assert.NoError(t, err)
 
-	err = verifier.Verify(s, version)
+	err = verifier.Verify(s, "beat/beat", version)
 	assert.NoError(t, err)
 
 	// Enable GPG signature validation.
@@ -111,7 +116,7 @@ func TestFetchVerify(t *testing.T) {
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(s, version)
+		err = verifier.Verify(s, "beat/beat", version)
 		require.Error(t, err)
 
 		// Don't delete these files when GPG validation failure.
@@ -124,7 +129,7 @@ func TestFetchVerify(t *testing.T) {
 		err = ioutil.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(s, version)
+		err = verifier.Verify(s, "beat/beat", version)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
 
@@ -208,7 +213,7 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = testVerifier.Verify(beatSpec, version)
+	err = testVerifier.Verify(beatSpec, "beat/filebeat", version)
 	require.NoError(t, err)
 
 	os.Remove(artifact)

@@ -18,7 +18,7 @@ type ErrorVerifier struct {
 	called bool
 }
 
-func (d *ErrorVerifier) Verify(spec component.Spec, version string) error {
+func (d *ErrorVerifier) Verify(spec component.Spec, remoteArtifact, version string) error {
 	d.called = true
 	return errors.New("failing")
 }
@@ -29,7 +29,7 @@ type FailVerifier struct {
 	called bool
 }
 
-func (d *FailVerifier) Verify(spec component.Spec, version string) error {
+func (d *FailVerifier) Verify(spec component.Spec, remoteArtifact, version string) error {
 	d.called = true
 	return &download.InvalidSignatureError{}
 }
@@ -40,7 +40,7 @@ type SuccVerifier struct {
 	called bool
 }
 
-func (d *SuccVerifier) Verify(spec component.Spec, version string) error {
+func (d *SuccVerifier) Verify(spec component.Spec, remoteArtifact, version string) error {
 	d.called = true
 	return nil
 }
@@ -74,7 +74,7 @@ func TestVerifier(t *testing.T) {
 
 	for _, tc := range testCases {
 		d := NewVerifier(tc.verifiers[0], tc.verifiers[1], tc.verifiers[2])
-		err := d.Verify(component.Spec{Name: "a"}, "b")
+		err := d.Verify(component.Spec{Name: "a"}, "", "b")
 
 		assert.Equal(t, tc.expectedResult, err == nil)
 

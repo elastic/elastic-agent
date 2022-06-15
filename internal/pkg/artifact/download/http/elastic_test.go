@@ -125,7 +125,7 @@ func TestVerify(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = testVerifier.Verify(beatSpec, version)
+			err = testVerifier.Verify(beatSpec, "beats/filebeat", version)
 			require.NoError(t, err)
 
 			os.Remove(artifact)

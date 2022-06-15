@@ -25,9 +25,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
 
-func TestDownloadBodyError(t *testing.T) {
+func init() {
 	componenttest.LoadComponents()
+}
 
+func TestDownloadBodyError(t *testing.T) {
 	// This tests the scenario where the download encounters a network error
 	// part way through the download, while copying the response body.
 

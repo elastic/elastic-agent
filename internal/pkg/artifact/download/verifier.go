@@ -54,7 +54,7 @@ type Verifier interface {
 	// *download.ChecksumMismatchError. And if the GPG signature is invalid then
 	// Verify returns a *download.InvalidSignatureError. Use errors.As() to
 	// check error types.
-	Verify(spec component.Spec, version string) error
+	Verify(spec component.Spec, remoteArtifact, version string) error
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum
