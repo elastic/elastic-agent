@@ -496,7 +496,11 @@ func Config() {
 
 // ControlProto generates pkg/agent/control/proto module.
 func ControlProto() error {
-	return sh.RunV("protoc", "--go_out=plugins=grpc:.", "control.proto")
+	return sh.RunV(
+		"protoc",
+		"--go_out=internal/pkg/agent/control/cproto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=internal/pkg/agent/control/cproto", "--go-grpc_opt=paths=source_relative",
+		"control.proto")
 }
 
 // BuildSpec make sure that all the suppported program spec are built into the binary.

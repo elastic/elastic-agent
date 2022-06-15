@@ -39,7 +39,7 @@ inputs:
     outputs:
       - shipper
 `,
-			Err: "input testing must define either command or service accessing 'inputs.0'",
+			Err: "input 'testing' must define either command or service accessing 'inputs.0'",
 		},
 		{
 			Name: "Duplicate Platform",
@@ -55,7 +55,22 @@ inputs:
       - shipper
     command: {}
 `,
-			Err: "input testing defines the platform linux/amd64 more than once accessing 'inputs.0'",
+			Err: "input 'testing' defines the platform 'linux/amd64' more than once accessing 'inputs.0'",
+		},
+		{
+			Name: "Unknown Platform",
+			Spec: `
+version: 2
+inputs:
+  - name: testing
+    description: Testing Input
+    platforms:
+      - unknown/amd64
+    outputs:
+      - shipper
+    command: {}
+`,
+			Err: "input 'testing' defines an unknown platform 'unknown/amd64' accessing 'inputs.0'",
 		},
 		{
 			Name: "Duplicate Output",
@@ -71,7 +86,7 @@ inputs:
       - shipper
     command: {}
 `,
-			Err: "input testing defines the output shipper more than once accessing 'inputs.0'",
+			Err: "input 'testing' defines the output 'shipper' more than once accessing 'inputs.0'",
 		},
 		{
 			Name: "Duplicate Platform Same Input Name",
@@ -93,7 +108,7 @@ inputs:
       - shipper
     command: {}
 `,
-			Err: "input testing at inputs.1 defines the same platform as a previous definition accessing config",
+			Err: "input 'testing' at inputs.1 defines the same platform as a previous definition accessing config",
 		},
 		{
 			Name: "Valid",

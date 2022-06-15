@@ -4,10 +4,10 @@
 
 syntax = "proto3";
 
-package proto;
+package cproto;
 
 option cc_enable_arenas = true;
-option go_package = "pkg/agent/control/proto;proto";
+option go_package = "internal/pkg/agent/control/cproto";
 
 // Status codes for the current state.
 enum Status {

@@ -27,17 +27,23 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 )
 
+const (
+	outputTypeHuman = "human"
+	outputTypeJSON  = "json"
+	outputTypeYAML  = "yaml"
+)
+
 var diagOutputs = map[string]outputter{
-	"human": humanDiagnosticsOutput,
-	"json":  jsonOutput,
-	"yaml":  yamlOutput,
+	outputTypeHuman: humanDiagnosticsOutput,
+	outputTypeJSON:  jsonOutput,
+	outputTypeYAML:  yamlOutput,
 }
 
 // DiagnosticsInfo a struct to track all information related to diagnostics for the agent.
@@ -98,8 +104,8 @@ func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *c
 
 			output, _ := c.Flags().GetString("output")
 			switch output {
-			case "yaml":
-			case "json":
+			case outputTypeYAML:
+			case outputTypeJSON:
 			default:
 				return fmt.Errorf("unsupported output: %s", output)
 			}
@@ -254,7 +260,7 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 }
 
 func diagnosticsPprofCmd(streams *cli.IOStreams, dur, cmdTimeout time.Duration, outFile, pType, appName, rk string) error {
-	pt, ok := proto.PprofOption_value[strings.ToUpper(pType)]
+	pt, ok := cproto.PprofOption_value[strings.ToUpper(pType)]
 	if !ok {
 		return fmt.Errorf("unknown pprof-type %q, select one of [allocs, block, cmdline, goroutine, heap, mutex, profile, threadcreate, trace]", pType)
 	}
@@ -278,13 +284,13 @@ func diagnosticsPprofCmd(streams *cli.IOStreams, dur, cmdTimeout time.Duration, 
 		return err
 	}
 
-	pprofData, err := daemon.Pprof(innerCtx, dur, []proto.PprofOption{proto.PprofOption(pt)}, appName, rk)
+	pprofData, err := daemon.Pprof(innerCtx, dur, []cproto.PprofOption{cproto.PprofOption(pt)}, appName, rk)
 	if err != nil {
 		return err
 	}
 
 	// validate response
-	pArr, ok := pprofData[proto.PprofOption_name[pt]]
+	pArr, ok := pprofData[cproto.PprofOption_name[pt]]
 	if !ok {
 		return fmt.Errorf("route key %q not found in response data (map length: %d)", rk, len(pprofData))
 	}
@@ -350,7 +356,7 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 	return diag, nil
 }
 
-func gatherMetrics(ctx context.Context) (*proto.ProcMetricsResponse, error) {
+func gatherMetrics(ctx context.Context) (*cproto.ProcMetricsResponse, error) {
 	daemon := client.New()
 	err := daemon.Connect(ctx)
 	if err != nil {
@@ -453,7 +459,7 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse, errs []error) error {
+func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *cproto.ProcMetricsResponse, errs []error) error {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
@@ -667,16 +673,16 @@ func getAllPprof(ctx context.Context, d time.Duration) (map[string][]client.Proc
 	if err != nil {
 		return nil, err
 	}
-	pprofTypes := []proto.PprofOption{
-		proto.PprofOption_ALLOCS,
-		proto.PprofOption_BLOCK,
-		proto.PprofOption_CMDLINE,
-		proto.PprofOption_GOROUTINE,
-		proto.PprofOption_HEAP,
-		proto.PprofOption_MUTEX,
-		proto.PprofOption_PROFILE,
-		proto.PprofOption_THREADCREATE,
-		proto.PprofOption_TRACE,
+	pprofTypes := []cproto.PprofOption{
+		cproto.PprofOption_ALLOCS,
+		cproto.PprofOption_BLOCK,
+		cproto.PprofOption_CMDLINE,
+		cproto.PprofOption_GOROUTINE,
+		cproto.PprofOption_HEAP,
+		cproto.PprofOption_MUTEX,
+		cproto.PprofOption_PROFILE,
+		cproto.PprofOption_THREADCREATE,
+		cproto.PprofOption_TRACE,
 	}
 	return daemon.Pprof(ctx, d, pprofTypes, "", "")
 }
@@ -717,7 +723,7 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 	return nil
 }
 
-func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse) error {
+func zipMetrics(zw *zip.Writer, metrics *cproto.ProcMetricsResponse) error {
 	//nolint:staticcheck,wastedassign // false positive
 	zf, err := zw.Create("metrics/")
 	if err != nil {

@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
 )
 
 // Spec a components specification.
@@ -32,7 +34,7 @@ func (s *Spec) Validate() error {
 		for _, platform := range input.Platforms {
 			for _, existing := range a {
 				if existing == platform {
-					return fmt.Errorf("input %s at inputs.%d defines the same platform as a previous definition", input.Name, i)
+					return fmt.Errorf("input '%s' at inputs.%d defines the same platform as a previous definition", input.Name, i)
 				}
 			}
 			a = append(a, platform)
@@ -58,20 +60,29 @@ type InputSpec struct {
 // Validate ensures correctness of input specification.
 func (s *InputSpec) Validate() error {
 	if s.Command == nil && s.Service == nil {
-		return fmt.Errorf("input %s must define either command or service", s.Name)
+		return fmt.Errorf("input '%s' must define either command or service", s.Name)
 	}
 	for i, a := range s.Platforms {
+		if !GlobalPlatforms.Exists(a) {
+			return fmt.Errorf("input '%s' defines an unknown platform '%s'", s.Name, a)
+		}
 		for j, b := range s.Platforms {
 			if i != j && a == b {
-				return fmt.Errorf("input %s defines the platform %s more than once", s.Name, a)
+				return fmt.Errorf("input '%s' defines the platform '%s' more than once", s.Name, a)
 			}
 		}
 	}
 	for i, a := range s.Outputs {
 		for j, b := range s.Outputs {
 			if i != j && a == b {
-				return fmt.Errorf("input %s defines the output %s more than once", s.Name, a)
+				return fmt.Errorf("input '%s' defines the output '%s' more than once", s.Name, a)
 			}
+		}
+	}
+	for idx, prevention := range s.Runtime.Preventions {
+		_, err := eql.New(prevention.Condition)
+		if err != nil {
+			return fmt.Errorf("input '%s' defined 'runtime.preventions.%d.condition' failed to compile: %w", s.Name, idx, err)
 		}
 	}
 	return nil

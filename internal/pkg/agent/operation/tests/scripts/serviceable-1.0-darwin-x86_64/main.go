@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	protobuf "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	protobuf "google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -29,27 +29,27 @@ func main() {
 		panic(err)
 	}
 	f, _ := os.OpenFile(filepath.Join(os.TempDir(), "testing.out"), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
-	f.WriteString("starting \n")
+	_, _ = f.WriteString("starting \n")
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &configServer{
 		f:      f,
 		ctx:    ctx,
 		cancel: cancel,
 	}
-	f.WriteString(fmt.Sprintf("reading creds from port: %d\n", srvPort))
+	_, _ = f.WriteString(fmt.Sprintf("reading creds from port: %d\n", srvPort))
 	client, err := clientFromNet(srvPort, s)
 	if err != nil {
-		f.WriteString(err.Error())
+		_, _ = f.WriteString(err.Error())
 		panic(err)
 	}
 	s.client = client
 	err = client.Start(ctx)
 	if err != nil {
-		f.WriteString(err.Error())
+		_, _ = f.WriteString(err.Error())
 		panic(err)
 	}
 	<-ctx.Done()
-	f.WriteString("finished \n")
+	_, _ = f.WriteString("finished \n")
 }
 
 type configServer struct {
@@ -60,41 +60,41 @@ type configServer struct {
 }
 
 func (s *configServer) OnConfig(cfgString string) {
-	s.client.Status(proto.StateObserved_CONFIGURING, "Writing config file", nil)
+	_ = s.client.Status(proto.StateObserved_CONFIGURING, "Writing config file", nil)
 
 	testCfg := &TestConfig{}
 	if err := yaml.Unmarshal([]byte(cfgString), &testCfg); err != nil {
-		s.client.Status(proto.StateObserved_FAILED, fmt.Sprintf("Failed to unmarshall config: %s", err), nil)
+		_ = s.client.Status(proto.StateObserved_FAILED, fmt.Sprintf("Failed to unmarshall config: %s", err), nil)
 		return
 	}
 
 	if testCfg.TestFile != "" {
 		tf, err := os.Create(testCfg.TestFile)
 		if err != nil {
-			s.client.Status(proto.StateObserved_FAILED, fmt.Sprintf("Failed to create file %s: %s", testCfg.TestFile, err), nil)
+			_ = s.client.Status(proto.StateObserved_FAILED, fmt.Sprintf("Failed to create file %s: %s", testCfg.TestFile, err), nil)
 			return
 		}
 
 		err = tf.Close()
 		if err != nil {
-			s.client.Status(proto.StateObserved_FAILED, fmt.Sprintf("Failed to close file %s: %s", testCfg.TestFile, err), nil)
+			_ = s.client.Status(proto.StateObserved_FAILED, fmt.Sprintf("Failed to close file %s: %s", testCfg.TestFile, err), nil)
 			return
 		}
 	}
 
-	s.client.Status(proto.StateObserved_HEALTHY, "Running", map[string]interface{}{
+	_ = s.client.Status(proto.StateObserved_HEALTHY, "Running", map[string]interface{}{
 		"status":  proto.StateObserved_HEALTHY,
 		"message": "Running",
 	})
 }
 
 func (s *configServer) OnStop() {
-	s.client.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+	_ = s.client.Status(proto.StateObserved_STOPPING, "Stopping", nil)
 	s.cancel()
 }
 
 func (s *configServer) OnError(err error) {
-	s.f.WriteString(err.Error())
+	_, _ = s.f.WriteString(err.Error())
 }
 
 // TestConfig is a configuration for testing Config calls
@@ -136,6 +136,7 @@ func clientFromNet(port int, impl client.StateInterface, actions ...client.Actio
 		ServerName:   connInfo.ServerName,
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
+		MinVersion:   tls.VersionTLS12,
 	})
 	return client.New(connInfo.Addr, connInfo.Token, impl, actions, grpc.WithTransportCredentials(trans)), nil
 }
