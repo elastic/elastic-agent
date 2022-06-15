@@ -32,12 +32,12 @@ func TestToComponents(t *testing.T) {
 		Result   []Component
 	}{
 		{
-			Name: "Empty policy",
+			Name:     "Empty policy",
 			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{},
+			Policy:   map[string]interface{}{},
 		},
 		{
-			Name: "Invalid: outputs as an array",
+			Name:     "Invalid: outputs as an array",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": []string{"should be a map"},
@@ -45,7 +45,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'outputs', expected a map not a []string",
 		},
 		{
-			Name: "Invalid: outputs entry as an array",
+			Name:     "Invalid: outputs entry as an array",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -55,7 +55,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'outputs.default', expected a map not a []string",
 		},
 		{
-			Name: "Invalid: outputs entry missing type",
+			Name:     "Invalid: outputs entry missing type",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -65,7 +65,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'outputs.default', 'type' missing",
 		},
 		{
-			Name: "Invalid: outputs entry type not a string",
+			Name:     "Invalid: outputs entry type not a string",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -77,7 +77,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'outputs.default.type', expected a string not a int",
 		},
 		{
-			Name: "Invalid: outputs entry type not a string",
+			Name:     "Invalid: outputs entry type not a string",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -90,7 +90,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'outputs.default.enabled', expected a bool not a string",
 		},
 		{
-			Name: "No inputs",
+			Name:     "No inputs",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -102,7 +102,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name: "Invalid: inputs as a map",
+			Name:     "Invalid: inputs as a map",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -116,7 +116,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs', expected an array not a map[string]interface {}",
 		},
 		{
-			Name: "Invalid: inputs entry as an array",
+			Name:     "Invalid: inputs entry as an array",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -132,7 +132,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0', expected a map not a []string",
 		},
 		{
-			Name: "Invalid: inputs entry missing type",
+			Name:     "Invalid: inputs entry missing type",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -148,7 +148,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0', 'type' missing",
 		},
 		{
-			Name: "Invalid: inputs entry type not a string",
+			Name:     "Invalid: inputs entry type not a string",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -166,7 +166,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.type', expected a string not a int",
 		},
 		{
-			Name: "Invalid: inputs entry missing id",
+			Name:     "Invalid: inputs entry missing id",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -184,7 +184,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0', 'id' missing",
 		},
 		{
-			Name: "Invalid: inputs entry id not a string",
+			Name:     "Invalid: inputs entry id not a string",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -203,7 +203,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.id', expected a string not a int",
 		},
 		{
-			Name: "Invalid: inputs entry use_output not a string",
+			Name:     "Invalid: inputs entry use_output not a string",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -223,7 +223,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.use_output', expected a string not a int",
 		},
 		{
-			Name: "Invalid: inputs entry use_output references unknown output",
+			Name:     "Invalid: inputs entry use_output references unknown output",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -243,7 +243,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.use_output', references an unknown output 'other'",
 		},
 		{
-			Name: "Invalid: inputs entry enabled not a bool",
+			Name:     "Invalid: inputs entry enabled not a bool",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -264,7 +264,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.enabled', expected a bool not a string",
 		},
 		{
-			Name: "Invalid: inputs unknown type",
+			Name:     "Invalid: inputs unknown type",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -358,18 +358,18 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name: "Invalid: inputs endpoint doesn't support logstash",
+			Name:     "Invalid: inputs endpoint doesn't support logstash",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
 					"default": map[string]interface{}{
-						"type":    "logstash",
+						"type": "logstash",
 					},
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
-						"type":       "endpoint",
-						"id":         "endpoint-0",
+						"type": "endpoint",
+						"id":   "endpoint-0",
 					},
 				},
 			},
@@ -452,7 +452,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name: "Output disabled",
+			Name:     "Output disabled",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -471,7 +471,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name: "Input disabled",
+			Name:     "Input disabled",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -490,7 +490,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name: "Simple representation",
+			Name:     "Simple representation",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -540,7 +540,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name: "Complex representation",
+			Name:     "Complex representation",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
