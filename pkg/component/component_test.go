@@ -364,15 +364,12 @@ func TestToComponents(t *testing.T) {
 				"outputs": map[string]interface{}{
 					"default": map[string]interface{}{
 						"type":    "logstash",
-						"enabled": true,
 					},
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
 						"type":       "endpoint",
 						"id":         "endpoint-0",
-						"use_output": "default",
-						"enabled":    true,
 					},
 				},
 			},
