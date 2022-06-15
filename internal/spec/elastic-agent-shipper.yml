@@ -3,4 +3,11 @@ cmd: elastic-agent-shipper
 args: []
 artifact: elastic-agent-shipper
 restart_on_output_change: true
-when: length(${shipper}) > 0
+
+rules:
+  - fix_stream: {}
+  - filter:
+      selectors:
+        - shipper
+
+when:  length(${shipper}) > 0

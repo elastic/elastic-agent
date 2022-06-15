@@ -402,8 +402,8 @@ shared:
         source: '{{.AgentDropPath}}/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz.sha512'
         mode: 0644
         skip_on_missing: true
-      'data/{{.BeatName}}-{{ commit_short }}/downloads/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz.asc':
-        source: '{{.AgentDropPath}}/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz.asc'
+      'data/{{.BeatName}}-{{ commit_short }}/downloads/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
+        source: '{{.AgentDropPath}}/elastic-agent-shipper-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
         mode: 0644
         skip_on_missing: true
       'data/{{.BeatName}}-{{ commit_short }}/downloads/cloudbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
