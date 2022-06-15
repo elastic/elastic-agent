@@ -51,7 +51,7 @@ const (
 	externalArtifacts = "EXTERNAL"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
-	specSuffix = ".spec.yml" // TODO: change after beat ignores yml config
+	specSuffix        = ".spec.yml" // TODO: change after beat ignores yml config
 )
 
 // Aliases for commands required by master makefile
@@ -776,7 +776,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			specName = specName[:idx]
 		}
 
-		if err := devtools.Copy(filepath.Join("specs", specName+".yml"), filepath.Join(dropPath, specName+specSuffix)); err != nil {
+		if err := devtools.Copy(filepath.Join("specs", specName+specSuffix), filepath.Join(dropPath, specName+specSuffix)); err != nil {
 			panic(err)
 		}
 	}
