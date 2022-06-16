@@ -219,7 +219,7 @@ pipeline {
         axes {
           axis {
             name 'K8S_VERSION'
-            values "v1.24.0, v1.23.6, v1.22.9, v1.21.12"
+            values "v1.24.0", "v1.23.6", "v1.22.9", "v1.21.12"
           }
         }
         stages {
