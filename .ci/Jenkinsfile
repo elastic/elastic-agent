@@ -51,6 +51,7 @@ pipeline {
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc)' ], shouldMatchAll: false).toString())
+          setEnvVar('BEAT_VERSION', sh(label: 'Get elastic agent version', script: 'make get-version', returnStdout: true)?.trim())
         }
       }
     }
@@ -59,8 +60,6 @@ pipeline {
         withGithubNotify(context: "Check") {
           withMageEnv(){
            dir("${BASE_DIR}"){
-              setEnvVar('BEAT_VERSION', sh(label: 'Get beat version', script: 'make get-version', returnStdout: true)?.trim())
-              log(level: 'INFO', text: "env.BEAT_VERSION=${env.BEAT_VERSION}")
               cmd(label: 'check', script: 'make check-ci')
             }
           }
@@ -240,7 +239,7 @@ pipeline {
     }
     stage('e2e tests') {
       when {
-        // Always when running builds on branches/tags
+        // Always when running builds on branches/tags, if so, then it runs sync to support the DRA
         // Enable if e2e related changes.
         beforeAgent true
         anyOf {
@@ -250,13 +249,13 @@ pipeline {
         }
       }
       steps {
-        // TODO: what's the testMatrixFile to be used if any
-        runE2E(testMatrixFile: '',
-               beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
+        runE2E(beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                gitHubCheckName: "e2e-tests",
                gitHubCheckRepo: env.REPO,
-               gitHubCheckSha1: env.GIT_BASE_COMMIT)
+               gitHubCheckSha1: env.GIT_BASE_COMMIT,
+               propagate: !isPR(),
+               wait: !isPR())
       }
     }
   }
