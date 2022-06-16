@@ -97,10 +97,7 @@ func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *c
 			}
 
 			output, _ := c.Flags().GetString("output")
-			switch output {
-			case "yaml":
-			case "json":
-			default:
+			if _, ok := diagOutputs[output]; !ok {
 				return fmt.Errorf("unsupported output: %s", output)
 			}
 
@@ -788,7 +785,6 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf, ts time.Time)
 }
 
 func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse, ts time.Time) error {
-	//nolint:staticcheck,wastedassign // false positive
 	_, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "metrics/",
 		Method:   zip.Deflate,
