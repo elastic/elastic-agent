@@ -41,7 +41,7 @@ func (s *Spec) Validate() error {
 		for _, platform := range input.Platforms {
 			for _, existing := range a {
 				if existing == platform {
-					return fmt.Errorf("input %s at inputs.%d defines the same platform as a previous definition", input.Name, i)
+					return fmt.Errorf("input '%s' at inputs.%d defines the same platform as a previous definition", input.Name, i)
 				}
 			}
 			a = append(a, platform)

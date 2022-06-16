@@ -38,7 +38,7 @@ import (
 func TestExportedMetrics(t *testing.T) {
 	programName := "testing"
 	expectedMetricsName := "metric_name"
-	component.SupportedMap[programName] = component.Spec{
+	component.Supported[programName] = component.Spec{
 		ProgramSpec: spec.Spec{
 			ExportedMetrics: []string{expectedMetricsName},
 		},
@@ -68,7 +68,7 @@ func TestExportedMetrics(t *testing.T) {
 	}
 
 	require.True(t, exportedMetricFound, "exported metric not found")
-	delete(component.SupportedMap, programName)
+	delete(component.Supported, programName)
 }
 
 func TestGenerateSteps(t *testing.T) {

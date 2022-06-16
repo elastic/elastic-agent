@@ -184,7 +184,7 @@ func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) 
 
 	for _, step := range steps {
 		if !strings.EqualFold(step.ProgramSpec.CommandName(), monitoringName) {
-			if _, isSupported := component.SupportedMap[step.ProgramSpec.CommandName()]; !isSupported {
+			if _, isSupported := component.Supported[step.ProgramSpec.CommandName()]; !isSupported {
 				// mark failed, new config cannot be run
 				msg := fmt.Sprintf("program '%s' is not supported", step.ProgramSpec.CommandName())
 				o.statusReporter.Update(state.Failed, msg, nil)

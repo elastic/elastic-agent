@@ -43,7 +43,7 @@ const (
 
 var (
 	configFilePattern          = regexp.MustCompile(`.*\.yml$|.*\.yml\.disabled$`)
-	componentConfigFilePattern = regexp.MustCompile(`.*beat\.spec\.yml$|.*beat\.yml$|apm-server\.yml|apm-server\.spec\.yml|elastic-agent\.yml$$`)
+	componentConfigFilePattern = regexp.MustCompile(`.*beat\.spec\.yml$|.*beat\.yml$|apm-server\.yml$|apm-server\.spec\.yml$|elastic-agent\.yml$`)
 )
 
 // PackageType defines the file format of the package (e.g. zip, rpm, etc).
@@ -822,19 +822,15 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return err
 		}
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
-			header.SetMode(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
-			header.SetMode(0755)
-		}
-
-		// is config file
-		if pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()) {
-			header.SetMode(pkgFile.ConfigMode & os.ModePerm)
-		}
-
-		if componentConfigFilePattern.MatchString(info.Name()) {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
 			header.SetMode(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.SetMode(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
+			header.SetMode(pkgFile.Mode & os.ModePerm)
+		case info.IsDir():
+			header.SetMode(0755)
 		}
 
 		if filepath.IsAbs(pkgFile.Target) {
@@ -898,19 +894,19 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		header.Uname, header.Gname = "root", "root"
 		header.Uid, header.Gid = 0, 0
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
+			header.Mode = int64(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
 			header.Mode = int64(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
+		case info.IsDir():
 			header.Mode = int64(0755)
 		}
 
-		// is config file
-		if pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()) {
-			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
-		}
-
-		if componentConfigFilePattern.MatchString(info.Name()) {
-			header.Mode = int64(componentConfigMode & os.ModePerm)
+		if strings.Contains(info.Name(), "disabled") {
+			log.Println(">>>>>", info.Name(), pkgFile.ConfigMode, "matches", configFilePattern.MatchString(info.Name()), "or", componentConfigFilePattern.MatchString(info.Name()))
 		}
 
 		if filepath.IsAbs(pkgFile.Target) {
@@ -976,19 +972,15 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Uname, header.Gname = "root", "root"
 		header.Uid, header.Gid = 0, 0
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
-			header.Mode = int64(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
-			header.Mode = int64(0755)
-		}
-
-		// is config file
-		if pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()) {
-			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
-		}
-
-		if componentConfigFilePattern.MatchString(info.Name()) {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
 			header.Mode = int64(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
+			header.Mode = int64(pkgFile.Mode & os.ModePerm)
+		case info.IsDir():
+			header.Mode = int64(0755)
 		}
 
 		header.Name = filepath.Join(baseDir, pkgFile.Target)

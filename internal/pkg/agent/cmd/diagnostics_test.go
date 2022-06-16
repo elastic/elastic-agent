@@ -95,7 +95,7 @@ func init() {
 func Test_collectEndpointSecurityLogs(t *testing.T) {
 	root := filepath.Join("testdata", "diagnostics", "endpoint-security", "logs")
 
-	specs := component.SupportedMap
+	specs := component.Supported
 	specs["endpoint-security"].ProgramSpec.LogPaths[runtime.GOOS] =
 		filepath.Join(root, "endpoint-*.log")
 
@@ -134,7 +134,7 @@ func Test_collectEndpointSecurityLogs(t *testing.T) {
 func Test_collectEndpointSecurityLogs_noEndpointSecurity(t *testing.T) {
 	root := filepath.Join("doesNotExist")
 
-	specs := component.SupportedMap
+	specs := component.Supported
 	specs["endpoint-security"].ProgramSpec.LogPaths["linux"] =
 		filepath.Join(root, "endpoint-*.log")
 

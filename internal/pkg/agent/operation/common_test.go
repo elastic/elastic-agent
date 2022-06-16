@@ -101,7 +101,7 @@ func getLogger() *logger.Logger {
 }
 
 func getProgram(binary, version string) *app.Descriptor {
-	spec := component.SupportedMap[binary]
+	spec := component.Supported[binary]
 	downloadCfg := &artifact.Config{
 		InstallPath:     installPath,
 		OperatingSystem: "darwin",

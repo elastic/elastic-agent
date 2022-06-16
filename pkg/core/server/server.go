@@ -21,9 +21,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/gofrs/uuid"
-	protobuf "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	protobuf "google.golang.org/protobuf/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -99,6 +99,8 @@ type Handler interface {
 
 // Server is the GRPC server that the launched applications connect back to.
 type Server struct {
+	proto.UnimplementedElasticAgentServer
+
 	logger     *logger.Logger
 	ca         *authority.CertificateAuthority
 	listenAddr string
@@ -154,6 +156,7 @@ func (s *Server) Start() error {
 		ClientAuth:     tls.RequireAndVerifyClientCert,
 		ClientCAs:      certPool,
 		GetCertificate: s.getCertificate,
+		MinVersion:     tls.VersionTLS12,
 	})
 	if s.tracer != nil {
 		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(s.tracer))
@@ -197,7 +200,10 @@ func (s *Server) Stop() {
 func (s *Server) Get(app interface{}) (*ApplicationState, bool) {
 	var foundState *ApplicationState
 	s.apps.Range(func(_ interface{}, val interface{}) bool {
-		as := val.(*ApplicationState)
+		as, ok := val.(*ApplicationState)
+		if !ok {
+			return true
+		}
 		if as.app == app {
 			foundState = as
 			return false
@@ -211,7 +217,10 @@ func (s *Server) Get(app interface{}) (*ApplicationState, bool) {
 func (s *Server) FindByInputType(inputType string) (*ApplicationState, bool) {
 	var foundState *ApplicationState
 	s.apps.Range(func(_ interface{}, val interface{}) bool {
-		as := val.(*ApplicationState)
+		as, ok := val.(*ApplicationState)
+		if !ok {
+			return true
+		}
 		if as.inputTypes == nil {
 			return true
 		}
@@ -383,6 +392,11 @@ func (s *Server) Checkin(server proto.ElasticAgent_CheckinServer) error {
 
 	<-sendDone
 	return nil
+}
+
+// CheckinV2 implements the GRPC bi-direction stream connection for v2 check-ins.
+func (s *Server) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
+	return errors.New("not implemented")
 }
 
 // Actions implements the GRPC bi-direction stream connection for actions.
@@ -883,7 +897,10 @@ func (s *Server) watchdog() {
 
 		now := time.Now().UTC()
 		s.apps.Range(func(_ interface{}, val interface{}) bool {
-			serverApp := val.(*ApplicationState)
+			serverApp, ok := val.(*ApplicationState)
+			if !ok {
+				return true
+			}
 			serverApp.checkinLock.RLock()
 			statusTime := serverApp.statusTime
 			serverApp.checkinLock.RUnlock()
@@ -934,7 +951,10 @@ func (s *Server) getByToken(token string) (*ApplicationState, bool) {
 func (s *Server) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	var cert *tls.Certificate
 	s.apps.Range(func(_ interface{}, val interface{}) bool {
-		sa := val.(*ApplicationState)
+		sa, ok := val.(*ApplicationState)
+		if !ok {
+			return true
+		}
 		if sa.srvName == chi.ServerName {
 			cert = sa.cert.Certificate
 			return false

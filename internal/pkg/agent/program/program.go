@@ -68,25 +68,24 @@ func Programs(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singl
 }
 
 // DetectPrograms returns the list of programs detected from the provided configuration.
-func DetectPrograms(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singleConfig *transpiler.AST) ([]Program, error) {
+func DetectPrograms(agentInfo transpiler.AgentInfo, components component.ComponentSet, singleConfig *transpiler.AST) ([]Program, error) {
 	programs := make([]Program, 0)
-	for _, dpu := range dpus {
-		for _, dp := range dpu {
-			specificAST := singleConfig.Clone()
-			ok, err := DetectProgram(dp.Spec.ProgramSpec.Rules, dp.Spec.ProgramSpec.When, dp.Spec.ProgramSpec.Constraints, agentInfo, specificAST)
-			if err != nil {
-				return nil, err
-			}
-			if !ok {
-				continue
-			}
-			program := Program{
-				Spec:   dp.Spec,
-				Config: specificAST,
-			}
-			programs = append(programs, program)
+	for _, dp := range components {
+		specificAST := singleConfig.Clone()
+		ok, err := DetectProgram(dp.ProgramSpec.Rules, dp.ProgramSpec.When, dp.ProgramSpec.Constraints, agentInfo, specificAST)
+		if err != nil {
+			return nil, err
 		}
+		if !ok {
+			continue
+		}
+		program := Program{
+			Spec:   dp,
+			Config: specificAST,
+		}
+		programs = append(programs, program)
 	}
+
 	return programs, nil
 
 }
@@ -129,12 +128,11 @@ func DetectProgram(rules *transpiler.RuleList, when string, constraints string, 
 
 // KnownProgramNames returns a list of runnable programs by the elastic-agent.
 func KnownProgramNames() []string {
-	names := make([]string, len(component.Supported))
-	for _, d := range component.Supported {
-		for idx, program := range d {
-			names[idx] = program.Name
-		}
+	names := make([]string, 0, len(component.Supported))
+	for name := range component.Supported {
+		names = append(names, name)
 	}
+
 	return names
 }
 

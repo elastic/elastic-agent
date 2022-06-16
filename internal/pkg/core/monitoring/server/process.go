@@ -187,7 +187,7 @@ func parseID(id string) (programDetail, error) {
 		return detail, errorfWithStatus(http.StatusBadRequest, "provided ID is not valid")
 	}
 
-	for p, spec := range component.SupportedMap {
+	for p, spec := range component.Supported {
 		if !strings.HasPrefix(id, p+separator) {
 			continue
 		}

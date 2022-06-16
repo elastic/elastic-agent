@@ -9,8 +9,38 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoadRuntimeSpecs(t *testing.T) {
+	for _, platform := range GlobalPlatforms {
+		t.Run(platform.String(), func(t *testing.T) {
+			detail := PlatformDetail{
+				Platform: platform,
+			}
+			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), detail, SkipBinaryCheck())
+			require.NoError(t, err)
+			assert.Greater(t, len(runtime.inputTypes), 0)
+			assert.Greater(t, len(runtime.inputSpecs), 0)
+
+			// filestream is supported by all platforms
+			input, err := runtime.GetInput("filestream")
+			require.NoError(t, err)
+			assert.NotNil(t, input)
+
+			// unknown input
+			_, err = runtime.GetInput("unknown")
+			require.ErrorIs(t, err, ErrInputNotSupported)
+
+			// endpoint not support on container platforms
+			if platform.OS == "container" {
+				_, err = runtime.GetInput("endpoint")
+				assert.ErrorIs(t, err, ErrInputNotSupportedOnPlatform)
+			}
+		})
+	}
+}
 
 func TestLoadSpec_Components(t *testing.T) {
 	scenarios := []struct {

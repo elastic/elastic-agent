@@ -24,6 +24,7 @@ inputs:
         - "logging.level=debug"
         - "-E"
         - "gc_percent=${OSQUERYBEAT_GOGC:100}"
+
 # backward compatibility, remove with new inputs
 restart_on_output_change: true
 action_input_types:
@@ -60,4 +61,3 @@ rules:
 
 when: length(${inputs}) > 0 and hasKey(${output}, 'elasticsearch')
 constraints: ${runtime.arch} != '386'
-

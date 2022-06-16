@@ -205,7 +205,7 @@ func (o *Operator) generateMonitoringSteps(version, outputType string, output in
 }
 
 func loadSpecFromSupported(processName string) component.Spec {
-	if loadedSpec, found := component.SupportedMap[strings.ToLower(processName)]; found {
+	if loadedSpec, found := component.Supported[strings.ToLower(processName)]; found {
 		return loadedSpec
 	}
 
@@ -661,7 +661,7 @@ func normalizeHTTPCopyRules(name string) []map[string]interface{} {
 		},
 	}
 
-	spec, found := component.SupportedMap[name]
+	spec, found := component.Supported[name]
 	if !found {
 		return fromToMap
 	}

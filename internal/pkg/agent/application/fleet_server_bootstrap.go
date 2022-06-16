@@ -220,11 +220,11 @@ func emit(ctx context.Context, log *logger.Logger, components component.Componen
 		}),
 	}), "inputs")
 
-	if len(components[component.FLEET_SERVER]) == 0 {
+	if _, found := components[component.FleetServerName]; !found {
 		return errors.New("missing required fleet-server program specification")
 	}
 
-	spec := components[component.FLEET_SERVER][0].Spec
+	spec := components[component.FleetServerName]
 	ok, err := program.DetectProgram(spec.ProgramSpec.Rules, spec.ProgramSpec.When, spec.ProgramSpec.Constraints, agentInfo, ast)
 	if err != nil {
 		return errors.New(err, "failed parsing the configuration")

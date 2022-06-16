@@ -4,20 +4,18 @@
 
 package component
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+)
 
-type ComponentSet map[ComponentType][]Component
+type ComponentSet map[string]Spec
 
-var Supported ComponentSet       // TODO: remove later , change logic to use injected DPUs
-var SupportedMap map[string]Spec // TODO: remove later , change logic to use injected DPUs
+var Supported ComponentSet // TODO: remove later , change logic to use injected DPUs
 
-const fleetServerName = "fleet-server"
+const FleetServerName = "fleet-server"
 
 func LoadComponents(path string) (ComponentSet, error) {
-	dps := make(map[ComponentType][]Component)
-	dps[OUTPUT] = make([]Component, 0)
-	dps[INPUT] = make([]Component, 0)
-	dps[FLEET_SERVER] = make([]Component, 0)
+	dps := make(ComponentSet)
 
 	// load specs from location
 	specs, err := ReadSpecs(path)
@@ -26,33 +24,9 @@ func LoadComponents(path string) (ComponentSet, error) {
 	}
 
 	for _, s := range specs {
-		t := INPUT
-		if len(s.Outputs) > 0 {
-			t = OUTPUT
-		} else if s.Name == fleetServerName {
-			t = FLEET_SERVER
-		}
-
-		dp := Component{
-			Type: t,
-			Name: s.Name,
-			Spec: s,
-		}
-
-		dps[t] = append(dps[t], dp)
+		dps[s.Name] = s
 	}
 
 	Supported = dps
-	SupportedMap = make(map[string]Spec)
-	for _, dt := range dps {
-		for _, dp := range dt {
-			SupportedMap[dp.Spec.Name] = dp.Spec
-		}
-	}
 	return dps, nil
-}
-
-// DetectNeededDPUs provides a list of needed DPUs (those we need to run or keep running) based on current config.
-func (dps *ComponentSet) DetectNeededDPUs(t ComponentType, config map[string]interface{}) ([]Component, error) {
-	return nil, nil
 }
