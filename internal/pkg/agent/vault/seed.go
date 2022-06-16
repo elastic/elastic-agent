@@ -12,12 +12,22 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
-const seedFile = ".seed"
+const (
+	seedFile = ".seed"
+)
+
+var (
+	mxSeed sync.Mutex
+)
 
 func getSeed(path string) ([]byte, error) {
 	fp := filepath.Join(path, seedFile)
+
+	mxSeed.Lock()
+	defer mxSeed.Unlock()
 
 	b, err := ioutil.ReadFile(fp)
 	if err != nil {
