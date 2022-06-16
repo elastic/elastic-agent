@@ -116,6 +116,7 @@ func TestReporter(t *testing.T) {
 		assert.Equal(t, time.Time{}, s.UpdateTime)
 	})
 
+	//nolint:dupl // test case
 	t.Run("Check agent status one component degraded", func(t *testing.T) {
 		r := NewController(l)
 		r1 := r.RegisterComponent("r1")
@@ -141,7 +142,7 @@ func TestReporter(t *testing.T) {
 
 		r1.Update(state.Healthy, "", nil)
 		r2.Update(state.Failed, "failed", nil)
-		r3.Update(state.Healthy, "", nil)
+		r3.Update(state.Degraded, "degraded", nil)
 
 		s := r.Status()
 		assert.Equal(t, Failed, s.Status)
