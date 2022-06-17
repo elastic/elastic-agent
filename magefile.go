@@ -423,12 +423,14 @@ func Package() {
 
 	packageAgent(requiredPackages, devtools.UseElasticAgentPackaging)
 }
+
 func getPackageName(beat, version, pkg string) (string, string) {
 	if _, ok := os.LookupEnv(snapshotEnv); ok {
 		version += "-SNAPSHOT"
 	}
 	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
 }
+
 func requiredPackagesPresent(basePath, beat, version string, requiredPackages []string) bool {
 	for _, pkg := range requiredPackages {
 		_, packageName := getPackageName(beat, version, pkg)
@@ -666,8 +668,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 	}
 
 	dropPath, found := os.LookupEnv(agentDropPath)
-	archivePath := filepath.Join(dropPath, "archives")
-	os.MkdirAll(archivePath, 0755)
+	var archivePath string
 
 	// build deps only when drop is not provided
 	if !found || len(dropPath) == 0 {
@@ -678,10 +679,10 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			panic(err)
 		}
 
-		if err := os.MkdirAll(dropPath, 0755); err != nil {
-			panic(err)
-		}
+		archivePath = filepath.Join(dropPath, "archives")
+		os.MkdirAll(archivePath, 0755)
 
+		defer os.RemoveAll(dropPath)
 		os.Setenv(agentDropPath, dropPath)
 
 		// cleanup after build
@@ -724,67 +725,113 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 
 				// copy to new drop
 				sourcePath := filepath.Join(pwd, "build", "distributions")
-				if err := copyAll(sourcePath, archivePath); err != nil {
+				for _, rp := range requiredPackages {
+					files, err := filepath.Glob(filepath.Join(sourcePath, "*"+rp+"*"))
+					if err != nil {
+						panic(err)
+					}
+
+					targetPath := filepath.Join(archivePath, rp)
+					os.MkdirAll(targetPath, 0755)
+					for _, f := range files {
+						targetFile := filepath.Join(targetPath, filepath.Base(f))
+						if err := sh.Copy(targetFile, f); err != nil {
+							panic(err)
+						}
+					}
+				}
+			}
+		}
+	} else {
+		archivePath = filepath.Join(dropPath, "archives")
+		os.MkdirAll(archivePath, 0755)
+
+		// move archives to archive path
+		matches, err := filepath.Glob(filepath.Join(dropPath, "*tar.gz*"))
+		if err != nil {
+			panic(err)
+		}
+		zipMatches, err := filepath.Glob(filepath.Join(dropPath, "*zip*"))
+		if err != nil {
+			panic(err)
+		}
+		matches = append(matches, zipMatches...)
+
+		for _, f := range matches {
+			for _, rp := range requiredPackages {
+				if !strings.Contains(f, rp) {
+					continue
+				}
+
+				targetPath := filepath.Join(archivePath, rp)
+				if err := os.Rename(f, filepath.Join(targetPath, filepath.Base(f))); err != nil {
 					panic(err)
 				}
 			}
 		}
 	}
-	defer os.RemoveAll(dropPath)
+	defer os.RemoveAll(archivePath)
 
 	// create flat dir
 	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
 	os.MkdirAll(flatPath, 0755)
+	defer os.RemoveAll(flatPath)
 
-	// untar all
-	matches, err := filepath.Glob(filepath.Join(archivePath, "*tar.gz"))
-	if err != nil {
-		panic(err)
-	}
-	zipMatches, err := filepath.Glob(filepath.Join(archivePath, "*zip"))
-	if err != nil {
-		panic(err)
-	}
-	matches = append(matches, zipMatches...)
+	for _, rp := range requiredPackages {
+		targetPath := filepath.Join(archivePath, rp)
+		versionedFlatPath := filepath.Join(flatPath, rp)
+		versionedDropPath := filepath.Join(dropPath, rp)
+		os.MkdirAll(targetPath, 0755)
+		os.MkdirAll(versionedFlatPath, 0755)
+		os.MkdirAll(versionedDropPath, 0755)
 
-	for _, m := range matches {
-		if err := devtools.Extract(m, flatPath); err != nil {
+		// untar all
+		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
+		if err != nil {
 			panic(err)
 		}
-	}
+		zipMatches, err := filepath.Glob(filepath.Join(targetPath, "*zip"))
+		if err != nil {
+			panic(err)
+		}
+		matches = append(matches, zipMatches...)
 
-	os.RemoveAll(archivePath)
-
-	files, err := filepath.Glob(filepath.Join(flatPath, "*"))
-	if err != nil {
-		panic(err)
-	}
-
-	for _, f := range files {
-		options := copy.Options{
-			OnSymlink: func(_ string) copy.SymlinkAction {
-				return copy.Shallow
-			},
-			Sync: true,
+		for _, m := range matches {
+			if err := devtools.Extract(m, versionedFlatPath); err != nil {
+				panic(err)
+			}
 		}
 
-		err = copy.Copy(f, dropPath, options)
+		files, err := filepath.Glob(filepath.Join(versionedFlatPath, "*"))
 		if err != nil {
 			panic(err)
 		}
 
-		// cope spec file for match
-		specName := filepath.Base(f)
-		idx := strings.Index(specName, "-"+version)
-		if idx != -1 {
-			specName = specName[:idx]
-		}
+		for _, f := range files {
+			options := copy.Options{
+				OnSymlink: func(_ string) copy.SymlinkAction {
+					return copy.Shallow
+				},
+				Sync: true,
+			}
 
-		if err := devtools.Copy(filepath.Join("specs", specName+specSuffix), filepath.Join(dropPath, specName+specSuffix)); err != nil {
-			panic(err)
+			err = copy.Copy(f, versionedDropPath, options)
+			if err != nil {
+				panic(err)
+			}
+
+			// cope spec file for match
+			specName := filepath.Base(f)
+			idx := strings.Index(specName, "-"+version)
+			if idx != -1 {
+				specName = specName[:idx]
+			}
+
+			if err := devtools.Copy(filepath.Join("specs", specName+specSuffix), filepath.Join(versionedDropPath, specName+specSuffix)); err != nil {
+				panic(err)
+			}
 		}
 	}
-	os.RemoveAll(flatPath)
 
 	// package agent
 	packagingFn()
@@ -817,7 +864,7 @@ func selectedPackageTypes() string {
 	return "PACKAGES=targz,zip"
 }
 
-func copyAll(from, to string) error {
+func copyAll(from, to string, suffixes ...[]string) error {
 	return filepath.Walk(from, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

@@ -65,7 +65,7 @@ shared:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/components:
-        source: '{{.AgentDropPath}}/'
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
@@ -116,7 +116,7 @@ shared:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
       /etc/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/components:
-        source: '{{.AgentDropPath}}/'
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
@@ -159,7 +159,7 @@ shared:
     files:
       <<: *agent_binary_files
       'data/{{.BeatName}}-{{ commit_short }}/components':
-        source: '{{.AgentDropPath}}/'
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
@@ -171,7 +171,7 @@ shared:
     files:
       <<: *agent_binary_files
       'data/{{.BeatName}}-{{ commit_short }}/components':
-        source: '{{.AgentDropPath}}/'
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/'
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
@@ -186,7 +186,7 @@ shared:
       user: '{{ .BeatName }}'
       linux_capabilities: ''
       image_name: ''
-      beats_install_path: "install"
+      beats_install_path: "install"   
     files:
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
@@ -196,6 +196,14 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
+      'data/cloud_downloads/metricbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/metricbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+        mode: 0755
+        skip_on_missing: true
+      'data/cloud_downloads/filebeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/filebeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+        mode: 0755
+        skip_on_missing: true
 
   - &agent_docker_arm_spec
     <<: *agent_docker_spec
