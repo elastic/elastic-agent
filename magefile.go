@@ -864,7 +864,7 @@ func selectedPackageTypes() string {
 	return "PACKAGES=targz,zip"
 }
 
-func copyAll(from, to string, suffixes ...[]string) error {
+func copyAll(from, to string) error {
 	return filepath.Walk(from, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
