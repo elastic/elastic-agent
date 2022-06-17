@@ -59,6 +59,10 @@ metricbeat:
           fields:
             should_be: first
       - add_fields:
+          target: "@metadata"
+          fields:
+            input_id: apache-metrics-id
+      - add_fields:
           target: "data_stream"
           fields:
             type: metrics

@@ -8,6 +8,10 @@ filebeat:
     processors:
     - add_fields:
         fields:
+          input_id: logfile-1
+        target: '@metadata'
+    - add_fields:
+        fields:
           dataset: generic
           namespace: default
           type: logs
@@ -35,6 +39,10 @@ filebeat:
     - /var/log/hello3.log
     - /var/log/hello4.log
     processors:
+    - add_fields:
+        fields:
+          input_id: logfile-2
+        target: '@metadata'
     - add_fields:
         fields:
           dataset: generic
