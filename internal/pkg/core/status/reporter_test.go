@@ -134,6 +134,7 @@ func TestReporter(t *testing.T) {
 		assert.NotEqual(t, time.Time{}, s.UpdateTime)
 	})
 
+	//nolint:dupl // test case
 	t.Run("Check agent status one component failed", func(t *testing.T) {
 		r := NewController(l)
 		r1 := r.RegisterComponent("r1")
