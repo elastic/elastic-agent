@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package fleet handles interactions between the elastic-agent and fleet-server.
+// Specifically it will handle agent checkins, and action queueing/dispatch.
 package fleet
 
 import (
@@ -303,7 +305,7 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 			}
 			if f.checkinFailCounter > 1 {
 				// Update status reporter for gateway to degraded when there are two consecutive failures.
-				// Note that this may not propogate to fleet-server as the agent is having issues checking in.
+				// Note that this may not propagate to fleet-server as the agent is having issues checking in.
 				// It may also (falsely) report a degraded session for 30s if it is eventually successful.
 				// However this component will allow the agent to report fleet gateway degredation locally.
 				f.statusReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
