@@ -191,7 +191,7 @@ func (a *ActionPolicyChange) Expiration() (time.Time, error) {
 
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
-	ActionID         string `yaml:"action_id"`
+	ActionID         string `yaml:"id"`
 	ActionType       string `yaml:"type"`
 	ActionStartTime  string `json:"start_time" yaml:"start_time,omitempty"` // TODO change to time.Time in unmarshal
 	ActionExpiration string `json:"expiration" yaml:"expiration,omitempty"`

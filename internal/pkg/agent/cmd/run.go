@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -122,6 +123,16 @@ func run(override cfgOverrider) error {
 	// This is needed for compatibility with agent running in standalone mode,
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
 	err = secret.CreateAgentSecret()
+	if err != nil {
+		return err
+	}
+
+	// Check if the fleet.yml or state.yml exists and encrypt them.
+	// This is needed to handle upgrade properly.
+	// On agent upgrade the older version for example 8.2 unpacks the 8.3 agent
+	// and tries to run it.
+	// The new version of the agent requires encrypted configuration files or it will not start and upgrade will fail and revert.
+	err = encryptConfigIfNeeded(logger)
 	if err != nil {
 		return err
 	}
@@ -475,4 +486,85 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 		ServiceEnvironment: cfg.Environment,
 		Transport:          ts,
 	})
+}
+
+// encryptConfigIfNeeded encrypts fleet.yml or state.yml if fleet.enc or state.enc does not exist already.
+func encryptConfigIfNeeded(log *logger.Logger) (err error) {
+	log.Debug("encrypt config if needed")
+
+	files := []struct {
+		Src string
+		Dst string
+	}{
+		{
+			Src: paths.AgentStateStoreYmlFile(),
+			Dst: paths.AgentStateStoreFile(),
+		},
+		{
+			Src: paths.AgentConfigYmlFile(),
+			Dst: paths.AgentConfigFile(),
+		},
+	}
+	for _, f := range files {
+		var b []byte
+
+		log.Debugf("check if the file %v exists", f.Dst)
+		exists, err := fileExists(f.Dst)
+		if err != nil {
+			// log and continue
+			log.Debugf("failed to access file %v", f.Dst)
+			err = nil
+		}
+
+		// If .enc file already exists, continue
+		if exists {
+			log.Debugf("file %v already exists", f.Dst)
+			continue
+		}
+
+		log.Debugf("read file: %v", f.Src)
+		b, err = ioutil.ReadFile(f.Src)
+		if err != nil {
+			log.Debugf("read file: %v, err: %v", f.Src, err)
+			if os.IsNotExist(err) {
+				log.Debugf("file: %v doesn't exists, continue", f.Src)
+				continue
+			}
+			return err
+		}
+
+		// Encrypt yml file
+		log.Debugf("encrypt file %v into %v", f.Src, f.Dst)
+		store := storage.NewEncryptedDiskStore(f.Dst)
+		err = store.Save(bytes.NewReader(b))
+		if err != nil {
+			log.Debugf("failed to encrypt file: %v, err: %v", f.Dst, err)
+			return err
+		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Remove state.yml file if no errors
+	fp := paths.AgentStateStoreYmlFile()
+	if err := os.Remove(fp); err != nil {
+		// Log only
+		log.Warnf("failed to remove file: %s, err: %v", fp, err)
+	}
+
+	// The agent can't remove fleet.yml, because it can be rolled back by the older version of the agent "watcher"
+	// and pre 8.3 version needs unencrypted fleet.yml file in order to start.
+
+	return nil
+}
+
+func fileExists(fp string) (ok bool, err error) {
+	if _, err = os.Stat(fp); err == nil {
+		ok = true
+	} else if os.IsNotExist(err) {
+		err = nil
+	}
+	return
 }
