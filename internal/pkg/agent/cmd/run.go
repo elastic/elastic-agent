@@ -513,7 +513,6 @@ func encryptConfigIfNeeded(log *logger.Logger) (err error) {
 		if err != nil {
 			// log and continue
 			log.Debugf("failed to access file %v", f.Dst)
-			err = nil
 		}
 
 		// If .enc file already exists, continue
@@ -566,5 +565,5 @@ func fileExists(fp string) (ok bool, err error) {
 	} else if os.IsNotExist(err) {
 		err = nil
 	}
-	return
+	return ok, err
 }
