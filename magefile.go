@@ -679,8 +679,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			panic(err)
 		}
 
-		archivePath = filepath.Join(dropPath, "archives")
-		os.MkdirAll(archivePath, 0755)
+		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 
 		defer os.RemoveAll(dropPath)
 		os.Setenv(agentDropPath, dropPath)
@@ -743,32 +742,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			}
 		}
 	} else {
-		archivePath = filepath.Join(dropPath, "archives")
-		os.MkdirAll(archivePath, 0755)
-
-		// move archives to archive path
-		matches, err := filepath.Glob(filepath.Join(dropPath, "*tar.gz*"))
-		if err != nil {
-			panic(err)
-		}
-		zipMatches, err := filepath.Glob(filepath.Join(dropPath, "*zip*"))
-		if err != nil {
-			panic(err)
-		}
-		matches = append(matches, zipMatches...)
-
-		for _, f := range matches {
-			for _, rp := range requiredPackages {
-				if !strings.Contains(f, rp) {
-					continue
-				}
-
-				targetPath := filepath.Join(archivePath, rp)
-				if err := os.Rename(f, filepath.Join(targetPath, filepath.Base(f))); err != nil {
-					panic(err)
-				}
-			}
-		}
+		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 	}
 	defer os.RemoveAll(archivePath)
 
@@ -797,6 +771,17 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		matches = append(matches, zipMatches...)
 
 		for _, m := range matches {
+			stat, err := os.Stat(m)
+			if os.IsNotExist(err) {
+				continue
+			} else if err != nil {
+				panic(errors.Wrap(err, "failed stating file"))
+			}
+
+			if stat.IsDir() {
+				continue
+			}
+
 			if err := devtools.Extract(m, versionedFlatPath); err != nil {
 				panic(err)
 			}
@@ -839,6 +824,48 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 	mg.Deps(Update)
 	mg.Deps(CrossBuild, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
+}
+
+func movePackagesToArchive(dropPath string, requiredPackages []string) string {
+	archivePath := filepath.Join(dropPath, "archives")
+	os.MkdirAll(archivePath, 0755)
+
+	// move archives to archive path
+	matches, err := filepath.Glob(filepath.Join(dropPath, "*tar.gz*"))
+	if err != nil {
+		panic(err)
+	}
+	zipMatches, err := filepath.Glob(filepath.Join(dropPath, "*zip*"))
+	if err != nil {
+		panic(err)
+	}
+	matches = append(matches, zipMatches...)
+
+	for _, f := range matches {
+		for _, rp := range requiredPackages {
+			if !strings.Contains(f, rp) {
+				continue
+			}
+
+			stat, err := os.Stat(f)
+			if os.IsNotExist(err) {
+				continue
+			} else if err != nil {
+				panic(errors.Wrap(err, "failed stating file"))
+			}
+
+			if stat.IsDir() {
+				continue
+			}
+
+			targetPath := filepath.Join(archivePath, rp)
+			if err := os.Rename(f, filepath.Join(targetPath, filepath.Base(f))); err != nil {
+				panic(errors.Wrap(err, "failed renaming file"))
+			}
+		}
+	}
+
+	return archivePath
 }
 
 func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
