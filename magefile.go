@@ -693,6 +693,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			for _, beat := range packedBeats {
 				for _, reqPackage := range requiredPackages {
 					targetPath := filepath.Join(archivePath, reqPackage)
+					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
 					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, targetPath)
 					if err != nil {
