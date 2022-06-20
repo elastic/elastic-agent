@@ -25,7 +25,6 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     tar xf {{ $beatHome }}/data/cloud_downloads/metricbeat-*.tar.gz -C /opt/metricbeat --strip-components=1 && \
     tar xf {{ $beatHome }}/data/cloud_downloads/filebeat-*.tar.gz -C /opt/filebeat --strip-components=1 && \
 {{- end }}
-    rm -rf {{ $beatHome }}/data/cloud_downloads && \
     true
 
 FROM {{ .from }}
