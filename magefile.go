@@ -692,8 +692,9 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			ctx := context.Background()
 			for _, beat := range packedBeats {
 				for _, reqPackage := range requiredPackages {
+					targetPath := filepath.Join(archivePath, reqPackage)
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
-					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, archivePath)
+					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, targetPath)
 					if err != nil {
 						panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
 					}
