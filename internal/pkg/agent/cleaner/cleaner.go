@@ -105,7 +105,7 @@ func (c *Cleaner) deleteFiles() {
 		c.log.Debugf("cleaner: delete file: %v", fp)
 		err := os.Remove(fp)
 		if err != nil {
-			c.log.Debugf("cleaner: delete file %v failed: %v", fp, err)
+			c.log.Warnf("cleaner: delete file %v failed: %v", fp, err)
 		}
 	}
 }

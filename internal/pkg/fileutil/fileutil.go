@@ -5,6 +5,8 @@
 package fileutil
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"time"
 )
@@ -13,7 +15,7 @@ import (
 func FileExists(fp string) (ok bool, err error) {
 	if _, err := os.Stat(fp); err == nil {
 		ok = true
-	} else if os.IsNotExist(err) {
+	} else if errors.Is(err, fs.ErrNotExist) {
 		err = nil
 	}
 	return ok, err
@@ -25,15 +27,15 @@ func GetModTime(fp string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	return fi.ModTime(), err
+	return fi.ModTime(), nil
 }
 
-// GetModTimeExists returns file modification time and existance status
+// GetModTimeExists returns file modification time and existence status
 // Returns no error if the file doesn't exists
 func GetModTimeExists(fp string) (modTime time.Time, exists bool, err error) {
 	modTime, err = GetModTime(fp)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return modTime, false, nil
 		}
 		return modTime, false, err
