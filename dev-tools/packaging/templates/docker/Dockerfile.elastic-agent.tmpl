@@ -17,6 +17,9 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     rm {{ $beatBinary }} && \
     ln -s {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent {{ $beatBinary }} && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/*beat && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/apm-server && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-endpoint && \
 {{- range $i, $modulesd := .ModulesDirs }}
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
