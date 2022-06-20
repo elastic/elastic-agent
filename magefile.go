@@ -763,8 +763,8 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 					continue
 				}
 
-				targetFile := filepath.Join(targetPath, filepath.Base(f))
-				if err := sh.Copy(targetFile, f); err != nil {
+				targetPath := filepath.Join(archivePath, rp)
+				if err := os.Rename(f, filepath.Join(targetPath, filepath.Base(f))); err != nil {
 					panic(err)
 				}
 			}
