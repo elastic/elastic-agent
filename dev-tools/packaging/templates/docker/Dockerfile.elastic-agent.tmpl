@@ -19,7 +19,6 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
 {{- range $i, $modulesd := .ModulesDirs }}
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
-    find {{ $beatHome }}/{{ $modulesd }} -name "*.yml*" -type f -exec chmod 0644 {} \; && \
 {{- end }}
 {{- if contains .image_name "-cloud" }}
     mkdir -p /opt/filebeat /opt/metricbeat && \
@@ -188,8 +187,6 @@ RUN chown {{ .user }} /app
 RUN chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components && \
     chown -R root:root {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*/*.yml && \
     chmod 0644 {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*/*.yml && \
-    find {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components -name "*.yml*" -type f -exec chown root:root {} \; && \
-    find {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
     # heartbeat requires cap_net_raw,cap_setuid to run ICMP checks and change npm user
     setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/heartbeat
 
