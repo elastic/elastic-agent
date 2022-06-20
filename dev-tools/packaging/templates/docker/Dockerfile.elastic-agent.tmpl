@@ -186,8 +186,10 @@ RUN chown {{ .user }} /app
 
 # Unpack beats to default install directory
 RUN chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components && \
-    chown -R root:root {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*.yml && \
-    chmod 0644 {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*.yml && \
+    chown -R root:root {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*/*.yml && \
+    chmod 0644 {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*/*.yml && \
+    find {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components -name "*.yml*" -type f -exec chown root:root {} \; && \
+    find {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
     # heartbeat requires cap_net_raw,cap_setuid to run ICMP checks and change npm user
     setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/heartbeat
 
