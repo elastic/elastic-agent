@@ -17,6 +17,7 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     rm {{ $beatBinary }} && \
     ln -s {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent {{ $beatBinary }} && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
+    setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/heartbeat && \
 {{- range $i, $modulesd := .ModulesDirs }}
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
@@ -181,13 +182,6 @@ RUN mkdir /app
 RUN chown {{ .user }} /app
 {{- end }}
 {{- end }}
-
-# Unpack beats to default install directory
-RUN chown -R {{ .user }}:{{ .user }} {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components && \
-    chown -R root:root {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*/*.yml && \
-    chmod 0644 {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/*/*.yml && \
-    # heartbeat requires cap_net_raw,cap_setuid to run ICMP checks and change npm user
-    setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/heartbeat
 
 USER {{ .user }}
 
