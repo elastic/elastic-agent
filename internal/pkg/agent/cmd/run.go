@@ -514,7 +514,7 @@ func encryptConfigIfNeeded(log *logger.Logger) (err error) {
 	for _, f := range files {
 		var b []byte
 
-		// Check if .yml file modification timestamp and existance
+		// Check if .yml file modification timestamp and existence
 		log.Debugf("check if the yml file %v exists", f.Src)
 		ymlModTime, ymlExists, err := fileutil.GetModTimeExists(f.Src)
 		if err != nil {
@@ -527,7 +527,7 @@ func encryptConfigIfNeeded(log *logger.Logger) (err error) {
 			continue
 		}
 
-		// Check if .enc file modification timestamp and existance
+		// Check if .enc file modification timestamp and existence
 		log.Debugf("check if the enc file %v exists", f.Dst)
 		encModTime, encExists, err := fileutil.GetModTimeExists(f.Dst)
 		if err != nil {

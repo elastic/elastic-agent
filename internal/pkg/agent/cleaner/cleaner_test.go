@@ -6,7 +6,6 @@ package cleaner
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -65,8 +64,5 @@ func checkDir(t *testing.T, dir string, expectedCount int) {
 
 	if len(entries) != expectedCount {
 		t.Fatalf("Dir %s expected %d entries, found %d", dir, expectedCount, len(entries))
-	}
-	for _, entry := range entries {
-		fmt.Println(entry.Name())
 	}
 }

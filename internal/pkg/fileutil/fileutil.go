@@ -12,13 +12,15 @@ import (
 )
 
 // FileExists returns true if file/dir exists
-func FileExists(fp string) (ok bool, err error) {
-	if _, err := os.Stat(fp); err == nil {
-		ok = true
-	} else if errors.Is(err, fs.ErrNotExist) {
-		err = nil
+func FileExists(fp string) (bool, error) {
+	_, err := os.Stat(fp)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
 	}
-	return ok, err
+	return true, nil
 }
 
 // GetModTime returns file modification time
@@ -32,8 +34,8 @@ func GetModTime(fp string) (time.Time, error) {
 
 // GetModTimeExists returns file modification time and existence status
 // Returns no error if the file doesn't exists
-func GetModTimeExists(fp string) (modTime time.Time, exists bool, err error) {
-	modTime, err = GetModTime(fp)
+func GetModTimeExists(fp string) (time.Time, bool, error) {
+	modTime, err := GetModTime(fp)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return modTime, false, nil
