@@ -17,7 +17,6 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     rm {{ $beatBinary }} && \
     ln -s {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent {{ $beatBinary }} && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
-    setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/{{.BeatName}}-{{ commit_short }}/components/heartbeat && \
 {{- range $i, $modulesd := .ModulesDirs }}
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
@@ -157,13 +156,16 @@ COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 COPY --from=home /opt /opt
 {{- end }}
 
+
+RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
 {{- if .linux_capabilities }}
 # Since the beat is stored at the other end of a symlink we must follow the symlink first
 # For security reasons setcap does not support symlinks. This is smart in the general case
 # but in our specific case since we're building a trusted image from trusted binaries this is
 # fine. Thus, we use readlink to follow the link and setcap on the actual binary
-RUN readlink -f {{ $beatBinary }} | xargs setcap {{ .linux_capabilities }}
+    readlink -f {{ $beatBinary }} | xargs setcap {{ .linux_capabilities }} && \
 {{- end }}
+true
 
 {{- if eq .user "root" }}
 {{- if contains .image_name "-cloud" }}
