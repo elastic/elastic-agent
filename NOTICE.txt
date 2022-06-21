@@ -5274,11 +5274,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sys
-Version: v0.0.0-20220405052023-b1e9470b6e64
+Version: v0.0.0-20220412211240-33da011f77ad
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.0.0-20220405052023-b1e9470b6e64/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.0.0-20220412211240-33da011f77ad/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -7110,11 +7110,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/containerd/containerd
-Version: v1.5.10
+Version: v1.5.13
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/containerd/containerd@v1.5.10/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/containerd/containerd@v1.5.13/LICENSE:
 
 
                                  Apache License
@@ -15120,11 +15120,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : go.uber.org/goleak
-Version: v1.1.11
+Version: v1.1.12
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.uber.org/goleak@v1.1.11/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.uber.org/goleak@v1.1.12/LICENSE:
 
 The MIT License (MIT)
 
