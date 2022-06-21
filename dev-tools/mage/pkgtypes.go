@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:goconst // avoiding const check for Deb/Zip
 package mage
 
 import (
@@ -16,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -36,6 +38,13 @@ const (
 
 	// defaultBinaryName specifies the output file for zip and tar.gz.
 	defaultBinaryName = "{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+
+	componentConfigMode os.FileMode = 0600
+)
+
+var (
+	configFilePattern          = regexp.MustCompile(`.*\.yml$|.*\.yml\.disabled$`)
+	componentConfigFilePattern = regexp.MustCompile(`.*beat\.spec\.yml$|.*beat\.yml$|apm-server\.yml$|apm-server\.spec\.yml$|elastic-agent\.yml$`)
 )
 
 // PackageType defines the file format of the package (e.g. zip, rpm, etc).
@@ -85,11 +94,12 @@ type PackageSpec struct {
 
 // PackageFile represents a file or directory within a package.
 type PackageFile struct {
-	Source        string                  `yaml:"source,omitempty"`          // Regular source file or directory.
-	Content       string                  `yaml:"content,omitempty"`         // Inline template string.
-	Template      string                  `yaml:"template,omitempty"`        // Input template file.
-	Target        string                  `yaml:"target,omitempty"`          // Target location in package. Relative paths are added to a package specific directory (e.g. metricbeat-7.0.0-linux-x86_64).
-	Mode          os.FileMode             `yaml:"mode,omitempty"`            // Target mode for file. Does not apply when source is a directory.
+	Source        string                  `yaml:"source,omitempty"`   // Regular source file or directory.
+	Content       string                  `yaml:"content,omitempty"`  // Inline template string.
+	Template      string                  `yaml:"template,omitempty"` // Input template file.
+	Target        string                  `yaml:"target,omitempty"`   // Target location in package. Relative paths are added to a package specific directory (e.g. metricbeat-7.0.0-linux-x86_64).
+	Mode          os.FileMode             `yaml:"mode,omitempty"`     // Target mode for file. Does not apply when source is a directory.
+	ConfigMode    os.FileMode             `yaml:"config_mode,omitempty"`
 	Config        bool                    `yaml:"config"`                    // Mark file as config in the package (deb and rpm only).
 	Modules       bool                    `yaml:"modules"`                   // Mark directory as directory with modules.
 	Dep           func(PackageSpec) error `yaml:"-" hash:"-" json:"-"`       // Dependency to invoke during Evaluate.
@@ -100,22 +110,22 @@ type PackageFile struct {
 
 // OSArchNames defines the names of architectures for use in packages.
 var OSArchNames = map[string]map[PackageType]map[string]string{
-	"windows": map[PackageType]map[string]string{
-		Zip: map[string]string{
+	"windows": {
+		Zip: {
 			"386":   "x86",
 			"amd64": "x86_64",
 		},
 	},
-	"darwin": map[PackageType]map[string]string{
-		TarGz: map[string]string{
+	"darwin": {
+		TarGz: {
 			"386":   "x86",
 			"amd64": "x86_64",
 			"arm64": "aarch64",
 			// "universal": "universal",
 		},
 	},
-	"linux": map[PackageType]map[string]string{
-		RPM: map[string]string{
+	"linux": {
+		RPM: {
 			"386":      "i686",
 			"amd64":    "x86_64",
 			"armv7":    "armhfp",
@@ -127,7 +137,7 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 			"s390x":    "s390x",
 		},
 		// https://www.debian.org/ports/
-		Deb: map[string]string{
+		Deb: {
 			"386":      "i386",
 			"amd64":    "amd64",
 			"armv5":    "armel",
@@ -140,7 +150,7 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 			"ppc64le":  "ppc64el",
 			"s390x":    "s390x",
 		},
-		TarGz: map[string]string{
+		TarGz: {
 			"386":      "x86",
 			"amd64":    "x86_64",
 			"armv5":    "armv5",
@@ -155,13 +165,13 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 			"ppc64le":  "ppc64le",
 			"s390x":    "s390x",
 		},
-		Docker: map[string]string{
+		Docker: {
 			"amd64": "amd64",
 			"arm64": "arm64",
 		},
 	},
-	"aix": map[PackageType]map[string]string{
-		TarGz: map[string]string{
+	"aix": {
+		TarGz: {
 			"ppc64": "ppc64",
 		},
 	},
@@ -443,7 +453,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 // ImageName computes the image name from the spec. A template for the image
 // name can be configured by adding image_name to extra_vars.
 func (s PackageSpec) ImageName() (string, error) {
-	if name, _ := s.ExtraVars["image_name"]; name != "" {
+	if name := s.ExtraVars["image_name"]; name != "" {
 		imageName, err := s.Expand(name)
 		if err != nil {
 			return "", errors.Wrapf(err, "failed to expand image_name")
@@ -670,14 +680,6 @@ func PackageTarGz(spec PackageSpec) error {
 	return errors.Wrap(CreateSHA512File(spec.OutputFile), "failed to create .sha512 file")
 }
 
-func replaceFileArch(filename string, pkgFile PackageFile, arch string) (string, PackageFile) {
-	filename = strings.ReplaceAll(filename, "universal", arch)
-	pkgFile.Source = strings.ReplaceAll(pkgFile.Source, "universal", arch)
-	pkgFile.Target = strings.ReplaceAll(pkgFile.Target, "universal", arch)
-
-	return filename, pkgFile
-}
-
 // PackageDeb packages a deb file. This requires Docker to execute FPM.
 func PackageDeb(spec PackageSpec) error {
 	return runFPM(spec, Deb)
@@ -821,9 +823,14 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			return err
 		}
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
+			header.SetMode(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.SetMode(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
 			header.SetMode(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
+		case info.IsDir():
 			header.SetMode(0755)
 		}
 
@@ -888,10 +895,19 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		header.Uname, header.Gname = "root", "root"
 		header.Uid, header.Gid = 0, 0
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
+			header.Mode = int64(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
 			header.Mode = int64(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
+		case info.IsDir():
 			header.Mode = int64(0755)
+		}
+
+		if strings.Contains(info.Name(), "disabled") {
+			log.Println(">>>>>", info.Name(), pkgFile.ConfigMode, "matches", configFilePattern.MatchString(info.Name()), "or", componentConfigFilePattern.MatchString(info.Name()))
 		}
 
 		if filepath.IsAbs(pkgFile.Target) {
@@ -957,9 +973,14 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Uname, header.Gname = "root", "root"
 		header.Uid, header.Gid = 0, 0
 
-		if info.Mode().IsRegular() && pkgFile.Mode > 0 {
+		switch {
+		case componentConfigFilePattern.MatchString(info.Name()):
+			header.Mode = int64(componentConfigMode & os.ModePerm)
+		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
+			header.Mode = int64(pkgFile.ConfigMode & os.ModePerm)
+		case info.Mode().IsRegular() && pkgFile.Mode > 0:
 			header.Mode = int64(pkgFile.Mode & os.ModePerm)
-		} else if info.IsDir() {
+		case info.IsDir():
 			header.Mode = int64(0755)
 		}
 

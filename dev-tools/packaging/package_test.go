@@ -34,10 +34,12 @@ const (
 	expectedManifestMode   = os.FileMode(0644)
 	expectedModuleFileMode = expectedManifestMode
 	expectedModuleDirMode  = os.FileMode(0755)
+
+	rootUser = "root"
 )
 
 var (
-	configFilePattern      = regexp.MustCompile(`.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$`)
+	configFilePattern      = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
 	manifestFilePattern    = regexp.MustCompile(`manifest.yml`)
 	modulesDirPattern      = regexp.MustCompile(`module/.+`)
 	modulesDDirPattern     = regexp.MustCompile(`modules.d/$`)
@@ -173,8 +175,6 @@ func checkZip(t *testing.T, file string) {
 }
 
 const (
-	npcapSettings   = "Windows Npcap installation settings"
-	npcapGrant      = `Insecure.Com LLC \(“The Nmap Project”\) has granted Elasticsearch`
 	npcapLicense    = `Dependency : Npcap \(https://nmap.org/npcap/\)`
 	libpcapLicense  = `Dependency : Libpcap \(http://www.tcpdump.org/\)`
 	winpcapLicense  = `Dependency : Winpcap \(https://www.winpcap.org/\)`
@@ -225,7 +225,7 @@ func checkDocker(t *testing.T, file string) {
 	checkDockerEntryPoint(t, p, info)
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
-	checkConfigPermissionsWithMode(t, p, os.FileMode(0644))
+	checkConfigPermissionsWithMode(t, p, configFilePattern, os.FileMode(0644))
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
@@ -234,13 +234,13 @@ func checkDocker(t *testing.T, file string) {
 
 // Verify that the main configuration file is installed with a 0600 file mode.
 func checkConfigPermissions(t *testing.T, p *packageFile) {
-	checkConfigPermissionsWithMode(t, p, expectedConfigMode)
+	checkConfigPermissionsWithMode(t, p, configFilePattern, expectedConfigMode)
 }
 
-func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, expectedMode os.FileMode) {
+func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
 	t.Run(p.Name+" config file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
-			if configFilePattern.MatchString(entry.File) {
+			if configPattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
 				if expectedMode != mode {
 					t.Errorf("file %v has wrong permissions: expected=%v actual=%v",
@@ -249,7 +249,7 @@ func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, expectedMode o
 				return
 			}
 		}
-		t.Errorf("no config file found matching %v", configFilePattern)
+		t.Errorf("no config file found matching %v", configPattern)
 	})
 }
 
@@ -493,7 +493,7 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 
 func checkDockerUser(t *testing.T, p *packageFile, info *dockerInfo, expectRoot bool) {
 	t.Run(fmt.Sprintf("%s user", p.Name), func(t *testing.T) {
-		if expectRoot != (info.Config.User == "root") {
+		if expectRoot != (info.Config.User == rootUser) {
 			t.Errorf("unexpected docker user: %s", info.Config.User)
 		}
 	})
@@ -564,7 +564,7 @@ func readRPM(rpmFile string) (*packageFile, *rpm.PackageFile, error) {
 			File: file.Name(),
 			Mode: file.Mode(),
 		}
-		if file.Owner() != "root" {
+		if file.Owner() != rootUser {
 			// not 0
 			pe.UID = 123
 			pe.GID = 123
@@ -707,6 +707,7 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
+	manifestFileName := "manifest.json"
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
@@ -717,12 +718,12 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 		}
 
 		switch {
-		case header.Name == "manifest.json":
+		case header.Name == manifestFileName:
 			manifest, err = readDockerManifest(tarReader)
 			if err != nil {
 				return nil, nil, err
 			}
-		case strings.HasSuffix(header.Name, ".json") && header.Name != "manifest.json":
+		case strings.HasSuffix(header.Name, ".json") && header.Name != manifestFileName:
 			info, err = readDockerInfo(tarReader)
 			if err != nil {
 				return nil, nil, err

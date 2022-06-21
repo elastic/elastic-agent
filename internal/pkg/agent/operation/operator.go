@@ -64,10 +64,10 @@ type Operator struct {
 	apps     map[string]Application
 	appsLock sync.Mutex
 
-	downloader       download.Downloader
-	verifier         download.Verifier
 	installer        install.InstallerChecker
 	uninstaller      uninstall.Uninstaller
+	downloader       download.Downloader
+	verifier         download.Verifier
 	statusController status.Controller
 	statusReporter   status.Reporter
 }
@@ -183,14 +183,14 @@ func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) 
 	o.statusController.UpdateStateID(stateID)
 
 	for _, step := range steps {
-		if !strings.EqualFold(step.ProgramSpec.Cmd, monitoringName) {
-			if _, isSupported := program.SupportedMap[strings.ToLower(step.ProgramSpec.Cmd)]; !isSupported {
+		if !strings.EqualFold(step.ProgramSpec.CommandName(), monitoringName) {
+			if _, isSupported := program.SupportedMap[step.ProgramSpec.CommandName()]; !isSupported {
 				// mark failed, new config cannot be run
-				msg := fmt.Sprintf("program '%s' is not supported", step.ProgramSpec.Cmd)
+				msg := fmt.Sprintf("program '%s' is not supported", step.ProgramSpec.CommandName())
 				o.statusReporter.Update(state.Failed, msg, nil)
 				return errors.New(msg,
 					errors.TypeApplication,
-					errors.M(errors.MetaKeyAppName, step.ProgramSpec.Cmd))
+					errors.M(errors.MetaKeyAppName, step.ProgramSpec.CommandName()))
 			}
 		}
 
@@ -250,16 +250,10 @@ func (o *Operator) Shutdown() {
 // specific configuration of new process is passed
 func (o *Operator) start(p Descriptor, cfg map[string]interface{}) (err error) {
 	flow := []operation{
-		newRetryableOperations(
-			o.logger,
-			o.config.RetryConfig,
-			newOperationFetch(o.logger, p, o.config, o.downloader),
-			newOperationVerify(p, o.config, o.verifier),
-		),
-		newOperationInstall(o.logger, p, o.config, o.installer),
 		newOperationStart(o.logger, p, o.config, cfg),
 		newOperationConfig(o.logger, o.config, cfg),
 	}
+
 	return o.runFlow(p, flow)
 }
 
@@ -267,7 +261,6 @@ func (o *Operator) start(p Descriptor, cfg map[string]interface{}) (err error) {
 func (o *Operator) stop(p Descriptor) (err error) {
 	flow := []operation{
 		newOperationStop(o.logger, o.config),
-		newOperationUninstall(o.logger, p, o.uninstaller),
 	}
 
 	return o.runFlow(p, flow)

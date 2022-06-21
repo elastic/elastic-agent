@@ -6,8 +6,8 @@ package app
 
 import (
 	"path/filepath"
-	"strings"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 )
@@ -23,12 +23,22 @@ type Descriptor struct {
 
 // NewDescriptor creates a program which satisfies Program interface and can be used with Operator.
 func NewDescriptor(spec program.Spec, version string, config *artifact.Config, tags map[Tag]string) *Descriptor {
-	dir := directory(spec, version, config)
+	dir := paths.Components()
+	return NewDescriptorWithPath(dir, spec, version, config, tags)
+}
+
+// NewDescriptorOnPath creates a program which satisfies Program interface and can be used with Operator.
+func NewDescriptorWithPath(path string, spec program.Spec, version string, config *artifact.Config, tags map[Tag]string) *Descriptor {
+	servicePort := 0
+	if spec.ServicePort > 0 {
+		servicePort = spec.ServicePort
+	}
+
 	return &Descriptor{
 		spec:         spec,
-		directory:    dir,
-		executionCtx: NewExecutionContext(spec.ServicePort, spec.Cmd, version, tags),
-		process:      specification(dir, spec),
+		directory:    path,
+		executionCtx: NewExecutionContext(servicePort, spec.CommandName(), version, tags),
+		process:      specification(path, spec),
 	}
 }
 
@@ -36,11 +46,6 @@ func NewDescriptor(spec program.Spec, version string, config *artifact.Config, t
 // 0 then the application is ran using the `service` application type, versus a `process` application.
 func (p *Descriptor) ServicePort() int {
 	return p.executionCtx.ServicePort
-}
-
-// ArtifactName is the name of the artifact to download from the artifact store. E.g beats/filebeat.
-func (p *Descriptor) ArtifactName() string {
-	return p.spec.Artifact
 }
 
 // BinaryName is the name of the binary. E.g filebeat.
@@ -79,26 +84,8 @@ func (p *Descriptor) Directory() string {
 
 func specification(dir string, spec program.Spec) ProcessSpec {
 	return ProcessSpec{
-		BinaryPath:    filepath.Join(dir, spec.Cmd),
+		BinaryPath:    filepath.Join(dir, spec.Command()),
 		Args:          spec.Args,
 		Configuration: nil,
 	}
-}
-
-func directory(spec program.Spec, version string, config *artifact.Config) string {
-	if version == "" {
-		return filepath.Join(config.InstallPath, spec.Cmd)
-	}
-
-	path, err := artifact.GetArtifactPath(spec, version, config.OS(), config.Arch(), config.InstallPath)
-	if err != nil {
-		return ""
-	}
-
-	suffix := ".tar.gz"
-	if config.OS() == "windows" {
-		suffix = ".zip"
-	}
-
-	return strings.TrimSuffix(path, suffix)
 }

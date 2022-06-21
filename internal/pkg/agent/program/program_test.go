@@ -488,7 +488,7 @@ func TestConfiguration(t *testing.T) {
 				require.Equal(t, len(testPrograms), len(progs))
 
 				for _, program := range progs {
-					filename := name + "-" + strings.ToLower(program.Spec.Cmd)
+					filename := name + "-" + program.Spec.CommandName()
 					if progKey != "default" {
 						filename += "-" + progKey
 					}
@@ -558,7 +558,7 @@ func TestUseCases(t *testing.T) {
 			for _, program := range defPrograms {
 				generatedPath := filepath.Join(
 					useCasesPath, "generated",
-					useCaseName+"."+strings.ToLower(program.Spec.Cmd)+".golden.yml",
+					useCaseName+"."+program.Spec.CommandName()+".golden.yml",
 				)
 
 				compareMap := &transpiler.MapVisitor{}

@@ -55,5 +55,6 @@ func (i *InstallerChecker) Check(ctx context.Context, spec program.Spec, version
 	if spec.CheckInstallSteps != nil {
 		return spec.CheckInstallSteps.Execute(ctx, installDir)
 	}
+
 	return nil
 }

@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,15 +23,17 @@ import (
 
 func TestMain(m *testing.M) {
 	// init supported with test cases
+	port, err := getFreePort()
+	if err != nil {
+		panic(err)
+	}
+
 	configurableSpec := program.Spec{
 		Name: "configurable",
 		Cmd:  "configurable",
 		Args: []string{},
 	}
-	port, err := getFreePort()
-	if err != nil {
-		panic(err)
-	}
+
 	serviceSpec := program.Spec{
 		ServicePort: port,
 		Name:        "serviceable",
@@ -44,10 +45,10 @@ func TestMain(m *testing.M) {
 	program.SupportedMap["configurable"] = configurableSpec
 	program.SupportedMap["serviceable"] = serviceSpec
 
-	if err := isAvailable("configurable", "1.0"); err != nil {
+	if err := isAvailable("configurable"); err != nil {
 		panic(err)
 	}
-	if err := isAvailable("serviceable", "1.0"); err != nil {
+	if err := isAvailable("serviceable"); err != nil {
 		panic(err)
 	}
 
@@ -462,15 +463,13 @@ func TestConfigurableService(t *testing.T) {
 	}
 }
 
-func isAvailable(name, version string) error {
-	p := getProgram(name, version)
+func isAvailable(name string) error {
+	p := getProgram(name, "version")
 	spec := p.ProcessSpec()
 	path := spec.BinaryPath
-	if runtime.GOOS == "windows" {
-		path += ".exe"
-	}
+
 	if s, err := os.Stat(path); err != nil || s == nil {
-		return fmt.Errorf("binary not available %s", spec.BinaryPath)
+		return fmt.Errorf("binary not available %s: %v", spec.BinaryPath, err)
 	}
 	return nil
 }

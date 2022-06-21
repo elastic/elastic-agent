@@ -145,7 +145,7 @@ func (b *Monitor) EnrichArgs(spec program.Spec, pipelineID string, args []string
 
 	loggingPath := b.generateLoggingPath(spec, pipelineID)
 	if loggingPath != "" {
-		logFile := spec.Cmd
+		logFile := spec.CommandName()
 		if isSidecar {
 			logFile += "_monitor"
 		}

@@ -206,12 +206,12 @@ func programsFromConfig(cfg *config.Config) ([]program.Program, error) {
 
 	for _, v := range ppMap {
 		for _, p := range v {
-			if _, found := check[p.Spec.Cmd]; found {
+			if _, found := check[p.Spec.CommandName()]; found {
 				continue
 			}
 
 			pp = append(pp, p)
-			check[p.Spec.Cmd] = true
+			check[p.Spec.CommandName()] = true
 		}
 	}
 

@@ -32,7 +32,7 @@ func GetArtifactName(spec program.Spec, version, operatingSystem, arch string) (
 		return "", errors.New(fmt.Sprintf("'%s' is not a valid combination for a package", key), errors.TypeConfig)
 	}
 
-	return fmt.Sprintf("%s-%s-%s", spec.Cmd, version, suffix), nil
+	return fmt.Sprintf("%s-%s-%s", spec.CommandName(), version, suffix), nil
 }
 
 // GetArtifactPath returns a full path of artifact for a program in specific version

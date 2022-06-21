@@ -35,10 +35,10 @@ func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string) s
 		return endpoint
 	}
 	if operatingSystem == "windows" {
-		return fmt.Sprintf(mbEndpointFileFormatWin, pipelineID, spec.Cmd)
+		return fmt.Sprintf(mbEndpointFileFormatWin, pipelineID, spec.CommandName())
 	}
 	// unix socket path must be less than 104 characters
-	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), pipelineID, spec.Cmd, spec.Cmd))
+	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), pipelineID, spec.CommandName(), spec.CommandName()))
 	if len(path) < 104 {
 		return path
 	}
@@ -52,9 +52,9 @@ func getLoggingFile(spec program.Spec, operatingSystem, installPath, pipelineID 
 		return path
 	}
 	if operatingSystem == "windows" {
-		return fmt.Sprintf(logFileFormatWin, paths.Home(), pipelineID, spec.Cmd)
+		return fmt.Sprintf(logFileFormatWin, paths.Home(), pipelineID, spec.CommandName())
 	}
-	return fmt.Sprintf(logFileFormat, paths.Home(), pipelineID, spec.Cmd)
+	return fmt.Sprintf(logFileFormat, paths.Home(), pipelineID, spec.CommandName())
 }
 
 // AgentMonitoringEndpoint returns endpoint with exposed metrics for agent.

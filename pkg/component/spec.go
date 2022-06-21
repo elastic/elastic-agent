@@ -8,12 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/elastic/elastic-agent/internal/pkg/eql"
 )
 
 // Spec a components specification.
 type Spec struct {
+	Name    string      `yaml:"name,omitempty"`
 	Version int         `config:"version" yaml:"version" validate:"required"`
 	Inputs  []InputSpec `config:"inputs,omitempty" yaml:"inputs,omitempty"`
 }
@@ -39,50 +38,6 @@ func (s *Spec) Validate() error {
 			}
 			a = append(a, platform)
 			inputsToPlatforms[input.Name] = a
-		}
-	}
-	return nil
-}
-
-// InputSpec is the specification for an input type.
-type InputSpec struct {
-	Name        string      `config:"name" yaml:"name"  validate:"required"`
-	Aliases     []string    `config:"aliases,omitempty" yaml:"aliases,omitempty"`
-	Description string      `config:"description" yaml:"description" validate:"required"`
-	Platforms   []string    `config:"platforms" yaml:"platforms" validate:"required,min=1"`
-	Outputs     []string    `config:"outputs" yaml:"outputs" validate:"required,min=1"`
-	Runtime     RuntimeSpec `config:"runtime" yaml:"runtime"`
-
-	Command *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
-	Service *ServiceSpec `config:"service,omitempty" yaml:"service,omitempty"`
-}
-
-// Validate ensures correctness of input specification.
-func (s *InputSpec) Validate() error {
-	if s.Command == nil && s.Service == nil {
-		return fmt.Errorf("input '%s' must define either command or service", s.Name)
-	}
-	for i, a := range s.Platforms {
-		if !GlobalPlatforms.Exists(a) {
-			return fmt.Errorf("input '%s' defines an unknown platform '%s'", s.Name, a)
-		}
-		for j, b := range s.Platforms {
-			if i != j && a == b {
-				return fmt.Errorf("input '%s' defines the platform '%s' more than once", s.Name, a)
-			}
-		}
-	}
-	for i, a := range s.Outputs {
-		for j, b := range s.Outputs {
-			if i != j && a == b {
-				return fmt.Errorf("input '%s' defines the output '%s' more than once", s.Name, a)
-			}
-		}
-	}
-	for idx, prevention := range s.Runtime.Preventions {
-		_, err := eql.New(prevention.Condition)
-		if err != nil {
-			return fmt.Errorf("input '%s' defined 'runtime.preventions.%d.condition' failed to compile: %w", s.Name, idx, err)
 		}
 	}
 	return nil

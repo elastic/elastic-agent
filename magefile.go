@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"github.com/otiai10/copy"
 	"github.com/pkg/errors"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
@@ -50,6 +51,7 @@ const (
 	externalArtifacts = "EXTERNAL"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
+	specSuffix        = ".spec.yml" // TODO: change after beat ignores yml config
 )
 
 // Aliases for commands required by master makefile
@@ -276,8 +278,8 @@ func (Build) TestBinaries() error {
 		execName += ".exe"
 	}
 	return combineErr(
-		RunGo("build", "-o", filepath.Join(p, "configurable-1.0-darwin-x86_64", configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p, "serviceable-1.0-darwin-x86_64", serviceableName), filepath.Join(p, "serviceable-1.0-darwin-x86_64", "main.go")),
+		RunGo("build", "-o", filepath.Join(p, configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
+		RunGo("build", "-o", filepath.Join(p, serviceableName), filepath.Join(p, "serviceable-1.0-darwin-x86_64", "main.go")),
 		RunGo("build", "-o", filepath.Join(p2, "exec-1.0-darwin-x86_64", execName), filepath.Join(p2, "exec-1.0-darwin-x86_64", "main.go")),
 	)
 }
@@ -421,12 +423,14 @@ func Package() {
 
 	packageAgent(requiredPackages, devtools.UseElasticAgentPackaging)
 }
+
 func getPackageName(beat, version, pkg string) (string, string) {
 	if _, ok := os.LookupEnv(snapshotEnv); ok {
 		version += "-SNAPSHOT"
 	}
 	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
 }
+
 func requiredPackagesPresent(basePath, beat, version string, requiredPackages []string) bool {
 	for _, pkg := range requiredPackages {
 		_, packageName := getPackageName(beat, version, pkg)
@@ -512,6 +516,8 @@ func BuildSpec() error {
 
 	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
 	return RunGo("run", goF, "--in", in, "--out", out)
+
+	return nil
 }
 
 func BuildPGP() error {
@@ -661,23 +667,24 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		version = release.Version()
 	}
 
+	dropPath, found := os.LookupEnv(agentDropPath)
+	var archivePath string
+
 	// build deps only when drop is not provided
-	if dropPathEnv, found := os.LookupEnv(agentDropPath); !found || len(dropPathEnv) == 0 {
+	if !found || len(dropPath) == 0 {
 		// prepare new drop
-		dropPath := filepath.Join("build", "distributions", "elastic-agent-drop")
+		dropPath = filepath.Join("build", "distributions", "elastic-agent-drop")
 		dropPath, err := filepath.Abs(dropPath)
 		if err != nil {
 			panic(err)
 		}
 
-		if err := os.MkdirAll(dropPath, 0755); err != nil {
-			panic(err)
-		}
+		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 
+		defer os.RemoveAll(dropPath)
 		os.Setenv(agentDropPath, dropPath)
 
 		// cleanup after build
-		defer os.RemoveAll(dropPath)
 		defer os.Unsetenv(agentDropPath)
 
 		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
@@ -685,8 +692,10 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			ctx := context.Background()
 			for _, beat := range packedBeats {
 				for _, reqPackage := range requiredPackages {
+					targetPath := filepath.Join(archivePath, reqPackage)
+					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
-					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, dropPath)
+					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, targetPath)
 					if err != nil {
 						panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
 					}
@@ -717,9 +726,96 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 
 				// copy to new drop
 				sourcePath := filepath.Join(pwd, "build", "distributions")
-				if err := copyAll(sourcePath, dropPath); err != nil {
-					panic(err)
+				for _, rp := range requiredPackages {
+					files, err := filepath.Glob(filepath.Join(sourcePath, "*"+rp+"*"))
+					if err != nil {
+						panic(err)
+					}
+
+					targetPath := filepath.Join(archivePath, rp)
+					os.MkdirAll(targetPath, 0755)
+					for _, f := range files {
+						targetFile := filepath.Join(targetPath, filepath.Base(f))
+						if err := sh.Copy(targetFile, f); err != nil {
+							panic(err)
+						}
+					}
 				}
+			}
+		}
+	} else {
+		archivePath = movePackagesToArchive(dropPath, requiredPackages)
+	}
+	defer os.RemoveAll(archivePath)
+
+	// create flat dir
+	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
+	os.MkdirAll(flatPath, 0755)
+	defer os.RemoveAll(flatPath)
+
+	for _, rp := range requiredPackages {
+		targetPath := filepath.Join(archivePath, rp)
+		versionedFlatPath := filepath.Join(flatPath, rp)
+		versionedDropPath := filepath.Join(dropPath, rp)
+		os.MkdirAll(targetPath, 0755)
+		os.MkdirAll(versionedFlatPath, 0755)
+		os.MkdirAll(versionedDropPath, 0755)
+
+		// untar all
+		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
+		if err != nil {
+			panic(err)
+		}
+		zipMatches, err := filepath.Glob(filepath.Join(targetPath, "*zip"))
+		if err != nil {
+			panic(err)
+		}
+		matches = append(matches, zipMatches...)
+
+		for _, m := range matches {
+			stat, err := os.Stat(m)
+			if os.IsNotExist(err) {
+				continue
+			} else if err != nil {
+				panic(errors.Wrap(err, "failed stating file"))
+			}
+
+			if stat.IsDir() {
+				continue
+			}
+
+			if err := devtools.Extract(m, versionedFlatPath); err != nil {
+				panic(err)
+			}
+		}
+
+		files, err := filepath.Glob(filepath.Join(versionedFlatPath, "*"))
+		if err != nil {
+			panic(err)
+		}
+
+		for _, f := range files {
+			options := copy.Options{
+				OnSymlink: func(_ string) copy.SymlinkAction {
+					return copy.Shallow
+				},
+				Sync: true,
+			}
+
+			err = copy.Copy(f, versionedDropPath, options)
+			if err != nil {
+				panic(err)
+			}
+
+			// cope spec file for match
+			specName := filepath.Base(f)
+			idx := strings.Index(specName, "-"+version)
+			if idx != -1 {
+				specName = specName[:idx]
+			}
+
+			if err := devtools.Copy(filepath.Join("specs", specName+specSuffix), filepath.Join(versionedDropPath, specName+specSuffix)); err != nil {
+				panic(err)
 			}
 		}
 	}
@@ -730,6 +826,48 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 	mg.Deps(Update)
 	mg.Deps(CrossBuild, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
+}
+
+func movePackagesToArchive(dropPath string, requiredPackages []string) string {
+	archivePath := filepath.Join(dropPath, "archives")
+	os.MkdirAll(archivePath, 0755)
+
+	// move archives to archive path
+	matches, err := filepath.Glob(filepath.Join(dropPath, "*tar.gz*"))
+	if err != nil {
+		panic(err)
+	}
+	zipMatches, err := filepath.Glob(filepath.Join(dropPath, "*zip*"))
+	if err != nil {
+		panic(err)
+	}
+	matches = append(matches, zipMatches...)
+
+	for _, f := range matches {
+		for _, rp := range requiredPackages {
+			if !strings.Contains(f, rp) {
+				continue
+			}
+
+			stat, err := os.Stat(f)
+			if os.IsNotExist(err) {
+				continue
+			} else if err != nil {
+				panic(errors.Wrap(err, "failed stating file"))
+			}
+
+			if stat.IsDir() {
+				continue
+			}
+
+			targetPath := filepath.Join(archivePath, rp)
+			if err := os.Rename(f, filepath.Join(targetPath, filepath.Base(f))); err != nil {
+				panic(errors.Wrap(err, "failed renaming file"))
+			}
+		}
+	}
+
+	return archivePath
 }
 
 func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
@@ -755,7 +893,7 @@ func selectedPackageTypes() string {
 	return "PACKAGES=targz,zip"
 }
 
-func copyAll(from, to string) error {
+func copyAll(from, to string, suffixes ...[]string) error {
 	return filepath.Walk(from, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

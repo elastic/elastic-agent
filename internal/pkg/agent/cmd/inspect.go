@@ -218,12 +218,12 @@ func printOutputFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, output
 
 		var programFound bool
 		for _, p := range programs {
-			if programName != "" && programName != p.Spec.Cmd {
+			if programName != "" && programName != p.Spec.CommandName() {
 				continue
 			}
 
 			programFound = true
-			_, _ = os.Stdout.WriteString(fmt.Sprintf("[%s] %s:\n", k, p.Spec.Cmd))
+			_, _ = os.Stdout.WriteString(fmt.Sprintf("[%s] %s:\n", k, p.Spec.CommandName()))
 			err = printMapStringConfig(p.Configuration())
 			if err != nil {
 				return fmt.Errorf("cannot print configuration of program '%s': %w", programName, err)

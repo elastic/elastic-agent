@@ -13,7 +13,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 )
 
-// Program represents a program that must be started or must run.
+// Program represents a program that must be started or must run .
 type Program struct {
 	Spec   Spec
 	Config *transpiler.AST
@@ -21,7 +21,7 @@ type Program struct {
 
 // Cmd return the execution command to run.
 func (p *Program) Cmd() string {
-	return p.Spec.Cmd
+	return p.Spec.Command()
 }
 
 // Checksum return the checksum of the current instance of the program.
@@ -70,7 +70,7 @@ func DetectPrograms(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST
 	programs := make([]Program, 0)
 	for _, spec := range Supported {
 		specificAST := singleConfig.Clone()
-		ok, err := DetectProgram(spec, agentInfo, specificAST)
+		ok, err := DetectProgram(spec.Rules, spec.When, spec.Constraints, agentInfo, specificAST)
 		if err != nil {
 			return nil, err
 		}
@@ -83,6 +83,7 @@ func DetectPrograms(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST
 		}
 		programs = append(programs, program)
 	}
+
 	return programs, nil
 }
 
@@ -90,9 +91,9 @@ func DetectPrograms(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST
 //
 // Note `ast` is modified to match what the program expects. Should clone the AST before passing to
 // this function if you want to still have the original.
-func DetectProgram(spec Spec, info transpiler.AgentInfo, ast *transpiler.AST) (bool, error) {
-	if len(spec.Constraints) > 0 {
-		constraints, err := eql.New(spec.Constraints)
+func DetectProgram(rules *transpiler.RuleList, when string, constraints string, info transpiler.AgentInfo, ast *transpiler.AST) (bool, error) {
+	if len(constraints) > 0 {
+		constraints, err := eql.New(constraints)
 		if err != nil {
 			return false, err
 		}
@@ -105,16 +106,16 @@ func DetectProgram(spec Spec, info transpiler.AgentInfo, ast *transpiler.AST) (b
 		}
 	}
 
-	err := spec.Rules.Apply(info, ast)
+	err := rules.Apply(info, ast)
 	if err != nil {
 		return false, err
 	}
 
-	if len(spec.When) == 0 {
+	if len(when) == 0 {
 		return false, ErrMissingWhen
 	}
 
-	expression, err := eql.New(spec.When)
+	expression, err := eql.New(when)
 	if err != nil {
 		return false, err
 	}
@@ -128,6 +129,7 @@ func KnownProgramNames() []string {
 	for idx, program := range Supported {
 		names[idx] = program.Name
 	}
+
 	return names
 }
 

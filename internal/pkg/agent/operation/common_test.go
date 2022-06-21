@@ -56,10 +56,10 @@ func getTestOperator(t *testing.T, downloadPath string, installPath string, p *a
 	l := getLogger()
 	agentInfo, _ := info.NewAgentInfo(true)
 
-	fetcher := &DummyDownloader{}
-	verifier := &DummyVerifier{}
 	installer := &DummyInstallerChecker{}
 	uninstaller := &DummyUninstaller{}
+	fetcher := &DummyDownloader{}
+	verifier := &DummyVerifier{}
 
 	stateResolver, err := stateresolver.NewStateResolver(l)
 	if err != nil {
@@ -107,7 +107,7 @@ func getProgram(binary, version string) *app.Descriptor {
 		OperatingSystem: "darwin",
 		Architecture:    "64",
 	}
-	return app.NewDescriptor(spec, version, downloadCfg, nil)
+	return app.NewDescriptorWithPath(installPath, spec, version, downloadCfg, nil)
 }
 
 func getAbsPath(path string) string {

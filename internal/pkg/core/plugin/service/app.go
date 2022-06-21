@@ -13,14 +13,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/core/plugin"
@@ -169,6 +168,7 @@ func (a *Application) Start(ctx context.Context, _ app.Taggable, cfg map[string]
 		a.srvState.UpdateConfig(a.srvState.Config())
 	} else {
 		a.setState(state.Starting, "Starting", nil)
+
 		a.srvState, err = a.srv.Register(a, string(cfgStr))
 		if err != nil {
 			return err

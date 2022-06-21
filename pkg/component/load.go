@@ -5,16 +5,19 @@
 package component
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/go-ucfg/yaml"
 )
 
-const specGlobPattern = "*.spec.yml"
+const (
+	specSuffix      = ".spec.yml"
+	specGlobPattern = "*" + specSuffix
+)
 
 var (
 	// ErrInputNotSupported is returned when the input is not supported on any platform

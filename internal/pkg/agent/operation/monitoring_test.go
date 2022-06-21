@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -21,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/stateresolver"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -37,7 +37,9 @@ import (
 func TestExportedMetrics(t *testing.T) {
 	programName := "testing"
 	expectedMetricsName := "metric_name"
-	program.SupportedMap[programName] = program.Spec{ExprtedMetrics: []string{expectedMetricsName}}
+	program.SupportedMap[programName] = program.Spec{
+		ExportedMetrics: []string{expectedMetricsName},
+	}
 
 	exportedMetrics := normalizeHTTPCopyRules(programName)
 
@@ -99,13 +101,13 @@ func TestGenerateSteps(t *testing.T) {
 			var fbFound, mbFound bool
 			for _, s := range steps {
 				// Filebeat step check
-				if s.ProgramSpec.Cmd == "filebeat" {
+				if s.ProgramSpec.CommandName() == "filebeat" {
 					fbFound = true
 					checkStep(t, "filebeat", outputType, sampleOutput, s)
 				}
 
 				// Metricbeat step check
-				if s.ProgramSpec.Cmd == "metricbeat" {
+				if s.ProgramSpec.CommandName() == "metricbeat" {
 					mbFound = true
 					checkStep(t, "metricbeat", outputType, sampleOutput, s)
 				}
@@ -159,10 +161,10 @@ func getMonitorableTestOperator(t *testing.T, installPath string, m monitoring.M
 	l := getLogger()
 	agentInfo, _ := info.NewAgentInfo(true)
 
-	fetcher := &DummyDownloader{}
-	verifier := &DummyVerifier{}
 	installer := &DummyInstallerChecker{}
 	uninstaller := &DummyUninstaller{}
+	fetcher := &DummyDownloader{}
+	verifier := &DummyVerifier{}
 
 	stateResolver, err := stateresolver.NewStateResolver(l)
 	if err != nil {

@@ -34,7 +34,7 @@ const (
 
 var (
 	beatSpec = program.Spec{
-		Name:     "Filebeat",
+		Name:     "filebeat",
 		Cmd:      "filebeat",
 		Artifact: "beats/filebeat",
 	}
@@ -165,16 +165,16 @@ func getRandomTestCases() []testCase {
 
 func getElasticCoClient() http.Client {
 	correctValues := map[string]struct{}{
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i386.deb"):             struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "amd64.deb"):            struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i686.rpm"):             struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "x86_64.rpm"):           struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-x86.tar.gz"):     struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-arm64.tar.gz"):   struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "linux-x86_64.tar.gz"):  struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "windows-x86.zip"):      struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "windows-x86_64.zip"):   struct{}{},
-		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "darwin-x86_64.tar.gz"): struct{}{},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "i386.deb"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "amd64.deb"):            {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "i686.rpm"):             {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "x86_64.rpm"):           {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "linux-x86.tar.gz"):     {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "linux-arm64.tar.gz"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "linux-x86_64.tar.gz"):  {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "windows-x86.zip"):      {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "windows-x86_64.zip"):   {},
+		fmt.Sprintf("%s-%s-%s", beatSpec.CommandName(), version, "darwin-x86_64.tar.gz"): {},
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

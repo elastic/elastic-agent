@@ -29,5 +29,5 @@ type Step struct {
 }
 
 func (s *Step) String() string {
-	return "[ID:" + s.ID + ", PROCESS: " + s.ProgramSpec.Cmd + " VERSION:" + s.Version + "]"
+	return "[ID:" + s.ID + ", PROCESS: " + s.ProgramSpec.Command() + " VERSION:" + s.Version + "]"
 }

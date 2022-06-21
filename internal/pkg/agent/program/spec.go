@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -40,7 +42,20 @@ type Spec struct {
 	When                  string               `yaml:"when"`
 	Constraints           string               `yaml:"constraints"`
 	RestartOnOutputChange bool                 `yaml:"restart_on_output_change,omitempty"`
-	ExprtedMetrics        []string             `yaml:"exported_metrics,omitempty"`
+	ExportedMetrics       []string             `yaml:"exported_metrics,omitempty"`
+}
+
+func (s *Spec) Command() string {
+	name := strings.ToLower(s.Cmd)
+	if runtime.GOOS == "windows" && !strings.HasSuffix(name, ".exe") {
+		return name + ".exe"
+	}
+
+	return name
+}
+
+func (s *Spec) CommandName() string {
+	return strings.ToLower(s.Cmd)
 }
 
 // ReadSpecs reads all the specs that match the provided globbing path.

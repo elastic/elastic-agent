@@ -54,7 +54,6 @@ type Descriptor interface {
 	Spec() program.Spec
 	ServicePort() int
 	BinaryName() string
-	ArtifactName() string
 	Version() string
 	ID() string
 	Directory() string

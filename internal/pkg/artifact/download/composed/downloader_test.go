@@ -59,7 +59,7 @@ func TestComposed(t *testing.T) {
 
 	for _, tc := range testCases {
 		d := NewDownloader(tc.downloaders[0], tc.downloaders[1])
-		r, _ := d.Download(context.TODO(), program.Spec{Name: "a", Cmd: "a", Artifact: "a/a"}, "b")
+		r, _ := d.Download(context.TODO(), program.Spec{Name: "a"}, "b")
 
 		assert.Equal(t, tc.expectedResult, r == "succ")
 

@@ -216,7 +216,7 @@ func emit(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInf
 	if !ok {
 		return errors.New("missing required fleet-server program specification")
 	}
-	ok, err = program.DetectProgram(spec, agentInfo, ast)
+	ok, err = program.DetectProgram(spec.Rules, spec.When, spec.Constraints, agentInfo, ast)
 	if err != nil {
 		return errors.New(err, "failed parsing the configuration")
 	}

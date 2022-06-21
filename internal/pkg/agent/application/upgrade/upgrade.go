@@ -41,7 +41,7 @@ const (
 
 var (
 	agentSpec = program.Spec{
-		Name:     "Elastic Agent",
+		Name:     "elastic-agent",
 		Cmd:      agentName,
 		Artifact: "beats/" + agentName,
 	}

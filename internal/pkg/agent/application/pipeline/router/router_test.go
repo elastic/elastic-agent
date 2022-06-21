@@ -45,7 +45,7 @@ type event struct {
 type notifyFunc func(pipeline.RoutingKey, rOp, ...interface{})
 
 func TestRouter(t *testing.T) {
-	programs := []program.Program{{Spec: program.Supported[1]}}
+	programs := []program.Program{{Spec: getRandomSpec()}}
 	ctx := context.Background()
 
 	t.Run("create new and destroy unused stream", func(t *testing.T) {
@@ -226,4 +226,8 @@ func assertOps(t *testing.T, expected []event, received []event) {
 
 func e(rk pipeline.RoutingKey, op rOp) event {
 	return event{rk: rk, op: op}
+}
+
+func getRandomSpec() program.Spec {
+	return program.Supported[1]
 }

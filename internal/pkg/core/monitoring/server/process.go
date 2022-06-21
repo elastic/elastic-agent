@@ -91,9 +91,9 @@ func processHandler(statsHandler func(http.ResponseWriter, *http.Request) error)
 }
 
 var beatsPathAllowlist = map[string]struct{}{
-	"":      struct{}{},
-	"stats": struct{}{},
-	"state": struct{}{},
+	"":      {},
+	"stats": {},
+	"state": {},
 }
 
 func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, error) {
