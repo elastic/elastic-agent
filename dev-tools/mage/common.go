@@ -41,7 +41,9 @@ import (
 )
 
 const (
-	inlineTemplate = "inline"
+	inlineTemplate      = "inline"
+	xpackDirName        = "x-pack"
+	windowsBinarySuffix = ".exe"
 )
 
 // Expand expands the given Go text/template string.
@@ -131,6 +133,7 @@ func expandFile(src, dst string, args ...map[string]interface{}) error {
 		return err
 	}
 
+	//nolint:gosec // 0644 is required
 	if err = ioutil.WriteFile(createDir(dst), []byte(output), 0644); err != nil {
 		return errors.Wrap(err, "failed to write rendered template")
 	}
@@ -276,6 +279,7 @@ func MustFindReplace(file string, re *regexp.Regexp, repl string) {
 func DownloadFile(url, destinationDir string) (string, error) {
 	log.Println("Downloading", url)
 
+	//nolint:gosec,noctx // url is not user input
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", errors.Wrap(err, "http get failed")
@@ -331,6 +335,7 @@ func unzip(sourceFile, destinationDir string) error {
 		}
 		defer innerFile.Close()
 
+		//nolint:gosec // G305 zip traversal, no user input
 		path := filepath.Join(destinationDir, f.Name)
 		if !strings.HasPrefix(path, destinationDir) {
 			return errors.Errorf("illegal file path in zip: %v", f.Name)
@@ -350,6 +355,7 @@ func unzip(sourceFile, destinationDir string) error {
 		}
 		defer out.Close()
 
+		//nolint:gosec // DoS vulnerability, no user input
 		if _, err = io.Copy(out, innerFile); err != nil {
 			return err
 		}
@@ -369,6 +375,7 @@ func unzip(sourceFile, destinationDir string) error {
 
 // Tar compress a directory using tar + gzip algorithms
 func Tar(src string, targetFile string) error {
+	//nolint:forbidigo // pattern forbidden but we want it here
 	fmt.Printf(">> creating TAR file from directory: %s, target: %s\n", src, targetFile)
 
 	f, err := os.Create(targetFile)
@@ -389,6 +396,7 @@ func Tar(src string, targetFile string) error {
 
 		// if a symlink, skip file
 		if fi.Mode().Type() == os.ModeSymlink {
+			//nolint:forbidigo // pattern forbidden but we want it here
 			fmt.Printf(">> skipping symlink: %s\n", file)
 			return nil
 		}
@@ -464,6 +472,7 @@ func untar(sourceFile, destinationDir string) error {
 			return err
 		}
 
+		//nolint:gosec // G305: file traversal, no user input
 		path := filepath.Join(destinationDir, header.Name)
 		if !strings.HasPrefix(path, destinationDir) {
 			return errors.Errorf("illegal file path in tar: %v", header.Name)
@@ -484,6 +493,7 @@ func untar(sourceFile, destinationDir string) error {
 				return err
 			}
 
+			//nolint:gosec // decompression bomb, no user input
 			if _, err = io.Copy(writer, tarReader); err != nil {
 				return err
 			}
@@ -560,7 +570,7 @@ func numParallel() int {
 // based on GOMAXPROCS. The provided ctx is passed to the functions (if they
 // accept it as a param).
 func ParallelCtx(ctx context.Context, fns ...interface{}) {
-	var fnWrappers []func(context.Context) error
+	fnWrappers := make([]func(context.Context) error, 0, len(fns))
 	for _, f := range fns {
 		fnWrapper := funcTypeWrap(f)
 		if fnWrapper == nil {
@@ -758,6 +768,7 @@ func CreateSHA512File(file string) error {
 	computedHash := hex.EncodeToString(sum.Sum(nil))
 	out := fmt.Sprintf("%v  %v", computedHash, filepath.Base(file))
 
+	//nolint:gosec // permissions are correct
 	return ioutil.WriteFile(file+".sha512", []byte(out), 0644)
 }
 
@@ -785,7 +796,7 @@ func IsUpToDate(dst string, sources ...string) bool {
 
 	var files []string
 	for _, s := range sources {
-		filepath.Walk(s, func(path string, info os.FileInfo, err error) error {
+		err := filepath.Walk(s, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				if os.IsNotExist(err) {
 					return nil
@@ -799,6 +810,9 @@ func IsUpToDate(dst string, sources ...string) bool {
 
 			return nil
 		})
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	execute, err := target.Path(dst, files...)
@@ -811,7 +825,7 @@ func OSSBeatDir(path ...string) string {
 	ossDir := CWD()
 
 	// Check if we need to correct ossDir because it's in x-pack.
-	if parentDir := filepath.Base(filepath.Dir(ossDir)); parentDir == "x-pack" {
+	if parentDir := filepath.Base(filepath.Dir(ossDir)); parentDir == xpackDirName {
 		// If the OSS version of the beat exists.
 		tmp := filepath.Join(ossDir, "../..", BeatName)
 		if _, err := os.Stat(tmp); !os.IsNotExist(err) {
@@ -828,7 +842,7 @@ func XPackBeatDir(path ...string) string {
 	// Check if we have an X-Pack only beats
 	cur := CWD()
 
-	if parentDir := filepath.Base(filepath.Dir(cur)); parentDir == "x-pack" {
+	if parentDir := filepath.Base(filepath.Dir(cur)); parentDir == xpackDirName {
 		tmp := filepath.Join(filepath.Dir(cur), BeatName)
 		return filepath.Join(append([]string{tmp}, path...)...)
 	}
@@ -856,7 +870,7 @@ func CreateDir(file string) string {
 // binaryExtension returns the appropriate file extension based on GOOS.
 func binaryExtension(goos string) string {
 	if goos == "windows" {
-		return ".exe"
+		return windowsBinarySuffix
 	}
 	return ""
 }
@@ -880,7 +894,7 @@ func ParseVersion(version string) (major, minor, patch int, err error) {
 	major, _ = strconv.Atoi(data["major"])
 	minor, _ = strconv.Atoi(data["minor"])
 	patch, _ = strconv.Atoi(data["patch"])
-	return
+	return major, minor, patch, nil
 }
 
 // ListMatchingEnvVars returns all of the environment variables names that begin
@@ -957,7 +971,7 @@ func ReadGLIBCRequirement(elfFile string) (*SemanticVersion, error) {
 		return nil, errors.New("no GLIBC symbols found in binary (is this a static binary?)")
 	}
 
-	var versions []SemanticVersion
+	versions := make([]SemanticVersion, 0, len(versionSet))
 	for ver := range versionSet {
 		versions = append(versions, ver)
 	}

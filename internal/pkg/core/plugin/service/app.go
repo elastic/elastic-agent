@@ -31,10 +31,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
-const (
-	maxTimeout = 2 * time.Minute
-)
-
 var (
 	// ErrAppNotInstalled is returned when configuration is performed on not installed application.
 	ErrAppNotInstalled = errors.New("application is not installed", errors.TypeApplication)
