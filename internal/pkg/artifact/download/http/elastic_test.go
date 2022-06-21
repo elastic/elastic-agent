@@ -71,7 +71,7 @@ func TestDownload(t *testing.T) {
 			config.Architecture = testCase.arch
 
 			testClient := NewDownloaderWithClient(log, config, elasticClient)
-			artifactPath, err := testClient.Download(context.Background(), "beats/filebeat", beatSpec, version)
+			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -112,7 +112,7 @@ func TestVerify(t *testing.T) {
 			config.Architecture = testCase.arch
 
 			testClient := NewDownloaderWithClient(log, config, elasticClient)
-			artifact, err := testClient.Download(context.Background(), "beats/filebeat", beatSpec, version)
+			artifact, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
 			}

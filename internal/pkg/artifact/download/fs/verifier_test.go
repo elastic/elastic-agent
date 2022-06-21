@@ -38,7 +38,7 @@ func TestFetchVerify(t *testing.T) {
 	installPath := filepath.Join("testdata", "install")
 	targetPath := filepath.Join("testdata", "download")
 	ctx := context.Background()
-	s := program.Spec{Name: "Beat"}
+	s := program.Spec{Name: "Beat", Cmd: "beat", Artifact: "beats/filebeat"}
 	version := "8.0.0"
 
 	targetFilePath := filepath.Join(targetPath, "beat-8.0.0-darwin-x86_64.tar.gz")
@@ -81,7 +81,7 @@ func TestFetchVerify(t *testing.T) {
 	// second one should pass
 	// download not skipped: package missing
 	// verify passes because hash is not correct
-	_, err = downloader.Download(ctx, "beat/beat", s, version)
+	_, err = downloader.Download(ctx, s, version)
 	assert.NoError(t, err)
 
 	// file downloaded ok
@@ -193,7 +193,7 @@ func TestVerify(t *testing.T) {
 	}
 
 	testClient := NewDownloader(config)
-	artifact, err := testClient.Download(context.Background(), "beat/filebeat", beatSpec, version)
+	artifact, err := testClient.Download(context.Background(), beatSpec, version)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,7 +19,7 @@ type FailingDownloader struct {
 	called bool
 }
 
-func (d *FailingDownloader) Download(ctx context.Context, _ string, _ program.Spec, _ string) (string, error) {
+func (d *FailingDownloader) Download(ctx context.Context, _ program.Spec, _ string) (string, error) {
 	d.called = true
 	return "", errors.New("failing")
 }
@@ -30,7 +30,7 @@ type SuccDownloader struct {
 	called bool
 }
 
-func (d *SuccDownloader) Download(ctx context.Context, _ string, _ program.Spec, _ string) (string, error) {
+func (d *SuccDownloader) Download(ctx context.Context, _ program.Spec, _ string) (string, error) {
 	d.called = true
 	return "succ", nil
 }
@@ -59,7 +59,7 @@ func TestComposed(t *testing.T) {
 
 	for _, tc := range testCases {
 		d := NewDownloader(tc.downloaders[0], tc.downloaders[1])
-		r, _ := d.Download(context.TODO(), "", program.Spec{Name: "a"}, "b")
+		r, _ := d.Download(context.TODO(), program.Spec{Name: "a"}, "b")
 
 		assert.Equal(t, tc.expectedResult, r == "succ")
 

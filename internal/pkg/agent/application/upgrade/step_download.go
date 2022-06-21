@@ -22,10 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const (
-	AgentRemoteArtifact = "beats/" + agentName
-)
-
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
@@ -54,7 +50,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, "initiating fetcher")
 	}
 
-	path, err := fetcher.Download(ctx, AgentRemoteArtifact, agentSpec, version)
+	path, err := fetcher.Download(ctx, agentSpec, version)
 	if err != nil {
 		return "", errors.New(err, "failed upgrade of agent binary")
 	}

@@ -142,7 +142,7 @@ func waitFor(t *testing.T, check func() error) {
 
 type DummyDownloader struct{}
 
-func (*DummyDownloader) Download(_ context.Context, _ string, _ program.Spec, _ string) (string, error) {
+func (*DummyDownloader) Download(_ context.Context, _ program.Spec, _ string) (string, error) {
 	return "", nil
 }
 

@@ -57,7 +57,7 @@ func TestDownloadBodyError(t *testing.T) {
 
 	log := newRecordLogger()
 	testClient := NewDownloaderWithClient(log, config, *client)
-	artifactPath, err := testClient.Download(context.Background(), "beats/filebeat", beatSpec, version)
+	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	if err == nil {
 		t.Fatal("expected Download to return an error")
@@ -108,7 +108,7 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 
 	log := newRecordLogger()
 	testClient := NewDownloaderWithClient(log, config, *client)
-	artifactPath, err := testClient.Download(context.Background(), "beats/filebeat", beatSpec, version)
+	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
 
@@ -162,7 +162,7 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 
 	log := newRecordLogger()
 	testClient := NewDownloaderWithClient(log, config, *client)
-	artifactPath, err := testClient.Download(context.Background(), "beats/filebeat", beatSpec, version)
+	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
 

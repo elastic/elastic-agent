@@ -75,7 +75,8 @@ func NewDownloaderWithClient(log progressLogger, config *artifact.Config, client
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, remoteArtifact string, spec program.Spec, version string) (_ string, err error) {
+func (e *Downloader) Download(ctx context.Context, spec program.Spec, version string) (_ string, err error) {
+	remoteArtifact := spec.Artifact
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {

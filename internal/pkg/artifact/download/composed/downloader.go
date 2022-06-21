@@ -34,13 +34,13 @@ func NewDownloader(downloaders ...download.Downloader) *Downloader {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, remoteArtifact string, spec program.Spec, version string) (string, error) {
+func (e *Downloader) Download(ctx context.Context, spec program.Spec, version string) (string, error) {
 	var err error
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 
 	for _, d := range e.dd {
-		s, e := d.Download(ctx, remoteArtifact, spec, version)
+		s, e := d.Download(ctx, spec, version)
 		if e == nil {
 			return s, nil
 		}
