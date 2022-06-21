@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/stateresolver"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install"
@@ -29,7 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/plugin/service"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
@@ -138,8 +138,8 @@ func (o *Operator) State() map[string]state.State {
 }
 
 // Specs returns all program specifications
-func (o *Operator) Specs() map[string]component.Spec {
-	r := make(map[string]component.Spec)
+func (o *Operator) Specs() map[string]program.Spec {
+	r := make(map[string]program.Spec)
 
 	o.appsLock.Lock()
 	defer o.appsLock.Unlock()
@@ -184,7 +184,7 @@ func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) 
 
 	for _, step := range steps {
 		if !strings.EqualFold(step.ProgramSpec.CommandName(), monitoringName) {
-			if _, isSupported := component.Supported[step.ProgramSpec.CommandName()]; !isSupported {
+			if _, isSupported := program.SupportedMap[step.ProgramSpec.CommandName()]; !isSupported {
 				// mark failed, new config cannot be run
 				msg := fmt.Sprintf("program '%s' is not supported", step.ProgramSpec.CommandName())
 				o.statusReporter.Update(state.Failed, msg, nil)

@@ -10,8 +10,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"go.elastic.co/apm"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // Downloader is a downloader with a predefined set of downloaders.
@@ -34,7 +34,7 @@ func NewDownloader(downloaders ...download.Downloader) *Downloader {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, remoteArtifact string, spec component.Spec, version string) (string, error) {
+func (e *Downloader) Download(ctx context.Context, remoteArtifact string, spec program.Spec, version string) (string, error) {
 	var err error
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()

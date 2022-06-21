@@ -14,9 +14,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -204,13 +204,15 @@ func (o *Operator) generateMonitoringSteps(version, outputType string, output in
 	return steps
 }
 
-func loadSpecFromSupported(processName string) component.Spec {
-	if loadedSpec, found := component.Supported[strings.ToLower(processName)]; found {
+func loadSpecFromSupported(processName string) program.Spec {
+	if loadedSpec, found := program.SupportedMap[strings.ToLower(processName)]; found {
 		return loadedSpec
 	}
 
-	return component.Spec{
-		Name: processName,
+	return program.Spec{
+		Name:     processName,
+		Cmd:      processName,
+		Artifact: fmt.Sprintf("%s/%s", artifactPrefix, processName),
 	}
 }
 
@@ -661,12 +663,12 @@ func normalizeHTTPCopyRules(name string) []map[string]interface{} {
 		},
 	}
 
-	spec, found := component.Supported[name]
+	spec, found := program.SupportedMap[name]
 	if !found {
 		return fromToMap
 	}
 
-	for _, exportedMetric := range spec.ProgramSpec.ExportedMetrics {
+	for _, exportedMetric := range spec.ExportedMetrics {
 		fromToMap = append(fromToMap, map[string]interface{}{
 			"from": fmt.Sprintf("http.agent.%s", exportedMetric),
 			"to":   exportedMetric,

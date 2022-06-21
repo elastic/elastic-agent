@@ -20,22 +20,11 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/internal/yamltest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
 
 var (
 	generateFlag = flag.Bool("generate", false, "Write golden files")
-	componentSet component.ComponentSet
 )
-
-func init() {
-	cs, err := componenttest.LoadComponents()
-	if err != nil {
-		panic(err)
-	}
-	componentSet = cs
-}
 
 func TestGroupBy(t *testing.T) {
 	t.Run("only named output", func(t *testing.T) {
@@ -480,7 +469,7 @@ func TestConfiguration(t *testing.T) {
 			ast, err := transpiler.NewAST(m)
 			require.NoError(t, err)
 
-			programs, err := Programs(&fakeAgentInfo{}, componentSet, ast)
+			programs, err := Programs(&fakeAgentInfo{}, ast)
 			if test.err {
 				require.Error(t, err)
 				return
@@ -558,7 +547,7 @@ func TestUseCases(t *testing.T) {
 			ast, err := transpiler.NewAST(m)
 			require.NoError(t, err)
 
-			programs, err := Programs(&fakeAgentInfo{}, componentSet, ast)
+			programs, err := Programs(&fakeAgentInfo{}, ast)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(programs))

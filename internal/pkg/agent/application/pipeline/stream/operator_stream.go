@@ -11,8 +11,8 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -26,7 +26,7 @@ type stater interface {
 }
 
 type specer interface {
-	Specs() map[string]component.Spec
+	Specs() map[string]program.Spec
 }
 
 func (b *operatorStream) Close() error {
@@ -41,7 +41,7 @@ func (b *operatorStream) State() map[string]state.State {
 	return nil
 }
 
-func (b *operatorStream) Specs() map[string]component.Spec {
+func (b *operatorStream) Specs() map[string]program.Spec {
 	if s, ok := b.configHandler.(specer); ok {
 		return s.Specs()
 	}

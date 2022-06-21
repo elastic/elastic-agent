@@ -82,11 +82,7 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 			return err
 		}
 		// Set input types from the spec
-		actionInputTypes := make([]string, 0)
-		if a.desc.Spec().ProgramSpec.ActionInputTypes != nil {
-			actionInputTypes = a.desc.Spec().ProgramSpec.ActionInputTypes
-		}
-		a.srvState.SetInputTypes(actionInputTypes)
+		a.srvState.SetInputTypes(a.desc.Spec().ActionInputTypes)
 	}
 
 	if a.state.Status != state.Stopped {

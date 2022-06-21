@@ -7,15 +7,15 @@ package hooks
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 type embeddedInstaller interface {
-	Install(ctx context.Context, spec component.Spec, version, installDir string) error
+	Install(ctx context.Context, spec program.Spec, version, installDir string) error
 }
 
 type embeddedChecker interface {
-	Check(ctx context.Context, spec component.Spec, version, installDir string) error
+	Check(ctx context.Context, spec program.Spec, version, installDir string) error
 }
 
 // InstallerChecker runs the PostInstallSteps after running the embedded installer
@@ -35,25 +35,25 @@ func NewInstallerChecker(i embeddedInstaller, c embeddedChecker) (*InstallerChec
 
 // Install performs installation of program in a specific version, then runs the
 // PostInstallSteps for the program if defined.
-func (i *InstallerChecker) Install(ctx context.Context, spec component.Spec, version, installDir string) error {
+func (i *InstallerChecker) Install(ctx context.Context, spec program.Spec, version, installDir string) error {
 	if err := i.installer.Install(ctx, spec, version, installDir); err != nil {
 		return err
 	}
-	if spec.ProgramSpec.PostInstallSteps != nil {
-		return spec.ProgramSpec.PostInstallSteps.Execute(ctx, installDir)
+	if spec.PostInstallSteps != nil {
+		return spec.PostInstallSteps.Execute(ctx, installDir)
 	}
 	return nil
 }
 
 // Check performs installation check of program to ensure that it is already installed, then
 // runs the InstallerCheckSteps to ensure that the installation is valid.
-func (i *InstallerChecker) Check(ctx context.Context, spec component.Spec, version, installDir string) error {
+func (i *InstallerChecker) Check(ctx context.Context, spec program.Spec, version, installDir string) error {
 	err := i.checker.Check(ctx, spec, version, installDir)
 	if err != nil {
 		return err
 	}
-	if spec.ProgramSpec.CheckInstallSteps != nil {
-		return spec.ProgramSpec.CheckInstallSteps.Execute(ctx, installDir)
+	if spec.CheckInstallSteps != nil {
+		return spec.CheckInstallSteps.Execute(ctx, installDir)
 	}
 
 	return nil

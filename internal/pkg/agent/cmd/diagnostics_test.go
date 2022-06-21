@@ -19,8 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 var testDiagnostics = DiagnosticsInfo{
@@ -86,17 +85,11 @@ func Example_humanDiagnosticsOutput() {
 	//      error: failed to get metricbeat data
 }
 
-func init() {
-	if _, err := componenttest.LoadComponents(); err != nil {
-		panic(err)
-	}
-}
-
 func Test_collectEndpointSecurityLogs(t *testing.T) {
 	root := filepath.Join("testdata", "diagnostics", "endpoint-security", "logs")
 
-	specs := component.Supported
-	specs["endpoint-security"].ProgramSpec.LogPaths[runtime.GOOS] =
+	specs := program.SupportedMap
+	specs["endpoint-security"].LogPaths[runtime.GOOS] =
 		filepath.Join(root, "endpoint-*.log")
 
 	buff := bytes.Buffer{}
@@ -134,8 +127,8 @@ func Test_collectEndpointSecurityLogs(t *testing.T) {
 func Test_collectEndpointSecurityLogs_noEndpointSecurity(t *testing.T) {
 	root := filepath.Join("doesNotExist")
 
-	specs := component.Supported
-	specs["endpoint-security"].ProgramSpec.LogPaths["linux"] =
+	specs := program.SupportedMap
+	specs["endpoint-security"].LogPaths["linux"] =
 		filepath.Join(root, "endpoint-*.log")
 
 	buff := bytes.Buffer{}

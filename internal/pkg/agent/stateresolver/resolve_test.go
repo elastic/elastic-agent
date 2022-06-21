@@ -18,15 +18,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
 
 func TestResolver(t *testing.T) {
-	if _, err := componenttest.LoadComponents(); err != nil {
-		t.Fatal(err)
-	}
-
 	fb1 := fb("1")
 	fb2 := fb("2")
 	mb1 := mb("2")
@@ -373,7 +367,7 @@ func (c *cfg) ProgramNames() []string {
 }
 
 func p(identifier, checksum string) program.Program {
-	s, ok := component.FindSpecByName(identifier)
+	s, ok := program.FindSpecByName(identifier)
 	if !ok {
 		panic("can't find spec with identifier " + identifier)
 	}

@@ -15,8 +15,8 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -39,7 +39,7 @@ func NewDownloader(config *artifact.Config) *Downloader {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, _ string, spec component.Spec, version string) (_ string, err error) {
+func (e *Downloader) Download(ctx context.Context, _ string, spec program.Spec, version string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 	downloadedFiles := make([]string, 0, 2)
@@ -64,7 +64,7 @@ func (e *Downloader) Download(ctx context.Context, _ string, spec component.Spec
 	return path, err
 }
 
-func (e *Downloader) download(operatingSystem string, spec component.Spec, version string) (string, error) {
+func (e *Downloader) download(operatingSystem string, spec program.Spec, version string) (string, error) {
 	filename, err := artifact.GetArtifactName(spec, version, operatingSystem, e.config.Arch())
 	if err != nil {
 		return "", errors.New(err, "generating package name failed")
@@ -78,7 +78,7 @@ func (e *Downloader) download(operatingSystem string, spec component.Spec, versi
 	return e.downloadFile(filename, fullPath)
 }
 
-func (e *Downloader) downloadHash(operatingSystem string, spec component.Spec, version string) (string, error) {
+func (e *Downloader) downloadHash(operatingSystem string, spec program.Spec, version string) (string, error) {
 	filename, err := artifact.GetArtifactName(spec, version, operatingSystem, e.config.Arch())
 	if err != nil {
 		return "", errors.New(err, "generating package name failed")

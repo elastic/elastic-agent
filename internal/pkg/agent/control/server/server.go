@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	monitoring "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/socket"
@@ -32,7 +33,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -55,11 +55,11 @@ type Server struct {
 }
 
 type specer interface {
-	Specs() map[string]component.Spec
+	Specs() map[string]program.Spec
 }
 
 type specInfo struct {
-	spec component.Spec
+	spec program.Spec
 	app  string
 	rk   string
 }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"runtime"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/atomic"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/awaitable"
@@ -16,7 +17,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/hooks"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/tar"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/zip"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 var (
@@ -29,7 +29,7 @@ type Installer interface {
 	// Install installs an artifact and returns
 	// location of the installed program
 	// error if something went wrong
-	Install(ctx context.Context, spec component.Spec, version, installDir string) error
+	Install(ctx context.Context, spec program.Spec, version, installDir string) error
 }
 
 // InstallerChecker is an interface that installs but also checks for valid installation.
@@ -37,7 +37,7 @@ type InstallerChecker interface {
 	Installer
 
 	// Check checks if the installation is good.
-	Check(ctx context.Context, spec component.Spec, version, installDir string) error
+	Check(ctx context.Context, spec program.Spec, version, installDir string) error
 }
 
 // AwaitableInstallerChecker is an interface that installs, checks but also is awaitable to check when actions are done.

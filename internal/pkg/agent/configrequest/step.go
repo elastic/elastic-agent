@@ -4,7 +4,7 @@
 
 package configrequest
 
-import "github.com/elastic/elastic-agent/pkg/component"
+import "github.com/elastic/elastic-agent/internal/pkg/agent/program"
 
 const (
 	// StepRun is a name of Start program event
@@ -23,7 +23,7 @@ type Step struct {
 	// Version is a version of a program
 	Version string
 	// Spec for the program
-	ProgramSpec component.Spec
+	ProgramSpec program.Spec
 	// Meta contains additional data such as version, configuration or tags.
 	Meta map[string]interface{}
 }

@@ -31,7 +31,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/go-sysinfo"
 )
@@ -285,14 +284,8 @@ func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 		return nil, err
 	}
 
-	components, err := component.LoadComponents(paths.Components())
-	if err != nil {
-		return nil, errors.New(err, "loading processing unit definitions")
-	}
-
 	emit, err := emitter.New(
 		ctx,
-		components,
 		log,
 		agentInfo,
 		composableWaiter,
@@ -322,8 +315,9 @@ func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 			return nil, err
 		}
 		router.programs["default"] = append(router.programs["default"], program.Program{
-			Spec: component.Spec{
+			Spec: program.Spec{
 				Name: "fleet-server",
+				Cmd:  "fleet-server",
 			},
 			Config: ast,
 		})

@@ -17,16 +17,9 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
-	_ "github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
-
-func init() {
-	componenttest.LoadComponents()
-}
 
 func TestMain(m *testing.M) {
 	// init supported with test cases
@@ -35,20 +28,22 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	configurableDpuSpec := component.Spec{
-		ProgramSpec: spec.Spec{},
-		Name:        "configurable",
+	configurableSpec := program.Spec{
+		Name: "configurable",
+		Cmd:  "configurable",
+		Args: []string{},
 	}
 
-	serviceDpuSpec := component.Spec{
-		ProgramSpec: spec.Spec{
-			ServicePort: port,
-		},
-		Name: "serviceable",
+	serviceSpec := program.Spec{
+		ServicePort: port,
+		Name:        "serviceable",
+		Cmd:         "serviceable",
+		Args:        []string{fmt.Sprintf("%d", port)},
 	}
 
-	component.Supported["configurable"] = configurableDpuSpec
-	component.Supported["serviceable"] = serviceDpuSpec
+	program.Supported = append(program.Supported, configurableSpec, serviceSpec)
+	program.SupportedMap["configurable"] = configurableSpec
+	program.SupportedMap["serviceable"] = serviceSpec
 
 	if err := isAvailable("configurable"); err != nil {
 		panic(err)

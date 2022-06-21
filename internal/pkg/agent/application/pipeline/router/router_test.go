@@ -13,8 +13,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -25,10 +23,6 @@ const (
 	executeOp
 	closeOp
 )
-
-func init() {
-	componenttest.LoadComponents()
-}
 
 func (r *rOp) String() string {
 	m := map[rOp]string{
@@ -56,7 +50,7 @@ func TestRouter(t *testing.T) {
 
 	t.Run("create new and destroy unused stream", func(t *testing.T) {
 		recorder := &recorder{}
-		r, err := New(nil, nil, recorder.factory)
+		r, err := New(nil, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -86,7 +80,7 @@ func TestRouter(t *testing.T) {
 		k2 := "KEY_2"
 
 		recorder := &recorder{}
-		r, err := New(nil, component.Supported, recorder.factory)
+		r, err := New(nil, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -124,7 +118,7 @@ func TestRouter(t *testing.T) {
 
 	t.Run("create new and delegate program to existing stream", func(t *testing.T) {
 		recorder := &recorder{}
-		r, err := New(nil, component.Supported, recorder.factory)
+		r, err := New(nil, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -151,7 +145,7 @@ func TestRouter(t *testing.T) {
 		k2 := "KEY_2"
 
 		recorder := &recorder{}
-		r, err := New(nil, component.Supported, recorder.factory)
+		r, err := New(nil, recorder.factory)
 		require.NoError(t, err)
 		_ = r.Route(ctx, "hello", map[pipeline.RoutingKey][]program.Program{
 			pipeline.DefaultRK: programs,
@@ -233,10 +227,7 @@ func assertOps(t *testing.T, expected []event, received []event) {
 func e(rk pipeline.RoutingKey, op rOp) event {
 	return event{rk: rk, op: op}
 }
-func getRandomSpec() component.Spec {
-	for _, v := range component.Supported {
-		return v
-	}
 
-	return component.Spec{Name: "beat"}
+func getRandomSpec() program.Spec {
+	return program.Supported[1]
 }

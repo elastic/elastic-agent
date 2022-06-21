@@ -31,13 +31,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/tar"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -706,7 +706,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	if err != nil {
 		return nil, errors.New(err, "creating installer")
 	}
-	spec := component.Spec{Name: name}
+	spec := program.Spec{Name: name, Cmd: name, Artifact: name}
 	version := release.Version()
 	if release.Snapshot() {
 		version = fmt.Sprintf("%s-SNAPSHOT", version)
@@ -726,7 +726,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	}
 	apmDir := filepath.Join(path, files[0].Name())
 	// Start apm-server process respecting path ENVs
-	apmBinary := filepath.Join(apmDir, spec.Command())
+	apmBinary := filepath.Join(apmDir, spec.Cmd)
 	log, err := logger.New("apm-server", false)
 	if err != nil {
 		return nil, err

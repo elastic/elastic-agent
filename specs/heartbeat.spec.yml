@@ -45,25 +45,3 @@ inputs:
     outputs: *outputs
     command:
       args: *args
-
-# backward compatibility, remove with new inputs
-restart_on_output_change: true
-rules:
-  - fix_stream: {}
-  - filter_values_with_regexp:
-      key: type
-      re: ^synthetics/.+
-      selector: inputs
-  - filter_values:
-      selector: inputs
-      key: enabled
-      values:
-        - true
-  - inject_agent_info: {}
-  - filter:
-      selectors:
-        - inputs
-        - output
-        - keystore
-when: length(${inputs}) > 0 and hasKey(${output}, 'elasticsearch', 'redis',
-  'kafka', 'logstash')

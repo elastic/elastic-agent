@@ -18,9 +18,9 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -178,7 +178,7 @@ type programDetail struct {
 	output       string
 	binaryName   string
 	isMonitoring bool
-	spec         component.Spec
+	spec         program.Spec
 }
 
 func parseID(id string) (programDetail, error) {
@@ -187,7 +187,7 @@ func parseID(id string) (programDetail, error) {
 		return detail, errorfWithStatus(http.StatusBadRequest, "provided ID is not valid")
 	}
 
-	for p, spec := range component.Supported {
+	for p, spec := range program.SupportedMap {
 		if !strings.HasPrefix(id, p+separator) {
 			continue
 		}

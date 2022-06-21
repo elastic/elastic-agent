@@ -9,15 +9,13 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
-// Program represents a program that must be started or must run.
+// Program represents a program that must be started or must run .
 type Program struct {
-	Spec   component.Spec
+	Spec   Spec
 	Config *transpiler.AST
 }
 
@@ -49,7 +47,7 @@ func (p *Program) Configuration() map[string]interface{} {
 
 // Programs take a Tree representation of the main configuration and apply all the different
 // programs rules and generate individual configuration from the rules.
-func Programs(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singleConfig *transpiler.AST) (map[string][]Program, error) {
+func Programs(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST) (map[string][]Program, error) {
 	grouped, err := groupByOutputs(singleConfig)
 	if err != nil {
 		return nil, errors.New(err, errors.TypeConfig, "fail to extract program configuration")
@@ -57,7 +55,7 @@ func Programs(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singl
 
 	groupedPrograms := make(map[string][]Program)
 	for k, config := range grouped {
-		programs, err := DetectPrograms(agentInfo, dpus, config)
+		programs, err := DetectPrograms(agentInfo, config)
 		if err != nil {
 			return nil, errors.New(err, errors.TypeConfig, "fail to generate program configuration")
 		}
@@ -68,11 +66,11 @@ func Programs(agentInfo transpiler.AgentInfo, dpus component.ComponentSet, singl
 }
 
 // DetectPrograms returns the list of programs detected from the provided configuration.
-func DetectPrograms(agentInfo transpiler.AgentInfo, components component.ComponentSet, singleConfig *transpiler.AST) ([]Program, error) {
+func DetectPrograms(agentInfo transpiler.AgentInfo, singleConfig *transpiler.AST) ([]Program, error) {
 	programs := make([]Program, 0)
-	for _, dp := range components {
+	for _, spec := range Supported {
 		specificAST := singleConfig.Clone()
-		ok, err := DetectProgram(dp.ProgramSpec.Rules, dp.ProgramSpec.When, dp.ProgramSpec.Constraints, agentInfo, specificAST)
+		ok, err := DetectProgram(spec.Rules, spec.When, spec.Constraints, agentInfo, specificAST)
 		if err != nil {
 			return nil, err
 		}
@@ -80,14 +78,13 @@ func DetectPrograms(agentInfo transpiler.AgentInfo, components component.Compone
 			continue
 		}
 		program := Program{
-			Spec:   dp,
+			Spec:   spec,
 			Config: specificAST,
 		}
 		programs = append(programs, program)
 	}
 
 	return programs, nil
-
 }
 
 // DetectProgram returns true or false if this program exists in the AST.
@@ -115,7 +112,7 @@ func DetectProgram(rules *transpiler.RuleList, when string, constraints string, 
 	}
 
 	if len(when) == 0 {
-		return false, spec.ErrMissingWhen
+		return false, ErrMissingWhen
 	}
 
 	expression, err := eql.New(when)
@@ -128,9 +125,9 @@ func DetectProgram(rules *transpiler.RuleList, when string, constraints string, 
 
 // KnownProgramNames returns a list of runnable programs by the elastic-agent.
 func KnownProgramNames() []string {
-	names := make([]string, 0, len(component.Supported))
-	for name := range component.Supported {
-		names = append(names, name)
+	names := make([]string, len(Supported))
+	for idx, program := range Supported {
+		names[idx] = program.Name
 	}
 
 	return names

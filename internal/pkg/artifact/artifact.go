@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 var packageArchMap = map[string]string{
@@ -25,7 +25,7 @@ var packageArchMap = map[string]string{
 }
 
 // GetArtifactName constructs a path to a downloaded artifact
-func GetArtifactName(spec component.Spec, version, operatingSystem, arch string) (string, error) {
+func GetArtifactName(spec program.Spec, version, operatingSystem, arch string) (string, error) {
 	key := fmt.Sprintf("%s-binary-%s", operatingSystem, arch)
 	suffix, found := packageArchMap[key]
 	if !found {
@@ -36,7 +36,7 @@ func GetArtifactName(spec component.Spec, version, operatingSystem, arch string)
 }
 
 // GetArtifactPath returns a full path of artifact for a program in specific version
-func GetArtifactPath(spec component.Spec, version, operatingSystem, arch, targetDir string) (string, error) {
+func GetArtifactPath(spec program.Spec, version, operatingSystem, arch, targetDir string) (string, error) {
 	artifactName, err := GetArtifactName(spec, version, operatingSystem, arch)
 	if err != nil {
 		return "", err

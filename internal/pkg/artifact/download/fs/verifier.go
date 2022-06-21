@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -47,7 +47,7 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(spec component.Spec, remoteArtifact, version string) error {
+func (v *Verifier) Verify(spec program.Spec, version string) error {
 	filename, err := artifact.GetArtifactName(spec, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")

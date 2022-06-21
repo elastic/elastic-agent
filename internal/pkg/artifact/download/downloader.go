@@ -7,10 +7,10 @@ package download
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 // Downloader is an interface allowing download of an artifact
 type Downloader interface {
-	Download(ctx context.Context, artifact string, spec component.Spec, version string) (string, error)
+	Download(ctx context.Context, artifact string, spec program.Spec, version string) (string, error)
 }

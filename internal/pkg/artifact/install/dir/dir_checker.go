@@ -8,7 +8,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 // Checker performs basic check that the install directory exists.
@@ -20,7 +20,7 @@ func NewChecker() *Checker {
 }
 
 // Check checks that the install directory exists.
-func (*Checker) Check(_ context.Context, _ component.Spec, _, installDir string) error {
+func (*Checker) Check(_ context.Context, _ program.Spec, _, installDir string) error {
 	_, err := os.Stat(installDir)
 	return err
 }

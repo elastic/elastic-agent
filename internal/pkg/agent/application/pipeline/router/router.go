@@ -14,19 +14,17 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type router struct {
-	components    component.ComponentSet
 	log           *logger.Logger
 	routes        *sorted.Set
 	streamFactory pipeline.StreamFunc
 }
 
 // New creates a new router.
-func New(log *logger.Logger, components component.ComponentSet, factory pipeline.StreamFunc) (pipeline.Router, error) {
+func New(log *logger.Logger, factory pipeline.StreamFunc) (pipeline.Router, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("router", false)
@@ -34,7 +32,7 @@ func New(log *logger.Logger, components component.ComponentSet, factory pipeline
 			return nil, err
 		}
 	}
-	return &router{log: log, components: components, streamFactory: factory, routes: sorted.NewSet()}, nil
+	return &router{log: log, streamFactory: factory, routes: sorted.NewSet()}, nil
 }
 
 func (r *router) Routes() *sorted.Set {

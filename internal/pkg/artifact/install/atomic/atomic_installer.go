@@ -11,12 +11,12 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/hashicorp/go-multierror"
 )
 
 type embeddedInstaller interface {
-	Install(ctx context.Context, spec component.Spec, version, installDir string) error
+	Install(ctx context.Context, spec program.Spec, version, installDir string) error
 }
 
 // Installer installs into temporary destination and moves to correct one after
@@ -33,7 +33,7 @@ func NewInstaller(i embeddedInstaller) (*Installer, error) {
 }
 
 // Install performs installation of program in a specific version.
-func (i *Installer) Install(ctx context.Context, spec component.Spec, version, installDir string) error {
+func (i *Installer) Install(ctx context.Context, spec program.Spec, version, installDir string) error {
 	// tar installer uses Dir of installDir to determine location of unpack
 	//
 	// installer is ran inside a tmp directory created in the parent installDir, this is so the atomic

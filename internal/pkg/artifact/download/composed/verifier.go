@@ -9,8 +9,8 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // Verifier is a verifier with a predefined set of verifiers.
@@ -32,13 +32,13 @@ func NewVerifier(verifiers ...download.Verifier) *Verifier {
 }
 
 // Verify checks the package from configured source.
-func (e *Verifier) Verify(spec component.Spec, remoteArtifact, version string) error {
+func (e *Verifier) Verify(spec program.Spec, version string) error {
 	var err error
 	var checksumMismatchErr *download.ChecksumMismatchError
 	var invalidSignatureErr *download.InvalidSignatureError
 
 	for _, v := range e.vv {
-		e := v.Verify(spec, remoteArtifact, version)
+		e := v.Verify(spec, version)
 		if e == nil {
 			// Success
 			return nil

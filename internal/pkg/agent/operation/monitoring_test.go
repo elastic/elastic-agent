@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/stateresolver"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -31,17 +31,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 func TestExportedMetrics(t *testing.T) {
 	programName := "testing"
 	expectedMetricsName := "metric_name"
-	component.Supported[programName] = component.Spec{
-		ProgramSpec: spec.Spec{
-			ExportedMetrics: []string{expectedMetricsName},
-		},
+	program.SupportedMap[programName] = program.Spec{
+		ExportedMetrics: []string{expectedMetricsName},
 	}
 
 	exportedMetrics := normalizeHTTPCopyRules(programName)
@@ -68,7 +65,7 @@ func TestExportedMetrics(t *testing.T) {
 	}
 
 	require.True(t, exportedMetricFound, "exported metric not found")
-	delete(component.Supported, programName)
+	delete(program.SupportedMap, programName)
 }
 
 func TestGenerateSteps(t *testing.T) {
@@ -203,7 +200,7 @@ func (*testMonitorableApp) Shutdown() {}
 func (*testMonitorableApp) Configure(_ context.Context, config map[string]interface{}) error {
 	return nil
 }
-func (*testMonitorableApp) Spec() component.Spec                                        { return component.Spec{} }
+func (*testMonitorableApp) Spec() program.Spec                                          { return program.Spec{} }
 func (*testMonitorableApp) State() state.State                                          { return state.State{} }
 func (*testMonitorableApp) SetState(_ state.Status, _ string, _ map[string]interface{}) {}
 func (a *testMonitorableApp) Monitor() monitoring.Monitor                               { return a.monitor }
@@ -217,24 +214,24 @@ type testMonitor struct {
 
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
-func (b *testMonitor) EnrichArgs(_ component.Spec, _ string, args []string, _ bool) []string {
+func (b *testMonitor) EnrichArgs(_ program.Spec, _ string, args []string, _ bool) []string {
 	return args
 }
 
 // Cleanup cleans up all drops.
-func (b *testMonitor) Cleanup(component.Spec, string) error { return nil }
+func (b *testMonitor) Cleanup(program.Spec, string) error { return nil }
 
 // Close closes the monitor.
 func (b *testMonitor) Close() {}
 
 // Prepare executes steps in order for monitoring to work correctly
-func (b *testMonitor) Prepare(component.Spec, string, int, int) error { return nil }
+func (b *testMonitor) Prepare(program.Spec, string, int, int) error { return nil }
 
 const testPath = "path"
 
 // LogPath describes a path where application stores logs. Empty if
 // application is not monitorable
-func (b *testMonitor) LogPath(component.Spec, string) string {
+func (b *testMonitor) LogPath(program.Spec, string) string {
 	if !b.monitorLogs {
 		return ""
 	}
@@ -243,7 +240,7 @@ func (b *testMonitor) LogPath(component.Spec, string) string {
 
 // MetricsPath describes a location where application exposes metrics
 // collectable by metricbeat.
-func (b *testMonitor) MetricsPath(component.Spec, string) string {
+func (b *testMonitor) MetricsPath(program.Spec, string) string {
 	if !b.monitorMetrics {
 		return ""
 	}
@@ -251,7 +248,7 @@ func (b *testMonitor) MetricsPath(component.Spec, string) string {
 }
 
 // MetricsPathPrefixed return metrics path prefixed with http+ prefix.
-func (b *testMonitor) MetricsPathPrefixed(component.Spec, string) string {
+func (b *testMonitor) MetricsPathPrefixed(program.Spec, string) string {
 	return "http+path"
 }
 

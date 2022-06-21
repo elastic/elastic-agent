@@ -7,11 +7,11 @@ package hooks
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 type embeddedUninstaller interface {
-	Uninstall(ctx context.Context, spec component.Spec, version, installDir string) error
+	Uninstall(ctx context.Context, spec program.Spec, version, installDir string) error
 }
 
 // Uninstaller that executes PreUninstallSteps
@@ -27,9 +27,9 @@ func NewUninstaller(i embeddedUninstaller) (*Uninstaller, error) {
 }
 
 // Uninstall performs the execution of the PreUninstallSteps
-func (i *Uninstaller) Uninstall(ctx context.Context, spec component.Spec, version, installDir string) error {
-	if spec.ProgramSpec.PreUninstallSteps != nil {
-		return spec.ProgramSpec.PreUninstallSteps.Execute(ctx, installDir)
+func (i *Uninstaller) Uninstall(ctx context.Context, spec program.Spec, version, installDir string) error {
+	if spec.PreUninstallSteps != nil {
+		return spec.PreUninstallSteps.Execute(ctx, installDir)
 	}
 	return i.uninstaller.Uninstall(ctx, spec, version, installDir)
 }

@@ -8,30 +8,30 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // Descriptor defines a program which needs to be run.
 // Is passed around operator operations.
 type Descriptor struct {
-	spec         component.Spec
+	spec         program.Spec
 	executionCtx ExecutionContext
 	directory    string
 	process      ProcessSpec
 }
 
 // NewDescriptor creates a program which satisfies Program interface and can be used with Operator.
-func NewDescriptor(spec component.Spec, version string, config *artifact.Config, tags map[Tag]string) *Descriptor {
+func NewDescriptor(spec program.Spec, version string, config *artifact.Config, tags map[Tag]string) *Descriptor {
 	dir := paths.Components()
 	return NewDescriptorWithPath(dir, spec, version, config, tags)
 }
 
 // NewDescriptorOnPath creates a program which satisfies Program interface and can be used with Operator.
-func NewDescriptorWithPath(path string, spec component.Spec, version string, config *artifact.Config, tags map[Tag]string) *Descriptor {
+func NewDescriptorWithPath(path string, spec program.Spec, version string, config *artifact.Config, tags map[Tag]string) *Descriptor {
 	servicePort := 0
-	if spec.ProgramSpec.ServicePort > 0 {
-		servicePort = spec.ProgramSpec.ServicePort
+	if spec.ServicePort > 0 {
+		servicePort = spec.ServicePort
 	}
 
 	return &Descriptor{
@@ -68,7 +68,7 @@ func (p *Descriptor) ID() string { return p.executionCtx.ID }
 func (p *Descriptor) ExecutionContext() ExecutionContext { return p.executionCtx }
 
 // Spec returns a program specification with resolved binary path.
-func (p *Descriptor) Spec() component.Spec {
+func (p *Descriptor) Spec() program.Spec {
 	return p.spec
 }
 
@@ -82,10 +82,10 @@ func (p *Descriptor) Directory() string {
 	return p.directory
 }
 
-func specification(dir string, spec component.Spec) ProcessSpec {
+func specification(dir string, spec program.Spec) ProcessSpec {
 	return ProcessSpec{
 		BinaryPath:    filepath.Join(dir, spec.Command()),
-		Args:          spec.Args(),
+		Args:          spec.Args,
 		Configuration: nil,
 	}
 }

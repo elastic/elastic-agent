@@ -7,22 +7,14 @@ package component
 import (
 	"errors"
 	"fmt"
-	"runtime"
-	"strings"
 	"time"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program/spec"
 )
 
 // Spec a components specification.
 type Spec struct {
-	Name    string       `yaml:"name,omitempty"`
-	Version int          `config:"version" yaml:"version" validate:"required"`
-	Inputs  []InputSpec  `config:"inputs,omitempty" yaml:"inputs,omitempty"`
-	Outputs []OutputSpec `config:"outputs,omitempty" yaml:"outputs,omitempty"`
-
-	// TODO: For backward comp, removed later
-	ProgramSpec spec.Spec `config:",inline" yaml:",inline"`
+	Name    string      `yaml:"name,omitempty"`
+	Version int         `config:"version" yaml:"version" validate:"required"`
+	Inputs  []InputSpec `config:"inputs,omitempty" yaml:"inputs,omitempty"`
 }
 
 // Validate ensures correctness of component specification.
@@ -48,32 +40,6 @@ func (s *Spec) Validate() error {
 			inputsToPlatforms[input.Name] = a
 		}
 	}
-	return nil
-}
-
-// CommandName is a command but without any OS specific suffixes.
-func (s *Spec) CommandName() string {
-	return strings.ToLower(s.Name)
-}
-
-func (s *Spec) Command() string {
-	name := strings.ToLower(s.Name)
-	if runtime.GOOS == "windows" {
-		return name + ".exe"
-	}
-
-	return name
-}
-
-func (s *Spec) Args() []string {
-	// TODO: once we run input per input:output combination match args to that
-	// meaning load args per input set
-	if len(s.Inputs) > 0 && s.Inputs[0].Command != nil {
-		return s.Inputs[0].Command.Args
-	} else if len(s.Outputs) > 0 {
-		return s.Outputs[0].Command.Args
-	}
-
 	return nil
 }
 

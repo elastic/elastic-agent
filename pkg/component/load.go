@@ -9,11 +9,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	ucfg "github.com/elastic/go-ucfg/yaml"
-	"gopkg.in/yaml.v2"
+	"github.com/elastic/go-ucfg/yaml"
 )
 
 const (
@@ -167,7 +165,7 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 // Will error in the case that the specification is not valid. Only valid specifications are allowed.
 func LoadSpec(data []byte) (Spec, error) {
 	var spec Spec
-	cfg, err := ucfg.NewConfig(data)
+	cfg, err := yaml.NewConfig(data)
 	if err != nil {
 		return spec, err
 	}
@@ -176,43 +174,6 @@ func LoadSpec(data []byte) (Spec, error) {
 		return spec, err
 	}
 	return spec, nil
-}
-
-// ReadSpecs reads all the specs that match the provided globbing path.
-func ReadSpecs(path string) ([]Spec, error) {
-	var specs []Spec
-	files, err := filepath.Glob(filepath.Join(path, "*"+specSuffix))
-	if err != nil {
-		return []Spec{}, errors.New(err, "could not include spec", errors.TypeConfig)
-	}
-
-	for _, f := range files {
-		data, err := ioutil.ReadFile(f)
-		if err != nil {
-			return []Spec{}, errors.New(err, fmt.Sprintf("could not read spec %s", f), errors.TypeConfig)
-		}
-
-		name := strings.TrimSuffix(filepath.Base(f), specSuffix)
-		spec := Spec{Name: name}
-		if err := yaml.Unmarshal(data, &spec); err != nil {
-			return []Spec{}, errors.New(err, "could not unmarshal YAML", errors.TypeConfig)
-		}
-		specs = append(specs, spec)
-	}
-
-	return specs, nil
-}
-
-// FindSpecByName find a spec by name and return it or false if we cannot find it.
-// TODO: remove
-func FindSpecByName(name string) (Spec, bool) {
-	for _, candidate := range Supported {
-		if strings.EqualFold(name, candidate.Name) {
-			return candidate, true
-		}
-
-	}
-	return Spec{}, false
 }
 
 func containsStr(s []string, v string) bool {

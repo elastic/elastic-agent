@@ -26,14 +26,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-func init() {
-	componenttest.LoadComponents()
-}
 
 func TestManagedModeRouting(t *testing.T) {
 
@@ -49,11 +43,11 @@ func TestManagedModeRouting(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
-	router, _ := router.New(log, component.Supported, streamFn)
+	router, _ := router.New(log, streamFn)
 	agentInfo, _ := info.NewAgentInfo(false)
 	nullStore := &storage.NullStore{}
 	composableCtrl, _ := composable.New(log, nil)
-	emit, err := emitter.New(ctx, component.Supported, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
+	emit, err := emitter.New(ctx, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
 	require.NoError(t, err)
 
 	actionDispatcher, err := dispatcher.New(ctx, log, handlers.NewDefault(log))

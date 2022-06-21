@@ -46,7 +46,6 @@ import (
 	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
@@ -135,12 +134,7 @@ func newManaged(
 		return nil, errors.New(err, "failed to initialize monitoring")
 	}
 
-	components, err := component.LoadComponents(paths.Components())
-	if err != nil {
-		return nil, errors.New(err, "loading processing unit definitions")
-	}
-
-	router, err := router.New(log, components, stream.Factory(managedApplication.bgContext, agentInfo, cfg.Settings, managedApplication.srv, combinedReporter, monitor, statusCtrl))
+	router, err := router.New(log, stream.Factory(managedApplication.bgContext, agentInfo, cfg.Settings, managedApplication.srv, combinedReporter, monitor, statusCtrl))
 	if err != nil {
 		return nil, errors.New(err, "fail to initialize pipeline router")
 	}
@@ -153,7 +147,6 @@ func newManaged(
 
 	emit, err := emitter.New(
 		managedApplication.bgContext,
-		components,
 		log,
 		agentInfo,
 		composableCtrl,

@@ -21,8 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -33,8 +33,10 @@ const (
 )
 
 var (
-	beatSpec = component.Spec{
-		Name: "filebeat",
+	beatSpec = program.Spec{
+		Name:     "filebeat",
+		Cmd:      "filebeat",
+		Artifact: "beats/filebeat",
 	}
 )
 
@@ -125,7 +127,7 @@ func TestVerify(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = testVerifier.Verify(beatSpec, "beats/filebeat", version)
+			err = testVerifier.Verify(beatSpec, version)
 			require.NoError(t, err)
 
 			os.Remove(artifact)

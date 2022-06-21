@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/stateresolver"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
@@ -27,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
@@ -101,7 +101,7 @@ func getLogger() *logger.Logger {
 }
 
 func getProgram(binary, version string) *app.Descriptor {
-	spec := component.Supported[binary]
+	spec := program.SupportedMap[binary]
 	downloadCfg := &artifact.Config{
 		InstallPath:     installPath,
 		OperatingSystem: "darwin",
@@ -142,7 +142,7 @@ func waitFor(t *testing.T, check func() error) {
 
 type DummyDownloader struct{}
 
-func (*DummyDownloader) Download(_ context.Context, _ string, _ component.Spec, _ string) (string, error) {
+func (*DummyDownloader) Download(_ context.Context, _ string, _ program.Spec, _ string) (string, error) {
 	return "", nil
 }
 
@@ -150,7 +150,7 @@ var _ download.Downloader = &DummyDownloader{}
 
 type DummyVerifier struct{}
 
-func (*DummyVerifier) Verify(_ component.Spec, _, _ string) error {
+func (*DummyVerifier) Verify(_ program.Spec, _ string) error {
 	return nil
 }
 
@@ -158,11 +158,11 @@ var _ download.Verifier = &DummyVerifier{}
 
 type DummyInstallerChecker struct{}
 
-func (*DummyInstallerChecker) Check(_ context.Context, _ component.Spec, _, _ string) error {
+func (*DummyInstallerChecker) Check(_ context.Context, _ program.Spec, _, _ string) error {
 	return nil
 }
 
-func (*DummyInstallerChecker) Install(_ context.Context, _ component.Spec, _, _ string) error {
+func (*DummyInstallerChecker) Install(_ context.Context, _ program.Spec, _, _ string) error {
 	return nil
 }
 
@@ -170,7 +170,7 @@ var _ install.InstallerChecker = &DummyInstallerChecker{}
 
 type DummyUninstaller struct{}
 
-func (*DummyUninstaller) Uninstall(_ context.Context, _ component.Spec, _, _ string) error {
+func (*DummyUninstaller) Uninstall(_ context.Context, _ program.Spec, _, _ string) error {
 	return nil
 }
 

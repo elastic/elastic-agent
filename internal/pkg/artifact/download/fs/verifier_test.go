@@ -18,11 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
 
 const (
@@ -30,12 +29,8 @@ const (
 )
 
 var (
-	beatSpec = component.Spec{Name: "Filebeat"}
+	beatSpec = program.Spec{Name: "Filebeat", Cmd: "filebeat", Artifact: "beat/filebeat"}
 )
-
-func init() {
-	componenttest.LoadComponents()
-}
 
 func TestFetchVerify(t *testing.T) {
 	timeout := 15 * time.Second
@@ -43,7 +38,7 @@ func TestFetchVerify(t *testing.T) {
 	installPath := filepath.Join("testdata", "install")
 	targetPath := filepath.Join("testdata", "download")
 	ctx := context.Background()
-	s := component.Spec{Name: "Beat"}
+	s := program.Spec{Name: "Beat"}
 	version := "8.0.0"
 
 	targetFilePath := filepath.Join(targetPath, "beat-8.0.0-darwin-x86_64.tar.gz")
@@ -73,7 +68,7 @@ func TestFetchVerify(t *testing.T) {
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(s, "beat/beat", version)
+	err = verifier.Verify(s, version)
 	var checksumErr *download.ChecksumMismatchError
 	assert.ErrorAs(t, err, &checksumErr)
 
@@ -96,7 +91,7 @@ func TestFetchVerify(t *testing.T) {
 	_, err = os.Stat(hashTargetFilePath)
 	assert.NoError(t, err)
 
-	err = verifier.Verify(s, "beat/beat", version)
+	err = verifier.Verify(s, version)
 	assert.NoError(t, err)
 
 	// Enable GPG signature validation.
@@ -116,7 +111,7 @@ func TestFetchVerify(t *testing.T) {
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(s, "beat/beat", version)
+		err = verifier.Verify(s, version)
 		require.Error(t, err)
 
 		// Don't delete these files when GPG validation failure.
@@ -129,7 +124,7 @@ func TestFetchVerify(t *testing.T) {
 		err = ioutil.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(s, "beat/beat", version)
+		err = verifier.Verify(s, version)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
 
@@ -213,7 +208,7 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = testVerifier.Verify(beatSpec, "beat/filebeat", version)
+	err = testVerifier.Verify(beatSpec, version)
 	require.NoError(t, err)
 
 	os.Remove(artifact)
@@ -221,7 +216,7 @@ func TestVerify(t *testing.T) {
 	os.RemoveAll(config.DropPath)
 }
 
-func prepareTestCase(beatSpec component.Spec, version string, cfg *artifact.Config) error {
+func prepareTestCase(beatSpec program.Spec, version string, cfg *artifact.Config) error {
 	filename, err := artifact.GetArtifactName(beatSpec, version, cfg.OperatingSystem, cfg.Architecture)
 	if err != nil {
 		return err

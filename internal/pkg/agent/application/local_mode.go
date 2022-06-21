@@ -32,7 +32,6 @@ import (
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
@@ -108,12 +107,7 @@ func newLocal(
 		return nil, errors.New(err, "failed to initialize monitoring")
 	}
 
-	components, err := component.LoadComponents(paths.Components())
-	if err != nil {
-		return nil, errors.New(err, "loading processing unit definitions")
-	}
-
-	router, err := router.New(log, components, stream.Factory(localApplication.bgContext, agentInfo, cfg.Settings, localApplication.srv, reporter, monitor, statusCtrl))
+	router, err := router.New(log, stream.Factory(localApplication.bgContext, agentInfo, cfg.Settings, localApplication.srv, reporter, monitor, statusCtrl))
 	if err != nil {
 		return nil, errors.New(err, "fail to initialize pipeline router")
 	}
@@ -127,7 +121,6 @@ func newLocal(
 	discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
 	emit, err := emitter.New(
 		localApplication.bgContext,
-		components,
 		log,
 		agentInfo,
 		composableCtrl,

@@ -22,12 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/pkg/component/componenttest"
 )
-
-func init() {
-	componenttest.LoadComponents()
-}
 
 func TestDownloadBodyError(t *testing.T) {
 	// This tests the scenario where the download encounters a network error

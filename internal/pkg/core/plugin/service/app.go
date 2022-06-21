@@ -9,9 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
@@ -22,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/core/plugin"
@@ -29,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
@@ -123,7 +120,7 @@ func (a *Application) Monitor() monitoring.Monitor {
 }
 
 // Spec returns the program spec of this app.
-func (a *Application) Spec() component.Spec {
+func (a *Application) Spec() program.Spec {
 	return a.desc.Spec()
 }
 
@@ -176,17 +173,13 @@ func (a *Application) Start(ctx context.Context, _ app.Taggable, cfg map[string]
 	} else {
 		a.setState(state.Starting, "Starting", nil)
 
-		if err := a.checkStart(); err != nil {
-			return err
-		}
-
 		a.srvState, err = a.srv.Register(a, string(cfgStr))
 		if err != nil {
 			return err
 		}
 
 		// Set input types from the spec
-		a.srvState.SetInputTypes(a.desc.Spec().ProgramSpec.ActionInputTypes)
+		a.srvState.SetInputTypes(a.desc.Spec().ActionInputTypes)
 	}
 
 	defer func() {
@@ -279,9 +272,6 @@ func (a *Application) Stop() {
 		a.setState(state.Stopped, "Stopped", nil)
 	}
 	a.srvState = nil
-	if err := a.uninstall(); err != nil {
-		a.logger.Errorf("failed uninstalling application %s(%s): %v", a.name, a.id, err)
-	}
 
 	a.cleanUp()
 	a.stopCredsListener()
@@ -384,98 +374,4 @@ func (a *Application) stopCredsListener() {
 	a.credsListener.Close()
 	a.credsWG.Wait()
 	a.credsListener = nil
-}
-
-// checkStart is used for services which needs to define their check and install steps.
-func (a *Application) checkStart() error {
-	srvSpec, err := a.serviceSpec()
-	if err != nil {
-		a.logger.Infof("checkStart: %s", err.Error())
-		return nil
-	}
-
-	if check := srvSpec.Operations.Check; check != nil {
-		if len(check.Args) == 0 {
-			a.logger.Infof("skipping check step for application '%s(%s)': no args defined", a.name, a.id)
-		} else {
-			if err := a.runOnProcess(check.Args, check.Timeout); err != nil {
-				return err
-			}
-		}
-	}
-
-	if install := srvSpec.Operations.Install; install != nil {
-		if len(install.Args) == 0 {
-			a.logger.Infof("skipping install step for application '%s(%s)': no args defined", a.name, a.id)
-		} else {
-			if err := a.runOnProcess(install.Args, install.Timeout); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// checkStart is used for services which needs to define their check and install steps.
-func (a *Application) uninstall() error {
-	srvSpec, err := a.serviceSpec()
-	if err != nil {
-		a.logger.Infof("checkStart: %s", err.Error())
-		return nil
-	}
-
-	if uninstall := srvSpec.Operations.Uninstall; uninstall != nil {
-		if len(uninstall.Args) == 0 {
-			a.logger.Infof("skipping uninstall step for application '%s(%s)': no args defined", a.name, a.id)
-		} else {
-			if err := a.runOnProcess(uninstall.Args, uninstall.Timeout); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (a *Application) serviceSpec() (*component.ServiceSpec, error) {
-	spec := a.Spec()
-	if len(spec.Inputs) == 0 {
-		return nil, errors.New("service %s(%s) has no inputs. checkStart skipped", a.name, a.id)
-	}
-
-	input := spec.Inputs[0]
-	if input.Service == nil {
-		return nil, errors.New("service %s(%s) has no service definition for input %s. checkStart skipped", a.name, a.id, input.Name)
-	}
-
-	return input.Service, nil
-}
-
-func (a *Application) runOnProcess(args []string, timeout time.Duration) error {
-	spec := a.desc.ProcessSpec()
-	getCmd := func(ctx context.Context, logger *logger.Logger, path string, uid, gid int, arg ...string) *exec.Cmd {
-		var cmd *exec.Cmd
-		if ctx == nil {
-			cmd = exec.Command(path, arg...)
-		} else {
-			cmd = exec.CommandContext(ctx, path, arg...)
-		}
-		cmd.Env = append(cmd.Env, os.Environ()...)
-		cmd.Dir = filepath.Dir(path)
-
-		return cmd
-	}
-
-	if timeout <= 0 {
-		timeout = maxTimeout
-	}
-	ctx, cancelFn := context.WithTimeout(context.Background(), timeout)
-	defer cancelFn()
-
-	cmd := getCmd(ctx, a.logger, spec.BinaryPath, a.uid, a.gid, args...)
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	return cmd.Wait()
 }

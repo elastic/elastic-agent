@@ -510,12 +510,12 @@ func ControlProto() error {
 // BuildSpec make sure that all the suppported program spec are built into the binary.
 func BuildSpec() error {
 	// go run dev-tools/cmd/buildspec/buildspec.go --in internal/agent/spec/*.yml --out internal/pkg/agent/program/supported.go
-	// goF := filepath.Join("dev-tools", "cmd", "buildspec", "buildspec.go")
-	// in := filepath.Join("internal", "spec", "*.yml")
-	// out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
+	goF := filepath.Join("dev-tools", "cmd", "buildspec", "buildspec.go")
+	in := filepath.Join("internal", "spec", "*.yml")
+	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
 
-	// fmt.Printf(">> Buildspec from %s to %s\n", in, out)
-	// return RunGo("run", goF, "--in", in, "--out", out)
+	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
+	return RunGo("run", goF, "--in", in, "--out", out)
 
 	return nil
 }

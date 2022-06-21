@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -30,8 +30,8 @@ const (
 )
 
 // MonitoringEndpoint is an endpoint where process is exposing its metrics.
-func MonitoringEndpoint(spec component.Spec, operatingSystem, pipelineID string) string {
-	if endpoint, ok := spec.ProgramSpec.MetricEndpoints[operatingSystem]; ok {
+func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string) string {
+	if endpoint, ok := spec.MetricEndpoints[operatingSystem]; ok {
 		return endpoint
 	}
 	if operatingSystem == "windows" {
@@ -47,8 +47,8 @@ func MonitoringEndpoint(spec component.Spec, operatingSystem, pipelineID string)
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
 }
 
-func getLoggingFile(spec component.Spec, operatingSystem, installPath, pipelineID string) string {
-	if path, ok := spec.ProgramSpec.LogPaths[operatingSystem]; ok {
+func getLoggingFile(spec program.Spec, operatingSystem, installPath, pipelineID string) string {
+	if path, ok := spec.LogPaths[operatingSystem]; ok {
 		return path
 	}
 	if operatingSystem == "windows" {
