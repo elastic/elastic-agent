@@ -34,6 +34,8 @@ const (
 	expectedManifestMode   = os.FileMode(0644)
 	expectedModuleFileMode = expectedManifestMode
 	expectedModuleDirMode  = os.FileMode(0755)
+
+	rootUser = "root"
 )
 
 var (
@@ -173,8 +175,6 @@ func checkZip(t *testing.T, file string) {
 }
 
 const (
-	npcapSettings   = "Windows Npcap installation settings"
-	npcapGrant      = `Insecure.Com LLC \(“The Nmap Project”\) has granted Elasticsearch`
 	npcapLicense    = `Dependency : Npcap \(https://nmap.org/npcap/\)`
 	libpcapLicense  = `Dependency : Libpcap \(http://www.tcpdump.org/\)`
 	winpcapLicense  = `Dependency : Winpcap \(https://www.winpcap.org/\)`
@@ -493,7 +493,7 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 
 func checkDockerUser(t *testing.T, p *packageFile, info *dockerInfo, expectRoot bool) {
 	t.Run(fmt.Sprintf("%s user", p.Name), func(t *testing.T) {
-		if expectRoot != (info.Config.User == "root") {
+		if expectRoot != (info.Config.User == rootUser) {
 			t.Errorf("unexpected docker user: %s", info.Config.User)
 		}
 	})
@@ -564,7 +564,7 @@ func readRPM(rpmFile string) (*packageFile, *rpm.PackageFile, error) {
 			File: file.Name(),
 			Mode: file.Mode(),
 		}
-		if file.Owner() != "root" {
+		if file.Owner() != rootUser {
 			// not 0
 			pe.UID = 123
 			pe.GID = 123
@@ -707,6 +707,7 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
+	manifestFileName := "manifest.json"
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
@@ -717,12 +718,12 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 		}
 
 		switch {
-		case header.Name == "manifest.json":
+		case header.Name == manifestFileName:
 			manifest, err = readDockerManifest(tarReader)
 			if err != nil {
 				return nil, nil, err
 			}
-		case strings.HasSuffix(header.Name, ".json") && header.Name != "manifest.json":
+		case strings.HasSuffix(header.Name, ".json") && header.Name != manifestFileName:
 			info, err = readDockerInfo(tarReader)
 			if err != nil {
 				return nil, nil, err
