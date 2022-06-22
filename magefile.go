@@ -25,6 +25,8 @@ import (
 	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
 
+	//"github.com/sirupsen/logrus"
+
 	"github.com/elastic/e2e-testing/pkg/downloads"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -394,6 +396,7 @@ func AssembleDarwinUniversal() error {
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
 func Package() {
+	//logrus.SetLevel(logrus.TraceLevel)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
@@ -676,7 +679,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		defer os.RemoveAll(dropPath)
 		defer os.Unsetenv(agentDropPath)
 
-		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat", "elastic-agent-shipper"}
+		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
 		if devtools.ExternalBuild == true {
 			ctx := context.Background()
 			for _, beat := range packedBeats {
@@ -689,6 +692,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				}
 			}
 		} else {
+			packedBeats = append(packedBeats, "elastic-agent-shipper")
 			// build from local repo, will assume beats repo is located on the same root level
 			fmt.Println(">>> Building from local repo")
 			for _, b := range packedBeats {
@@ -736,6 +740,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 }
 
 func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
+	fmt.Printf(">>> About to download: %s\n", packageName)
 	location, err := downloads.FetchBeatsBinary(
 		ctx,
 		packageName,
