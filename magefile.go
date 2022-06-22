@@ -25,8 +25,6 @@ import (
 	"github.com/magefile/mage/sh"
 	"github.com/pkg/errors"
 
-	//"github.com/sirupsen/logrus"
-
 	"github.com/elastic/e2e-testing/pkg/downloads"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -396,7 +394,6 @@ func AssembleDarwinUniversal() error {
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
 func Package() {
-	//logrus.SetLevel(logrus.TraceLevel)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
@@ -692,6 +689,8 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				}
 			}
 		} else {
+			// This shouldn't be needed as a special append() here, but until our artiface APIs have released shipper packages,
+			// we need to make sure the package command doesn't try to download a shipper tarball and blow up
 			packedBeats = append(packedBeats, "elastic-agent-shipper")
 			// build from local repo, will assume beats repo is located on the same root level
 			fmt.Println(">>> Building from local repo")
