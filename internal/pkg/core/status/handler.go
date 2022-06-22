@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// LivenessResponse is the response body for the liveness endpoint.
 type LivenessResponse struct {
 	ID         string    `json:"id"`
 	Status     string    `json:"status"`
@@ -24,9 +25,9 @@ func (r *controller) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		Message:    s.Message,
 		UpdateTime: s.UpdateTime,
 	}
-	status := 200
+	status := http.StatusOK
 	if s.Status != Healthy {
-		status = 503
+		status = http.StatusServiceUnavailable
 	}
 
 	wr.Header().Set("Content-Type", "application/json")
