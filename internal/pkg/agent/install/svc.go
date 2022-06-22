@@ -85,9 +85,9 @@ var darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
     <string>{{html .UserName}}</string>{{end}}
     {{if .ChRoot}}<key>RootDirectory</key>
     <string>{{html .ChRoot}}</string>{{end}}
-	{{if .Config.Option.ExitTimeOut}}<key>ExitTimeOut</key>
+    {{if .Config.Option.ExitTimeOut}}<key>ExitTimeOut</key>
     <integer>{{html .Config.Option.ExitTimeOut}}</integer>{{end}}
-	{{if .WorkingDirectory}}<key>WorkingDirectory</key>
+    {{if .WorkingDirectory}}<key>WorkingDirectory</key>
     <string>{{html .WorkingDirectory}}</string>{{end}}
     <key>SessionCreate</key>
     <{{bool .SessionCreate}}/>
