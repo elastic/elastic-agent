@@ -22,7 +22,7 @@ const (
 
 	// Set the launch daemon ExitTimeOut to 60 seconds in order to allow the agent to shutdown gracefully
 	// At the moment the version 8.3 & 8.4 of the agent are taking about 11 secs to shutdown
-	// and the launchd sends SIGKILL after 5 secs which causes the beats processes to be left running orphant
+	// and the launchd sends SIGKILL after 5 secs which causes the beats processes to be left running orphaned
 	// depending on the shutdown timing.
 	darwinServiceExitTimeout = 60
 )
@@ -67,7 +67,7 @@ func newService() (service.Service, error) {
 
 // A copy of the launchd plist template from github.com/kardianos/service
 // with added .Config.Option.ExitTimeOut option
-var darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
+const darwinLaunchdConfig = `<?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
 "http://www.apple.com/DTDs/PropertyList-1.0.dtd" >
 <plist version='1.0'>
