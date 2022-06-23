@@ -59,6 +59,10 @@ metricbeat:
           fields:
             should_be: first
       - add_fields:
+          target: "@metadata"
+          fields:
+            input_id: apache-metrics-id
+      - add_fields:
           target: "data_stream"
           fields:
             type: metrics
@@ -83,7 +87,7 @@ output:
     hosts: [127.0.0.1:9200, 127.0.0.1:9300]
     headers:
       h1: test-header
-                    
+
     namespace: test_namespace
     username: elastic
     password: changeme

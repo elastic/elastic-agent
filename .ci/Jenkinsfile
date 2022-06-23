@@ -263,7 +263,9 @@ pipeline {
   }
   post {
     cleanup {
-      notifyBuildResult(prComment: true)
+      notifyBuildResult(prComment: true,
+                        githubIssue: isBranch() && currentBuild.currentResult != "SUCCESS",
+                        githubLabels: 'Team:Elastic-Agent-Control-Plane')
     }
   }
 }
