@@ -8,7 +8,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -41,6 +40,8 @@ import (
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
+
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -850,12 +851,8 @@ func copyComponentSpecs(componentName, versionedDropPath string) (string, error)
 }
 
 func appendComponentChecksums(versionedDropPath string, checksums map[string]string) error {
-	var buffer bytes.Buffer
-
 	// for each spec file checksum calculate binary checksum as well
-	for file, checksum := range checksums {
-		buffer.WriteString(fmt.Sprintf("%s %s\n", checksum, file))
-
+	for file := range checksums {
 		if !strings.HasSuffix(file, specSuffix) {
 			continue
 		}
@@ -869,10 +866,15 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 			return err
 		}
 
-		buffer.WriteString(fmt.Sprintf("%s %s\n", hash, componentFile))
+		checksums[componentFile] = hash
 	}
 
-	return ioutil.WriteFile(filepath.Join(versionedDropPath, checksumFilename), buffer.Bytes(), 0644)
+	content, err := yamlChecksum(checksums)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0644)
 }
 
 func movePackagesToArchive(dropPath string, requiredPackages []string) string {
@@ -1005,4 +1007,23 @@ func injectBuildVars(m map[string]string) {
 	for k, v := range buildVars() {
 		m[k] = v
 	}
+}
+
+func yamlChecksum(checksums map[string]string) ([]byte, error) {
+	filesMap := make(map[string][]checksumFile)
+	files := make([]checksumFile, 0, len(checksums))
+	for file, checksum := range checksums {
+		files = append(files, checksumFile{
+			Name:     file,
+			Checksum: checksum,
+		})
+	}
+
+	filesMap["files"] = files
+	return yaml.Marshal(filesMap)
+}
+
+type checksumFile struct {
+	Name     string `yaml:"name"`
+	Checksum string `yaml:"sha512"`
 }
