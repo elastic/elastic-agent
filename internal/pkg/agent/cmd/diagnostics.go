@@ -103,14 +103,7 @@ func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *c
 			}
 
 			output, _ := c.Flags().GetString("output")
-<<<<<<< HEAD
-			switch output {
-			case outputTypeYAML:
-			case outputTypeJSON:
-			default:
-=======
 			if _, ok := diagOutputs[output]; !ok {
->>>>>>> 11ce21478f207439e109246510cb7c4d9ae2b00c
 				return fmt.Errorf("unsupported output: %s", output)
 			}
 
@@ -463,12 +456,8 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-<<<<<<< HEAD
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *cproto.ProcMetricsResponse, errs []error) error {
-=======
 func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse, errs []error) error {
 	ts := time.Now().UTC()
->>>>>>> 11ce21478f207439e109246510cb7c4d9ae2b00c
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
@@ -801,18 +790,12 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf, ts time.Time)
 	return nil
 }
 
-<<<<<<< HEAD
-func zipMetrics(zw *zip.Writer, metrics *cproto.ProcMetricsResponse) error {
-	//nolint:staticcheck,wastedassign // false positive
-	zf, err := zw.Create("metrics/")
-=======
 func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse, ts time.Time) error {
 	_, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "metrics/",
 		Method:   zip.Deflate,
 		Modified: ts,
 	})
->>>>>>> 11ce21478f207439e109246510cb7c4d9ae2b00c
 	if err != nil {
 		return err
 	}
