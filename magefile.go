@@ -8,9 +8,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +54,7 @@ const (
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	specSuffix        = ".spec.yml" // TODO: change after beat ignores yml config
+	checksumFilename  = "checksum.yml"
 )
 
 // Aliases for commands required by master makefile
@@ -794,6 +797,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			panic(err)
 		}
 
+		checksums := make(map[string]string)
 		for _, f := range files {
 			options := copy.Options{
 				OnSymlink: func(_ string) copy.SymlinkAction {
@@ -814,9 +818,16 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				specName = specName[:idx]
 			}
 
-			if err := devtools.Copy(filepath.Join("specs", specName+specSuffix), filepath.Join(versionedDropPath, specName+specSuffix)); err != nil {
+			checksum, err := copyComponentSpecs(specName, versionedDropPath)
+			if err != nil {
 				panic(err)
 			}
+
+			checksums[specName+specSuffix] = checksum
+		}
+
+		if err := appendComponentChecksums(versionedDropPath, checksums); err != nil {
+			panic(err)
 		}
 	}
 
@@ -826,6 +837,42 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 	mg.Deps(Update)
 	mg.Deps(CrossBuild, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
+}
+func copyComponentSpecs(componentName, versionedDropPath string) (string, error) {
+	sourceSpecFile := filepath.Join("specs", componentName+specSuffix)
+	err := devtools.Copy(sourceSpecFile, filepath.Join(versionedDropPath, componentName+specSuffix))
+	if err != nil {
+		return "", errors.Wrapf(err, "failed copying spec file '%s' to '%s'")
+	}
+
+	// compute checksum
+	return devtools.GetSHA512Hash(sourceSpecFile)
+}
+
+func appendComponentChecksums(versionedDropPath string, checksums map[string]string) error {
+	var buffer bytes.Buffer
+
+	// for each spec file checksum calculate binary checksum as well
+	for file, checksum := range checksums {
+		buffer.WriteString(fmt.Sprintf("%s %s\n", checksum, file))
+
+		if !strings.HasSuffix(file, specSuffix) {
+			continue
+		}
+
+		componentFile := strings.TrimSuffix(file, specSuffix)
+		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Printf(">>> Computing hash for '%s' failed: file not present\n", componentFile)
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		buffer.WriteString(fmt.Sprintf("%s %s\n", hash, componentFile))
+	}
+
+	return ioutil.WriteFile(filepath.Join(versionedDropPath, checksumFilename), buffer.Bytes(), 0644)
 }
 
 func movePackagesToArchive(dropPath string, requiredPackages []string) string {

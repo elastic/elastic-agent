@@ -906,10 +906,6 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			header.Mode = int64(0755)
 		}
 
-		if strings.Contains(info.Name(), "disabled") {
-			log.Println(">>>>>", info.Name(), pkgFile.ConfigMode, "matches", configFilePattern.MatchString(info.Name()), "or", componentConfigFilePattern.MatchString(info.Name()))
-		}
-
 		if filepath.IsAbs(pkgFile.Target) {
 			baseDir = ""
 		}
