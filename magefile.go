@@ -92,6 +92,15 @@ type Demo mg.Namespace
 // Dev runs package and build for dev purposes.
 type Dev mg.Namespace
 
+// this maps pre-packaged binaries to if they're x-pack beats
+// see packageAgent for more context
+var packedBeats = map[string]bool{
+	"filebeat":    true,
+	"heartbeat":   true,
+	"metricbeat":  true,
+	"osquerybeat": true,
+}
+
 // Notice regenerates the NOTICE.txt file.
 func Notice() error {
 	fmt.Println(">> Generating NOTICE")
@@ -676,10 +685,10 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		defer os.RemoveAll(dropPath)
 		defer os.Unsetenv(agentDropPath)
 
-		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
+		//packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
 		if devtools.ExternalBuild == true {
 			ctx := context.Background()
-			for _, beat := range packedBeats {
+			for beat, _ := range packedBeats {
 				for _, reqPackage := range requiredPackages {
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
 					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, dropPath)
@@ -689,14 +698,24 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				}
 			}
 		} else {
+			// This shouldn't be needed as a special append() here, but until our artiface APIs have released shipper packages,
+			// we need to make sure the package command doesn't try to download a shipper tarball and blow up
+			packedBeats["elastic-agent-shipper"] = false
 			// build from local repo, will assume beats repo is located on the same root level
-			for _, b := range packedBeats {
-				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
+			fmt.Println(">>> Building from local repo")
+			for beat, isXpack := range packedBeats {
+				var pwd string
+				var err error
+				if !isXpack {
+					pwd, err = filepath.Abs(filepath.Join("../", beat))
+				} else {
+					pwd, err = filepath.Abs(filepath.Join("../beats/x-pack", beat))
+				}
 				if err != nil {
 					panic(err)
 				}
 
-				if !requiredPackagesPresent(pwd, b, version, requiredPackages) {
+				if !requiredPackagesPresent(pwd, beat, version, requiredPackages) {
 					cmd := exec.Command("mage", "package")
 					cmd.Dir = pwd
 					cmd.Stdout = os.Stdout
@@ -729,6 +748,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 }
 
 func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
+	fmt.Printf(">>> About to download: %s\n", packageName)
 	location, err := downloads.FetchBeatsBinary(
 		ctx,
 		packageName,

@@ -1,0 +1,13 @@
+name: Shipper
+cmd: elastic-agent-shipper
+args: []
+artifact: elastic-agent-shipper
+restart_on_output_change: true
+
+rules:
+  - fix_stream: {}
+  - filter:
+      selectors:
+        - shipper
+
+when:  length(${shipper}) > 0
