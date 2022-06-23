@@ -103,10 +103,14 @@ func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *c
 			}
 
 			output, _ := c.Flags().GetString("output")
+<<<<<<< HEAD
 			switch output {
 			case outputTypeYAML:
 			case outputTypeJSON:
 			default:
+=======
+			if _, ok := diagOutputs[output]; !ok {
+>>>>>>> 11ce21478f207439e109246510cb7c4d9ae2b00c
 				return fmt.Errorf("unsupported output: %s", output)
 			}
 
@@ -459,7 +463,12 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
+<<<<<<< HEAD
 func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *cproto.ProcMetricsResponse, errs []error) error {
+=======
+func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse, errs []error) error {
+	ts := time.Now().UTC()
+>>>>>>> 11ce21478f207439e109246510cb7c4d9ae2b00c
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
@@ -467,7 +476,11 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 	zw := zip.NewWriter(f)
 
 	if len(errs) > 0 {
-		zf, err := zw.Create("errors.txt")
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     "errors.txt",
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -476,12 +489,20 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		}
 	}
 
-	_, err = zw.Create("meta/")
+	_, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "meta/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
-	zf, err := zw.Create("meta/elastic-agent-version." + outputFormat)
+	zf, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "meta/elastic-agent-version" + outputFormat,
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
@@ -491,7 +512,11 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 	}
 
 	for _, m := range diag.ProcMeta {
-		zf, err = zw.Create("meta/" + m.Name + "-" + m.RouteKey + "." + outputFormat)
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     "meta/" + m.Name + "-" + m.RouteKey + "." + outputFormat,
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -501,12 +526,20 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		}
 	}
 
-	_, err = zw.Create("config/")
+	_, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "config/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
-	zf, err = zw.Create("config/elastic-agent-local." + outputFormat)
+	zf, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "config/elastic-agent-local." + outputFormat,
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
@@ -514,7 +547,11 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		return closeHandlers(err, zw, f)
 	}
 
-	zf, err = zw.Create("config/elastic-agent-policy." + outputFormat)
+	zf, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "config/elastic-agent-policy." + outputFormat,
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
@@ -522,7 +559,11 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		return closeHandlers(err, zw, f)
 	}
 	for name, appCfg := range cfg.AppConfig {
-		zf, err := zw.Create("config/" + name + "." + outputFormat)
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     "config/" + name + "." + outputFormat,
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -531,19 +572,19 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		}
 	}
 
-	if err := zipLogs(zw); err != nil {
+	if err := zipLogs(zw, ts); err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
 	if pprof != nil {
-		err := zipProfs(zw, pprof)
+		err := zipProfs(zw, pprof, ts)
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
 	}
 
 	if metrics != nil && len(metrics.Result) > 0 {
-		err := zipMetrics(zw, metrics)
+		err := zipMetrics(zw, metrics, ts)
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -553,8 +594,12 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 }
 
 // zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
-func zipLogs(zw *zip.Writer) error {
-	_, err := zw.Create("logs/")
+func zipLogs(zw *zip.Writer, ts time.Time) error {
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return err
 	}
@@ -581,7 +626,16 @@ func zipLogs(zw *zip.Writer) error {
 		}
 
 		if d.IsDir() {
-			_, err := zw.Create("logs/" + name + "/")
+			dirTS := ts
+			di, err := d.Info()
+			if err == nil {
+				dirTS = di.ModTime()
+			}
+			_, err = zw.CreateHeader(&zip.FileHeader{
+				Name:     "logs/" + name + "/",
+				Method:   zip.Deflate,
+				Modified: dirTS,
+			})
 			if err != nil {
 				return fmt.Errorf("unable to create log directory in archive: %w", err)
 			}
@@ -631,7 +685,15 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	if err != nil {
 		return fmt.Errorf("unable to open log file: %w", err)
 	}
-	zf, err := zw.Create("logs/" + name)
+	lfs, err := lf.Stat()
+	if err != nil {
+		return closeHandlers(fmt.Errorf("unable to stat log file: %w", err), lf)
+	}
+	zf, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/" + name,
+		Method:   zip.Deflate,
+		Modified: lfs.ModTime(),
+	})
 	if err != nil {
 		return closeHandlers(fmt.Errorf("unable to create log file in archive: %w", err), lf)
 	}
@@ -687,20 +749,32 @@ func getAllPprof(ctx context.Context, d time.Duration) (map[string][]client.Proc
 	return daemon.Pprof(ctx, d, pprofTypes, "", "")
 }
 
-func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
-	_, err := zw.Create("pprof/")
+func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf, ts time.Time) error {
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "pprof/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return err
 	}
 
 	for pType, profs := range pprof {
-		_, err := zw.Create("pprof/" + pType + "/")
+		_, err = zw.CreateHeader(&zip.FileHeader{
+			Name:     "pprof/" + pType + "/",
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return err
 		}
 		for _, p := range profs {
 			if p.Error != "" {
-				zf, err := zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + "_error.txt")
+				zf, err := zw.CreateHeader(&zip.FileHeader{
+					Name:     "pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + "_error.txt",
+					Method:   zip.Deflate,
+					Modified: ts,
+				})
 				if err != nil {
 					return err
 				}
@@ -710,7 +784,11 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 				}
 				continue
 			}
-			zf, err := zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + ".pprof")
+			zf, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     "pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + ".pprof",
+				Method:   zip.Deflate,
+				Modified: ts,
+			})
 			if err != nil {
 				return err
 			}
@@ -723,16 +801,29 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 	return nil
 }
 
+<<<<<<< HEAD
 func zipMetrics(zw *zip.Writer, metrics *cproto.ProcMetricsResponse) error {
 	//nolint:staticcheck,wastedassign // false positive
 	zf, err := zw.Create("metrics/")
+=======
+func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse, ts time.Time) error {
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "metrics/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
+>>>>>>> 11ce21478f207439e109246510cb7c4d9ae2b00c
 	if err != nil {
 		return err
 	}
 
 	for _, m := range metrics.Result {
 		if m.Error != "" {
-			zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt")
+			zf, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     "metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt",
+				Method:   zip.Deflate,
+				Modified: ts,
+			})
 			if err != nil {
 				return err
 			}
@@ -742,7 +833,11 @@ func zipMetrics(zw *zip.Writer, metrics *cproto.ProcMetricsResponse) error {
 			}
 			continue
 		}
-		zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + ".json")
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     "metrics/" + m.AppName + "_" + m.RouteKey + ".json",
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return err
 		}

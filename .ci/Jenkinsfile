@@ -50,7 +50,7 @@ pipeline {
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
-          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc)' ], shouldMatchAll: false).toString())
+          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
         }
       }
     }
@@ -219,7 +219,7 @@ pipeline {
         axes {
           axis {
             name 'K8S_VERSION'
-            values "v1.24.0, v1.23.6, v1.22.9, v1.21.12"
+            values "v1.24.0", "v1.23.6", "v1.22.9", "v1.21.12"
           }
         }
         stages {
@@ -262,7 +262,9 @@ pipeline {
   }
   post {
     cleanup {
-      notifyBuildResult(prComment: true)
+      notifyBuildResult(prComment: true,
+                        githubIssue: isBranch() && currentBuild.currentResult != "SUCCESS",
+                        githubLabels: 'Team:Elastic-Agent-Control-Plane')
     }
   }
 }
