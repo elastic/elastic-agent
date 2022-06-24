@@ -840,9 +840,10 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 }
 func copyComponentSpecs(componentName, versionedDropPath string) (string, error) {
 	sourceSpecFile := filepath.Join("specs", componentName+specSuffix)
-	err := devtools.Copy(sourceSpecFile, filepath.Join(versionedDropPath, componentName+specSuffix))
+	targetPath := filepath.Join(versionedDropPath, componentName+specSuffix)
+	err := devtools.Copy(sourceSpecFile, targetPath)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed copying spec file %q to %q")
+		return "", errors.Wrapf(err, "failed copying spec file %q to %q", sourceSpecFile, targetPath)
 	}
 
 	// compute checksum
