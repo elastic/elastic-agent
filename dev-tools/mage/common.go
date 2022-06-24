@@ -761,7 +761,7 @@ func CreateSHA512File(file string) error {
 	out := fmt.Sprintf("%v  %v", computedHash, filepath.Base(file))
 
 	//nolint:gosec // permissions are correct
-	return ioutil.WriteFile(file+".sha512", []byte(out), 0644)
+	return os.WriteFile(file+".sha512", []byte(out), 0644)
 }
 func GetSHA512Hash(file string) (string, error) {
 	f, err := os.Open(file)
