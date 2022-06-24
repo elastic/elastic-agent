@@ -26,12 +26,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	repo "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
 	fleetreporterConfig "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet/config"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -705,59 +707,95 @@ func TestRetriesOnFailures(t *testing.T) {
 		Backoff:  backoffSettings{Init: 100 * time.Millisecond, Max: 5 * time.Second},
 	}
 
-	t.Run("When the gateway fails to communicate with the checkin API we will retry",
-		withGateway(agentInfo, settings, func(
-			t *testing.T,
-			gateway gateway.FleetGateway,
-			client *testingClient,
-			dispatcher *testingDispatcher,
-			scheduler *scheduler.Stepper,
-			rep repo.Backend,
-		) {
-			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
-				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
-			}
-			clientWaitFn := client.Answer(fail)
-			err := gateway.Start()
-			require.NoError(t, err)
+	t.Run("When the gateway fails to communicate with the checkin API we will retry", func(t *testing.T) {
+		scheduler := scheduler.NewStepper()
+		client := newTestingClient()
+		dispatcher := newTestingDispatcher()
+		log, _ := logger.New("fleet_gateway", false)
+		rep := getReporter(agentInfo, log, t)
 
-			_ = rep.Report(context.Background(), &testStateEvent{})
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-			// Initial tick is done out of bound so we can block on channels.
-			scheduler.Next()
+		diskStore := storage.NewDiskStore(paths.AgentStateStoreFile())
+		stateStore, err := store.NewStateStore(log, diskStore)
+		require.NoError(t, err)
 
-			// Simulate a 500 errors for the next 3 calls.
-			<-clientWaitFn
-			<-clientWaitFn
-			<-clientWaitFn
+		queue := &mockQueue{}
+		queue.On("DequeueActions").Return([]fleetapi.Action{})
+		queue.On("Actions").Return([]fleetapi.Action{})
 
-			// API recover
-			waitFn := ackSeq(
-				client.Answer(func(_ http.Header, body io.Reader) (*http.Response, error) {
-					cr := &request{}
-					content, err := ioutil.ReadAll(body)
-					if err != nil {
-						t.Fatal(err)
-					}
-					err = json.Unmarshal(content, &cr)
-					if err != nil {
-						t.Fatal(err)
-					}
+		fleetReporter := &testutils.MockReporter{}
+		fleetReporter.On("Update", state.Degraded, mock.Anything, mock.Anything).Times(2)
+		fleetReporter.On("Update", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		fleetReporter.On("Unregister").Maybe()
 
-					require.Equal(t, 1, len(cr.Events))
+		statusController := &testutils.MockController{}
+		statusController.On("RegisterComponent", "gateway").Return(fleetReporter).Once()
+		statusController.On("StatusString").Return("string")
 
-					resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
-					return resp, nil
-				}),
+		gateway, err := newFleetGatewayWithScheduler(
+			ctx,
+			log,
+			settings,
+			agentInfo,
+			client,
+			dispatcher,
+			scheduler,
+			rep,
+			noopacker.NewAcker(),
+			statusController,
+			stateStore,
+			queue,
+		)
+		require.NoError(t, err)
 
-				dispatcher.Answer(func(actions ...fleetapi.Action) error {
-					require.Equal(t, 0, len(actions))
-					return nil
-				}),
-			)
+		fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
+		}
+		clientWaitFn := client.Answer(fail)
+		err = gateway.Start()
+		require.NoError(t, err)
 
-			waitFn()
-		}))
+		_ = rep.Report(context.Background(), &testStateEvent{})
+
+		// Initial tick is done out of bound so we can block on channels.
+		scheduler.Next()
+
+		// Simulate a 500 errors for the next 3 calls.
+		<-clientWaitFn
+		<-clientWaitFn
+		<-clientWaitFn
+
+		// API recover
+		waitFn := ackSeq(
+			client.Answer(func(_ http.Header, body io.Reader) (*http.Response, error) {
+				cr := &request{}
+				content, err := ioutil.ReadAll(body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = json.Unmarshal(content, &cr)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				require.Equal(t, 1, len(cr.Events))
+
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				return resp, nil
+			}),
+
+			dispatcher.Answer(func(actions ...fleetapi.Action) error {
+				require.Equal(t, 0, len(actions))
+				return nil
+			}),
+		)
+
+		waitFn()
+		statusController.AssertExpectations(t)
+		fleetReporter.AssertExpectations(t)
+	})
 
 	t.Run("The retry loop is interruptible",
 		withGateway(agentInfo, &fleetGatewaySettings{

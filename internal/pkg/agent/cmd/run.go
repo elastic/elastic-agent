@@ -169,6 +169,7 @@ func run(override cfgOverrider) error {
 	rex := reexec.NewManager(rexLogger, execPath)
 
 	statusCtrl := status.NewController(logger)
+	statusCtrl.SetAgentID(agentInfo.AgentID())
 
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
 	if err != nil {
@@ -199,7 +200,7 @@ func run(override cfgOverrider) error {
 	control.SetRouteFn(app.Routes)
 	control.SetMonitoringCfg(cfg.Settings.MonitoringConfig)
 
-	serverStopFn, err := setupMetrics(agentInfo, logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, app, tracer)
+	serverStopFn, err := setupMetrics(agentInfo, logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, app, tracer, statusCtrl)
 	if err != nil {
 		return err
 	}
@@ -354,6 +355,7 @@ func setupMetrics(
 	cfg *monitoringCfg.MonitoringConfig,
 	app application.Application,
 	tracer *apm.Tracer,
+	statusCtrl status.Controller,
 ) (func() error, error) {
 	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
@@ -366,7 +368,7 @@ func setupMetrics(
 	}
 
 	bufferEnabled := cfg.HTTP.Buffer != nil && cfg.HTTP.Buffer.Enabled
-	s, err := monitoringServer.New(logger, endpointConfig, monitoring.GetNamespace, app.Routes, isProcessStatsEnabled(cfg.HTTP), bufferEnabled, tracer)
+	s, err := monitoringServer.New(logger, endpointConfig, monitoring.GetNamespace, app.Routes, isProcessStatsEnabled(cfg.HTTP), bufferEnabled, tracer, statusCtrl)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
