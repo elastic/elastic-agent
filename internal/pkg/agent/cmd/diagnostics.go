@@ -456,7 +456,7 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse, errs []error) error {
+func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *cproto.ProcMetricsResponse, errs []error) error {
 	ts := time.Now().UTC()
 	f, err := os.Create(fileName)
 	if err != nil {
@@ -790,7 +790,7 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf, ts time.Time)
 	return nil
 }
 
-func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse, ts time.Time) error {
+func zipMetrics(zw *zip.Writer, metrics *cproto.ProcMetricsResponse, ts time.Time) error {
 	_, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "metrics/",
 		Method:   zip.Deflate,
