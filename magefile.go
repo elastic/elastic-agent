@@ -10,14 +10,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -112,26 +110,26 @@ func Notice() error {
 	if err != nil {
 		return errors.Wrap(err, "failed running go list, please fix the issues reported")
 	}
+
+	f, err := os.CreateTemp("", "golist.json")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name()) // clean up
+
+	if _, err := f.Write([]byte(str)); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
 	fmt.Println(">> fmt - go run")
 	cmd := exec.Command("go", "run", "go.elastic.co/go-licence-detector", "-includeIndirect", "-rules", "dev-tools/notice/rules.json", "-overrides", "dev-tools/notice/overrides.json", "-noticeTemplate", "dev-tools/notice/NOTICE.txt.tmpl",
-		"-noticeOut", "NOTICE.txt", "-depsOut", "\"\"")
-	stdin, err := cmd.StdinPipe()
+		"-noticeOut", "NOTICE.txt", "-in", f.Name())
+
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.Wrap(err, "failed running go run, please fix the issues reported")
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer stdin.Close()
-		defer wg.Done()
-		if _, err := io.WriteString(stdin, str); err != nil {
-			fmt.Println(err)
-		}
-	}()
-	wg.Wait()
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		return errors.Wrap(err, "failed combined output, please fix the issues reported")
+		return errors.Wrapf(err, "failed combined output, please fix the issues reported: %q", string(out))
 	}
 	return nil
 }
