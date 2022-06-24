@@ -39,6 +39,8 @@ import (
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
+
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -52,6 +54,7 @@ const (
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	specSuffix        = ".spec.yml" // TODO: change after beat ignores yml config
+	checksumFilename  = "checksum.yml"
 )
 
 // Aliases for commands required by master makefile
@@ -373,7 +376,7 @@ func AssembleDarwinUniversal() error {
 	cmd := "lipo"
 
 	if _, err := exec.LookPath(cmd); err != nil {
-		return fmt.Errorf("'%s' is required to assemble the universal binary: %w",
+		return fmt.Errorf("%q is required to assemble the universal binary: %w",
 			cmd, err)
 	}
 
@@ -437,7 +440,7 @@ func requiredPackagesPresent(basePath, beat, version string, requiredPackages []
 		path := filepath.Join(basePath, "build", "distributions", packageName)
 
 		if _, err := os.Stat(path); err != nil {
-			fmt.Printf("Package '%s' does not exist on path: %s\n", packageName, path)
+			fmt.Printf("Package %q does not exist on path: %s\n", packageName, path)
 			return false
 		}
 	}
@@ -794,6 +797,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			panic(err)
 		}
 
+		checksums := make(map[string]string)
 		for _, f := range files {
 			options := copy.Options{
 				OnSymlink: func(_ string) copy.SymlinkAction {
@@ -814,9 +818,16 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				specName = specName[:idx]
 			}
 
-			if err := devtools.Copy(filepath.Join("specs", specName+specSuffix), filepath.Join(versionedDropPath, specName+specSuffix)); err != nil {
+			checksum, err := copyComponentSpecs(specName, versionedDropPath)
+			if err != nil {
 				panic(err)
 			}
+
+			checksums[specName+specSuffix] = checksum
+		}
+
+		if err := appendComponentChecksums(versionedDropPath, checksums); err != nil {
+			panic(err)
 		}
 	}
 
@@ -826,6 +837,44 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 	mg.Deps(Update)
 	mg.Deps(CrossBuild, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
+}
+func copyComponentSpecs(componentName, versionedDropPath string) (string, error) {
+	sourceSpecFile := filepath.Join("specs", componentName+specSuffix)
+	targetPath := filepath.Join(versionedDropPath, componentName+specSuffix)
+	err := devtools.Copy(sourceSpecFile, targetPath)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed copying spec file %q to %q", sourceSpecFile, targetPath)
+	}
+
+	// compute checksum
+	return devtools.GetSHA512Hash(sourceSpecFile)
+}
+
+func appendComponentChecksums(versionedDropPath string, checksums map[string]string) error {
+	// for each spec file checksum calculate binary checksum as well
+	for file := range checksums {
+		if !strings.HasSuffix(file, specSuffix) {
+			continue
+		}
+
+		componentFile := strings.TrimSuffix(file, specSuffix)
+		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Printf(">>> Computing hash for %q failed: file not present\n", componentFile)
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		checksums[componentFile] = hash
+	}
+
+	content, err := yamlChecksum(checksums)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0644)
 }
 
 func movePackagesToArchive(dropPath string, requiredPackages []string) string {
@@ -958,4 +1007,23 @@ func injectBuildVars(m map[string]string) {
 	for k, v := range buildVars() {
 		m[k] = v
 	}
+}
+
+func yamlChecksum(checksums map[string]string) ([]byte, error) {
+	filesMap := make(map[string][]checksumFile)
+	files := make([]checksumFile, 0, len(checksums))
+	for file, checksum := range checksums {
+		files = append(files, checksumFile{
+			Name:     file,
+			Checksum: checksum,
+		})
+	}
+
+	filesMap["files"] = files
+	return yaml.Marshal(filesMap)
+}
+
+type checksumFile struct {
+	Name     string `yaml:"name"`
+	Checksum string `yaml:"sha512"`
 }
