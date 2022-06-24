@@ -11,7 +11,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -377,7 +376,7 @@ func AssembleDarwinUniversal() error {
 	cmd := "lipo"
 
 	if _, err := exec.LookPath(cmd); err != nil {
-		return fmt.Errorf("'%s' is required to assemble the universal binary: %w",
+		return fmt.Errorf("%q is required to assemble the universal binary: %w",
 			cmd, err)
 	}
 
@@ -441,7 +440,7 @@ func requiredPackagesPresent(basePath, beat, version string, requiredPackages []
 		path := filepath.Join(basePath, "build", "distributions", packageName)
 
 		if _, err := os.Stat(path); err != nil {
-			fmt.Printf("Package '%s' does not exist on path: %s\n", packageName, path)
+			fmt.Printf("Package %q does not exist on path: %s\n", packageName, path)
 			return false
 		}
 	}
@@ -843,7 +842,7 @@ func copyComponentSpecs(componentName, versionedDropPath string) (string, error)
 	sourceSpecFile := filepath.Join("specs", componentName+specSuffix)
 	err := devtools.Copy(sourceSpecFile, filepath.Join(versionedDropPath, componentName+specSuffix))
 	if err != nil {
-		return "", errors.Wrapf(err, "failed copying spec file '%s' to '%s'")
+		return "", errors.Wrapf(err, "failed copying spec file %q to %q")
 	}
 
 	// compute checksum
@@ -860,7 +859,7 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		componentFile := strings.TrimSuffix(file, specSuffix)
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf(">>> Computing hash for '%s' failed: file not present\n", componentFile)
+			fmt.Printf(">>> Computing hash for %q failed: file not present\n", componentFile)
 			continue
 		} else if err != nil {
 			return err
@@ -874,7 +873,7 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		return err
 	}
 
-	return ioutil.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0644)
+	return os.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0644)
 }
 
 func movePackagesToArchive(dropPath string, requiredPackages []string) string {
