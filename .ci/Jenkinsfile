@@ -250,7 +250,7 @@ pipeline {
       }
       steps {
         // TODO: what's the testMatrixFile to be used if any
-        runE2E(testMatrixFile: '',
+        runE2E(testMatrixFile: '.ci/.e2e-tests-for-elastic-agent.yaml',
                beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                gitHubCheckName: "e2e-tests",
