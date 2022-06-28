@@ -103,6 +103,7 @@
 - diagnostics collect log names are fixed on Windows machines, command will ignore failures. AgentID is included in diagnostics(and diagnostics collect) output. {issue}81[81] {issue}92[92] {issue}190[190] {pull}262[262]
 - Collects stdout and stderr of applications run as a process and logs them. {issue}[88]
 - Remove VerificationMode option to empty string. Default will be `full`. {issue}[184]
+- diagnostics collect file mod times are set. {pull}570[570]
 
 ==== New features
 
@@ -184,3 +185,5 @@
 - Save the agent configuration and the state encrypted on the disk. {issue}535[535] {pull}398[398]
 - Bump node.js version for heartbeat/synthetics to 16.15.0
 - Support scheduled actions and cancellation of pending actions. {issue}393[393] {pull}419[419]
+- Add `@metadata.input_id` and `@metadata.stream_id` when applying the inject stream processor {pull}527[527]
+- Add liveness endpoint, allow fleet-gateway component to report degraded state, add update time and messages to status output. {issue}390[390] {pull}569[569]

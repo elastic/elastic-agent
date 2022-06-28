@@ -5,7 +5,6 @@
 package upgrade
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -20,10 +19,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
@@ -173,10 +170,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
-	if err := encryptConfigIfNeeded(u.log, newHash); err != nil {
-		return nil, errors.New(err, "failed to encrypt the configuration")
-	}
-
 	if err := ChangeSymlink(ctx, newHash); err != nil {
 		rollbackInstall(ctx, newHash)
 		return nil, err
@@ -219,6 +212,8 @@ func (u *Upgrader) Ack(ctx context.Context) error {
 	if err := u.ackAction(ctx, marker.Action); err != nil {
 		return err
 	}
+
+	marker.Acked = true
 
 	return saveMarker(marker)
 }
@@ -333,73 +328,6 @@ func copyVault(newHash string) error {
 	}
 
 	return nil
-}
-
-// Create the key if it doesn't exist and encrypt the fleet.yml and state.yml
-func encryptConfigIfNeeded(log *logger.Logger, newHash string) (err error) {
-	vaultPath := getVaultPath(newHash)
-
-	err = secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
-	if err != nil {
-		return err
-	}
-
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	ymlStateStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreYmlFile()))
-	stateStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreFile()))
-
-	files := []struct {
-		Src string
-		Dst string
-	}{
-		{
-			Src: ymlStateStorePath,
-			Dst: stateStorePath,
-		},
-		{
-			Src: paths.AgentConfigYmlFile(),
-			Dst: paths.AgentConfigFile(),
-		},
-	}
-	for _, f := range files {
-		var b []byte
-		b, err = ioutil.ReadFile(f.Src)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return err
-		}
-
-		// Encrypt yml file
-		store := storage.NewEncryptedDiskStore(f.Dst, storage.WithVaultPath(vaultPath))
-		err = store.Save(bytes.NewReader(b))
-		if err != nil {
-			return err
-		}
-
-		// Remove yml file if no errors
-		defer func(fp string) {
-			if err != nil {
-				return
-			}
-			if rerr := os.Remove(fp); rerr != nil {
-				log.Warnf("failed to remove file: %s, err: %v", fp, rerr)
-			}
-		}(f.Src)
-	}
-
-	// Do not remove AgentConfigYmlFile lock file if any error happened.
-	if err != nil {
-		return err
-	}
-
-	lockFp := paths.AgentConfigYmlFile() + ".lock"
-	if rerr := os.Remove(lockFp); rerr != nil {
-		log.Warnf("failed to remove file: %s, err: %v", lockFp, rerr)
-	}
-
-	return err
 }
 
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.
