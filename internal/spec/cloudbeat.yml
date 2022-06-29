@@ -7,8 +7,6 @@ args: [
 ]
 restart_on_output_change: true
 artifact: cloudbeat
-action_input_types:
-  - cloudbeat
 
 rules:
   - fix_stream: {}
@@ -19,11 +17,12 @@ rules:
       on_conflict: insert_after
       type: logs
 
-  - filter_values:
-      selector: inputs
+
+# All Cloudbeat input types begin with 'cloudbeat'.
+  - filter_values_with_regexp:
       key: type
-      values:
-        - cloudbeat
+      re: '^cloudbeat.+'
+      selector: inputs
 
   - inject_agent_info: {}
 
