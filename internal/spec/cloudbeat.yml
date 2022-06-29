@@ -21,7 +21,7 @@ rules:
 # All Cloudbeat input types begin with 'cloudbeat'.
   - filter_values_with_regexp:
       key: type
-      re: '^cloudbeat.+'
+      re: '^cloudbeat.*'
       selector: inputs
 
   - inject_agent_info: {}
