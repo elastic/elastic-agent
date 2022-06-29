@@ -19,6 +19,9 @@ spec:
           effect: NoSchedule
       serviceAccountName: elastic-agent
       hostNetwork: true
+      # Sharing the host process ID namespace gives visibility of all processes running on the same host.
+      # This enables the Elastic Security integration to observe all process exec events on the host.
+      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
