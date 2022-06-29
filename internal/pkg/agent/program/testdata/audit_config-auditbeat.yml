@@ -26,6 +26,10 @@ auditbeat:
             target: event
         - add_fields:
             fields:
+              stream_id: audit/auditd-auditd_manager.auditd-6d35f37c-2243-4229-9fba-ccf39305b536
+            target: '@metadata'
+        - add_fields:
+            fields:
               id: agent-id
               snapshot: false
               version: 8.0.0
@@ -61,6 +65,10 @@ auditbeat:
             target: event
         - add_fields:
             fields:
+              stream_id: fim_1
+            target: '@metadata'
+        - add_fields:
+            fields:
               id: agent-id
               snapshot: false
               version: 8.0.0
@@ -91,6 +99,10 @@ auditbeat:
             target: event
         - add_fields:
             fields:
+              stream_id: fim_2
+            target: '@metadata'
+        - add_fields:
+            fields:
               id: agent-id
               snapshot: false
               version: 8.0.0
@@ -119,6 +131,10 @@ auditbeat:
             target: event
         - add_fields:
             fields:
+              stream_id: id-auditd-system-socket
+            target: '@metadata'
+        - add_fields:
+            fields:
               id: agent-id
               snapshot: false
               version: 8.0.0
@@ -143,6 +159,10 @@ auditbeat:
             fields:
               dataset: audit_system.process
             target: event
+        - add_fields:
+            fields:
+              stream_id: id-auditd-system-process
+            target: '@metadata'
         - add_fields:
             fields:
               id: agent-id

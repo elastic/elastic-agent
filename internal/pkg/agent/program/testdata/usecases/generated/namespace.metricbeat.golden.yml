@@ -66,6 +66,10 @@ metricbeat:
           should_be: first
     - add_fields:
         fields:
+          input_id: apache-metrics-id
+        target: '@metadata'
+    - add_fields:
+        fields:
           dataset: generic
           namespace: testing
           type: metrics
