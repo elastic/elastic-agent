@@ -18,6 +18,18 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+var (
+	fakeInputSpec = component.InputSpec{
+		Name: "fake",
+		Command: &component.CommandSpec{
+			Timeouts: component.CommandTimeoutSpec{
+				Checkin: 30 * time.Second,
+				Stop:    30 * time.Second,
+			},
+		},
+	}
+)
+
 func TestManager_SimpleComponentErr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -141,10 +153,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
-			Spec: component.InputSpec{
-				Name:    "fake",
-				Command: &component.CommandSpec{},
-			},
+			Spec:       fakeInputSpec,
 		},
 		Units: []component.Unit{
 			{
@@ -262,10 +271,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
-			Spec: component.InputSpec{
-				Name:    "fake",
-				Command: &component.CommandSpec{},
-			},
+			Spec:       fakeInputSpec,
 		},
 		Units: []component.Unit{
 			{
@@ -388,10 +394,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
-			Spec: component.InputSpec{
-				Name:    "fake",
-				Command: &component.CommandSpec{},
-			},
+			Spec:       fakeInputSpec,
 		},
 		Units: []component.Unit{
 			{
@@ -546,10 +549,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
-			Spec: component.InputSpec{
-				Name:    "fake",
-				Command: &component.CommandSpec{},
-			},
+			Spec:       fakeInputSpec,
 		},
 		Units: []component.Unit{
 			{
@@ -672,10 +672,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
-			Spec: component.InputSpec{
-				Name:    "fake",
-				Command: &component.CommandSpec{},
-			},
+			Spec:       fakeInputSpec,
 		},
 		Units: []component.Unit{
 			{
@@ -933,10 +930,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
-			Spec: component.InputSpec{
-				Name:    "fake",
-				Command: &component.CommandSpec{},
-			},
+			Spec:       fakeInputSpec,
 		},
 		Units: []component.Unit{
 			{
@@ -1055,10 +1049,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 		InputType:  "fake",
 		BinaryName: "",
 		BinaryPath: binaryPath,
-		Spec: component.InputSpec{
-			Name:    "fake",
-			Command: &component.CommandSpec{},
-		},
+		Spec:       fakeInputSpec,
 	}
 	components := []component.Component{
 		{
