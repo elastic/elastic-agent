@@ -14,7 +14,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"text/tabwriter"
@@ -35,17 +34,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 )
 
-const (
-	HUMAN    = "human"
-	JSON     = "json"
-	YAML     = "yaml"
-	REDACTED = "<REDACTED>"
-)
-
 var diagOutputs = map[string]outputter{
-	HUMAN: humanDiagnosticsOutput,
-	JSON:  jsonOutput,
-	YAML:  yamlOutput,
+	"human": humanDiagnosticsOutput,
+	"json":  jsonOutput,
+	"yaml":  yamlOutput,
 }
 
 // DiagnosticsInfo a struct to track all information related to diagnostics for the agent.
@@ -91,7 +83,6 @@ func newDiagnosticsCommand(s []string, streams *cli.IOStreams) *cobra.Command {
 }
 
 func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:   "collect",
 		Short: "Collect diagnostics information from the elastic-agent and write it to a zip archive.",
@@ -124,7 +115,7 @@ func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *c
 	}
 
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
-	cmd.Flags().String("output", YAML, "Output the collected information in either json, or yaml (default: yaml)") // replace output flag with different options
+	cmd.Flags().String("output", "yaml", "Output the collected information in either json, or yaml (default: yaml)") // replace output flag with different options
 	cmd.Flags().Bool("pprof", false, "Collect all pprof data from all running applications.")
 	cmd.Flags().Duration("pprof-duration", time.Second*30, "The duration to collect trace and profiling data from the debug/pprof endpoints. (default: 30s)")
 	cmd.Flags().Duration("timeout", time.Second*30, "The timeout for the diagnostics collect command, will be either 30s or 30s+pprof-duration by default. Should be longer then pprof-duration when pprof is enabled as the command needs time to process/archive the response.")
@@ -699,75 +690,14 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 
 // writeFile writes json or yaml data from the interface to the writer.
 func writeFile(w io.Writer, outputFormat string, v interface{}) error {
-	redacted, err := redact(v)
-	if err != nil {
-		return err
-	}
-
-	if outputFormat == JSON {
+	if outputFormat == "json" {
 		je := json.NewEncoder(w)
 		je.SetIndent("", "  ")
-		return je.Encode(redacted)
+		return je.Encode(v)
 	}
-
 	ye := yaml.NewEncoder(w)
-	err = ye.Encode(redacted)
+	err := ye.Encode(v)
 	return closeHandlers(err, ye)
-}
-
-func redact(v interface{}) (map[string]interface{}, error) {
-	redacted := map[string]interface{}{}
-	bs, err := yaml.Marshal(v)
-	if err != nil {
-		return nil, fmt.Errorf("could not marshal data to redact: %w", err)
-	}
-
-	err = yaml.Unmarshal(bs, &redacted)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal data to redact: %w", err)
-	}
-
-	return redactMap(redacted), nil
-}
-
-func toMapStr(v interface{}) map[string]interface{} {
-	mm := map[string]interface{}{}
-	m, ok := v.(map[interface{}]interface{})
-	if !ok {
-		return mm
-	}
-
-	for k, v := range m {
-		mm[k.(string)] = v
-	}
-	return mm
-}
-
-func redactMap(m map[string]interface{}) map[string]interface{} {
-	for k, v := range m {
-		if v != nil && reflect.TypeOf(v).Kind() == reflect.Map {
-			v = redactMap(toMapStr(v))
-		}
-		if redactKey(k) {
-			v = REDACTED
-		}
-		m[k] = v
-	}
-	return m
-}
-
-func redactKey(k string) bool {
-	// "routekey" shouldn't be redacted.
-	// Add any other exceptions here.
-	if k == "routekey" {
-		return false
-	}
-
-	return strings.Contains(k, "certificate") ||
-		strings.Contains(k, "passphrase") ||
-		strings.Contains(k, "password") ||
-		strings.Contains(k, "token") ||
-		strings.Contains(k, "key")
 }
 
 // closeHandlers will close all passed closers attaching any errors to the passed err and returning the result
