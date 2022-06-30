@@ -25,6 +25,7 @@ import (
 )
 
 func TestDownloadBodyError(t *testing.T) {
+	t.Skip("Skipping flaky test: https://github.com/elastic/elastic-agent/issues/640")
 	// This tests the scenario where the download encounters a network error
 	// part way through the download, while copying the response body.
 

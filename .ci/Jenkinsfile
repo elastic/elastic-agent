@@ -252,7 +252,7 @@ pipeline {
       }
       steps {
         // TODO: what's the testMatrixFile to be used if any
-        runE2E(testMatrixFile: '',
+        runE2E(testMatrixFile: '.ci/.e2e-tests-for-elastic-agent.yaml',
                beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                gitHubCheckName: "e2e-tests",
@@ -264,6 +264,7 @@ pipeline {
   post {
     cleanup {
       notifyBuildResult(prComment: true,
+                        analyzeFlakey: !isTag(), jobName: getFlakyJobName(withBranch: (isPR() ? env.CHANGE_TARGET : env.BRANCH_NAME)),
                         githubIssue: isBranch() && currentBuild.currentResult != "SUCCESS",
                         githubLabels: 'Team:Elastic-Agent-Control-Plane')
     }

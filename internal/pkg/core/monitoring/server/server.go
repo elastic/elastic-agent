@@ -33,6 +33,7 @@ func New(
 	enableProcessStats bool,
 	enableBuffer bool,
 	tracer *apm.Tracer,
+	statusController http.Handler,
 ) (*api.Server, error) {
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
@@ -44,7 +45,7 @@ func New(
 		return nil, err
 	}
 
-	return exposeMetricsEndpoint(log, cfg, ns, routesFetchFn, enableProcessStats, enableBuffer, tracer)
+	return exposeMetricsEndpoint(log, cfg, ns, routesFetchFn, enableProcessStats, enableBuffer, tracer, statusController)
 }
 
 func exposeMetricsEndpoint(
@@ -55,6 +56,7 @@ func exposeMetricsEndpoint(
 	enableProcessStats bool,
 	enableBuffer bool,
 	tracer *apm.Tracer,
+	statusController http.Handler,
 ) (*api.Server, error) {
 	r := mux.NewRouter()
 	if tracer != nil {
@@ -62,6 +64,8 @@ func exposeMetricsEndpoint(
 	}
 	statsHandler := statsHandler(ns("stats"))
 	r.Handle("/stats", createHandler(statsHandler))
+
+	r.Handle("/liveness", statusController)
 
 	if enableProcessStats {
 		r.HandleFunc("/processes", processesHandler(routesFetchFn))

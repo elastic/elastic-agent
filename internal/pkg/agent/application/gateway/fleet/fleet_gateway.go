@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package fleet handles interactions between the elastic-agent and fleet-server.
+// Specifically it will handle agent checkins, and action queueing/dispatch.
 package fleet
 
 import (
@@ -75,23 +77,24 @@ type actionQueue interface {
 }
 
 type fleetGateway struct {
-	bgContext        context.Context
-	log              *logger.Logger
-	dispatcher       pipeline.Dispatcher
-	client           client.Sender
-	scheduler        scheduler.Scheduler
-	backoff          backoff.Backoff
-	settings         *fleetGatewaySettings
-	agentInfo        agentInfo
-	reporter         fleetReporter
-	done             chan struct{}
-	wg               sync.WaitGroup
-	acker            store.FleetAcker
-	unauthCounter    int
-	statusController status.Controller
-	statusReporter   status.Reporter
-	stateStore       stateStore
-	queue            actionQueue
+	bgContext          context.Context
+	log                *logger.Logger
+	dispatcher         pipeline.Dispatcher
+	client             client.Sender
+	scheduler          scheduler.Scheduler
+	backoff            backoff.Backoff
+	settings           *fleetGatewaySettings
+	agentInfo          agentInfo
+	reporter           fleetReporter
+	done               chan struct{}
+	wg                 sync.WaitGroup
+	acker              store.FleetAcker
+	unauthCounter      int
+	checkinFailCounter int
+	statusController   status.Controller
+	statusReporter     status.Reporter
+	stateStore         stateStore
+	queue              actionQueue
 }
 
 // New creates a new fleet gateway
@@ -286,6 +289,7 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 		f.log.Debugf("Checking started")
 		resp, err := f.execute(f.bgContext)
 		if err != nil {
+			f.checkinFailCounter++
 			f.log.Errorf("Could not communicate with fleet-server Checking API will retry, error: %s", err)
 			if !f.backoff.Wait() {
 				// Something bad has happened and we log it and we should update our current state.
@@ -299,8 +303,16 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 				f.statusReporter.Update(state.Failed, err.Error(), nil)
 				return nil, err
 			}
+			if f.checkinFailCounter > 1 {
+				// Update status reporter for gateway to degraded when there are two consecutive failures.
+				// Note that this may not propagate to fleet-server as the agent is having issues checking in.
+				// It may also (falsely) report a degraded session for 30s if it is eventually successful.
+				// However this component will allow the agent to report fleet gateway degredation locally.
+				f.statusReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
+			}
 			continue
 		}
+		f.checkinFailCounter = 0
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}

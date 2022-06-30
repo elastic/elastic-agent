@@ -2,11 +2,15 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package status handles process status reporting.
 package status
 
 import (
+	"fmt"
+	"net/http"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -47,10 +51,12 @@ type AgentStatus struct {
 	Status       AgentStatusCode
 	Message      string
 	Applications []AgentApplicationStatus
+	UpdateTime   time.Time
 }
 
 // Controller takes track of component statuses.
 type Controller interface {
+	SetAgentID(string)
 	RegisterComponent(string) Reporter
 	RegisterComponentWithPersistance(string, bool) Reporter
 	RegisterApp(id string, name string) Reporter
@@ -58,15 +64,19 @@ type Controller interface {
 	StatusCode() AgentStatusCode
 	StatusString() string
 	UpdateStateID(string)
+	ServeHTTP(http.ResponseWriter, *http.Request)
 }
 
 type controller struct {
 	mx           sync.Mutex
 	status       AgentStatusCode
+	message      string
+	updateTime   time.Time
 	reporters    map[string]*reporter
 	appReporters map[string]*reporter
 	log          *logger.Logger
 	stateID      string
+	agentID      string
 }
 
 // NewController creates a new reporter.
@@ -77,6 +87,14 @@ func NewController(log *logger.Logger) Controller {
 		appReporters: make(map[string]*reporter),
 		log:          log,
 	}
+}
+
+// SetAgentID sets the agentID of the controller
+// The AgentID may be used in the handler output.
+func (r *controller) SetAgentID(agentID string) {
+	r.mx.Lock()
+	defer r.mx.Unlock()
+	r.agentID = agentID
 }
 
 // UpdateStateID cleans health when new configuration is received.
@@ -175,8 +193,9 @@ func (r *controller) Status() AgentStatus {
 	}
 	return AgentStatus{
 		Status:       r.status,
-		Message:      "",
+		Message:      r.message,
 		Applications: apps,
+		UpdateTime:   r.updateTime,
 	}
 }
 
@@ -189,12 +208,14 @@ func (r *controller) StatusCode() AgentStatusCode {
 
 func (r *controller) updateStatus() {
 	status := Healthy
+	message := ""
 
 	r.mx.Lock()
 	for id, rep := range r.reporters {
 		s := statusToAgentStatus(rep.status)
 		if s > status {
 			status = s
+			message = fmt.Sprintf("component %s: %s", id, rep.message)
 		}
 
 		r.log.Debugf("'%s' has status '%s'", id, s)
@@ -207,6 +228,7 @@ func (r *controller) updateStatus() {
 			s := statusToAgentStatus(rep.status)
 			if s > status {
 				status = s
+				message = fmt.Sprintf("app %s: %s", id, rep.message)
 			}
 
 			r.log.Debugf("'%s' has status '%s'", id, s)
@@ -217,15 +239,17 @@ func (r *controller) updateStatus() {
 	}
 
 	if r.status != status {
-		r.logStatus(status)
+		r.logStatus(status, message)
 		r.status = status
+		r.message = message
+		r.updateTime = time.Now().UTC()
 	}
 
 	r.mx.Unlock()
 
 }
 
-func (r *controller) logStatus(status AgentStatusCode) {
+func (r *controller) logStatus(status AgentStatusCode, message string) {
 	logFn := r.log.Infof
 	if status == Degraded {
 		logFn = r.log.Warnf
@@ -233,7 +257,7 @@ func (r *controller) logStatus(status AgentStatusCode) {
 		logFn = r.log.Errorf
 	}
 
-	logFn("Elastic Agent status changed to: '%s'", status)
+	logFn("Elastic Agent status changed to %q: %q", status, message)
 }
 
 // StatusString retrieves human readable string of current agent status.
