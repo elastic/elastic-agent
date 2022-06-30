@@ -6,10 +6,11 @@ package state
 
 import (
 	"context"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	"strings"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // Status describes the current status of the application process.

@@ -6,12 +6,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	"math/rand"
 	"os"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // Setups and Runs agent.

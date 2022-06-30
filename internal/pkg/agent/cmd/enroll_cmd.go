@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -43,6 +42,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 const (

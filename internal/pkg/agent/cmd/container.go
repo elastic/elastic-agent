@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -39,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/version"
 )
 

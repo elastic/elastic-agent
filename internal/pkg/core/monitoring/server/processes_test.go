@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	"net/http"
 	"os"
 	"testing"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 func TestProcesses(t *testing.T) {

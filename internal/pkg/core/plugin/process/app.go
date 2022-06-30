@@ -7,7 +7,6 @@ package process
 import (
 	"context"
 	"fmt"
-	process2 "github.com/elastic/elastic-agent/pkg/core/process"
 	"os"
 	"reflect"
 	"sync"
@@ -24,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	process2 "github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 

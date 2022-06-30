@@ -6,7 +6,6 @@ package operation
 
 import (
 	"context"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
