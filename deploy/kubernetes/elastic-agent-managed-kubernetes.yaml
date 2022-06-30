@@ -19,6 +19,9 @@ spec:
           effect: NoSchedule
       serviceAccountName: elastic-agent
       hostNetwork: true
+      # Sharing the host process ID namespace gives visibility of all processes running on the same host.
+      # This enables the Elastic Security integration to observe all process exec events on the host.
+      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
@@ -85,6 +88,9 @@ spec:
             - name: etcsysmd
               mountPath: /hostfs/etc/systemd
               readOnly: true
+            - name: etc-mid
+              mountPath: /etc/machine-id
+              readOnly: true
       volumes:
         - name: proc
           hostPath:
@@ -113,6 +119,10 @@ spec:
         - name: etcsysmd
           hostPath:
             path: /etc/systemd
+        - name: etc-mid
+          hostPath:
+            path: /etc/machine-id
+            type: File
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
