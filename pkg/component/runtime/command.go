@@ -61,7 +61,8 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 	}, nil
 }
 
-func (c *CommandRuntime) Run(ctx context.Context, comm Communicator, checkinPeriod time.Duration) {
+func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) {
+	checkinPeriod := c.current.Spec.Spec.Command.Timeouts.Checkin
 	c.forceCompState(client.UnitStateStarting, "Starting")
 	t := time.NewTicker(checkinPeriod)
 	defer t.Stop()
@@ -205,7 +206,11 @@ func (c *CommandRuntime) compState(state client.UnitState) {
 	if state == client.UnitStateHealthy {
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
 	} else if state == client.UnitStateDegraded {
-		msg = fmt.Sprintf("Degraded: pid '%d' missed '%d' check-ins", c.proc.PID, c.missedCheckins)
+		if c.missedCheckins == 1 {
+			msg = fmt.Sprintf("Degraded: pid '%d' missed 1 check-in", c.proc.PID)
+		} else {
+			msg = fmt.Sprintf("Degraded: pid '%d' missed %d check-ins", c.proc.PID, c.missedCheckins)
+		}
 	}
 	if c.observed.State != state || c.observed.Message != msg {
 		c.observed.State = state

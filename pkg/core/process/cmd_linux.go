@@ -9,6 +9,7 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"os/exec"
@@ -41,7 +42,7 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 		return nil, fmt.Errorf("invalid uid: '%d' or gid: '%d'", uid, gid)
 	}
 
-	return cmd
+	return cmd, nil
 }
 
 func isInt32(val int) bool {

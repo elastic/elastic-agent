@@ -7,11 +7,9 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/atomic"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"sync"
-	"time"
-
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // ComponentUnitState is the state for a unit running in a component.
@@ -164,7 +162,7 @@ type ComponentRuntime interface {
 	// Called by Manager inside a go-routine. Run should not return until the passed in context is done. Run is always
 	// called before any of the other methods in the interface and once the context is done none of those methods will
 	// ever be called again.
-	Run(ctx context.Context, comm Communicator, checkinPeriod time.Duration)
+	Run(ctx context.Context, comm Communicator)
 	// Watch returns the channel that sends component state.
 	//
 	// Channel should send a new state anytime a state for a unit or the whole component changes.
@@ -288,7 +286,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 	go func() {
 		defer close(runChan)
 		defer comm.destroy()
-		runtime.Run(runCtx, comm, m.checkinPeriod)
+		runtime.Run(runCtx, comm)
 	}()
 
 	return state, nil

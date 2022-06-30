@@ -794,7 +794,6 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 
 	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
 	require.NoError(t, err)
-	m.checkinPeriod = 100 * time.Millisecond
 	errCh := make(chan error)
 	go func() {
 		errCh <- m.Run(ctx)
@@ -817,8 +816,14 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 			BinaryName: "",
 			BinaryPath: binaryPath,
 			Spec: component.InputSpec{
-				Name:    "fake",
-				Command: &component.CommandSpec{},
+				Name: "fake",
+				Command: &component.CommandSpec{
+					Timeouts: component.CommandTimeoutSpec{
+						// very low checkin timeout so we can cause missed check-ins
+						Checkin: 100 * time.Millisecond,
+						Stop:    30 * time.Second,
+					},
+				},
 			},
 		},
 		Units: []component.Unit{

@@ -32,9 +32,6 @@ const (
 	// initialCheckinTimeout is the maximum amount of wait time from initial check-in stream to
 	// getting the first check-in observed state.
 	initialCheckinTimeout = 5 * time.Second
-	// checkinPeriod is how often a component must send an observed checkin message over the communication
-	// control protocol.
-	checkinPeriod = 30 * time.Second
 	// maxCheckinMisses is the maximum number of check-in misses a component can miss before it is killed
 	// and restarted.
 	maxCheckinMisses = 3
@@ -67,8 +64,7 @@ type Manager struct {
 	subMx         sync.RWMutex
 	subscriptions map[string][]*Subscription
 
-	shuttingDown  atomic.Bool
-	checkinPeriod time.Duration
+	shuttingDown atomic.Bool
 }
 
 // NewManager creates a new manager.
@@ -85,7 +81,6 @@ func NewManager(logger *logger.Logger, listenAddr string, tracer *apm.Tracer) (*
 		waitReady:     make(map[string]waitForReady),
 		current:       make(map[string]*componentRuntimeState),
 		subscriptions: make(map[string][]*Subscription),
-		checkinPeriod: checkinPeriod,
 	}
 	return m, nil
 }

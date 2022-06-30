@@ -69,13 +69,13 @@ type CommandEnvSpec struct {
 
 // CommandTimeoutSpec is the timeout specification for subprocess.
 type CommandTimeoutSpec struct {
-	Spawn time.Duration `config:"spawn" yaml:"spawn"`
-	Stop  time.Duration `config:"stop" yaml:"stop"`
+	Checkin time.Duration `config:"checkin" yaml:"checkin"`
+	Stop    time.Duration `config:"stop" yaml:"stop"`
 }
 
 // InitDefaults initialized the defaults for the timeouts.
 func (t *CommandTimeoutSpec) InitDefaults() {
-	t.Spawn = 30 * time.Second
+	t.Checkin = 30 * time.Second
 	t.Stop = 30 * time.Second
 }
 

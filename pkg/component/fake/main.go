@@ -8,29 +8,34 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+)
+
+const (
+	fake = "fake"
 )
 
 func main() {
 	err := run()
 	if err != nil {
-		fmt.Printf("%s\n", err)
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
 }
 
 func run() error {
 	ver := client.VersionInfo{
-		Name:    "fake",
+		Name:    fake,
 		Version: "1.0",
 		Meta: map[string]string{
-			"input": "fake",
+			"input": fake,
 		},
 	}
 	c, _, err := client.NewV2FromReader(os.Stdin, ver)
@@ -73,7 +78,7 @@ func run() error {
 				s.removed(change.Unit)
 			}
 		case <-c.Errors():
-			//fmt.Fprintf(os.Stderr, "GRPC client error: %s", err)
+			fmt.Fprintf(os.Stderr, "GRPC client error: %s", err)
 		}
 	}
 }
@@ -182,13 +187,13 @@ func (f *fakeInput) Update(u *client.Unit) error {
 	if !ok {
 		return fmt.Errorf("unit missing config type")
 	}
-	if unitType != "fake" {
+	if unitType != fake {
 		return fmt.Errorf("unit type changed with the same unit ID: %s", unitType)
 	}
 
 	state, stateMsg, err := getStateFromMap(cfg)
 	if err != nil {
-		return fmt.Errorf("unit config parsing error: %s", err)
+		return fmt.Errorf("unit config parsing error: %w", err)
 	}
 	f.state = state
 	f.stateMsg = stateMsg
@@ -242,7 +247,7 @@ func newRunningUnit(unit *client.Unit) (runningUnit, error) {
 		return nil, fmt.Errorf("unit config type empty")
 	}
 	switch unitType {
-	case "fake":
+	case fake:
 		return newFakeInput(unit, cfg)
 	}
 	return nil, fmt.Errorf("unknown unit config type: %s", unitType)

@@ -3,8 +3,6 @@ package runtime
 import (
 	"context"
 	"errors"
-	"time"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -30,7 +28,7 @@ func NewFailedRuntime(comp component.Component) (ComponentRuntime, error) {
 }
 
 // Run runs the runtime for a component that got an error from the component loader.
-func (c *FailedRuntime) Run(ctx context.Context, _ Communicator, _ time.Duration) {
+func (c *FailedRuntime) Run(ctx context.Context, _ Communicator) {
 	// state is hard coded to failed
 	c.ch <- createState(c.current, false)
 	select {
