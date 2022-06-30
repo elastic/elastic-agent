@@ -61,7 +61,7 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 	}, nil
 }
 
-func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) {
+func (c *CommandRuntime) Run(ctx context.Context, comm Communicator, checkinPeriod time.Duration) {
 	c.forceCompState(client.UnitStateStarting, "Starting")
 	t := time.NewTicker(checkinPeriod)
 	defer t.Stop()
@@ -150,7 +150,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) {
 					//
 					// at this point it is assumed the sub-process has locked up and will not respond to a nice
 					// termination signal, so we jump directly to killing the process
-					msg := fmt.Sprintf("Failed: pid '%d' missed %d check-in's and will be killed", c.proc.PID, maxCheckinMisses)
+					msg := fmt.Sprintf("Failed: pid '%d' missed %d check-ins and will be killed", c.proc.PID, maxCheckinMisses)
 					c.forceCompState(client.UnitStateFailed, msg)
 					_ = c.proc.Kill() // watcher will handle it from here
 				}

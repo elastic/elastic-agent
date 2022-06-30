@@ -67,7 +67,8 @@ type Manager struct {
 	subMx         sync.RWMutex
 	subscriptions map[string][]*Subscription
 
-	shuttingDown atomic.Bool
+	shuttingDown  atomic.Bool
+	checkinPeriod time.Duration
 }
 
 // NewManager creates a new manager.
@@ -84,6 +85,7 @@ func NewManager(logger *logger.Logger, listenAddr string, tracer *apm.Tracer) (*
 		waitReady:     make(map[string]waitForReady),
 		current:       make(map[string]*componentRuntimeState),
 		subscriptions: make(map[string][]*Subscription),
+		checkinPeriod: checkinPeriod,
 	}
 	return m, nil
 }
