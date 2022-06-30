@@ -56,14 +56,27 @@ type RuntimePreventionSpec struct {
 
 // CommandSpec is the specification for an input that executes as a subprocess.
 type CommandSpec struct {
-	Args []string         `config:"args,omitempty" yaml:"args,omitempty"`
-	Env  []CommandEnvSpec `config:"env,omitempty" yaml:"env,omitempty"`
+	Args     []string           `config:"args,omitempty" yaml:"args,omitempty"`
+	Env      []CommandEnvSpec   `config:"env,omitempty" yaml:"env,omitempty"`
+	Timeouts CommandTimeoutSpec `config:"timeouts" yaml:"timeouts"`
 }
 
 // CommandEnvSpec is the specification that defines environment variables that will be set to execute the subprocess.
 type CommandEnvSpec struct {
 	Name  string `config:"name" yaml:"name" validate:"required"`
 	Value string `config:"value" yaml:"value" validate:"required"`
+}
+
+// CommandTimeoutSpec is the timeout specification for subprocess.
+type CommandTimeoutSpec struct {
+	Spawn time.Duration `config:"spawn" yaml:"spawn"`
+	Stop  time.Duration `config:"stop" yaml:"stop"`
+}
+
+// InitDefaults initialized the defaults for the timeouts.
+func (t *CommandTimeoutSpec) InitDefaults() {
+	t.Spawn = 30 * time.Second
+	t.Stop = 30 * time.Second
 }
 
 // ServiceSpec is the specification for an input that executes as a service.

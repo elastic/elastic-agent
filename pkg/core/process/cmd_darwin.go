@@ -9,16 +9,15 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func getCmd(ctx context.Context, logger *logger.Logger, path string, env []string, uid, gid int, arg ...string) *exec.Cmd {
+func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	if ctx == nil {
 		cmd = exec.Command(path, arg...)
@@ -37,14 +36,18 @@ func getCmd(ctx context.Context, logger *logger.Logger, path string, env []strin
 			},
 		}
 	} else {
-		logger.Errorf("provided uid or gid for %s is invalid. uid: '%d' gid: '%d'.", path, uid, gid)
+		return nil, fmt.Errorf("invalid uid: '%d' or gid: '%d'", uid, gid)
 	}
 
-	return cmd
+	return cmd, nil
 }
 
 func isInt32(val int) bool {
 	return val >= 0 && val <= math.MaxInt32
+}
+
+func killCmd(proc *os.Process) error {
+	return proc.Kill()
 }
 
 func terminateCmd(proc *os.Process) error {

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"net/http"
 	"os"
 	"testing"
@@ -15,7 +16,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 )

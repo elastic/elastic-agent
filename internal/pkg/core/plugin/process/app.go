@@ -7,6 +7,7 @@ package process
 import (
 	"context"
 	"fmt"
+	process2 "github.com/elastic/elastic-agent/pkg/core/process"
 	"os"
 	"reflect"
 	"sync"
@@ -19,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
@@ -56,7 +56,7 @@ type Application struct {
 	monitor        monitoring.Monitor
 	statusReporter status.Reporter
 
-	processConfig *process.Config
+	processConfig *process2.Config
 
 	logger *logger.Logger
 
@@ -190,7 +190,7 @@ func (a *Application) SetState(s state.Status, msg string, payload map[string]in
 	a.setState(s, msg, payload)
 }
 
-func (a *Application) watch(ctx context.Context, p app.Taggable, proc *process.Info, cfg map[string]interface{}) {
+func (a *Application) watch(ctx context.Context, p app.Taggable, proc *process2.Info, cfg map[string]interface{}) {
 	go func() {
 		var procState *os.ProcessState
 
@@ -235,7 +235,7 @@ func (a *Application) watch(ctx context.Context, p app.Taggable, proc *process.I
 	}()
 }
 
-func (a *Application) stopWatcher(procInfo *process.Info) {
+func (a *Application) stopWatcher(procInfo *process2.Info) {
 	if procInfo != nil {
 		if closer, ok := a.watchClosers[procInfo.PID]; ok {
 			closer()
@@ -280,7 +280,7 @@ func (a *Application) cleanUp() {
 	a.monitor.Cleanup(a.desc.Spec(), a.pipelineID)
 }
 
-func (a *Application) gracefulKill(proc *process.Info) {
+func (a *Application) gracefulKill(proc *process2.Info) {
 	if proc == nil || proc.Process == nil {
 		return
 	}

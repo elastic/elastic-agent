@@ -7,13 +7,13 @@ package process
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"time"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )

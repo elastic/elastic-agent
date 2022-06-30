@@ -5,7 +5,7 @@
 //go:build !windows
 // +build !windows
 
-package proc
+package process
 
 import (
 	"os"

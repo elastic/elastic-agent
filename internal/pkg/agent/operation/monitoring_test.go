@@ -7,6 +7,7 @@ package operation
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"testing"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
