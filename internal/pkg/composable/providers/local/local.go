@@ -11,7 +11,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func init() {
@@ -37,7 +37,7 @@ func ContextProviderBuilder(_ *logger.Logger, c *config.Config) (corecomp.Contex
 	if c != nil {
 		err := c.Unpack(p)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unpack vars: %s", err)
+			return nil, fmt.Errorf("failed to unpack vars: %w", err)
 		}
 	}
 	if p.Mapping == nil {

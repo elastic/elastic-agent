@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
@@ -263,7 +263,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 	mockFetchProvider, err := MockContextProviderBuilder()
 	require.NoError(t, err)
 
-	fetchContextProviders := common.MapStr{
+	fetchContextProviders := mapstr.M{
 		"kubernetes_secrets": mockFetchProvider,
 	}
 	vars, err := NewVarsWithProcessors(

@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,8 +27,8 @@ func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 Unless all the require command-line parameters are provided or -f is used this command will ask questions on how you
 would like the Agent to operate.
 `,
-		Run: func(c *cobra.Command, args []string) {
-			if err := installCmd(streams, c, args); err != nil {
+		Run: func(c *cobra.Command, _ []string) {
+			if err := installCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
@@ -41,7 +42,7 @@ would like the Agent to operate.
 	return cmd
 }
 
-func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
 		return err
@@ -49,7 +50,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 	isAdmin, err := install.HasRoot()
 	if err != nil {
-		return fmt.Errorf("unable to perform install command while checking for administrator rights, %v", err)
+		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", install.PermissionUser)
@@ -72,12 +73,12 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	// check the lock to ensure that elastic-agent is not already running in this directory
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	if err := locker.TryLock(); err != nil {
-		if err == filelock.ErrAppAlreadyRunning {
+		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			return fmt.Errorf("cannot perform installation as Elastic Agent is already running from this directory")
 		}
 		return err
 	}
-	locker.Unlock()
+	_ = locker.Unlock()
 
 	if status == install.Broken {
 		if !force && !nonInteractive {
@@ -167,7 +168,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 		defer func() {
 			if err != nil {
-				install.Uninstall(cfgFile)
+				_ = install.Uninstall(cfgFile)
 			}
 		}()
 
@@ -180,7 +181,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 			defer func() {
 				if err != nil {
-					install.StopService()
+					_ = install.StopService()
 				}
 			}()
 		}
@@ -189,24 +190,24 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	if enroll {
 		enrollArgs := []string{"enroll", "--from-install"}
 		enrollArgs = append(enrollArgs, buildEnrollmentFlags(cmd, url, token)...)
-		enrollCmd := exec.Command(install.ExecutablePath(), enrollArgs...)
+		enrollCmd := exec.Command(install.ExecutablePath(), enrollArgs...) //nolint:gosec // it's not tainted
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
 		err = enrollCmd.Start()
 		if err != nil {
-			return fmt.Errorf("failed to execute enroll command: %s", err)
+			return fmt.Errorf("failed to execute enroll command: %w", err)
 		}
 		err = enrollCmd.Wait()
 		if err != nil {
 			if status != install.PackageInstall {
-				install.Uninstall(cfgFile)
-				exitErr, ok := err.(*exec.ExitError)
-				if ok {
+				var exitErr *exec.ExitError
+				_ = install.Uninstall(cfgFile)
+				if err != nil && errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}
 			}
-			return fmt.Errorf("enroll command failed for unknown reason: %s", err)
+			return fmt.Errorf("enroll command failed for unknown reason: %w", err)
 		}
 	}
 

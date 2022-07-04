@@ -11,7 +11,7 @@ func M(key string, val interface{}) MetaRecord {
 	}
 }
 
-// New constructs an Agent Error based on provided parameteres.
+// New constructs an Agent Error based on provided parameters.
 // Accepts:
 // - string for error message [0..1]
 // - error for inner error [0..1]

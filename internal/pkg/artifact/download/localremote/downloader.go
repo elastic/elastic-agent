@@ -11,8 +11,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/fs"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/snapshot"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // NewDownloader creates a downloader which first checks local directory
@@ -23,7 +23,7 @@ func NewDownloader(log *logger.Logger, config *artifact.Config) (download.Downlo
 
 	// try snapshot repo before official
 	if release.Snapshot() {
-		snapDownloader, err := snapshot.NewDownloader(config, "")
+		snapDownloader, err := snapshot.NewDownloader(log, config, "")
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -31,7 +31,7 @@ func NewDownloader(log *logger.Logger, config *artifact.Config) (download.Downlo
 		}
 	}
 
-	httpDownloader, err := http.NewDownloader(config)
+	httpDownloader, err := http.NewDownloader(log, config)
 	if err != nil {
 		return nil, err
 	}

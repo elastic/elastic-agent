@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
@@ -18,8 +19,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 // Start starts the application with a specified config.
@@ -132,7 +133,10 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 		a.processConfig,
 		a.uid,
 		a.gid,
-		spec.Args)
+		spec.Args, func(c *exec.Cmd) {
+			c.Stdout = newLoggerWriter(a.Name(), logStdOut, a.logger)
+			c.Stderr = newLoggerWriter(a.Name(), logStdErr, a.logger)
+		})
 	if err != nil {
 		return fmt.Errorf("%q failed to start %q: %w",
 			a.Name(), spec.BinaryPath, err)

@@ -17,7 +17,26 @@ type Store interface {
 	Save(io.Reader) error
 }
 
+// Storage interacts with on-disk data stores.
+type Storage interface {
+	Store
+
+	// Load return an io.ReadCloser for the target store.
+	Load() (io.ReadCloser, error)
+
+	// Exists checks if the store exists.
+	Exists() (bool, error)
+}
+
 // DiskStore takes a persistedConfig and save it to a temporary files and replace the target file.
 type DiskStore struct {
 	target string
+}
+
+// EncryptedDiskStore encrypts config when saving to disk.
+// When saving it will save to a temporary file then replace the target file.
+type EncryptedDiskStore struct {
+	target    string
+	vaultPath string
+	key       []byte
 }

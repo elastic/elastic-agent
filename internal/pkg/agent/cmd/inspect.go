@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -28,10 +28,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/go-sysinfo"
 )
 
@@ -49,12 +49,12 @@ func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Comman
 		},
 	}
 
-	cmd.AddCommand(newInspectOutputCommandWithArgs(s, streams))
+	cmd.AddCommand(newInspectOutputCommandWithArgs(s))
 
 	return cmd
 }
 
-func newInspectOutputCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
+func newInspectOutputCommandWithArgs(_ []string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "output",
 		Short: "Displays configuration generated for output",
@@ -121,8 +121,8 @@ func printMapStringConfig(mapStr map[string]interface{}) error {
 		return errors.New(err, "could not marshal to YAML")
 	}
 
-	fmt.Println(string(data))
-	return nil
+	_, err = os.Stdout.WriteString(string(data))
+	return err
 }
 
 func printConfig(cfg *config.Config) error {
@@ -170,7 +170,7 @@ func listOutputsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 	}
 
 	for k := range programsGroup {
-		fmt.Println(k)
+		_, _ = os.Stdout.WriteString(k)
 	}
 
 	return nil
@@ -223,9 +223,12 @@ func printOutputFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, output
 			}
 
 			programFound = true
-			fmt.Printf("[%s] %s:\n", k, p.Spec.Cmd)
-			printMapStringConfig(p.Configuration())
-			fmt.Println("---")
+			_, _ = os.Stdout.WriteString(fmt.Sprintf("[%s] %s:\n", k, p.Spec.Cmd))
+			err = printMapStringConfig(p.Configuration())
+			if err != nil {
+				return fmt.Errorf("cannot print configuration of program '%s': %w", programName, err)
+			}
+			_, _ = os.Stdout.WriteString("---")
 		}
 
 		if !programFound {
@@ -299,7 +302,49 @@ func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 		return nil, err
 	}
 	composableWaiter.Wait()
+
+	// add the fleet-server input to default programs list
+	// this does not correspond to the actual config that fleet-server uses as it's in fleet.yml and not part of the assembled config (cfg)
+	fleetCFG, err := cfg.ToMapStr()
+	if err != nil {
+		return nil, err
+	}
+	if fleetInput := getFleetInput(fleetCFG); fleetInput != nil {
+		ast, err := transpiler.NewAST(fleetInput)
+		if err != nil {
+			return nil, err
+		}
+		router.programs["default"] = append(router.programs["default"], program.Program{
+			Spec: program.Spec{
+				Name: "fleet-server",
+				Cmd:  "fleet-server",
+			},
+			Config: ast,
+		})
+	}
+
 	return router.programs, nil
+}
+
+func getFleetInput(o map[string]interface{}) map[string]interface{} {
+	arr, ok := o["inputs"].([]interface{})
+	if !ok {
+		return nil
+	}
+	for _, iface := range arr {
+		input, ok := iface.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		t, ok := input["type"]
+		if !ok {
+			continue
+		}
+		if t.(string) == "fleet-server" {
+			return input
+		}
+	}
+	return nil
 }
 
 type inmemRouter struct {

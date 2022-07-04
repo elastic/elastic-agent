@@ -11,8 +11,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type stateStore interface {
@@ -63,7 +63,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker store.Fl
 	_ = h.dispatcher.Route(ctx, a.ID(), noPrograms)
 
 	if !action.IsDetected {
-		// ACK only events comming from fleet
+		// ACK only events received from fleet.
 		if err := acker.Ack(ctx, action); err != nil {
 			return err
 		}

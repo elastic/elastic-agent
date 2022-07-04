@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"sync"
 	"time"
 
@@ -44,7 +43,8 @@ type Version struct {
 	Snapshot  bool
 }
 
-// ApplicationStatus is a status of an application inside of Elastic Agent.
+// ApplicationStatus is a status of an application managed by the Elastic Agent.
+// TODO(Anderson): Implement sort.Interface and sort it.
 type ApplicationStatus struct {
 	ID      string
 	Name    string

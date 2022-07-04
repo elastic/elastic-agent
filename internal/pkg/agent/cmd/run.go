@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -19,29 +20,34 @@ import (
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/api"
-	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
-	"github.com/elastic/beats/v7/libbeat/monitoring"
-	"github.com/elastic/beats/v7/libbeat/service"
+	"github.com/elastic/elastic-agent-libs/api"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/elastic-agent-libs/service"
+	"github.com/elastic/elastic-agent-system-metrics/report"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cleaner"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	monitoringServer "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/internal/pkg/fileutil"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -55,7 +61,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Use:   "run",
 		Short: "Start the elastic-agent.",
 		Run: func(_ *cobra.Command, _ []string) {
-			if err := run(streams, nil); err != nil {
+			if err := run(nil); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
@@ -63,7 +69,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	}
 }
 
-func run(streams *cli.IOStreams, override cfgOverrider) error {
+func run(override cfgOverrider) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -76,7 +82,9 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 	if err := locker.TryLock(); err != nil {
 		return err
 	}
-	defer locker.Unlock()
+	defer func() {
+		_ = locker.Unlock()
+	}()
 
 	service.BeforeRun()
 	defer service.Cleanup()
@@ -112,6 +120,29 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
 	}
+
+	// Ensure we have the agent secret created.
+	// The secret is not created here if it exists already from the previous enrollment.
+	// This is needed for compatibility with agent running in standalone mode,
+	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
+	err = secret.CreateAgentSecret()
+	if err != nil {
+		return err
+	}
+
+	// Check if the fleet.yml or state.yml exists and encrypt them.
+	// This is needed to handle upgrade properly.
+	// On agent upgrade the older version for example 8.2 unpacks the 8.3 agent
+	// and tries to run it.
+	// The new version of the agent requires encrypted configuration files or it will not start and upgrade will fail and revert.
+	err = encryptConfigIfNeeded(logger)
+	if err != nil {
+		return err
+	}
+
+	// Start the old unencrypted agent configuration file cleaner
+	startOldAgentConfigCleaner(ctx, logger)
+
 	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)
 	if err != nil {
 		return errors.New(err,
@@ -138,6 +169,7 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 	rex := reexec.NewManager(rexLogger, execPath)
 
 	statusCtrl := status.NewController(logger)
+	statusCtrl.SetAgentID(agentInfo.AgentID())
 
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
 	if err != nil {
@@ -168,11 +200,13 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 	control.SetRouteFn(app.Routes)
 	control.SetMonitoringCfg(cfg.Settings.MonitoringConfig)
 
-	serverStopFn, err := setupMetrics(agentInfo, logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, app, tracer)
+	serverStopFn, err := setupMetrics(agentInfo, logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, app, tracer, statusCtrl)
 	if err != nil {
 		return err
 	}
-	defer serverStopFn()
+	defer func() {
+		_ = serverStopFn()
+	}()
 
 	if err := app.Start(); err != nil {
 		return err
@@ -180,7 +214,7 @@ func run(streams *cli.IOStreams, override cfgOverrider) error {
 
 	// listen for signals
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 	reexecing := false
 	for {
 		breakout := false
@@ -268,7 +302,7 @@ func getOverwrites(rawConfig *config.Config) error {
 		return nil
 	}
 	path := paths.AgentConfigFile()
-	store := storage.NewDiskStore(path)
+	store := storage.NewEncryptedDiskStore(path)
 
 	reader, err := store.Load()
 	if err != nil && errors.Is(err, os.ErrNotExist) {
@@ -321,9 +355,9 @@ func setupMetrics(
 	cfg *monitoringCfg.MonitoringConfig,
 	app application.Application,
 	tracer *apm.Tracer,
+	statusCtrl status.Controller,
 ) (func() error, error) {
-	// use libbeat to setup metrics
-	if err := metrics.SetupMetrics(agentName); err != nil {
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
 	}
 
@@ -334,7 +368,7 @@ func setupMetrics(
 	}
 
 	bufferEnabled := cfg.HTTP.Buffer != nil && cfg.HTTP.Buffer.Enabled
-	s, err := monitoringServer.New(logger, endpointConfig, monitoring.GetNamespace, app.Routes, isProcessStatsEnabled(cfg.HTTP), bufferEnabled, tracer)
+	s, err := monitoringServer.New(logger, endpointConfig, monitoring.GetNamespace, app.Routes, isProcessStatsEnabled(cfg.HTTP), bufferEnabled, tracer, statusCtrl)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
@@ -356,7 +390,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		// no enrollment file exists or failed to stat it; nothing to do
-		return cfg, nil
+		return cfg, nil //nolint:nilerr // there is nothing to do
 	}
 	contents, err := ioutil.ReadFile(enrollPath)
 	if err != nil {
@@ -460,4 +494,122 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 		ServiceEnvironment: cfg.Environment,
 		Transport:          ts,
 	})
+}
+
+// encryptConfigIfNeeded encrypts fleet.yml or state.yml if fleet.enc or state.enc does not exist already.
+func encryptConfigIfNeeded(log *logger.Logger) (err error) {
+	log.Debug("encrypt config if needed")
+
+	files := []struct {
+		Src string
+		Dst string
+	}{
+		{
+			Src: paths.AgentStateStoreYmlFile(),
+			Dst: paths.AgentStateStoreFile(),
+		},
+		{
+			Src: paths.AgentConfigYmlFile(),
+			Dst: paths.AgentConfigFile(),
+		},
+	}
+	for _, f := range files {
+		var b []byte
+
+		// Check if .yml file modification timestamp and existence
+		log.Debugf("check if the yml file %v exists", f.Src)
+		ymlModTime, ymlExists, err := fileutil.GetModTimeExists(f.Src)
+		if err != nil {
+			log.Errorf("failed to access yml file %v: %v", f.Src, err)
+			return err
+		}
+
+		if !ymlExists {
+			log.Debugf("yml file %v doesn't exists, continue", f.Src)
+			continue
+		}
+
+		// Check if .enc file modification timestamp and existence
+		log.Debugf("check if the enc file %v exists", f.Dst)
+		encModTime, encExists, err := fileutil.GetModTimeExists(f.Dst)
+		if err != nil {
+			log.Errorf("failed to access enc file %v: %v", f.Dst, err)
+			return err
+		}
+
+		// If enc file exists and the yml file modification time is before enc file modification time then skip encryption.
+		// The reasoning is that the yml was not modified since the last time it was migrated to the encrypted file.
+		// The modification of the yml is possible in the cases where the agent upgrade failed and rolled back, leaving .enc file on the disk for example
+		if encExists && ymlModTime.Before(encModTime) {
+			log.Debugf("enc file %v already exists, and the yml was not modified after migration, yml mod time: %v, enc mod time: %v", f.Dst, ymlModTime, encModTime)
+			continue
+		}
+
+		log.Debugf("read file: %v", f.Src)
+		b, err = ioutil.ReadFile(f.Src)
+		if err != nil {
+			log.Debugf("read file: %v, err: %v", f.Src, err)
+			return err
+		}
+
+		// Encrypt yml file
+		log.Debugf("encrypt file %v into %v", f.Src, f.Dst)
+		store := storage.NewEncryptedDiskStore(f.Dst)
+		err = store.Save(bytes.NewReader(b))
+		if err != nil {
+			log.Debugf("failed to encrypt file: %v, err: %v", f.Dst, err)
+			return err
+		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Remove state.yml file if no errors
+	fp := paths.AgentStateStoreYmlFile()
+	// Check if state.yml exists
+	exists, err := fileutil.FileExists(fp)
+	if err != nil {
+		log.Warnf("failed to check if file %s exists, err: %v", fp, err)
+	}
+	if exists {
+		if err := os.Remove(fp); err != nil {
+			// Log only
+			log.Warnf("failed to remove file: %s, err: %v", fp, err)
+		}
+	}
+
+	// The agent can't remove fleet.yml, because it can be rolled back by the older version of the agent "watcher"
+	// and pre 8.3 version needs unencrypted fleet.yml file in order to start.
+	// The fleet.yml file removal is performed by the cleaner on the agent start after the .enc configuration was stable for the grace period after upgrade
+
+	return nil
+}
+
+// startOldAgentConfigCleaner starts the cleaner that removes fleet.yml and fleet.yml.lock files after 15 mins by default
+// The interval is calculated from the last modified time of fleet.enc. It's possible that the fleet.enc
+// will be modified again during that time, the assumption is that at some point there will be 15 mins interval when the fleet.enc is not modified.
+// The modification time is used because it's the most cross-patform compatible timestamp on the files.
+// This is tied to grace period, default 10 mins, when the agent is considered "stable" after the upgrade.
+// The old agent watcher doesn't know anything about configuration encryption so we have to delete the old configuration files here.
+// The cleaner is only started if fleet.yml exists
+func startOldAgentConfigCleaner(ctx context.Context, log *logp.Logger) {
+	// Start cleaner only when fleet.yml exists
+	fp := paths.AgentConfigYmlFile()
+	exists, err := fileutil.FileExists(fp)
+	if err != nil {
+		log.Warnf("failed to check if file %s exists, err: %v", fp, err)
+	}
+	if !exists {
+		return
+	}
+
+	c := cleaner.New(log, paths.AgentConfigFile(), []string{fp, fmt.Sprintf("%s.lock", fp)})
+	go func() {
+		err := c.Run(ctx)
+		if err != nil {
+			log.Warnf("failed running the old configuration files cleaner, err: %v", err)
+		}
+	}()
 }

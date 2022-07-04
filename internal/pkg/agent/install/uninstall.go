@@ -16,7 +16,7 @@ import (
 
 	"github.com/kardianos/service"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -29,9 +29,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -55,7 +55,6 @@ func Uninstall(cfgFile string) error {
 				fmt.Sprintf("failed to stop service (%s)", paths.ServiceName),
 				errors.M("service", paths.ServiceName))
 		}
-		status = service.StatusStopped
 	}
 	_ = svc.Uninstall()
 
@@ -77,7 +76,7 @@ func Uninstall(cfgFile string) error {
 	// remove existing directory
 	err = os.RemoveAll(paths.InstallPath)
 	if err != nil {
-		if runtime.GOOS == "windows" {
+		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
 			// possible to fail on Windows, because elastic-agent.exe is running from
 			// this directory.
 			return nil
@@ -116,6 +115,7 @@ func delayedRemoval(path string) {
 	// The installation path will still exists because we are executing from that
 	// directory. So cmd.exe is spawned that sleeps for 2 seconds (using ping, recommend way from
 	// from Windows) then rmdir is performed.
+	//nolint:gosec // it's not tainted
 	rmdir := exec.Command(
 		filepath.Join(os.Getenv("windir"), "system32", "cmd.exe"),
 		"/C", "ping", "-n", "2", "127.0.0.1", "&&", "rmdir", "/s", "/q", path)
@@ -163,7 +163,7 @@ func uninstallPrograms(ctx context.Context, cfgFile string) error {
 	for _, p := range pp {
 		descriptor := app.NewDescriptor(p.Spec, currentVersion, artifactConfig, nil)
 		if err := uninstaller.Uninstall(ctx, p.Spec, currentVersion, descriptor.Directory()); err != nil {
-			fmt.Printf("failed to uninstall '%s': %v\n", p.Spec.Name, err)
+			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall '%s': %v\n", p.Spec.Name, err))
 		}
 	}
 
@@ -244,7 +244,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		if err != nil {
 			return nil, err
 		}
-		ctrl.Run(ctx, varsCallback)
+		_ = ctrl.Run(ctx, varsCallback)
 		wg.Wait()
 
 		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
@@ -273,7 +273,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		ast = newAst
 	}
 
-	finalConfig, err := newAst.Map()
+	finalConfig, err := ast.Map()
 	if err != nil {
 		return nil, err
 	}

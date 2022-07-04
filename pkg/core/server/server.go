@@ -30,7 +30,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -976,7 +976,7 @@ type actionResult struct {
 }
 
 func reportableErr(err error) bool {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return false
 	}
 	s, ok := status.FromError(err)

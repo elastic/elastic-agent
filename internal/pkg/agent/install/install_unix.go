@@ -46,7 +46,7 @@ func checkPackageInstall() bool {
 	}
 
 	// check rhel and sles based systems (or systems that use rpm)
-	// if package has been installed query retuns with a list of associated files.
+	// if package has been installed the query will returns the list of associated files.
 	// otherwise if uninstalled, or has never been installled status ends with "not installed"
 	if _, err := exec.Command("which", "rpm").Output(); err == nil {
 		out, err := exec.Command("rpm", "-q", paths.BinaryName, "--state").Output()

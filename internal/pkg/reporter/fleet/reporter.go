@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/reporter"
 	"github.com/elastic/elastic-agent/internal/pkg/reporter/fleet/config"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type event struct {
@@ -129,7 +129,7 @@ OUTER:
 }
 
 // Close stops all the background jobs reporter is running.
-// Guards agains panic of closing channel multiple times.
+// Guards against panic of closing channel multiple times.
 func (r *Reporter) Close() error {
 	return nil
 }

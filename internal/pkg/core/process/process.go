@@ -11,9 +11,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/elastic/beats/v7/x-pack/libbeat/common/proc"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/proc"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 var (
@@ -37,7 +37,7 @@ type Option func(c *exec.Cmd)
 // - process id
 // - error
 func Start(logger *logger.Logger, path string, config *Config, uid, gid int, args []string, opts ...Option) (proc *Info, err error) {
-	return StartContext(nil, logger, path, config, uid, gid, args, opts...)
+	return StartContext(nil, logger, path, config, uid, gid, args, opts...) //nolint:staticcheck // calls a different function if no ctx
 }
 
 // StartContext starts a new process with context.

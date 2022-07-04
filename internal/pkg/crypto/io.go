@@ -63,7 +63,7 @@ var DefaultOptions = &Option{
 	BlockSize:       bytes.MinRead,
 }
 
-// versionMagicHeader is the format version that will be added at the begining of the header and
+// versionMagicHeader is the format version that will be added at the beginning of the header and
 // can be used to change how the decryption work in future version.
 var versionMagicHeader = []byte("v2")
 
@@ -296,7 +296,7 @@ func (r *Reader) readTo(b []byte) (int, error) {
 	if !r.eof {
 		if err := r.consumeBlock(); err != nil {
 			// We read all the blocks
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				r.eof = true
 			} else {
 				r.err = err

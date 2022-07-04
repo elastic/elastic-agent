@@ -16,12 +16,12 @@ import (
 	downloader "github.com/elastic/elastic-agent/internal/pkg/artifact/download/localremote"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 // Factory creates a new stream factory.

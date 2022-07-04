@@ -11,7 +11,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // ItemPriority is the priority that item mappings are added to the provider.
@@ -46,7 +46,7 @@ func DynamicProviderBuilder(_ *logger.Logger, c *config.Config) (composable.Dyna
 	if c != nil {
 		err := c.Unpack(p)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unpack vars: %s", err)
+			return nil, fmt.Errorf("failed to unpack vars: %w", err)
 		}
 	}
 	if p.Items == nil {

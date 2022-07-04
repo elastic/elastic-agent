@@ -11,7 +11,7 @@ import (
 
 	"github.com/hectane/go-acl"
 
-	"github.com/elastic/beats/v7/libbeat/common/file"
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
@@ -55,14 +55,23 @@ func (d *DiskStore) Save(in io.Reader) error {
 	defer os.Remove(tmpFile)
 
 	if _, err := io.Copy(fd, in); err != nil {
-		_ = fd.Close()
+		if err := fd.Close(); err != nil {
+			return errors.New(err, "could not close temporary file",
+				errors.TypeFilesystem,
+				errors.M(errors.MetaKeyPath, tmpFile))
+		}
 
 		return errors.New(err, "could not save content on disk",
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
-	_ = fd.Sync()
+	if err := fd.Sync(); err != nil {
+		return errors.New(err,
+			fmt.Sprintf("could not sync temporary file %s", d.target),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, tmpFile))
+	}
 
 	if err := fd.Close(); err != nil {
 		return errors.New(err, "could not close temporary file",

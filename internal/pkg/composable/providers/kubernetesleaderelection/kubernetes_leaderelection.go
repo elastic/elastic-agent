@@ -13,17 +13,17 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func init() {
-	composable.Providers.AddContextProvider("kubernetes_leaderelection", ContextProviderBuilder)
+	_ = composable.Providers.AddContextProvider("kubernetes_leaderelection", ContextProviderBuilder)
 }
 
 type contextProvider struct {
@@ -76,7 +76,6 @@ func (p *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		Name:      p.config.LeaderLease,
 		Namespace: ns,
 	}
-	metaUID := lease.GetObjectMeta().GetUID()
 	p.leaderElection = &leaderelection.LeaderElectionConfig{
 		Lock: &resourcelock.LeaseLock{
 			LeaseMeta: lease,
@@ -92,11 +91,11 @@ func (p *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				p.logger.Debugf("leader election lock GAINED, id %v", id)
-				p.startLeading(string(metaUID))
+				p.startLeading()
 			},
 			OnStoppedLeading: func() {
 				p.logger.Debugf("leader election lock LOST, id %v", id)
-				p.stopLeading(string(metaUID))
+				p.stopLeading()
 			},
 		},
 	}
@@ -118,7 +117,7 @@ func (p *contextProvider) startLeaderElector(ctx context.Context) {
 	go le.Run(ctx)
 }
 
-func (p *contextProvider) startLeading(metaUID string) {
+func (p *contextProvider) startLeading() {
 	mapping := map[string]interface{}{
 		"leader": true,
 	}
@@ -129,7 +128,7 @@ func (p *contextProvider) startLeading(metaUID string) {
 	}
 }
 
-func (p *contextProvider) stopLeading(metaUID string) {
+func (p *contextProvider) stopLeading() {
 	mapping := map[string]interface{}{
 		"leader": false,
 	}

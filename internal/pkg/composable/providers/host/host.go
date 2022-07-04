@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // DefaultCheckInterval is the default timeout used to check if any host information has changed.
@@ -89,7 +89,7 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config) (corecomp.Cont
 	if c != nil {
 		err := c.Unpack(p)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unpack config: %s", err)
+			return nil, fmt.Errorf("failed to unpack config: %w", err)
 		}
 	}
 	if p.CheckInterval <= 0 {

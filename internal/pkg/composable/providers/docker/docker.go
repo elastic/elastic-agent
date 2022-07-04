@@ -8,21 +8,22 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/bus"
-	"github.com/elastic/beats/v7/libbeat/common/docker"
-	"github.com/elastic/beats/v7/libbeat/common/safemapstr"
+	"github.com/elastic/elastic-agent-autodiscover/bus"
+	"github.com/elastic/elastic-agent-autodiscover/docker"
+	"github.com/elastic/elastic-agent-autodiscover/utils"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-libs/safemapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // ContainerPriority is the priority that container mappings are added to the provider.
 const ContainerPriority = 0
 
 func init() {
-	composable.Providers.AddDynamicProvider("docker", DynamicProviderBuilder)
+	_ = composable.Providers.AddDynamicProvider("docker", DynamicProviderBuilder)
 }
 
 type dockerContainerData struct {
@@ -79,7 +80,10 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 					delete(stoppers, data.container.ID)
 					return
 				}
-				comm.AddOrUpdate(data.container.ID, ContainerPriority, data.mapping, data.processors)
+				err = comm.AddOrUpdate(data.container.ID, ContainerPriority, data.mapping, data.processors)
+				if err != nil {
+					c.logger.Errorf("%s", err)
+				}
 			case event := <-stopListener.Events():
 				data, err := generateData(event)
 				if err != nil {
@@ -119,11 +123,11 @@ func generateData(event bus.Event) (*dockerContainerData, error) {
 		return nil, fmt.Errorf("unable to get container from watcher event")
 	}
 
-	labelMap := common.MapStr{}
-	processorLabelMap := common.MapStr{}
+	labelMap := mapstr.M{}
+	processorLabelMap := mapstr.M{}
 	for k, v := range container.Labels {
-		safemapstr.Put(labelMap, k, v)
-		processorLabelMap.Put(common.DeDot(k), v)
+		_ = safemapstr.Put(labelMap, k, v)
+		_, _ = processorLabelMap.Put(utils.DeDot(k), v)
 	}
 
 	data := &dockerContainerData{

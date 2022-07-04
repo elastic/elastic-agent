@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/bus"
-	"github.com/elastic/beats/v7/libbeat/common/docker"
+	"github.com/elastic/elastic-agent-autodiscover/bus"
+	"github.com/elastic/elastic-agent-autodiscover/docker"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
 func TestGenerateData(t *testing.T) {
@@ -35,9 +35,9 @@ func TestGenerateData(t *testing.T) {
 			"id":    container.ID,
 			"name":  container.Name,
 			"image": container.Image,
-			"labels": common.MapStr{
-				"do": common.MapStr{"not": common.MapStr{"include": "true"}},
-				"co": common.MapStr{"elastic": common.MapStr{"logs/disable": "true"}},
+			"labels": mapstr.M{
+				"do": mapstr.M{"not": mapstr.M{"include": "true"}},
+				"co": mapstr.M{"elastic": mapstr.M{"logs/disable": "true"}},
 			},
 		},
 	}
@@ -48,7 +48,7 @@ func TestGenerateData(t *testing.T) {
 					"id":    container.ID,
 					"name":  container.Name,
 					"image": container.Image,
-					"labels": common.MapStr{
+					"labels": mapstr.M{
 						"do_not_include":          "true",
 						"co_elastic_logs/disable": "true",
 					},

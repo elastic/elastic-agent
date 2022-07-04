@@ -14,10 +14,10 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/file"
-	"github.com/elastic/beats/v7/libbeat/logp"
-	"github.com/elastic/beats/v7/libbeat/logp/configure"
+	"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
@@ -28,6 +28,9 @@ const iso8601Format = "2006-01-02T15:04:05.000Z0700"
 
 // DefaultLogLevel used in agent and its processes.
 const DefaultLogLevel = logp.InfoLevel
+
+// DefaultLogDirectory used in agent and its processes.
+const DefaultLogDirectory = "logs"
 
 // Logger alias ecslog.Logger with Logger.
 type Logger = logp.Logger
@@ -50,7 +53,7 @@ func NewWithLogpLevel(name string, level logp.Level, logInternal bool) (*Logger,
 }
 
 // NewFromConfig takes the user configuration and generate the right logger.
-// TODO: Finish implementation, need support on the library that we use.
+// We should finish implementation, need support on the library that we use.
 func NewFromConfig(name string, cfg *Config, logInternal bool) (*Logger, error) {
 	return new(name, cfg, logInternal)
 }
@@ -72,12 +75,12 @@ func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 	}
 
 	if err := configure.LoggingWithOutputs("", commonCfg, outputs...); err != nil {
-		return nil, fmt.Errorf("error initializing logging: %v", err)
+		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
 	return logp.NewLogger(name), nil
 }
 
-func toCommonConfig(cfg *Config) (*common.Config, error) {
+func toCommonConfig(cfg *Config) (*config.C, error) {
 	// work around custom types and common config
 	// when custom type is transformed to common.Config
 	// value is determined based on reflect value which is incorrect
@@ -87,7 +90,7 @@ func toCommonConfig(cfg *Config) (*common.Config, error) {
 		return nil, err
 	}
 
-	commonLogp, err := common.NewConfigFrom(string(yamlCfg))
+	commonLogp, err := config.NewConfigFrom(string(yamlCfg))
 	if err != nil {
 		return nil, errors.New(err, errors.TypeConfig)
 	}
@@ -114,7 +117,7 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Home(), "logs", cfg.Beat)
+	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
 
 	rotator, err := file.NewFileRotator(filename,
 		file.MaxSizeBytes(defaultCfg.Files.MaxSize),

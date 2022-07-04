@@ -14,7 +14,7 @@ import (
 	"text/template"
 
 	lic "github.com/elastic/elastic-agent/dev-tools/licenses"
-	"github.com/elastic/elastic-agent/internal/pkg/packer"
+	"github.com/elastic/elastic-agent/pkg/packer"
 )
 
 var (
@@ -41,7 +41,7 @@ package program
 import (
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/packer"
+	"github.com/elastic/elastic-agent/pkg/packer"
 )
 
 var Supported []Spec

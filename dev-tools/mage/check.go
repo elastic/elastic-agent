@@ -5,21 +5,15 @@
 package mage
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/v7/libbeat/processors/dissect"
+	devtools "github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
@@ -30,82 +24,11 @@ import (
 // It checks the file permissions of python test cases and YAML files.
 // It checks .go source files using 'go vet'.
 func Check() error {
-	fmt.Println(">> check: Checking source code for common problems")
+	fmt.Println(">> check: Checking source code for common problems") //nolint:forbidigo // it's ok to use fmt.println in mage
 
-	mg.Deps(GoVet, CheckYAMLNotExecutable)
+	mg.Deps(GoVet, CheckYAMLNotExecutable, devtools.CheckNoChanges)
 
-	changes, err := GitDiffIndex()
-	if err != nil {
-		return errors.Wrap(err, "failed to diff the git index")
-	}
-
-	if len(changes) > 0 {
-		if mg.Verbose() {
-			GitDiff()
-		}
-
-		return errors.Errorf("some files are not up-to-date. "+
-			"Run 'make update' then review and commit the changes. "+
-			"Modified: %v", changes)
-	}
 	return nil
-}
-
-// GitDiffIndex returns a list of files that differ from what is committed.
-// These could file that were created, deleted, modified, or moved.
-func GitDiffIndex() ([]string, error) {
-	// Ensure the index is updated so that diff-index gives accurate results.
-	if err := sh.Run("git", "update-index", "-q", "--refresh"); err != nil {
-		return nil, err
-	}
-
-	// git diff-index provides a list of modified files.
-	// https://www.git-scm.com/docs/git-diff-index
-	out, err := sh.Output("git", "diff-index", "HEAD", "--", ".")
-	if err != nil {
-		return nil, err
-	}
-
-	// Example formats.
-	// :100644 100644 bcd1234... 0123456... M file0
-	// :100644 100644 abcd123... 1234567... R86 file1 file3
-	d, err := dissect.New(":%{src_mode} %{dst_mode} %{src_sha1} %{dst_sha1} %{status}\t%{paths}")
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse lines.
-	var modified []string
-	s := bufio.NewScanner(bytes.NewBufferString(out))
-	for s.Scan() {
-		m, err := d.Dissect(s.Text())
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to dissect git diff-index output")
-		}
-
-		paths := strings.Split(m["paths"], "\t")
-		if len(paths) > 1 {
-			modified = append(modified, paths[1])
-		} else {
-			modified = append(modified, paths[0])
-		}
-	}
-	if err = s.Err(); err != nil {
-		return nil, err
-	}
-
-	return modified, nil
-}
-
-// GitDiff runs 'git diff' and writes the output to stdout.
-func GitDiff() error {
-	c := exec.Command("git", "--no-pager", "diff", "--minimal")
-	c.Stdin = nil
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	log.Println("exec:", strings.Join(c.Args, " "))
-	err := c.Run()
-	return err
 }
 
 // CheckYAMLNotExecutable checks that no .yml or .yaml files are executable.
@@ -124,11 +47,11 @@ func CheckYAMLNotExecutable() error {
 		}
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed search for YAML files")
+		return fmt.Errorf("failed search for YAML files: %w", err)
 	}
 
 	if len(executableYAMLFiles) > 0 {
-		return errors.Errorf("YAML files cannot be executable. Fix "+
+		return fmt.Errorf("YAML files cannot be executable. Fix "+
 			"permissions of %v", executableYAMLFiles)
 
 	}
@@ -138,12 +61,15 @@ func CheckYAMLNotExecutable() error {
 // GoVet vets the .go source code using 'go vet'.
 func GoVet() error {
 	err := sh.RunV("go", "vet", "./...")
-	return errors.Wrap(err, "failed running go vet, please fix the issues reported")
+	if err != nil {
+		return fmt.Errorf("failed running go vet, please fix the issues reported: %w", err)
+	}
+	return nil
 }
 
 // CheckLicenseHeaders checks license headers in .go files.
 func CheckLicenseHeaders() error {
-	fmt.Println(">> fmt - go-licenser: Checking for missing headers")
+	fmt.Println(">> fmt - go-licenser: Checking for missing headers") //nolint:forbidigo // it's ok to use fmt.println in mage
 	mg.Deps(InstallGoLicenser)
 
 	licenser := gotool.Licenser

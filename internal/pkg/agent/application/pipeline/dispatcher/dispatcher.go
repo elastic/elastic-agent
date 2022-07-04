@@ -15,8 +15,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type actionHandlers map[string]actions.Handler

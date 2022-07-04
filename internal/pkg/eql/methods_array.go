@@ -12,7 +12,7 @@ import (
 // arrayContains check if value is a member of the array.
 func arrayContains(args []interface{}) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, fmt.Errorf("arrayContains: accepts minimum 2 arguments; recieved %d", len(args))
+		return nil, fmt.Errorf("arrayContains: accepts minimum 2 arguments; received %d", len(args))
 	}
 	switch a := args[0].(type) {
 	case *null:
@@ -27,5 +27,5 @@ func arrayContains(args []interface{}) (interface{}, error) {
 		}
 		return false, nil
 	}
-	return nil, fmt.Errorf("arrayContains: first argument must be an array; recieved %T", args[0])
+	return nil, fmt.Errorf("arrayContains: first argument must be an array; received %T", args[0])
 }

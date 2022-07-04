@@ -16,6 +16,7 @@ pipeline {
     JOB_GCS_EXT_CREDENTIALS = 'fleet-ci-gcs-plugin-file-credentials'  // Support uploadPackagesToGoogleBucket
     DOCKER_ELASTIC_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
+    DEVELOPER_MODE=true
   }
   options {
     timeout(time: 2, unit: 'HOURS')
@@ -49,7 +50,7 @@ pipeline {
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
-          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc)' ], shouldMatchAll: false).toString())
+          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
         }
       }
     }
@@ -78,9 +79,7 @@ pipeline {
         axes {
           axis {
             name 'PLATFORM'
-            // TODO: 'macosx && x86_64' to be added once macosx is available in fleet-ci
-            //       for the time being we use macos
-            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable'
+            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable', 'darwin && orka && x86_64'
           }
         }
         stages {
@@ -102,14 +101,19 @@ pipeline {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
                   dir("${BASE_DIR}"){
-                    cmd(label: 'Go unitTest', script: 'mage unitTest')
+                    withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                      cmd(label: 'Go unitTest', script: 'mage unitTest')
+                    }
                   }
                 }
               }
             }
             post {
               always {
-                junit(allowEmptyResults: true, keepLongStdio: true, testResults: '**/junit-report.xml')
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+                whenTrue(isCodeCoverageEnabled()) {
+                  coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
+                }
               }
             }
           }
@@ -215,7 +219,7 @@ pipeline {
         axes {
           axis {
             name 'K8S_VERSION'
-            values "v1.23.0", "v1.22.0", "v1.21.1", "v1.20.7", "v1.19.11", "v1.18.19"
+            values "v1.24.0", "v1.23.6", "v1.22.9", "v1.21.12"
           }
         }
         stages {
@@ -223,7 +227,12 @@ pipeline {
             steps {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.11.1', context: "K8s-${K8S_VERSION}")
+              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.14.0', context: "K8s-${K8S_VERSION}")
+            }
+            post {
+              always {
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+              }
             }
           }
         }
@@ -236,12 +245,13 @@ pipeline {
         beforeAgent true
         anyOf {
           not { changeRequest() }
-          expression { return isE2eEnabled() }
+          // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
+          expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
         }
       }
       steps {
         // TODO: what's the testMatrixFile to be used if any
-        runE2E(testMatrixFile: '',
+        runE2E(testMatrixFile: '.ci/.e2e-tests-for-elastic-agent.yaml',
                beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                gitHubCheckName: "e2e-tests",
@@ -252,9 +262,17 @@ pipeline {
   }
   post {
     cleanup {
-      notifyBuildResult(prComment: true)
+      notifyBuildResult(prComment: true,
+                        analyzeFlakey: !isTag(), jobName: getFlakyJobName(withBranch: (isPR() ? env.CHANGE_TARGET : env.BRANCH_NAME)),
+                        githubIssue: isBranch() && currentBuild.currentResult != "SUCCESS",
+                        githubLabels: 'Team:Elastic-Agent-Control-Plane')
     }
   }
+}
+
+// As agreed let's report the code coverage for Linux but no ARM only.
+def isCodeCoverageEnabled() {
+  return (isUnix() && !isArm())
 }
 
 def withPackageEnv(platform, Closure body) {

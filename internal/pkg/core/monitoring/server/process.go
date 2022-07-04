@@ -15,8 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/beats/v7/metricbeat/mb/parse"
-
 	"github.com/gorilla/mux"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -99,12 +97,12 @@ var beatsPathAllowlist = map[string]struct{}{
 }
 
 func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, error) {
-	hostData, err := parse.ParseURL(endpoint, "http", "", "", path, "")
+	hostData, err := parseURL(endpoint, "http", "", "", path, "")
 	if err != nil {
 		return nil, 0, errorWithStatus(http.StatusInternalServerError, err)
 	}
 
-	dialer, err := hostData.Transport.Make(timeout)
+	dialer, err := hostData.transport.Make(timeout)
 	if err != nil {
 		return nil, 0, errorWithStatus(http.StatusInternalServerError, err)
 	}
@@ -116,11 +114,11 @@ func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, er
 		},
 	}
 
-	req, err := http.NewRequest("GET", hostData.URI, nil)
+	req, err := http.NewRequest("GET", hostData.uri, nil)
 	if err != nil {
 		return nil, 0, errorWithStatus(
 			http.StatusInternalServerError,
-			fmt.Errorf("fetching metrics failed: %v", err.Error()),
+			fmt.Errorf("fetching metrics failed: %w", err),
 		)
 	}
 
