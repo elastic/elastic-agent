@@ -39,6 +39,10 @@ pipeline {
     // disabled by default, but required for merge:
     // opt-in with 'ci:end-to-end' tag on PR
     booleanParam(name: 'end_to_end_tests_ci', defaultValue: false, description: 'Enable End-to-End tests')
+
+    // disabled by default, but required for merge:
+    // opt-in with 'extended-windows' tag on PR
+    booleanParam(name: 'extended_windows_ci', defaultValue: false, description: 'Enable Extended Windows tests')
   }
   stages {
     stage('Checkout') {
@@ -51,6 +55,7 @@ pipeline {
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
+          setEnvVar('EXT_WINDOWS_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
         }
       }
     }
@@ -259,6 +264,66 @@ pipeline {
                gitHubCheckSha1: env.GIT_BASE_COMMIT)
       }
     }
+    stage('extended windows') {
+      when {
+        // Always when running builds on branches/tags
+        // Enable if extended windows support related changes.
+        beforeAgent true
+        anyOf {
+          not { changeRequest() }
+          expression { return isExtendedWindowsEnabled() && env.ONLY_DOCS == "false"}
+        }
+      }
+      failFast false
+      matrix {
+        agent {label "${PLATFORM} && windows-immutable"}
+        options { skipDefaultCheckout() }
+        axes {
+          axis {
+            name 'PLATFORM'
+            values 'windows-8', 'windows-10', 'windows-11', 'windows-2012-r2'
+          }
+        }
+        stages {
+          stage('build'){
+            options { skipDefaultCheckout() }
+            steps {
+              withGithubNotify(context: "Build-${PLATFORM}") {
+                deleteDir()
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+                withMageEnv(){
+                  dir("${BASE_DIR}"){
+                    cmd(label: 'Go build', script: 'mage build')
+                  }
+                }
+              }
+            }
+          }
+          stage('Test') {
+            options { skipDefaultCheckout() }
+            steps {
+              withGithubNotify(context: "Test-${PLATFORM}") {
+                withMageEnv(){
+                  dir("${BASE_DIR}"){
+                    withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                      cmd(label: 'Go unitTest', script: 'mage unitTest')
+                    }
+                  }
+                }
+              }
+            }
+            post {
+              always {
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+                whenTrue(isCodeCoverageEnabled()) {
+                  coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
   post {
     cleanup {
@@ -371,4 +436,11 @@ def isE2eEnabled() {
 */
 def isPackageEnabled() {
   return env.PACKAGING_CHANGES == "true" || env.GITHUB_COMMENT?.contains('package') || matchesPrLabel(label: 'ci:package')
+}
+
+/**
+* Wrapper to know if the build should enable the windows extended support
+*/
+def isExtendedWindowsEnabled() {
+  return env.EXT_WINDOWS_CHANGES == "true" || params.extended_windows_ci || env.GITHUB_COMMENT?.contains('extended windows') || matchesPrLabel(label: 'ci:extended-windows')
 }
