@@ -75,8 +75,20 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
+			`${"with:colon"}`,
+			NewStrVal("with:colon"),
+			false,
+			false,
+		},
+		{
 			`${"direct"}`,
 			NewStrVal("direct"),
+			false,
+			false,
+		},
+		{
+			`${un-der_score.missing|'with:colon'}`,
+			NewStrVal("with:colon"),
 			false,
 			false,
 		},
