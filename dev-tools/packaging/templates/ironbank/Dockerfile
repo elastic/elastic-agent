@@ -78,7 +78,7 @@ RUN find /usr/share//elastic-agent/data -type d -exec chmod 0770 {} \; && \
 COPY jq /usr/local/bin
 RUN chown root:root /usr/local/bin/jq && chmod 0755 /usr/local/bin/jq
 
-COPY docker-entrypoint /usr/local/bin/docker-entrypoint
+COPY config/docker-entrypoint /usr/local/bin/docker-entrypoint
 RUN chmod 755 /usr/local/bin/docker-entrypoint
 
 USER ${ELASTIC_PRODUCT}

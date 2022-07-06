@@ -898,7 +898,13 @@ func prepareIronbankBuild() error {
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot create templates for the IronBank: %+v", err)
+	}
+
+	// copy files
+	sourcePath := filepath.Join("dev-tools", "packaging", "files", "ironbank")
+	if err := devtools.Copy(sourcePath, ironbank); err != nil {
+		return fmt.Errorf("cannot create files for the IronBank: %+v", err)
 	}
 	return nil
 }
