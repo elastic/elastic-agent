@@ -31,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -157,6 +158,7 @@ func newManaged(
 		},
 		caps,
 		monitor,
+		artifact.NewReloader(cfg.Settings.DownloadConfig),
 	)
 	if err != nil {
 		return nil, err
@@ -207,16 +209,6 @@ func newManaged(
 		agentInfo,
 		cfg,
 		storeSaver,
-		map[string]handlers.ReloadFunc{
-			"agent.download.sourceURI": func(value interface{}) error {
-				if strVal, ok := value.(string); !ok {
-					return errors.New("provided source_uri is not a string")
-				} else if strVal != "" {
-					cfg.Settings.DownloadConfig.SourceURI = strVal
-				}
-				return nil
-			},
-		},
 	)
 
 	actionDispatcher.MustRegister(

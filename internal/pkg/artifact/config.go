@@ -11,6 +11,8 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -44,6 +46,35 @@ type Config struct {
 	DropPath string `yaml:"dropPath" config:"drop_path"`
 
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
+}
+
+type Reloader struct {
+	log *logger.Logger
+	cfg *Config
+}
+
+func NewReloader(cfg *Config) *Reloader {
+	return &Reloader{cfg: cfg}
+}
+
+func (r *Reloader) Reload(rawConfig *config.Config) error {
+	type c struct {
+		Config *Config `config:"agent.download" yaml:"agent.download" json:"agent.download"`
+	}
+
+	cfg := &c{
+		Config: DefaultConfig(),
+	}
+	if err := rawConfig.Unpack(&cfg); err != nil {
+		return err
+	}
+
+	r.log.Debugf("Source URI changed from %q to %q", r.cfg.SourceURI, cfg.Config.SourceURI)
+	if cfg.Config.SourceURI != "" {
+		r.cfg.SourceURI = cfg.Config.SourceURI
+	}
+
+	return nil
 }
 
 // DefaultConfig creates a config with pre-set default values.

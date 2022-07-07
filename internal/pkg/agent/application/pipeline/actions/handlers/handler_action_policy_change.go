@@ -11,7 +11,6 @@ import (
 	"io"
 	"io/ioutil"
 	"sort"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -34,8 +33,6 @@ const (
 	apiStatusTimeout = 15 * time.Second
 )
 
-type ReloadFunc func(value interface{}) error
-
 // PolicyChange is a handler for POLICY_CHANGE action.
 type PolicyChange struct {
 	log       *logger.Logger
@@ -44,7 +41,6 @@ type PolicyChange struct {
 	config    *configuration.Configuration
 	store     storage.Store
 	setters   []actions.ClientSetter
-	reloaders map[string]ReloadFunc
 }
 
 // NewPolicyChange creates a new PolicyChange handler.
@@ -54,7 +50,6 @@ func NewPolicyChange(
 	agentInfo *info.AgentInfo,
 	config *configuration.Configuration,
 	store storage.Store,
-	reloaders map[string]ReloadFunc,
 	setters ...actions.ClientSetter,
 ) *PolicyChange {
 	return &PolicyChange{
@@ -64,7 +59,6 @@ func NewPolicyChange(
 		config:    config,
 		store:     store,
 		setters:   setters,
-		reloaders: reloaders,
 	}
 }
 
@@ -90,11 +84,6 @@ func (h *PolicyChange) Handle(ctx context.Context, a fleetapi.Action, acker stor
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
 
-	err = h.handleReloads(ctx, c)
-	if err != nil {
-		return err
-	}
-
 	h.log.Debugf("handlerPolicyChange: emit configuration for action %+v", a)
 	err = h.handleFleetServerHosts(ctx, c)
 	if err != nil {
@@ -105,72 +94,6 @@ func (h *PolicyChange) Handle(ctx context.Context, a fleetapi.Action, acker stor
 	}
 
 	return acker.Ack(ctx, action)
-}
-
-func (h *PolicyChange) handleReloads(ctx context.Context, c *config.Config) error {
-	if len(h.reloaders) == 0 {
-		return nil
-	}
-
-	data, err := c.ToMapStr()
-	if err != nil {
-		return errors.New(err, "could not convert the configuration from the policy", errors.TypeConfig)
-	}
-
-	for key, reloader := range h.reloaders {
-		if err := h.handleReload(ctx, data, key, reloader); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (h *PolicyChange) handleReload(ctx context.Context, configMap map[string]interface{}, key string, reloader ReloadFunc) error {
-	if configMap == nil {
-		return nil
-	}
-
-	findFn := func(key string, data map[string]interface{}) (interface{}, bool) {
-		for {
-			// break loop on cancellation
-			if ctx.Err() != nil {
-				return nil, false
-			}
-			if key == "" {
-				return nil, false
-			}
-
-			if val, found := data[key]; found {
-				return val, true
-			}
-
-			sepIdx := strings.IndexRune(key, '.')
-			if sepIdx < 0 {
-				// simple key, no config counterpart found
-				return nil, false
-			}
-
-			k := key[:sepIdx]
-			val, found := data[k]
-			if !found {
-				return nil, false
-			}
-
-			expectedMap, ok := val.(map[string]interface{})
-			if !ok {
-				return nil, false
-			}
-
-			data = expectedMap
-			key = key[sepIdx+1:]
-		}
-	}
-
-	if val, found := findFn(key, configMap); found {
-		return reloader(val)
-	}
-
-	return nil
 }
 
 func (h *PolicyChange) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
