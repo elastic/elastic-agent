@@ -61,7 +61,6 @@ func TestManagedModeRouting(t *testing.T) {
 			agentInfo,
 			cfg,
 			nullStore,
-			nil,
 		),
 	)
 
