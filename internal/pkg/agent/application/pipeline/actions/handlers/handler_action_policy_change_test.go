@@ -44,7 +44,7 @@ func TestPolicyChange(t *testing.T) {
 
 		conf := map[string]interface{}{"hello": "world"}
 		action := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123-test1",
+			ActionID:   "abc1",
 			ActionType: "POLICY_CHANGE",
 			Policy:     conf,
 		}
@@ -69,7 +69,7 @@ func TestPolicyChange(t *testing.T) {
 
 		conf := map[string]interface{}{"hello": "world"}
 		action := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123-test2",
+			ActionID:   "abc2",
 			ActionType: "POLICY_CHANGE",
 			Policy:     conf,
 		}
@@ -94,7 +94,7 @@ func TestPolicyChange(t *testing.T) {
 			"agent.download.sourceURI": "test",
 		}
 		action := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123-test3",
+			ActionID:   "abc3",
 			ActionType: "POLICY_CHANGE",
 			Policy:     conf,
 		}
@@ -134,7 +134,7 @@ func TestPolicyChange(t *testing.T) {
 			},
 		}
 		action := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123-test4",
+			ActionID:   "abc4",
 			ActionType: "POLICY_CHANGE",
 			Policy:     conf,
 		}
