@@ -207,6 +207,16 @@ func newManaged(
 		agentInfo,
 		cfg,
 		storeSaver,
+		map[string]handlers.ReloadFunc{
+			"agent.download.sourceURI": func(value interface{}) error {
+				if strVal, ok := value.(string); !ok {
+					return errors.New("provided soruce_uri is not a string")
+				} else if strVal != "" {
+					cfg.Settings.DownloadConfig.SourceURI = strVal
+				}
+				return nil
+			},
+		},
 	)
 
 	actionDispatcher.MustRegister(

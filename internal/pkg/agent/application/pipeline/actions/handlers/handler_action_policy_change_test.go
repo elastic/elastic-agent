@@ -86,6 +86,82 @@ func TestPolicyChange(t *testing.T) {
 		err := handler.Handle(context.Background(), action, ack)
 		require.Error(t, err)
 	})
+
+	t.Run("Receive and handle source_uri correctly", func(t *testing.T) {
+		emitter := &mockEmitter{}
+
+		conf := map[string]interface{}{
+			"agent.download.sourceURI": "test",
+		}
+		action := &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Policy:     conf,
+		}
+
+		cfg := configuration.DefaultConfiguration()
+		handler := &PolicyChange{
+			log:       log,
+			emitter:   emitter.Emitter,
+			agentInfo: agentInfo,
+			config:    cfg,
+			store:     nullStore,
+			reloaders: map[string]ReloadFunc{
+				"agent.download.sourceURI": func(value interface{}) error {
+					if strVal, ok := value.(string); !ok {
+						return errors.New("provided soruce_uri is not a string")
+					} else if strVal != "" {
+						cfg.Settings.DownloadConfig.SourceURI = strVal
+					}
+					return nil
+				},
+			},
+		}
+
+		err := handler.Handle(context.Background(), action, ack)
+		require.NoError(t, err)
+		require.Equal(t, "test", cfg.Settings.DownloadConfig.SourceURI)
+	})
+
+	t.Run("Receive and handle source_uri correctly, broken keys", func(t *testing.T) {
+		emitter := &mockEmitter{}
+
+		conf := map[string]interface{}{
+			"agent": map[string]interface{}{
+				"download": map[string]interface{}{
+					"sourceURI": "test",
+				},
+			},
+		}
+		action := &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Policy:     conf,
+		}
+
+		cfg := configuration.DefaultConfiguration()
+		handler := &PolicyChange{
+			log:       log,
+			emitter:   emitter.Emitter,
+			agentInfo: agentInfo,
+			config:    cfg,
+			store:     nullStore,
+			reloaders: map[string]ReloadFunc{
+				"agent.download.sourceURI": func(value interface{}) error {
+					if strVal, ok := value.(string); !ok {
+						return errors.New("provided soruce_uri is not a string")
+					} else if strVal != "" {
+						cfg.Settings.DownloadConfig.SourceURI = strVal
+					}
+					return nil
+				},
+			},
+		}
+
+		err := handler.Handle(context.Background(), action, ack)
+		require.NoError(t, err)
+		require.Equal(t, "test", cfg.Settings.DownloadConfig.SourceURI)
+	})
 }
 
 func TestPolicyAcked(t *testing.T) {
