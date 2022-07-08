@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	"github.com/elastic/elastic-agent-autodiscover/utils"
 	c "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -149,10 +150,30 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 
 	data := generatePodData(pod, p.metagen, namespaceAnnotations)
 	data.mapping["scope"] = p.scope
-	// Emit the pod
-	// We emit Pod + containers to ensure that configs matching Pod only
-	// get Pod metadata (not specific to any container)
-	_ = p.comm.AddOrUpdate(data.uid, PodPriority, data.mapping, data.processors)
+
+	if p.config.Hints.Enabled() { // This is "hints based autodiscovery flow"
+		if ann, ok := data.mapping["annotations"]; ok {
+			annotations := ann.(mapstr.M)
+			hints := utils.GenerateHints(annotations, "", p.config.Prefix)
+			if len(hints) > 0 {
+				p.logger.Errorf("Extracted hints are :%v", hints)
+				hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger)
+				p.logger.Errorf("Generated hints mappings are :%v", hintsMapping)
+				_ = p.comm.AddOrUpdate(
+					data.uid,
+					PodPriority,
+					map[string]interface{}{"hints": hintsMapping},
+					data.processors, // TODO: add processors here explicitely ->>> NOOOO
+				)
+			}
+		}
+	} else { // This is the "template-based autodiscovery" flow
+		// emit normal mapping to be used in dynamic variable resolution
+		// Emit the pod
+		// We emit Pod + containers to ensure that configs matching Pod only
+		// get Pod metadata (not specific to any container)
+		_ = p.comm.AddOrUpdate(data.uid, PodPriority, data.mapping, data.processors)
+	}
 
 	// Emit all containers in the pod
 	// We should deal with init containers stopping after initialization

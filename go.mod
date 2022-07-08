@@ -11,9 +11,9 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/docker/go-units v0.4.0
 	github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4
-	github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab
+	github.com/elastic/elastic-agent-autodiscover v0.2.1
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
-	github.com/elastic/elastic-agent-libs v0.2.3
+	github.com/elastic/elastic-agent-libs v0.2.5
 	github.com/elastic/elastic-agent-system-metrics v0.3.0
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
@@ -132,7 +132,7 @@ require (
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
 	google.golang.org/grpc/examples v0.0.0-20220304170021-431ea809a767 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed // indirect
