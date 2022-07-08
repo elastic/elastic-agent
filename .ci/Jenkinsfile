@@ -277,7 +277,7 @@ def isCodeCoverageEnabled() {
 
 def withPackageEnv(platform, Closure body) {
   if (isUnix()) {
-    if (platform.contains('macosx')) {
+    if (isDarwin()) {
       withPackageDarwinEnv() {
         body()
       }
