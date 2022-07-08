@@ -41,7 +41,7 @@ pipeline {
     booleanParam(name: 'end_to_end_tests_ci', defaultValue: false, description: 'Enable End-to-End tests')
 
     // disabled by default, but required for merge:
-    // opt-in with 'extended-windows' tag on PR
+    // opt-in with 'ci:extended-windows' tag on PR
     booleanParam(name: 'extended_windows_ci', defaultValue: false, description: 'Enable Extended Windows tests')
   }
   stages {
