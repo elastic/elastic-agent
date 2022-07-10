@@ -14,5 +14,5 @@ const defaultAgentVaultPath = "vault"
 
 // AgentVaultPath is the directory that contains all the files for the value
 func AgentVaultPath() string {
-	return filepath.Join(Home(), defaultAgentVaultPath)
+	return filepath.Join(Top(), defaultAgentVaultPath)
 }

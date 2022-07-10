@@ -29,8 +29,9 @@ type Vault struct {
 	mx   sync.Mutex
 }
 
-// Open initializes the vault store
-func New(path string) (*Vault, error) {
+// New creates the vault store
+func New(path string, opts ...OptionFunc) (v *Vault, err error) {
+	options := applyOptions(opts...)
 	dir := filepath.Dir(path)
 
 	// If there is no specific path then get the executable directory
@@ -43,12 +44,29 @@ func New(path string) (*Vault, error) {
 		path = filepath.Join(dir, path)
 	}
 
-	err := os.MkdirAll(path, 0750)
-	if err != nil {
-		return nil, err
+	if options.readonly {
+		fi, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
+		if !fi.IsDir() {
+			return nil, fs.ErrNotExist
+		}
+	} else {
+		err := os.MkdirAll(path, 0750)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	key, err := getSeed(path)
+	var key []byte
+
+	if options.readonly {
+		key, err = getSeed(path)
+	} else {
+		key, err = createSeedIfNotExists(path)
+	}
+
 	if err != nil {
 		return nil, err
 	}

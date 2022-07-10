@@ -9,6 +9,7 @@ package vault
 
 import (
 	"errors"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -24,6 +25,24 @@ var (
 )
 
 func getSeed(path string) ([]byte, error) {
+	fp := filepath.Join(path, seedFile)
+
+	mxSeed.Lock()
+	defer mxSeed.Unlock()
+
+	b, err := ioutil.ReadFile(fp)
+	if err != nil {
+		return nil, err
+	}
+
+	// return fs.ErrNotExists if invalid length of bytes returned
+	if len(b) != int(AES256) {
+		return nil, fs.ErrNotExist
+	}
+	return b, nil
+}
+
+func createSeedIfNotExists(path string) ([]byte, error) {
 	fp := filepath.Join(path, seedFile)
 
 	mxSeed.Lock()

@@ -10,6 +10,7 @@ package vault
 import (
 	"context"
 	"encoding/hex"
+	"io/fs"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -26,7 +27,40 @@ func TestGetSeed(t *testing.T) {
 
 	assert.NoFileExists(t, fp)
 
-	b, err := getSeed(dir)
+	// seed is not yet created
+	_, err := getSeed(dir)
+
+	// should be not found
+	assert.ErrorIs(t, err, fs.ErrNotExist)
+
+	b, err := createSeedIfNotExists(dir)
+	assert.NoError(t, err)
+
+	assert.FileExists(t, fp)
+
+	diff := cmp.Diff(int(AES256), len(b))
+	if diff != "" {
+		t.Error(diff)
+	}
+
+	// try get seed
+	gotSeed, err := getSeed(dir)
+	assert.NoError(t, err)
+
+	diff = cmp.Diff(b, gotSeed)
+	if diff != "" {
+		t.Error(diff)
+	}
+}
+
+func TestCreateSeedIfNotExists(t *testing.T) {
+	dir := t.TempDir()
+
+	fp := filepath.Join(dir, seedFile)
+
+	assert.NoFileExists(t, fp)
+
+	b, err := createSeedIfNotExists(dir)
 	assert.NoError(t, err)
 
 	assert.FileExists(t, fp)
@@ -37,7 +71,7 @@ func TestGetSeed(t *testing.T) {
 	}
 }
 
-func TestGetSeedRace(t *testing.T) {
+func TestCreateSeedIfNotExistsRace(t *testing.T) {
 	var err error
 
 	dir := t.TempDir()
@@ -51,7 +85,7 @@ func TestGetSeedRace(t *testing.T) {
 	for i := 0; i < count; i++ {
 		g.Go(func(idx int) func() error {
 			return func() error {
-				seed, err := getSeed(dir)
+				seed, err := createSeedIfNotExists(dir)
 				mx.Lock()
 				res[idx] = seed
 				mx.Unlock()
