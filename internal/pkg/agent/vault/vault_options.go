@@ -16,6 +16,7 @@ func WithReadonly(readonly bool) OptionFunc {
 	}
 }
 
+//nolint:deadcode // not used on darwin
 func applyOptions(opts ...OptionFunc) Options {
 	var options Options
 

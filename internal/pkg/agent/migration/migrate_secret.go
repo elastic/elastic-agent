@@ -51,32 +51,32 @@ func MigrateAgentSecret(log *logp.Logger) error {
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			// The secret is not found in this instance of the vault, continue with migration
-			log.Debug("agent secret copied from 8.3.0-.8.3.2 doesn't exists, continue with migration")
+			log.Debug("agent secret copied from 8.3.0-8.3.2 doesn't exists, continue with migration")
 		} else {
 			log.Errorf("failed agent 8.3.0-8.3.2 secret check: %v", err)
 			return err
 		}
 	} else {
 		// The secret is found, save in the new agent vault
-		log.Debug("agent secret from 8.3.0-.8.3.2 is found, migrate to the new vault")
+		log.Debug("agent secret from 8.3.0-8.3.2 is found, migrate to the new vault")
 		return secret.SetAgentSecret(sec)
 	}
 
 	// Scan other agent data directories, find the latest agent secret
-	log.Debug("search for possible latest agent 8.3.0-.8.3.2 secret")
+	log.Debug("search for possible latest agent 8.3.0-8.3.2 secret")
 	dataDir := paths.Data()
 
 	sec, err = findPreviousAgentSecret(dataDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			// The secret is not found
-			log.Debug("no previous agent 8.3.0-.8.3.2 secrets found, nothing to migrate")
+			log.Debug("no previous agent 8.3.0-8.3.2 secrets found, nothing to migrate")
 			return nil
 		}
-		log.Errorf("search for possible latest agent 8.3.0-.8.3.2 secret failed: %v", err)
+		log.Errorf("search for possible latest agent 8.3.0-8.3.2 secret failed: %v", err)
 		return err
 	}
-	log.Debug("found previous agent 8.3.0-.8.3.2 secret, migrate to the new vault")
+	log.Debug("found previous agent 8.3.0-8.3.2 secret, migrate to the new vault")
 	return secret.SetAgentSecret(sec)
 }
 
