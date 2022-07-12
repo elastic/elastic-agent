@@ -14,7 +14,7 @@ spec:
       labels:
         app: elastic-agent
     spec:
-      # To run Elastic Agent on master nodes
+      # To run Elastic Agent on Kubernetes master nodes
       # Agents running on master nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
         - key: node-role.kubernetes.io/master
