@@ -330,7 +330,7 @@ func TestEql(t *testing.T) {
 		}
 		t.Run(title, func(t *testing.T) {
 			if showDebug == "1" {
-				debug(test.expression)
+				debug(t, test.expression)
 			}
 
 			r, err := Eval(test.expression, store)
@@ -346,17 +346,17 @@ func TestEql(t *testing.T) {
 	}
 }
 
-func debug(expression string) {
+func debug(t testing.T, expression string) {
 	raw := antlr.NewInputStream(expression)
 
 	lexer := parser.NewEqlLexer(raw)
 	for {
-		t := lexer.NextToken()
-		if t.GetTokenType() == antlr.TokenEOF {
+		token := lexer.NextToken()
+		if token.GetTokenType() == antlr.TokenEOF {
 			break
 		}
-		fmt.Printf("%s (%q)\n",
-			lexer.SymbolicNames[t.GetTokenType()], t.GetText())
+		t.Logf("%s (%q)\n",
+			lexer.SymbolicNames[token.GetTokenType()], token.GetText())
 	}
 }
 
