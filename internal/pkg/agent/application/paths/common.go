@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -21,6 +22,8 @@ const (
 	// AgentLockFileName is the name of the overall Elastic Agent file lock.
 	AgentLockFileName = "agent.lock"
 	tempSubdir        = "tmp"
+
+	darwin = "darwin"
 )
 
 var (
@@ -172,10 +175,15 @@ func SetInstall(path string) {
 // initialTop returns the initial top-level path for the binary
 //
 // When nested in top-level/data/elastic-agent-${hash}/ the result is top-level/.
+// The agent fexecutable for MacOS is wrappend in the bundle, so the path to the binary is
+// top-level/data/elastic-agent-${hash}/elastic-agent.app/Contents/MacOS
 func initialTop() string {
 	exePath := retrieveExecutablePath()
 	if insideData(exePath) {
-		return filepath.Dir(filepath.Dir(exePath))
+		exePath = filepath.Dir(filepath.Dir(exePath))
+		if runtime.GOOS == darwin {
+			exePath = filepath.Dir(filepath.Dir(filepath.Dir(exePath)))
+		}
 	}
 	return exePath
 }
@@ -196,5 +204,8 @@ func retrieveExecutablePath() string {
 // insideData returns true when the exePath is inside of the current Agents data path.
 func insideData(exePath string) bool {
 	expectedPath := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
+	if runtime.GOOS == darwin {
+		expectedPath = filepath.Join(expectedPath, "elastic-agent.app", "Contents", "MacOS")
+	}
 	return strings.HasSuffix(exePath, expectedPath)
 }
