@@ -5,16 +5,18 @@
 package info
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestIsInsideData(t *testing.T) {
 
-	validExePath := "data/elastic-agent-unknow" // "unknown" the private default value, trimmed for hash value length
+	validExePath := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
 
 	if runtime.GOOS == darwin {
 		validExePath = filepath.Join(validExePath, "elastic-agent.app", "Contents", "MacOS")
