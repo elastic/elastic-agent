@@ -7,7 +7,6 @@ package process
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	"io"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 

@@ -1,14 +1,20 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package runtime
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"gopkg.in/yaml.v2"
 	"os"
 	"os/exec"
 	"time"
+
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
@@ -16,9 +22,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
+type actionMode int
+
 const (
-	actionStart = 0
-	actionStop  = 1
+	actionStart = actionMode(0)
+	actionStop  = actionMode(1)
 )
 
 type procState struct {
@@ -26,15 +34,16 @@ type procState struct {
 	state *os.ProcessState
 }
 
+// CommandRuntime provides the command runtime for running a component as a subprocess.
 type CommandRuntime struct {
 	current component.Component
 
 	ch       chan ComponentState
-	actionCh chan int
+	actionCh chan actionMode
 	procCh   chan procState
 	compCh   chan component.Component
 
-	actionState int
+	actionState actionMode
 	proc        *process.Info
 
 	expected       ComponentState
@@ -43,16 +52,17 @@ type CommandRuntime struct {
 	missedCheckins int
 }
 
+// NewCommandRuntime creates a new command runtime for the provided component.
 func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 	if comp.Spec.Spec.Command == nil {
-		return nil, errors.New("must have command defined in input specification")
+		return nil, errors.New("must have command defined in specification")
 	}
 	expected := newComponentState(&comp, client.UnitStateHealthy, "", 1)
 	observed := newComponentState(&comp, client.UnitStateStarting, "Starting", 0)
 	return &CommandRuntime{
 		current:     comp,
 		ch:          make(chan ComponentState),
-		actionCh:    make(chan int),
+		actionCh:    make(chan actionMode),
 		procCh:      make(chan procState),
 		compCh:      make(chan component.Component),
 		actionState: actionStart,
@@ -61,7 +71,12 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 	}, nil
 }
 
-func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) {
+// Run starts the runtime for the component.
+//
+// Called by Manager inside a go-routine. Run should not return until the passed in context is done. Run is always
+// called before any of the other methods in the interface and once the context is done none of those methods will
+// ever be called again.
+func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 	checkinPeriod := c.current.Spec.Spec.Command.Timeouts.Checkin
 	c.forceCompState(client.UnitStateStarting, "Starting")
 	t := time.NewTicker(checkinPeriod)
@@ -69,7 +84,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return ctx.Err()
 		case as := <-c.actionCh:
 			c.actionState = as
 			switch as {
@@ -135,10 +150,10 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) {
 				now := time.Now().UTC()
 				if c.lastCheckin.IsZero() {
 					// never checked-in
-					c.missedCheckins += 1
+					c.missedCheckins++
 				} else if now.Sub(c.lastCheckin) > checkinPeriod {
 					// missed check-in during required period
-					c.missedCheckins += 1
+					c.missedCheckins++
 				} else if now.Sub(c.lastCheckin) <= checkinPeriod {
 					c.missedCheckins = 0
 				}
@@ -160,25 +175,40 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) {
 	}
 }
 
+// Watch returns the channel that sends component state.
+//
+// Channel should send a new state anytime a state for a unit or the whole component changes.
 func (c *CommandRuntime) Watch() <-chan ComponentState {
 	return c.ch
 }
 
+// Start starts the component.
+//
+// Non-blocking and never returns an error.
 func (c *CommandRuntime) Start() error {
 	c.actionCh <- actionStart
 	return nil
 }
 
+// Update updates the currComp runtime with a new-revision for the component definition.
+//
+// Non-blocking and never returns an error.
 func (c *CommandRuntime) Update(comp component.Component) error {
 	c.compCh <- comp
 	return nil
 }
 
+// Stop stops the component.
+//
+// Non-blocking and never returns an error.
 func (c *CommandRuntime) Stop() error {
 	c.actionCh <- actionStop
 	return nil
 }
 
+// Teardown tears down the component.
+//
+// Non-blocking and never returns an error.
 func (c *CommandRuntime) Teardown() error {
 	// teardown is not different from stop for command runtime
 	return c.Stop()

@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package runtime
 
 // Subscription provides a channel for notifications on a component state.
@@ -9,7 +13,7 @@ type Subscription struct {
 func newSubscription(manager *Manager) *Subscription {
 	return &Subscription{
 		manager: manager,
-		ch:      make(chan ComponentState, 1), // buffer of 1 to allow initial latest state
+		ch:      make(chan ComponentState, 1), // buffer of 1 to allow initial latestState state
 	}
 }
 

@@ -31,21 +31,21 @@ func Start(path string, uid, gid int, args []string, env []string, opts ...Optio
 func StartContext(ctx context.Context, path string, uid, gid int, args []string, env []string, opts ...Option) (*Info, error) {
 	cmd, err := getCmd(ctx, path, env, uid, gid, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create command for '%s': %w", path, err)
+		return nil, fmt.Errorf("failed to create command for %q: %w", path, err)
 	}
 	for _, o := range opts {
 		if err := o(cmd); err != nil {
-			return nil, fmt.Errorf("failed to set option command for '%s': %w", path, err)
+			return nil, fmt.Errorf("failed to set option command for %q: %w", path, err)
 		}
 	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stdin for '%s': %w", path, err)
+		return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
 	}
 
 	// start process
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start '%s': %w", path, err)
+		return nil, fmt.Errorf("failed to start %q: %w", path, err)
 	}
 
 	// Hook to JobObject on windows, noop on other platforms.
@@ -54,7 +54,7 @@ func StartContext(ctx context.Context, path string, uid, gid int, args []string,
 	// after the agent process gets killed.
 	if err := JobObject.Assign(cmd.Process); err != nil {
 		_ = killCmd(cmd.Process)
-		return nil, fmt.Errorf("failed job assignment '%s': %w", path, err)
+		return nil, fmt.Errorf("failed job assignment %q: %w", path, err)
 	}
 
 	return &Info{

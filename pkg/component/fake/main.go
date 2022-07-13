@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -77,8 +78,10 @@ func run() error {
 			case client.UnitChangedRemoved:
 				s.removed(change.Unit)
 			}
-		case <-c.Errors():
-			fmt.Fprintf(os.Stderr, "GRPC client error: %s", err)
+		case err := <-c.Errors():
+			if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
+				fmt.Fprintf(os.Stderr, "GRPC client error: %s", err)
+			}
 		}
 	}
 }
@@ -139,22 +142,18 @@ type runningUnit interface {
 
 type fakeInput struct {
 	unit *client.Unit
-	cfg  map[string]interface{}
+	cfg  inputConfig
 
 	state    client.UnitState
 	stateMsg string
 }
 
-func newFakeInput(unit *client.Unit, cfg map[string]interface{}) (*fakeInput, error) {
-	state, msg, err := getStateFromMap(cfg)
-	if err != nil {
-		return nil, err
-	}
+func newFakeInput(unit *client.Unit, cfg inputConfig) (*fakeInput, error) {
 	i := &fakeInput{
 		unit:     unit,
 		cfg:      cfg,
-		state:    state,
-		stateMsg: msg,
+		state:    cfg.State,
+		stateMsg: cfg.Message,
 	}
 	unit.RegisterAction(&stateSetterAction{i})
 	unit.RegisterAction(&killAction{})
@@ -234,23 +233,19 @@ func (s *killAction) Execute(_ context.Context, params map[string]interface{}) (
 
 func newRunningUnit(unit *client.Unit) (runningUnit, error) {
 	_, config := unit.Expected()
-	var cfg map[string]interface{}
+	var cfg inputConfig
 	err := yaml.Unmarshal([]byte(config), &cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
 	}
-	unitType, ok := cfg["type"]
-	if !ok {
-		return nil, fmt.Errorf("unit missing config type")
-	}
-	if unitType == "" {
+	if cfg.Type == "" {
 		return nil, fmt.Errorf("unit config type empty")
 	}
-	switch unitType {
+	switch cfg.Type {
 	case fake:
 		return newFakeInput(unit, cfg)
 	}
-	return nil, fmt.Errorf("unknown unit config type: %s", unitType)
+	return nil, fmt.Errorf("unknown unit config type: %s", cfg.Type)
 }
 
 func newUnitKey(unit *client.Unit) unitKey {
@@ -281,4 +276,10 @@ func getStateFromMap(cfg map[string]interface{}) (client.UnitState, string, erro
 		stateMsgStr, _ = stateMsg.(string)
 	}
 	return stateType, stateMsgStr, nil
+}
+
+type inputConfig struct {
+	Type    string           `json:"type" yaml:"type"`
+	State   client.UnitState `json:"state" yaml:"state"`
+	Message string           `json:"message" yaml:"message"`
 }

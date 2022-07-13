@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package runtime
 
 import (
@@ -7,21 +11,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gofrs/uuid"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/atomic"
+	"github.com/gofrs/uuid"
+
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/atomic"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -209,7 +215,7 @@ func (m *Manager) WaitForReady(ctx context.Context) error {
 	}
 }
 
-// Update updates the current state of the running components.
+// Update updates the currComp state of the running components.
 //
 // This returns as soon as possible, work is performed in the background to
 func (m *Manager) Update(components []component.Component) error {
@@ -290,13 +296,13 @@ func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name s
 func (m *Manager) Subscribe(componentID string) *Subscription {
 	sub := newSubscription(m)
 
-	// add latest to channel
+	// add latestState to channel
 	m.mx.RLock()
 	comp, ok := m.current[componentID]
 	m.mx.RUnlock()
 	if ok {
 		comp.latestMx.RLock()
-		sub.ch <- comp.latest
+		sub.ch <- comp.latestState
 		comp.latestMx.RUnlock()
 	}
 
@@ -308,10 +314,12 @@ func (m *Manager) Subscribe(componentID string) *Subscription {
 	return sub
 }
 
+// Checkin is called by v1 sub-processes and has been removed.
 func (m *Manager) Checkin(_ proto.ElasticAgent_CheckinServer) error {
 	return status.Error(codes.Unavailable, "removed; upgrade to V2")
 }
 
+// CheckinV2 is the new v2 communication for components.
 func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	initCheckinChan := make(chan *proto.CheckinObserved)
 	go func() {
@@ -353,6 +361,7 @@ func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	return runtime.comm.checkin(server, initCheckin)
 }
 
+// Actions is the actions stream used to broker actions between Elastic Agent and components.
 func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 	initRespChan := make(chan *proto.ActionResponse)
 	go func() {
@@ -412,7 +421,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		existing, ok := m.current[comp.ID]
 		if ok {
 			// existing component; send runtime updated value
-			existing.current = comp
+			existing.currComp = comp
 			if err := existing.runtime.Update(comp); err != nil {
 				return fmt.Errorf("failed to update component %s: %w", comp.ID, err)
 			}
@@ -462,7 +471,7 @@ func (m *Manager) shutdown() {
 
 func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentState) {
 	m.subMx.RLock()
-	subs, ok := m.subscriptions[state.current.ID]
+	subs, ok := m.subscriptions[state.currComp.ID]
 	if ok {
 		for _, sub := range subs {
 			sub.ch <- latest
@@ -472,9 +481,9 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 
 	shutdown := state.shuttingDown.Load()
 	if shutdown && latest.State == client.UnitStateStopped {
-		// shutdown is complete; remove from current
+		// shutdown is complete; remove from currComp
 		m.mx.Lock()
-		delete(m.current, state.current.ID)
+		delete(m.current, state.currComp.ID)
 		m.mx.Unlock()
 
 		state.destroy()
@@ -540,7 +549,7 @@ func (m *Manager) getRuntimeFromUnit(unit component.Unit) *componentRuntimeState
 	m.mx.RLock()
 	defer m.mx.RUnlock()
 	for _, comp := range m.current {
-		for _, u := range comp.current.Units {
+		for _, u := range comp.currComp.Units {
 			if u.Type == unit.Type && u.ID == unit.ID {
 				return comp
 			}

@@ -1,15 +1,20 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package runtime
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"sync"
 )
 
 // ComponentUnitState is the state for a unit running in a component.
@@ -71,7 +76,7 @@ func (s *ComponentState) syncComponent(comp *component.Component, initState clie
 		existing.Payload = nil
 		existing.config = unit.Config
 		if ok {
-			existing.configStateIdx += 1
+			existing.configStateIdx++
 		} else {
 			existing.configStateIdx = initCfgIdx
 		}
@@ -162,7 +167,7 @@ type ComponentRuntime interface {
 	// Called by Manager inside a go-routine. Run should not return until the passed in context is done. Run is always
 	// called before any of the other methods in the interface and once the context is done none of those methods will
 	// ever be called again.
-	Run(ctx context.Context, comm Communicator)
+	Run(ctx context.Context, comm Communicator) error
 	// Watch returns the channel that sends component state.
 	//
 	// Channel should send a new state anytime a state for a unit or the whole component changes.
@@ -171,7 +176,7 @@ type ComponentRuntime interface {
 	//
 	// Must be non-blocking and never return an error unless the whole Elastic Agent needs to exit.
 	Start() error
-	// Update updates the current runtime with a new-revision for the component definition.
+	// Update updates the currComp runtime with a new-revision for the component definition.
 	//
 	// Must be non-blocking and never return an error unless the whole Elastic Agent needs to exit.
 	Update(comp component.Component) error
@@ -208,13 +213,13 @@ type componentRuntimeState struct {
 	logger  *logger.Logger
 	comm    *runtimeComm
 
-	current component.Component
-	runtime ComponentRuntime
+	currComp component.Component
+	runtime  ComponentRuntime
 
 	shuttingDown atomic.Bool
 
-	latestMx sync.RWMutex
-	latest   ComponentState
+	latestMx    sync.RWMutex
+	latestState ComponentState
 
 	watchChan      chan bool
 	watchCanceller context.CancelFunc
@@ -239,12 +244,12 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 	watchChan := make(chan bool)
 	runChan := make(chan bool)
 	state := &componentRuntimeState{
-		manager: m,
-		logger:  logger,
-		comm:    comm,
-		current: comp,
-		runtime: runtime,
-		latest: ComponentState{
+		manager:  m,
+		logger:   logger,
+		comm:     comm,
+		currComp: comp,
+		runtime:  runtime,
+		latestState: ComponentState{
 			State:   client.UnitStateStarting,
 			Message: "Starting",
 			Units:   nil,
@@ -265,7 +270,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 				return
 			case s := <-runtime.Watch():
 				state.latestMx.Lock()
-				state.latest = s
+				state.latestState = s
 				state.latestMx.Unlock()
 				state.manager.stateChanged(state, s)
 			case ar := <-comm.actionsResponse:
@@ -286,7 +291,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 	go func() {
 		defer close(runChan)
 		defer comm.destroy()
-		runtime.Run(runCtx, comm)
+		_ = runtime.Run(runCtx, comm)
 	}()
 
 	return state, nil
@@ -300,9 +305,8 @@ func (s *componentRuntimeState) stop(teardown bool) error {
 	s.shuttingDown.Store(true)
 	if teardown {
 		return s.runtime.Teardown()
-	} else {
-		return s.runtime.Stop()
 	}
+	return s.runtime.Stop()
 }
 
 func (s *componentRuntimeState) destroy() {

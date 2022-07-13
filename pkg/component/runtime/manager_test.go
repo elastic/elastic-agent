@@ -1,19 +1,26 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package runtime
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"go.elastic.co/apm/apmtest"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"go.elastic.co/apm/apmtest"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -1209,19 +1216,19 @@ LOOP:
 			require.NoError(t, err)
 		case err := <-subErrCh0:
 			require.NoError(t, err)
-			count += 1
+			count++
 			if count >= 3 {
 				break LOOP
 			}
 		case err := <-subErrCh1:
 			require.NoError(t, err)
-			count += 1
+			count++
 			if count >= 3 {
 				break LOOP
 			}
 		case err := <-subErrCh2:
 			require.NoError(t, err)
-			count += 1
+			count++
 			if count >= 3 {
 				break LOOP
 			}
@@ -1266,7 +1273,7 @@ func signalState(subErrCh chan error, state *ComponentState) {
 			if unit.State == client.UnitStateStarting {
 				// acceptable
 			} else if unit.State == client.UnitStateHealthy {
-				healthy += 1
+				healthy++
 			} else if issue == "" {
 				issue = fmt.Sprintf("unit %s in invalid state %v", key.UnitID, unit.State)
 			}

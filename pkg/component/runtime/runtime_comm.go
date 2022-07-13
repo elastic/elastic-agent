@@ -1,18 +1,25 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package runtime
 
 import (
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	protobuf "google.golang.org/protobuf/proto"
 	"io"
 	"strings"
 	"sync"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	protobuf "google.golang.org/protobuf/proto"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
 	"github.com/gofrs/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
