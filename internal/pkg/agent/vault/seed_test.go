@@ -25,18 +25,18 @@ func TestGetSeed(t *testing.T) {
 
 	fp := filepath.Join(dir, seedFile)
 
-	assert.NoFileExists(t, fp)
+	require.NoFileExists(t, fp)
 
 	// seed is not yet created
 	_, err := getSeed(dir)
 
 	// should be not found
-	assert.ErrorIs(t, err, fs.ErrNotExist)
+	require.ErrorIs(t, err, fs.ErrNotExist)
 
 	b, err := createSeedIfNotExists(dir)
 	assert.NoError(t, err)
 
-	assert.FileExists(t, fp)
+	require.FileExists(t, fp)
 
 	diff := cmp.Diff(int(AES256), len(b))
 	if diff != "" {
@@ -63,7 +63,7 @@ func TestCreateSeedIfNotExists(t *testing.T) {
 	b, err := createSeedIfNotExists(dir)
 	assert.NoError(t, err)
 
-	assert.FileExists(t, fp)
+	require.FileExists(t, fp)
 
 	diff := cmp.Diff(int(AES256), len(b))
 	if diff != "" {

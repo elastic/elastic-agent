@@ -6,6 +6,7 @@ package migration
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -36,7 +37,8 @@ func MigrateAgentSecret(log *logp.Logger) error {
 			// The secret doesn't exists, perform migration below
 			log.Debug("agent secret doesn't exists, perform migration")
 		} else {
-			log.Errorf("failed read the agent secret: %v", err)
+			err = fmt.Errorf("failed read the agent secret: %w", err)
+			log.Error(err)
 			return err
 		}
 	} else {
@@ -53,7 +55,8 @@ func MigrateAgentSecret(log *logp.Logger) error {
 			// The secret is not found in this instance of the vault, continue with migration
 			log.Debug("agent secret copied from 8.3.0-8.3.2 doesn't exists, continue with migration")
 		} else {
-			log.Errorf("failed agent 8.3.0-8.3.2 secret check: %v", err)
+			err = fmt.Errorf("failed agent 8.3.0-8.3.2 secret check: %w", err)
+			log.Error(err)
 			return err
 		}
 	} else {
@@ -73,17 +76,19 @@ func MigrateAgentSecret(log *logp.Logger) error {
 			log.Debug("no previous agent 8.3.0-8.3.2 secrets found, nothing to migrate")
 			return nil
 		}
-		log.Errorf("search for possible latest agent 8.3.0-8.3.2 secret failed: %v", err)
+		err = fmt.Errorf("search for possible latest agent 8.3.0-8.3.2 secret failed: %w", err)
+		log.Error(err)
 		return err
 	}
 	log.Debug("found previous agent 8.3.0-8.3.2 secret, migrate to the new vault")
 	return secret.SetAgentSecret(sec)
 }
 
-func findPreviousAgentSecret(dataDir string) (sec secret.Secret, err error) {
+func findPreviousAgentSecret(dataDir string) (secret.Secret, error) {
 	found := false
+	var sec secret.Secret
 	fileSystem := os.DirFS(dataDir)
-	err = fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -91,8 +96,8 @@ func findPreviousAgentSecret(dataDir string) (sec secret.Secret, err error) {
 			if strings.HasPrefix(d.Name(), "elastic-agent-") {
 				vaultPath := getLegacyVaultPathFromPath(filepath.Join(dataDir, path))
 				s, err := secret.GetAgentSecret(secret.WithVaultPath(vaultPath))
-				// Ignore if error, keep scanning
 				if err != nil {
+					// Ignore if fs.ErrNotExist error, keep scanning
 					if errors.Is(err, fs.ErrNotExist) {
 						return nil
 					}
@@ -131,6 +136,6 @@ func getLegacyVaultPath() string {
 	return getLegacyVaultPathFromPath(paths.Home())
 }
 
-func getLegacyVaultPathFromPath(homePath string) string {
-	return filepath.Join(homePath, "vault")
+func getLegacyVaultPathFromPath(path string) string {
+	return filepath.Join(path, "vault")
 }

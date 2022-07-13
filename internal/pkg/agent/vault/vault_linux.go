@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -55,18 +56,11 @@ func New(path string, opts ...OptionFunc) (v *Vault, err error) {
 	} else {
 		err := os.MkdirAll(path, 0750)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create vault path: %v, err: %w", path, err)
 		}
 	}
 
-	var key []byte
-
-	if options.readonly {
-		key, err = getSeed(path)
-	} else {
-		key, err = createSeedIfNotExists(path)
-	}
-
+	key, err := getOrCreateSeed(path, options.readonly)
 	if err != nil {
 		return nil, err
 	}

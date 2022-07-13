@@ -6,6 +6,7 @@ package secret
 
 import (
 	"encoding/json"
+	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -52,7 +53,7 @@ func Create(key string, opts ...OptionFunc) error {
 	options := applyOptions(opts...)
 	v, err := vault.New(options.vaultPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create new vault: %w", err)
 	}
 	defer v.Close()
 
@@ -118,7 +119,7 @@ func Set(key string, secret Secret, opts ...OptionFunc) error {
 	options := applyOptions(opts...)
 	v, err := vault.New(options.vaultPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create new vault: %w", err)
 	}
 	defer v.Close()
 	return set(v, key, secret)
@@ -127,7 +128,7 @@ func Set(key string, secret Secret, opts ...OptionFunc) error {
 func set(v *vault.Vault, key string, secret Secret) error {
 	b, err := json.Marshal(secret)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not marshal secret: %w", err)
 	}
 
 	return v.Set(key, b)
@@ -138,7 +139,7 @@ func Remove(key string, opts ...OptionFunc) error {
 	options := applyOptions(opts...)
 	v, err := vault.New(options.vaultPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create new vault: %w", err)
 	}
 	defer v.Close()
 

@@ -9,6 +9,7 @@ package vault
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -32,12 +33,12 @@ func getSeed(path string) ([]byte, error) {
 
 	b, err := ioutil.ReadFile(fp)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read seed file: %w", err)
 	}
 
 	// return fs.ErrNotExists if invalid length of bytes returned
 	if len(b) != int(AES256) {
-		return nil, fs.ErrNotExist
+		return nil, fmt.Errorf("invalid seed length, expected: %v, got: %v: %w", int(AES256), len(b), fs.ErrNotExist)
 	}
 	return b, nil
 }
@@ -70,4 +71,11 @@ func createSeedIfNotExists(path string) ([]byte, error) {
 	}
 
 	return seed, nil
+}
+
+func getOrCreateSeed(path string, readonly bool) ([]byte, error) {
+	if readonly {
+		return getSeed(path)
+	}
+	return createSeedIfNotExists(path)
 }

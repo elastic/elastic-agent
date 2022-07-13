@@ -60,14 +60,7 @@ func New(path string, opts ...OptionFunc) (v *Vault, err error) {
 		}
 	}
 
-	var entropy []byte
-
-	if options.readonly {
-		entropy, err = getSeed(path)
-	} else {
-		entropy, err = createSeedIfNotExists(path)
-	}
-
+	entropy, err := getOrCreateSeed(path, options.readonly)
 	if err != nil {
 		return nil, err
 	}

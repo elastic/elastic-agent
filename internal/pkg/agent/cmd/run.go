@@ -133,6 +133,7 @@ func run(override cfgOverrider) error {
 	err = migration.MigrateAgentSecret(logger)
 	logger.Debug("migration of agent secret completed, err: %v", err)
 	if err != nil {
+		err = errors.New(err, "failed to perfrom the agent secret migration")
 		logger.Error(err)
 		return err
 	}
