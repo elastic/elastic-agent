@@ -6,8 +6,9 @@ package composable_test
 
 import (
 	"context"
-	"sync"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
@@ -80,17 +81,34 @@ func TestController(t *testing.T) {
 	c, err := composable.New(log, cfg)
 	require.NoError(t, err)
 
-	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	wg.Add(1)
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer timeoutCancel()
+
 	var setVars []*transpiler.Vars
-	err = c.Run(ctx, func(vars []*transpiler.Vars) {
-		setVars = vars
-		wg.Done()
-	})
+	go func() {
+		defer cancel()
+		for {
+			select {
+			case <-timeoutCtx.Done():
+				return
+			case vars := <-c.Watch():
+				setVars = vars
+			}
+		}
+	}()
+
+	errCh := make(chan error)
+	go func() {
+		errCh <- c.Run(ctx)
+	}()
+	err = <-errCh
+	if errors.Is(err, context.Canceled) {
+		err = nil
+	}
 	require.NoError(t, err)
-	wg.Wait()
 
 	assert.Len(t, setVars, 3)
 

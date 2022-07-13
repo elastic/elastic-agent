@@ -41,15 +41,28 @@ func TestContextProvider(t *testing.T) {
 	require.Equal(t, 100*time.Millisecond, hostProvider.CheckInterval)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	comm := ctesting.NewContextComm(ctx)
-	err = provider.Run(comm)
+
+	go func() {
+		err = provider.Run(comm)
+	}()
+
+	// wait for it to be called once
+	var wg sync.WaitGroup
+	wg.Add(1)
+	comm.CallOnSet(func() {
+		wg.Done()
+	})
+	wg.Wait()
+	comm.CallOnSet(nil)
+
 	require.NoError(t, err)
 	starting, err = ctesting.CloneMap(starting)
 	require.NoError(t, err)
 	require.Equal(t, starting, comm.Current())
 
 	// wait for it to be called again
-	var wg sync.WaitGroup
 	wg.Add(1)
 	comm.CallOnSet(func() {
 		wg.Done()

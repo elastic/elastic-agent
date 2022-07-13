@@ -374,12 +374,13 @@ func newWaitForCompose(wrapped composable.Controller) *waitForCompose {
 	}
 }
 
-func (w *waitForCompose) Run(ctx context.Context, cb composable.VarsCallback) error {
-	err := w.controller.Run(ctx, func(vars []*transpiler.Vars) {
-		cb(vars)
-		w.done <- true
-	})
+func (w *waitForCompose) Run(ctx context.Context) error {
+	err := w.controller.Run(ctx)
 	return err
+}
+
+func (w *waitForCompose) Watch() <-chan []*transpiler.Vars {
+	return nil
 }
 
 func (w *waitForCompose) Wait() {

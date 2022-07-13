@@ -12,7 +12,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
-	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 // ExternalInputsPattern is a glob that matches the paths of external configuration files.
@@ -22,7 +21,7 @@ var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
 type SettingsConfig struct {
 	DownloadConfig   *artifact.Config                `yaml:"download" config:"download" json:"download"`
 	ProcessConfig    *process.Config                 `yaml:"process" config:"process" json:"process"`
-	GRPC             *server.Config                  `yaml:"grpc" config:"grpc" json:"grpc"`
+	GRPC             *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
 	RetryConfig      *retry.Config                   `yaml:"retry" config:"retry" json:"retry"`
 	MonitoringConfig *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
 	LoggingConfig    *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
@@ -40,7 +39,7 @@ func DefaultSettingsConfig() *SettingsConfig {
 		DownloadConfig:   artifact.DefaultConfig(),
 		LoggingConfig:    logger.DefaultLoggingConfig(),
 		MonitoringConfig: monitoringCfg.DefaultConfig(),
-		GRPC:             server.DefaultGRPCConfig(),
+		GRPC:             DefaultGRPCConfig(),
 		Reload:           DefaultReloadConfig(),
 	}
 }

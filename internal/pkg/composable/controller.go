@@ -22,19 +22,21 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// VarsCallback is callback called when the current vars state changes.
-type VarsCallback func([]*transpiler.Vars)
-
 // Controller manages the state of the providers current context.
 type Controller interface {
 	// Run runs the controller.
 	//
 	// Cancelling the context stops the controller.
-	Run(ctx context.Context, cb VarsCallback) error
+	Run(ctx context.Context) error
+
+	// Watch returns the channel to watch for variable changes.
+	Watch() <-chan []*transpiler.Vars
 }
 
 // controller manages the state of the providers current context.
 type controller struct {
+	logger           *logger.Logger
+	ch               chan []*transpiler.Vars
 	contextProviders map[string]*contextProviderState
 	dynamicProviders map[string]*dynamicProviderState
 }
@@ -87,28 +89,39 @@ func New(log *logger.Logger, c *config.Config) (Controller, error) {
 	}
 
 	return &controller{
+		logger:           l,
+		ch:               make(chan []*transpiler.Vars),
 		contextProviders: contextProviders,
 		dynamicProviders: dynamicProviders,
 	}, nil
 }
 
 // Run runs the controller.
-func (c *controller) Run(ctx context.Context, cb VarsCallback) error {
-	// large number not to block performing Run on the provided providers
-	notify := make(chan bool, 5000)
+func (c *controller) Run(ctx context.Context) error {
+	c.logger.Debugf("Starting controller for composable inputs")
+	defer c.logger.Debugf("Stopped controller for composable inputs")
+
+	notify := make(chan bool)
 	localCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	fetchContextProviders := mapstr.M{}
+
+	var wg sync.WaitGroup
+	wg.Add(len(c.contextProviders) + len(c.dynamicProviders))
 
 	// run all the enabled context providers
 	for name, state := range c.contextProviders {
 		state.Context = localCtx
 		state.signal = notify
-		err := state.provider.Run(state)
-		if err != nil {
-			cancel()
-			return errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
-		}
+		go func() {
+			defer wg.Done()
+			err := state.provider.Run(state)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
+				c.logger.Errorf("%s", err)
+			}
+		}()
 		if p, ok := state.provider.(corecomp.FetchContextProvider); ok {
 			_, _ = fetchContextProviders.Put(name, p)
 		}
@@ -118,65 +131,68 @@ func (c *controller) Run(ctx context.Context, cb VarsCallback) error {
 	for name, state := range c.dynamicProviders {
 		state.Context = localCtx
 		state.signal = notify
-		err := state.provider.Run(state)
-		if err != nil {
-			cancel()
-			return errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
-		}
+		go func() {
+			defer wg.Done()
+			err := state.provider.Run(state)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
+				c.logger.Errorf("%s", err)
+			}
+		}()
 	}
 
-	go func() {
+	c.logger.Debugf("Started controller for composable inputs")
+
+	// performs debounce of notifies; accumulates them into 100 millisecond chunks
+	t := time.NewTimer(100 * time.Millisecond)
+	for {
+	DEBOUNCE:
 		for {
-			// performs debounce of notifies; accumulates them into 100 millisecond chunks
-			changed := false
-			t := time.NewTimer(100 * time.Millisecond)
-			for {
-				exitloop := false
-				select {
-				case <-ctx.Done():
-					cancel()
-					return
-				case <-notify:
-					changed = true
-				case <-t.C:
-					exitloop = true
-				}
-				if exitloop {
-					break
-				}
+			select {
+			case <-ctx.Done():
+				c.logger.Debugf("Stopping controller for composable inputs")
+				t.Stop()
+				cancel()
+				wg.Wait()
+				return ctx.Err()
+			case <-notify:
+				t.Reset(100 * time.Millisecond)
+				c.logger.Debugf("Variable state changed for composable inputs; debounce started")
+				drainChan(notify)
+			case <-t.C:
+				break DEBOUNCE
 			}
-
-			t.Stop()
-			if !changed {
-				continue
-			}
-
-			// build the vars list of mappings
-			vars := make([]*transpiler.Vars, 1)
-			mapping := map[string]interface{}{}
-			for name, state := range c.contextProviders {
-				mapping[name] = state.Current()
-			}
-			// this is ensured not to error, by how the mappings states are verified
-			vars[0], _ = transpiler.NewVars(mapping, fetchContextProviders)
-
-			// add to the vars list for each dynamic providers mappings
-			for name, state := range c.dynamicProviders {
-				for _, mappings := range state.Mappings() {
-					local, _ := cloneMap(mapping) // will not fail; already been successfully cloned once
-					local[name] = mappings.mapping
-					// this is ensured not to error, by how the mappings states are verified
-					v, _ := transpiler.NewVarsWithProcessors(local, name, mappings.processors, fetchContextProviders)
-					vars = append(vars, v)
-				}
-			}
-
-			// execute the callback
-			cb(vars)
 		}
-	}()
 
-	return nil
+		c.logger.Debugf("Computing new variable state for composable inputs")
+
+		// build the vars list of mappings
+		vars := make([]*transpiler.Vars, 1)
+		mapping := map[string]interface{}{}
+		for name, state := range c.contextProviders {
+			mapping[name] = state.Current()
+		}
+		// this is ensured not to error, by how the mappings states are verified
+		vars[0], _ = transpiler.NewVars(mapping, fetchContextProviders)
+
+		// add to the vars list for each dynamic providers mappings
+		for name, state := range c.dynamicProviders {
+			for _, mappings := range state.Mappings() {
+				local, _ := cloneMap(mapping) // will not fail; already been successfully cloned once
+				local[name] = mappings.mapping
+				// this is ensured not to error, by how the mappings states are verified
+				v, _ := transpiler.NewVarsWithProcessors(local, name, mappings.processors, fetchContextProviders)
+				vars = append(vars, v)
+			}
+		}
+
+		c.ch <- vars
+	}
+}
+
+// Watch returns the channel for variable changes.
+func (c *controller) Watch() <-chan []*transpiler.Vars {
+	return c.ch
 }
 
 type contextProviderState struct {
@@ -350,4 +366,14 @@ func addToSet(set []int, i int) []int {
 		}
 	}
 	return append(set, i)
+}
+
+func drainChan(ch chan bool) {
+	for {
+		select {
+		case <-ch:
+		default:
+			return
+		}
+	}
 }

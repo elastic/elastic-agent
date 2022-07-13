@@ -6,34 +6,27 @@ package application
 
 import (
 	"context"
+	"fmt"
+	"go.elastic.co/apm"
 	"path/filepath"
 
-	"go.elastic.co/apm"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/stream"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/dir"
 	acker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
-	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
-	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 type discoverFunc func() ([]string, error)
@@ -44,24 +37,26 @@ var ErrNoConfiguration = errors.New("no configuration found", errors.TypeConfig)
 // Local represents a standalone agents, that will read his configuration directly from disk.
 // Some part of the configuration can be reloaded.
 type Local struct {
-	bgContext   context.Context
-	cancelCtxFn context.CancelFunc
 	log         *logger.Logger
-	router      pipeline.Router
-	source      source
 	agentInfo   *info.AgentInfo
-	srv         *server.Server
+	caps        capabilities.Capability
+	reexec      reexecManager
+	uc          upgraderControl
+	downloadCfg *artifact.Config
+
+	runtime    coordinator.RuntimeManager
+	config     coordinator.ConfigManager
+	composable coordinator.VarsManager
+
+	coordinator *coordinator.Coordinator
 }
 
-type source interface {
-	Start() error
-	Stop() error
-}
-
-// newLocal return a agent managed by local configuration.
+// newLocal return an agent managed by local configuration.
 func newLocal(
-	ctx context.Context,
 	log *logger.Logger,
+	specs component.RuntimeSpecs,
+	caps capabilities.Capability,
+	cfg *configuration.Configuration,
 	pathConfigFile string,
 	rawConfig *config.Config,
 	reexec reexecManager,
@@ -70,96 +65,36 @@ func newLocal(
 	agentInfo *info.AgentInfo,
 	tracer *apm.Tracer,
 ) (*Local, error) {
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, statusCtrl)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	if log == nil {
-		log, err = logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	logR := logreporter.NewReporter(log)
-
 	localApplication := &Local{
-		log:       log,
-		agentInfo: agentInfo,
+		log:         log,
+		agentInfo:   agentInfo,
+		caps:        caps,
+		reexec:      reexec,
+		uc:          uc,
+		downloadCfg: cfg.Settings.DownloadConfig,
 	}
 
-	localApplication.bgContext, localApplication.cancelCtxFn = context.WithCancel(ctx)
-	localApplication.srv, err = server.NewFromConfig(log, cfg.Settings.GRPC, &operation.ApplicationStatusHandler{}, tracer)
+	loader := config.NewLoader(log, externalConfigsGlob())
+	discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
+	if !cfg.Settings.Reload.Enabled {
+		log.Debug("Reloading of configuration is off")
+		localApplication.config = newOnce(log, discover, loader)
+	} else {
+		log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
+		localApplication.config = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+	}
+
+	var err error
+	localApplication.runtime, err = runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
 	if err != nil {
-		return nil, errors.New(err, "initialize GRPC listener")
+		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
-
-	reporter := reporting.NewReporter(localApplication.bgContext, log, localApplication.agentInfo, logR)
-
-	monitor, err := monitoring.NewMonitor(cfg.Settings)
-	if err != nil {
-		return nil, errors.New(err, "failed to initialize monitoring")
-	}
-
-	router, err := router.New(log, stream.Factory(localApplication.bgContext, agentInfo, cfg.Settings, localApplication.srv, reporter, monitor, statusCtrl))
-	if err != nil {
-		return nil, errors.New(err, "fail to initialize pipeline router")
-	}
-	localApplication.router = router
-
-	composableCtrl, err := composable.New(log, rawConfig)
+	localApplication.composable, err = composable.New(log, rawConfig)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
-	emit, err := emitter.New(
-		localApplication.bgContext,
-		log,
-		agentInfo,
-		composableCtrl,
-		router,
-		&pipeline.ConfigModifiers{
-			Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring},
-			Filters:    []pipeline.FilterFunc{filters.StreamChecker},
-		},
-		caps,
-		monitor,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	loader := config.NewLoader(log, externalConfigsGlob())
-
-	var cfgSource source
-	if !cfg.Settings.Reload.Enabled {
-		log.Debug("Reloading of configuration is off")
-		cfgSource = newOnce(log, discover, loader, emit)
-	} else {
-		log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
-		cfgSource = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader, emit)
-	}
-
-	localApplication.source = cfgSource
-
-	// create a upgrader to use in local mode
-	upgrader := upgrade.NewUpgrader(
-		agentInfo,
-		cfg.Settings.DownloadConfig,
-		log,
-		[]context.CancelFunc{localApplication.cancelCtxFn},
-		reexec,
-		acker.NewAcker(),
-		reporter,
-		caps)
-	uc.SetUpgrader(upgrader)
+	localApplication.coordinator = coordinator.New(log, specs, localApplication.runtime, localApplication.config, localApplication.composable, caps)
 
 	return localApplication, nil
 }
@@ -170,30 +105,29 @@ func externalConfigsGlob() string {
 
 // Routes returns a list of routes handled by agent.
 func (l *Local) Routes() *sorted.Set {
-	return l.router.Routes()
-}
-
-// Start starts a local agent.
-func (l *Local) Start() error {
-	l.log.Info("Agent is starting")
-	defer l.log.Info("Agent is stopped")
-
-	if err := l.srv.Start(); err != nil {
-		return err
-	}
-	if err := l.source.Start(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-// Stop stops a local agent.
-func (l *Local) Stop() error {
-	err := l.source.Stop()
-	l.cancelCtxFn()
-	l.router.Shutdown()
-	l.srv.Stop()
+// Run runs the local agent.
+//
+// Blocks until the context is cancelled.
+func (l *Local) Run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+
+	u := upgrade.NewUpgrader(
+		l.agentInfo,
+		l.downloadCfg,
+		l.log,
+		[]context.CancelFunc{cancel},
+		l.reexec,
+		acker.NewAcker(),
+		nil,
+		l.caps)
+	l.uc.SetUpgrader(u)
+
+	err := l.coordinator.Run(ctx)
+
+	l.uc.SetUpgrader(nil)
 	return err
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -22,9 +21,7 @@ import (
 // New creates a new emitter function.
 func New(ctx context.Context, log *logger.Logger, agentInfo *info.AgentInfo, controller composable.Controller, router pipeline.Router, modifiers *pipeline.ConfigModifiers, caps capabilities.Capability, reloadables ...reloadable) (pipeline.EmitterFunc, error) {
 	ctrl := NewController(log, agentInfo, controller, router, modifiers, caps, reloadables...)
-	err := controller.Run(ctx, func(vars []*transpiler.Vars) {
-		ctrl.Set(ctx, vars)
-	})
+	err := controller.Run(ctx)
 	if err != nil {
 		return nil, errors.New(err, "failed to start composable controller")
 	}

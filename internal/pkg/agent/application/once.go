@@ -6,8 +6,8 @@ package application
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -17,14 +17,14 @@ type once struct {
 	log      *logger.Logger
 	discover discoverFunc
 	loader   *config.Loader
-	emitter  pipeline.EmitterFunc
+	ch       chan *config.Config
 }
 
-func newOnce(log *logger.Logger, discover discoverFunc, loader *config.Loader, emitter pipeline.EmitterFunc) *once {
-	return &once{log: log, discover: discover, loader: loader, emitter: emitter}
+func newOnce(log *logger.Logger, discover discoverFunc, loader *config.Loader) *once {
+	return &once{log: log, discover: discover, loader: loader, ch: make(chan *config.Config)}
 }
 
-func (o *once) Start() error {
+func (o *once) Run(ctx context.Context) error {
 	files, err := o.discover()
 	if err != nil {
 		return errors.New(err, "could not discover configuration files", errors.TypeConfig)
@@ -34,18 +34,23 @@ func (o *once) Start() error {
 		return ErrNoConfiguration
 	}
 
-	return readfiles(context.Background(), files, o.loader, o.emitter)
+	cfg, err := readfiles(files, o.loader)
+	if err != nil {
+		return err
+	}
+	o.ch <- cfg
+	<-ctx.Done()
+	return ctx.Err()
 }
 
-func (o *once) Stop() error {
-	return nil
+func (o *once) Watch() <-chan *config.Config {
+	return o.ch
 }
 
-func readfiles(ctx context.Context, files []string, loader *config.Loader, emitter pipeline.EmitterFunc) error {
+func readfiles(files []string, loader *config.Loader) (*config.Config, error) {
 	c, err := loader.Load(files)
 	if err != nil {
-		return errors.New(err, "could not load or merge configuration", errors.TypeConfig)
+		return nil, fmt.Errorf("failed to load or merge configuration: %w", err)
 	}
-
-	return emitter(ctx, c)
+	return c, nil
 }

@@ -7,14 +7,12 @@ package install
 import (
 	"context"
 	"fmt"
+	"github.com/kardianos/service"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
-
-	"github.com/kardianos/service"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -233,19 +231,12 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
 		varsArray := make([]*transpiler.Vars, 0)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		varsCallback := func(vv []*transpiler.Vars) {
-			varsArray = vv
-			wg.Done()
-		}
 
 		ctrl, err := composable.New(log, cfg)
 		if err != nil {
 			return nil, err
 		}
-		_ = ctrl.Run(ctx, varsCallback)
-		wg.Wait()
+		_ = ctrl.Run(ctx)
 
 		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {

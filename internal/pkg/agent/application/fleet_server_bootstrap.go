@@ -4,6 +4,7 @@
 
 package application
 
+/*
 import (
 	"context"
 
@@ -233,3 +234,4 @@ func emit(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInf
 		},
 	})
 }
+*/

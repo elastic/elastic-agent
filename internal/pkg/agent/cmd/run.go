@@ -65,7 +65,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	}
 }
 
-func run(override cfgOverrider) error {
+func run(override cfgOverrider, modifiers ...application.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -123,7 +123,7 @@ func run(override cfgOverrider) error {
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
 	err = secret.CreateAgentSecret()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read/write secrets: %w", err)
 	}
 
 	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)
@@ -174,7 +174,7 @@ func run(override cfgOverrider) error {
 	}
 	defer control.Stop()
 
-	app, err := application.New(logger, rex, statusCtrl, control, agentInfo, tracer)
+	app, err := application.New(logger, rex, statusCtrl, control, agentInfo, tracer, modifiers...)
 	if err != nil {
 		return err
 	}
@@ -190,9 +190,15 @@ func run(override cfgOverrider) error {
 		_ = serverStopFn()
 	}()
 
-	if err := app.Start(); err != nil {
-		return err
-	}
+	appDone := make(chan bool)
+	appErrCh := make(chan error)
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		err := app.Run(ctx)
+		close(appDone)
+		appErrCh <- err
+	}()
 
 	// listen for signals
 	signals := make(chan os.Signal, 1)
@@ -202,6 +208,8 @@ func run(override cfgOverrider) error {
 		breakout := false
 		select {
 		case <-stop:
+			breakout = true
+		case <-appDone:
 			breakout = true
 		case <-rex.ShutdownChan():
 			reexecing = true
@@ -222,7 +230,9 @@ func run(override cfgOverrider) error {
 		}
 	}
 
-	err = app.Stop()
+	cancel()
+	err = <-appErrCh
+
 	if !reexecing {
 		logger.Info("Shutting down completed.")
 		return err

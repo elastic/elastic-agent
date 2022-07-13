@@ -7,8 +7,12 @@ package application
 import (
 	"context"
 	"fmt"
-
+	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/go-sysinfo"
 	"go.elastic.co/apm"
+	goruntime "runtime"
+	"strconv"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -24,10 +28,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// PlatformModifier can modify the platform details before the runtime specifications are loaded.
+type PlatformModifier func(detail component.PlatformDetail) component.PlatformDetail
+
 // Application is the application interface implemented by the different running mode.
 type Application interface {
-	Start() error
-	Stop() error
+	Run(ctx context.Context) error
 	AgentInfo() *info.AgentInfo
 	Routes() *sorted.Set
 }
@@ -48,59 +54,83 @@ func New(
 	uc upgraderControl,
 	agentInfo *info.AgentInfo,
 	tracer *apm.Tracer,
+	modifiers ...PlatformModifier,
 ) (Application, error) {
-	// Load configuration from disk to understand in which mode of operation
-	// we must start the elastic-agent, the mode of operation cannot be changed without restarting the
-	// elastic-agent.
+	log.Info("Gathering system information")
+	platform, err := getPlatformDetail(modifiers...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gather system information: %w", err)
+	}
+
+	log.Info("Detecting available inputs and outputs")
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
+	}
+
+	log.Info("Determine allowed capabilities")
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, statusCtrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine capabilities: %w", err)
+	}
+
+	log.Info("Parsing configuration and determining execution mode")
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
-
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
-
-	return createApplication(log, pathConfigFile, rawConfig, reexec, statusCtrl, uc, agentInfo, tracer)
-}
-
-func createApplication(
-	log *logger.Logger,
-	pathConfigFile string,
-	rawConfig *config.Config,
-	reexec reexecManager,
-	statusCtrl status.Controller,
-	uc upgraderControl,
-	agentInfo *info.AgentInfo,
-	tracer *apm.Tracer,
-) (Application, error) {
-	log.Info("Detecting execution mode")
-	ctx := context.Background()
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Agent is managed locally")
-		return newLocal(ctx, log, paths.ConfigFile(), rawConfig, reexec, statusCtrl, uc, agentInfo, tracer)
+		return newLocal(log, specs, caps, cfg, paths.ConfigFile(), rawConfig, reexec, statusCtrl, uc, agentInfo, tracer)
 	}
 
 	// not in standalone; both modes require reading the fleet.yml configuration file
-	var store storage.Store
-	store, cfg, err = mergeFleetConfig(rawConfig)
-	if err != nil {
-		return nil, err
-	}
+	//var store storage.Store
+	//store, cfg, err = mergeFleetConfig(rawConfig)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 		log.Info("Agent is in Fleet Server bootstrap mode")
-		return newFleetServerBootstrap(ctx, log, pathConfigFile, rawConfig, statusCtrl, agentInfo, tracer)
+		//return newFleetServerBootstrap(ctx, log, pathConfigFile, rawConfig, statusCtrl, agentInfo, tracer)
+		return nil, errors.New("TODO: fleet-server bootstrap mode")
 	}
 
 	log.Info("Agent is managed by Fleet")
-	return newManaged(ctx, log, store, cfg, rawConfig, reexec, statusCtrl, agentInfo, tracer)
+	//return newManaged(ctx, log, store, cfg, rawConfig, reexec, statusCtrl, agentInfo, tracer)
+	return nil, errors.New("TODO: fleet mode")
+}
+
+func getPlatformDetail(modifiers ...PlatformModifier) (component.PlatformDetail, error) {
+	info, err := sysinfo.Host()
+	if err != nil {
+		return component.PlatformDetail{}, err
+	}
+	os := info.Info().OS
+	detail := component.PlatformDetail{
+		Platform: component.Platform{
+			OS:   goruntime.GOOS,
+			Arch: goruntime.GOARCH,
+			GOOS: goruntime.GOOS,
+		},
+		Family: os.Family,
+		Major:  strconv.Itoa(os.Major),
+		Minor:  strconv.Itoa(os.Minor),
+	}
+	for _, modifier := range modifiers {
+		detail = modifier(detail)
+	}
+	return detail, nil
 }
 
 func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {

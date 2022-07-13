@@ -4,13 +4,15 @@
 
 package application
 
+/*
 import (
 	"context"
 	"fmt"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"go.elastic.co/apm"
-
-	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
@@ -62,34 +64,37 @@ type stateStore interface {
 // Managed application, when the application is run in managed mode, most of the configuration are
 // coming from the Fleet App.
 type Managed struct {
-	bgContext   context.Context
-	cancelCtxFn context.CancelFunc
-	log         *logger.Logger
-	Config      configuration.FleetAgentConfig
+	log        *logger.Logger
+	Config     configuration.FleetAgentConfig
+	gateway    gateway.FleetGateway
+	stateStore stateStore
+	upgrader   *upgrade.Upgrader
+
 	agentInfo   *info.AgentInfo
-	gateway     gateway.FleetGateway
-	router      pipeline.Router
-	srv         *server.Server
-	stateStore  stateStore
-	upgrader    *upgrade.Upgrader
+	caps        capabilities.Capability
+	reexec      reexecManager
+	uc          upgraderControl
+	downloadCfg *artifact.Config
+
+	runtime    coordinator.RuntimeManager
+	config     coordinator.ConfigManager
+	composable coordinator.VarsManager
+
+	coordinator *coordinator.Coordinator
 }
 
 func newManaged(
-	ctx context.Context,
 	log *logger.Logger,
-	storeSaver storage.Store,
+	specs component.RuntimeSpecs,
+	caps capabilities.Capability,
 	cfg *configuration.Configuration,
+	storeSaver storage.Store,
 	rawConfig *config.Config,
 	reexec reexecManager,
 	statusCtrl status.Controller,
 	agentInfo *info.AgentInfo,
 	tracer *apm.Tracer,
 ) (*Managed, error) {
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, statusCtrl)
-	if err != nil {
-		return nil, err
-	}
-
 	client, err := client.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
 		return nil, errors.New(err,
@@ -98,69 +103,22 @@ func newManaged(
 			errors.M(errors.MetaKeyURI, cfg.Fleet.Client.Host))
 	}
 
-	sysInfo, err := sysinfo.Host()
-	if err != nil {
-		return nil, errors.New(err,
-			"fail to get system information",
-			errors.TypeUnexpected)
-	}
-
 	managedApplication := &Managed{
 		log:       log,
 		agentInfo: agentInfo,
 	}
 
-	managedApplication.bgContext, managedApplication.cancelCtxFn = context.WithCancel(ctx)
-	managedApplication.srv, err = server.NewFromConfig(log, cfg.Settings.GRPC, &operation.ApplicationStatusHandler{}, tracer)
+	managedApplication.runtime, err = runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
 	if err != nil {
-		return nil, errors.New(err, "initialize GRPC listener", errors.TypeNetwork)
+		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
-	// must start before `Start` is called as Fleet will already try to start applications
-	// before `Start` is even called.
-	err = managedApplication.srv.Start()
-	if err != nil {
-		return nil, errors.New(err, "starting GRPC listener", errors.TypeNetwork)
-	}
-
-	logR := logreporter.NewReporter(log)
-	fleetR, err := fleetreporter.NewReporter(agentInfo, log, cfg.Fleet.Reporting)
-	if err != nil {
-		return nil, errors.New(err, "fail to create reporters")
-	}
-
-	combinedReporter := reporting.NewReporter(managedApplication.bgContext, log, agentInfo, logR, fleetR)
-	monitor, err := monitoring.NewMonitor(cfg.Settings)
-	if err != nil {
-		return nil, errors.New(err, "failed to initialize monitoring")
-	}
-
-	router, err := router.New(log, stream.Factory(managedApplication.bgContext, agentInfo, cfg.Settings, managedApplication.srv, combinedReporter, monitor, statusCtrl))
-	if err != nil {
-		return nil, errors.New(err, "fail to initialize pipeline router")
-	}
-	managedApplication.router = router
-
-	composableCtrl, err := composable.New(log, rawConfig)
+	managedApplication.composable, err = composable.New(log, rawConfig)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	emit, err := emitter.New(
-		managedApplication.bgContext,
-		log,
-		agentInfo,
-		composableCtrl,
-		router,
-		&pipeline.ConfigModifiers{
-			Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring},
-			Filters:    []pipeline.FilterFunc{filters.StreamChecker, modifiers.InjectFleet(rawConfig, sysInfo.Info(), agentInfo)},
-		},
-		caps,
-		monitor,
-	)
-	if err != nil {
-		return nil, err
-	}
+	managedApplication.coordinator = coordinator.New(log, specs, managedApplication.runtime, managedApplication.config, managedApplication.composable, caps)
+
 	acker, err := fleet.NewAcker(log, agentInfo, client)
 	if err != nil {
 		return nil, err
@@ -359,3 +317,4 @@ func (m *Managed) wasUnenrolled() bool {
 
 	return false
 }
+*/
