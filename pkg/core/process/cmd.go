@@ -12,11 +12,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func getCmd(ctx context.Context, logger *logger.Logger, path string, env []string, uid, gid int, arg ...string) *exec.Cmd {
+func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	if ctx == nil {
 		cmd = exec.Command(path, arg...)
@@ -27,7 +25,11 @@ func getCmd(ctx context.Context, logger *logger.Logger, path string, env []strin
 	cmd.Env = append(cmd.Env, env...)
 	cmd.Dir = filepath.Dir(path)
 
-	return cmd
+	return cmd, nil
+}
+
+func killCmd(proc *os.Process) error {
+	return proc.Kill()
 }
 
 func terminateCmd(proc *os.Process) error {

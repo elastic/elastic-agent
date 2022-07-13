@@ -37,12 +37,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 const (
@@ -600,9 +600,10 @@ func (c *enrollCmd) startAgent(ctx context.Context) (<-chan *os.ProcessState, er
 		args = append(args, "--path.home.unversioned")
 	}
 	proc, err := process.StartContext(
-		ctx, c.log, cmd, nil, os.Geteuid(), os.Getegid(), args, func(c *exec.Cmd) {
+		ctx, cmd, os.Geteuid(), os.Getegid(), args, nil, func(c *exec.Cmd) error {
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
+			return nil
 		})
 	if err != nil {
 		return nil, err

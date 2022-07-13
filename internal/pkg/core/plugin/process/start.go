@@ -18,8 +18,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
@@ -128,14 +128,13 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 	spec.Args = injectDataPath(spec.Args, a.pipelineID, a.id)
 
 	a.state.ProcessInfo, err = process.Start(
-		a.logger,
 		spec.BinaryPath,
-		a.processConfig,
 		a.uid,
 		a.gid,
-		spec.Args, func(c *exec.Cmd) {
+		spec.Args, nil, func(c *exec.Cmd) error {
 			c.Stdout = newLoggerWriter(a.Name(), logStdOut, a.logger)
 			c.Stderr = newLoggerWriter(a.Name(), logStdErr, a.logger)
+			return nil
 		})
 	if err != nil {
 		return fmt.Errorf("%q failed to start %q: %w",

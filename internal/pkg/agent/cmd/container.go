@@ -36,9 +36,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/tar"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -727,10 +727,6 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	apmDir := filepath.Join(path, files[0].Name())
 	// Start apm-server process respecting path ENVs
 	apmBinary := filepath.Join(apmDir, spec.Cmd)
-	log, err := logger.New("apm-server", false)
-	if err != nil {
-		return nil, err
-	}
 	// add APM Server specific configuration
 	var args []string
 	addEnv := func(arg, env string) {
@@ -751,7 +747,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	addEnv("--httpprof", "HTTPPROF")
 	addSettingEnv("gc_percent", "APMSERVER_GOGC")
 	logInfo(streams, "Starting legacy apm-server daemon as a subprocess.")
-	return process.Start(log, apmBinary, nil, os.Geteuid(), os.Getegid(), args)
+	return process.Start(apmBinary, os.Geteuid(), os.Getegid(), args, nil)
 }
 
 func logToStderr(cfg *configuration.Configuration) {

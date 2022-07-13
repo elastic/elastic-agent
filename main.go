@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/proc"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // Setups and Runs agent.
@@ -21,7 +21,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	pj, err := proc.CreateJobObject()
+	pj, err := process.CreateJobObject()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize process job object: %v\n", err)
 		os.Exit(1)
