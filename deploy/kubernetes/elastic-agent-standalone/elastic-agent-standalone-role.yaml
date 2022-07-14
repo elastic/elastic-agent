@@ -45,7 +45,7 @@ rules:
       - nodes/stats
     verbs:
       - get
-  # Required for apiserver
+  # Needed for apiserver
   - nonResourceURLs:
       - "/metrics"
     verbs:

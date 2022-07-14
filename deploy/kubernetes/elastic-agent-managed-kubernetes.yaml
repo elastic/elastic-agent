@@ -14,7 +14,7 @@ spec:
       labels:
         app: elastic-agent
     spec:
-      # Tolerations are needed to run Elastic Agent on master nodes.
+      # Tolerations are needed to run Elastic Agent on Kubernetes master nodes.
       # Agents running on master nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
         - key: node-role.kubernetes.io/master
@@ -192,6 +192,7 @@ rules:
       - pods
       - services
       - configmaps
+      # Needed for cloudbeat
       - serviceaccounts
       - persistentvolumes
       - persistentvolumeclaims
@@ -223,11 +224,12 @@ rules:
       - jobs
       - cronjobs
     verbs: [ "get", "list", "watch" ]
-  # required for apiserver
+  # Needed for apiserver
   - nonResourceURLs:
       - "/metrics"
     verbs:
       - get
+  # Needed for cloudbeat
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources:
       - clusterrolebindings
@@ -235,6 +237,7 @@ rules:
       - rolebindings
       - roles
     verbs: ["get", "list", "watch"]
+  # Needed for cloudbeat
   - apiGroups: ["policy"]
     resources:
       - podsecuritypolicies
@@ -244,7 +247,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: elastic-agent
-  # should be the namespace where elastic-agent is running
+  # Should be the namespace where elastic-agent is running
   namespace: kube-system
   labels:
     k8s-app: elastic-agent
