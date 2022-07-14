@@ -187,3 +187,4 @@
 - Save the agent configuration and the state encrypted on the disk. {issue}535[535] {pull}398[398]
 - Bump node.js version for heartbeat/synthetics to 16.15.0
 - Support scheduled actions and cancellation of pending actions. {issue}393[393] {pull}419[419]
+- Fix incorrectly creating a filebeat redis input when a policy contains a packetbeat redis input. {issue}[427] {pull}[700]
