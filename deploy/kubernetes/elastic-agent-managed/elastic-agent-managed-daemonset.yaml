@@ -14,7 +14,7 @@ spec:
       labels:
         app: elastic-agent
     spec:
-      # To run Elastic Agent on master nodes
+      # Tolerations are needed to run Elastic Agent on master nodes.
       # Agents running on master nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
         - key: node-role.kubernetes.io/master
@@ -35,11 +35,10 @@ spec:
             # Set to true to communicate with Fleet with either insecure HTTP or unverified HTTPS
             - name: FLEET_INSECURE
               value: "true"
-            # URL to enroll the Fleet Server into
+            # Fleet Server URL to enroll the Elastic Agent into
             - name: FLEET_URL
               value: "https://fleet-server:8220"
-            # The token to use for Fleet enrollment
-            # If left empty KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
+            # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
             - name: FLEET_ENROLLMENT_TOKEN
               value: ""
             - name: KIBANA_HOST

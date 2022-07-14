@@ -38,7 +38,6 @@ spec:
             # Fleet Server URL to enroll the Elastic Agent into
             - name: FLEET_URL
               value: "https://fleet-server:8220"
-            # The token to use for Fleet enrollment
             # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
             - name: FLEET_ENROLLMENT_TOKEN
               value: ""
@@ -225,7 +224,7 @@ rules:
       - jobs
       - cronjobs
     verbs: [ "get", "list", "watch" ]
-  # Required for apiserver
+  # Needed for apiserver
   - nonResourceURLs:
       - "/metrics"
     verbs:
