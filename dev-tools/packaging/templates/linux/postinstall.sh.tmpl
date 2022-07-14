@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+set -e
+
+symlink="/usr/share/elastic-agent/bin/elastic-agent"
+old_agent_dir="$( dirname "$(readlink -f -- "$symlink")" )"
+
+commit_hash="{{ commit_short }}"
+
+yml_path="$old_agent_dir/state.yml"
+enc_path="$old_agent_dir/state.enc"
+
+new_agent_dir="$( dirname "$old_agent_dir")/elastic-agent-$commit_hash"
+
+if ! [[ "$old_agent_dir" -ef "$new_agent_dir" ]]; then
+    echo "migrate state from $old_agent_dir to $new_agent_dir"
+
+    if test -f "$yml_path"; then
+        echo "found "$yml_path", copy to "$new_agent_dir"."
+        cp "$yml_path" "$new_agent_dir"
+    fi
+
+    if test -f "$enc_path"; then
+        echo "found "$enc_path", copy to "$new_agent_dir"."
+        cp "$enc_path" "$new_agent_dir"
+    fi
+
+    if test -f "$yml_path"; then
+        echo "found symlink $symlink, unlink"
+        unlink "$symlink"
+    fi
+
+    echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
+    ln -s "$new_agent_dir/elastic-agent" "$symlink"
+fi
+
+systemctl daemon-reload 2> /dev/null
+exit 0
