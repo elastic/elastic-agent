@@ -36,9 +36,11 @@ spec:
             - name: FLEET_INSECURE
               value: "true"
             # Fleet Server URL to enroll the Elastic Agent into
+            # FLEET_URL can be found in Kibana, go to Management > Fleet > Settings
             - name: FLEET_URL
               value: "https://fleet-server:8220"
             # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
+            # More detail on enrollment tokens - https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html
             - name: FLEET_ENROLLMENT_TOKEN
               value: ""
             - name: KIBANA_HOST
