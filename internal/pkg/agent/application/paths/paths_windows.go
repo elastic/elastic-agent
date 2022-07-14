@@ -42,5 +42,5 @@ func ArePathsEqual(expected, actual string) bool {
 
 // AgentVaultPath is the directory that contains all the files for the value
 func AgentVaultPath() string {
-	return filepath.Join(Top(), defaultAgentVaultPath)
+	return filepath.Join(Config(), defaultAgentVaultPath)
 }
