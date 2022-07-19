@@ -71,7 +71,7 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, error) 
 	agentConfigFile := paths.AgentConfigFile()
 	reader, err := s.Load()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load from ioStore: %w", err)
 	}
 
 	// reader is closed by this function
@@ -195,20 +195,20 @@ func loadAgentInfo(forceUpdate bool, logLevel string, createAgentID bool) (*pers
 	agentConfigFile := paths.AgentConfigFile()
 	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)
 
-	agentinfo, err := getInfoFromStore(diskStore, logLevel)
+	agentInfo, err := getInfoFromStore(diskStore, logLevel)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get agent info from store: %w", err)
 	}
 
-	if agentinfo != nil && !forceUpdate && (agentinfo.ID != "" || !createAgentID) {
-		return agentinfo, nil
+	if agentInfo != nil && !forceUpdate && (agentInfo.ID != "" || !createAgentID) {
+		return agentInfo, nil
 	}
 
-	if err := updateID(agentinfo, diskStore); err != nil {
-		return nil, err
+	if err := updateID(agentInfo, diskStore); err != nil {
+		return nil, fmt.Errorf("could not update agent ID on disk store: %w", err)
 	}
 
-	return agentinfo, nil
+	return agentInfo, nil
 }
 
 func updateID(agentInfo *persistentAgentInfo, s ioStore) error {
