@@ -7,7 +7,9 @@ package migration
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,6 +18,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/fileutil"
 )
 
 const (
@@ -88,7 +92,7 @@ func findPreviousAgentSecret(dataDir string) (secret.Secret, error) {
 	found := false
 	var sec secret.Secret
 	fileSystem := os.DirFS(dataDir)
-	err := fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+	_ = fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -103,9 +107,27 @@ func findPreviousAgentSecret(dataDir string) (secret.Secret, error) {
 					}
 					return err
 				}
-				if s.CreatedOn.After(sec.CreatedOn) {
+
+				// Check that the configuration can be decrypted with the found agent secret
+				exists, _ := fileutil.FileExists(paths.AgentConfigFile())
+				if exists {
+					store := storage.NewEncryptedDiskStore(paths.AgentConfigFile(), storage.WithVaultPath(vaultPath))
+					r, err := store.Load()
+					if err != nil {
+						//nolint:nilerr // ignore the error keep scanning
+						return nil
+					}
+
+					defer r.Close()
+					_, err = ioutil.ReadAll(r)
+					if err != nil {
+						//nolint:nilerr // ignore the error keep scanning
+						return nil
+					}
+
 					sec = s
 					found = true
+					return io.EOF
 				}
 			} else if d.Name() != "." {
 				return fs.SkipDir
@@ -116,7 +138,7 @@ func findPreviousAgentSecret(dataDir string) (secret.Secret, error) {
 	if !found {
 		return sec, fs.ErrNotExist
 	}
-	return sec, err
+	return sec, nil
 }
 
 func getAgentSecretFromHomePath(homePath string) (sec secret.Secret, err error) {

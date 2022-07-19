@@ -13,12 +13,14 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
@@ -101,7 +103,11 @@ func TestFindAgentSecretFromHomePath(t *testing.T) {
 			name: "vault with valid secret",
 			setupFn: func(homePath string) error {
 				vaultPath := getLegacyVaultPathFromPath(homePath)
-				return secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
+				err := secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
+				if err != nil {
+					return err
+				}
+				return generateTestConfig(vaultPath)
 			},
 		},
 	}
@@ -136,29 +142,65 @@ func TestFindAgentSecretFromHomePath(t *testing.T) {
 	}
 }
 
+type configType int
+
+const (
+	NoConfig configType = iota
+	MatchingConfig
+	NonMatchingConfig
+)
+
 func TestFindNewestAgentSecret(t *testing.T) {
-	top := t.TempDir()
-	paths.SetTop(top)
-	dataDir := paths.Data()
 
-	wantSecret, err := generateTestSecrets(dataDir, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sec, err := findPreviousAgentSecret(dataDir)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name    string
+		cfgType configType
+		wantErr error
+	}{
+		{
+			name:    "missing config",
+			cfgType: NoConfig,
+			wantErr: fs.ErrNotExist,
+		},
+		{
+			name:    "matching config",
+			cfgType: MatchingConfig,
+		},
+		{
+			name:    "non-matching config",
+			cfgType: NonMatchingConfig,
+			wantErr: fs.ErrNotExist,
+		},
 	}
 
-	diff := cmp.Diff(sec, wantSecret)
-	if diff != "" {
-		t.Fatal(diff)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			top := t.TempDir()
+			paths.SetTop(top)
+			paths.SetConfig(top)
+			dataDir := paths.Data()
+
+			wantSecret, err := generateTestSecrets(dataDir, 3, tc.cfgType)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sec, err := findPreviousAgentSecret(dataDir)
+
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("want err: %v, got err: %v", tc.wantErr, err)
+			}
+			diff := cmp.Diff(sec, wantSecret)
+			if diff != "" {
+				t.Fatal(diff)
+			}
+		})
 	}
 }
 
 func TestMigrateAgentSecret(t *testing.T) {
 	top := t.TempDir()
 	paths.SetTop(top)
+	paths.SetConfig(top)
 	dataDir := paths.Data()
 
 	// No vault home path
@@ -188,7 +230,7 @@ func TestMigrateAgentSecret(t *testing.T) {
 	}
 
 	// Generate few valid secrets to scan for
-	wantSecret, err := generateTestSecrets(dataDir, 5)
+	wantSecret, err := generateTestSecrets(dataDir, 5, MatchingConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,6 +297,7 @@ func TestMigrateAgentSecretAlreadyExists(t *testing.T) {
 func TestMigrateAgentSecretFromLegacyLocation(t *testing.T) {
 	top := t.TempDir()
 	paths.SetTop(top)
+	paths.SetConfig(top)
 	vaultPath := getLegacyVaultPath()
 	err := secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
 	if err != nil {
@@ -291,7 +334,13 @@ func generateTestHomePath(dataDir string) string {
 	return filepath.Join(dataDir, "elastic-agent-"+suffix)
 }
 
-func generateTestSecrets(dataDir string, count int) (newestSecret secret.Secret, err error) {
+func generateTestConfig(vaultPath string) error {
+	fleetEncConfigFile := paths.AgentConfigFile()
+	store := storage.NewEncryptedDiskStore(fleetEncConfigFile, storage.WithVaultPath(vaultPath))
+	return store.Save(strings.NewReader("foo"))
+}
+
+func generateTestSecrets(dataDir string, count int, cfgType configType) (wantSecret secret.Secret, err error) {
 	now := time.Now()
 
 	// Generate multiple home paths
@@ -300,21 +349,38 @@ func generateTestSecrets(dataDir string, count int) (newestSecret secret.Secret,
 		homePath := generateTestHomePath(dataDir)
 		k, err := vault.NewKey(vault.AES256)
 		if err != nil {
-			return newestSecret, err
+			return wantSecret, err
 		}
 
 		sec := secret.Secret{
 			Value:     k,
 			CreatedOn: now.Add(-time.Duration(i+1) * time.Minute),
 		}
-		if i == 0 {
-			newestSecret = sec
+
+		vaultPath := getLegacyVaultPathFromPath(homePath)
+		err = secret.SetAgentSecret(sec, secret.WithVaultPath(vaultPath))
+		if err != nil {
+			return wantSecret, err
 		}
 
-		err = secret.SetAgentSecret(sec, secret.WithVaultPath(getLegacyVaultPathFromPath(homePath)))
-		if err != nil {
-			return newestSecret, err
+		switch cfgType {
+		case NoConfig:
+		case MatchingConfig, NonMatchingConfig:
+			if i == 0 {
+				wantSecret = sec
+				// Create matching encrypted config file, the content of the file doesn't matter for this test
+				err = generateTestConfig(vaultPath)
+				if err != nil {
+					return wantSecret, err
+				}
+			}
+		}
+		// Delete
+		if cfgType == NonMatchingConfig && i == 0 {
+			_ = os.RemoveAll(vaultPath)
+			wantSecret = secret.Secret{}
 		}
 	}
-	return newestSecret, nil
+
+	return wantSecret, nil
 }
