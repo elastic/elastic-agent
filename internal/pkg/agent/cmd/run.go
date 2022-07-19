@@ -37,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -119,6 +120,22 @@ func run(override cfgOverrider) error {
 	createAgentID := true
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
+	}
+
+	// This is specific for the agent upgrade from 8.3.0 - 8.3.2 to 8.x and above on Linux and Windows platforms.
+	// Addresses the issue: https://github.com/elastic/elastic-agent/issues/682
+	// The vault directory was located in the hash versioned "Home" directory of the agent.
+	// This moves the vault directory two levels up into  the "Config" directory next to fleet.enc file
+	// in order to be able to "upgrade" the agent from deb/rpm that is not invoking the upgrade handle and
+	// doesn't perform the migration of the state or vault.
+	// If the agent secret doesn't exist, then search for the newest agent secret in the agent data directories
+	// and migrate it into the new vault location.
+	err = migration.MigrateAgentSecret(logger)
+	logger.Debug("migration of agent secret completed, err: %v", err)
+	if err != nil {
+		err = errors.New(err, "failed to perfrom the agent secret migration")
+		logger.Error(err)
+		return err
 	}
 
 	// Ensure we have the agent secret created.

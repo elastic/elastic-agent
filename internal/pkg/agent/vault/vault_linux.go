@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -29,8 +30,9 @@ type Vault struct {
 	mx   sync.Mutex
 }
 
-// Open initializes the vault store
-func New(path string) (*Vault, error) {
+// New creates the vault store
+func New(path string, opts ...OptionFunc) (v *Vault, err error) {
+	options := applyOptions(opts...)
 	dir := filepath.Dir(path)
 
 	// If there is no specific path then get the executable directory
@@ -43,12 +45,22 @@ func New(path string) (*Vault, error) {
 		path = filepath.Join(dir, path)
 	}
 
-	err := os.MkdirAll(path, 0750)
-	if err != nil {
-		return nil, err
+	if options.readonly {
+		fi, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
+		if !fi.IsDir() {
+			return nil, fs.ErrNotExist
+		}
+	} else {
+		err := os.MkdirAll(path, 0750)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create vault path: %v, err: %w", path, err)
+		}
 	}
 
-	key, err := getSeed(path)
+	key, err := getOrCreateSeed(path, options.readonly)
 	if err != nil {
 		return nil, err
 	}
