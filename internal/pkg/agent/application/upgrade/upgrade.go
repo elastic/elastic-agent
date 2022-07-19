@@ -126,6 +126,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 				"running under control of the systems supervisor")
 	}
 
+	err = preUpgradeCleanup(a.Version())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q before update: %v", paths.Downloads(), err)
+	}
+
 	if u.caps != nil {
 		if _, err := u.caps.Apply(a); errors.Is(err, capabilities.ErrBlocked) {
 			return nil, nil
@@ -137,6 +142,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	sourceURI := u.sourceURI(a.SourceURI())
 	archivePath, err := u.downloadArtifact(ctx, a.Version(), sourceURI)
 	if err != nil {
+		// Run the same preUpgradeCleanup task to get rid of any newly downloaded files
+		// This may have an issue if users are upgrading to the same version number.
+		if dErr := preUpgradeCleanup(a.Version()); dErr != nil {
+			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
+		}
 		return nil, err
 	}
 
@@ -182,6 +192,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	if reexecNow {
 		u.reexec.ReExec(cb)
 		return nil, nil
+	}
+
+	// Clean everything from the downloads dir
+	// If we wanted to be a bit simpler we could call os.RemoveAll to remove the dir + children
+	err = cleanAllDownloads()
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
 	}
 
 	return cb, nil
