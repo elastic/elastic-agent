@@ -840,9 +840,9 @@ func saveIronbank() error {
 	fmt.Println(">> saveIronbank: save the IronBank container context.")
 
 	ironbank := getIronbankContextName()
-	buildDir := filepath.Join(ironbank)
+	buildDir := filepath.Join("build", ironbank)
 	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
-		return fmt.Errorf("cannot find the folder with the ironbank context")
+		return fmt.Errorf("cannot find the folder with the ironbank context: %+v", err)
 	}
 
 	distributionsDir := "build/distributions"
@@ -852,12 +852,21 @@ func saveIronbank() error {
 			return fmt.Errorf("cannot create folder for docker artifacts: %+v", err)
 		}
 	}
-	tarGzFile := filepath.Join(distributionsDir, ironbank+".tar.gz")
+
+	// change dir to the buildDir location where the ironbank folder exists
+	// this will generate a tar.gz without some nested folders.
+	wd, _ := os.Getwd()
+	os.Chdir(buildDir)
+	defer os.Chdir(wd)
+
+	// move the folder to the parent folder, there are two parent folder since
+	// buildDir contains a two folders dir.
+	tarGzFile := filepath.Join("..", "..", distributionsDir, ironbank+".tar.gz")
 
 	// Save the build context as tar.gz artifact
-	err := devtools.Tar(buildDir, tarGzFile)
+	err := devtools.Tar("./", tarGzFile)
 	if err != nil {
-		return fmt.Errorf("cannot compress the tar.gz file")
+		return fmt.Errorf("cannot compress the tar.gz file: %+v", err)
 	}
 
 	return errors.Wrap(devtools.CreateSHA512File(tarGzFile), "failed to create .sha512 file")
@@ -875,7 +884,7 @@ func getIronbankContextName() string {
 
 func prepareIronbankBuild() error {
 	fmt.Println(">> prepareIronbankBuild: prepare the IronBank container context.")
-	ironbank := getIronbankContextName()
+	buildDir := filepath.Join("build", getIronbankContextName())
 	templatesDir := filepath.Join("dev-tools", "packaging", "templates", "ironbank")
 
 	data := map[string]interface{}{
@@ -885,7 +894,7 @@ func prepareIronbankBuild() error {
 	err := filepath.Walk(templatesDir, func(path string, info os.FileInfo, _ error) error {
 		if !info.IsDir() {
 			target := strings.TrimSuffix(
-				filepath.Join(ironbank, filepath.Base(path)),
+				filepath.Join(buildDir, filepath.Base(path)),
 				".tmpl",
 			)
 
@@ -903,7 +912,7 @@ func prepareIronbankBuild() error {
 
 	// copy files
 	sourcePath := filepath.Join("dev-tools", "packaging", "files", "ironbank")
-	if err := devtools.Copy(sourcePath, ironbank); err != nil {
+	if err := devtools.Copy(sourcePath, buildDir); err != nil {
 		return fmt.Errorf("cannot create files for the IronBank: %+v", err)
 	}
 	return nil
