@@ -25,8 +25,9 @@ func TestGenerateServiceData(t *testing.T) {
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo":       "bar",
-				"with-dash": "dash-value",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
 				"baz": "ban",
@@ -65,8 +66,9 @@ func TestGenerateServiceData(t *testing.T) {
 			"baz": "ban",
 		},
 		"labels": mapstr.M{
-			"foo":       "bar",
-			"with-dash": "dash-value",
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 	}
 
@@ -82,8 +84,9 @@ func TestGenerateServiceData(t *testing.T) {
 				"ip":   "1.2.3.4",
 			},
 			"labels": mapstr.M{
-				"foo":       "bar",
-				"with-dash": "dash-value",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			"annotations": mapstr.M{
 				"baz": "ban",
@@ -142,8 +145,9 @@ func (s *svcMeta) GenerateK8s(obj kubernetes.Resource, opts ...metadata.FieldOpt
 			"ip":   "1.2.3.4",
 		},
 		"labels": mapstr.M{
-			"foo":       "bar",
-			"with-dash": "dash-value",
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 		"annotations": mapstr.M{
 			"baz": "ban",
