@@ -7,30 +7,34 @@ package dispatcher
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"reflect"
 	"strings"
 
 	"go.elastic.co/apm"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type actionHandlers map[string]actions.Handler
 
+// Dispatcher processes actions coming from fleet api.
+type Dispatcher interface {
+	Dispatch(context.Context, acker.Acker, ...fleetapi.Action) error
+}
+
 // ActionDispatcher processes actions coming from fleet using registered set of handlers.
 type ActionDispatcher struct {
-	ctx      context.Context
 	log      *logger.Logger
 	handlers actionHandlers
 	def      actions.Handler
 }
 
 // New creates a new action dispatcher.
-func New(ctx context.Context, log *logger.Logger, def actions.Handler) (*ActionDispatcher, error) {
+func New(log *logger.Logger, def actions.Handler) (*ActionDispatcher, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("action_dispatcher", false)
@@ -44,7 +48,6 @@ func New(ctx context.Context, log *logger.Logger, def actions.Handler) (*ActionD
 	}
 
 	return &ActionDispatcher{
-		ctx:      ctx,
 		log:      log,
 		handlers: make(actionHandlers),
 		def:      def,
@@ -76,20 +79,12 @@ func (ad *ActionDispatcher) key(a fleetapi.Action) string {
 }
 
 // Dispatch dispatches an action using pre-registered set of handlers.
-// ctx is used here ONLY to carry the span, for cancelation use the cancel
-// function of the ActionDispatcher.ctx.
-func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker, actions ...fleetapi.Action) (err error) {
+func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, actions ...fleetapi.Action) (err error) {
 	span, ctx := apm.StartSpan(ctx, "dispatch", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
-
-	// Creating a child context that carries both the ad.ctx cancelation and
-	// the span from ctx.
-	ctx, cancel := context.WithCancel(ad.ctx)
-	defer cancel()
-	ctx = apm.ContextWithSpan(ctx, span)
 
 	if len(actions) == 0 {
 		ad.log.Debug("No action to dispatch")
@@ -103,11 +98,11 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 	)
 
 	for _, action := range actions {
-		if err := ad.ctx.Err(); err != nil {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		if err := ad.dispatchAction(action, acker); err != nil {
+		if err := ad.dispatchAction(ctx, action, acker); err != nil {
 			ad.log.Debugf("Failed to dispatch action '%+v', error: %+v", action, err)
 			return err
 		}
@@ -117,13 +112,13 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 	return acker.Commit(ctx)
 }
 
-func (ad *ActionDispatcher) dispatchAction(a fleetapi.Action, acker store.FleetAcker) error {
+func (ad *ActionDispatcher) dispatchAction(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	handler, found := ad.handlers[(ad.key(a))]
 	if !found {
-		return ad.def.Handle(ad.ctx, a, acker)
+		return ad.def.Handle(ctx, a, acker)
 	}
 
-	return handler.Handle(ad.ctx, a, acker)
+	return handler.Handle(ctx, a, acker)
 }
 
 func detectTypes(actions []fleetapi.Action) []string {

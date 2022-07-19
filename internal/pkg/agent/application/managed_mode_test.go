@@ -7,6 +7,8 @@ package application
 import (
 	"context"
 	"encoding/json"
+	handlers2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"testing"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -17,8 +19,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/actions/handlers"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
@@ -50,13 +50,13 @@ func TestManagedModeRouting(t *testing.T) {
 	emit, err := emitter.New(ctx, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
 	require.NoError(t, err)
 
-	actionDispatcher, err := dispatcher.New(ctx, log, handlers.NewDefault(log))
+	actionDispatcher, err := dispatcher.New(ctx, log, handlers2.NewDefault(log))
 	require.NoError(t, err)
 
 	cfg := configuration.DefaultConfiguration()
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionPolicyChange{},
-		handlers.NewPolicyChange(
+		handlers2.NewPolicyChange(
 			log,
 			emit,
 			agentInfo,

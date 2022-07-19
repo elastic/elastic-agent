@@ -48,6 +48,12 @@ var (
 	ErrNoUnit = errors.New("no unit under control of this manager")
 )
 
+// ComponentComponentState provides a structure to map a component to current component state.
+type ComponentComponentState struct {
+	Component component.Component
+	State     ComponentState
+}
+
 // Manager for the entire runtime of operating components.
 type Manager struct {
 	proto.UnimplementedElasticAgentServer
@@ -67,8 +73,13 @@ type Manager struct {
 	mx      sync.RWMutex
 	current map[string]*componentRuntimeState
 
-	subMx         sync.RWMutex
-	subscriptions map[string][]*Subscription
+	subMx            sync.RWMutex
+	subscriptions    map[string][]*Subscription
+	subAllMx         sync.RWMutex
+	subscribeAll     []*SubscriptionAll
+	subscribeAllInit chan *SubscriptionAll
+
+	errCh chan error
 
 	shuttingDown atomic.Bool
 }
@@ -87,6 +98,7 @@ func NewManager(logger *logger.Logger, listenAddr string, tracer *apm.Tracer) (*
 		waitReady:     make(map[string]waitForReady),
 		current:       make(map[string]*componentRuntimeState),
 		subscriptions: make(map[string][]*Subscription),
+		errCh:         make(chan error),
 	}
 	return m, nil
 }
@@ -215,6 +227,11 @@ func (m *Manager) WaitForReady(ctx context.Context) error {
 	}
 }
 
+// Errors returns channel that errors are reported on.
+func (m *Manager) Errors() <-chan error {
+	return m.errCh
+}
+
 // Update updates the currComp state of the running components.
 //
 // This returns as soon as possible, work is performed in the background to
@@ -227,6 +244,22 @@ func (m *Manager) Update(components []component.Component) error {
 	// teardown is true because the public `Update` method would be coming directly from
 	// policy so if a component was removed it needs to be torn down.
 	return m.update(components, true)
+}
+
+// State returns the current component states.
+func (m *Manager) State() []ComponentComponentState {
+	m.mx.RLock()
+	defer m.mx.RUnlock()
+	states := make([]ComponentComponentState, 0, len(m.current))
+	for _, crs := range m.current {
+		crs.latestMx.RLock()
+		states = append(states, ComponentComponentState{
+			Component: crs.currComp,
+			State:     crs.latestState.Copy(),
+		})
+		crs.latestMx.RUnlock()
+	}
+	return states
 }
 
 // PerformAction executes an action on a unit.
@@ -290,11 +323,11 @@ func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name s
 // Subscribe to changes in a component.
 //
 // Allows a component without that ID to exists. Once a component starts matching that ID then changes will start to
-// be provided over the channel.
+// be provided over the channel. Cancelling the context results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Manager to block.
-func (m *Manager) Subscribe(componentID string) *Subscription {
-	sub := newSubscription(m)
+func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscription {
+	sub := newSubscription(ctx, m)
 
 	// add latestState to channel
 	m.mx.RLock()
@@ -302,14 +335,88 @@ func (m *Manager) Subscribe(componentID string) *Subscription {
 	m.mx.RUnlock()
 	if ok {
 		comp.latestMx.RLock()
-		sub.ch <- comp.latestState
+		latestState := comp.latestState.Copy()
 		comp.latestMx.RUnlock()
+		go func() {
+			select {
+			case <-ctx.Done():
+			case sub.ch <- latestState:
+			}
+		}()
 	}
 
 	// add subscription for future changes
 	m.subMx.Lock()
 	m.subscriptions[componentID] = append(m.subscriptions[componentID], sub)
-	defer m.subMx.Unlock()
+	m.subMx.Unlock()
+
+	go func() {
+		<-ctx.Done()
+
+		// unsubscribe
+		m.subMx.Lock()
+		defer m.subMx.Unlock()
+		for key, subs := range m.subscriptions {
+			for i, s := range subs {
+				if sub == s {
+					m.subscriptions[key] = append(m.subscriptions[key][:i], m.subscriptions[key][i+1:]...)
+					return
+				}
+			}
+		}
+	}()
+
+	return sub
+}
+
+// SubscribeAll subscribes to all changes in all components.
+//
+// This provides the current state for existing components at the time of first subscription. Cancelling the context
+// results in the subscription being unsubscribed.
+//
+// Note: Not reading from a subscription channel will cause the Manager to block.
+func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
+	sub := newSubscriptionAll(ctx, m)
+
+	// add latest states
+	m.mx.RLock()
+	latest := make([]ComponentComponentState, 0, len(m.current))
+	for _, comp := range m.current {
+		comp.latestMx.RLock()
+		latest = append(latest, ComponentComponentState{Component: comp.currComp, State: comp.latestState.Copy()})
+		comp.latestMx.RUnlock()
+	}
+	m.mx.RUnlock()
+	if len(latest) > 0 {
+		go func() {
+			for _, l := range latest {
+				select {
+				case <-ctx.Done():
+					return
+				case sub.ch <- l:
+				}
+			}
+		}()
+	}
+
+	// add subscription for future changes
+	m.subAllMx.Lock()
+	m.subscribeAll = append(m.subscribeAll, sub)
+	m.subAllMx.Unlock()
+
+	go func() {
+		<-ctx.Done()
+
+		// unsubscribe
+		m.subAllMx.Lock()
+		defer m.subAllMx.Unlock()
+		for i, s := range m.subscribeAll {
+			if sub == s {
+				m.subscribeAll = append(m.subscribeAll[:i], m.subscribeAll[i+1:]...)
+				return
+			}
+		}
+	}()
 
 	return sub
 }
@@ -470,11 +577,26 @@ func (m *Manager) shutdown() {
 }
 
 func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentState) {
+	m.subAllMx.RLock()
+	for _, sub := range m.subscribeAll {
+		select {
+		case <-sub.ctx.Done():
+		case sub.ch <- ComponentComponentState{
+			Component: state.currComp,
+			State:     latest,
+		}:
+		}
+	}
+	m.subAllMx.RUnlock()
+
 	m.subMx.RLock()
 	subs, ok := m.subscriptions[state.currComp.ID]
 	if ok {
 		for _, sub := range subs {
-			sub.ch <- latest
+			select {
+			case <-sub.ctx.Done():
+			case sub.ch <- latest:
+			}
 		}
 	}
 	m.subMx.RUnlock()
@@ -487,19 +609,6 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 		m.mx.Unlock()
 
 		state.destroy()
-	}
-}
-
-func (m *Manager) unsubscribe(subscription *Subscription) {
-	m.subMx.Lock()
-	defer m.subMx.Unlock()
-	for key, subs := range m.subscriptions {
-		for i, sub := range subs {
-			if subscription == sub {
-				m.subscriptions[key] = append(m.subscriptions[key][:i], m.subscriptions[key][i+1:]...)
-				return
-			}
-		}
 	}
 }
 

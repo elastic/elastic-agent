@@ -7,6 +7,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -17,11 +18,12 @@ type once struct {
 	log      *logger.Logger
 	discover discoverFunc
 	loader   *config.Loader
-	ch       chan *config.Config
+	ch       chan coordinator.ConfigChange
+	errCh    chan error
 }
 
 func newOnce(log *logger.Logger, discover discoverFunc, loader *config.Loader) *once {
-	return &once{log: log, discover: discover, loader: loader, ch: make(chan *config.Config)}
+	return &once{log: log, discover: discover, loader: loader, ch: make(chan coordinator.ConfigChange), errCh: make(chan error)}
 }
 
 func (o *once) Run(ctx context.Context) error {
@@ -38,12 +40,16 @@ func (o *once) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	o.ch <- cfg
+	o.ch <- &localConfigChange{cfg}
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func (o *once) Watch() <-chan *config.Config {
+func (o *once) Errors() <-chan error {
+	return o.errCh
+}
+
+func (o *once) Watch() <-chan coordinator.ConfigChange {
 	return o.ch
 }
 

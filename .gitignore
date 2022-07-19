@@ -21,6 +21,8 @@ go_env.properties
 mage_output_file.go
 elastic_agent
 fleet.yml
+fleet.enc
+fleet.enc.lock
 
 # Editor swap files
 *.swp

@@ -15,24 +15,38 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 )
 
-// Status is the status of the Elastic Agent
-type Status = cproto.Status
+// UnitType is the type of the unit
+type UnitType = cproto.UnitType
+
+// State is the state codes
+type State = cproto.State
+
+const (
+	// UnitTypeInput is an input unit.
+	UnitTypeInput UnitType = cproto.UnitType_INPUT
+	// UnitTypeOutput is an output unit.
+	UnitTypeOutput UnitType = cproto.UnitType_OUTPUT
+)
 
 const (
 	// Starting is when the it is still starting.
-	Starting Status = cproto.Status_STARTING
+	Starting State = cproto.State_STARTING
 	// Configuring is when it is configuring.
-	Configuring Status = cproto.Status_CONFIGURING
+	Configuring State = cproto.State_CONFIGURING
 	// Healthy is when it is healthy.
-	Healthy Status = cproto.Status_HEALTHY
+	Healthy State = cproto.State_HEALTHY
 	// Degraded is when it is degraded.
-	Degraded Status = cproto.Status_DEGRADED
+	Degraded State = cproto.State_DEGRADED
 	// Failed is when it is failed.
-	Failed Status = cproto.Status_FAILED
+	Failed State = cproto.State_FAILED
 	// Stopping is when it is stopping.
-	Stopping Status = cproto.Status_STOPPING
+	Stopping State = cproto.State_STOPPING
+	// Stopped is when it is stopped.
+	Stopped State = cproto.State_STOPPED
 	// Upgrading is when it is upgrading.
-	Upgrading Status = cproto.Status_UPGRADING
+	Upgrading State = cproto.State_UPGRADING
+	// Rollback is when it is upgrading is rolling back.
+	Rollback State = cproto.State_ROLLBACK
 )
 
 // Version is the current running version of the daemon.
@@ -43,14 +57,29 @@ type Version struct {
 	Snapshot  bool
 }
 
-// ApplicationStatus is a status of an application managed by the Elastic Agent.
-// TODO(Anderson): Implement sort.Interface and sort it.
-type ApplicationStatus struct {
-	ID      string
-	Name    string
-	Status  Status
-	Message string
-	Payload map[string]interface{}
+// ComponentUnitState is a state of a unit running inside a component.
+type ComponentUnitState struct {
+	UnitID   string                 `json:"unit_id" yaml:"unit_id"`
+	UnitType UnitType               `json:"unit_type" yaml:"unit_type"`
+	State    State                  `json:"state" yaml:"state"`
+	Message  string                 `json:"message" yaml:"message"`
+	Payload  map[string]interface{} `json:"payload,omitempty" yaml:"payload,omitempty"`
+}
+
+// ComponentState is a state of a component managed by the Elastic Agent.
+type ComponentState struct {
+	ID      string               `json:"id" yaml:"id"`
+	Name    string               `json:"name" yaml:"name"`
+	State   State                `json:"state" yaml:"state"`
+	Message string               `json:"message" yaml:"message"`
+	Units   []ComponentUnitState `json:"units" yaml:"units"`
+}
+
+// AgentState is the current state of the Elastic Agent.
+type AgentState struct {
+	State      State            `json:"state" yaml:"state"`
+	Message    string           `json:"message" yaml:"message"`
+	Components []ComponentState `json:"components" yaml:"components"`
 }
 
 // ProcMeta is the running version and ID information for a running process.
@@ -80,13 +109,6 @@ type ProcPProf struct {
 	Error    string
 }
 
-// AgentStatus is the current status of the Elastic Agent.
-type AgentStatus struct {
-	Status       Status
-	Message      string
-	Applications []*ApplicationStatus
-}
-
 // Client communicates to Elastic Agent through the control protocol.
 type Client interface {
 	// Connect connects to the running Elastic Agent.
@@ -95,8 +117,8 @@ type Client interface {
 	Disconnect()
 	// Version returns the current version of the running agent.
 	Version(ctx context.Context) (Version, error)
-	// Status returns the current status of the running agent.
-	Status(ctx context.Context) (*AgentStatus, error)
+	// State returns the current state of the running agent.
+	State(ctx context.Context) (*AgentState, error)
 	// Restart triggers restarting the current running daemon.
 	Restart(ctx context.Context) error
 	// Upgrade triggers upgrade of the current running daemon.
@@ -161,32 +183,42 @@ func (c *client) Version(ctx context.Context) (Version, error) {
 	}, nil
 }
 
-// Status returns the current status of the running agent.
-func (c *client) Status(ctx context.Context) (*AgentStatus, error) {
-	res, err := c.client.Status(ctx, &cproto.Empty{})
+// State returns the current state of the running agent.
+func (c *client) State(ctx context.Context) (*AgentState, error) {
+	res, err := c.client.State(ctx, &cproto.Empty{})
 	if err != nil {
 		return nil, err
 	}
-	s := &AgentStatus{
-		Status:       res.Status,
-		Message:      res.Message,
-		Applications: make([]*ApplicationStatus, len(res.Applications)),
+	s := &AgentState{
+		State:      res.State,
+		Message:    res.Message,
+		Components: make([]ComponentState, 0, len(res.Components)),
 	}
-	for i, appRes := range res.Applications {
-		var payload map[string]interface{}
-		if appRes.Payload != "" {
-			err := json.Unmarshal([]byte(appRes.Payload), &payload)
-			if err != nil {
-				return nil, err
+	for _, comp := range res.Components {
+		units := make([]ComponentUnitState, 0, len(comp.Units))
+		for _, unit := range comp.Units {
+			var payload map[string]interface{}
+			if unit.Payload != "" {
+				err := json.Unmarshal([]byte(unit.Payload), &payload)
+				if err != nil {
+					return nil, err
+				}
 			}
+			units = append(units, ComponentUnitState{
+				UnitID:   unit.UnitId,
+				UnitType: unit.UnitType,
+				State:    unit.State,
+				Message:  unit.Message,
+				Payload:  payload,
+			})
 		}
-		s.Applications[i] = &ApplicationStatus{
-			ID:      appRes.Id,
-			Name:    appRes.Name,
-			Status:  appRes.Status,
-			Message: appRes.Message,
-			Payload: payload,
-		}
+		s.Components = append(s.Components, ComponentState{
+			ID:      comp.Id,
+			Name:    comp.Name,
+			State:   comp.State,
+			Message: comp.Message,
+			Units:   units,
+		})
 	}
 	return s, nil
 }

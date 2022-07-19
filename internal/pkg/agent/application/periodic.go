@@ -6,6 +6,7 @@ package application
 
 import (
 	"context"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"strings"
 	"time"
 
@@ -21,7 +22,8 @@ type periodic struct {
 	watcher  *filewatcher.Watch
 	loader   *config.Loader
 	discover discoverFunc
-	ch       chan *config.Config
+	ch       chan coordinator.ConfigChange
+	errCh    chan error
 }
 
 func (p *periodic) Run(ctx context.Context) error {
@@ -44,7 +46,11 @@ func (p *periodic) Run(ctx context.Context) error {
 	}
 }
 
-func (p *periodic) Watch() <-chan *config.Config {
+func (p *periodic) Errors() <-chan error {
+	return p.errCh
+}
+
+func (p *periodic) Watch() <-chan coordinator.ConfigChange {
 	return p.ch
 }
 
@@ -97,7 +103,7 @@ func (p *periodic) work() error {
 			p.watcher.Invalidate()
 			return err
 		}
-		p.ch <- cfg
+		p.ch <- &localConfigChange{cfg}
 		return nil
 	}
 
@@ -124,6 +130,24 @@ func newPeriodic(
 		watcher:  w,
 		discover: discover,
 		loader:   loader,
-		ch:       make(chan *config.Config),
+		ch:       make(chan coordinator.ConfigChange),
+		errCh:    make(chan error),
 	}
+}
+
+type localConfigChange struct {
+	cfg *config.Config
+}
+
+func (l *localConfigChange) Config() *config.Config {
+	return l.cfg
+}
+
+func (l *localConfigChange) Ack() error {
+	// do nothing
+	return nil
+}
+
+func (l *localConfigChange) Fail(_ error) {
+	// do nothing
 }

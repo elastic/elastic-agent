@@ -16,9 +16,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
@@ -29,7 +26,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/go-sysinfo"
@@ -102,7 +98,7 @@ func printMapStringConfig(mapStr map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l, status.NewController(l))
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
 	if err != nil {
 		return err
 	}
@@ -279,7 +275,7 @@ func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 		configModifiers.Filters = append(configModifiers.Filters, modifiers.InjectFleet(cfg, sysInfo.Info(), agentInfo))
 	}
 
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, status.NewController(log))
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
 		return nil, err
 	}
@@ -377,6 +373,10 @@ func newWaitForCompose(wrapped composable.Controller) *waitForCompose {
 func (w *waitForCompose) Run(ctx context.Context) error {
 	err := w.controller.Run(ctx)
 	return err
+}
+
+func (w *waitForCompose) Errors() <-chan error {
+	return nil
 }
 
 func (w *waitForCompose) Watch() <-chan []*transpiler.Vars {

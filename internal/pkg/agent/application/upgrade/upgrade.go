@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,8 +26,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -47,40 +46,16 @@ var (
 	}
 )
 
+var (
+	// ErrSameVersion error is returned when the upgrade results in the same installed version.
+	ErrSameVersion = errors.New("upgrade did not occur because its the same version")
+)
+
 // Upgrader performs an upgrade
 type Upgrader struct {
-	agentInfo   *info.AgentInfo
-	settings    *artifact.Config
 	log         *logger.Logger
-	closers     []context.CancelFunc
-	reexec      reexecManager
-	acker       acker
-	reporter    stateReporter
+	settings    *artifact.Config
 	upgradeable bool
-	caps        capabilities.Capability
-}
-
-// Action is the upgrade action state.
-type Action interface {
-	// Version to upgrade to.
-	Version() string
-	// SourceURI for download.
-	SourceURI() string
-	// FleetAction is the action from fleet that started the action (optional).
-	FleetAction() *fleetapi.ActionUpgrade
-}
-
-type reexecManager interface {
-	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
-}
-
-type acker interface {
-	Ack(ctx context.Context, action fleetapi.Action) error
-	Commit(ctx context.Context) error
-}
-
-type stateReporter interface {
-	OnStateChange(id string, name string, s state.State)
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -91,17 +66,11 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(agentInfo *info.AgentInfo, settings *artifact.Config, log *logger.Logger, closers []context.CancelFunc, reexec reexecManager, a acker, r stateReporter, caps capabilities.Capability) *Upgrader {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config) *Upgrader {
 	return &Upgrader{
-		agentInfo:   agentInfo,
-		settings:    settings,
 		log:         log,
-		closers:     closers,
-		reexec:      reexec,
-		acker:       a,
-		reporter:    r,
+		settings:    settings,
 		upgradeable: IsUpgradeable(),
-		caps:        caps,
 	}
 }
 
@@ -112,40 +81,17 @@ func (u *Upgrader) Upgradeable() bool {
 
 // Upgrade upgrades running agent, function returns shutdown callback if some needs to be executed for cases when
 // reexec is called by caller.
-func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error) {
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
-	// report failed
-	defer func() {
-		if err != nil {
-			if action := a.FleetAction(); action != nil {
-				u.reportFailure(ctx, action, err)
-			}
-			apm.CaptureError(ctx, err).Send()
-		}
-	}()
 
-	if !u.upgradeable {
-		return nil, fmt.Errorf(
-			"cannot be upgraded; must be installed with install sub-command and " +
-				"running under control of the systems supervisor")
-	}
-
-	if u.caps != nil {
-		if _, err := u.caps.Apply(a); errors.Is(err, capabilities.ErrBlocked) {
-			return nil, nil
-		}
-	}
-
-	u.reportUpdating(a.Version())
-
-	sourceURI := u.sourceURI(a.SourceURI())
-	archivePath, err := u.downloadArtifact(ctx, a.Version(), sourceURI)
+	sourceURI = u.sourceURI(sourceURI)
+	archivePath, err := u.downloadArtifact(ctx, version, sourceURI)
 	if err != nil {
 		return nil, err
 	}
 
-	newHash, err := u.unpack(ctx, a.Version(), archivePath)
+	newHash, err := u.unpack(ctx, version, archivePath)
 	if err != nil {
 		return nil, err
 	}
@@ -155,13 +101,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	}
 
 	if strings.HasPrefix(release.Commit(), newHash) {
-		// not an error
-		if action := a.FleetAction(); action != nil {
-			//nolint:errcheck // keeping the same behavior, and making linter happy
-			u.ackAction(ctx, action)
-		}
-		u.log.Warn("upgrading to same version")
-		return nil, nil
+		return nil, ErrSameVersion
 	}
 
 	// Copy vault directory for linux/windows only
@@ -182,7 +122,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, newHash, a); err != nil {
+	if err := u.markUpgrade(ctx, newHash, action); err != nil {
 		rollbackInstall(ctx, newHash)
 		return nil, err
 	}
@@ -192,17 +132,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		return nil, errors.New("failed to invoke rollback watcher", err)
 	}
 
-	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), release.TrimCommit(newHash))
-	if reexecNow {
-		u.reexec.ReExec(cb)
-		return nil, nil
-	}
-
+	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))
 	return cb, nil
 }
 
 // Ack acks last upgrade action
-func (u *Upgrader) Ack(ctx context.Context) error {
+func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	// get upgrade action
 	marker, err := LoadMarker()
 	if err != nil {
@@ -216,7 +151,11 @@ func (u *Upgrader) Ack(ctx context.Context) error {
 		return nil
 	}
 
-	if err := u.ackAction(ctx, marker.Action); err != nil {
+	if err := acker.Ack(ctx, marker.Action); err != nil {
+		return err
+	}
+
+	if err := acker.Commit(ctx); err != nil {
 		return err
 	}
 
@@ -229,50 +168,6 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	}
 
 	return u.settings.SourceURI
-}
-
-// ackAction is used for successful updates, it was either updated successfully or to the same version
-// so we need to remove updating state and get prevent from receiving same update action again.
-func (u *Upgrader) ackAction(ctx context.Context, action fleetapi.Action) error {
-	if err := u.acker.Ack(ctx, action); err != nil {
-		return err
-	}
-
-	if err := u.acker.Commit(ctx); err != nil {
-		return err
-	}
-
-	u.reporter.OnStateChange(
-		"",
-		agentName,
-		state.State{Status: state.Healthy},
-	)
-
-	return nil
-}
-
-// report failure is used when update process fails. action is acked so it won't be received again
-// and state is changed to FAILED
-func (u *Upgrader) reportFailure(ctx context.Context, action fleetapi.Action, err error) {
-	// ack action
-	_ = u.acker.Ack(ctx, action)
-
-	// report failure
-	u.reporter.OnStateChange(
-		"",
-		agentName,
-		state.State{Status: state.Failed, Message: err.Error()},
-	)
-}
-
-// reportUpdating sets state of agent to updating.
-func (u *Upgrader) reportUpdating(version string) {
-	// report failure
-	u.reporter.OnStateChange(
-		"",
-		agentName,
-		state.State{Status: state.Updating, Message: fmt.Sprintf("Update to version '%s' started", version)},
-	)
 }
 
 func rollbackInstall(ctx context.Context, hash string) {

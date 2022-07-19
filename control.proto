@@ -9,16 +9,23 @@ package cproto;
 option cc_enable_arenas = true;
 option go_package = "internal/pkg/agent/control/cproto";
 
-// Status codes for the current state.
-enum Status {
+// State codes for the current state.
+enum State {
   STARTING = 0;
   CONFIGURING = 1;
   HEALTHY = 2;
   DEGRADED = 3;
   FAILED = 4;
   STOPPING = 5;
-  UPGRADING = 6;
-  ROLLBACK = 7;
+  STOPPED = 6;
+  UPGRADING = 7;
+  ROLLBACK = 8;
+}
+
+// Unit Type running inside a component.
+enum UnitType {
+  INPUT = 0;
+  OUTPUT = 1;
 }
 
 // Action status codes for restart and upgrade response.
@@ -93,18 +100,43 @@ message UpgradeResponse {
   string error = 3;
 }
 
-// Current status of the application in Elastic Agent.
-message ApplicationStatus {
-  // Unique application ID.
-  string id = 1;
-  // Application name.
-  string name = 2;
-  // Current status.
-  Status status = 3;
-  // Current status message.
+message ComponentUnitState {
+  // Type of unit in the component.
+  UnitType unit_type = 1;
+  // ID of the unit in the component.
+  string unit_id = 2;
+  // Current state.
+  State state = 3;
+  // Current state message.
   string message = 4;
-  // Current status payload.
+  // Current state payload.
   string payload = 5;
+}
+
+// Version information reported by the component to Elastic Agent.
+message ComponentVersionInfo {
+  // Name of the component.
+  string name = 1;
+  // Version of the component.
+  string version = 2;
+  // Extra meta information about the version.
+  map<string, string> meta = 3;
+}
+
+// Current state of a running component by Elastic Agent.
+message ComponentState {
+  // Unique component ID.
+  string id = 1;
+  // Component name.
+  string name = 2;
+  // Current state.
+  State state = 3;
+  // Current state message.
+  string message = 4;
+  // Current units running in the component.
+  repeated ComponentUnitState units = 5;
+  // Current version information for the running component.
+  ComponentVersionInfo version_info = 6;
 }
 
 // Current metadata for a running process.
@@ -126,14 +158,14 @@ message ProcMeta {
   string error = 15;
 }
 
-// Status is the current status of Elastic Agent.
-message StatusResponse {
-  // Overall status of Elastic Agent.
-  Status status = 1;
+// StateResponse is the current state of Elastic Agent.
+message StateResponse {
+  // Overall state of Elastic Agent.
+  State state = 1;
   // Overall status message of Elastic Agent.
   string message = 2;
-  // Status of each application in Elastic Agent.
-  repeated ApplicationStatus applications = 3;
+  // Status of each component in Elastic Agent.
+  repeated ComponentState components = 3;
 }
 
 // ProcMetaResponse is the current running version infomation for all processes.
@@ -184,8 +216,8 @@ service ElasticAgentControl {
   // Fetches the currently running version of the Elastic Agent.
   rpc Version(Empty) returns (VersionResponse);
 
-  // Fetches the currently status of the Elastic Agent.
-  rpc Status(Empty) returns (StatusResponse);
+  // Fetches the currently states of the Elastic Agent.
+  rpc State(Empty) returns (StateResponse);
 
   // Restart restarts the current running Elastic Agent.
   rpc Restart(Empty) returns (RestartResponse);

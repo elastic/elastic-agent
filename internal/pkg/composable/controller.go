@@ -29,6 +29,9 @@ type Controller interface {
 	// Cancelling the context stops the controller.
 	Run(ctx context.Context) error
 
+	// Errors returns the channel to watch for reported errors.
+	Errors() <-chan error
+
 	// Watch returns the channel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
 }
@@ -37,6 +40,7 @@ type Controller interface {
 type controller struct {
 	logger           *logger.Logger
 	ch               chan []*transpiler.Vars
+	errCh            chan error
 	contextProviders map[string]*contextProviderState
 	dynamicProviders map[string]*dynamicProviderState
 }
@@ -91,6 +95,7 @@ func New(log *logger.Logger, c *config.Config) (Controller, error) {
 	return &controller{
 		logger:           l,
 		ch:               make(chan []*transpiler.Vars),
+		errCh:            make(chan error),
 		contextProviders: contextProviders,
 		dynamicProviders: dynamicProviders,
 	}, nil
@@ -188,6 +193,11 @@ func (c *controller) Run(ctx context.Context) error {
 
 		c.ch <- vars
 	}
+}
+
+// Errors returns the channel to watch for reported errors.
+func (c *controller) Errors() <-chan error {
+	return c.errCh
 }
 
 // Watch returns the channel for variable changes.

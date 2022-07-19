@@ -19,11 +19,7 @@ import (
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/api"
-	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
-	"github.com/elastic/elastic-agent-system-metrics/report"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -37,13 +33,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	monitoringServer "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/server"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -151,8 +143,6 @@ func run(override cfgOverrider, modifiers ...application.PlatformModifier) error
 	rexLogger := logger.Named("reexec")
 	rex := reexec.NewManager(rexLogger, execPath)
 
-	statusCtrl := status.NewController(logger)
-
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
 	if err != nil {
 		return fmt.Errorf("could not initiate APM tracer: %w", err)
@@ -167,28 +157,27 @@ func run(override cfgOverrider, modifiers ...application.PlatformModifier) error
 		logger.Info("APM instrumentation disabled")
 	}
 
-	control := server.New(logger.Named("control"), rex, statusCtrl, nil, tracer)
+	app, err := application.New(logger, agentInfo, rex, tracer, modifiers...)
+	if err != nil {
+		return err
+	}
+
+	control := server.New(logger.Named("control"), cfg.Settings.MonitoringConfig, app, tracer)
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err
 	}
 	defer control.Stop()
 
-	app, err := application.New(logger, rex, statusCtrl, control, agentInfo, tracer, modifiers...)
-	if err != nil {
-		return err
-	}
-
-	control.SetRouteFn(app.Routes)
-	control.SetMonitoringCfg(cfg.Settings.MonitoringConfig)
-
-	serverStopFn, err := setupMetrics(agentInfo, logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, app, tracer)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = serverStopFn()
-	}()
+	/*
+		serverStopFn, err := setupMetrics(agentInfo, logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, app, tracer)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = serverStopFn()
+		}()
+	*/
 
 	appDone := make(chan bool)
 	appErrCh := make(chan error)
@@ -340,6 +329,7 @@ func defaultLogLevel(cfg *configuration.Configuration) string {
 	return defaultLogLevel
 }
 
+/*
 func setupMetrics(
 	_ *info.AgentInfo,
 	logger *logger.Logger,
@@ -376,6 +366,7 @@ func setupMetrics(
 func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringHTTPConfig) bool {
 	return cfg != nil && cfg.Enabled
 }
+*/
 
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
 	enrollPath := paths.AgentEnrollFile()

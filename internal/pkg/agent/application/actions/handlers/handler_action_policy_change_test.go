@@ -6,6 +6,7 @@ package handlers
 
 import (
 	"context"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"sync"
 	"testing"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,24 +23,14 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type mockEmitter struct {
-	err    error
-	policy *config.Config
-}
-
-func (m *mockEmitter) Emitter(_ context.Context, policy *config.Config) error {
-	m.policy = policy
-	return m.err
-}
-
 func TestPolicyChange(t *testing.T) {
 	log, _ := logger.New("", false)
-	ack := noopacker.NewAcker()
+	ack := noopacker.New()
 	agentInfo, _ := info.NewAgentInfo(true)
 	nullStore := &storage.NullStore{}
 
 	t.Run("Receive a config change and successfully emits a raw configuration", func(t *testing.T) {
-		emitter := &mockEmitter{}
+		ch := make(chan coordinator.ConfigChange, 1)
 
 		conf := map[string]interface{}{"hello": "world"}
 		action := &fleetapi.ActionPolicyChange{
@@ -50,41 +40,13 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := &PolicyChange{
-			log:       log,
-			emitter:   emitter.Emitter,
-			agentInfo: agentInfo,
-			config:    cfg,
-			store:     nullStore,
-		}
+		handler := NewPolicyChange(log, agentInfo, cfg, nullStore, ch)
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
-		require.Equal(t, config.MustNewConfigFrom(conf), emitter.policy)
-	})
 
-	t.Run("Receive a config and fail to emits a raw configuration", func(t *testing.T) {
-		mockErr := errors.New("error returned")
-		emitter := &mockEmitter{err: mockErr}
-
-		conf := map[string]interface{}{"hello": "world"}
-		action := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123",
-			ActionType: "POLICY_CHANGE",
-			Policy:     conf,
-		}
-
-		cfg := configuration.DefaultConfiguration()
-		handler := &PolicyChange{
-			log:       log,
-			emitter:   emitter.Emitter,
-			agentInfo: agentInfo,
-			config:    cfg,
-			store:     nullStore,
-		}
-
-		err := handler.Handle(context.Background(), action, ack)
-		require.Error(t, err)
+		change := <-ch
+		require.Equal(t, config.MustNewConfigFrom(conf), change.Config())
 	})
 }
 
@@ -93,40 +55,9 @@ func TestPolicyAcked(t *testing.T) {
 	agentInfo, _ := info.NewAgentInfo(true)
 	nullStore := &storage.NullStore{}
 
-	t.Run("Config change should not ACK on error", func(t *testing.T) {
-		tacker := &testAcker{}
-
-		mockErr := errors.New("error returned")
-		emitter := &mockEmitter{err: mockErr}
-
-		config := map[string]interface{}{"hello": "world"}
-		actionID := "abc123"
-		action := &fleetapi.ActionPolicyChange{
-			ActionID:   actionID,
-			ActionType: "POLICY_CHANGE",
-			Policy:     config,
-		}
-
-		cfg := configuration.DefaultConfiguration()
-		handler := &PolicyChange{
-			log:       log,
-			emitter:   emitter.Emitter,
-			agentInfo: agentInfo,
-			config:    cfg,
-			store:     nullStore,
-		}
-
-		err := handler.Handle(context.Background(), action, tacker)
-		require.Error(t, err)
-
-		actions := tacker.Items()
-		assert.EqualValues(t, 0, len(actions))
-	})
-
 	t.Run("Config change should ACK", func(t *testing.T) {
+		ch := make(chan coordinator.ConfigChange, 1)
 		tacker := &testAcker{}
-
-		emitter := &mockEmitter{}
 
 		config := map[string]interface{}{"hello": "world"}
 		actionID := "abc123"
@@ -137,16 +68,13 @@ func TestPolicyAcked(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := &PolicyChange{
-			log:       log,
-			emitter:   emitter.Emitter,
-			agentInfo: agentInfo,
-			config:    cfg,
-			store:     nullStore,
-		}
+		handler := NewPolicyChange(log, agentInfo, cfg, nullStore, ch)
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)
+
+		change := <-ch
+		require.NoError(t, change.Ack())
 
 		actions := tacker.Items()
 		assert.EqualValues(t, 1, len(actions))

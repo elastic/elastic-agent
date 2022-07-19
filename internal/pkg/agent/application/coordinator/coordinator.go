@@ -4,19 +4,51 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"go.elastic.co/apm"
 )
 
-// Runner provides interface to run a manager.
+var (
+	// ErrNotUpgradable error is returned when upgrade cannot be performed.
+	ErrNotUpgradable = errors.New(
+		"cannot be upgraded; must be installed with install sub-command and " +
+			"running under control of the systems supervisor")
+)
+
+// ReExecManager provides an interface to perform re-execution of the entire agent.
+type ReExecManager interface {
+	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
+}
+
+// UpgradeManager provides an interface to perform the upgrade action for the agent.
+type UpgradeManager interface {
+	// Upgradeable returns true if can be upgraded.
+	Upgradeable() bool
+
+	// Upgrade upgrades running agent.
+	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error)
+}
+
+// Runner provides interface to run a manager and receive running errors.
 type Runner interface {
 	// Run runs the manager.
 	Run(context.Context) error
+
+	// Errors returns the channel to listen to errors on.
+	//
+	// A manager should send a nil error to clear its previous error when it should no longer report as an error.
+	Errors() <-chan error
 }
 
 // RuntimeManager provides an interface to run and update the runtime.
@@ -25,6 +57,33 @@ type RuntimeManager interface {
 
 	// Update updates the current components model.
 	Update([]component.Component) error
+
+	// State returns the current components model state.
+	State() []runtime.ComponentComponentState
+
+	// PerformAction executes an action on a unit.
+	PerformAction(ctx context.Context, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
+
+	// SubscribeAll provides an interface to watch for changes in all components.
+	SubscribeAll(context.Context) *runtime.SubscriptionAll
+}
+
+// ConfigChange provides an interface for receiving a new configuration.
+//
+// Ack must be called if the configuration change was accepted and Fail should be called if it fails to be accepted.
+type ConfigChange interface {
+	// Config returns the configuration for this change.
+	Config() *config.Config
+
+	// Ack marks the configuration change as accepted.
+	Ack() error
+
+	// Fail marks the configuration change as failed.
+	Fail(err error)
+}
+
+// ErrorReporter provides an interface for any manager that is handled by the coordinator to report errors.
+type ErrorReporter interface {
 }
 
 // ConfigManager provides an interface to run and watch for configuration changes.
@@ -32,7 +91,7 @@ type ConfigManager interface {
 	Runner
 
 	// Watch returns the chanel to watch for configuration changes.
-	Watch() <-chan *config.Config
+	Watch() <-chan ConfigChange
 }
 
 // VarsManager provides an interface to run and watch for variable changes.
@@ -47,15 +106,36 @@ type VarsManager interface {
 // passing it into the components runtime manager.
 type ComponentsModifier func(comps []component.Component) ([]component.Component, error)
 
-// Coordinator manages the intersection between configuration change and updated variables.
+// State provides the current state of the coordinator along with all the current states of components and units.
+type State struct {
+	State      agentclient.State
+	Message    string
+	Components []runtime.ComponentComponentState
+}
+
+// StateFetcher provides an interface to fetch the current state of the coordinator.
+type StateFetcher interface {
+	// State returns the current state of the coordinator.
+	State() State
+}
+
+// Coordinator manages the entire state of the Elastic Agent.
+//
+// All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
 type Coordinator struct {
 	logger *logger.Logger
 
 	specs component.RuntimeSpecs
 
-	runtime RuntimeManager
-	config  ConfigManager
-	vars    VarsManager
+	reexecMgr  ReExecManager
+	upgradeMgr UpgradeManager
+
+	runtimeMgr    RuntimeManager
+	runtimeMgrErr error
+	configMgr     ConfigManager
+	configMgrErr  error
+	varsMgr       VarsManager
+	varsMgrErr    error
 
 	caps      capabilities.Capability
 	modifiers []ComponentsModifier
@@ -64,26 +144,160 @@ type Coordinator struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, specs component.RuntimeSpecs, runtime RuntimeManager, config ConfigManager, vars VarsManager, caps capabilities.Capability, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, modifiers ...ComponentsModifier) *Coordinator {
 	return &Coordinator{
-		logger:    logger,
-		specs:     specs,
-		runtime:   runtime,
-		config:    config,
-		vars:      vars,
-		caps:      caps,
-		modifiers: modifiers,
+		logger:     logger,
+		specs:      specs,
+		reexecMgr:  reexecMgr,
+		upgradeMgr: upgradeMgr,
+		runtimeMgr: runtimeMgr,
+		configMgr:  configMgr,
+		varsMgr:    varsMgr,
+		caps:       caps,
+		modifiers:  modifiers,
+		state: coordinatorState{
+			state: agentclient.Starting,
+		},
 	}
+}
+
+// State returns the current state for the coordinator.
+func (c *Coordinator) State() (s State) {
+	s.State = c.state.state
+	s.Message = c.state.message
+	s.Components = c.runtimeMgr.State()
+	if c.state.overrideState != nil {
+		// state has been overridden due to an action that is occurring
+		s.State = c.state.overrideState.state
+		s.Message = c.state.overrideState.message
+	} else if s.State == agentclient.Healthy {
+		// if any of the managers are reporting an error then something is wrong
+		// or
+		// coordinator overall is reported is healthy; in the case any component or unit is not healthy then we report
+		// as degraded because we are not fully healthy
+		if c.runtimeMgrErr != nil {
+			s.State = agentclient.Failed
+			s.Message = c.runtimeMgrErr.Error()
+		} else if c.configMgrErr != nil {
+			s.State = agentclient.Failed
+			s.Message = c.configMgrErr.Error()
+		} else if c.varsMgrErr != nil {
+			s.State = agentclient.Failed
+			s.Message = c.varsMgrErr.Error()
+		} else if hasState(s.Components, client.UnitStateFailed) {
+			s.State = agentclient.Degraded
+			s.Message = "1 or more components/units in a failed state"
+		} else if hasState(s.Components, client.UnitStateDegraded) {
+			s.State = agentclient.Degraded
+			s.Message = "1 or more components/units in a degraded state"
+		}
+	}
+	return s
+}
+
+// ReExec performs the re-execution.
+func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string) {
+	// override the overall state to stopping until the re-execution is complete
+	c.state.overrideState = &coordinatorOverrideState{
+		state:   agentclient.Stopping,
+		message: "Re-executing",
+	}
+	c.reexecMgr.ReExec(callback, argOverrides...)
+}
+
+// Upgrade runs the upgrade process.
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) error {
+	// early check outside of upgrader before overridding the state
+	if c.upgradeMgr.Upgradeable() {
+		return ErrNotUpgradable
+	}
+
+	// early check capabilities to ensure this upgrade actions is allowed
+	if c.caps != nil {
+		if _, err := c.caps.Apply(map[string]interface{}{
+			"version":   version,
+			"sourceURI": sourceURI,
+		}); errors.Is(err, capabilities.ErrBlocked) {
+			return ErrNotUpgradable
+		}
+	}
+
+	// override the overall state to upgrading until the re-execution is complete
+	c.state.overrideState = &coordinatorOverrideState{
+		state:   agentclient.Upgrading,
+		message: fmt.Sprintf("Upgrading to version %s", version),
+	}
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action)
+	if err != nil {
+		c.state.overrideState = nil
+		return err
+	}
+	c.ReExec(cb)
+	return nil
+}
+
+// PerformAction executes an action on a unit.
+func (c *Coordinator) PerformAction(ctx context.Context, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	return c.runtimeMgr.PerformAction(ctx, unit, name, params)
 }
 
 // Run runs the coordinator.
 //
 // The RuntimeManager, ConfigManager and VarsManager that is passed into NewCoordinator are also ran and lifecycle controlled by the Run.
+//
+// In the case that either of the above managers fail, they will all be restarted unless the context was explicitly cancelled or timed out.
 func (c *Coordinator) Run(ctx context.Context) error {
+	// log all changes in the state of the runtime
+	go func() {
+		state := make(map[string]coordinatorComponentLogState)
+
+		sub := c.runtimeMgr.SubscribeAll(ctx)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case s := <-sub.Ch():
+				logState := newCoordinatorComponentLogState(&s)
+				_, ok := state[s.Component.ID]
+				if !ok {
+					c.logger.With("component", logState).Info("New component created")
+				} else {
+					c.logger.With("component", logState).Info("Existing component state changed")
+				}
+				state[s.Component.ID] = logState
+				if s.State.State == client.UnitStateStopped {
+					delete(state, s.Component.ID)
+				}
+			}
+		}
+	}()
+
+	for {
+		c.state.state = agentclient.Starting
+		c.state.message = "Waiting for initial configuration and composable variables"
+		err := c.runner(ctx)
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				c.state.state = agentclient.Stopped
+				c.state.message = "Requested to be stopped"
+				// do not restart
+				return err
+			}
+		}
+		c.state.state = agentclient.Failed
+		c.state.message = fmt.Sprintf("Coordinator failed and will be restarted: %s", err)
+		c.logger.Errorf("coordinator failed and will be restarted: %s", err)
+	}
+}
+
+// runner performs the actual work of running all the managers
+//
+// if one of the managers fails the others are also stopped and then the whole runner returns
+func (c *Coordinator) runner(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	runtimeWatcher := c.runtime
+	runtimeWatcher := c.runtimeMgr
 	runtimeRun := make(chan bool)
 	runtimeErrCh := make(chan error)
 	go func(manager Runner) {
@@ -92,7 +306,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		runtimeErrCh <- err
 	}(runtimeWatcher)
 
-	configWatcher := c.config
+	configWatcher := c.configMgr
 	configRun := make(chan bool)
 	configErrCh := make(chan error)
 	go func(manager Runner) {
@@ -101,7 +315,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		configErrCh <- err
 	}(configWatcher)
 
-	varsWatcher := c.vars
+	varsWatcher := c.varsMgr
 	varsRun := make(chan bool)
 	varsErrCh := make(chan error)
 	go func(manager Runner) {
@@ -114,14 +328,17 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			runtimeErr := <-runtimeErrCh
+			c.runtimeMgrErr = runtimeErr
+			configErr := <-configErrCh
+			c.configMgrErr = configErr
+			varsErr := <-varsErrCh
+			c.varsMgrErr = varsErr
 			if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
 				return runtimeErr
 			}
-			configErr := <-configErrCh
 			if configErr != nil && !errors.Is(configErr, context.Canceled) {
 				return configErr
 			}
-			varsErr := <-varsErrCh
 			if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
 				return varsErr
 			}
@@ -138,15 +355,33 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			if ctx.Err() == nil {
 				cancel()
 			}
-		case cfg := <-configWatcher.Watch():
+		case runtimeErr := <-c.runtimeMgr.Errors():
+			c.runtimeMgrErr = runtimeErr
+		case configErr := <-c.configMgr.Errors():
+			c.configMgrErr = configErr
+		case varsErr := <-c.varsMgr.Errors():
+			c.varsMgrErr = varsErr
+		case change := <-configWatcher.Watch():
 			if ctx.Err() == nil {
-				if err := c.processConfig(ctx, cfg); err != nil {
+				if err := c.processConfig(ctx, change.Config()); err != nil {
+					c.state.state = agentclient.Failed
+					c.state.message = err.Error()
 					c.logger.Errorf("%s", err)
+					change.Fail(err)
+				} else {
+					if err := change.Ack(); err != nil {
+						err = fmt.Errorf("failed to ack configuration change: %w", err)
+						c.state.state = agentclient.Failed
+						c.state.message = err.Error()
+						c.logger.Errorf("%s", err)
+					}
 				}
 			}
 		case vars := <-varsWatcher.Watch():
 			if ctx.Err() == nil {
 				if err := c.processVars(ctx, vars); err != nil {
+					c.state.state = agentclient.Failed
+					c.state.message = err.Error()
 					c.logger.Errorf("%s", err)
 				}
 			}
@@ -250,12 +485,102 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 
 	c.logger.Info("Updating running component model")
 	c.logger.With("components", comps).Debug("Updating running component model")
-	return c.runtime.Update(comps)
+	err = c.runtimeMgr.Update(comps)
+	if err != nil {
+		return err
+	}
+	c.state.state = agentclient.Healthy
+	c.state.message = "Running"
+	return nil
 }
 
 type coordinatorState struct {
+	state         agentclient.State
+	message       string
+	overrideState *coordinatorOverrideState
+
 	config     *config.Config
 	ast        *transpiler.AST
 	vars       []*transpiler.Vars
 	components []component.Component
+}
+
+type coordinatorOverrideState struct {
+	state   agentclient.State
+	message string
+}
+
+type coordinatorComponentLogState struct {
+	ID      string                             `json:"id"`
+	State   string                             `json:"state"`
+	Message string                             `json:"message"`
+	Inputs  []coordinatorComponentUnitLogState `json:"inputs"`
+	Output  coordinatorComponentUnitLogState   `json:"output,omitempty"`
+}
+
+type coordinatorComponentUnitLogState struct {
+	ID      string `json:"id"`
+	State   string `json:"state"`
+	Message string `json:"message"`
+}
+
+func newCoordinatorComponentLogState(state *runtime.ComponentComponentState) coordinatorComponentLogState {
+	var output coordinatorComponentUnitLogState
+	inputs := make([]coordinatorComponentUnitLogState, 0, len(state.State.Units))
+	for key, unit := range state.State.Units {
+		if key.UnitType == client.UnitTypeInput {
+			inputs = append(inputs, coordinatorComponentUnitLogState{
+				ID:      key.UnitID,
+				State:   newCoordinatorComponentStateStr(unit.State),
+				Message: unit.Message,
+			})
+		} else {
+			output = coordinatorComponentUnitLogState{
+				ID:      key.UnitID,
+				State:   newCoordinatorComponentStateStr(unit.State),
+				Message: unit.Message,
+			}
+		}
+	}
+	return coordinatorComponentLogState{
+		ID:      state.Component.ID,
+		State:   newCoordinatorComponentStateStr(state.State.State),
+		Message: state.State.Message,
+		Inputs:  inputs,
+		Output:  output,
+	}
+}
+
+func newCoordinatorComponentStateStr(state client.UnitState) string {
+	switch state {
+	case client.UnitStateStarting:
+		return "Starting"
+	case client.UnitStateConfiguring:
+		return "Configuring"
+	case client.UnitStateDegraded:
+		return "Degraded"
+	case client.UnitStateHealthy:
+		return "Healthy"
+	case client.UnitStateFailed:
+		return "Failed"
+	case client.UnitStateStopping:
+		return "Stopping"
+	case client.UnitStateStopped:
+		return "Stopped"
+	}
+	return "Unknown"
+}
+
+func hasState(components []runtime.ComponentComponentState, state client.UnitState) bool {
+	for _, comp := range components {
+		if comp.State.State == state {
+			return true
+		}
+		for _, unit := range comp.State.Units {
+			if unit.State == state {
+				return true
+			}
+		}
+	}
+	return false
 }

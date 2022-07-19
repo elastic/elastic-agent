@@ -6,8 +6,8 @@ package handlers
 
 import (
 	"context"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -25,7 +25,7 @@ func NewUnknown(log *logger.Logger) *Unknown {
 }
 
 // Handle handles unknown actions, no action is taken.
-func (h *Unknown) Handle(_ context.Context, a fleetapi.Action, acker store.FleetAcker) error {
+func (h *Unknown) Handle(_ context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Errorf("HandlerUnknown: action '%+v' received", a)
 	return nil
 }

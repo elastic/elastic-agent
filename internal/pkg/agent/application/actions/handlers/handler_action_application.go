@@ -7,13 +7,15 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 const (
@@ -25,27 +27,28 @@ var errActionTimeoutInvalid = errors.New("action timeout is invalid")
 
 // AppAction is a handler for application actions.
 type AppAction struct {
-	log *logger.Logger
-	srv *server.Server
+	log   *logger.Logger
+	coord *coordinator.Coordinator
 }
 
 // NewAppAction creates a new AppAction handler.
-func NewAppAction(log *logger.Logger, srv *server.Server) *AppAction {
+func NewAppAction(log *logger.Logger, coord *coordinator.Coordinator) *AppAction {
 	return &AppAction{
-		log: log,
-		srv: srv,
+		log:   log,
+		coord: coord,
 	}
 }
 
 // Handle handles application action.
-func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker store.FleetAcker) error {
+func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerAppAction: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionApp)
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionApp and received %T", a)
 	}
 
-	appState, ok := h.srv.FindByInputType(action.InputType)
+	state := h.coord.State()
+	unit, ok := findUnitFromInputType(state, action.InputType)
 	if !ok {
 		// If the matching action is not found ack the action with the error for action result document
 		action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
@@ -71,8 +74,10 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker store.F
 
 	var res map[string]interface{}
 	if err == nil {
-		h.log.Debugf("handlerAppAction: action '%v' started with timeout: %v", action.InputType, timeout)
-		res, err = appState.PerformAction(action.InputType, params, timeout)
+		h.log.Debugf("handlerAppAction: action '%v' started with timeout: %v", action.ActionType, timeout)
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		res, err = h.coord.PerformAction(ctx, unit, action.ActionType, params)
 	}
 	end := time.Now().UTC()
 
@@ -142,4 +147,18 @@ func readMapString(m map[string]interface{}, key string, def string) string {
 		}
 	}
 	return def
+}
+
+func findUnitFromInputType(state coordinator.State, inputType string) (component.Unit, bool) {
+	for _, comp := range state.Components {
+		for _, unit := range comp.Component.Units {
+			if unit.Type == client.UnitTypeInput {
+				it, ok := unit.Config["type"]
+				if ok && it == inputType {
+					return unit, true
+				}
+			}
+		}
+	}
+	return component.Unit{}, false
 }

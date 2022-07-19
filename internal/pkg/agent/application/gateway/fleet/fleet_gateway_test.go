@@ -8,12 +8,13 @@ package fleet
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -22,15 +23,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
-	repo "github.com/elastic/elastic-agent/internal/pkg/reporter"
-	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
-	fleetreporterConfig "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet/config"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -45,9 +44,9 @@ type testingClient struct {
 
 func (t *testingClient) Send(
 	_ context.Context,
-	method string,
-	path string,
-	params url.Values,
+	_ string,
+	_ string,
+	_ url.Values,
 	headers http.Header,
 	body io.Reader,
 ) (*http.Response, error) {
@@ -80,7 +79,7 @@ type testingDispatcher struct {
 	received chan struct{}
 }
 
-func (t *testingDispatcher) Dispatch(_ context.Context, acker store.FleetAcker, actions ...fleetapi.Action) error {
+func (t *testingDispatcher) Dispatch(_ context.Context, acker acker.Acker, actions ...fleetapi.Action) error {
 	t.Lock()
 	defer t.Unlock()
 	defer func() { t.received <- struct{}{} }()
@@ -135,7 +134,7 @@ func (m *mockQueue) Actions() []fleetapi.Action {
 	return args.Get(0).([]fleetapi.Action)
 }
 
-type withGatewayFunc func(*testing.T, gateway.FleetGateway, *testingClient, *testingDispatcher, *scheduler.Stepper, repo.Backend)
+type withGatewayFunc func(*testing.T, gateway.FleetGateway, *testingClient, *testingDispatcher, *scheduler.Stepper)
 
 func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
@@ -144,37 +143,29 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 		dispatcher := newTestingDispatcher()
 
 		log, _ := logger.New("fleet_gateway", false)
-		rep := getReporter(agentInfo, log, t)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		diskStore := storage.NewDiskStore(paths.AgentStateStoreFile())
-		stateStore, err := store.NewStateStore(log, diskStore)
-		require.NoError(t, err)
+		stateStore := newStateStore(t, log)
 
 		queue := &mockQueue{}
 		queue.On("DequeueActions").Return([]fleetapi.Action{})
 		queue.On("Actions").Return([]fleetapi.Action{})
 
 		gateway, err := newFleetGatewayWithScheduler(
-			ctx,
 			log,
 			settings,
 			agentInfo,
 			client,
 			dispatcher,
 			scheduler,
-			rep,
-			noopacker.NewAcker(),
-			&noopController{},
+			noop.New(),
+			&emptyStateFetcher{},
 			stateStore,
 			queue,
 		)
 
 		require.NoError(t, err)
 
-		fn(t, gateway, client, dispatcher, scheduler, rep)
+		fn(t, gateway, client, dispatcher, scheduler)
 	}
 }
 
@@ -212,8 +203,10 @@ func TestFleetGateway(t *testing.T) {
 		client *testingClient,
 		dispatcher *testingDispatcher,
 		scheduler *scheduler.Stepper,
-		rep repo.Backend,
 	) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		waitFn := ackSeq(
 			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
@@ -224,12 +217,16 @@ func TestFleetGateway(t *testing.T) {
 				return nil
 			}),
 		)
-		err := gateway.Start()
-		require.NoError(t, err)
+
+		errCh := runFleetGateway(ctx, gateway)
 
 		// Synchronize scheduler and acking of calls from the worker go routine.
 		scheduler.Next()
 		waitFn()
+
+		cancel()
+		err := <-errCh
+		require.NoError(t, err)
 	}))
 
 	t.Run("Successfully connects and receives a series of actions", withGateway(agentInfo, settings, func(
@@ -238,8 +235,10 @@ func TestFleetGateway(t *testing.T) {
 		client *testingClient,
 		dispatcher *testingDispatcher,
 		scheduler *scheduler.Stepper,
-		rep repo.Backend,
 	) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		waitFn := ackSeq(
 			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
 				// TODO: assert no events
@@ -269,11 +268,15 @@ func TestFleetGateway(t *testing.T) {
 				return nil
 			}),
 		)
-		err := gateway.Start()
-		require.NoError(t, err)
+
+		errCh := runFleetGateway(ctx, gateway)
 
 		scheduler.Next()
 		waitFn()
+
+		cancel()
+		err := <-errCh
+		require.NoError(t, err)
 	}))
 
 	// Test the normal time based execution.
@@ -286,30 +289,24 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		log, _ := logger.New("tst", false)
-
-		diskStore := storage.NewDiskStore(paths.AgentStateStoreFile())
-		stateStore, err := store.NewStateStore(log, diskStore)
-		require.NoError(t, err)
+		stateStore := newStateStore(t, log)
 
 		queue := &mockQueue{}
 		queue.On("DequeueActions").Return([]fleetapi.Action{})
 		queue.On("Actions").Return([]fleetapi.Action{})
 
 		gateway, err := newFleetGatewayWithScheduler(
-			ctx,
 			log,
 			settings,
 			agentInfo,
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
-			noopacker.NewAcker(),
-			&noopController{},
+			noop.New(),
+			&emptyStateFetcher{},
 			stateStore,
 			queue,
 		)
-
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -323,8 +320,7 @@ func TestFleetGateway(t *testing.T) {
 			}),
 		)
 
-		err = gateway.Start()
-		require.NoError(t, err)
+		errCh := runFleetGateway(ctx, gateway)
 
 		var count int
 		for {
@@ -334,6 +330,10 @@ func TestFleetGateway(t *testing.T) {
 				return
 			}
 		}
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
 	})
 
 	t.Run("queue action from checkin", func(t *testing.T) {
@@ -345,10 +345,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		log, _ := logger.New("tst", false)
-
-		diskStore := storage.NewDiskStore(paths.AgentStateStoreFile())
-		stateStore, err := store.NewStateStore(log, diskStore)
-		require.NoError(t, err)
+		stateStore := newStateStore(t, log)
 
 		ts := time.Now().UTC().Round(time.Second)
 		queue := &mockQueue{}
@@ -357,20 +354,17 @@ func TestFleetGateway(t *testing.T) {
 		queue.On("Actions").Return([]fleetapi.Action{})
 
 		gateway, err := newFleetGatewayWithScheduler(
-			ctx,
 			log,
 			settings,
 			agentInfo,
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
-			noopacker.NewAcker(),
-			&noopController{},
+			noop.New(),
+			&emptyStateFetcher{},
 			stateStore,
 			queue,
 		)
-
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -395,12 +389,15 @@ func TestFleetGateway(t *testing.T) {
 			}),
 		)
 
-		err = gateway.Start()
-		require.NoError(t, err)
+		errCh := runFleetGateway(ctx, gateway)
 
 		scheduler.Next()
 		waitFn()
 		queue.AssertExpectations(t)
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
 	})
 
 	t.Run("run action from queue", func(t *testing.T) {
@@ -412,10 +409,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		log, _ := logger.New("tst", false)
-
-		diskStore := storage.NewDiskStore(paths.AgentStateStoreFile())
-		stateStore, err := store.NewStateStore(log, diskStore)
-		require.NoError(t, err)
+		stateStore := newStateStore(t, log)
 
 		ts := time.Now().UTC().Round(time.Second)
 		queue := &mockQueue{}
@@ -423,20 +417,17 @@ func TestFleetGateway(t *testing.T) {
 		queue.On("Actions").Return([]fleetapi.Action{})
 
 		gateway, err := newFleetGatewayWithScheduler(
-			ctx,
 			log,
 			settings,
 			agentInfo,
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
-			noopacker.NewAcker(),
-			&noopController{},
+			noop.New(),
+			&emptyStateFetcher{},
 			stateStore,
 			queue,
 		)
-
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -450,12 +441,15 @@ func TestFleetGateway(t *testing.T) {
 			}),
 		)
 
-		err = gateway.Start()
-		require.NoError(t, err)
+		errCh := runFleetGateway(ctx, gateway)
 
 		scheduler.Next()
 		waitFn()
 		queue.AssertExpectations(t)
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
 	})
 
 	t.Run("discard expired action from queue", func(t *testing.T) {
@@ -467,10 +461,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		log, _ := logger.New("tst", false)
-
-		diskStore := storage.NewDiskStore(paths.AgentStateStoreFile())
-		stateStore, err := store.NewStateStore(log, diskStore)
-		require.NoError(t, err)
+		stateStore := newStateStore(t, log)
 
 		ts := time.Now().UTC().Round(time.Second)
 		queue := &mockQueue{}
@@ -478,20 +469,17 @@ func TestFleetGateway(t *testing.T) {
 		queue.On("Actions").Return([]fleetapi.Action{})
 
 		gateway, err := newFleetGatewayWithScheduler(
-			ctx,
 			log,
 			settings,
 			agentInfo,
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
-			noopacker.NewAcker(),
-			&noopController{},
+			noop.New(),
+			&emptyStateFetcher{},
 			stateStore,
 			queue,
 		)
-
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -505,12 +493,15 @@ func TestFleetGateway(t *testing.T) {
 			}),
 		)
 
-		err = gateway.Start()
-		require.NoError(t, err)
+		errCh := runFleetGateway(ctx, gateway)
 
 		scheduler.Next()
 		waitFn()
 		queue.AssertExpectations(t)
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
 	})
 
 	t.Run("cancel action from checkin", func(t *testing.T) {
@@ -522,10 +513,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		log, _ := logger.New("tst", false)
-
-		diskStore := storage.NewDiskStore(paths.AgentStateStoreFile())
-		stateStore, err := store.NewStateStore(log, diskStore)
-		require.NoError(t, err)
+		stateStore := newStateStore(t, log)
 
 		ts := time.Now().UTC().Round(time.Second)
 		queue := &mockQueue{}
@@ -535,20 +523,17 @@ func TestFleetGateway(t *testing.T) {
 		// queue.Cancel does not need to be mocked here as it is ran in the cancel action dispatcher.
 
 		gateway, err := newFleetGatewayWithScheduler(
-			ctx,
 			log,
 			settings,
 			agentInfo,
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
-			noopacker.NewAcker(),
-			&noopController{},
+			noop.New(),
+			&emptyStateFetcher{},
 			stateStore,
 			queue,
 		)
-
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -578,52 +563,16 @@ func TestFleetGateway(t *testing.T) {
 			}),
 		)
 
-		err = gateway.Start()
-		require.NoError(t, err)
+		errCh := runFleetGateway(ctx, gateway)
 
 		scheduler.Next()
 		waitFn()
 		queue.AssertExpectations(t)
-	})
 
-	t.Run("send event and receive no action", withGateway(agentInfo, settings, func(
-		t *testing.T,
-		gateway gateway.FleetGateway,
-		client *testingClient,
-		dispatcher *testingDispatcher,
-		scheduler *scheduler.Stepper,
-		rep repo.Backend,
-	) {
-		_ = rep.Report(context.Background(), &testStateEvent{})
-		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
-				cr := &request{}
-				content, err := ioutil.ReadAll(body)
-				if err != nil {
-					t.Fatal(err)
-				}
-				err = json.Unmarshal(content, &cr)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				require.Equal(t, 1, len(cr.Events))
-
-				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
-				return resp, nil
-			}),
-			dispatcher.Answer(func(actions ...fleetapi.Action) error {
-				require.Equal(t, 0, len(actions))
-				return nil
-			}),
-		)
-		err := gateway.Start()
+		cancel()
+		err = <-errCh
 		require.NoError(t, err)
-
-		// Synchronize scheduler and acking of calls from the worker go routine.
-		scheduler.Next()
-		waitFn()
-	}))
+	})
 
 	t.Run("Test the wait loop is interruptible", func(t *testing.T) {
 		// 20mins is the double of the base timeout values for golang test suites.
@@ -634,18 +583,15 @@ func TestFleetGateway(t *testing.T) {
 		dispatcher := newTestingDispatcher()
 
 		ctx, cancel := context.WithCancel(context.Background())
-		log, _ := logger.New("tst", false)
 
-		diskStore := storage.NewDiskStore(paths.AgentStateStoreFile())
-		stateStore, err := store.NewStateStore(log, diskStore)
-		require.NoError(t, err)
+		log, _ := logger.New("tst", false)
+		stateStore := newStateStore(t, log)
 
 		queue := &mockQueue{}
 		queue.On("DequeueActions").Return([]fleetapi.Action{})
 		queue.On("Actions").Return([]fleetapi.Action{})
 
 		gateway, err := newFleetGatewayWithScheduler(
-			ctx,
 			log,
 			&fleetGatewaySettings{
 				Duration: d,
@@ -655,13 +601,11 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
-			noopacker.NewAcker(),
-			&noopController{},
+			noop.New(),
+			&emptyStateFetcher{},
 			stateStore,
 			queue,
 		)
-
 		require.NoError(t, err)
 
 		ch1 := dispatcher.Answer(func(actions ...fleetapi.Action) error { return nil })
@@ -670,8 +614,7 @@ func TestFleetGateway(t *testing.T) {
 			return resp, nil
 		})
 
-		err = gateway.Start()
-		require.NoError(t, err)
+		errCh := runFleetGateway(ctx, gateway)
 
 		// Silently dispatch action.
 		go func() {
@@ -694,6 +637,8 @@ func TestFleetGateway(t *testing.T) {
 		// 2. WaitTick() will block for 20 minutes.
 		// 3. Stop will should unblock the wait.
 		cancel()
+		err = <-errCh
+		require.NoError(t, err)
 	})
 
 }
@@ -712,16 +657,16 @@ func TestRetriesOnFailures(t *testing.T) {
 			client *testingClient,
 			dispatcher *testingDispatcher,
 			scheduler *scheduler.Stepper,
-			rep repo.Backend,
 		) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
 			}
 			clientWaitFn := client.Answer(fail)
-			err := gateway.Start()
-			require.NoError(t, err)
 
-			_ = rep.Report(context.Background(), &testStateEvent{})
+			errCh := runFleetGateway(ctx, gateway)
 
 			// Initial tick is done out of bound so we can block on channels.
 			scheduler.Next()
@@ -734,18 +679,6 @@ func TestRetriesOnFailures(t *testing.T) {
 			// API recover
 			waitFn := ackSeq(
 				client.Answer(func(_ http.Header, body io.Reader) (*http.Response, error) {
-					cr := &request{}
-					content, err := ioutil.ReadAll(body)
-					if err != nil {
-						t.Fatal(err)
-					}
-					err = json.Unmarshal(content, &cr)
-					if err != nil {
-						t.Fatal(err)
-					}
-
-					require.Equal(t, 1, len(cr.Events))
-
 					resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 					return resp, nil
 				}),
@@ -757,6 +690,10 @@ func TestRetriesOnFailures(t *testing.T) {
 			)
 
 			waitFn()
+
+			cancel()
+			err := <-errCh
+			require.NoError(t, err)
 		}))
 
 	t.Run("The retry loop is interruptible",
@@ -769,16 +706,16 @@ func TestRetriesOnFailures(t *testing.T) {
 			client *testingClient,
 			dispatcher *testingDispatcher,
 			scheduler *scheduler.Stepper,
-			rep repo.Backend,
 		) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
 			}
 			waitChan := client.Answer(fail)
-			err := gateway.Start()
-			require.NoError(t, err)
 
-			_ = rep.Report(context.Background(), &testStateEvent{})
+			errCh := runFleetGateway(ctx, gateway)
 
 			// Initial tick is done out of bound so we can block on channels.
 			scheduler.Next()
@@ -787,32 +724,59 @@ func TestRetriesOnFailures(t *testing.T) {
 			// delay.
 			<-waitChan
 
-			// non-obvious but withGateway on return will stop the gateway before returning and we should
-			// exit the retry loop. The init value of the backoff is set to exceed the test default timeout.
+			cancel()
+			err := <-errCh
+			require.NoError(t, err)
 		}))
-}
-
-func getReporter(info agentInfo, log *logger.Logger, t *testing.T) *fleetreporter.Reporter {
-	fleetR, err := fleetreporter.NewReporter(info, log, fleetreporterConfig.DefaultConfig())
-	if err != nil {
-		t.Fatal(errors.Wrap(err, "fail to create reporters"))
-	}
-
-	return fleetR
 }
 
 type testAgentInfo struct{}
 
 func (testAgentInfo) AgentID() string { return "agent-secret" }
 
-type testStateEvent struct{}
+type emptyStateFetcher struct{}
 
-func (testStateEvent) Type() string                    { return repo.EventTypeState }
-func (testStateEvent) SubType() string                 { return repo.EventSubTypeInProgress }
-func (testStateEvent) Time() time.Time                 { return time.Unix(0, 1) }
-func (testStateEvent) Message() string                 { return "hello" }
-func (testStateEvent) Payload() map[string]interface{} { return map[string]interface{}{"key": 1} }
+func (e *emptyStateFetcher) State() coordinator.State {
+	return coordinator.State{}
+}
 
-type request struct {
-	Events []interface{} `json:"events"`
+func runFleetGateway(ctx context.Context, g gateway.FleetGateway) <-chan error {
+	done := make(chan bool)
+	errCh := make(chan error, 1)
+	go func() {
+		err := g.Run(ctx)
+		close(done)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			errCh <- err
+		} else {
+			errCh <- nil
+		}
+	}()
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-g.Errors():
+				// ignore errors here
+			}
+		}
+	}()
+	return errCh
+}
+
+func newStateStore(t *testing.T, log *logger.Logger) *store.StateStore {
+	dir, err := ioutil.TempDir("", "fleet-gateway-unit-test")
+	require.NoError(t, err)
+
+	filename := filepath.Join(dir, "state.enc")
+	diskStore := storage.NewDiskStore(filename)
+	stateStore, err := store.NewStateStore(log, diskStore)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.RemoveAll(dir)
+	})
+
+	return stateStore
 }

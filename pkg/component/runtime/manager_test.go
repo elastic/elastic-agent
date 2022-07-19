@@ -70,8 +70,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe("error-default")
-		defer sub.Unsubscribe()
+		sub := m.Subscribe(subCtx, "error-default")
 		for {
 			select {
 			case <-subCtx.Done():
@@ -179,8 +178,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe("fake-default")
-		defer sub.Unsubscribe()
+		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
@@ -297,8 +295,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe("fake-default")
-		defer sub.Unsubscribe()
+		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
@@ -431,8 +428,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 	go func() {
 		unit1Stopped := false
 
-		sub := m.Subscribe("fake-default")
-		defer sub.Unsubscribe()
+		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
@@ -575,8 +571,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe("fake-default")
-		defer sub.Unsubscribe()
+		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
@@ -700,8 +695,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 	go func() {
 		killed := false
 
-		sub := m.Subscribe("fake-default")
-		defer sub.Unsubscribe()
+		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
@@ -849,8 +843,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	go func() {
 		wasDegraded := false
 
-		sub := m.Subscribe("fake-default")
-		defer sub.Unsubscribe()
+		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
@@ -956,8 +949,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe("fake-default")
-		defer sub.Unsubscribe()
+		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
@@ -1166,12 +1158,9 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	subErrCh1 := make(chan error)
 	subErrCh2 := make(chan error)
 	go func() {
-		sub0 := m.Subscribe("fake-0")
-		defer sub0.Unsubscribe()
-		sub1 := m.Subscribe("fake-1")
-		defer sub1.Unsubscribe()
-		sub2 := m.Subscribe("fake-2")
-		defer sub2.Unsubscribe()
+		sub0 := m.Subscribe(subCtx, "fake-0")
+		sub1 := m.Subscribe(subCtx, "fake-1")
+		sub2 := m.Subscribe(subCtx, "fake-2")
 		for {
 			select {
 			case <-subCtx.Done():

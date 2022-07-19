@@ -4,97 +4,49 @@
 
 package application
 
-/*
 import (
 	"context"
 	"fmt"
+	handlers2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"go.elastic.co/apm"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
-	localgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleetserver"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/actions/handlers"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/dispatcher"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/stream"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
-	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
-	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
-	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
-	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
-type stateStore interface {
-	Add(fleetapi.Action)
-	AckToken() string
-	SetAckToken(ackToken string)
-	Save() error
-	Actions() []fleetapi.Action
-	Queue() []fleetapi.Action
-}
-
-// Managed application, when the application is run in managed mode, most of the configuration are
-// coming from the Fleet App.
-type Managed struct {
-	log        *logger.Logger
-	Config     configuration.FleetAgentConfig
-	gateway    gateway.FleetGateway
-	stateStore stateStore
-	upgrader   *upgrade.Upgrader
-
+type managedConfigManager struct {
+	log         *logger.Logger
 	agentInfo   *info.AgentInfo
-	caps        capabilities.Capability
-	reexec      reexecManager
-	uc          upgraderControl
-	downloadCfg *artifact.Config
+	cfg         *configuration.Configuration
+	client      *remote.Client
+	store       storage.Store
+	stateStore  *store.StateStore
+	actionQueue *queue.ActionQueue
+	coord       *coordinator.Coordinator
 
-	runtime    coordinator.RuntimeManager
-	config     coordinator.ConfigManager
-	composable coordinator.VarsManager
-
-	coordinator *coordinator.Coordinator
+	ch    chan coordinator.ConfigChange
+	errCh chan error
 }
 
-func newManaged(
+func newManagedConfigManager(
 	log *logger.Logger,
-	specs component.RuntimeSpecs,
-	caps capabilities.Capability,
+	agentInfo *info.AgentInfo,
 	cfg *configuration.Configuration,
 	storeSaver storage.Store,
-	rawConfig *config.Config,
-	reexec reexecManager,
-	statusCtrl status.Controller,
-	agentInfo *info.AgentInfo,
-	tracer *apm.Tracer,
-) (*Managed, error) {
+) (*managedConfigManager, error) {
 	client, err := client.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
 		return nil, errors.New(err,
@@ -103,68 +55,179 @@ func newManaged(
 			errors.M(errors.MetaKeyURI, cfg.Fleet.Client.Host))
 	}
 
-	managedApplication := &Managed{
-		log:       log,
-		agentInfo: agentInfo,
-	}
-
-	managedApplication.runtime, err = runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
-	}
-	managedApplication.composable, err = composable.New(log, rawConfig)
-	if err != nil {
-		return nil, errors.New(err, "failed to initialize composable controller")
-	}
-
-	managedApplication.coordinator = coordinator.New(log, specs, managedApplication.runtime, managedApplication.config, managedApplication.composable, caps)
-
-	acker, err := fleet.NewAcker(log, agentInfo, client)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create ack retrier that is used by lazyAcker to enqueue/retry failed acks
-	retrier := retrier.New(acker, log)
-	// Run acking retrier. The lazy acker sends failed actions acks to retrier.
-	go retrier.Run(ctx)
-
-	batchedAcker := lazy.NewAcker(acker, log, lazy.WithRetrier(retrier))
-
 	// Create the state store that will persist the last good policy change on disk.
 	stateStore, err := store.NewStateStoreWithMigration(log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("fail to read action store '%s'", paths.AgentActionStoreFile()))
 	}
-	managedApplication.stateStore = stateStore
-	actionAcker := store.NewStateStoreActionAcker(batchedAcker, stateStore)
 
 	actionQueue, err := queue.NewActionQueue(stateStore.Queue())
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
 
-	actionDispatcher, err := dispatcher.New(managedApplication.bgContext, log, handlers.NewDefault(log))
+	return &managedConfigManager{
+		log:         log,
+		agentInfo:   agentInfo,
+		cfg:         cfg,
+		client:      client,
+		store:       storeSaver,
+		stateStore:  stateStore,
+		actionQueue: actionQueue,
+		ch:          make(chan coordinator.ConfigChange),
+		errCh:       make(chan error),
+	}, nil
+}
+
+func (m *managedConfigManager) Run(ctx context.Context) error {
+	// Check setup correctly in application (the actionDispatcher and coord must be set manually)
+	if m.coord == nil {
+		return errors.New("coord must be set before calling Run")
+	}
+
+	// Un-enrolled so we will not do anything.
+	if m.wasUnenrolled() {
+		m.log.Warnf("Elastic Agent was previously unenrolled. To reactivate please reconfigure or enroll again.")
+		return nil
+	}
+
+	// Reload ID because of win7 sync issue
+	if err := m.agentInfo.ReloadID(); err != nil {
+		return err
+	}
+
+	// Create context that is cancelled on unenroll.
+	gatewayCtx, gatewayCancel := context.WithCancel(ctx)
+	defer gatewayCancel()
+
+	// Create the actionDispatcher.
+	actionDispatcher, err := newManagedActionDispatcher(m, gatewayCancel)
+	if err != nil {
+		return err
+	}
+
+	// Create ackers to enqueue/retry failed acks
+	ack, err := fleet.NewAcker(m.log, m.agentInfo, m.client)
+	if err != nil {
+		return fmt.Errorf("failed to create acker: %w", err)
+	}
+	retrier := retrier.New(ack, m.log)
+	batchedAcker := lazy.NewAcker(ack, m.log, lazy.WithRetrier(retrier))
+	actionAcker := store.NewStateStoreActionAcker(batchedAcker, m.stateStore)
+
+	// Run the retrier.
+	retrierRun := make(chan bool)
+	retrierCtx, retrierCancel := context.WithCancel(ctx)
+	defer func() {
+		retrierCancel()
+		<-retrierRun
+	}()
+	go func() {
+		retrier.Run(retrierCtx)
+		close(retrierRun)
+	}()
+
+	actions := m.stateStore.Actions()
+	//stateRestored := false
+	if len(actions) > 0 && !m.wasUnenrolled() {
+		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
+		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
+		// But at the moment this is not possible because the policy change was acked.
+		if err := store.ReplayActions(ctx, m.log, actionDispatcher, actionAcker, actions...); err != nil {
+			m.log.Errorf("could not recover state, error %+v, skipping...", err)
+		}
+		//stateRestored = true
+	}
+
+	gateway, err := fleetgateway.New(
+		m.log,
+		m.agentInfo,
+		m.client,
+		actionDispatcher,
+		actionAcker,
+		m.coord,
+		m.stateStore,
+		m.actionQueue,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Proxy errors from the gateway to our own channel.
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case err := <-gateway.Errors():
+				m.errCh <- err
+			}
+		}
+	}()
+
+	// Run the gateway.
+	gatewayRun := make(chan bool)
+	gatewayErrCh := make(chan error)
+	defer func() {
+		gatewayCancel()
+		<-gatewayRun
+	}()
+	go func() {
+		err := gateway.Run(gatewayCtx)
+		close(gatewayRun)
+		gatewayErrCh <- err
+	}()
+
+	/*
+		gateway, err = localgateway.New(ctx, m.log, m.cfg.Fleet, rawConfig, gateway, emit, !stateRestored)
+		if err != nil {
+			return nil, err
+		}
+		// add the acker and gateway to setters, so the they can be updated
+		// when the hosts for Fleet Server are updated by the policy.
+		if cfg.Fleet.Server == nil {
+			// setters only set when not running a local Fleet Server
+			policyChanger.AddSetter(gateway)
+			policyChanger.AddSetter(acker)
+		}
+
+		managedApplication.gateway = gateway
+	*/
+
+	<-ctx.Done()
+	return <-gatewayErrCh
+}
+
+func (m *managedConfigManager) Errors() <-chan error {
+	return m.errCh
+}
+
+func (m *managedConfigManager) Watch() <-chan coordinator.ConfigChange {
+	return m.ch
+}
+
+func (m *managedConfigManager) wasUnenrolled() bool {
+	actions := m.stateStore.Actions()
+	for _, a := range actions {
+		if a.Type() == "UNENROLL" {
+			return true
+		}
+	}
+	return false
+}
+
+func newManagedActionDispatcher(m *managedConfigManager, canceller context.CancelFunc) (*dispatcher.ActionDispatcher, error) {
+	actionDispatcher, err := dispatcher.New(m.log, handlers2.NewDefault(m.log))
 	if err != nil {
 		return nil, err
 	}
 
-	managedApplication.upgrader = upgrade.NewUpgrader(
-		agentInfo,
-		cfg.Settings.DownloadConfig,
-		log,
-		[]context.CancelFunc{managedApplication.cancelCtxFn},
-		reexec,
-		acker,
-		combinedReporter,
-		caps)
-
-	policyChanger := handlers.NewPolicyChange(
-		log,
-		emit,
-		agentInfo,
-		cfg,
-		storeSaver,
+	policyChanger := handlers2.NewPolicyChange(
+		m.log,
+		m.agentInfo,
+		m.cfg,
+		m.store,
+		m.ch,
 	)
 
 	actionDispatcher.MustRegister(
@@ -174,147 +237,50 @@ func newManaged(
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionPolicyReassign{},
-		handlers.NewPolicyReassign(log),
+		handlers2.NewPolicyReassign(m.log),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionUnenroll{},
-		handlers.NewUnenroll(
-			log,
-			emit,
-			router,
-			[]context.CancelFunc{managedApplication.cancelCtxFn},
-			stateStore,
+		handlers2.NewUnenroll(
+			m.log,
+			m.ch,
+			[]context.CancelFunc{canceller},
+			m.stateStore,
 		),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionUpgrade{},
-		handlers.NewUpgrade(log, managedApplication.upgrader),
+		handlers2.NewUpgrade(m.log, m.coord),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionSettings{},
-		handlers.NewSettings(
-			log,
-			reexec,
-			agentInfo,
+		handlers2.NewSettings(
+			m.log,
+			m.agentInfo,
+			m.coord,
 		),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionCancel{},
-		handlers.NewCancel(
-			log,
-			actionQueue,
+		handlers2.NewCancel(
+			m.log,
+			m.actionQueue,
 		),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionApp{},
-		handlers.NewAppAction(log, managedApplication.srv),
+		handlers2.NewAppAction(m.log, m.coord),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionUnknown{},
-		handlers.NewUnknown(log),
+		handlers2.NewUnknown(m.log),
 	)
 
-	actions := stateStore.Actions()
-	stateRestored := false
-	if len(actions) > 0 && !managedApplication.wasUnenrolled() {
-		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
-		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
-		// But at the moment this is not possible because the policy change was acked.
-		if err := store.ReplayActions(ctx, log, actionDispatcher, actionAcker, actions...); err != nil {
-			log.Errorf("could not recover state, error %+v, skipping...", err)
-		}
-		stateRestored = true
-	}
-
-	gateway, err := fleetgateway.New(
-		managedApplication.bgContext,
-		log,
-		agentInfo,
-		client,
-		actionDispatcher,
-		fleetR,
-		actionAcker,
-		statusCtrl,
-		stateStore,
-		actionQueue,
-	)
-	if err != nil {
-		return nil, err
-	}
-	gateway, err = localgateway.New(managedApplication.bgContext, log, cfg.Fleet, rawConfig, gateway, emit, !stateRestored)
-	if err != nil {
-		return nil, err
-	}
-	// add the acker and gateway to setters, so the they can be updated
-	// when the hosts for Fleet Server are updated by the policy.
-	if cfg.Fleet.Server == nil {
-		// setters only set when not running a local Fleet Server
-		policyChanger.AddSetter(gateway)
-		policyChanger.AddSetter(acker)
-	}
-
-	managedApplication.gateway = gateway
-	return managedApplication, nil
+	return actionDispatcher, nil
 }
-
-// Routes returns a list of routes handled by agent.
-func (m *Managed) Routes() *sorted.Set {
-	return m.router.Routes()
-}
-
-// Start starts a managed elastic-agent.
-func (m *Managed) Start() error {
-	m.log.Info("Agent is starting")
-	if m.wasUnenrolled() {
-		m.log.Warnf("agent was previously unenrolled. To reactivate please reconfigure or enroll again.")
-		return nil
-	}
-
-	// reload ID because of win7 sync issue
-	if err := m.agentInfo.ReloadID(); err != nil {
-		return err
-	}
-
-	err := m.upgrader.Ack(m.bgContext)
-	if err != nil {
-		m.log.Warnf("failed to ack update %v", err)
-	}
-
-	err = m.gateway.Start()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Stop stops a managed elastic-agent.
-func (m *Managed) Stop() error {
-	defer m.log.Info("Agent is stopped")
-	m.cancelCtxFn()
-	m.router.Shutdown()
-	m.srv.Stop()
-	return nil
-}
-
-// AgentInfo retrieves elastic-agent information.
-func (m *Managed) AgentInfo() *info.AgentInfo {
-	return m.agentInfo
-}
-
-func (m *Managed) wasUnenrolled() bool {
-	actions := m.stateStore.Actions()
-	for _, a := range actions {
-		if a.Type() == "UNENROLL" {
-			return true
-		}
-	}
-
-	return false
-}
-*/

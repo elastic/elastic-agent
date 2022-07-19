@@ -64,7 +64,7 @@ func (ch *ErrorChecker) Run(ctx context.Context) {
 				continue
 			}
 
-			status, err := ch.agentClient.Status(ctx)
+			state, err := ch.agentClient.State(ctx)
 			ch.agentClient.Disconnect()
 			if err != nil {
 				ch.log.Error("failed retrieving agent status", err)
@@ -78,14 +78,14 @@ func (ch *ErrorChecker) Run(ctx context.Context) {
 			// call was successful, reset counter
 			ch.failuresCounter = 0
 
-			if status.Status == client.Failed {
+			if state.State == client.Failed {
 				ch.log.Error("error checker notifying failure of agent")
 				ch.notifyChan <- ErrAgentStatusFailed
 			}
 
-			for _, app := range status.Applications {
-				if app.Status == client.Failed {
-					err = multierror.Append(err, errors.New(fmt.Sprintf("application %s[%v] failed: %s", app.Name, app.ID, app.Message)))
+			for _, comp := range state.Components {
+				if comp.State == client.Failed {
+					err = multierror.Append(err, errors.New(fmt.Sprintf("component %s[%v] failed: %s", comp.Name, comp.ID, comp.Message)))
 				}
 			}
 

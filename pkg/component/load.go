@@ -146,6 +146,15 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 	}, nil
 }
 
+// Inputs returns the list of supported inputs for this platform.
+func (r *RuntimeSpecs) Inputs() []string {
+	inputs := make([]string, 0, len(r.inputSpecs))
+	for inputType, _ := range r.inputSpecs {
+		inputs = append(inputs, inputType)
+	}
+	return inputs
+}
+
 // GetInput returns the input runtime specification for this input on this platform.
 func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 	runtime, ok := r.inputSpecs[inputType]
