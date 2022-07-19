@@ -25,7 +25,7 @@ if ! [[ "$old_agent_dir" -ef "$new_agent_dir" ]]; then
         cp "$enc_path" "$new_agent_dir"
     fi
 
-    if test -f "$yml_path"; then
+    if test -f "$symlink"; then
         echo "found symlink $symlink, unlink"
         unlink "$symlink"
     fi
