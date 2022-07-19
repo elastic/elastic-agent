@@ -109,6 +109,7 @@
 - diagnostics collect file mod times are set. {pull}570[570]
 - Allow ':' characters in dynamic variables {issue}624[624] {pull}680[680]
 - Allow the - char to appear as part of variable names in eql expressions. {issue}709[709] {pull}710[710]
+- Allow the / char in variable names in eql and transpiler. {issue}715[715] {pull}718[718]
 
 ==== New features
 
