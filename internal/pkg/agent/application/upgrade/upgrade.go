@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/otiai10/copy"
@@ -33,7 +32,6 @@ const (
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
-	darwin          = "darwin"
 )
 
 var (
@@ -159,11 +157,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		}
 		u.log.Warn("upgrading to same version")
 		return nil, nil
-	}
-
-	// Copy vault directory for linux/windows only
-	if err := copyVault(newHash); err != nil {
-		return nil, errors.New(err, "failed to copy vault")
 	}
 
 	if err := copyActionStore(newHash); err != nil {
@@ -295,36 +288,6 @@ func copyActionStore(newHash string) error {
 		if err := ioutil.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func getVaultPath(newHash string) string {
-	vaultPath := paths.AgentVaultPath()
-	if runtime.GOOS == darwin {
-		return vaultPath
-	}
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	return filepath.Join(newHome, filepath.Base(vaultPath))
-}
-
-// Copies the vault files for windows and linux
-func copyVault(newHash string) error {
-	// No vault files to copy on darwin
-	if runtime.GOOS == darwin {
-		return nil
-	}
-
-	vaultPath := paths.AgentVaultPath()
-	newVaultPath := getVaultPath(newHash)
-
-	err := copyDir(vaultPath, newVaultPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
 	}
 
 	return nil
