@@ -175,7 +175,7 @@ pipeline {
                 withMageEnv(){
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
-                      cmd(label: 'Go package', script: 'mage package')
+                      cmd(label: 'Go package', script: 'mage package ironbank')
                       uploadPackagesToGoogleBucket(
                         credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
                         repo: env.REPO,
