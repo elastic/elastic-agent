@@ -10,13 +10,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
 	"go.elastic.co/apm"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
