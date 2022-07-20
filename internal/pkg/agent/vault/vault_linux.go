@@ -39,7 +39,7 @@ func New(path string, opts ...OptionFunc) (v *Vault, err error) {
 	if dir == "." {
 		exefp, err := os.Executable()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not get executable path: %w", err)
 		}
 		dir = filepath.Dir(exefp)
 		path = filepath.Join(dir, path)
@@ -62,7 +62,7 @@ func New(path string, opts ...OptionFunc) (v *Vault, err error) {
 
 	key, err := getOrCreateSeed(path, options.readonly)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get seed to create new valt: %w", err)
 	}
 
 	return &Vault{
