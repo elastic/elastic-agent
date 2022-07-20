@@ -33,6 +33,7 @@ var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
 // FleetServerComponentModifier modifies the comps to inject extra information from the policy into
 // the Fleet Server component and units needed to run Fleet Server correctly.
 func FleetServerComponentModifier(comps []component.Component, policy map[string]interface{}) ([]component.Component, error) {
+	// TODO(blakerouse): Need to add logic to update the Fleet Server component with extra information from the policy.
 	return comps, nil
 }
 
