@@ -20,11 +20,8 @@ shared:
   # Deb/RPM spec for community beats.
   - &deb_rpm_agent_spec
     <<: *common
-    post_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/systemd-daemon-reload.sh'
+    post_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postinstall.sh.tmpl'
     files:
-      /usr/share/{{.BeatName}}/bin/{{.BeatName}}{{.BinaryExt}}:
-        source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-        mode: 0755
       /usr/share/{{.BeatName}}/LICENSE.txt:
         source: '{{ repo.RootDir }}/LICENSE.txt'
         mode: 0644
@@ -1083,11 +1080,6 @@ specs:
       spec:
         <<: *deb_rpm_agent_spec
         <<: *elastic_license_for_deb_rpm
-        files:
-          /usr/share/{{.BeatName}}/bin/{{.BeatName}}{{.BinaryExt}}:
-            source: /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
-            symlink: true
-            mode: 0755
 
     - os: linux
       arch: amd64
