@@ -11,17 +11,15 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	dispatcher2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
-	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -72,7 +70,7 @@ type actionQueue interface {
 
 type fleetGateway struct {
 	log           *logger.Logger
-	dispatcher    dispatcher2.Dispatcher
+	dispatcher    dispatcher.Dispatcher
 	client        client.Sender
 	scheduler     scheduler.Scheduler
 	settings      *fleetGatewaySettings
@@ -90,7 +88,7 @@ func New(
 	log *logger.Logger,
 	agentInfo agentInfo,
 	client client.Sender,
-	d dispatcher2.Dispatcher,
+	d dispatcher.Dispatcher,
 	acker acker.Acker,
 	stateFetcher coordinator.StateFetcher,
 	stateStore stateStore,
@@ -117,7 +115,7 @@ func newFleetGatewayWithScheduler(
 	settings *fleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
-	d dispatcher2.Dispatcher,
+	d dispatcher.Dispatcher,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
 	stateFetcher coordinator.StateFetcher,

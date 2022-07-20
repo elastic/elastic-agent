@@ -8,9 +8,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
