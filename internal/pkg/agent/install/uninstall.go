@@ -7,12 +7,13 @@ package install
 import (
 	"context"
 	"fmt"
-	"github.com/kardianos/service"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/kardianos/service"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"

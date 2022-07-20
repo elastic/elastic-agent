@@ -7,7 +7,10 @@ package application
 import (
 	"context"
 	"fmt"
-	handlers2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
+	"time"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
@@ -21,9 +24,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -35,6 +39,7 @@ type managedConfigManager struct {
 	store       storage.Store
 	stateStore  *store.StateStore
 	actionQueue *queue.ActionQueue
+	runtime     *runtime.Manager
 	coord       *coordinator.Coordinator
 
 	ch    chan coordinator.ConfigChange
@@ -46,8 +51,9 @@ func newManagedConfigManager(
 	agentInfo *info.AgentInfo,
 	cfg *configuration.Configuration,
 	storeSaver storage.Store,
+	runtime *runtime.Manager,
 ) (*managedConfigManager, error) {
-	client, err := client.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
+	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
 		return nil, errors.New(err,
 			"fail to create API client",
@@ -74,6 +80,7 @@ func newManagedConfigManager(
 		store:       storeSaver,
 		stateStore:  stateStore,
 		actionQueue: actionQueue,
+		runtime:     runtime,
 		ch:          make(chan coordinator.ConfigChange),
 		errCh:       make(chan error),
 	}, nil
@@ -101,7 +108,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	defer gatewayCancel()
 
 	// Create the actionDispatcher.
-	actionDispatcher, err := newManagedActionDispatcher(m, gatewayCancel)
+	actionDispatcher, policyChanger, err := newManagedActionDispatcher(m, gatewayCancel)
 	if err != nil {
 		return err
 	}
@@ -128,7 +135,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	}()
 
 	actions := m.stateStore.Actions()
-	//stateRestored := false
+	stateRestored := false
 	if len(actions) > 0 && !m.wasUnenrolled() {
 		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
@@ -136,7 +143,16 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		if err := store.ReplayActions(ctx, m.log, actionDispatcher, actionAcker, actions...); err != nil {
 			m.log.Errorf("could not recover state, error %+v, skipping...", err)
 		}
-		//stateRestored = true
+		stateRestored = true
+	}
+
+	// In the case this is the first start and this Elastic Agent is running a Fleet Server; we need to ensure that
+	// the Fleet Server is running before the Fleet gateway is started.
+	if !stateRestored && m.cfg.Fleet.Server != nil {
+		err = m.initFleetServer(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to initialize Fleet Server: %w", err)
+		}
 	}
 
 	gateway, err := fleetgateway.New(
@@ -151,6 +167,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	// Not running a Fleet Server so the gateway and acker can be changed based on the configuration change.
+	if m.cfg.Fleet.Server == nil {
+		policyChanger.AddSetter(gateway)
+		policyChanger.AddSetter(ack)
 	}
 
 	// Proxy errors from the gateway to our own channel.
@@ -178,22 +200,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		gatewayErrCh <- err
 	}()
 
-	/*
-		gateway, err = localgateway.New(ctx, m.log, m.cfg.Fleet, rawConfig, gateway, emit, !stateRestored)
-		if err != nil {
-			return nil, err
-		}
-		// add the acker and gateway to setters, so the they can be updated
-		// when the hosts for Fleet Server are updated by the policy.
-		if cfg.Fleet.Server == nil {
-			// setters only set when not running a local Fleet Server
-			policyChanger.AddSetter(gateway)
-			policyChanger.AddSetter(acker)
-		}
-
-		managedApplication.gateway = gateway
-	*/
-
 	<-ctx.Done()
 	return <-gatewayErrCh
 }
@@ -216,13 +222,53 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 	return false
 }
 
-func newManagedActionDispatcher(m *managedConfigManager, canceller context.CancelFunc) (*dispatcher.ActionDispatcher, error) {
-	actionDispatcher, err := dispatcher.New(m.log, handlers2.NewDefault(m.log))
-	if err != nil {
-		return nil, err
+func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	m.log.Debugf("injecting basic fleet-server for first start")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case m.ch <- &localConfigChange{injectFleetServerInput}:
 	}
 
-	policyChanger := handlers2.NewPolicyChange(
+	m.log.Debugf("watching fleet-server-default component state")
+	sub := m.runtime.Subscribe(ctx, "fleet-server-default")
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case state := <-sub.Ch():
+			if fleetServerRunning(state) {
+				m.log.With("state", state).Debugf("fleet-server-default component is running")
+				return nil
+			}
+			m.log.With("state", state).Debugf("fleet-server-default component is not running")
+		}
+	}
+}
+
+func fleetServerRunning(state runtime.ComponentState) bool {
+	if state.State == client.UnitStateHealthy || state.State == client.UnitStateDegraded {
+		for key, unit := range state.Units {
+			if key.UnitType == client.UnitTypeInput && key.UnitID == "fleet-server-default-fleet-server" {
+				if unit.State == client.UnitStateHealthy || unit.State == client.UnitStateDegraded {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func newManagedActionDispatcher(m *managedConfigManager, canceller context.CancelFunc) (*dispatcher.ActionDispatcher, *handlers.PolicyChange, error) {
+	actionDispatcher, err := dispatcher.New(m.log, handlers.NewDefault(m.log))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	policyChanger := handlers.NewPolicyChange(
 		m.log,
 		m.agentInfo,
 		m.cfg,
@@ -237,12 +283,12 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionPolicyReassign{},
-		handlers2.NewPolicyReassign(m.log),
+		handlers.NewPolicyReassign(m.log),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionUnenroll{},
-		handlers2.NewUnenroll(
+		handlers.NewUnenroll(
 			m.log,
 			m.ch,
 			[]context.CancelFunc{canceller},
@@ -252,12 +298,12 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionUpgrade{},
-		handlers2.NewUpgrade(m.log, m.coord),
+		handlers.NewUpgrade(m.log, m.coord),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionSettings{},
-		handlers2.NewSettings(
+		handlers.NewSettings(
 			m.log,
 			m.agentInfo,
 			m.coord,
@@ -266,7 +312,7 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionCancel{},
-		handlers2.NewCancel(
+		handlers.NewCancel(
 			m.log,
 			m.actionQueue,
 		),
@@ -274,13 +320,13 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionApp{},
-		handlers2.NewAppAction(m.log, m.coord),
+		handlers.NewAppAction(m.log, m.coord),
 	)
 
 	actionDispatcher.MustRegister(
 		&fleetapi.ActionUnknown{},
-		handlers2.NewUnknown(m.log),
+		handlers.NewUnknown(m.log),
 	)
 
-	return actionDispatcher, nil
+	return actionDispatcher, policyChanger, nil
 }

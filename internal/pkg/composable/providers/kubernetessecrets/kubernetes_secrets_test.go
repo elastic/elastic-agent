@@ -6,9 +6,10 @@ package kubernetessecrets
 
 import (
 	"context"
-	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"testing"
 	"time"
+
+	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

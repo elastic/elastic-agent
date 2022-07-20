@@ -6,9 +6,10 @@ package handlers
 
 import (
 	"context"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"sync"
 	"testing"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"

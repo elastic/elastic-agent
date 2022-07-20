@@ -8,13 +8,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"io"
 	"io/ioutil"
 	"sort"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 
 	"gopkg.in/yaml.v2"
 

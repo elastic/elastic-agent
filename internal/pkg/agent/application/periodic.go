@@ -6,9 +6,10 @@ package application
 
 import (
 	"context"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"

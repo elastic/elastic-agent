@@ -7,6 +7,7 @@ package application
 import (
 	"context"
 	"fmt"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"

@@ -7,10 +7,11 @@ package dispatcher
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"reflect"
 	"strings"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 
 	"go.elastic.co/apm"
 

@@ -6,6 +6,7 @@ package handlers
 
 import (
 	"context"
+
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"

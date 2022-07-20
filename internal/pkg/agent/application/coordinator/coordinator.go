@@ -1,10 +1,17 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package coordinator
 
 import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+
+	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -16,7 +23,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"go.elastic.co/apm"
 )
 
 var (
@@ -104,7 +110,7 @@ type VarsManager interface {
 
 // ComponentsModifier is a function that takes the computed components model and modifies it before
 // passing it into the components runtime manager.
-type ComponentsModifier func(comps []component.Component) ([]component.Component, error)
+type ComponentsModifier func(comps []component.Component, policy map[string]interface{}) ([]component.Component, error)
 
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
@@ -477,7 +483,7 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	}
 
 	for _, modifier := range c.modifiers {
-		comps, err = modifier(comps)
+		comps, err = modifier(comps, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to modify components: %w", err)
 		}

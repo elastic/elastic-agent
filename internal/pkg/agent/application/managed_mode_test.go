@@ -7,9 +7,10 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	handlers2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
-	"testing"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"

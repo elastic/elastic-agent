@@ -8,11 +8,12 @@ import (
 	"context"
 	stderr "errors"
 	"fmt"
+	"time"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	dispatcher2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 

@@ -8,12 +8,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"net"
+	"sync"
+
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
-	"net"
-	"sync"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"

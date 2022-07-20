@@ -5,30 +5,11 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
-	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/go-sysinfo"
 )
 
 func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Command {
@@ -38,10 +19,12 @@ func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Comman
 		Long:  "Shows current configuration of the agent",
 		Args:  cobra.ExactArgs(0),
 		Run: func(c *cobra.Command, args []string) {
-			if err := inspectConfig(paths.ConfigFile()); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
-			}
+			/*
+				if err := inspectConfig(paths.ConfigFile()); err != nil {
+					fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+					os.Exit(1)
+				}
+			*/
 		},
 	}
 
@@ -57,19 +40,22 @@ func newInspectOutputCommandWithArgs(_ []string) *cobra.Command {
 		Long:  "Displays configuration generated for output.\nIf no output is specified list of output is displayed",
 		Args:  cobra.MaximumNArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			outName, _ := c.Flags().GetString("output")
-			program, _ := c.Flags().GetString("program")
-			cfgPath := paths.ConfigFile()
-			agentInfo, err := info.NewAgentInfo(false)
-			if err != nil {
-				return err
-			}
+			/*
+				outName, _ := c.Flags().GetString("output")
+				program, _ := c.Flags().GetString("program")
+				cfgPath := paths.ConfigFile()
+				agentInfo, err := info.NewAgentInfo(false)
+				if err != nil {
+					return err
+				}
 
-			if outName == "" {
-				return inspectOutputs(cfgPath, agentInfo)
-			}
+					if outName == "" {
+						return inspectOutputs(cfgPath, agentInfo)
+					}
 
-			return inspectOutput(cfgPath, outName, program, agentInfo)
+					return inspectOutput(cfgPath, outName, program, agentInfo)
+			*/
+			return nil
 		},
 	}
 
@@ -79,6 +65,7 @@ func newInspectOutputCommandWithArgs(_ []string) *cobra.Command {
 	return cmd
 }
 
+/*
 func inspectConfig(cfgPath string) error {
 	err := tryContainerLoadPaths()
 	if err != nil {
@@ -386,6 +373,7 @@ func (w *waitForCompose) Watch() <-chan []*transpiler.Vars {
 func (w *waitForCompose) Wait() {
 	<-w.done
 }
+*/
 
 func isStandalone(cfg *config.Config) (bool, error) {
 	c, err := configuration.NewFromConfig(cfg)

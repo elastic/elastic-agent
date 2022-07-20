@@ -10,8 +10,9 @@ import (
 	goruntime "runtime"
 	"strconv"
 
-	"github.com/elastic/go-sysinfo"
 	"go.elastic.co/apm"
+
+	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -78,8 +79,14 @@ func New(
 
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig)
 
+	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+	}
+
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
+	var compModifiers []coordinator.ComponentsModifier
 	if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
@@ -94,34 +101,34 @@ func New(
 		}
 	} else if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
-		//	//return newFleetServerBootstrap(ctx, log, pathConfigFile, rawConfig, statusCtrl, agentInfo, tracer)
-		//	return nil, errors.New("TODO: fleet-server bootstrap mode")
+		compModifiers = append(compModifiers, FleetServerComponentModifier)
+		configMgr, err = newFleetServerBootstrapManager(log)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		log.Info("Parsed configuration and determined agent is managed by Fleet")
-
 		var store storage.Store
 		store, cfg, err = mergeFleetConfig(rawConfig)
 		if err != nil {
 			return nil, err
 		}
 
-		managed, err = newManagedConfigManager(log, agentInfo, cfg, store)
+		log.Info("Parsed configuration and determined agent is managed by Fleet")
+
+		compModifiers = append(compModifiers, FleetServerComponentModifier)
+		managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
 		if err != nil {
 			return nil, err
 		}
 		configMgr = managed
 	}
 
-	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
-	}
 	composable, err := composable.New(log, rawConfig)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, specs, reexec, upgrader, runtime, configMgr, composable, caps)
+	coord := coordinator.New(log, specs, reexec, upgrader, runtime, configMgr, composable, caps, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

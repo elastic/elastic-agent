@@ -8,12 +8,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
