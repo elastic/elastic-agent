@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -77,10 +78,10 @@ func run() error {
 			case client.UnitChangedRemoved:
 				s.removed(change.Unit)
 			}
-		case _ = <-c.Errors():
-			//if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
-			//	fmt.Fprintf(os.Stderr, "GRPC client error: %s", err)
-			//}
+		case err := <-c.Errors():
+			if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
+				fmt.Fprintf(os.Stderr, "GRPC client error: %s", err)
+			}
 		}
 	}
 }

@@ -754,22 +754,29 @@ func VerifySHA256(file string, hash string) error {
 // CreateSHA512File computes the sha512 sum of the specified file the writes
 // a sidecar file containing the hash and filename.
 func CreateSHA512File(file string) error {
+	computedHash, err := GetSHA512Hash(file)
+	if err != nil {
+		return err
+	}
+	out := fmt.Sprintf("%v  %v", computedHash, filepath.Base(file))
+
+	//nolint:gosec // permissions are correct
+	return os.WriteFile(file+".sha512", []byte(out), 0644)
+}
+func GetSHA512Hash(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return errors.Wrap(err, "failed to open file for sha512 summing")
+		return "", errors.Wrap(err, "failed to open file for sha512 summing")
 	}
 	defer f.Close()
 
 	sum := sha512.New()
 	if _, err := io.Copy(sum, f); err != nil {
-		return errors.Wrap(err, "failed reading from input file")
+		return "", errors.Wrap(err, "failed reading from input file")
 	}
 
 	computedHash := hex.EncodeToString(sum.Sum(nil))
-	out := fmt.Sprintf("%v  %v", computedHash, filepath.Base(file))
-
-	//nolint:gosec // permissions are correct
-	return ioutil.WriteFile(file+".sha512", []byte(out), 0644)
+	return computedHash, nil
 }
 
 // Mage executes mage targets in the specified directory.
