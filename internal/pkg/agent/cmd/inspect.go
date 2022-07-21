@@ -19,6 +19,7 @@ func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Comman
 		Long:  "Shows current configuration of the agent",
 		Args:  cobra.ExactArgs(0),
 		Run: func(c *cobra.Command, args []string) {
+			// TODO(blakerouse): Fix inspect command for Elastic Agent v2
 			/*
 				if err := inspectConfig(paths.ConfigFile()); err != nil {
 					fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
@@ -40,6 +41,7 @@ func newInspectOutputCommandWithArgs(_ []string) *cobra.Command {
 		Long:  "Displays configuration generated for output.\nIf no output is specified list of output is displayed",
 		Args:  cobra.MaximumNArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
+			// TODO(blakerouse): Fix inspect command for Elastic Agent v2
 			/*
 				outName, _ := c.Flags().GetString("output")
 				program, _ := c.Flags().GetString("program")

@@ -270,24 +270,17 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	p := filepath.Join("internal", "pkg", "agent", "operation", "tests", "scripts")
-	p2 := filepath.Join("internal", "pkg", "agent", "transpiler", "tests")
-	p3 := filepath.Join("pkg", "component")
-	configurableName := "configurable"
-	serviceableName := "serviceable"
+	p := filepath.Join("internal", "pkg", "agent", "transpiler", "tests")
+	p2 := filepath.Join("pkg", "component")
 	execName := "exec"
 	fakeName := "fake"
 	if runtime.GOOS == "windows" {
-		configurableName += ".exe"
-		serviceableName += ".exe"
 		execName += ".exe"
 		fakeName += ".exe"
 	}
 	return combineErr(
-		RunGo("build", "-o", filepath.Join(p, configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p, serviceableName), filepath.Join(p, "serviceable-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p2, "exec-1.0-darwin-x86_64", execName), filepath.Join(p2, "exec-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p3, "fake", fakeName), filepath.Join(p3, "fake", "main.go")),
+		RunGo("build", "-o", filepath.Join(p, "exec-1.0-darwin-x86_64", execName), filepath.Join(p, "exec-1.0-darwin-x86_64", "main.go")),
+		RunGo("build", "-o", filepath.Join(p2, "fake", fakeName), filepath.Join(p2, "fake", "main.go")),
 	)
 }
 
@@ -487,7 +480,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildSpec, BuildPGP, BuildFleetCfg)
+	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg)
 }
 
 // CrossBuild cross-builds the beat for all target platforms.
@@ -512,19 +505,6 @@ func ControlProto() error {
 		"--go_out=internal/pkg/agent/control/cproto", "--go_opt=paths=source_relative",
 		"--go-grpc_out=internal/pkg/agent/control/cproto", "--go-grpc_opt=paths=source_relative",
 		"control.proto")
-}
-
-// BuildSpec make sure that all the suppported program spec are built into the binary.
-func BuildSpec() error {
-	// go run dev-tools/cmd/buildspec/buildspec.go --in internal/agent/spec/*.yml --out internal/pkg/agent/program/supported.go
-	goF := filepath.Join("dev-tools", "cmd", "buildspec", "buildspec.go")
-	in := filepath.Join("internal", "spec", "*.yml")
-	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
-
-	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
-
-	return nil
 }
 
 func BuildPGP() error {

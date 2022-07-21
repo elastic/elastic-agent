@@ -7,7 +7,8 @@ package configuration
 import (
 	"path/filepath"
 
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/pkg/core/logger"

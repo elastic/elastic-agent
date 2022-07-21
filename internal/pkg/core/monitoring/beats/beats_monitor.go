@@ -13,9 +13,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )

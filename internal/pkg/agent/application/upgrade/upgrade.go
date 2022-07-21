@@ -14,8 +14,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -23,11 +21,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -40,7 +38,7 @@ const (
 )
 
 var (
-	agentSpec = program.Spec{
+	agentArtifact = artifact.Artifact{
 		Name:     "elastic-agent",
 		Cmd:      agentName,
 		Artifact: "beats/" + agentName,

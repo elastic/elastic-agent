@@ -7,12 +7,8 @@ package application
 import (
 	"fmt"
 	"path/filepath"
-	goruntime "runtime"
-	"strconv"
 
 	"go.elastic.co/apm"
-
-	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -35,18 +31,15 @@ type discoverFunc func() ([]string, error)
 // ErrNoConfiguration is returned when no configuration are found.
 var ErrNoConfiguration = errors.New("no configuration found", errors.TypeConfig)
 
-// PlatformModifier can modify the platform details before the runtime specifications are loaded.
-type PlatformModifier func(detail component.PlatformDetail) component.PlatformDetail
-
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	log *logger.Logger,
 	agentInfo *info.AgentInfo,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
-	modifiers ...PlatformModifier,
+	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, error) {
-	platform, err := getPlatformDetail(modifiers...)
+	platform, err := component.LoadPlatformDetail(modifiers...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather system information: %w", err)
 	}
@@ -135,28 +128,6 @@ func New(
 		managed.coord = coord
 	}
 	return coord, nil
-}
-
-func getPlatformDetail(modifiers ...PlatformModifier) (component.PlatformDetail, error) {
-	info, err := sysinfo.Host()
-	if err != nil {
-		return component.PlatformDetail{}, err
-	}
-	os := info.Info().OS
-	detail := component.PlatformDetail{
-		Platform: component.Platform{
-			OS:   goruntime.GOOS,
-			Arch: goruntime.GOARCH,
-			GOOS: goruntime.GOOS,
-		},
-		Family: os.Family,
-		Major:  strconv.Itoa(os.Major),
-		Minor:  strconv.Itoa(os.Minor),
-	}
-	for _, modifier := range modifiers {
-		detail = modifier(detail)
-	}
-	return detail, nil
 }
 
 func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {

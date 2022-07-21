@@ -8,16 +8,17 @@ import (
 	"context"
 	"strings"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	download2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	composed2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/composed"
+	fs2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/fs"
+	http2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/localremote"
+	snapshot2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/snapshot"
+
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/composed"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/fs"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
-	downloader "github.com/elastic/elastic-agent/internal/pkg/artifact/download/localremote"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/snapshot"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -50,57 +51,57 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, "initiating fetcher")
 	}
 
-	path, err := fetcher.Download(ctx, agentSpec, version)
+	path, err := fetcher.Download(ctx, agentArtifact, version)
 	if err != nil {
 		return "", errors.New(err, "failed upgrade of agent binary")
 	}
 
-	if err := verifier.Verify(agentSpec, version); err != nil {
+	if err := verifier.Verify(agentArtifact, version); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
 
 	return path, nil
 }
 
-func newDownloader(version string, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
+func newDownloader(version string, log *logger.Logger, settings *artifact.Config) (download2.Downloader, error) {
 	if !strings.HasSuffix(version, "-SNAPSHOT") {
-		return downloader.NewDownloader(log, settings)
+		return localremote.NewDownloader(log, settings)
 	}
 
 	// try snapshot repo before official
-	snapDownloader, err := snapshot.NewDownloader(log, settings, version)
+	snapDownloader, err := snapshot2.NewDownloader(log, settings, version)
 	if err != nil {
 		return nil, err
 	}
 
-	httpDownloader, err := http.NewDownloader(log, settings)
+	httpDownloader, err := http2.NewDownloader(log, settings)
 	if err != nil {
 		return nil, err
 	}
 
-	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
+	return composed2.NewDownloader(fs2.NewDownloader(settings), snapDownloader, httpDownloader), nil
 }
 
-func newVerifier(version string, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+func newVerifier(version string, log *logger.Logger, settings *artifact.Config) (download2.Verifier, error) {
 	allowEmptyPgp, pgp := release.PGP()
 	if !strings.HasSuffix(version, "-SNAPSHOT") {
-		return downloader.NewVerifier(log, settings, allowEmptyPgp, pgp)
+		return localremote.NewVerifier(log, settings, allowEmptyPgp, pgp)
 	}
 
-	fsVerifier, err := fs.NewVerifier(settings, allowEmptyPgp, pgp)
+	fsVerifier, err := fs2.NewVerifier(settings, allowEmptyPgp, pgp)
 	if err != nil {
 		return nil, err
 	}
 
-	snapshotVerifier, err := snapshot.NewVerifier(settings, allowEmptyPgp, pgp, version)
+	snapshotVerifier, err := snapshot2.NewVerifier(settings, allowEmptyPgp, pgp, version)
 	if err != nil {
 		return nil, err
 	}
 
-	remoteVerifier, err := http.NewVerifier(settings, allowEmptyPgp, pgp)
+	remoteVerifier, err := http2.NewVerifier(settings, allowEmptyPgp, pgp)
 	if err != nil {
 		return nil, err
 	}
 
-	return composed.NewVerifier(fsVerifier, snapshotVerifier, remoteVerifier), nil
+	return composed2.NewVerifier(fsVerifier, snapshotVerifier, remoteVerifier), nil
 }
