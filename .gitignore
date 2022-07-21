@@ -46,6 +46,7 @@ fleet.yml
 
 # agent
 build/
+build1/
 elastic-agent
 elastic-agent.dev.yml
 elastic-agent.yml.*
@@ -63,3 +64,5 @@ internal/pkg/agent/transpiler/tests/exec-1.0-darwin-x86_64/exec
 # VSCode
 /.vscode
 
+
+dist/

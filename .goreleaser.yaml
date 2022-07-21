@@ -1,0 +1,66 @@
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+builds:
+  - id: darwin-amd64
+    binary: 'elastic-agent-{{ .Os }}-{{ .Arch }}'
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    env:
+      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/amd64
+      - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
+      - CC=o64-clang
+      - CXX=o64-clang++
+    flags:
+      - -mod=readonly
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    no_unique_dist_dir: true
+  - id: darwin-arm
+    binary: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}'
+    env:
+      - PKG_CONFIG_SYSROOT_DIR=/bindings/lame
+      - CC=oa64-clang
+      - CXX=oa64-clang++
+    goos:
+       - darwin
+    goarch:
+      - arm64
+    flags:
+      - -mod=readonly
+    no_unique_dist_dir: true
+  - id: linux-amd64
+    binary: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}'
+    goos:
+      - linux
+    goarch:
+      - amd64
+    env:
+      - CC=x86_64-linux-gnu-gcc
+      - CXX=x86_64-linux-gnu-g++
+    no_unique_dist_dir: true
+  - id: linux-arm
+    binary: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}'
+    goos:
+      - linux
+    goarch:
+      - arm64
+    env:
+      - CC=aarch64-linux-gnu-gcc
+      - CXX=aarch64-linux-gnu-g++
+    no_unique_dist_dir: true
+  - id: windows
+    binary: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}'
+    goos:
+      - windows
+    goarch:
+      - amd64
+    env:
+      - CC=x86_64-w64-mingw32-gcc
+      - CXX=x86_64-w64-mingw32-g++
+    no_unique_dist_dir: true
+dist: build1/golang-crossbuild

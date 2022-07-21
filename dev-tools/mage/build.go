@@ -177,6 +177,8 @@ func Build(params BuildArgs) error {
 	}
 
 	log.Println("Adding build environment vars:", env)
+	fmt.Println(env)
+	fmt.Println(args)
 	return sh.RunWith(env, "go", args...)
 }
 
