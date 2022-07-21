@@ -25,7 +25,6 @@ import (
 )
 
 func TestDownloadBodyError(t *testing.T) {
-	t.Skip("Skipping flaky test: https://github.com/elastic/elastic-agent/issues/640")
 	// This tests the scenario where the download encounters a network error
 	// part way through the download, while copying the response body.
 
@@ -65,9 +64,9 @@ func TestDownloadBodyError(t *testing.T) {
 	}
 
 	require.GreaterOrEqual(t, len(log.info), 1, "download error not logged at info level")
-	assert.Equal(t, log.info[len(log.info)-1].record, "download from %s failed at %s @ %sps: %s")
+	assert.True(t, containsMessage(log.info, "download from %s failed at %s @ %sps: %s"))
 	require.GreaterOrEqual(t, len(log.warn), 1, "download error not logged at warn level")
-	assert.Equal(t, log.warn[len(log.warn)-1].record, "download from %s failed at %s @ %sps: %s")
+	assert.True(t, containsMessage(log.warn, "download from %s failed at %s @ %sps: %s"))
 }
 
 func TestDownloadLogProgressWithLength(t *testing.T) {
@@ -207,4 +206,13 @@ func (f *recordLogger) Warnf(record string, args ...interface{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.warn = append(f.warn, logMessage{record, args})
+}
+
+func containsMessage(logs []logMessage, msg string) bool {
+	for _, item := range logs {
+		if item.record == msg {
+			return true
+		}
+	}
+	return false
 }
