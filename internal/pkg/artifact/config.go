@@ -53,8 +53,11 @@ type Reloader struct {
 	cfg *Config
 }
 
-func NewReloader(cfg *Config) *Reloader {
-	return &Reloader{cfg: cfg}
+func NewReloader(cfg *Config, log *logger.Logger) *Reloader {
+	return &Reloader{
+		log: log,
+		cfg: cfg,
+	}
 }
 
 func (r *Reloader) Reload(rawConfig *config.Config) error {
