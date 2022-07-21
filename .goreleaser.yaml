@@ -64,3 +64,5 @@ builds:
       - CXX=x86_64-w64-mingw32-g++
     no_unique_dist_dir: true
 dist: build1/golang-crossbuild
+changelog:
+  skip: true
