@@ -10,7 +10,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -23,7 +22,6 @@ type SettingsConfig struct {
 	DownloadConfig   *artifact.Config                `yaml:"download" config:"download" json:"download"`
 	ProcessConfig    *process.Config                 `yaml:"process" config:"process" json:"process"`
 	GRPC             *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
-	RetryConfig      *retry.Config                   `yaml:"retry" config:"retry" json:"retry"`
 	MonitoringConfig *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
 	LoggingConfig    *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
 
@@ -36,7 +34,6 @@ type SettingsConfig struct {
 func DefaultSettingsConfig() *SettingsConfig {
 	return &SettingsConfig{
 		ProcessConfig:    process.DefaultConfig(),
-		RetryConfig:      retry.DefaultConfig(),
 		DownloadConfig:   artifact.DefaultConfig(),
 		LoggingConfig:    logger.DefaultLoggingConfig(),
 		MonitoringConfig: monitoringCfg.DefaultConfig(),

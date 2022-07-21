@@ -3,6 +3,7 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //nolint:goconst // avoiding const check for Deb/Zip
+
 package mage
 
 import (

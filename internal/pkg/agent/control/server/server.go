@@ -19,7 +19,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -38,16 +37,6 @@ type Server struct {
 	server        *grpc.Server
 	tracer        *apm.Tracer
 	lock          sync.RWMutex
-}
-
-type specer interface {
-	Specs() map[string]program.Spec
-}
-
-type specInfo struct {
-	spec program.Spec
-	app  string
-	rk   string
 }
 
 // New creates a new control protocol server.
