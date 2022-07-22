@@ -227,6 +227,7 @@ data:
                   fields:
                     ecs.version: 1.12.0
       - name: container-log
+        id: container-log-${kubernetes.pod.name}-${kubernetes.container.id}
         type: filestream
         use_output: default
         meta:
@@ -252,6 +253,7 @@ data:
             paths:
               - /var/log/containers/*${kubernetes.container.id}.log
       - name: audit-log
+        id: audit-log
         type: filestream
         use_output: default
         meta:
