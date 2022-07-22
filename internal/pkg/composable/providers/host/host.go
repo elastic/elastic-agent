@@ -24,7 +24,7 @@ import (
 const DefaultCheckInterval = 5 * time.Minute
 
 func init() {
-	composable.Providers.AddContextProvider("host", ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
 }
 
 type infoFetcher func() (map[string]interface{}, error)

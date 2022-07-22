@@ -119,14 +119,14 @@ func (c *controller) Run(ctx context.Context) error {
 	for name, state := range c.contextProviders {
 		state.Context = localCtx
 		state.signal = notify
-		go func() {
+		go func(name string, state *contextProviderState) {
 			defer wg.Done()
 			err := state.provider.Run(state)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 				c.logger.Errorf("%s", err)
 			}
-		}()
+		}(name, state)
 		if p, ok := state.provider.(corecomp.FetchContextProvider); ok {
 			_, _ = fetchContextProviders.Put(name, p)
 		}
@@ -136,14 +136,14 @@ func (c *controller) Run(ctx context.Context) error {
 	for name, state := range c.dynamicProviders {
 		state.Context = localCtx
 		state.signal = notify
-		go func() {
+		go func(name string, state *dynamicProviderState) {
 			defer wg.Done()
 			err := state.provider.Run(state)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 				c.logger.Errorf("%s", err)
 			}
-		}()
+		}(name, state)
 	}
 
 	c.logger.Debugf("Started controller for composable inputs")

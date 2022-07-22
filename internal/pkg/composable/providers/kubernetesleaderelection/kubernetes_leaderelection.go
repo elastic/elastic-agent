@@ -23,7 +23,7 @@ import (
 )
 
 func init() {
-	_ = composable.Providers.AddContextProvider("kubernetes_leaderelection", ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("kubernetes_leaderelection", ContextProviderBuilder)
 }
 
 type contextProvider struct {

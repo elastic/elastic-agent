@@ -36,6 +36,14 @@ type DynamicProvider interface {
 // DynamicProviderBuilder creates a new dynamic provider based on the given config and returns it.
 type DynamicProviderBuilder func(log *logger.Logger, config *config.Config) (DynamicProvider, error)
 
+// MustAddDynamicProvider adds a new DynamicProviderBuilder and panics if it AddDynamicProvider returns an error.
+func (r *providerRegistry) MustAddDynamicProvider(name string, builder DynamicProviderBuilder) {
+	err := r.AddDynamicProvider(name, builder)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // AddDynamicProvider adds a new DynamicProviderBuilder
 func (r *providerRegistry) AddDynamicProvider(name string, builder DynamicProviderBuilder) error {
 	r.lock.Lock()
