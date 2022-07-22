@@ -18,7 +18,7 @@ import (
 const ItemPriority = 0
 
 func init() {
-	composable.Providers.AddDynamicProvider("local_dynamic", DynamicProviderBuilder)
+	composable.Providers.MustAddDynamicProvider("local_dynamic", DynamicProviderBuilder)
 }
 
 type dynamicItem struct {

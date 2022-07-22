@@ -24,7 +24,7 @@ var _ corecomp.FetchContextProvider = (*contextProviderK8sSecrets)(nil)
 var getK8sClientFunc = getK8sClient
 
 func init() {
-	_ = composable.Providers.AddContextProvider("kubernetes_secrets", ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("kubernetes_secrets", ContextProviderBuilder)
 }
 
 type contextProviderK8sSecrets struct {

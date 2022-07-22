@@ -23,7 +23,7 @@ import (
 const ContainerPriority = 0
 
 func init() {
-	_ = composable.Providers.AddDynamicProvider("docker", DynamicProviderBuilder)
+	composable.Providers.MustAddDynamicProvider("docker", DynamicProviderBuilder)
 }
 
 type dockerContainerData struct {

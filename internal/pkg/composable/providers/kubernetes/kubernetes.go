@@ -30,7 +30,7 @@ const (
 const nodeScope = "node"
 
 func init() {
-	_ = composable.Providers.AddDynamicProvider("kubernetes", DynamicProviderBuilder)
+	composable.Providers.MustAddDynamicProvider("kubernetes", DynamicProviderBuilder)
 }
 
 type dynamicProvider struct {
