@@ -10,10 +10,11 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 // ECSMeta is a collection of agent related metadata in ECS compliant object form.
@@ -123,7 +124,7 @@ const (
 func Metadata() (*ECSMeta, error) {
 	agentInfo, err := NewAgentInfo(false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create new agent info: %w", err)
 	}
 
 	meta, err := agentInfo.ECSMetadata()
