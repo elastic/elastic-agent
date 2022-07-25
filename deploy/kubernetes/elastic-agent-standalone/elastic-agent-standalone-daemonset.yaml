@@ -14,6 +14,8 @@ spec:
       labels:
         app: elastic-agent-standalone
     spec:
+      # Tolerations are needed to run Elastic Agent on Kubernetes master nodes.
+      # Agents running on master nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
@@ -28,10 +30,14 @@ spec:
             "-e",
           ]
           env:
+            # The basic authentication username used to connect to Elasticsearch
+            # This user needs the privileges required to publish events to Elasticsearch.
             - name: ES_USERNAME
               value: "elastic"
+            # The basic authentication password used to connect to Elasticsearch
             - name: ES_PASSWORD
               value: ""
+            # The Elasticsearch host to communicate with
             - name: ES_HOST
               value: ""
             - name: NODE_NAME
@@ -99,18 +105,23 @@ spec:
         - name: varlog
           hostPath:
             path: /var/log
+        # Needed for cloudbeat
         - name: etc-kubernetes
           hostPath:
             path: /etc/kubernetes
+        # Needed for cloudbeat
         - name: var-lib
           hostPath:
             path: /var/lib
+        # Needed for cloudbeat
         - name: passwd
           hostPath:
             path: /etc/passwd
+        # Needed for cloudbeat
         - name: group
           hostPath:
             path: /etc/group
+        # Needed for cloudbeat
         - name: etcsysmd
           hostPath:
             path: /etc/systemd
