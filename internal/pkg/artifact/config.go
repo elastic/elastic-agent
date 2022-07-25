@@ -19,6 +19,8 @@ const (
 	darwin  = "darwin"
 	linux   = "linux"
 	windows = "windows"
+
+	defaultSourceURI = "https://artifacts.elastic.co/downloads/"
 )
 
 // Config is a configuration used for verifier and downloader
@@ -53,25 +55,42 @@ type Reloader struct {
 	cfg *Config
 }
 
-func NewReloader(cfg *Config) *Reloader {
-	return &Reloader{cfg: cfg}
+func NewReloader(cfg *Config, log *logger.Logger) *Reloader {
+	return &Reloader{
+		cfg: cfg,
+		log: log,
+	}
 }
 
 func (r *Reloader) Reload(rawConfig *config.Config) error {
-	type c struct {
-		Config *Config `config:"agent.download" yaml:"agent.download" json:"agent.download"`
-	}
+	type reloadConfig struct {
+		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
+		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
 
-	cfg := &c{
-		Config: DefaultConfig(),
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
+		// different naming.
+		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
 	}
+	cfg := &reloadConfig{}
 	if err := rawConfig.Unpack(&cfg); err != nil {
 		return err
 	}
 
-	r.log.Debugf("Source URI changed from %q to %q", r.cfg.SourceURI, cfg.Config.SourceURI)
-	if cfg.Config.SourceURI != "" {
-		r.cfg.SourceURI = cfg.Config.SourceURI
+	var newSourceURI string
+	if cfg.FleetSourceURI != "" {
+		// fleet configuration takes precedense
+		newSourceURI = cfg.FleetSourceURI
+	} else if cfg.SourceURI != "" {
+		newSourceURI = cfg.SourceURI
+	}
+
+	if newSourceURI != "" {
+		r.log.Infof("Source URI changed from %q to %q", r.cfg.SourceURI, newSourceURI)
+		r.cfg.SourceURI = newSourceURI
+	} else {
+		// source uri unset, reset to default
+		r.log.Infof("Source URI reset from %q to %q", r.cfg.SourceURI, defaultSourceURI)
+		r.cfg.SourceURI = defaultSourceURI
 	}
 
 	return nil
@@ -87,7 +106,7 @@ func DefaultConfig() *Config {
 	transport.Timeout = 10 * time.Minute
 
 	return &Config{
-		SourceURI:             "https://artifacts.elastic.co/downloads/",
+		SourceURI:             defaultSourceURI,
 		TargetDirectory:       paths.Downloads(),
 		InstallPath:           paths.Install(),
 		HTTPTransportSettings: transport,

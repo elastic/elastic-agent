@@ -158,7 +158,7 @@ func newManaged(
 		},
 		caps,
 		monitor,
-		artifact.NewReloader(cfg.Settings.DownloadConfig),
+		artifact.NewReloader(cfg.Settings.DownloadConfig, log),
 	)
 	if err != nil {
 		return nil, err
