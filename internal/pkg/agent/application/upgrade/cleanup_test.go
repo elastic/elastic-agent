@@ -20,21 +20,13 @@ func setupDir(t *testing.T) {
 	paths.SetDownloads(dir)
 
 	err := os.WriteFile(filepath.Join(dir, "test-8.3.0-file"), []byte("hello, world!"), 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(dir, "test-8.4.0-file"), []byte("hello, world!"), 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(dir, "test-8.5.0-file"), []byte("hello, world!"), 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(dir, "test-hash-file"), []byte("hello, world!"), 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 }
 
 func TestPreUpgradeCleanup(t *testing.T) {
@@ -46,9 +38,9 @@ func TestPreUpgradeCleanup(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 	require.Equal(t, "test-8.4.0-file", files[0].Name())
-	fi, err := files[0].Info()
+	p, err := os.ReadFile(filepath.Join(paths.Downloads(), files[0].Name()))
 	require.NoError(t, err)
-	require.Greater(t, fi.Size(), int64(0))
+	require.Equal(t, []byte("hello, world!"), p)
 }
 
 func TestCleanAllDownloads(t *testing.T) {
