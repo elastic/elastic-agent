@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,34 +17,35 @@ import (
 func preUpgradeCleanup(version string) error {
 	files, err := os.ReadDir(paths.Downloads())
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to read directory %q: %w", paths.Downloads(), err)
 	}
+	var rErr error
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 		if !strings.Contains(file.Name(), version) {
 			if err := os.Remove(filepath.Join(paths.Downloads(), file.Name())); err != nil {
-				return err
+				rErr = muliterror.Append(rErr, fmt.Errorf("unable to remove file %q: %w", filepath.Joing(paths.Downloads(), file.Name()), err))
 			}
 		}
 	}
-	return nil
+	return rErr
 }
 
 // cleanAllDownloads will remove all files from the downloads directory
 func cleanAllDownloads() error {
 	files, err := os.ReadDir(paths.Downloads())
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to read directory %q: %w", paths.Downloads(), err)
 	}
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 		if err := os.Remove(filepath.Join(paths.Downloads(), file.Name())); err != nil {
-			return err
+			rErr = muliterror.Append(rErr, fmt.Errorf("unable to remove file %q: %w", filepath.Joing(paths.Downloads(), file.Name()), err))
 		}
 	}
-	return nil
+	return rErr
 }
