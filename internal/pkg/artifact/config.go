@@ -78,7 +78,7 @@ func (r *Reloader) Reload(rawConfig *config.Config) error {
 
 	var newSourceURI string
 	if cfg.FleetSourceURI != "" {
-		// fleet configuration takes precedense
+		// fleet configuration takes precedence
 		newSourceURI = cfg.FleetSourceURI
 	} else if cfg.SourceURI != "" {
 		newSourceURI = cfg.SourceURI
