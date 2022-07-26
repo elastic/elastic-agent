@@ -20,14 +20,10 @@ changelog:
 nfpms:
   # note that this is an array of nfpm configs
   - id: linux-amd-deb
-    file_name_template: "{{ .ConventionalFileName }}"
+    maintainer: 'Elastic'
+    file_name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
     builds:
       - linux-amd64
-    replacements:
-      amd64: 64-bit
-      386: 32-bit
-      darwin: macOS
-      linux: Tux
     vendor: Elastic B.V.
     homepage: https://elastic.co/
     description: |-
@@ -39,9 +35,6 @@ nfpms:
     # Template to the path that the binaries should be installed.
     # Defaults to `/usr/bin`.
     bindir: /usr/bin
-    # Version Epoch.
-    # Default is extracted from `version` if it is semver compatible.
-    epoch: 2
     # Section.
     section: default
     # Contents to add to the package.
@@ -67,35 +60,39 @@ nfpms:
         file_info:
           mode: 0644
       - src: dev-tools/packaging/templates/common/README.md.tmpl
-        dst: /usr/share/{{.BeatName}}/README.md.tmpl
-        type: "template"
-        file_info:
-          mode: 0644
-      - src: elastic-agent.reference.yml
-        dst: /usr/bin/{{ .ProjectName }}
+        dst: /usr/share/{{ .ProjectName }}/README.md.tmpl
+        type: template
         file_info:
           mode: 0644
       # The src and dst attributes also supports name templates
-      - src: /dev-tools/packaging/templates/linux/beatname.sh.tmpl
-        dst: /usr/bin/{{ .ProjectName }}/beatname.sh.tmpl
-        type: "template"
+      - src: dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl
+        dst: /usr/bin/{{ .ProjectName }}/elastic-agent.sh.tmpl
+        type: template
         file_info:
           mode: 0755
-      - src: /dev-tools/packaging/templates/linux/systemd.unit.tmpl
-        dst: lib/systemd/system/{{ .ProjectName }}.service/systemd.unit.tmpl
-        type: "template"
+      - src: dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl
+        dst: lib/systemd/system/{{ .ProjectName }}.service/elastic-agent.unit.tmpl
+        type: template
         file_info:
           mode: 0644
-      - src: /dev-tools/packaging/templates/{{.PackageType}}/init.sh.tmpl
-        dst: /etc/init.d/{{ .ProjectName }}/init.sh.tmpl
-        type: "template"
+      - src: dev-tools/packaging/templates/deb/elastic-agent.init.sh.tmpl
+        dst: /etc/init.d/{{ .ProjectName }}/elastic-agent.init.sh.tmpl
+        type: template
+        packager: deb
         file_info:
           mode: 0755
+      - src: dev-tools/packaging/templates/rpm/elastic-agent.init.sh.tmpl
+        dst: /etc/init.d/{{ .ProjectName }}/elastic-agent.init.sh.tmpl
+        type: template
+        packager: rpm
+        file_info:
+          mode: 0755
+
     # Scripts to execute during the installation of the package.
     # Keys are the possible targets during the installation process
     # Values are the paths to the scripts which will be executed
     scripts:
-      postinstall: '/dev-tools/packaging/files/linux/systemd-daemon-reload.sh'
+      postinstall: dev-tools/packaging/templates/linux/postinstall.sh.tmpl
     # Custom configuration applied only to the RPM packager.
     rpm:
       # RPM specific scripts.
@@ -107,13 +104,13 @@ nfpms:
         # The id will be transformed to uppercase.
         # E.g. If your nfpm id is 'default' then the rpm-specific passphrase
         # should be set as `$NFPM_DEFAULT_RPM_PASSPHRASE`
-        key_file: '{{ .Env.GPG_KEY_PATH }}'
+        #key_file: '{{ .Env.GPG_KEY_PATH }}'
 
     # Custom configuration applied only to the Deb packager.
     deb:
       scripts:
         # Deb templates file, when using debconf.
-        templates: templates
+        #templates: dev-tools/packaging/templates/deb
       # The package is signed if a key_file is set
       signature:
         # Template to the PGP secret key file path (can also be ASCII-armored).
@@ -123,5 +120,5 @@ nfpms:
         # The id will be transformed to uppercase.
         # E.g. If your nfpm id is 'default' then the deb-specific passphrase
         # should be set as `$NFPM_DEFAULT_DEB_PASSPHRASE`
-        key_file: '{{ .Env.GPG_KEY_PATH }}'
+        #key_file: '{{ .Env.GPG_KEY_PATH }}'
 

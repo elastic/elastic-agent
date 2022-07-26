@@ -925,3 +925,17 @@ func majorMinor() string {
 	}
 	return ""
 }
+
+func GoPackage() error {
+	pwd, _ := os.Getwd()
+	commit, _ := devtools.CommitHash()
+	env := map[string]string{
+		"AGENT_COMMIT":       commit,
+		"AGENT_COMMIT_SHORT": commit[:6],
+	}
+
+	fmt.Println(pwd)
+	return sh.RunWithV("docker", "run", "--rm", "--privileged", "-e", "CGO_ENABLED=1", "-v", "/var/run/docker.sock:/var/run/docker.sock",
+		"-v", fmt.Sprintf("%s:/go/src/elastic-agent", pwd), "-v", fmt.Sprintf("%s/sysroot:/sysroot", pwd), "-w", "/go/src/elastic-agent", "goreleaser/goreleaser-cross:v1.17.6", "--rm-dist", "--skip-validate", "--skip-publish", "--debug")
+
+}

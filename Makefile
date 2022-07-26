@@ -73,31 +73,3 @@ check-no-changes:
 .PHONY: get-version
 get-version:
 	@mage dumpVariables | grep 'beat_version' | cut -d"=" -f 2 | tr -d " "
-
-
-## goreleaser
-
-PACKAGE_NAME          := elastic-agent
-GOLANG_CROSS_VERSION  ?= v1.17.6
-
-SYSROOT_DIR     ?= sysroots
-SYSROOT_ARCHIVE ?= sysroots.tar.bz2
-
-.PHONY: build
-build:
-	@if [ ! -f ".build-env" ]; then \
-		echo "\033[91m.build-env is required for build\033[0m";\
-		exit 1;\
-	fi
-	docker run \
-		--rm \
-		--privileged \
-		-e CGO_ENABLED=1 \
-		--env-file .build-env \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v `pwd`:/go/src/$(PACKAGE_NAME) \
-		-v `pwd`/sysroot:/sysroot \
-		-w /go/src/$(PACKAGE_NAME) \
-		goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
-		build --rm-dist --skip-validate
-
