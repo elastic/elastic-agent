@@ -24,7 +24,7 @@ import (
 const DefaultCheckInterval = 5 * time.Minute
 
 func init() {
-	composable.Providers.AddContextProvider("host", ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
 }
 
 type infoFetcher func() (map[string]interface{}, error)
@@ -50,34 +50,30 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 	}
 
 	// Update context when any host information changes.
-	go func() {
-		for {
-			t := time.NewTimer(c.CheckInterval)
-			select {
-			case <-comm.Done():
-				t.Stop()
-				return
-			case <-t.C:
-			}
-
-			updated, err := c.fetcher()
-			if err != nil {
-				c.logger.Warnf("Failed fetching latest host information: %s", err)
-				continue
-			}
-			if reflect.DeepEqual(current, updated) {
-				// nothing to do
-				continue
-			}
-			current = updated
-			err = comm.Set(updated)
-			if err != nil {
-				c.logger.Errorf("Failed updating mapping to latest host information: %s", err)
-			}
+	for {
+		t := time.NewTimer(c.CheckInterval)
+		select {
+		case <-comm.Done():
+			t.Stop()
+			return comm.Err()
+		case <-t.C:
 		}
-	}()
 
-	return nil
+		updated, err := c.fetcher()
+		if err != nil {
+			c.logger.Warnf("Failed fetching latest host information: %s", err)
+			continue
+		}
+		if reflect.DeepEqual(current, updated) {
+			// nothing to do
+			continue
+		}
+		current = updated
+		err = comm.Set(updated)
+		if err != nil {
+			c.logger.Errorf("Failed updating mapping to latest host information: %s", err)
+		}
+	}
 }
 
 // ContextProviderBuilder builds the context provider.

@@ -8,8 +8,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -32,7 +32,7 @@ func NewCancel(log *logger.Logger, cancel queueCanceler) *Cancel {
 }
 
 // Handle will cancel any actions in the queue that match target_id.
-func (h *Cancel) Handle(ctx context.Context, a fleetapi.Action, acker store.FleetAcker) error {
+func (h *Cancel) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	action, ok := a.(*fleetapi.ActionCancel)
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionCancel and received %T", a)

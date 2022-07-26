@@ -7,8 +7,8 @@ package handlers
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -25,7 +25,7 @@ func NewDefault(log *logger.Logger) *Default {
 }
 
 // Handle is a default handler, no action is taken.
-func (h *Default) Handle(_ context.Context, a fleetapi.Action, acker store.FleetAcker) error {
+func (h *Default) Handle(_ context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Errorf("HandlerDefault: action '%+v' received", a)
 	return nil
 }

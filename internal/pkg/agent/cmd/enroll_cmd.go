@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -303,7 +302,7 @@ func (c *enrollCmd) writeDelayEnroll(streams *cli.IOStreams) error {
 func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig map[string]interface{}) (string, error) {
 	c.log.Debug("verifying communication with running Elastic Agent daemon")
 	agentRunning := true
-	_, err := getDaemonStatus(ctx)
+	_, err := getDaemonState(ctx)
 	if err != nil {
 		if !c.options.FleetServer.SpawnAgent {
 			// wait longer to try and communicate with the Elastic Agent
@@ -641,7 +640,7 @@ func delay(ctx context.Context, d time.Duration) {
 	}
 }
 
-func getDaemonStatus(ctx context.Context) (*client.AgentStatus, error) {
+func getDaemonState(ctx context.Context) (*client.AgentState, error) {
 	ctx, cancel := context.WithTimeout(ctx, daemonTimeout)
 	defer cancel()
 	daemon := client.New()
@@ -650,7 +649,7 @@ func getDaemonStatus(ctx context.Context) (*client.AgentStatus, error) {
 		return nil, err
 	}
 	defer daemon.Disconnect()
-	return daemon.Status(ctx)
+	return daemon.State(ctx)
 }
 
 type waitResult struct {
@@ -680,7 +679,7 @@ func waitForAgent(ctx context.Context, timeout time.Duration) error {
 		backOff := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
 		for {
 			backOff.Wait()
-			_, err := getDaemonStatus(innerCtx)
+			_, err := getDaemonState(innerCtx)
 			if errors.Is(err, context.Canceled) {
 				resChan <- waitResult{err: err}
 				return
@@ -730,7 +729,7 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 		backExp := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
 		for {
 			backExp.Wait()
-			status, err := getDaemonStatus(innerCtx)
+			state, err := getDaemonState(innerCtx)
 			if errors.Is(err, context.Canceled) {
 				resChan <- waitResult{err: err}
 				return
@@ -750,8 +749,8 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 				}
 				continue
 			}
-			app := getAppFromStatus(status, "fleet-server")
-			if app == nil {
+			unit := getCompUnitFromStatus(state, "fleet-server")
+			if unit == nil {
 				err = errors.New("no fleet-server application running")
 				log.Debugf("%s: %s", waitingForFleetServer, err)
 				if msg != waitingForFleetServer {
@@ -767,16 +766,16 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 				}
 				continue
 			}
-			log.Debugf("%s: %s - %s", waitingForFleetServer, app.Status, app.Message)
-			if app.Status == cproto.Status_DEGRADED || app.Status == cproto.Status_HEALTHY {
+			log.Debugf("%s: %s - %s", waitingForFleetServer, unit.State, unit.Message)
+			if unit.State == client.Degraded || unit.State == client.Healthy {
 				// app has started and is running
-				if app.Message != "" {
-					log.Infof("Fleet Server - %s", app.Message)
+				if unit.Message != "" {
+					log.Infof("Fleet Server - %s", unit.Message)
 				}
 				// extract the enrollment token from the status payload
 				token := ""
-				if app.Payload != nil {
-					if enrollToken, ok := app.Payload["enrollment_token"]; ok {
+				if unit.Payload != nil {
+					if enrollToken, ok := unit.Payload["enrollment_token"]; ok {
 						if tokenStr, ok := enrollToken.(string); ok {
 							token = tokenStr
 						}
@@ -785,8 +784,8 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 				resChan <- waitResult{enrollmentToken: token}
 				break
 			}
-			if app.Message != "" {
-				appMsg := fmt.Sprintf("Fleet Server - %s", app.Message)
+			if unit.Message != "" {
+				appMsg := fmt.Sprintf("Fleet Server - %s", unit.Message)
 				if msg != appMsg {
 					msg = appMsg
 					msgCount = 0
@@ -827,10 +826,14 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 	return res.enrollmentToken, nil
 }
 
-func getAppFromStatus(status *client.AgentStatus, name string) *client.ApplicationStatus {
-	for _, app := range status.Applications {
-		if app.Name == name {
-			return app
+func getCompUnitFromStatus(state *client.AgentState, name string) *client.ComponentUnitState {
+	for _, comp := range state.Components {
+		if comp.Name == name {
+			for _, unit := range comp.Units {
+				if unit.UnitType == client.UnitTypeInput {
+					return &unit
+				}
+			}
 		}
 	}
 	return nil

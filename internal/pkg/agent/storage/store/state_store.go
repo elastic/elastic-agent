@@ -16,21 +16,16 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type dispatcher interface {
-	Dispatch(context.Context, FleetAcker, ...action) error
+	Dispatch(context.Context, acker.Acker, ...action) error
 }
 
 type store interface {
 	Save(io.Reader) error
-}
-
-// FleetAcker is an acker of actions to fleet.
-type FleetAcker interface {
-	Ack(ctx context.Context, action fleetapi.Action) error
-	Commit(ctx context.Context) error
 }
 
 type storeLoad interface {
@@ -93,7 +88,7 @@ func NewStateStoreWithMigration(log *logger.Logger, actionStorePath, stateStoreP
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
-func NewStateStoreActionAcker(acker FleetAcker, store *StateStore) *StateStoreActionAcker {
+func NewStateStoreActionAcker(acker acker.Acker, store *StateStore) *StateStoreActionAcker {
 	return &StateStoreActionAcker{acker: acker, store: store}
 }
 
@@ -326,7 +321,7 @@ func (s *StateStore) AckToken() string {
 // its up to the action store to decide if we need to persist the event for future replay or just
 // discard the event.
 type StateStoreActionAcker struct {
-	acker FleetAcker
+	acker acker.Acker
 	store *StateStore
 }
 
@@ -350,7 +345,7 @@ func ReplayActions(
 	ctx context.Context,
 	log *logger.Logger,
 	dispatcher dispatcher,
-	acker FleetAcker,
+	acker acker.Acker,
 	actions ...action,
 ) error {
 	log.Info("restoring current policy from disk")

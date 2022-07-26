@@ -7,8 +7,8 @@ package handlers
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -25,7 +25,7 @@ func NewPolicyReassign(log *logger.Logger) *PolicyReassign {
 }
 
 // Handle handles POLICY_REASSIGN action.
-func (h *PolicyReassign) Handle(ctx context.Context, a fleetapi.Action, acker store.FleetAcker) error {
+func (h *PolicyReassign) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerPolicyReassign: action '%+v' received", a)
 
 	if err := acker.Ack(ctx, a); err != nil {

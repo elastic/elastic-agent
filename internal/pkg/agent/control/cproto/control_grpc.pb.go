@@ -29,8 +29,8 @@ const _ = grpc.SupportPackageIsVersion7
 type ElasticAgentControlClient interface {
 	// Fetches the currently running version of the Elastic Agent.
 	Version(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VersionResponse, error)
-	// Fetches the currently status of the Elastic Agent.
-	Status(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StatusResponse, error)
+	// Fetches the currently states of the Elastic Agent.
+	State(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StateResponse, error)
 	// Restart restarts the current running Elastic Agent.
 	Restart(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RestartResponse, error)
 	// Upgrade starts the upgrade process of Elastic Agent.
@@ -60,9 +60,9 @@ func (c *elasticAgentControlClient) Version(ctx context.Context, in *Empty, opts
 	return out, nil
 }
 
-func (c *elasticAgentControlClient) Status(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StatusResponse, error) {
-	out := new(StatusResponse)
-	err := c.cc.Invoke(ctx, "/cproto.ElasticAgentControl/Status", in, out, opts...)
+func (c *elasticAgentControlClient) State(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StateResponse, error) {
+	out := new(StateResponse)
+	err := c.cc.Invoke(ctx, "/cproto.ElasticAgentControl/State", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +120,8 @@ func (c *elasticAgentControlClient) ProcMetrics(ctx context.Context, in *Empty, 
 type ElasticAgentControlServer interface {
 	// Fetches the currently running version of the Elastic Agent.
 	Version(context.Context, *Empty) (*VersionResponse, error)
-	// Fetches the currently status of the Elastic Agent.
-	Status(context.Context, *Empty) (*StatusResponse, error)
+	// Fetches the currently states of the Elastic Agent.
+	State(context.Context, *Empty) (*StateResponse, error)
 	// Restart restarts the current running Elastic Agent.
 	Restart(context.Context, *Empty) (*RestartResponse, error)
 	// Upgrade starts the upgrade process of Elastic Agent.
@@ -142,8 +142,8 @@ type UnimplementedElasticAgentControlServer struct {
 func (UnimplementedElasticAgentControlServer) Version(context.Context, *Empty) (*VersionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Version not implemented")
 }
-func (UnimplementedElasticAgentControlServer) Status(context.Context, *Empty) (*StatusResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
+func (UnimplementedElasticAgentControlServer) State(context.Context, *Empty) (*StateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method State not implemented")
 }
 func (UnimplementedElasticAgentControlServer) Restart(context.Context, *Empty) (*RestartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Restart not implemented")
@@ -191,20 +191,20 @@ func _ElasticAgentControl_Version_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ElasticAgentControl_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ElasticAgentControl_State_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ElasticAgentControlServer).Status(ctx, in)
+		return srv.(ElasticAgentControlServer).State(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cproto.ElasticAgentControl/Status",
+		FullMethod: "/cproto.ElasticAgentControl/State",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ElasticAgentControlServer).Status(ctx, req.(*Empty))
+		return srv.(ElasticAgentControlServer).State(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -311,8 +311,8 @@ var ElasticAgentControl_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ElasticAgentControl_Version_Handler,
 		},
 		{
-			MethodName: "Status",
-			Handler:    _ElasticAgentControl_Status_Handler,
+			MethodName: "State",
+			Handler:    _ElasticAgentControl_State_Handler,
 		},
 		{
 			MethodName: "Restart",

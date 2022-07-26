@@ -8,11 +8,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -23,25 +24,25 @@ type reexecManager interface {
 // Settings handles settings change coming from fleet and updates log level.
 type Settings struct {
 	log       *logger.Logger
-	reexec    reexecManager
 	agentInfo *info.AgentInfo
+	coord     *coordinator.Coordinator
 }
 
 // NewSettings creates a new Settings handler.
 func NewSettings(
 	log *logger.Logger,
-	reexec reexecManager,
 	agentInfo *info.AgentInfo,
+	coord *coordinator.Coordinator,
 ) *Settings {
 	return &Settings{
 		log:       log,
-		reexec:    reexec,
 		agentInfo: agentInfo,
+		coord:     coord,
 	}
 }
 
 // Handle handles SETTINGS action.
-func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker store.FleetAcker) error {
+func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerUpgrade: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionSettings)
 	if !ok {
@@ -62,7 +63,7 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker store.Fl
 		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", action.ActionID)
 	}
 
-	h.reexec.ReExec(nil)
+	h.coord.ReExec(nil)
 	return nil
 }
 

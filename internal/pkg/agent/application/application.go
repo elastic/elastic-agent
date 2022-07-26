@@ -5,102 +5,158 @@
 package application
 
 import (
-	"context"
 	"fmt"
+	"path/filepath"
+	goruntime "runtime"
+	"strconv"
 
 	"go.elastic.co/apm"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/go-sysinfo"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/dir"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// Application is the application interface implemented by the different running mode.
-type Application interface {
-	Start() error
-	Stop() error
-	AgentInfo() *info.AgentInfo
-	Routes() *sorted.Set
-}
+type discoverFunc func() ([]string, error)
 
-type reexecManager interface {
-	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
-}
+// ErrNoConfiguration is returned when no configuration are found.
+var ErrNoConfiguration = errors.New("no configuration found", errors.TypeConfig)
 
-type upgraderControl interface {
-	SetUpgrader(upgrader *upgrade.Upgrader)
-}
+// PlatformModifier can modify the platform details before the runtime specifications are loaded.
+type PlatformModifier func(detail component.PlatformDetail) component.PlatformDetail
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	log *logger.Logger,
-	reexec reexecManager,
-	statusCtrl status.Controller,
-	uc upgraderControl,
 	agentInfo *info.AgentInfo,
+	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
-) (Application, error) {
-	// Load configuration from disk to understand in which mode of operation
-	// we must start the elastic-agent, the mode of operation cannot be changed without restarting the
-	// elastic-agent.
+	modifiers ...PlatformModifier,
+) (*coordinator.Coordinator, error) {
+	platform, err := getPlatformDetail(modifiers...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gather system information: %w", err)
+	}
+	log.Info("Gathered system information")
+
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
+	}
+	log.With("inputs", specs.Inputs()).Info("Detected available inputs and outputs")
+
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine capabilities: %w", err)
+	}
+	log.Info("Determined allowed capabilities")
+
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
-
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
-
-	return createApplication(log, pathConfigFile, rawConfig, reexec, statusCtrl, uc, agentInfo, tracer)
-}
-
-func createApplication(
-	log *logger.Logger,
-	pathConfigFile string,
-	rawConfig *config.Config,
-	reexec reexecManager,
-	statusCtrl status.Controller,
-	uc upgraderControl,
-	agentInfo *info.AgentInfo,
-	tracer *apm.Tracer,
-) (Application, error) {
-	log.Info("Detecting execution mode")
-	ctx := context.Background()
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	if configuration.IsStandalone(cfg.Fleet) {
-		log.Info("Agent is managed locally")
-		return newLocal(ctx, log, paths.ConfigFile(), rawConfig, reexec, statusCtrl, uc, agentInfo, tracer)
-	}
+	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig)
 
-	// not in standalone; both modes require reading the fleet.yml configuration file
-	var store storage.Store
-	store, cfg, err = mergeFleetConfig(rawConfig)
+	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
 
-	if configuration.IsFleetServerBootstrap(cfg.Fleet) {
-		log.Info("Agent is in Fleet Server bootstrap mode")
-		return newFleetServerBootstrap(ctx, log, pathConfigFile, rawConfig, statusCtrl, agentInfo, tracer)
+	var configMgr coordinator.ConfigManager
+	var managed *managedConfigManager
+	var compModifiers []coordinator.ComponentsModifier
+	if configuration.IsStandalone(cfg.Fleet) {
+		log.Info("Parsed configuration and determined agent is managed locally")
+
+		loader := config.NewLoader(log, externalConfigsGlob())
+		discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
+		if !cfg.Settings.Reload.Enabled {
+			log.Debug("Reloading of configuration is off")
+			configMgr = newOnce(log, discover, loader)
+		} else {
+			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
+			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+		}
+	} else if configuration.IsFleetServerBootstrap(cfg.Fleet) {
+		log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
+		compModifiers = append(compModifiers, FleetServerComponentModifier)
+		configMgr, err = newFleetServerBootstrapManager(log)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		var store storage.Store
+		store, cfg, err = mergeFleetConfig(rawConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		log.Info("Parsed configuration and determined agent is managed by Fleet")
+
+		compModifiers = append(compModifiers, FleetServerComponentModifier)
+		managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
+		if err != nil {
+			return nil, err
+		}
+		configMgr = managed
 	}
 
-	log.Info("Agent is managed by Fleet")
-	return newManaged(ctx, log, store, cfg, rawConfig, reexec, statusCtrl, agentInfo, tracer)
+	composable, err := composable.New(log, rawConfig)
+	if err != nil {
+		return nil, errors.New(err, "failed to initialize composable controller")
+	}
+
+	coord := coordinator.New(log, specs, reexec, upgrader, runtime, configMgr, composable, caps, compModifiers...)
+	if managed != nil {
+		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
+		// coordinator, so it must be set here once the coordinator is created
+		managed.coord = coord
+	}
+	return coord, nil
+}
+
+func getPlatformDetail(modifiers ...PlatformModifier) (component.PlatformDetail, error) {
+	info, err := sysinfo.Host()
+	if err != nil {
+		return component.PlatformDetail{}, err
+	}
+	os := info.Info().OS
+	detail := component.PlatformDetail{
+		Platform: component.Platform{
+			OS:   goruntime.GOOS,
+			Arch: goruntime.GOARCH,
+			GOOS: goruntime.GOOS,
+		},
+		Family: os.Family,
+		Major:  strconv.Itoa(os.Major),
+		Minor:  strconv.Itoa(os.Minor),
+	}
+	for _, modifier := range modifiers {
+		detail = modifier(detail)
+	}
+	return detail, nil
 }
 
 func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
@@ -145,4 +201,29 @@ func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.C
 	}
 
 	return store, cfg, nil
+}
+
+func externalConfigsGlob() string {
+	return filepath.Join(paths.Config(), configuration.ExternalInputsPattern)
+}
+
+func discoverer(patterns ...string) discoverFunc {
+	var p []string
+	for _, newP := range patterns {
+		if len(newP) == 0 {
+			continue
+		}
+
+		p = append(p, newP)
+	}
+
+	if len(p) == 0 {
+		return func() ([]string, error) {
+			return []string{}, ErrNoConfiguration
+		}
+	}
+
+	return func() ([]string, error) {
+		return dir.DiscoverFiles(p...)
+	}
 }

@@ -35,12 +35,24 @@ type ComponentUnitKey struct {
 	UnitID   string
 }
 
+// ComponentVersionInfo provides version information reported by the component.
+type ComponentVersionInfo struct {
+	// Name of the binary.
+	Name string
+	// Version of the binary.
+	Version string
+	// Additional metadata about the binary.
+	Meta map[string]string
+}
+
 // ComponentState is the overall state of the component.
 type ComponentState struct {
 	State   client.UnitState
 	Message string
 
 	Units map[ComponentUnitKey]ComponentUnitState
+
+	VersionInfo ComponentVersionInfo
 }
 
 func newComponentState(comp *component.Component, initState client.UnitState, initMessage string, initCfgIdx uint64) (s ComponentState) {
@@ -155,6 +167,17 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 					s.Units[key] = unit
 				}
 			}
+		}
+	}
+	if checkin.VersionInfo != nil {
+		if checkin.VersionInfo.Name != "" {
+			s.VersionInfo.Name = checkin.VersionInfo.Name
+		}
+		if checkin.VersionInfo.Version != "" {
+			s.VersionInfo.Version = checkin.VersionInfo.Version
+		}
+		if checkin.VersionInfo.Meta != nil {
+			s.VersionInfo.Meta = checkin.VersionInfo.Meta
 		}
 	}
 	return changed
@@ -280,7 +303,9 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 					delete(state.actions, ar.Id)
 				}
 				state.actionsMx.Unlock()
-				callback(ar)
+				if ok {
+					callback(ar)
+				}
 			}
 		}
 	}()

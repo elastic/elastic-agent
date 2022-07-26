@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/filewatcher"
@@ -19,35 +20,39 @@ import (
 type periodic struct {
 	log      *logger.Logger
 	period   time.Duration
-	done     chan struct{}
 	watcher  *filewatcher.Watch
 	loader   *config.Loader
-	emitter  pipeline.EmitterFunc
 	discover discoverFunc
+	ch       chan coordinator.ConfigChange
+	errCh    chan error
 }
 
-func (p *periodic) Start() error {
-	go func() {
+func (p *periodic) Run(ctx context.Context) error {
+	if err := p.work(); err != nil {
+		return err
+	}
+
+	t := time.NewTicker(p.period)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.C:
+		}
+
 		if err := p.work(); err != nil {
-			p.log.Debugf("Failed to read configuration, error: %s", err)
+			return err
 		}
+	}
+}
 
-	WORK:
-		for {
-			t := time.NewTimer(p.period)
-			select {
-			case <-p.done:
-				t.Stop()
-				break WORK
-			case <-t.C:
-			}
+func (p *periodic) Errors() <-chan error {
+	return p.errCh
+}
 
-			if err := p.work(); err != nil {
-				p.log.Debugf("Failed to read configuration, error: %s", err)
-			}
-		}
-	}()
-	return nil
+func (p *periodic) Watch() <-chan coordinator.ConfigChange {
+	return p.ch
 }
 
 func (p *periodic) work() error {
@@ -92,21 +97,18 @@ func (p *periodic) work() error {
 			p.log.Debugf("Unchanged %d files: %s", len(s.Unchanged), strings.Join(s.Updated, ", "))
 		}
 
-		err := readfiles(context.Background(), files, p.loader, p.emitter)
+		cfg, err := readfiles(files, p.loader)
 		if err != nil {
 			// assume something when really wrong and invalidate any cache
 			// so we get a full new config on next tick.
 			p.watcher.Invalidate()
-			return errors.New(err, "could not emit configuration")
+			return err
 		}
+		p.ch <- &localConfigChange{cfg}
+		return nil
 	}
 
 	p.log.Info("No configuration change")
-	return nil
-}
-
-func (p *periodic) Stop() error {
-	close(p.done)
 	return nil
 }
 
@@ -115,7 +117,6 @@ func newPeriodic(
 	period time.Duration,
 	discover discoverFunc,
 	loader *config.Loader,
-	emitter pipeline.EmitterFunc,
 ) *periodic {
 	w, err := filewatcher.New(log, filewatcher.DefaultComparer)
 
@@ -127,10 +128,27 @@ func newPeriodic(
 	return &periodic{
 		log:      log,
 		period:   period,
-		done:     make(chan struct{}),
 		watcher:  w,
 		discover: discover,
 		loader:   loader,
-		emitter:  emitter,
+		ch:       make(chan coordinator.ConfigChange),
+		errCh:    make(chan error),
 	}
+}
+
+type localConfigChange struct {
+	cfg *config.Config
+}
+
+func (l *localConfigChange) Config() *config.Config {
+	return l.cfg
+}
+
+func (l *localConfigChange) Ack() error {
+	// do nothing
+	return nil
+}
+
+func (l *localConfigChange) Fail(_ error) {
+	// do nothing
 }

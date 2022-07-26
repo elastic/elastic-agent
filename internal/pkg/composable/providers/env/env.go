@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	composable.Providers.AddContextProvider("env", ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("env", ContextProviderBuilder)
 }
 
 type contextProvider struct{}

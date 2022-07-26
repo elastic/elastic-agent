@@ -428,29 +428,31 @@ func gatherConfig() (AgentConfig, error) {
 	}
 	cfg.ConfigRendered = mapCFG
 
-	// Gather vars to render process config
-	isStandalone, err := isStandalone(renderedCFG)
-	if err != nil {
-		return AgentConfig{}, err
-	}
-
-	log, err := newErrorLogger()
-	if err != nil {
-		return AgentConfig{}, err
-	}
-
-	// Get process config - uses same approach as inspect output command.
-	// Does not contact server process to request configs.
-	pMap, err := getProgramsFromConfig(log, agentInfo, renderedCFG, isStandalone)
-	if err != nil {
-		return AgentConfig{}, err
-	}
-	cfg.AppConfig = make(map[string]interface{}, 0)
-	for rk, programs := range pMap {
-		for _, p := range programs {
-			cfg.AppConfig[p.Identifier()+"_"+rk] = p.Configuration()
+	/*
+		// Gather vars to render process config
+		isStandalone, err := isStandalone(renderedCFG)
+		if err != nil {
+			return AgentConfig{}, err
 		}
-	}
+
+		log, err := newErrorLogger()
+		if err != nil {
+			return AgentConfig{}, err
+		}
+
+		// Get process config - uses same approach as inspect output command.
+		// Does not contact server process to request configs.
+		pMap, err := getProgramsFromConfig(log, agentInfo, renderedCFG, isStandalone)
+		if err != nil {
+			return AgentConfig{}, err
+		}
+		cfg.AppConfig = make(map[string]interface{}, 0)
+		for rk, programs := range pMap {
+			for _, p := range programs {
+				cfg.AppConfig[p.Identifier()+"_"+rk] = p.Configuration()
+			}
+		}
+	*/
 
 	return cfg, nil
 }

@@ -7,14 +7,14 @@ package actions
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
 
 // Handler handles action coming from fleet.
 type Handler interface {
-	Handle(ctx context.Context, a fleetapi.Action, acker store.FleetAcker) error
+	Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error
 }
 
 // ClientSetter sets the client for communication.

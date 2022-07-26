@@ -8,10 +8,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -27,8 +27,7 @@ type stateStore interface {
 // For it to be operational again it needs to be either enrolled or reconfigured.
 type Unenroll struct {
 	log        *logger.Logger
-	emitter    pipeline.EmitterFunc
-	dispatcher pipeline.Router
+	ch         chan coordinator.ConfigChange
 	closers    []context.CancelFunc
 	stateStore stateStore
 }
@@ -36,43 +35,40 @@ type Unenroll struct {
 // NewUnenroll creates a new Unenroll handler.
 func NewUnenroll(
 	log *logger.Logger,
-	emitter pipeline.EmitterFunc,
-	dispatcher pipeline.Router,
+	ch chan coordinator.ConfigChange,
 	closers []context.CancelFunc,
 	stateStore stateStore,
 ) *Unenroll {
 	return &Unenroll{
 		log:        log,
-		emitter:    emitter,
-		dispatcher: dispatcher,
+		ch:         ch,
 		closers:    closers,
 		stateStore: stateStore,
 	}
 }
 
 // Handle handles UNENROLL action.
-func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker store.FleetAcker) error {
+func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerUnenroll: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionUnenroll)
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionUnenroll and received %T", a)
 	}
 
-	// Providing empty map will close all pipelines
-	noPrograms := make(map[pipeline.RoutingKey][]program.Program)
-	_ = h.dispatcher.Route(ctx, a.ID(), noPrograms)
+	if action.IsDetected {
+		// not from Fleet; so we set it to nil so policyChange doesn't ack it
+		a = nil
+	}
 
-	if !action.IsDetected {
-		// ACK only events received from fleet.
-		if err := acker.Ack(ctx, action); err != nil {
-			return err
-		}
+	h.ch <- &policyChange{
+		ctx:    ctx,
+		cfg:    config.New(),
+		action: a,
+		acker:  acker,
+		commit: true,
+	}
 
-		// commit all acks before quitting.
-		if err := acker.Commit(ctx); err != nil {
-			return err
-		}
-	} else if h.stateStore != nil {
+	if h.stateStore != nil {
 		// backup action for future start to avoid starting fleet gateway loop
 		h.stateStore.Add(a)
 		h.stateStore.Save()

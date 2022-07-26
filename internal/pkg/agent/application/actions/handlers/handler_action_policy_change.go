@@ -15,15 +15,15 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -36,28 +36,28 @@ const (
 // PolicyChange is a handler for POLICY_CHANGE action.
 type PolicyChange struct {
 	log       *logger.Logger
-	emitter   pipeline.EmitterFunc
 	agentInfo *info.AgentInfo
 	config    *configuration.Configuration
 	store     storage.Store
+	ch        chan coordinator.ConfigChange
 	setters   []actions.ClientSetter
 }
 
 // NewPolicyChange creates a new PolicyChange handler.
 func NewPolicyChange(
 	log *logger.Logger,
-	emitter pipeline.EmitterFunc,
 	agentInfo *info.AgentInfo,
 	config *configuration.Configuration,
 	store storage.Store,
+	ch chan coordinator.ConfigChange,
 	setters ...actions.ClientSetter,
 ) *PolicyChange {
 	return &PolicyChange{
 		log:       log,
-		emitter:   emitter,
 		agentInfo: agentInfo,
 		config:    config,
 		store:     store,
+		ch:        ch,
 		setters:   setters,
 	}
 }
@@ -72,7 +72,7 @@ func (h *PolicyChange) AddSetter(cs actions.ClientSetter) {
 }
 
 // Handle handles policy change action.
-func (h *PolicyChange) Handle(ctx context.Context, a fleetapi.Action, acker store.FleetAcker) error {
+func (h *PolicyChange) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerPolicyChange: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionPolicyChange)
 	if !ok {
@@ -89,11 +89,19 @@ func (h *PolicyChange) Handle(ctx context.Context, a fleetapi.Action, acker stor
 	if err != nil {
 		return err
 	}
-	if err := h.emitter(ctx, c); err != nil {
-		return err
-	}
 
-	return acker.Ack(ctx, action)
+	h.ch <- &policyChange{
+		ctx:    ctx,
+		cfg:    c,
+		action: a,
+		acker:  acker,
+	}
+	return nil
+}
+
+// Watch returns the channel for configuration change notifications.
+func (h *PolicyChange) Watch() <-chan coordinator.ConfigChange {
+	return h.ch
 }
 
 func (h *PolicyChange) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
@@ -209,4 +217,34 @@ func fleetToReader(agentInfo *info.AgentInfo, cfg *configuration.Configuration) 
 		return nil, err
 	}
 	return bytes.NewReader(data), nil
+}
+
+type policyChange struct {
+	ctx    context.Context
+	cfg    *config.Config
+	action fleetapi.Action
+	acker  acker.Acker
+	commit bool
+}
+
+func (l *policyChange) Config() *config.Config {
+	return l.cfg
+}
+
+func (l *policyChange) Ack() error {
+	if l.action == nil {
+		return nil
+	}
+	err := l.acker.Ack(l.ctx, l.action)
+	if err != nil {
+		return err
+	}
+	if l.commit {
+		return l.acker.Commit(l.ctx)
+	}
+	return nil
+}
+
+func (l *policyChange) Fail(_ error) {
+	// do nothing
 }

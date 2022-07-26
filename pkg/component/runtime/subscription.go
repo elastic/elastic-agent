@@ -4,16 +4,22 @@
 
 package runtime
 
+import (
+	"context"
+)
+
 // Subscription provides a channel for notifications on a component state.
 type Subscription struct {
+	ctx     context.Context
 	manager *Manager
 	ch      chan ComponentState
 }
 
-func newSubscription(manager *Manager) *Subscription {
+func newSubscription(ctx context.Context, manager *Manager) *Subscription {
 	return &Subscription{
+		ctx:     ctx,
 		manager: manager,
-		ch:      make(chan ComponentState, 1), // buffer of 1 to allow initial latestState state
+		ch:      make(chan ComponentState),
 	}
 }
 
@@ -22,7 +28,22 @@ func (s *Subscription) Ch() <-chan ComponentState {
 	return s.ch
 }
 
-// Unsubscribe removes the subscription.
-func (s *Subscription) Unsubscribe() {
-	s.manager.unsubscribe(s)
+// SubscriptionAll provides a channel for notifications on all component state changes.
+type SubscriptionAll struct {
+	ctx     context.Context
+	manager *Manager
+	ch      chan ComponentComponentState
+}
+
+func newSubscriptionAll(ctx context.Context, manager *Manager) *SubscriptionAll {
+	return &SubscriptionAll{
+		ctx:     ctx,
+		manager: manager,
+		ch:      make(chan ComponentComponentState),
+	}
+}
+
+// Ch provides the channel to get state changes.
+func (s *SubscriptionAll) Ch() <-chan ComponentComponentState {
+	return s.ch
 }

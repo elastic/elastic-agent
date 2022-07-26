@@ -6,230 +6,73 @@ package application
 
 import (
 	"context"
+	"time"
 
-	"go.elastic.co/apm"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/go-sysinfo"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/stream"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
-	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
-// FleetServerBootstrap application, does just enough to get a Fleet Server up and running so enrollment
-// can complete.
-type FleetServerBootstrap struct {
-	bgContext   context.Context
-	cancelCtxFn context.CancelFunc
-	log         *logger.Logger
-	Config      configuration.FleetAgentConfig
-	agentInfo   *info.AgentInfo
-	router      pipeline.Router
-	source      source
-	srv         *server.Server
-}
-
-func newFleetServerBootstrap(
-	ctx context.Context,
-	log *logger.Logger,
-	pathConfigFile string,
-	rawConfig *config.Config,
-	statusCtrl status.Controller,
-	agentInfo *info.AgentInfo,
-	tracer *apm.Tracer,
-) (*FleetServerBootstrap, error) {
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	if log == nil {
-		log, err = logger.NewFromConfig("", cfg.Settings.LoggingConfig, false)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	logR := logreporter.NewReporter(log)
-
-	sysInfo, err := sysinfo.Host()
-	if err != nil {
-		return nil, errors.New(err,
-			"fail to get system information",
-			errors.TypeUnexpected)
-	}
-
-	bootstrapApp := &FleetServerBootstrap{
-		log:       log,
-		agentInfo: agentInfo,
-	}
-
-	bootstrapApp.bgContext, bootstrapApp.cancelCtxFn = context.WithCancel(ctx)
-	bootstrapApp.srv, err = server.NewFromConfig(log, cfg.Settings.GRPC, &operation.ApplicationStatusHandler{}, tracer)
-	if err != nil {
-		return nil, errors.New(err, "initialize GRPC listener")
-	}
-
-	reporter := reporting.NewReporter(bootstrapApp.bgContext, log, bootstrapApp.agentInfo, logR)
-
-	if cfg.Settings.MonitoringConfig != nil {
-		cfg.Settings.MonitoringConfig.Enabled = false
-	} else {
-		cfg.Settings.MonitoringConfig = &monitoringCfg.MonitoringConfig{Enabled: false}
-	}
-	monitor, err := monitoring.NewMonitor(cfg.Settings)
-	if err != nil {
-		return nil, errors.New(err, "failed to initialize monitoring")
-	}
-
-	router, err := router.New(log, stream.Factory(bootstrapApp.bgContext, agentInfo, cfg.Settings, bootstrapApp.srv, reporter, monitor, statusCtrl))
-	if err != nil {
-		return nil, errors.New(err, "fail to initialize pipeline router")
-	}
-	bootstrapApp.router = router
-
-	emit, err := bootstrapEmitter(
-		bootstrapApp.bgContext,
-		log,
-		agentInfo,
-		router,
-		&pipeline.ConfigModifiers{
-			Filters: []pipeline.FilterFunc{filters.StreamChecker, modifiers.InjectFleet(rawConfig, sysInfo.Info(), agentInfo)},
+// injectFleetServerInput is the base configuration that is used plus the FleetServerComponentModifier that adjusts
+// the components before sending them to the runtime manager.
+var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
+	"outputs": map[string]interface{}{
+		"default": map[string]interface{}{
+			"type":  "elasticsearch",
+			"hosts": []string{"localhost:9200"},
 		},
-	)
-	if err != nil {
-		return nil, err
-	}
+	},
+	"inputs": []interface{}{
+		map[string]interface{}{
+			"type": "fleet-server",
+		},
+	},
+})
 
-	loader := config.NewLoader(log, "")
-	discover := discoverer(pathConfigFile, cfg.Settings.Path)
-	bootstrapApp.source = newOnce(log, discover, loader, emit)
-	return bootstrapApp, nil
+// FleetServerComponentModifier modifies the comps to inject extra information from the policy into
+// the Fleet Server component and units needed to run Fleet Server correctly.
+func FleetServerComponentModifier(comps []component.Component, policy map[string]interface{}) ([]component.Component, error) {
+	// TODO(blakerouse): Need to add logic to update the Fleet Server component with extra information from the policy.
+	return comps, nil
 }
 
-// Routes returns a list of routes handled by server.
-func (b *FleetServerBootstrap) Routes() *sorted.Set {
-	return b.router.Routes()
+type fleetServerBootstrapManager struct {
+	log *logger.Logger
+
+	ch    chan coordinator.ConfigChange
+	errCh chan error
 }
 
-// Start starts a managed elastic-agent.
-func (b *FleetServerBootstrap) Start() error {
-	b.log.Info("Agent is starting")
-	defer b.log.Info("Agent is stopped")
-
-	if err := b.srv.Start(); err != nil {
-		return err
-	}
-	if err := b.source.Start(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Stop stops a local agent.
-func (b *FleetServerBootstrap) Stop() error {
-	err := b.source.Stop()
-	b.cancelCtxFn()
-	b.router.Shutdown()
-	b.srv.Stop()
-	return err
-}
-
-// AgentInfo retrieves elastic-agent information.
-func (b *FleetServerBootstrap) AgentInfo() *info.AgentInfo {
-	return b.agentInfo
-}
-
-func bootstrapEmitter(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInfo, router pipeline.Router, modifiers *pipeline.ConfigModifiers) (pipeline.EmitterFunc, error) {
-	ch := make(chan *config.Config)
-
-	go func() {
-		for {
-			var c *config.Config
-			select {
-			case <-ctx.Done():
-				return
-			case c = <-ch:
-			}
-
-			err := emit(ctx, log, agentInfo, router, modifiers, c)
-			if err != nil {
-				log.Error(err)
-			}
-		}
-	}()
-
-	return func(ctx context.Context, c *config.Config) error {
-		span, _ := apm.StartSpan(ctx, "emit", "app.internal")
-		defer span.End()
-		ch <- c
-		return nil
+func newFleetServerBootstrapManager(
+	log *logger.Logger,
+) (*fleetServerBootstrapManager, error) {
+	return &fleetServerBootstrapManager{
+		log:   log,
+		ch:    make(chan coordinator.ConfigChange),
+		errCh: make(chan error),
 	}, nil
 }
 
-func emit(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInfo, router pipeline.Router, modifiers *pipeline.ConfigModifiers, c *config.Config) error {
-	if err := info.InjectAgentConfig(c); err != nil {
-		return err
+func (m *fleetServerBootstrapManager) Run(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	m.log.Debugf("injecting fleet-server for bootstrap")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case m.ch <- &localConfigChange{injectFleetServerInput}:
 	}
 
-	// perform and verify ast translation
-	m, err := c.ToMapStr()
-	if err != nil {
-		return errors.New(err, "could not create the AST from the configuration", errors.TypeConfig)
-	}
-	ast, err := transpiler.NewAST(m)
-	if err != nil {
-		return errors.New(err, "could not create the AST from the configuration", errors.TypeConfig)
-	}
-	for _, filter := range modifiers.Filters {
-		if err := filter(log, ast); err != nil {
-			return errors.New(err, "failed to filter configuration", errors.TypeConfig)
-		}
-	}
+	<-ctx.Done()
+	return ctx.Err()
+}
 
-	// overwrite the inputs to only have a single fleet-server input
-	transpiler.Insert(ast, transpiler.NewList([]transpiler.Node{
-		transpiler.NewDict([]transpiler.Node{
-			transpiler.NewKey("type", transpiler.NewStrVal("fleet-server")),
-		}),
-	}), "inputs")
+func (m *fleetServerBootstrapManager) Errors() <-chan error {
+	return m.errCh
+}
 
-	spec, ok := program.SupportedMap["fleet-server"]
-	if !ok {
-		return errors.New("missing required fleet-server program specification")
-	}
-	ok, err = program.DetectProgram(spec.Rules, spec.When, spec.Constraints, agentInfo, ast)
-	if err != nil {
-		return errors.New(err, "failed parsing the configuration")
-	}
-	if !ok {
-		return errors.New("bootstrap configuration is incorrect causing fleet-server to not be started")
-	}
-
-	return router.Route(ctx, ast.HashStr(), map[pipeline.RoutingKey][]program.Program{
-		pipeline.DefaultRK: {
-			{
-				Spec:   spec,
-				Config: ast,
-			},
-		},
-	})
+func (m *fleetServerBootstrapManager) Watch() <-chan coordinator.ConfigChange {
+	return m.ch
 }

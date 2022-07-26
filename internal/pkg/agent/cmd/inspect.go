@@ -5,34 +5,11 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/go-sysinfo"
 )
 
 func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Command {
@@ -42,10 +19,12 @@ func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Comman
 		Long:  "Shows current configuration of the agent",
 		Args:  cobra.ExactArgs(0),
 		Run: func(c *cobra.Command, args []string) {
-			if err := inspectConfig(paths.ConfigFile()); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
-			}
+			/*
+				if err := inspectConfig(paths.ConfigFile()); err != nil {
+					fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+					os.Exit(1)
+				}
+			*/
 		},
 	}
 
@@ -61,19 +40,22 @@ func newInspectOutputCommandWithArgs(_ []string) *cobra.Command {
 		Long:  "Displays configuration generated for output.\nIf no output is specified list of output is displayed",
 		Args:  cobra.MaximumNArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			outName, _ := c.Flags().GetString("output")
-			program, _ := c.Flags().GetString("program")
-			cfgPath := paths.ConfigFile()
-			agentInfo, err := info.NewAgentInfo(false)
-			if err != nil {
-				return err
-			}
+			/*
+				outName, _ := c.Flags().GetString("output")
+				program, _ := c.Flags().GetString("program")
+				cfgPath := paths.ConfigFile()
+				agentInfo, err := info.NewAgentInfo(false)
+				if err != nil {
+					return err
+				}
 
-			if outName == "" {
-				return inspectOutputs(cfgPath, agentInfo)
-			}
+					if outName == "" {
+						return inspectOutputs(cfgPath, agentInfo)
+					}
 
-			return inspectOutput(cfgPath, outName, program, agentInfo)
+					return inspectOutput(cfgPath, outName, program, agentInfo)
+			*/
+			return nil
 		},
 	}
 
@@ -83,6 +65,7 @@ func newInspectOutputCommandWithArgs(_ []string) *cobra.Command {
 	return cmd
 }
 
+/*
 func inspectConfig(cfgPath string) error {
 	err := tryContainerLoadPaths()
 	if err != nil {
@@ -102,7 +85,7 @@ func printMapStringConfig(mapStr map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l, status.NewController(l))
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
 	if err != nil {
 		return err
 	}
@@ -279,7 +262,7 @@ func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *c
 		configModifiers.Filters = append(configModifiers.Filters, modifiers.InjectFleet(cfg, sysInfo.Info(), agentInfo))
 	}
 
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, status.NewController(log))
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
 		return nil, err
 	}
@@ -374,17 +357,23 @@ func newWaitForCompose(wrapped composable.Controller) *waitForCompose {
 	}
 }
 
-func (w *waitForCompose) Run(ctx context.Context, cb composable.VarsCallback) error {
-	err := w.controller.Run(ctx, func(vars []*transpiler.Vars) {
-		cb(vars)
-		w.done <- true
-	})
+func (w *waitForCompose) Run(ctx context.Context) error {
+	err := w.controller.Run(ctx)
 	return err
+}
+
+func (w *waitForCompose) Errors() <-chan error {
+	return nil
+}
+
+func (w *waitForCompose) Watch() <-chan []*transpiler.Vars {
+	return nil
 }
 
 func (w *waitForCompose) Wait() {
 	<-w.done
 }
+*/
 
 func isStandalone(cfg *config.Config) (bool, error) {
 	c, err := configuration.NewFromConfig(cfg)

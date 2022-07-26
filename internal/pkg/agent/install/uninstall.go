@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/kardianos/service"
 
@@ -29,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -233,19 +231,12 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
 		varsArray := make([]*transpiler.Vars, 0)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		varsCallback := func(vv []*transpiler.Vars) {
-			varsArray = vv
-			wg.Done()
-		}
 
 		ctrl, err := composable.New(log, cfg)
 		if err != nil {
 			return nil, err
 		}
-		_ = ctrl.Run(ctx, varsCallback)
-		wg.Wait()
+		_ = ctrl.Run(ctx)
 
 		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {
@@ -258,7 +249,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	}
 
 	// apply caps
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, status.NewController(log))
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
 		return nil, err
 	}
