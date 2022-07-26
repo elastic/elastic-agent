@@ -126,7 +126,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 				"running under control of the systems supervisor")
 	}
 
-	err = preUpgradeCleanup(a.Version())
+	err = preUpgradeCleanup(u.agentInfo.Version())
 	if err != nil {
 		u.log.Errorf("Unable to clean downloads dir %q before update: %v", paths.Downloads(), err)
 	}
@@ -144,7 +144,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	if err != nil {
 		// Run the same preUpgradeCleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
-		if dErr := preUpgradeCleanup(a.Version()); dErr != nil {
+		if dErr := preUpgradeCleanup(u.agentInfo.Version()); dErr != nil {
 			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
 		}
 		return nil, err
