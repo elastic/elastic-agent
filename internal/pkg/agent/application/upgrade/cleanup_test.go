@@ -42,12 +42,3 @@ func TestPreUpgradeCleanup(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("hello, world!"), p)
 }
-
-func TestCleanAllDownloads(t *testing.T) {
-	setupDir(t)
-	err := cleanAllDownloads()
-	require.NoError(t, err)
-	files, err := os.ReadDir(paths.Downloads())
-	require.NoError(t, err)
-	require.Len(t, files, 0)
-}

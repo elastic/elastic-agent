@@ -34,21 +34,3 @@ func preUpgradeCleanup(version string) error {
 	}
 	return rErr
 }
-
-// cleanAllDownloads will remove all files from the downloads directory
-func cleanAllDownloads() error {
-	files, err := os.ReadDir(paths.Downloads())
-	if err != nil {
-		return fmt.Errorf("unable to read directory %q: %w", paths.Downloads(), err)
-	}
-	var rErr error
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		if err := os.Remove(filepath.Join(paths.Downloads(), file.Name())); err != nil {
-			rErr = multierror.Append(rErr, fmt.Errorf("unable to remove file %q: %w", filepath.Join(paths.Downloads(), file.Name()), err))
-		}
-	}
-	return rErr
-}

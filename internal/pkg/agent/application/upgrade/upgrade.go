@@ -190,13 +190,16 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), release.TrimCommit(newHash))
 	if reexecNow {
+		err = os.RemoveAll(paths.Downloads())
+		if err != nil {
+			u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
+		}
 		u.reexec.ReExec(cb)
 		return nil, nil
 	}
 
 	// Clean everything from the downloads dir
-	// If we wanted to be a bit simpler we could call os.RemoveAll to remove the dir + children
-	err = cleanAllDownloads()
+	err = os.RemoveAll(paths.Downloads())
 	if err != nil {
 		u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
 	}
