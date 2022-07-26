@@ -79,7 +79,7 @@ pipeline {
         axes {
           axis {
             name 'PLATFORM'
-            values 'ubuntu-20.04 && immutable', 'aws && aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable', 'darwin && orka && x86_64'
+            values 'ubuntu-20.04 && immutable', 'aws && aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable', 'macos12 && x86_64'
           }
         }
         stages {
@@ -175,7 +175,7 @@ pipeline {
                 withMageEnv(){
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
-                      cmd(label: 'Go package', script: 'mage package')
+                      cmd(label: 'Go package', script: 'mage package ironbank')
                       uploadPackagesToGoogleBucket(
                         credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
                         repo: env.REPO,
@@ -277,7 +277,7 @@ def isCodeCoverageEnabled() {
 
 def withPackageEnv(platform, Closure body) {
   if (isUnix()) {
-    if (platform.contains('macosx')) {
+    if (isDarwin()) {
       withPackageDarwinEnv() {
         body()
       }

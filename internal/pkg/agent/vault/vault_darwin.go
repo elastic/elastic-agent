@@ -37,13 +37,15 @@ type Vault struct {
 }
 
 // New initializes the vault store
-// Call Close when done to release the resouces
-func New(name string) (*Vault, error) {
+// Call Close when done to release the resources
+func New(name string, opts ...OptionFunc) (*Vault, error) {
 	var keychain C.SecKeychainRef
+
 	err := statusToError(C.OpenKeychain(keychain))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not open keychain: %w", err)
 	}
+
 	return &Vault{
 		name:     name,
 		keychain: keychain,
