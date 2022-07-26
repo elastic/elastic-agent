@@ -151,7 +151,7 @@ func (h *PolicyChange) handleFleetServerHosts(ctx context.Context, c *config.Con
 			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
 	}
 	// discard body for proper cancellation and connection reuse
-	io.Copy(ioutil.Discard, resp.Body)
+	_, _ = io.Copy(ioutil.Discard, resp.Body)
 	resp.Body.Close()
 
 	reader, err := fleetToReader(h.agentInfo, h.config)
