@@ -48,11 +48,13 @@ func TestFetchVerify(t *testing.T) {
 	defer os.RemoveAll(targetPath)
 
 	config := &artifact.Config{
-		TargetDirectory: targetPath,
-		DropPath:        dropPath,
-		InstallPath:     installPath,
-		OperatingSystem: "darwin",
-		Architecture:    "32",
+		AgentArtifactSettings: artifact.AgentArtifactSettings{
+			TargetDirectory: targetPath,
+			DropPath:        dropPath,
+			InstallPath:     installPath,
+			OperatingSystem: "darwin",
+			Architecture:    "32",
+		},
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: timeout,
 		},
@@ -179,10 +181,12 @@ func TestVerify(t *testing.T) {
 	timeout := 30 * time.Second
 
 	config := &artifact.Config{
-		TargetDirectory: targetDir,
-		DropPath:        filepath.Join(targetDir, "drop"),
-		OperatingSystem: "linux",
-		Architecture:    "32",
+		AgentArtifactSettings: artifact.AgentArtifactSettings{
+			TargetDirectory: targetDir,
+			DropPath:        filepath.Join(targetDir, "drop"),
+			OperatingSystem: "linux",
+			Architecture:    "32",
+		},
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: timeout,
 		},

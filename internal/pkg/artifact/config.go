@@ -26,12 +26,12 @@ const (
 
 // Config is a configuration used for verifier and downloader
 type Config struct {
-	agentArtifactSettings `config:",inline" yaml:",inline"`
+	AgentArtifactSettings `config:",inline" yaml:",inline"`
 
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
 
-type agentArtifactSettings struct {
+type AgentArtifactSettings struct {
 	// OperatingSystem: operating system [linux, windows, darwin]
 	OperatingSystem string `json:"-" config:",ignore"`
 
@@ -85,11 +85,11 @@ func (r *Reloader) Reload(rawConfig *config.Config) error {
 
 func (r *Reloader) reloadArtifactSettings(rawConfig *config.Config) error {
 	type artifactSettings struct {
-		Config agentArtifactSettings `json:"agent.download" config:"agent.download"`
+		Config AgentArtifactSettings `json:"agent.download" config:"agent.download"`
 	}
 
 	cfg := &artifactSettings{}
-	cfg.Config = DefaultConfig().agentArtifactSettings
+	cfg.Config = DefaultConfig().AgentArtifactSettings
 	if err := rawConfig.Unpack(&cfg); err != nil {
 		return err
 	}
@@ -167,13 +167,13 @@ func DefaultConfig() *Config {
 	// The HTTP download will log progress in the case that it is taking a while to download.
 	transport.Timeout = 10 * time.Minute
 
-	artifactSettings := &agentArtifactSettings{
+	artifactSettings := &AgentArtifactSettings{
 		SourceURI:       defaultSourceURI,
 		TargetDirectory: paths.Downloads(),
 		InstallPath:     paths.Install(),
 	}
 	return &Config{
-		agentArtifactSettings: *artifactSettings,
+		AgentArtifactSettings: *artifactSettings,
 		HTTPTransportSettings: transport,
 	}
 }

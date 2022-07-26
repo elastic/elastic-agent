@@ -57,8 +57,10 @@ func TestDownload(t *testing.T) {
 	elasticClient := getElasticCoClient()
 
 	config := &artifact.Config{
-		SourceURI:       source,
-		TargetDirectory: targetDir,
+		AgentArtifactSettings: artifact.AgentArtifactSettings{
+			SourceURI:       source,
+			TargetDirectory: targetDir,
+		},
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: timeout,
 		},
@@ -98,8 +100,10 @@ func TestVerify(t *testing.T) {
 	elasticClient := getElasticCoClient()
 
 	config := &artifact.Config{
-		SourceURI:       source,
-		TargetDirectory: targetDir,
+		AgentArtifactSettings: artifact.AgentArtifactSettings{
+			SourceURI:       source,
+			TargetDirectory: targetDir,
+		},
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: timeout,
 		},
