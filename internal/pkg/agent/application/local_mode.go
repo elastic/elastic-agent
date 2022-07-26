@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -131,6 +132,7 @@ func newLocal(
 		},
 		caps,
 		monitor,
+		artifact.NewReloader(cfg.Settings.DownloadConfig, log),
 	)
 	if err != nil {
 		return nil, err

@@ -25,6 +25,12 @@ const (
 
 // Config is a configuration used for verifier and downloader
 type Config struct {
+	agentArtifactSettings `config:",inline" yaml:",inline"`
+
+	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
+}
+
+type agentArtifactSettings struct {
 	// OperatingSystem: operating system [linux, windows, darwin]
 	OperatingSystem string `json:"-" config:",ignore"`
 
@@ -46,8 +52,6 @@ type Config struct {
 	// local or network disk.
 	// If not provided FileSystem Downloader will fallback to /beats subfolder of elastic-agent directory.
 	DropPath string `yaml:"dropPath" config:"drop_path"`
-
-	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
 
 type Reloader struct {
@@ -63,6 +67,66 @@ func NewReloader(cfg *Config, log *logger.Logger) *Reloader {
 }
 
 func (r *Reloader) Reload(rawConfig *config.Config) error {
+	if err := r.reloadArtifactSettings(rawConfig); err != nil {
+		return err
+	}
+
+	if err := r.reloadTransport(rawConfig); err != nil {
+		return err
+	}
+
+	if err := r.reloadSourceURI(rawConfig); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Reloader) reloadArtifactSettings(rawConfig *config.Config) error {
+	type artifactSettings struct {
+		Config agentArtifactSettings `json:"agent.download" config:"agent.download"`
+	}
+
+	cfg := &artifactSettings{}
+	cfg.Config = DefaultConfig().agentArtifactSettings
+	if err := rawConfig.Unpack(&cfg); err != nil {
+		return err
+	}
+
+	if cfg.Config.DropPath != "" {
+		r.cfg.DropPath = cfg.Config.DropPath
+	}
+	if cfg.Config.TargetDirectory != "" {
+		r.cfg.TargetDirectory = cfg.Config.TargetDirectory
+	}
+	if cfg.Config.InstallPath != "" {
+		r.cfg.InstallPath = cfg.Config.InstallPath
+	}
+	return nil
+}
+
+func (r *Reloader) reloadTransport(rawConfig *config.Config) error {
+	type transportSettings struct {
+		Config httpcommon.HTTPTransportSettings `json:"agent.download" config:"agent.download"`
+	}
+
+	cfg := &transportSettings{}
+	cfg.Config = DefaultConfig().HTTPTransportSettings
+	if err := rawConfig.Unpack(&cfg); err != nil {
+		return err
+	}
+
+	if cfg.Config.TLS != nil {
+		r.cfg.TLS = cfg.Config.TLS
+	}
+
+	r.cfg.Proxy = cfg.Config.Proxy
+	r.cfg.Timeout = cfg.Config.Timeout
+
+	return nil
+}
+
+func (r *Reloader) reloadSourceURI(rawConfig *config.Config) error {
 	type reloadConfig struct {
 		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
@@ -105,10 +169,13 @@ func DefaultConfig() *Config {
 	// The HTTP download will log progress in the case that it is taking a while to download.
 	transport.Timeout = 10 * time.Minute
 
+	artifactSettings := &agentArtifactSettings{
+		SourceURI:       defaultSourceURI,
+		TargetDirectory: paths.Downloads(),
+		InstallPath:     paths.Install(),
+	}
 	return &Config{
-		SourceURI:             defaultSourceURI,
-		TargetDirectory:       paths.Downloads(),
-		InstallPath:           paths.Install(),
+		agentArtifactSettings: *artifactSettings,
 		HTTPTransportSettings: transport,
 	}
 }
