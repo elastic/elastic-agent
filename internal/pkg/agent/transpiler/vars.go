@@ -14,7 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
-var varsRegex = regexp.MustCompile(`\${([\p{L}\d\s\\\-_|.'"]*)}`)
+var varsRegex = regexp.MustCompile(`\${([\p{L}\d\s\\\-_|.'":\/]*)}`)
 
 // ErrNoMatch is return when the replace didn't fail, just that no vars match to perform the replace.
 var ErrNoMatch = fmt.Errorf("no matching vars")

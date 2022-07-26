@@ -26,7 +26,9 @@ func TestGenerateNodeData(t *testing.T) {
 			Name: "testnode",
 			UID:  types.UID(uid),
 			Labels: map[string]string{
-				"foo": "bar",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
 				"baz": "ban",
@@ -54,7 +56,9 @@ func TestGenerateNodeData(t *testing.T) {
 			"baz": "ban",
 		},
 		"labels": mapstr.M{
-			"foo": "bar",
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 	}
 
@@ -64,7 +68,11 @@ func TestGenerateNodeData(t *testing.T) {
 				"name": "devcluster",
 				"url":  "8.8.8.8:9090"},
 		}, "kubernetes": mapstr.M{
-			"labels":      mapstr.M{"foo": "bar"},
+			"labels": mapstr.M{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
+			},
 			"annotations": mapstr.M{"baz": "ban"},
 			"node": mapstr.M{
 				"ip":   "node1",
@@ -123,7 +131,9 @@ func (n *nodeMeta) GenerateK8s(obj kubernetes.Resource, opts ...metadata.FieldOp
 			"ip":   "node1",
 		},
 		"labels": mapstr.M{
-			"foo": "bar",
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 		"annotations": mapstr.M{
 			"baz": "ban",

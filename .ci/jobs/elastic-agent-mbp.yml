@@ -2,7 +2,7 @@
 - job:
     name: "elastic-agent/elastic-agent-mbp"
     display-name: elastic-agent
-    description: "POC to isolate elastic agent from beats"
+    description: "Elastic agent"
     project-type: multibranch
     script-path: .ci/Jenkinsfile
     scm:
@@ -12,6 +12,7 @@
           discover-pr-forks-trust: permission
           discover-pr-origin: merge-current
           discover-tags: true
+          head-filter-regex: '(main|7\.17|8\.\d+|PR-.*|v\d+\.\d+\.\d+)'
           notification-context: 'fleet-ci'
           repo: elastic-agent
           repo-owner: elastic
@@ -39,4 +40,4 @@
             timeout: 100
           timeout: '15'
           use-author: true
-          wipe-workspace: 'True'
+          wipe-workspace: true
