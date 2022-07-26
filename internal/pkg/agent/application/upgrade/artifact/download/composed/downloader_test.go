@@ -15,6 +15,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	succ = "succ"
+)
+
 type FailingDownloader struct {
 	called bool
 }
@@ -32,7 +36,7 @@ type SuccDownloader struct {
 
 func (d *SuccDownloader) Download(ctx context.Context, _ artifact.Artifact, _ string) (string, error) {
 	d.called = true
-	return "succ", nil
+	return succ, nil
 }
 func (d *SuccDownloader) Called() bool { return d.called }
 
@@ -61,7 +65,7 @@ func TestComposed(t *testing.T) {
 		d := NewDownloader(tc.downloaders[0], tc.downloaders[1])
 		r, _ := d.Download(context.TODO(), artifact.Artifact{Name: "a"}, "b")
 
-		assert.Equal(t, tc.expectedResult, r == "succ")
+		assert.Equal(t, tc.expectedResult, r == succ)
 
 		assert.True(t, tc.checkFunc(tc.downloaders))
 	}

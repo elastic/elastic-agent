@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//nolint:goconst // avoiding const check for Deb/Zip
-
 package mage
 
 import (
@@ -41,6 +39,13 @@ const (
 	defaultBinaryName = "{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
 
 	componentConfigMode os.FileMode = 0600
+
+	rpm     = "rpm"
+	deb     = "deb"
+	zipExt  = "zip"
+	targz   = "tar.gz"
+	docker  = "docker"
+	invalid = "invalid"
 )
 
 var (
@@ -205,17 +210,17 @@ func getOSArchName(platform BuildPlatform, t PackageType) (string, error) {
 func (typ PackageType) String() string {
 	switch typ {
 	case RPM:
-		return "rpm"
+		return rpm
 	case Deb:
-		return "deb"
+		return deb
 	case Zip:
-		return "zip"
+		return zipExt
 	case TarGz:
-		return "tar.gz"
+		return targz
 	case Docker:
-		return "docker"
+		return docker
 	default:
-		return "invalid"
+		return invalid
 	}
 }
 
@@ -227,15 +232,15 @@ func (typ PackageType) MarshalText() ([]byte, error) {
 // UnmarshalText returns a PackageType based on the given text.
 func (typ *PackageType) UnmarshalText(text []byte) error {
 	switch strings.ToLower(string(text)) {
-	case "rpm":
+	case rpm:
 		*typ = RPM
-	case "deb":
+	case deb:
 		*typ = Deb
-	case "tar.gz", "tgz", "targz":
+	case targz, "tgz", "targz":
 		*typ = TarGz
-	case "zip":
+	case zipExt:
 		*typ = Zip
-	case "docker":
+	case docker:
 		*typ = Docker
 	default:
 		return errors.Errorf("unknown package type: %v", string(text))

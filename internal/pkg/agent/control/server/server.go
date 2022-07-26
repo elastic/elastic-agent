@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"sync"
 
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
@@ -24,8 +23,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const agentName = "elastic-agent"
-
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
@@ -36,7 +33,6 @@ type Server struct {
 	listener      net.Listener
 	server        *grpc.Server
 	tracer        *apm.Tracer
-	lock          sync.RWMutex
 }
 
 // New creates a new control protocol server.

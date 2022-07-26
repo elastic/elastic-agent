@@ -179,7 +179,7 @@ func externalConfigsGlob() string {
 }
 
 func discoverer(patterns ...string) discoverFunc {
-	var p []string
+	p := make([]string, 0, len(patterns))
 	for _, newP := range patterns {
 		if len(newP) == 0 {
 			continue
