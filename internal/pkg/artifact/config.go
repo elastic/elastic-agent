@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -73,7 +74,7 @@ func (r *Reloader) Reload(rawConfig *config.Config) error {
 	}
 	cfg := &reloadConfig{}
 	if err := rawConfig.Unpack(&cfg); err != nil {
-		return err
+		return errors.New(err, "failed to unpack config during reload")
 	}
 
 	var newSourceURI string
