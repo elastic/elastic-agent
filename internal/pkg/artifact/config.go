@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -68,15 +69,15 @@ func NewReloader(cfg *Config, log *logger.Logger) *Reloader {
 
 func (r *Reloader) Reload(rawConfig *config.Config) error {
 	if err := r.reloadArtifactSettings(rawConfig); err != nil {
-		return err
+		return errors.New(err, "failed to reload artifact settings")
 	}
 
 	if err := r.reloadTransport(rawConfig); err != nil {
-		return err
+		return errors.New(err, "failed to reload transport settings")
 	}
 
 	if err := r.reloadSourceURI(rawConfig); err != nil {
-		return err
+		return errors.New(err, "failed to reload source URI")
 	}
 
 	return nil
@@ -116,10 +117,7 @@ func (r *Reloader) reloadTransport(rawConfig *config.Config) error {
 		return err
 	}
 
-	if cfg.Config.TLS != nil {
-		r.cfg.TLS = cfg.Config.TLS
-	}
-
+	r.cfg.TLS = cfg.Config.TLS
 	r.cfg.Proxy = cfg.Config.Proxy
 	r.cfg.Timeout = cfg.Config.Timeout
 

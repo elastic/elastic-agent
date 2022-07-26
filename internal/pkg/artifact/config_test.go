@@ -22,8 +22,9 @@ func TestReload(t *testing.T) {
   target_directory: "a/b/c"
   install_path: "i/p"
   drop_path: "d/p"
-  ssl.enabled: true
   proxy_disable: true
+  ssl.enabled: true
+  ssl.ca_trusted_fingerprint: "my_finger_print"
 `
 
 	c, err := config.NewConfigFrom(input)
@@ -35,6 +36,7 @@ func TestReload(t *testing.T) {
 	require.Equal(t, "a/b/c", cfg.TargetDirectory)
 	require.NotNil(t, cfg.TLS)
 	require.Equal(t, true, *cfg.TLS.Enabled)
+	require.Equal(t, "my_finger_print", cfg.TLS.CATrustedFingerprint)
 	require.NotNil(t, cfg.Proxy)
 	require.Equal(t, true, cfg.Proxy.Disable)
 }
