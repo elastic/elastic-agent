@@ -6,7 +6,11 @@ package component
 
 import (
 	"fmt"
+	goruntime "runtime"
+	"strconv"
 	"strings"
+
+	"github.com/elastic/go-sysinfo"
 )
 
 const (
@@ -102,4 +106,30 @@ type PlatformDetail struct {
 	Family string
 	Major  string
 	Minor  string
+}
+
+// PlatformModifier can modify the platform details before the runtime specifications are loaded.
+type PlatformModifier func(detail PlatformDetail) PlatformDetail
+
+// LoadPlatformDetail loads the platform details for the current system.
+func LoadPlatformDetail(modifiers ...PlatformModifier) (PlatformDetail, error) {
+	info, err := sysinfo.Host()
+	if err != nil {
+		return PlatformDetail{}, err
+	}
+	os := info.Info().OS
+	detail := PlatformDetail{
+		Platform: Platform{
+			OS:   goruntime.GOOS,
+			Arch: goruntime.GOARCH,
+			GOOS: goruntime.GOOS,
+		},
+		Family: os.Family,
+		Major:  strconv.Itoa(os.Major),
+		Minor:  strconv.Itoa(os.Minor),
+	}
+	for _, modifier := range modifiers {
+		detail = modifier(detail)
+	}
+	return detail, nil
 }

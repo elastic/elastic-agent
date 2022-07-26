@@ -763,6 +763,8 @@ func CreateSHA512File(file string) error {
 	//nolint:gosec // permissions are correct
 	return os.WriteFile(file+".sha512", []byte(out), 0644)
 }
+
+// GetSHA512Hash returns SHA512 hash of file.
 func GetSHA512Hash(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {

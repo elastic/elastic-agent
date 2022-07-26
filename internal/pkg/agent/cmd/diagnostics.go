@@ -428,6 +428,7 @@ func gatherConfig() (AgentConfig, error) {
 	}
 	cfg.ConfigRendered = mapCFG
 
+	// TODO(blakerouse): Fix diagnostic command for Elastic Agent v2
 	/*
 		// Gather vars to render process config
 		isStandalone, err := isStandalone(renderedCFG)

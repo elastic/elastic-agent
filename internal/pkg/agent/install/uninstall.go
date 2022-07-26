@@ -16,25 +16,15 @@ import (
 	"github.com/kardianos/service"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
-	"github.com/elastic/elastic-agent/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-)
-
-const (
-	inputsKey  = "inputs"
-	outputsKey = "outputs"
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
@@ -56,7 +46,7 @@ func Uninstall(cfgFile string) error {
 	}
 	_ = svc.Uninstall()
 
-	if err := uninstallPrograms(context.Background(), cfgFile); err != nil {
+	if err := uninstallComponents(context.Background(), cfgFile); err != nil {
 		return err
 	}
 
@@ -121,10 +111,20 @@ func delayedRemoval(path string) {
 
 }
 
-func uninstallPrograms(ctx context.Context, cfgFile string) error {
+func uninstallComponents(ctx context.Context, cfgFile string) error {
 	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 	if err != nil {
 		return err
+	}
+
+	platform, err := component.LoadPlatformDetail()
+	if err != nil {
+		return fmt.Errorf("failed to gather system information: %w", err)
+	}
+
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
 	cfg, err := operations.LoadFullAgentConfig(cfgFile, false)
@@ -137,83 +137,48 @@ func uninstallPrograms(ctx context.Context, cfgFile string) error {
 		return err
 	}
 
-	pp, err := programsFromConfig(cfg)
+	comps, err := serviceComponentsFromConfig(specs, cfg)
 	if err != nil {
 		return err
 	}
 
 	// nothing to remove
-	if len(pp) == 0 {
+	if len(comps) == 0 {
 		return nil
 	}
 
-	uninstaller, err := uninstall.NewUninstaller()
-	if err != nil {
-		return err
-	}
-
-	currentVersion := release.Version()
-	if release.Snapshot() {
-		currentVersion = fmt.Sprintf("%s-SNAPSHOT", currentVersion)
-	}
-	artifactConfig := artifact.DefaultConfig()
-
-	for _, p := range pp {
-		descriptor := app.NewDescriptor(p.Spec, currentVersion, artifactConfig, nil)
-		if err := uninstaller.Uninstall(ctx, p.Spec, currentVersion, descriptor.Directory()); err != nil {
-			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall '%s': %v\n", p.Spec.Name, err))
+	// remove each service component
+	for _, comp := range comps {
+		if err := uninstallComponent(ctx, comp); err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
 	}
 
 	return nil
 }
 
-func programsFromConfig(cfg *config.Config) ([]program.Program, error) {
+func uninstallComponent(_ context.Context, _ component.Component) error {
+	// TODO(blakerouse): Perform uninstall of service component; once the service runtime is written.
+	return errors.New("failed to uninstall component; not implemented")
+}
+
+func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
 	mm, err := cfg.ToMapStr()
 	if err != nil {
 		return nil, errors.New("failed to create a map from config", err)
 	}
-
-	// if no input is defined nothing to remove
-	if _, found := mm[inputsKey]; !found {
-		return nil, nil
-	}
-
-	// if no output is defined nothing to remove
-	if _, found := mm[outputsKey]; !found {
-		return nil, nil
-	}
-
-	ast, err := transpiler.NewAST(mm)
+	allComps, err := specs.ToComponents(mm)
 	if err != nil {
-		return nil, errors.New("failed to create a ast from config", err)
+		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
-
-	agentInfo, err := info.NewAgentInfo(false)
-	if err != nil {
-		return nil, errors.New("failed to get an agent info", err)
-	}
-
-	ppMap, err := program.Programs(agentInfo, ast)
-	if err != nil {
-		return nil, errors.New("failed to get programs from config", err)
-	}
-
-	var pp []program.Program
-	check := make(map[string]bool)
-
-	for _, v := range ppMap {
-		for _, p := range v {
-			if _, found := check[p.Spec.CommandName()]; found {
-				continue
-			}
-
-			pp = append(pp, p)
-			check[p.Spec.CommandName()] = true
+	var serviceComps []component.Component
+	for _, comp := range allComps {
+		if comp.Err == nil && comp.Spec.Spec.Service != nil {
+			// non-error and service based component
+			serviceComps = append(serviceComps, comp)
 		}
 	}
-
-	return pp, nil
+	return serviceComps, nil
 }
 
 func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) (*config.Config, error) {
