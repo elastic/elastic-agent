@@ -139,12 +139,14 @@ func (r *Reloader) reloadSourceURI(rawConfig *config.Config) error {
 	}
 
 	var newSourceURI string
-	if cfg.FleetSourceURI != "" {
+	if fleetURI := strings.TrimSpace(cfg.FleetSourceURI); fleetURI != "" {
 		// fleet configuration takes precedence
-		newSourceURI = cfg.FleetSourceURI
-	} else if cfg.SourceURI != "" {
-		newSourceURI = cfg.SourceURI
+		newSourceURI = fleetURI
+	} else if sourceURI := strings.TrimSpace(cfg.SourceURI); sourceURI != "" {
+		newSourceURI = sourceURI
 	}
+
+	newSourceURI = strings.TrimSpace(newSourceURI)
 
 	if newSourceURI != "" {
 		r.log.Infof("Source URI changed from %q to %q", r.cfg.SourceURI, newSourceURI)
