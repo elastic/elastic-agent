@@ -5,7 +5,7 @@ before:
     - go mod tidy
 builds:
   - id: linux-amd64
-    binary: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}/{{ .ProjectName }}'
+    binary: '{{ .ProjectName }}'
     goos:
       - linux
     goarch:
@@ -28,12 +28,6 @@ archives:
       amd64: x86_64
     wrap_in_directory: true
     files:
-      # a more complete example, check the globbing deep dive below
-      - src: build1/golang-crossbuild/{{ .ProjectName }}-{{ .Os }}-amd64/{{ .ProjectName }}
-        dst: data/{{ .ProjectName }}-{{ .Env.AGENT_COMMIT_SHORT }}
-        strip_parent: true
-        info:
-          mode: 0755
       - src: LICENSE.txt
         dst: .
         strip_parent: true
@@ -57,7 +51,21 @@ archives:
         dst: .
         info:
           mode: 0644
-
+      - src: build1/golang-crossbuild/{{ .ProjectName }}
+        dst: ./data/elastic-agent-8c06d3
+        strip_parent: true
+        info:
+          mode: 0755
+      - src: build/distributions/metricbeat-8.4.0-linux-x86_64.tar.gz
+        dst: ./data/elastic-agent-8c06d3/downloads
+        strip_parent: true
+        info:
+          mode: 0644
+      - src: build/distributions/filebeat-8.4.0-linux-x86_64.tar.gz
+        dst: ./data/elastic-agent-8c06d3/downloads
+        strip_parent: true
+        info:
+          mode: 0644
 nfpms:
   # note that this is an array of nfpm configs
   - id: linux-amd
