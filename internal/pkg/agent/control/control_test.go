@@ -16,13 +16,12 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestServerClient_Version(t *testing.T) {
-	srv := server.New(newErrorLogger(t), nil, nil, nil, apmtest.DiscardTracer)
+	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer)
 	err := srv.Start()
 	require.NoError(t, err)
 	defer srv.Stop()
@@ -41,29 +40,6 @@ func TestServerClient_Version(t *testing.T) {
 		BuildTime: release.BuildTime(),
 		Snapshot:  release.Snapshot(),
 	}, ver)
-}
-
-func TestServerClient_Status(t *testing.T) {
-	l := newErrorLogger(t)
-	statusCtrl := status.NewController(l)
-	srv := server.New(l, nil, statusCtrl, nil, apmtest.DiscardTracer)
-	err := srv.Start()
-	require.NoError(t, err)
-	defer srv.Stop()
-
-	c := client.New()
-	err = c.Connect(context.Background())
-	require.NoError(t, err)
-	defer c.Disconnect()
-
-	status, err := c.Status(context.Background())
-	require.NoError(t, err)
-
-	assert.Equal(t, &client.AgentStatus{
-		Status:       client.Healthy,
-		Message:      "",
-		Applications: []*client.ApplicationStatus{},
-	}, status)
 }
 
 func newErrorLogger(t *testing.T) *logger.Logger {

@@ -6,7 +6,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,8 +21,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
@@ -33,11 +30,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/tar"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/version"
@@ -268,7 +263,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr)
+		return run(logToStderr, isContainer)
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -333,7 +328,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr)
+	return run(logToStderr, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -700,23 +695,22 @@ func truncateString(b []byte) string {
 func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, error) {
 	name := "apm-server"
 	logInfo(streams, "Preparing apm-server for legacy mode.")
-	cfg := artifact.DefaultConfig()
 
-	logInfo(streams, fmt.Sprintf("Extracting apm-server into install directory %s.", path))
-	installer, err := tar.NewInstaller(cfg)
+	platform, err := component.LoadPlatformDetail(isContainer)
 	if err != nil {
-		return nil, errors.New(err, "creating installer")
+		return nil, fmt.Errorf("failed to gather system information: %w", err)
 	}
-	spec := program.Spec{Name: name, Cmd: name, Artifact: name}
-	version := release.Version()
-	if release.Snapshot() {
-		version = fmt.Sprintf("%s-SNAPSHOT", version)
+
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
-	// Extract the bundled apm-server into the APM_SERVER_PATH
-	if err := installer.Install(context.Background(), spec, version, path); err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("installing %s (%s) from %s to %s", spec.Name, version, cfg.TargetDirectory, path))
+
+	spec, err := specs.GetInput(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect apm-server input: %w", err)
 	}
+
 	// Get the apm-server directory
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
@@ -725,9 +719,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	if len(files) != 1 || !files[0].IsDir() {
 		return nil, errors.New("expected one directory")
 	}
-	apmDir := filepath.Join(path, files[0].Name())
-	// Start apm-server process respecting path ENVs
-	apmBinary := filepath.Join(apmDir, spec.Cmd)
+
 	// add APM Server specific configuration
 	var args []string
 	addEnv := func(arg, env string) {
@@ -748,7 +740,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	addEnv("--httpprof", "HTTPPROF")
 	addSettingEnv("gc_percent", "APMSERVER_GOGC")
 	logInfo(streams, "Starting legacy apm-server daemon as a subprocess.")
-	return process.Start(apmBinary, os.Geteuid(), os.Getegid(), args, nil)
+	return process.Start(spec.BinaryPath, os.Geteuid(), os.Getegid(), args, nil)
 }
 
 func logToStderr(cfg *configuration.Configuration) {
@@ -958,4 +950,13 @@ func envIntWithDefault(defVal string, keys ...string) (int, error) {
 	}
 
 	return strconv.Atoi(valStr)
+}
+
+// isContainer changes the platform details to be a container.
+//
+// Runtime specifications can provide unique configurations when running in a container, this ensures that
+// those configurations are used versus the standard Linux configurations.
+func isContainer(detail component.PlatformDetail) component.PlatformDetail {
+	detail.OS = component.Container
+	return detail
 }

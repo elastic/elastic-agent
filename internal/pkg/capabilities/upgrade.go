@@ -13,11 +13,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const (
-	versionKey   = "version"
-	sourceURIKey = "source_uri"
-)
-
 // NewUpgradeCapability creates capability filter for upgrade.
 // Available variables:
 // - version

@@ -14,7 +14,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 )
@@ -562,9 +560,10 @@ func zipLogs(zw *zip.Writer) error {
 		return err
 	}
 
-	if err := collectEndpointSecurityLogs(zw, program.SupportedMap); err != nil {
-		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
-	}
+	// TODO(blakerouse): Fix diagnostics for v2
+	//if err := collectEndpointSecurityLogs(zw, program.SupportedMap); err != nil {
+	//	return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
+	//}
 
 	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
 	logPath := filepath.Join(paths.Home(), "logs") + string(filepath.Separator)
@@ -595,6 +594,7 @@ func zipLogs(zw *zip.Writer) error {
 	})
 }
 
+/*
 func collectEndpointSecurityLogs(zw *zip.Writer, specs map[string]program.Spec) error {
 	spec, ok := specs["endpoint-security"]
 	if !ok {
@@ -628,6 +628,7 @@ func collectEndpointSecurityLogs(zw *zip.Writer, specs map[string]program.Spec) 
 		return saveLogs(name, path, zw)
 	})
 }
+*/
 
 func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	lf, err := os.Open(logPath)

@@ -2,15 +2,15 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // duplicate code is in test cases
 package capabilities
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -18,7 +18,6 @@ import (
 )
 
 func TestMultiInput(t *testing.T) {
-	tr := &testReporter{}
 	l, _ := logger.New("test", false)
 	t.Run("no match", func(t *testing.T) {
 
@@ -122,7 +121,7 @@ func TestMultiInput(t *testing.T) {
 		initialInputs := []string{"system/metrics", "system/logs"}
 		expectedInputs := []string{"system/logs"}
 
-		cap, err := newInputsCapability(l, rd, tr)
+		cap, err := newInputsCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -144,7 +143,8 @@ func TestMultiInput(t *testing.T) {
 
 		for _, in := range expectedInputs {
 			var typeFound bool
-			nodes := inputsList.Value().([]transpiler.Node)
+			nodes, ok := inputsList.Value().([]transpiler.Node)
+			require.True(t, ok)
 			for _, inputNode := range nodes {
 				typeNode, found := inputNode.Find("type")
 				assert.True(t, found, "type not found")
@@ -170,7 +170,7 @@ func TestMultiInput(t *testing.T) {
 				Input: "system/metrics",
 			}},
 		}
-		cap, err := newInputsCapability(l, rd, tr)
+		cap, err := newInputsCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -185,10 +185,9 @@ func TestMultiInput(t *testing.T) {
 
 func TestInput(t *testing.T) {
 	l, _ := logger.New("test", false)
-	tr := &testReporter{}
 	t.Run("invalid rule", func(t *testing.T) {
 		r := &upgradeCapability{}
-		cap, err := newInputCapability(l, r, tr)
+		cap, err := newInputCapability(l, r)
 		assert.NoError(t, err, "no error expected")
 		assert.Nil(t, cap, "cap should not be created")
 	})
@@ -198,7 +197,7 @@ func TestInput(t *testing.T) {
 			Type:  "allow",
 			Input: "",
 		}
-		cap, err := newInputCapability(l, r, tr)
+		cap, err := newInputCapability(l, r)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 	})
@@ -250,8 +249,7 @@ func TestInput(t *testing.T) {
 }
 
 func runInputTest(t *testing.T, l *logger.Logger, r *inputCapability, expectedInputs []string, initialInputs []string) {
-	tr := &testReporter{}
-	cap, err := newInputCapability(l, r, tr)
+	cap, err := newInputCapability(l, r)
 	assert.NoError(t, err, "error not expected, provided eql is valid")
 	assert.NotNil(t, cap, "cap should be created")
 
@@ -311,8 +309,7 @@ func runInputTest(t *testing.T, l *logger.Logger, r *inputCapability, expectedIn
 }
 
 func runMultiInputTest(t *testing.T, l *logger.Logger, rd *ruleDefinitions, expectedInputs []string, initialInputs []string) {
-	tr := &testReporter{}
-	cap, err := newInputsCapability(l, rd, tr)
+	cap, err := newInputsCapability(l, rd)
 	assert.NoError(t, err, "error not expected, provided eql is valid")
 	assert.NotNil(t, cap, "cap should be created")
 
@@ -392,8 +389,3 @@ func getInputsMap(tt ...string) map[string]interface{} {
 
 	return astMap
 }
-
-type testReporter struct{}
-
-func (*testReporter) Update(state.Status, string, map[string]interface{}) {}
-func (*testReporter) Unregister()                                         {}
