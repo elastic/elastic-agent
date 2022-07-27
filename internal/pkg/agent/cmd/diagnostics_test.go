@@ -4,6 +4,8 @@
 
 package cmd
 
+/*
+
 import (
 	"archive/zip"
 	"bytes"
@@ -211,3 +213,4 @@ func contains(list []string, val string) bool {
 
 	return false
 }
+*/

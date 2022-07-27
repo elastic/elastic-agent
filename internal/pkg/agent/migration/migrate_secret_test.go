@@ -17,13 +17,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid"
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
-	"github.com/gofrs/uuid"
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestFindAgentSecretFromHomePath(t *testing.T) {

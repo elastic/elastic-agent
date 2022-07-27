@@ -2,7 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//nolint:dupl // duplicate code is in test cases
 package fleet
 
 import (
@@ -322,14 +321,16 @@ func TestFleetGateway(t *testing.T) {
 
 		errCh := runFleetGateway(ctx, gateway)
 
-		var count int
-		for {
-			waitFn()
-			count++
-			if count == 4 {
-				return
+		func() {
+			var count int
+			for {
+				waitFn()
+				count++
+				if count == 4 {
+					return
+				}
 			}
-		}
+		}()
 
 		cancel()
 		err = <-errCh
