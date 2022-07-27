@@ -2,12 +2,14 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package status
+package coordinator
 
 import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 )
 
 // LivenessResponse is the response body for the liveness endpoint.
@@ -18,19 +20,21 @@ type LivenessResponse struct {
 	UpdateTime time.Time `json:"update_timestamp"`
 }
 
-// ServeHTTP is an HTTP Handler for the status controller.
-// Respose code is 200 for a healthy agent, and 503 otherwise.
+// ServeHTTP is an HTTP Handler for the coordinatorr.
+// Response code is 200 for a healthy agent, and 503 otherwise.
 // Response body is a JSON object that contains the agent ID, status, message, and the last status update time.
-func (r *controller) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	s := r.Status()
+func (c *Coordinator) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
+	s := c.State()
 	lr := LivenessResponse{
-		ID:         r.agentID,
-		Status:     s.Status.String(),
-		Message:    s.Message,
-		UpdateTime: s.UpdateTime,
+		ID:      c.agentInfo.AgentID(),
+		Status:  s.State.String(),
+		Message: s.Message,
+
+		// TODO(blakerouse): Coordinator should be changed to store the last timestamp that the state has changed.
+		UpdateTime: time.Now().UTC(),
 	}
 	status := http.StatusOK
-	if s.Status != Healthy {
+	if s.State != client.Healthy {
 		status = http.StatusServiceUnavailable
 	}
 
@@ -38,6 +42,6 @@ func (r *controller) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	wr.WriteHeader(status)
 	enc := json.NewEncoder(wr)
 	if err := enc.Encode(lr); err != nil {
-		r.log.Errorf("Unable to encode liveness response: %v", err)
+		c.logger.Errorf("Unable to encode liveness response: %v", err)
 	}
 }

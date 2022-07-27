@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
 
@@ -68,6 +70,40 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 		agentInfo:   agentInfo,
 		upgradeable: IsUpgradeable(),
 	}
+}
+
+// Reload reloads the artifact configuration for the upgrader.
+func (u *Upgrader) Reload(rawConfig *config.Config) error {
+	type reloadConfig struct {
+		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
+		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
+
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
+		// different naming.
+		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
+	}
+	cfg := &reloadConfig{}
+	if err := rawConfig.Unpack(&cfg); err != nil {
+		return errors.New(err, "failed to unpack config during reload")
+	}
+
+	var newSourceURI string
+	if cfg.FleetSourceURI != "" {
+		// fleet configuration takes precedence
+		newSourceURI = cfg.FleetSourceURI
+	} else if cfg.SourceURI != "" {
+		newSourceURI = cfg.SourceURI
+	}
+
+	if newSourceURI != "" {
+		u.log.Infof("Source URI changed from %q to %q", u.settings.SourceURI, newSourceURI)
+		u.settings.SourceURI = newSourceURI
+	} else {
+		// source uri unset, reset to default
+		u.log.Infof("Source URI reset from %q to %q", u.settings.SourceURI, artifact.DefaultSourceURI)
+		u.settings.SourceURI = artifact.DefaultSourceURI
+	}
+	return nil
 }
 
 // Upgradeable returns true if the Elastic Agent can be upgraded.

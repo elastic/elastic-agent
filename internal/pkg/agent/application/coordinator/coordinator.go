@@ -42,6 +42,9 @@ type UpgradeManager interface {
 	// Upgradeable returns true if can be upgraded.
 	Upgradeable() bool
 
+	// Reload reloads the configuration for the upgrade manager.
+	Reload(rawConfig *config.Config) error
+
 	// Upgrade upgrades running agent.
 	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error)
 }
@@ -129,7 +132,8 @@ type StateFetcher interface {
 //
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
 type Coordinator struct {
-	logger *logger.Logger
+	logger    *logger.Logger
+	agentInfo *info.AgentInfo
 
 	specs component.RuntimeSpecs
 
@@ -150,9 +154,10 @@ type Coordinator struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, modifiers ...ComponentsModifier) *Coordinator {
 	return &Coordinator{
 		logger:     logger,
+		agentInfo:  agentInfo,
 		specs:      specs,
 		reexecMgr:  reexecMgr,
 		upgradeMgr: upgradeMgr,
@@ -427,6 +432,10 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		if !ok {
 			return fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
 		}
+	}
+
+	if err := c.upgradeMgr.Reload(cfg); err != nil {
+		return fmt.Errorf("failed to reload upgrade manager configuration: %w", err)
 	}
 
 	c.state.config = cfg
