@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -323,15 +322,4 @@ func getConfig() map[string]string {
 		"filter": "f_val",
 		"key":    "val",
 	}
-}
-
-func newErrorLogger(t *testing.T) *logger.Logger {
-	t.Helper()
-
-	loggerCfg := logger.DefaultLoggingConfig()
-	loggerCfg.Level = logp.ErrorLevel
-
-	log, err := logger.NewFromConfig("", loggerCfg, false)
-	require.NoError(t, err)
-	return log
 }

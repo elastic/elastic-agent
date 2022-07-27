@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // duplicate code is in test cases
 package capabilities
 
 import (
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -121,7 +123,8 @@ func TestMultiOutput(t *testing.T) {
 
 		for _, in := range expectedOutputs {
 			var typeFound bool
-			nodes := outputsDict.Value().([]transpiler.Node)
+			nodes, ok := outputsDict.Value().([]transpiler.Node)
+			require.True(t, ok)
 			for _, outputKeyNode := range nodes {
 				outputNode, ok := outputKeyNode.(*transpiler.Key).Value().(*transpiler.Dict)
 				assert.True(t, ok, "output type key not string")
