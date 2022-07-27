@@ -14,11 +14,10 @@ import (
 )
 
 func TestUpgrade(t *testing.T) {
-	tr := &testReporter{}
 	l, _ := logger.New("test", false)
 	t.Run("invalid rule", func(t *testing.T) {
 		r := &inputCapability{}
-		cap, err := newUpgradeCapability(l, r, tr)
+		cap, err := newUpgradeCapability(l, r)
 		assert.NoError(t, err, "no error expected")
 		assert.Nil(t, cap, "cap should not be created")
 	})
@@ -33,7 +32,7 @@ func TestUpgrade(t *testing.T) {
 			},
 		}
 
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 	})
@@ -47,7 +46,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -69,7 +68,7 @@ func TestUpgrade(t *testing.T) {
 			},
 		}
 
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -90,7 +89,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -111,7 +110,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -132,7 +131,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -153,7 +152,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -174,7 +173,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -195,7 +194,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -221,7 +220,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -245,7 +244,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -269,7 +268,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -293,7 +292,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -316,7 +315,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 

@@ -16,7 +16,6 @@ import (
 )
 
 func TestMultiOutput(t *testing.T) {
-	tr := &testReporter{}
 	l, _ := logger.New("test", false)
 	t.Run("no match", func(t *testing.T) {
 		rd := &ruleDefinitions{
@@ -100,7 +99,7 @@ func TestMultiOutput(t *testing.T) {
 		initialOutputs := []string{"elasticsearch", "logstash"}
 		expectedOutputs := []string{"elasticsearch"}
 
-		cap, err := newOutputsCapability(l, rd, tr)
+		cap, err := newOutputsCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -152,7 +151,7 @@ func TestMultiOutput(t *testing.T) {
 			}},
 		}
 
-		cap, err := newOutputsCapability(l, rd, tr)
+		cap, err := newOutputsCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -166,11 +165,10 @@ func TestMultiOutput(t *testing.T) {
 }
 
 func TestOutput(t *testing.T) {
-	tr := &testReporter{}
 	l, _ := logger.New("test", false)
 	t.Run("invalid rule", func(t *testing.T) {
 		r := &upgradeCapability{}
-		cap, err := newOutputCapability(l, r, tr)
+		cap, err := newOutputCapability(l, r)
 		assert.NoError(t, err, "no error expected")
 		assert.Nil(t, cap, "cap should not be created")
 	})
@@ -180,7 +178,7 @@ func TestOutput(t *testing.T) {
 			Type:   "allow",
 			Output: "",
 		}
-		cap, err := newOutputCapability(l, r, tr)
+		cap, err := newOutputCapability(l, r)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 	})
@@ -231,8 +229,7 @@ func TestOutput(t *testing.T) {
 }
 
 func runMultiOutputTest(t *testing.T, l *logger.Logger, rd *ruleDefinitions, expectedOutputs []string, initialOutputs []string) {
-	tr := &testReporter{}
-	cap, err := newOutputsCapability(l, rd, tr)
+	cap, err := newOutputsCapability(l, rd)
 	assert.NoError(t, err, "error not expected, provided eql is valid")
 	assert.NotNil(t, cap, "cap should be created")
 
@@ -286,8 +283,7 @@ func runMultiOutputTest(t *testing.T, l *logger.Logger, rd *ruleDefinitions, exp
 }
 
 func runOutputTest(t *testing.T, l *logger.Logger, r *outputCapability, expectedOutputs []string, initialOutputs []string) {
-	tr := &testReporter{}
-	cap, err := newOutputCapability(l, r, tr)
+	cap, err := newOutputCapability(l, r)
 	assert.NoError(t, err, "error not expected, provided eql is valid")
 	assert.NotNil(t, cap, "cap should be created")
 

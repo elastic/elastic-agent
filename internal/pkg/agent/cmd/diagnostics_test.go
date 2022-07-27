@@ -4,6 +4,8 @@
 
 package cmd
 
+/*
+
 import (
 	"archive/zip"
 	"bytes"
@@ -19,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 )
 
 var testDiagnostics = DiagnosticsInfo{
@@ -137,3 +138,4 @@ func Test_collectEndpointSecurityLogs_noEndpointSecurity(t *testing.T) {
 	err := collectEndpointSecurityLogs(zw, specs)
 	assert.NoError(t, err, "collectEndpointSecurityLogs should not return an error")
 }
+*/

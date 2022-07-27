@@ -14,15 +14,12 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220524131921-43bacbeec516
 	github.com/elastic/elastic-agent-libs v0.2.3
-	github.com/elastic/elastic-agent-system-metrics v0.3.0
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
 	github.com/elastic/go-ucfg v0.8.5
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/google/go-cmp v0.5.6
-	github.com/google/uuid v1.3.0
-	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901
@@ -71,9 +68,7 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/docker v20.10.12+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
-	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
@@ -86,6 +81,7 @@ require (
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/licenseclassifier v0.0.0-20200402202327-879cb1424de0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
@@ -144,7 +140,6 @@ require (
 	github.com/hashicorp/go-version v1.2.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	go.elastic.co/apm v1.15.0
-	go.elastic.co/apm/module/apmgorilla v1.15.0
 	go.elastic.co/apm/module/apmgrpc v1.15.0
 	k8s.io/klog/v2 v2.30.0 // indirect
 )

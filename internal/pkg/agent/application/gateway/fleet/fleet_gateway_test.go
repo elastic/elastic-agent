@@ -322,14 +322,16 @@ func TestFleetGateway(t *testing.T) {
 
 		errCh := runFleetGateway(ctx, gateway)
 
-		var count int
-		for {
-			waitFn()
-			count++
-			if count == 4 {
-				return
+		func() {
+			var count int
+			for {
+				waitFn()
+				count++
+				if count == 4 {
+					return
+				}
 			}
-		}
+		}()
 
 		cancel()
 		err = <-errCh
