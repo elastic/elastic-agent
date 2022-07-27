@@ -17,9 +17,41 @@ builds:
 dist: build1/golang-crossbuild
 changelog:
   skip: true
+archives:
+  - id: linux
+    builds:
+      - linux-amd64
+    format: tar.gz
+    name_template: "{{ .ProjectName }}-{{ .Env.STACK_VERSION }}-{{ .Os }}-{{ .Arch }}"
+    # Default is empty.
+    replacements:
+      amd64: x86_64
+    files:
+      - LICENSE.txt
+      - dev-tools/packaging/templates/common/README.md.tmpl
+      - NOTICE.txt
+      - docs/*
+      - design/*.png
+      - templates/**/*
+      # a more complete example, check the globbing deep dive below
+      - src: '*.md'
+        dst: docs
+        # Strip parent folders when adding files to the archive.
+        # Default: false
+        strip_parent: true
+        # File info.
+        # Not all fields are supported by all formats available formats.
+        # Defaults to the file info of the actual file if not provided.
+        info:
+          owner: root
+          group: root
+          mode: 0644
+          # format is `time.RFC3339Nano`
+          mtime: 2008-01-02T15:04:05Z
+
 nfpms:
   # note that this is an array of nfpm configs
-  - id: linux-amd-deb
+  - id: linux-amd
     maintainer: 'Elastic'
     file_name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
     builds:
@@ -87,24 +119,13 @@ nfpms:
         packager: rpm
         file_info:
           mode: 0755
-
-    # Scripts to execute during the installation of the package.
-    # Keys are the possible targets during the installation process
-    # Values are the paths to the scripts which will be executed
     scripts:
       postinstall: dev-tools/packaging/templates/linux/postinstall.sh.tmpl
     # Custom configuration applied only to the RPM packager.
     rpm:
       # RPM specific scripts.
       signature:
-        # Template to the PGP secret key file path (can also be ASCII-armored).
-        # The passphrase is taken from the environment variable
-        # `$NFPM_ID_RPM_PASSPHRASE` with a fallback to `$NFPM_ID_PASSPHRASE`,
-        # where ID is the id of the current nfpm config.
-        # The id will be transformed to uppercase.
-        # E.g. If your nfpm id is 'default' then the rpm-specific passphrase
-        # should be set as `$NFPM_DEFAULT_RPM_PASSPHRASE`
-        #key_file: '{{ .Env.GPG_KEY_PATH }}'
+        key_file: 'GPG-KEY-elasticsearch'
 
     # Custom configuration applied only to the Deb packager.
     deb:
@@ -113,12 +134,5 @@ nfpms:
         #templates: dev-tools/packaging/templates/deb
       # The package is signed if a key_file is set
       signature:
-        # Template to the PGP secret key file path (can also be ASCII-armored).
-        # The passphrase is taken from the environment variable
-        # `$NFPM_ID_DEB_PASSPHRASE` with a fallback to `$NFPM_ID_PASSPHRASE`,
-        # where ID is the id of the current nfpm config.
-        # The id will be transformed to uppercase.
-        # E.g. If your nfpm id is 'default' then the deb-specific passphrase
-        # should be set as `$NFPM_DEFAULT_DEB_PASSPHRASE`
-        #key_file: '{{ .Env.GPG_KEY_PATH }}'
+        key_file: 'GPG-KEY-elasticsearch'
 

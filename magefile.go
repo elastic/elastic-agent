@@ -932,6 +932,7 @@ func GoPackage() error {
 	env := map[string]string{
 		"AGENT_COMMIT":       commit,
 		"AGENT_COMMIT_SHORT": commit[:6],
+		"STACK_VERSION":      "8.4.0",
 	}
 
 	fmt.Println(pwd)
