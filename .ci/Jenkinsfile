@@ -50,7 +50,7 @@ pipeline {
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
-          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc)' ], shouldMatchAll: false).toString())
+          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
         }
       }
     }
@@ -79,7 +79,7 @@ pipeline {
         axes {
           axis {
             name 'PLATFORM'
-            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable', 'darwin && orka && x86_64'
+            values 'ubuntu-20.04 && immutable', 'aws && aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable', 'macos12 && x86_64'
           }
         }
         stages {
@@ -164,7 +164,7 @@ pipeline {
               }
             }
             environment {
-              ARCH = "${PLATFORM.equals('aarch64') ? 'arm64' : 'amd64'}"
+              ARCH = "${PLATFORM.contains('aarch64') ? 'arm64' : 'amd64'}"
               DEV = true
               EXTERNAL = true
             }
@@ -175,7 +175,7 @@ pipeline {
                 withMageEnv(){
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
-                      cmd(label: 'Go package', script: 'mage package')
+                      cmd(label: 'Go package', script: 'mage package ironbank')
                       uploadPackagesToGoogleBucket(
                         credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
                         repo: env.REPO,
@@ -219,7 +219,7 @@ pipeline {
         axes {
           axis {
             name 'K8S_VERSION'
-            values "v1.24.0, v1.23.6, v1.22.9, v1.21.12"
+            values "v1.24.0", "v1.23.6", "v1.22.9", "v1.21.12"
           }
         }
         stages {
@@ -251,18 +251,23 @@ pipeline {
       }
       steps {
         // TODO: what's the testMatrixFile to be used if any
-        runE2E(testMatrixFile: '',
+        runE2E(testMatrixFile: '.ci/.e2e-tests-for-elastic-agent.yaml',
                beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                gitHubCheckName: "e2e-tests",
                gitHubCheckRepo: env.REPO,
-               gitHubCheckSha1: env.GIT_BASE_COMMIT)
+               gitHubCheckSha1: env.GIT_BASE_COMMIT,
+               propagate: true,
+               wait: true)
       }
     }
   }
   post {
     cleanup {
-      notifyBuildResult(prComment: true)
+      notifyBuildResult(prComment: true,
+                        analyzeFlakey: !isTag(), jobName: getFlakyJobName(withBranch: (isPR() ? env.CHANGE_TARGET : env.BRANCH_NAME)),
+                        githubIssue: isBranch() && currentBuild.currentResult != "SUCCESS",
+                        githubLabels: 'Team:Elastic-Agent-Control-Plane')
     }
   }
 }
@@ -274,7 +279,7 @@ def isCodeCoverageEnabled() {
 
 def withPackageEnv(platform, Closure body) {
   if (isUnix()) {
-    if (platform.contains('macosx')) {
+    if (isDarwin()) {
       withPackageDarwinEnv() {
         body()
       }

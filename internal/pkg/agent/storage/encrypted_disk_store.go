@@ -15,6 +15,7 @@ import (
 	"github.com/hectane/go-acl"
 
 	"github.com/elastic/elastic-agent-libs/file"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -78,7 +79,7 @@ func (d *EncryptedDiskStore) ensureKey() error {
 	if d.key == nil {
 		key, err := secret.GetAgentSecret(secret.WithVaultPath(d.vaultPath))
 		if err != nil {
-			return err
+			return fmt.Errorf("could not get agent key: %w", err)
 		}
 		d.key = key.Value
 	}

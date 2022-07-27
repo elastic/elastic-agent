@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,7 +31,7 @@ var testDiagnostics = DiagnosticsInfo{
 		BuildTime: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
 		Snapshot:  false,
 	},
-	ProcMeta: []client.ProcMeta{client.ProcMeta{
+	ProcMeta: []client.ProcMeta{{
 		Process:            "filebeat",
 		Name:               "filebeat",
 		Hostname:           "test-host",
@@ -45,7 +46,7 @@ var testDiagnostics = DiagnosticsInfo{
 		BinaryArchitecture: "test-architecture",
 		RouteKey:           "test",
 		ElasticLicensed:    true,
-	}, client.ProcMeta{
+	}, {
 		Process:            "filebeat",
 		Name:               "filebeat_monitoring",
 		Hostname:           "test-host",
@@ -60,7 +61,7 @@ var testDiagnostics = DiagnosticsInfo{
 		BinaryArchitecture: "test-architecture",
 		RouteKey:           "test",
 		ElasticLicensed:    true,
-	}, client.ProcMeta{
+	}, {
 		Name:     "metricbeat",
 		RouteKey: "test",
 		Error:    "failed to get metricbeat data",
@@ -136,4 +137,77 @@ func Test_collectEndpointSecurityLogs_noEndpointSecurity(t *testing.T) {
 	zw := zip.NewWriter(&buff)
 	err := collectEndpointSecurityLogs(zw, specs)
 	assert.NoError(t, err, "collectEndpointSecurityLogs should not return an error")
+}
+
+func Test_redact(t *testing.T) {
+	tests := []struct {
+		name         string
+		arg          interface{}
+		wantRedacted []string
+		wantErr      assert.ErrorAssertionFunc
+	}{
+		{
+			name: "tlscommon.Config",
+			arg: tlscommon.Config{
+				Enabled:          nil,
+				VerificationMode: 0,
+				Versions:         nil,
+				CipherSuites:     nil,
+				CAs:              []string{"ca1", "ca2"},
+				Certificate: tlscommon.CertificateConfig{
+					Certificate: "Certificate",
+					Key:         "Key",
+					Passphrase:  "Passphrase",
+				},
+				CurveTypes:           nil,
+				Renegotiation:        0,
+				CASha256:             nil,
+				CATrustedFingerprint: "",
+			},
+			wantRedacted: []string{
+				"certificate", "key", "key_passphrase", "certificate_authorities"},
+		},
+		{
+			name: "some map",
+			arg: map[string]interface{}{
+				"s":          "sss",
+				"some_key":   "hey, a key!",
+				"a_password": "changeme",
+				"my_token":   "a_token",
+				"nested": map[string]string{
+					"4242":            "4242",
+					"4242key":         "4242key",
+					"4242password":    "4242password",
+					"4242certificate": "4242certificate",
+				},
+			},
+			wantRedacted: []string{
+				"some_key", "a_password", "my_token", "4242key", "4242password", "4242certificate"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := redact(tt.arg)
+			require.NoError(t, err)
+
+			for k, v := range got {
+				if contains(tt.wantRedacted, k) {
+					assert.Equal(t, v, REDACTED)
+				} else {
+					assert.NotEqual(t, v, REDACTED)
+				}
+			}
+		})
+	}
+}
+
+func contains(list []string, val string) bool {
+	for _, k := range list {
+		if val == k {
+			return true
+		}
+	}
+
+	return false
 }

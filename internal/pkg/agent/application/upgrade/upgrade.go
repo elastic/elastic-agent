@@ -5,13 +5,11 @@
 package upgrade
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/otiai10/copy"
@@ -20,10 +18,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -39,7 +35,7 @@ const (
 
 var (
 	agentArtifact = artifact.Artifact{
-		Name:     "elastic-agent",
+		Name:     "Elastic Agent",
 		Cmd:      agentName,
 		Artifact: "beats/" + agentName,
 	}
@@ -84,9 +80,19 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
 
+	err = preUpgradeCleanup(u.agentInfo.Version())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q before update: %v", paths.Downloads(), err)
+	}
+
 	sourceURI = u.sourceURI(sourceURI)
 	archivePath, err := u.downloadArtifact(ctx, version, sourceURI)
 	if err != nil {
+		// Run the same preUpgradeCleanup task to get rid of any newly downloaded files
+		// This may have an issue if users are upgrading to the same version number.
+		if dErr := preUpgradeCleanup(u.agentInfo.Version()); dErr != nil {
+			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
+		}
 		return nil, err
 	}
 
@@ -103,17 +109,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, ErrSameVersion
 	}
 
-	// Copy vault directory for linux/windows only
-	if err := copyVault(newHash); err != nil {
-		return nil, errors.New(err, "failed to copy vault")
-	}
-
 	if err := copyActionStore(newHash); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
-	}
-
-	if err := encryptConfigIfNeeded(u.log, newHash); err != nil {
-		return nil, errors.New(err, "failed to encrypt the configuration")
 	}
 
 	if err := ChangeSymlink(ctx, newHash); err != nil {
@@ -132,6 +129,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))
+
+	// Clean everything from the downloads dir
+	err = os.RemoveAll(paths.Downloads())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
+	}
+
 	return cb, nil
 }
 
@@ -157,6 +161,8 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	if err := acker.Commit(ctx); err != nil {
 		return err
 	}
+
+	marker.Acked = true
 
 	return saveMarker(marker)
 }
@@ -197,103 +203,6 @@ func copyActionStore(newHash string) error {
 	}
 
 	return nil
-}
-
-func getVaultPath(newHash string) string {
-	vaultPath := paths.AgentVaultPath()
-	if runtime.GOOS == darwin {
-		return vaultPath
-	}
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	return filepath.Join(newHome, filepath.Base(vaultPath))
-}
-
-// Copies the vault files for windows and linux
-func copyVault(newHash string) error {
-	// No vault files to copy on darwin
-	if runtime.GOOS == darwin {
-		return nil
-	}
-
-	vaultPath := paths.AgentVaultPath()
-	newVaultPath := getVaultPath(newHash)
-
-	err := copyDir(vaultPath, newVaultPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
-	return nil
-}
-
-// Create the key if it doesn't exist and encrypt the fleet.yml and state.yml
-func encryptConfigIfNeeded(log *logger.Logger, newHash string) (err error) {
-	vaultPath := getVaultPath(newHash)
-
-	err = secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
-	if err != nil {
-		return err
-	}
-
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	ymlStateStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreYmlFile()))
-	stateStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreFile()))
-
-	files := []struct {
-		Src string
-		Dst string
-	}{
-		{
-			Src: ymlStateStorePath,
-			Dst: stateStorePath,
-		},
-		{
-			Src: paths.AgentConfigYmlFile(),
-			Dst: paths.AgentConfigFile(),
-		},
-	}
-	for _, f := range files {
-		var b []byte
-		b, err = ioutil.ReadFile(f.Src)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return err
-		}
-
-		// Encrypt yml file
-		store := storage.NewEncryptedDiskStore(f.Dst, storage.WithVaultPath(vaultPath))
-		err = store.Save(bytes.NewReader(b))
-		if err != nil {
-			return err
-		}
-
-		// Remove yml file if no errors
-		defer func(fp string) {
-			if err != nil {
-				return
-			}
-			if rerr := os.Remove(fp); rerr != nil {
-				log.Warnf("failed to remove file: %s, err: %v", fp, rerr)
-			}
-		}(f.Src)
-	}
-
-	// Do not remove AgentConfigYmlFile lock file if any error happened.
-	if err != nil {
-		return err
-	}
-
-	lockFp := paths.AgentConfigYmlFile() + ".lock"
-	if rerr := os.Remove(lockFp); rerr != nil {
-		log.Warnf("failed to remove file: %s, err: %v", lockFp, rerr)
-	}
-
-	return err
 }
 
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.

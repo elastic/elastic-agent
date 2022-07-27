@@ -38,6 +38,58 @@ type UpdateMarker struct {
 	Action *fleetapi.ActionUpgrade `json:"action" yaml:"action"`
 }
 
+// MarkerActionUpgrade adapter struct compatible with pre 8.3 version of the marker file format
+type MarkerActionUpgrade struct {
+	ActionID   string `yaml:"id"`
+	ActionType string `yaml:"type"`
+	Version    string `yaml:"version"`
+	SourceURI  string `yaml:"source_uri,omitempty"`
+}
+
+func convertToMarkerAction(a *fleetapi.ActionUpgrade) *MarkerActionUpgrade {
+	if a == nil {
+		return nil
+	}
+	return &MarkerActionUpgrade{
+		ActionID:   a.ActionID,
+		ActionType: a.ActionType,
+		Version:    a.Version,
+		SourceURI:  a.SourceURI,
+	}
+}
+
+func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
+	if a == nil {
+		return nil
+	}
+	return &fleetapi.ActionUpgrade{
+		ActionID:   a.ActionID,
+		ActionType: a.ActionType,
+		Version:    a.Version,
+		SourceURI:  a.SourceURI,
+	}
+}
+
+type updateMarkerSerializer struct {
+	Hash        string               `yaml:"hash"`
+	UpdatedOn   time.Time            `yaml:"updated_on"`
+	PrevVersion string               `yaml:"prev_version"`
+	PrevHash    string               `yaml:"prev_hash"`
+	Acked       bool                 `yaml:"acked"`
+	Action      *MarkerActionUpgrade `yaml:"action"`
+}
+
+func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
+	return &updateMarkerSerializer{
+		Hash:        m.Hash,
+		UpdatedOn:   m.UpdatedOn,
+		PrevVersion: m.PrevVersion,
+		PrevHash:    m.PrevHash,
+		Acked:       m.Acked,
+		Action:      convertToMarkerAction(m.Action),
+	}
+}
+
 // markUpgrade marks update happened so we can handle grace period
 func (u *Upgrader) markUpgrade(_ context.Context, hash string, action *fleetapi.ActionUpgrade) error {
 	prevVersion := release.Version()
@@ -46,7 +98,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, hash string, action *fleetapi.
 		prevHash = prevHash[:hashLen]
 	}
 
-	marker := UpdateMarker{
+	marker := &UpdateMarker{
 		Hash:        hash,
 		UpdatedOn:   time.Now(),
 		PrevVersion: prevVersion,
@@ -54,7 +106,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, hash string, action *fleetapi.
 		Action:      action,
 	}
 
-	markerBytes, err := yaml.Marshal(marker)
+	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
 	if err != nil {
 		return errors.New(err, errors.TypeConfig, "failed to parse marker file")
 	}
@@ -103,16 +155,31 @@ func LoadMarker() (*UpdateMarker, error) {
 		return nil, err
 	}
 
-	marker := &UpdateMarker{}
+	marker := &updateMarkerSerializer{}
 	if err := yaml.Unmarshal(markerBytes, &marker); err != nil {
 		return nil, err
 	}
 
-	return marker, nil
+	return &UpdateMarker{
+		Hash:        marker.Hash,
+		UpdatedOn:   marker.UpdatedOn,
+		PrevVersion: marker.PrevVersion,
+		PrevHash:    marker.PrevHash,
+		Acked:       marker.Acked,
+		Action:      convertToActionUpgrade(marker.Action),
+	}, nil
 }
 
 func saveMarker(marker *UpdateMarker) error {
-	markerBytes, err := yaml.Marshal(marker)
+	makerSerializer := &updateMarkerSerializer{
+		Hash:        marker.Hash,
+		UpdatedOn:   marker.UpdatedOn,
+		PrevVersion: marker.PrevVersion,
+		PrevHash:    marker.PrevHash,
+		Acked:       marker.Acked,
+		Action:      convertToMarkerAction(marker.Action),
+	}
+	markerBytes, err := yaml.Marshal(makerSerializer)
 	if err != nil {
 		return err
 	}
