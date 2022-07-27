@@ -70,7 +70,7 @@ func New(
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig)
+	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
 
 	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
 	if err != nil {

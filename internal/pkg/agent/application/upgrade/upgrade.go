@@ -30,7 +30,6 @@ const (
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
-	darwin          = "darwin"
 )
 
 var (
@@ -50,6 +49,7 @@ var (
 type Upgrader struct {
 	log         *logger.Logger
 	settings    *artifact.Config
+	agentInfo   *info.AgentInfo
 	upgradeable bool
 }
 
@@ -61,10 +61,11 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config) *Upgrader {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) *Upgrader {
 	return &Upgrader{
 		log:         log,
 		settings:    settings,
+		agentInfo:   agentInfo,
 		upgradeable: IsUpgradeable(),
 	}
 }
@@ -74,8 +75,7 @@ func (u *Upgrader) Upgradeable() bool {
 	return u.upgradeable
 }
 
-// Upgrade upgrades running agent, function returns shutdown callback if some needs to be executed for cases when
-// reexec is called by caller.
+// Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error) {
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
