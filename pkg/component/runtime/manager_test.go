@@ -25,6 +25,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+const (
+	exeExt = ".exe"
+)
+
 var (
 	fakeInputSpec = component.InputSpec{
 		Name: "fake",
@@ -151,7 +155,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 
 	binaryPath := filepath.Join("..", "fake", "fake")
 	if runtime.GOOS == component.Windows {
-		binaryPath += ".exe"
+		binaryPath += exeExt
 	}
 	comp := component.Component{
 		ID: "fake-default",
@@ -268,7 +272,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 
 	binaryPath := filepath.Join("..", "fake", "fake")
 	if runtime.GOOS == component.Windows {
-		binaryPath += ".exe"
+		binaryPath += exeExt
 	}
 	comp := component.Component{
 		ID: "fake-default",
@@ -390,7 +394,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 
 	binaryPath := filepath.Join("..", "fake", "fake")
 	if runtime.GOOS == component.Windows {
-		binaryPath += ".exe"
+		binaryPath += exeExt
 	}
 	comp := component.Component{
 		ID: "fake-default",
@@ -544,7 +548,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 
 	binaryPath := filepath.Join("..", "fake", "fake")
 	if runtime.GOOS == component.Windows {
-		binaryPath += ".exe"
+		binaryPath += exeExt
 	}
 	comp := component.Component{
 		ID: "fake-default",
@@ -670,7 +674,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 
 	binaryPath := filepath.Join("..", "fake", "fake")
 	if runtime.GOOS == component.Windows {
-		binaryPath += ".exe"
+		binaryPath += exeExt
 	}
 	comp := component.Component{
 		ID: "fake-default",
@@ -709,8 +713,6 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 				if state.State == client.UnitStateFailed {
 					if !killed {
 						subErrCh <- fmt.Errorf("component failed: %s", state.Message)
-					} else {
-						// expected to go to failed as it was killed with the action
 					}
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
@@ -718,8 +720,6 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 						if unit.State == client.UnitStateFailed {
 							if !killed {
 								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-							} else {
-								// expected to go to failed as it was killed with the action
 							}
 						} else if unit.State == client.UnitStateHealthy {
 							// force the input to exit and it should be restarted
@@ -809,7 +809,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 
 	binaryPath := filepath.Join("..", "fake", "fake")
 	if runtime.GOOS == component.Windows {
-		binaryPath += ".exe"
+		binaryPath += exeExt
 	}
 	comp := component.Component{
 		ID: "fake-default",
@@ -926,7 +926,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 
 	binaryPath := filepath.Join("..", "fake", "fake")
 	if runtime.GOOS == component.Windows {
-		binaryPath += ".exe"
+		binaryPath += exeExt
 	}
 	comp := component.Component{
 		ID: "fake-default",
@@ -1046,7 +1046,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 
 	binaryPath := filepath.Join("..", "fake", "fake")
 	if runtime.GOOS == component.Windows {
-		binaryPath += ".exe"
+		binaryPath += exeExt
 	}
 	runtimeSpec := component.InputRuntimeSpec{
 		InputType:  "fake",

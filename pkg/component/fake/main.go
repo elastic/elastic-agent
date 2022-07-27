@@ -148,7 +148,7 @@ type fakeInput struct {
 	stateMsg string
 }
 
-func newFakeInput(unit *client.Unit, cfg inputConfig) (*fakeInput, error) {
+func newFakeInput(unit *client.Unit, cfg inputConfig) *fakeInput {
 	i := &fakeInput{
 		unit:     unit,
 		cfg:      cfg,
@@ -158,7 +158,7 @@ func newFakeInput(unit *client.Unit, cfg inputConfig) (*fakeInput, error) {
 	unit.RegisterAction(&stateSetterAction{i})
 	unit.RegisterAction(&killAction{})
 	_ = unit.UpdateState(i.state, i.stateMsg, nil)
-	return i, nil
+	return i
 }
 
 func (f *fakeInput) Unit() *client.Unit {
@@ -243,7 +243,7 @@ func newRunningUnit(unit *client.Unit) (runningUnit, error) {
 	}
 	switch cfg.Type {
 	case fake:
-		return newFakeInput(unit, cfg)
+		return newFakeInput(unit, cfg), nil
 	}
 	return nil, fmt.Errorf("unknown unit config type: %s", cfg.Type)
 }
