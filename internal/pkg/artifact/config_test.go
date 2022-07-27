@@ -232,6 +232,7 @@ func TestReload(t *testing.T) {
 		require.Equal(t, tc.expectedTargetDirectory, cfg.TargetDirectory)
 		require.Equal(t, tc.expectedInstallDirectory, cfg.InstallPath)
 		require.Equal(t, tc.expectedDropDirectory, cfg.DropPath)
+		require.Equal(t, tc.expectedTimeout, cfg.Timeout)
 
 		require.Equal(t, tc.expectedDisableProxy, cfg.Proxy.Disable)
 
