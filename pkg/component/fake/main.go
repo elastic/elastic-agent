@@ -80,7 +80,7 @@ func run() error {
 			}
 		case err := <-c.Errors():
 			if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
-				fmt.Fprintf(os.Stderr, "GRPC client error: %s", err)
+				fmt.Fprintf(os.Stderr, "GRPC client error: %+v\n", err)
 			}
 		}
 	}

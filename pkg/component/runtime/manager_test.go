@@ -586,15 +586,19 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 						if unit.State == client.UnitStateFailed {
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 						} else if unit.State == client.UnitStateHealthy {
-							actionCtx, actionCancel := context.WithTimeout(context.Background(), 3*time.Second)
-							_, err := m.PerformAction(actionCtx, comp.Units[0], "set_state", map[string]interface{}{
-								"state":   client.UnitStateDegraded,
-								"message": "Action Set Degraded",
-							})
-							actionCancel()
-							if err != nil {
-								subErrCh <- err
-							}
+							// must be called in a separate go routine because it cannot block receiving from the
+							// subscription channel
+							go func() {
+								actionCtx, actionCancel := context.WithTimeout(context.Background(), 15*time.Second)
+								_, err := m.PerformAction(actionCtx, comp.Units[0], "set_state", map[string]interface{}{
+									"state":   client.UnitStateDegraded,
+									"message": "Action Set Degraded",
+								})
+								actionCancel()
+								if err != nil {
+									subErrCh <- err
+								}
+							}()
 						} else if unit.State == client.UnitStateDegraded {
 							// action set it to degraded
 							subErrCh <- nil
