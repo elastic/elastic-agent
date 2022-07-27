@@ -514,10 +514,9 @@ type coordinatorState struct {
 	message       string
 	overrideState *coordinatorOverrideState
 
-	config     *config.Config
-	ast        *transpiler.AST
-	vars       []*transpiler.Vars
-	components []component.Component
+	config *config.Config
+	ast    *transpiler.AST
+	vars   []*transpiler.Vars
 }
 
 type coordinatorOverrideState struct {
