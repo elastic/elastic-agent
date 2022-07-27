@@ -200,6 +200,22 @@ func TestReload(t *testing.T) {
 			expectedDisableProxy:     defaultValues.Proxy.Disable,
 			expectedTimeout:          defaultValues.Timeout,
 		},
+		{
+			input: `agent.download:
+  source_uri: "testing.uri"
+  sourceURI: "another.uri"
+`,
+			initialConfig:            DefaultConfig(),
+			expectedSourceURI:        "testing.uri",
+			expectedTargetDirectory:  defaultValues.TargetDirectory,
+			expectedInstallDirectory: defaultValues.InstallPath,
+			expectedDropDirectory:    defaultValues.DropPath,
+			expectedFingerprint:      "",
+			expectedTLS:              defaultValues.TLS != nil,
+			expectedTLSEnabled:       false,
+			expectedDisableProxy:     defaultValues.Proxy.Disable,
+			expectedTimeout:          defaultValues.Timeout,
+		},
 	}
 
 	l, _ := logger.NewTesting("t")
