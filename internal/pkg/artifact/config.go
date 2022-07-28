@@ -198,12 +198,12 @@ func (c *Config) Unpack(cfg *c.C) error {
 		InstallPath     string `yaml:"installPath" config:"install_path"`
 		DropPath        string `yaml:"dropPath" config:"drop_path"`
 	}{
-		OperatingSystem: settings.OperatingSystem,
-		Architecture:    settings.Architecture,
-		SourceURI:       settings.SourceURI,
-		TargetDirectory: settings.TargetDirectory,
-		InstallPath:     settings.InstallPath,
-		DropPath:        settings.DropPath,
+		OperatingSystem: c.OperatingSystem,
+		Architecture:    c.Architecture,
+		SourceURI:       c.SourceURI,
+		TargetDirectory: c.TargetDirectory,
+		InstallPath:     c.InstallPath,
+		DropPath:        c.DropPath,
 	}
 
 	if err := cfg.Unpack(&tmp); err != nil {
@@ -215,7 +215,7 @@ func (c *Config) Unpack(cfg *c.C) error {
 		return err
 	}
 
-	*settings = Config{
+	*c = Config{
 		OperatingSystem:       tmp.OperatingSystem,
 		Architecture:          tmp.Architecture,
 		SourceURI:             tmp.SourceURI,
