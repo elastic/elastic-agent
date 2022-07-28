@@ -5,7 +5,6 @@
 package component
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -16,7 +15,7 @@ import (
 
 var (
 	// ErrOutputNotSupported is returned when an input does not support an output type
-	ErrOutputNotSupported = errors.New("input doesn't support output type")
+	ErrOutputNotSupported = newError("input doesn't support output type")
 )
 
 // ErrInputRuntimeCheckFail error is used when an input specification runtime prevention check occurs.
@@ -37,25 +36,25 @@ func (e *ErrInputRuntimeCheckFail) Error() string {
 
 // Unit is a single input or output that a component must run.
 type Unit struct {
-	ID     string
-	Type   client.UnitType
-	Config map[string]interface{}
+	ID     string                 `yaml:"id"`
+	Type   client.UnitType        `yaml:"type"`
+	Config map[string]interface{} `yaml:"config,omitempty"`
 }
 
 // Component is a set of units that needs to run.
 type Component struct {
 	// ID is the unique ID of the component.
-	ID string
+	ID string `yaml:"id"`
 
 	// Err used when there is an error with running this input. Used by the runtime to alert
 	// the reason that all of these units are failed.
-	Err error
+	Err error `yaml:"error,omitempty"`
 
 	// Spec on how the input should run.
-	Spec InputRuntimeSpec
+	Spec InputRuntimeSpec `yaml:"spec,omitempty"`
 
 	// Units that should be running inside this component.
-	Units []Unit
+	Units []Unit `yaml:"units"`
 }
 
 // ToComponents returns the components that should be running based on the policy and the current runtime specification.

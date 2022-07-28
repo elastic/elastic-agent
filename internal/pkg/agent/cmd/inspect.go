@@ -5,71 +5,127 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
+	"context"
+	"fmt"
+	"os"
+	"strings"
+	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/service"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect",
 		Short: "Shows configuration of the agent",
-		Long:  "Shows current configuration of the agent",
-		Args:  cobra.ExactArgs(0),
+		Long: `Shows current configuration of the agent.
+
+By default variable substitution is not performed. Use the --variables flag to enable variable substitution. The
+first set of computed variables are used when only the --variables flag is defined. This can prevent some of the
+dynamic provides (kubernetes, docker, etc.) from providing all the possible variables it could have discovered if given
+more time. The --variables-timeout allows an amount of time to be provided for variable discovery, when set it will
+wait that amount of time before using the variables for the configuration.
+`,
+		Args: cobra.ExactArgs(0),
 		Run: func(c *cobra.Command, args []string) {
-			// TODO(blakerouse): Fix inspect command for Elastic Agent v2
-			/*
-				if err := inspectConfig(paths.ConfigFile()); err != nil {
-					fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-					os.Exit(1)
-				}
-			*/
+			var opts inspectConfigOpts
+			opts.variables, _ = c.Flags().GetBool("variables")
+			opts.variablesTimeout, _ = c.Flags().GetDuration("variables-timeout")
+
+			ctx, cancel := context.WithCancel(context.Background())
+			service.HandleSignals(func() {}, cancel)
+			if err := inspectConfig(ctx, paths.ConfigFile(), opts, streams); err != nil {
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				os.Exit(1)
+			}
 		},
 	}
 
-	cmd.AddCommand(newInspectOutputCommandWithArgs(s))
+	cmd.Flags().Bool("variables", false, "render configuration with variables substituted")
+	cmd.Flags().Duration("variables-timeout", time.Duration(0), "wait this amount of time for variables before performing substitution")
+
+	cmd.AddCommand(newInspectComponentsCommandWithArgs(s, streams))
 
 	return cmd
 }
 
-func newInspectOutputCommandWithArgs(_ []string) *cobra.Command {
+func newInspectComponentsCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "output",
-		Short: "Displays configuration generated for output",
-		Long:  "Displays configuration generated for output.\nIf no output is specified list of output is displayed",
-		Args:  cobra.MaximumNArgs(2),
-		RunE: func(c *cobra.Command, args []string) error {
-			// TODO(blakerouse): Fix inspect command for Elastic Agent v2
-			/*
-				outName, _ := c.Flags().GetString("output")
-				program, _ := c.Flags().GetString("program")
-				cfgPath := paths.ConfigFile()
-				agentInfo, err := info.NewAgentInfo(false)
-				if err != nil {
-					return err
-				}
+		Use:   "components [id]",
+		Short: "Displays the components model for the configuration",
+		Long: `Displays the generated components model for the current configuration.
 
-					if outName == "" {
-						return inspectOutputs(cfgPath, agentInfo)
-					}
+By default the configuration for each unit inside of a component is not returned. Use --show-config to display the
+configuration in all the units.
 
-					return inspectOutput(cfgPath, outName, program, agentInfo)
-			*/
-			return nil
+A specific component can be selected by its ID and only that component and all its units will be returned. Because its
+possible for a component to have many units the configuration for each unit is still not provided by default. Use
+--show-config to display the configuration in all the units.
+
+A specific unit inside of a component can be selected by using <component_id>/<unit_id> and only that unit will be
+returned. In this mode the configuration is provided by default, using the --show-config is a noop.
+
+The selected input or output runtime specification for a component is never provided unless enabled with --show-spec.
+
+Variable substitution is always performed when computing the components, and it cannot be disabled. By default only the
+first set of computed variables are used. This can prevent some of the dynamic provides (kubernetes, docker, etc.) from
+providing all the possible variables it could have discovered if given more time. The --variables-timeout allows an
+amount of time to be provided for variable discovery, when set it will wait that amount of time before using the
+variables for the configuration.
+`,
+		Args: cobra.MaximumNArgs(1),
+		Run: func(c *cobra.Command, args []string) {
+			var opts inspectComponentsOpts
+			if len(args) > 0 {
+				opts.id = args[0]
+			}
+			opts.showConfig, _ = c.Flags().GetBool("show-config")
+			opts.showSpec, _ = c.Flags().GetBool("show-spec")
+			opts.variablesTimeout, _ = c.Flags().GetDuration("variables-timeout")
+
+			ctx, cancel := context.WithCancel(context.Background())
+			service.HandleSignals(func() {}, cancel)
+			if err := inspectComponents(ctx, paths.ConfigFile(), opts, streams); err != nil {
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				os.Exit(1)
+			}
 		},
 	}
 
-	cmd.Flags().StringP("output", "o", "", "name of the output to be inspected")
-	cmd.Flags().StringP("program", "p", "", "type of program to inspect, needs to be combined with output. e.g filebeat")
+	cmd.Flags().Bool("show-config", false, "show the configuration for all units")
+	cmd.Flags().Bool("show-spec", false, "show the runtime specification for a component")
+	cmd.Flags().Duration("variables-timeout", time.Duration(0), "wait this amount of time for variables before performing substitution")
 
 	return cmd
 }
 
-/*
-func inspectConfig(cfgPath string) error {
+type inspectConfigOpts struct {
+	variables        bool
+	variablesTimeout time.Duration
+}
+
+func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, streams *cli.IOStreams) error {
 	err := tryContainerLoadPaths()
+	if err != nil {
+		return err
+	}
+
+	l, err := newErrorLogger()
 	if err != nil {
 		return err
 	}
@@ -79,19 +135,36 @@ func inspectConfig(cfgPath string) error {
 		return err
 	}
 
-	return printConfig(fullCfg)
-}
-
-func printMapStringConfig(mapStr map[string]interface{}) error {
-	l, err := newErrorLogger()
+	if !opts.variables {
+		return printConfig(fullCfg, l, streams)
+	}
+	cfg, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesTimeout)
 	if err != nil {
 		return err
 	}
+	return printMapStringConfig(cfg, streams)
+}
+
+func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams) error {
+	data, err := yaml.Marshal(mapStr)
+	if err != nil {
+		return errors.New(err, "could not marshal to YAML")
+	}
+
+	_, err = streams.Out.Write(data)
+	return err
+}
+
+func printConfig(cfg *config.Config, l *logger.Logger, streams *cli.IOStreams) error {
 	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
 	if err != nil {
 		return err
 	}
 
+	mapStr, err := cfg.ToMapStr()
+	if err != nil {
+		return err
+	}
 	newCfg, err := caps.Apply(mapStr)
 	if err != nil {
 		return errors.New(err, "failed to apply capabilities")
@@ -101,287 +174,275 @@ func printMapStringConfig(mapStr map[string]interface{}) error {
 		return errors.New("config returned from capabilities has invalid type")
 	}
 
-	data, err := yaml.Marshal(newMap)
-	if err != nil {
-		return errors.New(err, "could not marshal to YAML")
-	}
-
-	_, err = os.Stdout.WriteString(string(data))
-	return err
+	return printMapStringConfig(newMap, streams)
 }
 
-func printConfig(cfg *config.Config) error {
-	mapStr, err := cfg.ToMapStr()
+type inspectComponentsOpts struct {
+	id               string
+	showConfig       bool
+	showSpec         bool
+	variablesTimeout time.Duration
+}
+
+func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponentsOpts, streams *cli.IOStreams) error {
+	l, err := newErrorLogger()
 	if err != nil {
 		return err
 	}
 
-	return printMapStringConfig(mapStr)
+	// Ensure that when running inside a container that the correct paths are used.
+	err = tryContainerLoadPaths()
+	if err != nil {
+		return err
+	}
+
+	// Load the requirements before trying to load the configuration. These should always load
+	// even if the configuration is wrong.
+	platform, err := component.LoadPlatformDetail()
+	if err != nil {
+		return fmt.Errorf("failed to gather system information: %w", err)
+	}
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
+	}
+
+	m, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesTimeout)
+	if err != nil {
+		return err
+	}
+
+	// Compute the components from the computed configuration.
+	comps, err := specs.ToComponents(m)
+	if err != nil {
+		return fmt.Errorf("failed to render components: %w", err)
+	}
+
+	// ID provided.
+	if opts.id != "" {
+		splitID := strings.SplitN(opts.id, "/", 2)
+		compID := splitID[0]
+		unitID := ""
+		if len(splitID) > 1 {
+			unitID = splitID[1]
+		}
+		comp, ok := findComponent(comps, compID)
+		if ok {
+			if unitID != "" {
+				unit, ok := findUnit(comp, unitID)
+				if ok {
+					return printUnit(unit, streams)
+				}
+				return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
+			}
+			if !opts.showSpec {
+				comp.Spec = component.InputRuntimeSpec{}
+			}
+			if !opts.showConfig {
+				for key, unit := range comp.Units {
+					unit.Config = nil
+					comp.Units[key] = unit
+				}
+			}
+			return printComponent(comp, streams)
+		}
+		return fmt.Errorf("unable to find component with ID: %s", compID)
+	}
+
+	// Hide configuration unless toggled on.
+	if !opts.showConfig {
+		for i, comp := range comps {
+			for key, unit := range comp.Units {
+				unit.Config = nil
+				comp.Units[key] = unit
+			}
+			comps[i] = comp
+		}
+	}
+
+	// Hide runtime specification unless toggled on.
+	if !opts.showSpec {
+		for i, comp := range comps {
+			comp.Spec = component.InputRuntimeSpec{}
+			comps[i] = comp
+		}
+	}
+
+	return printComponents(comps, streams)
+}
+
+func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration) (map[string]interface{}, error) {
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine capabilities: %w", err)
+	}
+
+	cfg, err := operations.LoadFullAgentConfig(cfgPath, true)
+	if err != nil {
+		return nil, err
+	}
+	m, err := cfg.ToMapStr()
+	if err != nil {
+		return nil, err
+	}
+	ast, err := transpiler.NewAST(m)
+	if err != nil {
+		return nil, fmt.Errorf("could not create the AST from the configuration: %w", err)
+	}
+
+	var ok bool
+	updatedAst, err := caps.Apply(ast)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply capabilities: %w", err)
+	}
+	ast, ok = updatedAst.(*transpiler.AST)
+	if !ok {
+		return nil, fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
+	}
+
+	// Wait for the variables based on the timeout.
+	vars, err := waitForVariables(ctx, l, cfg, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gather variables: %s", err)
+	}
+
+	// Render the inputs using the discovered inputs.
+	inputs, ok := transpiler.Lookup(ast, "inputs")
+	if ok {
+		renderedInputs, err := transpiler.RenderInputs(inputs, vars)
+		if err != nil {
+			return nil, fmt.Errorf("rendering inputs failed: %w", err)
+		}
+		err = transpiler.Insert(ast, renderedInputs, "inputs")
+		if err != nil {
+			return nil, fmt.Errorf("inserting rendered inputs failed: %w", err)
+		}
+	}
+	m, err = ast.Map()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+	}
+	return m, nil
+}
+
+type varsWait struct {
+	vars []*transpiler.Vars
+	err  error
+}
+
+func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config, timeout time.Duration) ([]*transpiler.Vars, error) {
+	var cancel context.CancelFunc
+
+	composable, err := composable.New(l, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create composable controller: %w", err)
+	}
+
+	hasTimeout := false
+	if timeout > time.Duration(0) {
+		hasTimeout = true
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	defer cancel()
+
+	resCh := make(chan varsWait)
+	go func() {
+		var err error
+		var vars []*transpiler.Vars
+		for {
+			select {
+			case <-ctx.Done():
+				if err == nil {
+					err = ctx.Err()
+				}
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					err = nil
+				}
+				resCh <- varsWait{vars: vars, err: err}
+				return
+			case cErr := <-composable.Errors():
+				err = cErr
+				if err != nil {
+					cancel()
+				}
+			case cVars := <-composable.Watch():
+				vars = cVars
+				if !hasTimeout {
+					cancel()
+				}
+			}
+		}
+	}()
+
+	errCh := make(chan error)
+	go func() {
+		err := composable.Run(ctx)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	err = <-errCh
+	if err != nil {
+		return nil, err
+	}
+	res := <-resCh
+	return res.vars, res.err
+}
+
+func printComponents(components []component.Component, streams *cli.IOStreams) error {
+	topLevel := struct {
+		Components []component.Component `yaml:"components"`
+	}{
+		Components: components,
+	}
+	data, err := yaml.Marshal(topLevel)
+	if err != nil {
+		return errors.New(err, "could not marshal to YAML")
+	}
+	_, err = streams.Out.Write(data)
+	return err
+}
+
+func printComponent(comp component.Component, streams *cli.IOStreams) error {
+	data, err := yaml.Marshal(comp)
+	if err != nil {
+		return errors.New(err, "could not marshal to YAML")
+	}
+	_, err = streams.Out.Write(data)
+	return err
+}
+
+func printUnit(unit component.Unit, streams *cli.IOStreams) error {
+	data, err := yaml.Marshal(unit)
+	if err != nil {
+		return errors.New(err, "could not marshal to YAML")
+	}
+	_, err = streams.Out.Write(data)
+	return err
+}
+
+func findUnit(comp component.Component, id string) (component.Unit, bool) {
+	for _, unit := range comp.Units {
+		if unit.ID == id {
+			return unit, true
+		}
+	}
+	return component.Unit{}, false
+}
+
+func findComponent(components []component.Component, id string) (component.Component, bool) {
+	for _, comp := range components {
+		if comp.ID == id {
+			return comp, true
+		}
+	}
+	return component.Component{}, false
 }
 
 func newErrorLogger() (*logger.Logger, error) {
 	return logger.NewWithLogpLevel("", logp.ErrorLevel, false)
-}
-
-func inspectOutputs(cfgPath string, agentInfo *info.AgentInfo) error {
-	l, err := newErrorLogger()
-	if err != nil {
-		return err
-	}
-
-	fullCfg, err := operations.LoadFullAgentConfig(cfgPath, true)
-	if err != nil {
-		return err
-	}
-
-	fleetConfig, err := fullCfg.ToMapStr()
-	if err != nil {
-		return err
-	}
-
-	isStandalone, err := isStandalone(fullCfg)
-	if err != nil {
-		return err
-	}
-
-	return listOutputsFromMap(l, agentInfo, fleetConfig, isStandalone)
-}
-
-func listOutputsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *config.Config, isStandalone bool) error {
-	programsGroup, err := getProgramsFromConfig(log, agentInfo, cfg, isStandalone)
-	if err != nil {
-		return err
-
-	}
-
-	for k := range programsGroup {
-		_, _ = os.Stdout.WriteString(k)
-	}
-
-	return nil
-}
-
-func listOutputsFromMap(log *logger.Logger, agentInfo *info.AgentInfo, cfg map[string]interface{}, isStandalone bool) error {
-	c, err := config.NewConfigFrom(cfg)
-	if err != nil {
-		return err
-	}
-
-	return listOutputsFromConfig(log, agentInfo, c, isStandalone)
-}
-
-func inspectOutput(cfgPath, output, program string, agentInfo *info.AgentInfo) error {
-	l, err := newErrorLogger()
-	if err != nil {
-		return err
-	}
-
-	fullCfg, err := operations.LoadFullAgentConfig(cfgPath, true)
-	if err != nil {
-		return err
-	}
-
-	fleetConfig, err := fullCfg.ToMapStr()
-	if err != nil {
-		return err
-	}
-
-	return printOutputFromMap(l, agentInfo, output, program, fleetConfig, true)
-}
-
-func printOutputFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, output, programName string, cfg *config.Config, isStandalone bool) error {
-	programsGroup, err := getProgramsFromConfig(log, agentInfo, cfg, isStandalone)
-	if err != nil {
-		return err
-
-	}
-
-	for k, programs := range programsGroup {
-		if k != output {
-			continue
-		}
-
-		var programFound bool
-		for _, p := range programs {
-			if programName != "" && programName != p.Spec.CommandName() {
-				continue
-			}
-
-			programFound = true
-			_, _ = os.Stdout.WriteString(fmt.Sprintf("[%s] %s:\n", k, p.Spec.CommandName()))
-			err = printMapStringConfig(p.Configuration())
-			if err != nil {
-				return fmt.Errorf("cannot print configuration of program '%s': %w", programName, err)
-			}
-			_, _ = os.Stdout.WriteString("---")
-		}
-
-		if !programFound {
-			return fmt.Errorf("program '%s' is not recognized within output '%s', try running `elastic-agent inspect output` to find available outputs",
-				programName,
-				output)
-		}
-
-		return nil
-	}
-
-	return fmt.Errorf("output '%s' is not recognized, try running `elastic-agent inspect output` to find available outputs", output)
-
-}
-
-func printOutputFromMap(log *logger.Logger, agentInfo *info.AgentInfo, output, programName string, cfg map[string]interface{}, isStandalone bool) error {
-	c, err := config.NewConfigFrom(cfg)
-	if err != nil {
-		return err
-	}
-
-	return printOutputFromConfig(log, agentInfo, output, programName, c, isStandalone)
-}
-
-func getProgramsFromConfig(log *logger.Logger, agentInfo *info.AgentInfo, cfg *config.Config, isStandalone bool) (map[string][]program.Program, error) {
-	monitor := noop.NewMonitor()
-	router := &inmemRouter{}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	composableCtrl, err := composable.New(log, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	composableWaiter := newWaitForCompose(composableCtrl)
-	configModifiers := &pipeline.ConfigModifiers{
-		Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring},
-		Filters:    []pipeline.FilterFunc{filters.StreamChecker},
-	}
-
-	if !isStandalone {
-		sysInfo, err := sysinfo.Host()
-		if err != nil {
-			return nil, errors.New(err,
-				"fail to get system information",
-				errors.TypeUnexpected)
-		}
-		configModifiers.Filters = append(configModifiers.Filters, modifiers.InjectFleet(cfg, sysInfo.Info(), agentInfo))
-	}
-
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
-	if err != nil {
-		return nil, err
-	}
-
-	emit, err := emitter.New(
-		ctx,
-		log,
-		agentInfo,
-		composableWaiter,
-		router,
-		configModifiers,
-		caps,
-		monitor,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := emit(ctx, cfg); err != nil {
-		return nil, err
-	}
-	composableWaiter.Wait()
-
-	// add the fleet-server input to default programs list
-	// this does not correspond to the actual config that fleet-server uses as it's in fleet.yml and not part of the assembled config (cfg)
-	fleetCFG, err := cfg.ToMapStr()
-	if err != nil {
-		return nil, err
-	}
-	if fleetInput := getFleetInput(fleetCFG); fleetInput != nil {
-		ast, err := transpiler.NewAST(fleetInput)
-		if err != nil {
-			return nil, err
-		}
-		router.programs["default"] = append(router.programs["default"], program.Program{
-			Spec: program.Spec{
-				Name: "fleet-server",
-				Cmd:  "fleet-server",
-			},
-			Config: ast,
-		})
-	}
-
-	return router.programs, nil
-}
-
-func getFleetInput(o map[string]interface{}) map[string]interface{} {
-	arr, ok := o["inputs"].([]interface{})
-	if !ok {
-		return nil
-	}
-	for _, iface := range arr {
-		input, ok := iface.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		t, ok := input["type"]
-		if !ok {
-			continue
-		}
-		if t.(string) == "fleet-server" {
-			return input
-		}
-	}
-	return nil
-}
-
-type inmemRouter struct {
-	programs map[string][]program.Program
-}
-
-func (r *inmemRouter) Routes() *sorted.Set {
-	return nil
-}
-
-func (r *inmemRouter) Route(_ context.Context, _ string, grpProg map[pipeline.RoutingKey][]program.Program) error {
-	r.programs = grpProg
-	return nil
-}
-
-func (r *inmemRouter) Shutdown() {}
-
-type waitForCompose struct {
-	controller composable.Controller
-	done       chan bool
-}
-
-func newWaitForCompose(wrapped composable.Controller) *waitForCompose {
-	return &waitForCompose{
-		controller: wrapped,
-		done:       make(chan bool),
-	}
-}
-
-func (w *waitForCompose) Run(ctx context.Context) error {
-	err := w.controller.Run(ctx)
-	return err
-}
-
-func (w *waitForCompose) Errors() <-chan error {
-	return nil
-}
-
-func (w *waitForCompose) Watch() <-chan []*transpiler.Vars {
-	return nil
-}
-
-func (w *waitForCompose) Wait() {
-	<-w.done
-}
-*/
-
-func isStandalone(cfg *config.Config) (bool, error) {
-	c, err := configuration.NewFromConfig(cfg)
-	if err != nil {
-		return false, err
-	}
-
-	return configuration.IsStandalone(c.Fleet), nil
 }
