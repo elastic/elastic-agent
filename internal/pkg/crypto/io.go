@@ -21,11 +21,11 @@ import (
 // Option is the default options used to generate the encrypt and decrypt writer.
 // NOTE: the defined options need to be same for both the Reader and the writer.
 type Option struct {
+	Generator       bytesGen
 	IterationsCount int
 	KeyLength       int
 	SaltLength      int
 	IVLength        int
-	Generator       bytesGen
 
 	// BlockSize must be a factor of aes.BlockSize
 	BlockSize int

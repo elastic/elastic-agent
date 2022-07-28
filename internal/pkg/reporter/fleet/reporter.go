@@ -38,12 +38,12 @@ func (e *event) Message() string {
 
 // Reporter is a reporter without any effects, serves just as a showcase for further implementations.
 type Reporter struct {
+	lastAck   time.Time
 	info      agentInfo
 	logger    *logger.Logger
 	queue     []fleetapi.SerializableEvent
-	qlock     sync.Mutex
 	threshold int
-	lastAck   time.Time
+	qlock     sync.Mutex
 }
 
 type agentInfo interface {

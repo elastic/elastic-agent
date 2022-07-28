@@ -76,9 +76,9 @@ func FromProto(s proto.StateObserved_Status) Status {
 // State wraps the process state and application status.
 type State struct {
 	ProcessInfo *process.Info
-	Status      Status
-	Message     string
 	Payload     map[string]interface{}
+	Message     string
+	Status      Status
 }
 
 // Reporter is interface that is called when a state is changed.
