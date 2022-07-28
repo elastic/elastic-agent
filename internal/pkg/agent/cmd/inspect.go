@@ -303,7 +303,7 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	// Wait for the variables based on the timeout.
 	vars, err := waitForVariables(ctx, l, cfg, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to gather variables: %s", err)
+		return nil, fmt.Errorf("failed to gather variables: %w", err)
 	}
 
 	// Render the inputs using the discovered inputs.
