@@ -228,6 +228,7 @@ func (a *Application) watch(ctx context.Context, p app.Taggable, proc *process.I
 		a.setState(state.Restarting, msg, nil)
 
 		// it was a crash
+		// nolint: errcheck // Ignore the error at this point.
 		a.start(ctx, p, cfg, true)
 	}()
 }
@@ -274,6 +275,7 @@ func (a *Application) setState(s state.Status, msg string, payload map[string]in
 }
 
 func (a *Application) cleanUp() {
+	// nolint: errcheck // Ignore the error at this point.
 	a.monitor.Cleanup(a.desc.Spec(), a.pipelineID)
 }
 
