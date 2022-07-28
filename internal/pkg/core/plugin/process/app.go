@@ -228,7 +228,10 @@ func (a *Application) watch(ctx context.Context, p app.Taggable, proc *process.I
 		a.setState(state.Restarting, msg, nil)
 
 		// it was a crash
-		a.start(ctx, p, cfg, true)
+		if err := a.start(ctx, p, cfg, true); err != nil {
+			a.setState(state.Failed, err.Error(), nil)
+			return
+		}
 	}()
 }
 
@@ -274,7 +277,9 @@ func (a *Application) setState(s state.Status, msg string, payload map[string]in
 }
 
 func (a *Application) cleanUp() {
-	a.monitor.Cleanup(a.desc.Spec(), a.pipelineID)
+	if err := a.monitor.Cleanup(a.desc.Spec(), a.pipelineID); err != nil {
+		a.setState(state.Failed, fmt.Sprintf("cleanup failed: %s", err.Error()), nil)
+	}
 }
 
 func (a *Application) gracefulKill(proc *process.Info) {

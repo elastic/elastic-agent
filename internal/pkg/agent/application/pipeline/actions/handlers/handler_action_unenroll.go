@@ -75,7 +75,9 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker store.Fl
 	} else if h.stateStore != nil {
 		// backup action for future start to avoid starting fleet gateway loop
 		h.stateStore.Add(a)
-		h.stateStore.Save()
+		if err := h.stateStore.Save(); err != nil {
+			return err
+		}
 	}
 
 	// close fleet gateway loop
