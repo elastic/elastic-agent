@@ -47,10 +47,8 @@ func getTestOperator(t *testing.T, downloadPath string, installPath string, p *a
 			FailureTimeout: 1, // restart instantly
 		},
 		DownloadConfig: &artifact.Config{
-			AgentArtifactSettings: artifact.AgentArtifactSettings{
-				TargetDirectory: downloadPath,
-				InstallPath:     installPath,
-			},
+			TargetDirectory: downloadPath,
+			InstallPath:     installPath,
 		},
 		LoggingConfig: logger.DefaultLoggingConfig(),
 	}
@@ -105,11 +103,9 @@ func getLogger() *logger.Logger {
 func getProgram(binary, version string) *app.Descriptor {
 	spec := program.SupportedMap[binary]
 	downloadCfg := &artifact.Config{
-		AgentArtifactSettings: artifact.AgentArtifactSettings{
-			InstallPath:     installPath,
-			OperatingSystem: "darwin",
-			Architecture:    "64",
-		},
+		InstallPath:     installPath,
+		OperatingSystem: "darwin",
+		Architecture:    "64",
 	}
 	return app.NewDescriptor(spec, version, downloadCfg, nil)
 }

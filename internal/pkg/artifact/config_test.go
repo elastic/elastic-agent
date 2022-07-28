@@ -71,7 +71,7 @@ func TestReload(t *testing.T) {
   sourceURI: ""
 `,
 			initialConfig: &Config{
-				AgentArtifactSettings: AgentArtifactSettings{SourceURI: "testing.uri"},
+				SourceURI:             "testing.uri",
 				HTTPTransportSettings: defaultValues.HTTPTransportSettings,
 			},
 			expectedSourceURI:        defaultValues.SourceURI, // fallback to default when set to empty
@@ -87,7 +87,7 @@ func TestReload(t *testing.T) {
 		{
 			input: ``,
 			initialConfig: &Config{
-				AgentArtifactSettings: AgentArtifactSettings{SourceURI: "testing.uri"},
+				SourceURI:             "testing.uri",
 				HTTPTransportSettings: defaultValues.HTTPTransportSettings,
 			},
 			expectedSourceURI:        defaultValues.SourceURI, // fallback to default when not set
@@ -105,7 +105,7 @@ func TestReload(t *testing.T) {
   sourceURI: " "
 `,
 			initialConfig: &Config{
-				AgentArtifactSettings: AgentArtifactSettings{SourceURI: "testing.uri"},
+				SourceURI:             "testing.uri",
 				HTTPTransportSettings: defaultValues.HTTPTransportSettings,
 			},
 			expectedSourceURI:        defaultValues.SourceURI, // fallback to default when set to whitespace
@@ -123,7 +123,7 @@ func TestReload(t *testing.T) {
   source_uri: " "
 `,
 			initialConfig: &Config{
-				AgentArtifactSettings: AgentArtifactSettings{SourceURI: "testing.uri"},
+				SourceURI:             "testing.uri",
 				HTTPTransportSettings: defaultValues.HTTPTransportSettings,
 			},
 			expectedSourceURI:        defaultValues.SourceURI, // fallback to default when set to whitespace
@@ -155,7 +155,7 @@ func TestReload(t *testing.T) {
 		{
 			input: ``,
 			initialConfig: &Config{
-				AgentArtifactSettings: AgentArtifactSettings{SourceURI: "testing.uri"},
+				SourceURI:             "testing.uri",
 				HTTPTransportSettings: defaultValues.HTTPTransportSettings,
 			},
 			expectedSourceURI:        defaultValues.SourceURI,

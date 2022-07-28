@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	c "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -26,12 +27,6 @@ const (
 
 // Config is a configuration used for verifier and downloader
 type Config struct {
-	AgentArtifactSettings `config:",inline" yaml:",inline"`
-
-	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
-}
-
-type AgentArtifactSettings struct {
 	// OperatingSystem: operating system [linux, windows, darwin]
 	OperatingSystem string `json:"-" config:",ignore"`
 
@@ -53,6 +48,8 @@ type AgentArtifactSettings struct {
 	// local or network disk.
 	// If not provided FileSystem Downloader will fallback to /beats subfolder of elastic-agent directory.
 	DropPath string `yaml:"dropPath" config:"drop_path"`
+
+	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
 
 type Reloader struct {
@@ -68,12 +65,8 @@ func NewReloader(cfg *Config, log *logger.Logger) *Reloader {
 }
 
 func (r *Reloader) Reload(rawConfig *config.Config) error {
-	if err := r.reloadArtifactSettings(rawConfig); err != nil {
-		return errors.New(err, "failed to reload artifact settings")
-	}
-
-	if err := r.reloadTransport(rawConfig); err != nil {
-		return errors.New(err, "failed to reload transport settings")
+	if err := r.reloadConfig(rawConfig); err != nil {
+		return errors.New(err, "failed to reload source URI")
 	}
 
 	if err := r.reloadSourceURI(rawConfig); err != nil {
@@ -83,43 +76,26 @@ func (r *Reloader) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
-func (r *Reloader) reloadArtifactSettings(rawConfig *config.Config) error {
-	type artifactSettings struct {
-		Config AgentArtifactSettings `json:"agent.download" config:"agent.download"`
+func (r *Reloader) reloadConfig(rawConfig *config.Config) error {
+	type reloadConfig struct {
+		C *Config `json:"agent.download" config:"agent.download"`
 	}
-
-	cfg := &artifactSettings{}
-	cfg.Config = DefaultConfig().AgentArtifactSettings
-	if err := rawConfig.Unpack(&cfg); err != nil {
+	tmp := &reloadConfig{
+		C: DefaultConfig(),
+	}
+	if err := rawConfig.Unpack(&tmp); err != nil {
 		return err
 	}
 
-	if cfg.Config.DropPath != "" {
-		r.cfg.DropPath = cfg.Config.DropPath
+	*(r.cfg) = Config{
+		OperatingSystem:       tmp.C.OperatingSystem,
+		Architecture:          tmp.C.Architecture,
+		SourceURI:             tmp.C.SourceURI,
+		TargetDirectory:       tmp.C.TargetDirectory,
+		InstallPath:           tmp.C.InstallPath,
+		DropPath:              tmp.C.DropPath,
+		HTTPTransportSettings: tmp.C.HTTPTransportSettings,
 	}
-	if cfg.Config.TargetDirectory != "" {
-		r.cfg.TargetDirectory = cfg.Config.TargetDirectory
-	}
-	if cfg.Config.InstallPath != "" {
-		r.cfg.InstallPath = cfg.Config.InstallPath
-	}
-	return nil
-}
-
-func (r *Reloader) reloadTransport(rawConfig *config.Config) error {
-	type transportSettings struct {
-		Config httpcommon.HTTPTransportSettings `json:"agent.download" config:"agent.download"`
-	}
-
-	cfg := &transportSettings{}
-	cfg.Config = DefaultConfig().HTTPTransportSettings
-	if err := rawConfig.Unpack(&cfg); err != nil {
-		return err
-	}
-
-	r.cfg.TLS = cfg.Config.TLS
-	r.cfg.Proxy = cfg.Config.Proxy
-	r.cfg.Timeout = cfg.Config.Timeout
 
 	return nil
 }
@@ -169,13 +145,10 @@ func DefaultConfig() *Config {
 	// The HTTP download will log progress in the case that it is taking a while to download.
 	transport.Timeout = 10 * time.Minute
 
-	artifactSettings := &AgentArtifactSettings{
-		SourceURI:       defaultSourceURI,
-		TargetDirectory: paths.Downloads(),
-		InstallPath:     paths.Install(),
-	}
 	return &Config{
-		AgentArtifactSettings: *artifactSettings,
+		SourceURI:             defaultSourceURI,
+		TargetDirectory:       paths.Downloads(),
+		InstallPath:           paths.Install(),
 		HTTPTransportSettings: transport,
 	}
 }
@@ -213,4 +186,43 @@ func (c *Config) Arch() string {
 
 	c.Architecture = arch
 	return c.Architecture
+}
+
+// Unpack reads a config object into the settings.
+func (settings *Config) Unpack(cfg *c.C) error {
+	tmp := struct {
+		OperatingSystem string `json:"-" config:",ignore"`
+		Architecture    string `json:"-" config:",ignore"`
+		SourceURI       string `json:"sourceURI" config:"sourceURI"`
+		TargetDirectory string `json:"targetDirectory" config:"target_directory"`
+		InstallPath     string `yaml:"installPath" config:"install_path"`
+		DropPath        string `yaml:"dropPath" config:"drop_path"`
+	}{
+		OperatingSystem: settings.OperatingSystem,
+		Architecture:    settings.Architecture,
+		SourceURI:       settings.SourceURI,
+		TargetDirectory: settings.TargetDirectory,
+		InstallPath:     settings.InstallPath,
+		DropPath:        settings.DropPath,
+	}
+
+	if err := cfg.Unpack(&tmp); err != nil {
+		return err
+	}
+
+	transport := DefaultConfig().HTTPTransportSettings
+	if err := cfg.Unpack(&transport); err != nil {
+		return err
+	}
+
+	*settings = Config{
+		OperatingSystem:       tmp.OperatingSystem,
+		Architecture:          tmp.Architecture,
+		SourceURI:             tmp.SourceURI,
+		TargetDirectory:       tmp.TargetDirectory,
+		InstallPath:           tmp.InstallPath,
+		DropPath:              tmp.DropPath,
+		HTTPTransportSettings: transport,
+	}
+	return nil
 }

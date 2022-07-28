@@ -150,10 +150,8 @@ func getMonitorableTestOperator(t *testing.T, installPath string, m monitoring.M
 		},
 		ProcessConfig: &process.Config{},
 		DownloadConfig: &artifact.Config{
-			AgentArtifactSettings: artifact.AgentArtifactSettings{
-				InstallPath:     installPath,
-				OperatingSystem: "darwin",
-			},
+			InstallPath:     installPath,
+			OperatingSystem: "darwin",
 		},
 		MonitoringConfig: mcfg,
 	}

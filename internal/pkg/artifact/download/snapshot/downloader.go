@@ -34,14 +34,13 @@ func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.
 	}
 
 	return &artifact.Config{
-		AgentArtifactSettings: artifact.AgentArtifactSettings{
-			OperatingSystem: config.OperatingSystem,
-			Architecture:    config.Architecture,
-			SourceURI:       snapshotURI,
-			TargetDirectory: config.TargetDirectory,
-			InstallPath:     config.InstallPath,
-			DropPath:        config.DropPath,
-		},
+		OperatingSystem: config.OperatingSystem,
+		Architecture:    config.Architecture,
+		SourceURI:       snapshotURI,
+		TargetDirectory: config.TargetDirectory,
+		InstallPath:     config.InstallPath,
+		DropPath:        config.DropPath,
+
 		HTTPTransportSettings: config.HTTPTransportSettings,
 	}, nil
 }

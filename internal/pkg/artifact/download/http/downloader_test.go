@@ -49,12 +49,10 @@ func TestDownloadBodyError(t *testing.T) {
 	}
 
 	config := &artifact.Config{
-		AgentArtifactSettings: artifact.AgentArtifactSettings{
-			SourceURI:       srv.URL,
-			TargetDirectory: targetDir,
-			OperatingSystem: "linux",
-			Architecture:    "64",
-		},
+		SourceURI:       srv.URL,
+		TargetDirectory: targetDir,
+		OperatingSystem: "linux",
+		Architecture:    "64",
 	}
 
 	log := newRecordLogger()
@@ -99,12 +97,10 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	}
 
 	config := &artifact.Config{
-		AgentArtifactSettings: artifact.AgentArtifactSettings{
-			SourceURI:       srv.URL,
-			TargetDirectory: targetDir,
-			OperatingSystem: "linux",
-			Architecture:    "64",
-		},
+		SourceURI:       srv.URL,
+		TargetDirectory: targetDir,
+		OperatingSystem: "linux",
+		Architecture:    "64",
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: totalTime,
 		},
@@ -155,12 +151,10 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	}
 
 	config := &artifact.Config{
-		AgentArtifactSettings: artifact.AgentArtifactSettings{
-			SourceURI:       srv.URL,
-			TargetDirectory: targetDir,
-			OperatingSystem: "linux",
-			Architecture:    "64",
-		},
+		SourceURI:       srv.URL,
+		TargetDirectory: targetDir,
+		OperatingSystem: "linux",
+		Architecture:    "64",
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: totalTime,
 		},
