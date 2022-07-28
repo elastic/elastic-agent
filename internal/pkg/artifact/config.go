@@ -189,7 +189,7 @@ func (c *Config) Arch() string {
 }
 
 // Unpack reads a config object into the settings.
-func (settings *Config) Unpack(cfg *c.C) error {
+func (c *Config) Unpack(cfg *c.C) error {
 	tmp := struct {
 		OperatingSystem string `json:"-" config:",ignore"`
 		Architecture    string `json:"-" config:",ignore"`
