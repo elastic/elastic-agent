@@ -5,14 +5,14 @@
 package upgrade
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
+
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
@@ -20,10 +20,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -34,12 +32,11 @@ const (
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
-	darwin          = "darwin"
 )
 
 var (
 	agentArtifact = artifact.Artifact{
-		Name:     "elastic-agent",
+		Name:     "Elastic Agent",
 		Cmd:      agentName,
 		Artifact: "beats/" + agentName,
 	}
@@ -54,6 +51,7 @@ var (
 type Upgrader struct {
 	log         *logger.Logger
 	settings    *artifact.Config
+	agentInfo   *info.AgentInfo
 	upgradeable bool
 }
 
@@ -65,12 +63,47 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config) *Upgrader {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) *Upgrader {
 	return &Upgrader{
 		log:         log,
 		settings:    settings,
+		agentInfo:   agentInfo,
 		upgradeable: IsUpgradeable(),
 	}
+}
+
+// Reload reloads the artifact configuration for the upgrader.
+func (u *Upgrader) Reload(rawConfig *config.Config) error {
+	type reloadConfig struct {
+		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
+		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
+
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
+		// different naming.
+		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
+	}
+	cfg := &reloadConfig{}
+	if err := rawConfig.Unpack(&cfg); err != nil {
+		return errors.New(err, "failed to unpack config during reload")
+	}
+
+	var newSourceURI string
+	if cfg.FleetSourceURI != "" {
+		// fleet configuration takes precedence
+		newSourceURI = cfg.FleetSourceURI
+	} else if cfg.SourceURI != "" {
+		newSourceURI = cfg.SourceURI
+	}
+
+	if newSourceURI != "" {
+		u.log.Infof("Source URI changed from %q to %q", u.settings.SourceURI, newSourceURI)
+		u.settings.SourceURI = newSourceURI
+	} else {
+		// source uri unset, reset to default
+		u.log.Infof("Source URI reset from %q to %q", u.settings.SourceURI, artifact.DefaultSourceURI)
+		u.settings.SourceURI = artifact.DefaultSourceURI
+	}
+	return nil
 }
 
 // Upgradeable returns true if the Elastic Agent can be upgraded.
@@ -78,15 +111,24 @@ func (u *Upgrader) Upgradeable() bool {
 	return u.upgradeable
 }
 
-// Upgrade upgrades running agent, function returns shutdown callback if some needs to be executed for cases when
-// reexec is called by caller.
+// Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error) {
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
 
+	err = preUpgradeCleanup(u.agentInfo.Version())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q before update: %v", paths.Downloads(), err)
+	}
+
 	sourceURI = u.sourceURI(sourceURI)
 	archivePath, err := u.downloadArtifact(ctx, version, sourceURI)
 	if err != nil {
+		// Run the same preUpgradeCleanup task to get rid of any newly downloaded files
+		// This may have an issue if users are upgrading to the same version number.
+		if dErr := preUpgradeCleanup(u.agentInfo.Version()); dErr != nil {
+			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
+		}
 		return nil, err
 	}
 
@@ -103,17 +145,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, ErrSameVersion
 	}
 
-	// Copy vault directory for linux/windows only
-	if err := copyVault(newHash); err != nil {
-		return nil, errors.New(err, "failed to copy vault")
-	}
-
 	if err := copyActionStore(newHash); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
-	}
-
-	if err := encryptConfigIfNeeded(u.log, newHash); err != nil {
-		return nil, errors.New(err, "failed to encrypt the configuration")
 	}
 
 	if err := ChangeSymlink(ctx, newHash); err != nil {
@@ -132,6 +165,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))
+
+	// Clean everything from the downloads dir
+	err = os.RemoveAll(paths.Downloads())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
+	}
+
 	return cb, nil
 }
 
@@ -157,6 +197,8 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	if err := acker.Commit(ctx); err != nil {
 		return err
 	}
+
+	marker.Acked = true
 
 	return saveMarker(marker)
 }
@@ -197,103 +239,6 @@ func copyActionStore(newHash string) error {
 	}
 
 	return nil
-}
-
-func getVaultPath(newHash string) string {
-	vaultPath := paths.AgentVaultPath()
-	if runtime.GOOS == darwin {
-		return vaultPath
-	}
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	return filepath.Join(newHome, filepath.Base(vaultPath))
-}
-
-// Copies the vault files for windows and linux
-func copyVault(newHash string) error {
-	// No vault files to copy on darwin
-	if runtime.GOOS == darwin {
-		return nil
-	}
-
-	vaultPath := paths.AgentVaultPath()
-	newVaultPath := getVaultPath(newHash)
-
-	err := copyDir(vaultPath, newVaultPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
-	return nil
-}
-
-// Create the key if it doesn't exist and encrypt the fleet.yml and state.yml
-func encryptConfigIfNeeded(log *logger.Logger, newHash string) (err error) {
-	vaultPath := getVaultPath(newHash)
-
-	err = secret.CreateAgentSecret(secret.WithVaultPath(vaultPath))
-	if err != nil {
-		return err
-	}
-
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	ymlStateStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreYmlFile()))
-	stateStorePath := filepath.Join(newHome, filepath.Base(paths.AgentStateStoreFile()))
-
-	files := []struct {
-		Src string
-		Dst string
-	}{
-		{
-			Src: ymlStateStorePath,
-			Dst: stateStorePath,
-		},
-		{
-			Src: paths.AgentConfigYmlFile(),
-			Dst: paths.AgentConfigFile(),
-		},
-	}
-	for _, f := range files {
-		var b []byte
-		b, err = ioutil.ReadFile(f.Src)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return err
-		}
-
-		// Encrypt yml file
-		store := storage.NewEncryptedDiskStore(f.Dst, storage.WithVaultPath(vaultPath))
-		err = store.Save(bytes.NewReader(b))
-		if err != nil {
-			return err
-		}
-
-		// Remove yml file if no errors
-		defer func(fp string) {
-			if err != nil {
-				return
-			}
-			if rerr := os.Remove(fp); rerr != nil {
-				log.Warnf("failed to remove file: %s, err: %v", fp, rerr)
-			}
-		}(f.Src)
-	}
-
-	// Do not remove AgentConfigYmlFile lock file if any error happened.
-	if err != nil {
-		return err
-	}
-
-	lockFp := paths.AgentConfigYmlFile() + ".lock"
-	if rerr := os.Remove(lockFp); rerr != nil {
-		log.Warnf("failed to remove file: %s, err: %v", lockFp, rerr)
-	}
-
-	return err
 }
 
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.

@@ -17,6 +17,9 @@ const (
 	darwin  = "darwin"
 	linux   = "linux"
 	windows = "windows"
+
+	// DefaultSourceURI is the default source URI for downloading artifacts.
+	DefaultSourceURI = "https://artifacts.elastic.co/downloads/"
 )
 
 // Config is a configuration used for verifier and downloader
@@ -56,7 +59,7 @@ func DefaultConfig() *Config {
 	transport.Timeout = 10 * time.Minute
 
 	return &Config{
-		SourceURI:             "https://artifacts.elastic.co/downloads/",
+		SourceURI:             DefaultSourceURI,
 		TargetDirectory:       paths.Downloads(),
 		InstallPath:           paths.Install(),
 		HTTPTransportSettings: transport,

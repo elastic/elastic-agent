@@ -70,7 +70,7 @@ func New(
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig)
+	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
 
 	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
 	if err != nil {
@@ -121,7 +121,7 @@ func New(
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, specs, reexec, upgrader, runtime, configMgr, composable, caps, compModifiers...)
+	coord := coordinator.New(log, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
