@@ -1,0 +1,90 @@
+inputs:
+    - name: http_endpoint-cisco_meraki
+      type: http_endpoint
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cisco_meraki.events.enabled} == true and ${kubernetes.hints.cisco_meraki.enabled} == true
+          data_stream:
+            dataset: cisco_meraki.events
+            type: logs
+          enabled: true
+          listen_address: localhost
+          listen_port: 8686
+          prefix: json
+          processors: ${kubernetes.hints.cisco_meraki.events.processors}
+          ssl:
+            certificate: /etc/pki/client/cert.pem
+            enabled: false
+            key: /etc/pki/client/cert.key
+          tags:
+            - forwarded
+            - meraki-events
+          type: http_endpoint
+          url: /meraki/events
+      data_stream.namespace: default
+    - name: udp-cisco_meraki
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cisco_meraki.log.enabled} == true or ${kubernetes.hints.cisco_meraki.enabled} == true
+          data_stream:
+            dataset: cisco_meraki.log
+            type: logs
+          fields:
+            _conf:
+                tz_offset: UTC
+          fields_under_root: true
+          host: localhost:8685
+          max_message_size: 1 MiB
+          processors: ${kubernetes.hints.cisco_meraki.log.processors}
+          tags:
+            - cisco-meraki
+            - forwarded
+      data_stream.namespace: default
+    - name: tcp-cisco_meraki
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cisco_meraki.log.enabled} == true and ${kubernetes.hints.cisco_meraki.enabled} == true
+          data_stream:
+            dataset: cisco_meraki.log
+            type: logs
+          fields:
+            _conf:
+                tz_offset: UTC
+          fields_under_root: true
+          host: localhost:8685
+          max_message_size: 1 MiB
+          processors: ${kubernetes.hints.cisco_meraki.log.processors}
+          tags:
+            - cisco-meraki
+            - forwarded
+      data_stream.namespace: default
+    - name: filestream-cisco_meraki
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cisco_meraki.log.enabled} == true and ${kubernetes.hints.cisco_meraki.enabled} == true
+          data_stream:
+            dataset: cisco_meraki.log
+            type: logs
+          exclude_files:
+            - .gz$
+          fields:
+            _conf:
+                tz_offset: UTC
+          fields_under_root: true
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.cisco_meraki.log.stream|all}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors: ${kubernetes.hints.cisco_meraki.log.processors}
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - cisco-meraki
+            - forwarded
+      data_stream.namespace: default
