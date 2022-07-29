@@ -72,7 +72,7 @@ func TempDir() string {
 	tmpDir := filepath.Join(Data(), tempSubdir)
 	tmpCreator.Do(func() {
 		// create tempdir as it probably don't exists
-		os.MkdirAll(tmpDir, 0750)
+		_ = os.MkdirAll(tmpDir, 0750)
 	})
 	return tmpDir
 }
