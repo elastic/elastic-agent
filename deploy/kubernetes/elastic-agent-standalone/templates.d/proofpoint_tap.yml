@@ -1,0 +1,156 @@
+inputs:
+    - name: httpjson-proofpoint_tap
+      type: httpjson
+      use_output: default
+      streams:
+        - auth.basic.password: null
+          auth.basic.user: null
+          condition: ${kubernetes.hints.proofpoint_tap.clicks_blocked.enabled} == true or ${kubernetes.hints.proofpoint_tap.enabled} == true
+          config_version: 2
+          cursor:
+            last_received_time:
+                value: '[[.last_response.body.queryEndTime]]'
+          data_stream:
+            dataset: proofpoint_tap.clicks_blocked
+            type: logs
+          interval: 1h
+          processors: ${kubernetes.hints.proofpoint_tap.clicks_blocked.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                target: url.params.format
+                value: json
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]/[[formatDate ((now (parseDuration "-24h")).Add (parseDuration "1h"))]]'
+                target: url.params.interval
+                value: '[[if (le (formatDate ((parseDate .cursor.last_received_time "RFC3339").Add (parseDuration "1h"))) (formatDate (now)))]][[formatDate (parseDate .cursor.last_received_time "RFC3339")]]/[[formatDate ((parseDate .cursor.last_received_time "RFC3339").Add (parseDuration "1h"))]][[else]][[formatDate (parseDate .cursor.last_received_time "RFC3339")]]/[[formatDate now]][[end]]'
+          request.url: /v2/siem/clicks/blocked
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.interval
+                value: '[[if (le (formatDate ((parseDate .last_response.body.queryEndTime "RFC3339").Add (parseDuration "1h"))) (formatDate (now)))]][[formatDate (parseDate .last_response.body.queryEndTime "RFC3339")]]/[[formatDate ((parseDate .last_response.body.queryEndTime "RFC3339").Add (parseDuration "1h"))]][[else]][[.last_response.terminate_pagination]][[end]]'
+          response.split:
+            target: body.clicksBlocked
+          tags:
+            - forwarded
+            - proofpoint_tap-clicks_blocked
+        - auth.basic.password: null
+          auth.basic.user: null
+          condition: ${kubernetes.hints.proofpoint_tap.clicks_permitted.enabled} == true or ${kubernetes.hints.proofpoint_tap.enabled} == true
+          config_version: 2
+          cursor:
+            last_received_time:
+                value: '[[.last_response.body.queryEndTime]]'
+          data_stream:
+            dataset: proofpoint_tap.clicks_permitted
+            type: logs
+          interval: 1h
+          processors: ${kubernetes.hints.proofpoint_tap.clicks_permitted.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                target: url.params.format
+                value: json
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]/[[formatDate ((now (parseDuration "-24h")).Add (parseDuration "1h"))]]'
+                target: url.params.interval
+                value: '[[if (le (formatDate ((parseDate .cursor.last_received_time "RFC3339").Add (parseDuration "1h"))) (formatDate (now)))]][[formatDate (parseDate .cursor.last_received_time "RFC3339")]]/[[formatDate ((parseDate .cursor.last_received_time "RFC3339").Add (parseDuration "1h"))]][[else]][[formatDate (parseDate .cursor.last_received_time "RFC3339")]]/[[formatDate now]][[end]]'
+          request.url: /v2/siem/clicks/permitted
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.interval
+                value: '[[if (le (formatDate ((parseDate .last_response.body.queryEndTime "RFC3339").Add (parseDuration "1h"))) (formatDate (now)))]][[formatDate (parseDate .last_response.body.queryEndTime "RFC3339")]]/[[formatDate ((parseDate .last_response.body.queryEndTime "RFC3339").Add (parseDuration "1h"))]][[else]][[.last_response.terminate_pagination]][[end]]'
+          response.split:
+            target: body.clicksPermitted
+          tags:
+            - forwarded
+            - proofpoint_tap-clicks_permitted
+        - auth.basic.password: null
+          auth.basic.user: null
+          condition: ${kubernetes.hints.proofpoint_tap.message_blocked.enabled} == true or ${kubernetes.hints.proofpoint_tap.enabled} == true
+          config_version: 2
+          cursor:
+            last_received_time:
+                value: '[[.last_response.body.queryEndTime]]'
+          data_stream:
+            dataset: proofpoint_tap.message_blocked
+            type: logs
+          interval: 1h
+          processors: ${kubernetes.hints.proofpoint_tap.message_blocked.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                target: url.params.format
+                value: json
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]/[[formatDate ((now (parseDuration "-24h")).Add (parseDuration "1h"))]]'
+                target: url.params.interval
+                value: '[[if (le (formatDate ((parseDate .cursor.last_received_time "RFC3339").Add (parseDuration "1h"))) (formatDate (now)))]][[formatDate (parseDate .cursor.last_received_time "RFC3339")]]/[[formatDate ((parseDate .cursor.last_received_time "RFC3339").Add (parseDuration "1h"))]][[else]][[formatDate (parseDate .cursor.last_received_time "RFC3339")]]/[[formatDate now]][[end]]'
+          request.url: /v2/siem/messages/blocked
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.interval
+                value: '[[if (le (formatDate ((parseDate .last_response.body.queryEndTime "RFC3339").Add (parseDuration "1h"))) (formatDate (now)))]][[formatDate (parseDate .last_response.body.queryEndTime "RFC3339")]]/[[formatDate ((parseDate .last_response.body.queryEndTime "RFC3339").Add (parseDuration "1h"))]][[else]][[.last_response.terminate_pagination]][[end]]'
+          response.split:
+            target: body.messagesBlocked
+          tags:
+            - forwarded
+            - proofpoint_tap-message_blocked
+        - auth.basic.password: null
+          auth.basic.user: null
+          condition: ${kubernetes.hints.proofpoint_tap.message_delivered.enabled} == true or ${kubernetes.hints.proofpoint_tap.enabled} == true
+          config_version: 2
+          cursor:
+            last_received_time:
+                value: '[[.last_response.body.queryEndTime]]'
+          data_stream:
+            dataset: proofpoint_tap.message_delivered
+            type: logs
+          interval: 1h
+          processors: ${kubernetes.hints.proofpoint_tap.message_delivered.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                target: url.params.format
+                value: json
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]/[[formatDate ((now (parseDuration "-24h")).Add (parseDuration "1h"))]]'
+                target: url.params.interval
+                value: '[[if (le (formatDate ((parseDate .cursor.last_received_time "RFC3339").Add (parseDuration "1h"))) (formatDate (now)))]][[formatDate (parseDate .cursor.last_received_time "RFC3339")]]/[[formatDate ((parseDate .cursor.last_received_time "RFC3339").Add (parseDuration "1h"))]][[else]][[formatDate (parseDate .cursor.last_received_time "RFC3339")]]/[[formatDate now]][[end]]'
+          request.url: /v2/siem/messages/delivered
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.interval
+                value: '[[if (le (formatDate ((parseDate .last_response.body.queryEndTime "RFC3339").Add (parseDuration "1h"))) (formatDate (now)))]][[formatDate (parseDate .last_response.body.queryEndTime "RFC3339")]]/[[formatDate ((parseDate .last_response.body.queryEndTime "RFC3339").Add (parseDuration "1h"))]][[else]][[.last_response.terminate_pagination]][[end]]'
+          response.split:
+            target: body.messagesDelivered
+          tags:
+            - forwarded
+            - proofpoint_tap-message_delivered
+      data_stream.namespace: default
+    - name: filestream-proofpoint_tap
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.container_logs.enabled} == true
+          data_stream:
+            dataset: kubernetes.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors: ""
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

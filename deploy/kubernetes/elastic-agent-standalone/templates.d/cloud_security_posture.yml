@@ -1,0 +1,47 @@
+inputs:
+    - name: cloudbeat/vanilla-cloud_security_posture
+      type: cloudbeat/vanilla
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cloud_security_posture.findings.enabled} == true or ${kubernetes.hints.cloud_security_posture.enabled} == true
+          data_stream:
+            dataset: cloud_security_posture.findings
+            type: logs
+          name: Findings
+          processors:
+            - add_cluster_id: null
+      data_stream.namespace: default
+    - name: cloudbeat/eks-cloud_security_posture
+      type: cloudbeat/eks
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cloud_security_posture.findings.enabled} == true and ${kubernetes.hints.cloud_security_posture.enabled} == true
+          data_stream:
+            dataset: cloud_security_posture.findings
+            type: logs
+          name: Findings
+          processors:
+            - add_cluster_id: null
+      data_stream.namespace: default
+    - name: filestream-cloud_security_posture
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.container_logs.enabled} == true
+          data_stream:
+            dataset: kubernetes.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors: ""
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

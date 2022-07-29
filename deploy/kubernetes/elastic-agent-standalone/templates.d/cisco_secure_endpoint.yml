@@ -1,0 +1,66 @@
+inputs:
+    - name: httpjson-cisco_secure_endpoint
+      type: httpjson
+      use_output: default
+      streams:
+        - auth.basic.password: null
+          auth.basic.user: null
+          condition: ${kubernetes.hints.cisco_secure_endpoint.event.enabled} == true or ${kubernetes.hints.cisco_secure_endpoint.enabled} == true
+          config_version: "2"
+          cursor:
+            timestamp:
+                value: '[[ .first_event.data.date ]]'
+          data_stream:
+            dataset: cisco_secure_endpoint.event
+            type: logs
+          interval: 1h
+          processors: ${kubernetes.hints.cisco_secure_endpoint.event.processors}
+          request.method: GET
+          request.rate_limit.early_limit: 1
+          request.rate_limit.limit: '[[ .last_response.header.Get "X-Rate-Limit-Limit" ]]'
+          request.rate_limit.remaining: '[[ .last_response.header.Get "X-Rate-Limit-Remaining" ]]'
+          request.rate_limit.reset: '[[ add (toInt (.last_response.header.Get "X-Rate-Limit-Reset")) ((now).Unix) ]]'
+          request.timeout: 60s
+          request.transforms:
+            - set:
+                default: '[[ formatDate (now (parseDuration "-24h")) "2006-01-02T15:04:05-07:00" ]]'
+                target: url.params.start_date
+                value: '[[.cursor.timestamp]]'
+            - set:
+                target: url.params.limit
+                value: 100
+          request.url: https://api.amp.cisco.com/v1/events?offset=0&amp;limit=300
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.value
+                value: '[[ .last_response.body.metadata.links.next ]]'
+          response.split:
+            keep_parent: true
+            target: body.data
+          tags:
+            - cisco-secure_endpoint
+            - forwarded
+      data_stream.namespace: default
+    - name: filestream-cisco_secure_endpoint
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.container_logs.enabled} == true
+          data_stream:
+            dataset: kubernetes.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors: ""
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

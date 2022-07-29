@@ -1,0 +1,51 @@
+inputs:
+    - name: filestream-infoblox_nios
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.container_logs.enabled} == true
+          data_stream:
+            dataset: kubernetes.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors: ""
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
+    - name: tcp-infoblox_nios
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
+          data_stream:
+            dataset: infoblox_nios.log
+            type: logs
+          host: localhost:9027
+          processors: ${kubernetes.hints.infoblox_nios.log.processors}
+          tags:
+            - forwarded
+            - infoblox_nios-log
+      data_stream.namespace: default
+    - name: udp-infoblox_nios
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
+          data_stream:
+            dataset: infoblox_nios.log
+            type: logs
+          host: localhost:9028
+          processors: ${kubernetes.hints.infoblox_nios.log.processors}
+          tags:
+            - forwarded
+            - infoblox_nios-log
+      data_stream.namespace: default

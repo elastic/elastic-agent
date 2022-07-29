@@ -1,0 +1,168 @@
+inputs:
+    - name: httpjson-cisco_duo
+      type: httpjson
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cisco_duo.admin.enabled} == true or ${kubernetes.hints.cisco_duo.enabled} == true
+          config_version: 2
+          cursor:
+            last_published:
+                value: '[[toInt .last_event.timestamp]]'
+          data_stream:
+            dataset: cisco_duo.admin
+            type: logs
+          interval: 1m
+          processors: ${kubernetes.hints.cisco_duo.admin.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                default: '[[(now (parseDuration "-1m")).Unix]]'
+                target: url.params.mintime
+                value: '[[.cursor.last_published]]'
+            - set:
+                target: header.Date
+                value: '[[formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700"]]'
+            - set:
+                target: header.Authorization
+                value: '[[sprintf "Basic %s" (base64Encode (sprintf "%s:%s" "" (hmac "sha1" "" (formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700") "\n" "GET" "\n" .url.Host "\n" "/admin/v1/logs/administrator" "\n" .url.RawQuery)))]]'
+          request.url: /admin/v1/logs/administrator
+          response.split:
+            target: body.response
+          tags:
+            - forwarded
+            - cisco_duo-admin
+        - condition: ${kubernetes.hints.cisco_duo.auth.enabled} == true or ${kubernetes.hints.cisco_duo.enabled} == true
+          config_version: 2
+          cursor:
+            last_published:
+                value: '[[mul (toInt .last_event.timestamp) 1000]]'
+          data_stream:
+            dataset: cisco_duo.auth
+            type: logs
+          interval: 1m
+          processors: ${kubernetes.hints.cisco_duo.auth.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                target: url.params.limit
+                value: 1000
+            - set:
+                target: url.params.sort
+                value: ts:asc
+            - set:
+                default: '[[div (((now (parseDuration "-2m")).Add (parseDuration "-1m")).UnixNano) 1e6]]'
+                target: url.params.mintime
+                value: '[[.cursor.last_published]]'
+            - set:
+                target: url.params.maxtime
+                value: '[[div ((now (parseDuration "-2m")).UnixNano) 1e6]]'
+            - set:
+                target: header.Date
+                value: '[[formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700"]]'
+            - set:
+                target: header.Authorization
+                value: '[[sprintf "Basic %s" (base64Encode (sprintf "%s:%s" "" (hmac "sha1" "" (formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700") "\n" "GET" "\n" .url.Host "\n" "/admin/v2/logs/authentication" "\n" .url.RawQuery)))]]'
+          request.url: /admin/v2/logs/authentication
+          response.split:
+            target: body.response.authlogs
+          tags:
+            - forwarded
+            - cisco_duo-auth
+        - condition: ${kubernetes.hints.cisco_duo.offline_enrollment.enabled} == true or ${kubernetes.hints.cisco_duo.enabled} == true
+          config_version: 2
+          cursor:
+            last_published:
+                value: '[[toInt .last_event.timestamp]]'
+          data_stream:
+            dataset: cisco_duo.offline_enrollment
+            type: logs
+          interval: 1m
+          processors: ${kubernetes.hints.cisco_duo.offline_enrollment.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                default: '[[((now (parseDuration "-2m")).Add (parseDuration "-1m")).Unix]]'
+                target: url.params.mintime
+                value: '[[.cursor.last_published]]'
+            - set:
+                target: header.Date
+                value: '[[formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700"]]'
+            - set:
+                target: header.Authorization
+                value: '[[sprintf "Basic %s" (base64Encode (sprintf "%s:%s" "" (hmac "sha1" "" (formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700") "\n" "GET" "\n" .url.Host "\n" "/admin/v1/logs/offline_enrollment" "\n" .url.RawQuery)))]]'
+          request.url: /admin/v1/logs/offline_enrollment
+          response.split:
+            target: body.response
+          tags:
+            - forwarded
+            - cisco_duo-offline_enrollment
+        - condition: ${kubernetes.hints.cisco_duo.summary.enabled} == true or ${kubernetes.hints.cisco_duo.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: cisco_duo.summary
+            type: logs
+          interval: 1m
+          processors: ${kubernetes.hints.cisco_duo.summary.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                target: header.Date
+                value: '[[formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700"]]'
+            - set:
+                target: header.Authorization
+                value: '[[sprintf "Basic %s" (base64Encode (sprintf "%s:%s" "" (hmac "sha1" "" (formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700") "\n" "GET" "\n" .url.Host "\n" "/admin/v1/info/summary" "\n")))]]'
+          request.url: /admin/v1/info/summary
+          tags:
+            - forwarded
+            - cisco_duo-summary
+        - condition: ${kubernetes.hints.cisco_duo.telephony.enabled} == true or ${kubernetes.hints.cisco_duo.enabled} == true
+          config_version: 2
+          cursor:
+            last_published:
+                value: '[[toInt .last_event.timestamp]]'
+          data_stream:
+            dataset: cisco_duo.telephony
+            type: logs
+          interval: 1m
+          processors: ${kubernetes.hints.cisco_duo.telephony.processors}
+          request.method: GET
+          request.transforms:
+            - set:
+                default: '[[(now (parseDuration "-1m")).Unix]]'
+                target: url.params.mintime
+                value: '[[.cursor.last_published]]'
+            - set:
+                target: header.Date
+                value: '[[formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700"]]'
+            - set:
+                target: header.Authorization
+                value: '[[sprintf "Basic %s" (base64Encode (sprintf "%s:%s" "" (hmac "sha1" "" (formatDate (now) "Mon, 02 Jan 2006 15:04:05 -0700") "\n" "GET" "\n" .url.Host "\n" "/admin/v1/logs/telephony" "\n" .url.RawQuery)))]]'
+          request.url: /admin/v1/logs/telephony
+          response.split:
+            target: body.response
+          tags:
+            - forwarded
+            - cisco_duo-telephony
+      data_stream.namespace: default
+    - name: filestream-cisco_duo
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.container_logs.enabled} == true
+          data_stream:
+            dataset: kubernetes.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors: ""
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
