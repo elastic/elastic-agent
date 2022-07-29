@@ -23,6 +23,9 @@ const (
 	tempSubdir        = "tmp"
 )
 
+// ExternalInputsPattern is a glob that matches the paths of external configuration files.
+var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
+
 var (
 	topPath         string
 	configPath      string
@@ -117,6 +120,11 @@ func ConfigFile() string {
 		return configFilePath
 	}
 	return filepath.Join(Config(), configFilePath)
+}
+
+// ExternalInputs returns the path to load external inputs from.
+func ExternalInputs() string {
+	return filepath.Join(Config(), ExternalInputsPattern)
 }
 
 // Data returns the data directory for Agent

@@ -17,13 +17,13 @@ import (
 
 type once struct {
 	log      *logger.Logger
-	discover discoverFunc
+	discover config.DiscoverFunc
 	loader   *config.Loader
 	ch       chan coordinator.ConfigChange
 	errCh    chan error
 }
 
-func newOnce(log *logger.Logger, discover discoverFunc, loader *config.Loader) *once {
+func newOnce(log *logger.Logger, discover config.DiscoverFunc, loader *config.Loader) *once {
 	return &once{log: log, discover: discover, loader: loader, ch: make(chan coordinator.ConfigChange), errCh: make(chan error)}
 }
 
@@ -34,7 +34,7 @@ func (o *once) Run(ctx context.Context) error {
 	}
 
 	if len(files) == 0 {
-		return ErrNoConfiguration
+		return config.ErrNoConfiguration
 	}
 
 	cfg, err := readfiles(files, o.loader)

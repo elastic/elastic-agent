@@ -37,15 +37,15 @@ func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Comman
 
 By default variable substitution is not performed. Use the --variables flag to enable variable substitution. The
 first set of computed variables are used when only the --variables flag is defined. This can prevent some of the
-dynamic provides (kubernetes, docker, etc.) from providing all the possible variables it could have discovered if given
-more time. The --variables-timeout allows an amount of time to be provided for variable discovery, when set it will
+dynamic providers (kubernetes, docker, etc.) from providing all the possible variables it could have discovered if given
+more time. The --variables-wait allows an amount of time to be provided for variable discovery, when set it will
 wait that amount of time before using the variables for the configuration.
 `,
 		Args: cobra.ExactArgs(0),
 		Run: func(c *cobra.Command, args []string) {
 			var opts inspectConfigOpts
 			opts.variables, _ = c.Flags().GetBool("variables")
-			opts.variablesTimeout, _ = c.Flags().GetDuration("variables-timeout")
+			opts.variablesWait, _ = c.Flags().GetDuration("variables-wait")
 
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
@@ -57,7 +57,7 @@ wait that amount of time before using the variables for the configuration.
 	}
 
 	cmd.Flags().Bool("variables", false, "render configuration with variables substituted")
-	cmd.Flags().Duration("variables-timeout", time.Duration(0), "wait this amount of time for variables before performing substitution")
+	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution")
 
 	cmd.AddCommand(newInspectComponentsCommandWithArgs(s, streams))
 
@@ -83,8 +83,8 @@ returned. In this mode the configuration is provided by default, using the --sho
 The selected input or output runtime specification for a component is never provided unless enabled with --show-spec.
 
 Variable substitution is always performed when computing the components, and it cannot be disabled. By default only the
-first set of computed variables are used. This can prevent some of the dynamic provides (kubernetes, docker, etc.) from
-providing all the possible variables it could have discovered if given more time. The --variables-timeout allows an
+first set of computed variables are used. This can prevent some of the dynamic providers (kubernetes, docker, etc.) from
+providing all the possible variables it could have discovered if given more time. The --variables-wait allows an
 amount of time to be provided for variable discovery, when set it will wait that amount of time before using the
 variables for the configuration.
 `,
@@ -96,7 +96,7 @@ variables for the configuration.
 			}
 			opts.showConfig, _ = c.Flags().GetBool("show-config")
 			opts.showSpec, _ = c.Flags().GetBool("show-spec")
-			opts.variablesTimeout, _ = c.Flags().GetDuration("variables-timeout")
+			opts.variablesWait, _ = c.Flags().GetDuration("variables-wait")
 
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
@@ -109,14 +109,14 @@ variables for the configuration.
 
 	cmd.Flags().Bool("show-config", false, "show the configuration for all units")
 	cmd.Flags().Bool("show-spec", false, "show the runtime specification for a component")
-	cmd.Flags().Duration("variables-timeout", time.Duration(0), "wait this amount of time for variables before performing substitution")
+	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution")
 
 	return cmd
 }
 
 type inspectConfigOpts struct {
-	variables        bool
-	variablesTimeout time.Duration
+	variables     bool
+	variablesWait time.Duration
 }
 
 func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, streams *cli.IOStreams) error {
@@ -130,7 +130,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return err
 	}
 
-	fullCfg, err := operations.LoadFullAgentConfig(cfgPath, true)
+	fullCfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 	if !opts.variables {
 		return printConfig(fullCfg, l, streams)
 	}
-	cfg, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesTimeout)
+	cfg, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
 		return err
 	}
@@ -178,10 +178,10 @@ func printConfig(cfg *config.Config, l *logger.Logger, streams *cli.IOStreams) e
 }
 
 type inspectComponentsOpts struct {
-	id               string
-	showConfig       bool
-	showSpec         bool
-	variablesTimeout time.Duration
+	id            string
+	showConfig    bool
+	showSpec      bool
+	variablesWait time.Duration
 }
 
 func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponentsOpts, streams *cli.IOStreams) error {
@@ -207,7 +207,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
-	m, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesTimeout)
+	m, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
 		return err
 	}
@@ -277,7 +277,7 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 		return nil, fmt.Errorf("failed to determine capabilities: %w", err)
 	}
 
-	cfg, err := operations.LoadFullAgentConfig(cfgPath, true)
+	cfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +330,7 @@ type varsWait struct {
 	err  error
 }
 
-func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config, timeout time.Duration) ([]*transpiler.Vars, error) {
+func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config, wait time.Duration) ([]*transpiler.Vars, error) {
 	var cancel context.CancelFunc
 
 	composable, err := composable.New(l, cfg)
@@ -339,9 +339,9 @@ func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config,
 	}
 
 	hasTimeout := false
-	if timeout > time.Duration(0) {
+	if wait > time.Duration(0) {
 		hasTimeout = true
-		ctx, cancel = context.WithTimeout(ctx, timeout)
+		ctx, cancel = context.WithTimeout(ctx, wait)
 	} else {
 		ctx, cancel = context.WithCancel(ctx)
 	}

@@ -22,7 +22,7 @@ type periodic struct {
 	period   time.Duration
 	watcher  *filewatcher.Watch
 	loader   *config.Loader
-	discover discoverFunc
+	discover config.DiscoverFunc
 	ch       chan coordinator.ConfigChange
 	errCh    chan error
 }
@@ -62,7 +62,7 @@ func (p *periodic) work() error {
 	}
 
 	if len(files) == 0 {
-		return ErrNoConfiguration
+		return config.ErrNoConfiguration
 	}
 
 	// Reset the state of the watched files
@@ -115,7 +115,7 @@ func (p *periodic) work() error {
 func newPeriodic(
 	log *logger.Logger,
 	period time.Duration,
-	discover discoverFunc,
+	discover config.DiscoverFunc,
 	loader *config.Loader,
 ) *periodic {
 	w, err := filewatcher.New(log, filewatcher.DefaultComparer)
