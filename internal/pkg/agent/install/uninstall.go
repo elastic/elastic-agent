@@ -235,9 +235,15 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		varsArray := make([]*transpiler.Vars, 0)
 		var wg sync.WaitGroup
 		wg.Add(1)
+
+		ctx, cancel := context.WithCancel(ctx)
+
+		// The composable system will continuously run, we are only interested in the first run on of the
+		// renderer to collect the variables we should stop the execution.
 		varsCallback := func(vv []*transpiler.Vars) {
 			varsArray = vv
 			wg.Done()
+			cancel()
 		}
 
 		ctrl, err := composable.New(log, cfg)
