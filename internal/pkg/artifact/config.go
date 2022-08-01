@@ -66,7 +66,7 @@ func NewReloader(cfg *Config, log *logger.Logger) *Reloader {
 
 func (r *Reloader) Reload(rawConfig *config.Config) error {
 	if err := r.reloadConfig(rawConfig); err != nil {
-		return errors.New(err, "failed to reload source URI")
+		return errors.New(err, "failed to reload config")
 	}
 
 	if err := r.reloadSourceURI(rawConfig); err != nil {
@@ -111,7 +111,7 @@ func (r *Reloader) reloadSourceURI(rawConfig *config.Config) error {
 	}
 	cfg := &reloadConfig{}
 	if err := rawConfig.Unpack(&cfg); err != nil {
-		return err
+		return errors.New(err, "failed to unpack config during reload")
 	}
 
 	var newSourceURI string
@@ -121,8 +121,6 @@ func (r *Reloader) reloadSourceURI(rawConfig *config.Config) error {
 	} else if sourceURI := strings.TrimSpace(cfg.SourceURI); sourceURI != "" {
 		newSourceURI = sourceURI
 	}
-
-	newSourceURI = strings.TrimSpace(newSourceURI)
 
 	if newSourceURI != "" {
 		r.log.Infof("Source URI changed from %q to %q", r.cfg.SourceURI, newSourceURI)
