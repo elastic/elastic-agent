@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
 
+set -e
+
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
 old_agent_dir=""
 
 # check if $symlink exists for the previous install
-if test -f "$symlink"; then
-    resolved_symlink="$(readlink -f -e -- "$symlink")"
+# and derive the old agent directory
+if test -L "$symlink"; then
+    resolved_symlink="$(readlink -f -- "$symlink")"
     # check if it is resolved to non empty string
     if ! [ -z "$resolved_symlink" ]; then
         old_agent_dir="$( dirname "$resolved_symlink" )"
     fi
 fi
 
-set -e
-
 commit_hash="{{ commit_short }}"
 
 new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$commit_hash"
 
 # copy the state files if there was a previous agent install
-if ! [ -z "$old_agent_dir" ]; then
+if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then
     yml_path="$old_agent_dir/state.yml"
     enc_path="$old_agent_dir/state.enc"
     echo "migrate state from $old_agent_dir to $new_agent_dir"
