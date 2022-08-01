@@ -37,7 +37,7 @@ if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; the
 fi
 
 # delete symlink if exists
-if test -f "$symlink"; then
+if test -L "$symlink"; then
     echo "found symlink $symlink, unlink"
     unlink "$symlink"
 fi
