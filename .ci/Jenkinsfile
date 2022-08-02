@@ -248,7 +248,6 @@ pipeline {
         }
       }
       failFast false
-      matrix {
         agent {label 'ubuntu-20.04 && immutable'}
         options { skipDefaultCheckout() }
         stages {
@@ -267,7 +266,6 @@ pipeline {
               }
             }
           }
-        }
       }
     }
     stage('e2e tests') {
