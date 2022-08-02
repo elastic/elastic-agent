@@ -238,6 +238,38 @@ pipeline {
         }
       }
     }
+    stage('Sync K8s') {
+      when {
+        // Only on Prs
+        // Enable if k8s related changes.
+        anyOf {
+          not { changeRequest() }                           // If is PR
+          expression { return env.K8S_CHANGES == "true" }   // If k8s changes
+        }
+      }
+      failFast false
+      matrix {
+        agent {label 'ubuntu-20.04 && immutable'}
+        options { skipDefaultCheckout() }
+        stages {
+          stage('OpenKibanaPR') {
+            steps {
+              deleteDir()
+              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+                dir("${BASE_DIR}"){
+                sh(label: 'Update-Kibana-kubernetes-templates [open PR]', script: """
+                  DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request""")
+                }
+            }
+            post {
+              always {
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+              }
+            }
+          }
+        }
+      }
+    }
     stage('e2e tests') {
       when {
         // Always when running builds on branches/tags
