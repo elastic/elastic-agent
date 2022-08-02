@@ -476,7 +476,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildSpec, BuildPGP, BuildFleetCfg)
+	mg.SerialDeps(Config, BuildSpec, BuildFleetCfg)
 }
 
 // CrossBuild cross-builds the beat for all target platforms.
@@ -507,16 +507,6 @@ func BuildSpec() error {
 	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
 
 	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
-}
-
-func BuildPGP() error {
-	// go run elastic-agent/dev-tools/cmd/buildpgp/build_pgp.go --in agent/spec/GPG-KEY-elasticsearch --out elastic-agent/pkg/release/pgp.go
-	goF := filepath.Join("dev-tools", "cmd", "buildpgp", "build_pgp.go")
-	in := "GPG-KEY-elasticsearch"
-	out := filepath.Join("internal", "pkg", "release", "pgp.go")
-
-	fmt.Printf(">> BuildPGP from %s to %s\n", in, out)
 	return RunGo("run", goF, "--in", in, "--out", out)
 }
 
