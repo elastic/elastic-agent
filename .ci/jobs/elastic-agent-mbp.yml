@@ -2,7 +2,7 @@
 - job:
     name: "elastic-agent/elastic-agent-mbp"
     display-name: elastic-agent
-    description: "Elastic agent"
+    description: "Elastic Agent"
     project-type: multibranch
     script-path: .ci/Jenkinsfile
     scm:
