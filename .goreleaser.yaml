@@ -1,0 +1,155 @@
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+builds:
+  - id: linux-amd64
+    binary: '{{ .ProjectName }}'
+    goos:
+      - linux
+    goarch:
+      - amd64
+    env:
+      - CC=x86_64-linux-gnu-gcc
+      - CXX=x86_64-linux-gnu-g++
+    no_unique_dist_dir: true
+dist: build1/golang-crossbuild
+changelog:
+  skip: true
+archives:
+  - id: linux
+    builds:
+      - linux-amd64
+    format: tar.gz
+    name_template: "{{ .ProjectName }}-{{ .Env.STACK_VERSION }}-{{ .Os }}-{{ .Arch }}"
+    # Default is empty.
+    replacements:
+      amd64: x86_64
+    wrap_in_directory: true
+    files:
+      - src: LICENSE.txt
+        dst: .
+        strip_parent: true
+        info:
+          mode: 0644
+      - src: NOTICE.txt
+        dst: .
+        strip_parent: true
+        info:
+          mode: 0644
+      - src: dev-tools/packaging/templates/common/README.md.tmpl
+        dst: .
+        strip_parent: true
+        info:
+          mode: 0644
+      - src: elastic-agent.yml
+        dst: .
+        info:
+          mode: 0600
+      - src: elastic-agent.reference.yml
+        dst: .
+        info:
+          mode: 0644
+      - src: build1/golang-crossbuild/{{ .ProjectName }}
+        dst: ./data/elastic-agent-8c06d3
+        strip_parent: true
+        info:
+          mode: 0755
+      - src: build/distributions/metricbeat-8.4.0-linux-x86_64.tar.gz
+        dst: ./data/elastic-agent-8c06d3/downloads
+        strip_parent: true
+        info:
+          mode: 0644
+      - src: build/distributions/filebeat-8.4.0-linux-x86_64.tar.gz
+        dst: ./data/elastic-agent-8c06d3/downloads
+        strip_parent: true
+        info:
+          mode: 0644
+nfpms:
+  # note that this is an array of nfpm configs
+  - id: linux-amd
+    maintainer: 'Elastic'
+    file_name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    builds:
+      - linux-amd64
+    vendor: Elastic B.V.
+    homepage: https://elastic.co/
+    description: |-
+      Elastic agent works.
+    license: Elastic License
+    formats:
+      - deb
+      - rpm
+    # Template to the path that the binaries should be installed.
+    # Defaults to `/usr/bin`.
+    bindir: /usr/bin
+    # Section.
+    section: default
+    # Contents to add to the package.
+    # GoReleaser will automatically add the binaries.
+    contents:
+      # Basic file that applies to all packagers
+      - src: LICENSE.txt
+        dst: /usr/share/{{ .ProjectName }}/LICENSE.txt
+        file_info:
+          mode: 0644
+      - src: NOTICE.txt
+        dst: /usr/share/{{ .ProjectName }}/NOTICE.txt
+        file_info:
+          mode: 0644
+      # Simple config file
+      - src: elastic-agent.yml
+        dst: /etc/{{ .ProjectName }}/elastic-agent.yml
+        type: config
+        file_info:
+          mode: 0600
+      - src: elastic-agent.reference.yml
+        dst: /etc/{{ .ProjectName }}/elastic-agent.reference.yml
+        file_info:
+          mode: 0644
+      - src: dev-tools/packaging/templates/common/README.md.tmpl
+        dst: /usr/share/{{ .ProjectName }}/README.md.tmpl
+        type: template
+        file_info:
+          mode: 0644
+      # The src and dst attributes also supports name templates
+      - src: dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl
+        dst: /usr/bin/{{ .ProjectName }}/elastic-agent.sh.tmpl
+        type: template
+        file_info:
+          mode: 0755
+      - src: dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl
+        dst: lib/systemd/system/{{ .ProjectName }}.service/elastic-agent.unit.tmpl
+        type: template
+        file_info:
+          mode: 0644
+      - src: dev-tools/packaging/templates/deb/elastic-agent.init.sh.tmpl
+        dst: /etc/init.d/{{ .ProjectName }}/elastic-agent.init.sh.tmpl
+        type: template
+        packager: deb
+        file_info:
+          mode: 0755
+      - src: dev-tools/packaging/templates/rpm/elastic-agent.init.sh.tmpl
+        dst: /etc/init.d/{{ .ProjectName }}/elastic-agent.init.sh.tmpl
+        type: template
+        packager: rpm
+        file_info:
+          mode: 0755
+    scripts:
+      postinstall: dev-tools/packaging/templates/linux/postinstall.sh.tmpl
+    # Custom configuration applied only to the RPM packager.
+    rpm:
+      # RPM specific scripts.
+      signature:
+        #key_file: 'GPG-KEY-elasticsearch'
+
+    # Custom configuration applied only to the Deb packager.
+    deb:
+      scripts:
+        # Deb templates file, when using debconf.
+        #templates: dev-tools/packaging/templates/deb
+      # The package is signed if a key_file is set
+      signature:
+        #key_file: 'GPG-KEY-elasticsearch'
+
