@@ -142,15 +142,21 @@ RUN set -e ; \
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
 RUN chmod 755 /usr/local/bin/docker-entrypoint
 
-COPY --from=home {{ $beatHome }} {{ $beatHome }}
+
+
+RUN groupadd --gid 1000 {{ .BeatName }}
+RUN useradd -M --uid 1000 --gid 1000 --groups 0 --home {{ $beatHome }} {{ .user }}
+
+
+COPY --chown={{ .user }}:root --from=home {{ $beatHome }} {{ $beatHome }}
 
 # Elastic Agent needs group permissions in the home itself to be able to
 # create fleet.yml when running as non-root.
 RUN chmod 0770 {{ $beatHome }}
 
 RUN mkdir /licenses
-COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
-COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
+COPY --chown={{ .user }}:root --from=home {{ $beatHome }}/LICENSE.txt /licenses
+COPY --chown={{ .user }}:root --from=home {{ $beatHome }}/NOTICE.txt /licenses
 
 {{- if contains .image_name "-cloud" }}
 COPY --from=home /opt /opt
@@ -170,8 +176,6 @@ RUN readlink -f {{ $beatBinary }} | xargs setcap {{ .linux_capabilities }}
 RUN mkdir /app
 {{- end }}
 {{- else }}
-RUN groupadd --gid 1000 {{ .BeatName }}
-RUN useradd -M --uid 1000 --gid 1000 --groups 0 --home {{ $beatHome }} {{ .user }}
 {{- if (and (contains .image_name "-complete") (not (contains .from "ubi-minimal")))  }}
 RUN chown {{ .user }} $NODE_PATH
 {{- end }}
@@ -242,6 +246,6 @@ CMD ["/app/apm.sh"]
 RUN echo -e '#!/bin/sh\nexec /usr/local/bin/docker-entrypoint' > /app/apm.sh && \
     chmod 0555 /app/apm.sh
 {{- else }}
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "--", "/usr/local/bin/docker-entrypoint"]
 {{- end }}
 
