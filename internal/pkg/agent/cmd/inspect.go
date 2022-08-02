@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -332,6 +333,7 @@ type varsWait struct {
 
 func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config, wait time.Duration) ([]*transpiler.Vars, error) {
 	var cancel context.CancelFunc
+	var vars []*transpiler.Vars
 
 	composable, err := composable.New(l, cfg)
 	if err != nil {
@@ -347,10 +349,9 @@ func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config,
 	}
 	defer cancel()
 
-	resCh := make(chan varsWait)
-	go func() {
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
 		var err error
-		var vars []*transpiler.Vars
 		for {
 			select {
 			case <-ctx.Done():
@@ -360,8 +361,7 @@ func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config,
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					err = nil
 				}
-				resCh <- varsWait{vars: vars, err: err}
-				return
+				return err
 			case cErr := <-composable.Errors():
 				err = cErr
 				if err != nil {
@@ -374,23 +374,21 @@ func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config,
 				}
 			}
 		}
-	}()
+	})
 
-	errCh := make(chan error)
-	go func() {
+	g.Go(func() error {
 		err := composable.Run(ctx)
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			err = nil
 		}
-		errCh <- err
-	}()
+		return err
+	})
 
-	err = <-errCh
+	err = g.Wait()
 	if err != nil {
 		return nil, err
 	}
-	res := <-resCh
-	return res.vars, res.err
+	return vars, nil
 }
 
 func printComponents(components []component.Component, streams *cli.IOStreams) error {
