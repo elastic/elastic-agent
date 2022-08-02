@@ -50,6 +50,8 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 
 		// in case app reported status it might still be running and failure timer
 		// in progress. Stop timer and stop failing process
+		a.logger.Infof("%s is started and state != %s. Stopping failed timer",
+			a.Name(), state.Restarting.ToProto().String())
 		a.stopFailedTimer()
 		a.stopWatcher(a.state.ProcessInfo)
 
