@@ -6,7 +6,6 @@ package application
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"go.elastic.co/apm"
 
@@ -20,16 +19,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/dir"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-type discoverFunc func() ([]string, error)
-
-// ErrNoConfiguration is returned when no configuration are found.
-var ErrNoConfiguration = errors.New("no configuration found", errors.TypeConfig)
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
@@ -83,8 +76,8 @@ func New(
 	if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
-		loader := config.NewLoader(log, externalConfigsGlob())
-		discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
+		loader := config.NewLoader(log, paths.ExternalInputs())
+		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs())
 		if !cfg.Settings.Reload.Enabled {
 			log.Debug("Reloading of configuration is off")
 			configMgr = newOnce(log, discover, loader)
@@ -172,29 +165,4 @@ func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.C
 	}
 
 	return store, cfg, nil
-}
-
-func externalConfigsGlob() string {
-	return filepath.Join(paths.Config(), configuration.ExternalInputsPattern)
-}
-
-func discoverer(patterns ...string) discoverFunc {
-	p := make([]string, 0, len(patterns))
-	for _, newP := range patterns {
-		if len(newP) == 0 {
-			continue
-		}
-
-		p = append(p, newP)
-	}
-
-	if len(p) == 0 {
-		return func() ([]string, error) {
-			return []string{}, ErrNoConfiguration
-		}
-	}
-
-	return func() ([]string, error) {
-		return dir.DiscoverFiles(p...)
-	}
 }

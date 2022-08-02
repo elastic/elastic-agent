@@ -5,12 +5,12 @@
 package component
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/go-ucfg/yaml"
 )
 
@@ -21,17 +21,17 @@ const (
 
 var (
 	// ErrInputNotSupported is returned when the input is not supported on any platform
-	ErrInputNotSupported = errors.New("input not supported")
+	ErrInputNotSupported = newError("input not supported")
 	// ErrInputNotSupportedOnPlatform is returned when the input is supported but not on this platform
-	ErrInputNotSupportedOnPlatform = errors.New("input not supported on this platform")
+	ErrInputNotSupportedOnPlatform = newError("input not supported on this platform")
 )
 
 // InputRuntimeSpec returns the specification for running this input on the current platform.
 type InputRuntimeSpec struct {
-	InputType  string
-	BinaryName string
-	BinaryPath string
-	Spec       InputSpec
+	InputType  string    `yaml:"input_type"`
+	BinaryName string    `yaml:"binary_name"`
+	BinaryPath string    `yaml:"binary_path"`
+	Spec       InputSpec `yaml:"spec"`
 }
 
 // RuntimeSpecs return all the specifications for inputs that are supported on the current platform.

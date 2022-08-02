@@ -398,6 +398,11 @@ func outputDiagnostics(w io.Writer, d DiagnosticsInfo) error {
 }
 
 func gatherConfig() (AgentConfig, error) {
+	log, err := newErrorLogger()
+	if err != nil {
+		return AgentConfig{}, err
+	}
+
 	cfg := AgentConfig{}
 	localCFG, err := loadConfig(nil)
 	if err != nil {
@@ -405,7 +410,7 @@ func gatherConfig() (AgentConfig, error) {
 	}
 	cfg.ConfigLocal = localCFG
 
-	renderedCFG, err := operations.LoadFullAgentConfig(paths.ConfigFile(), true)
+	renderedCFG, err := operations.LoadFullAgentConfig(log, paths.ConfigFile(), true)
 	if err != nil {
 		return cfg, err
 	}
@@ -430,11 +435,6 @@ func gatherConfig() (AgentConfig, error) {
 	/*
 		// Gather vars to render process config
 		isStandalone, err := isStandalone(renderedCFG)
-		if err != nil {
-			return AgentConfig{}, err
-		}
-
-		log, err := newErrorLogger()
 		if err != nil {
 			return AgentConfig{}, err
 		}

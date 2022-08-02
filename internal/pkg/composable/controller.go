@@ -158,6 +158,21 @@ func (c *controller) Run(ctx context.Context) error {
 				c.logger.Debugf("Stopping controller for composable inputs")
 				t.Stop()
 				cancel()
+
+				// wait for all providers to stop (but its possible they still send notifications over notify
+				// channel, and we cannot block them sending)
+				emptyChan, emptyCancel := context.WithCancel(context.Background())
+				defer emptyCancel()
+				go func() {
+					for {
+						select {
+						case <-emptyChan.Done():
+							return
+						case <-notify:
+						}
+					}
+				}()
+
 				wg.Wait()
 				return ctx.Err()
 			case <-notify:

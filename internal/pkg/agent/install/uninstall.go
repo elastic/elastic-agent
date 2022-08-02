@@ -127,7 +127,7 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
-	cfg, err := operations.LoadFullAgentConfig(cfgFile, false)
+	cfg, err := operations.LoadFullAgentConfig(log, cfgFile, false)
 	if err != nil {
 		return err
 	}
