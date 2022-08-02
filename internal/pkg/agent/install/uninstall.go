@@ -235,10 +235,11 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	if ok {
 		varsArray := make([]*transpiler.Vars, 0)
 
-		// Gie some time for the providers to replaces the variables
+		// Give some time for the providers to replace the variables
 		const timeout = 15 * time.Second
 		var doOnce sync.Once
 		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
 
 		// The composable system will continuously run, we are only interested in the first run on of the
 		// renderer to collect the variables we should stop the execution.
