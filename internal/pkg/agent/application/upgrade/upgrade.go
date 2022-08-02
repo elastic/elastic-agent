@@ -44,15 +44,15 @@ var (
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	agentInfo   *info.AgentInfo
-	settings    *artifact.Config
-	log         *logger.Logger
-	closers     []context.CancelFunc
+	reporter    stateReporter
+	caps        capabilities.Capability
 	reexec      reexecManager
 	acker       acker
-	reporter    stateReporter
+	settings    *artifact.Config
+	agentInfo   *info.AgentInfo
+	log         *logger.Logger
+	closers     []context.CancelFunc
 	upgradeable bool
-	caps        capabilities.Capability
 }
 
 // Action is the upgrade action state.

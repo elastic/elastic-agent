@@ -39,19 +39,19 @@ func (s AgentStatusCode) String() string {
 
 // AgentApplicationStatus returns the status of specific application.
 type AgentApplicationStatus struct {
+	Payload map[string]interface{}
 	ID      string
 	Name    string
-	Status  state.Status
 	Message string
-	Payload map[string]interface{}
+	Status  state.Status
 }
 
 // AgentStatus returns the overall status of the Elastic Agent.
 type AgentStatus struct {
-	Status       AgentStatusCode
+	UpdateTime   time.Time
 	Message      string
 	Applications []AgentApplicationStatus
-	UpdateTime   time.Time
+	Status       AgentStatusCode
 }
 
 // Controller takes track of component statuses.
@@ -68,15 +68,15 @@ type Controller interface {
 }
 
 type controller struct {
-	mx           sync.Mutex
-	status       AgentStatusCode
-	message      string
 	updateTime   time.Time
+	log          *logger.Logger
 	reporters    map[string]*reporter
 	appReporters map[string]*reporter
-	log          *logger.Logger
 	stateID      string
+	message      string
 	agentID      string
+	status       AgentStatusCode
+	mx           sync.Mutex
 }
 
 // NewController creates a new reporter.
@@ -272,15 +272,15 @@ type Reporter interface {
 }
 
 type reporter struct {
-	name             string
-	mx               sync.Mutex
-	isPersistent     bool
-	isRegistered     bool
-	status           state.Status
-	message          string
 	payload          map[string]interface{}
 	unregisterFunc   func()
 	notifyChangeFunc func()
+	message          string
+	name             string
+	status           state.Status
+	mx               sync.Mutex
+	isRegistered     bool
+	isPersistent     bool
 }
 
 // Update updates the status of a component.

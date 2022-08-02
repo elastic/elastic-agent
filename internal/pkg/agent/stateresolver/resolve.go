@@ -60,10 +60,10 @@ func (s *state) String() string {
 }
 
 type active struct {
-	LastChange   stateChange
+	Program      program.Program
 	LastModified time.Time
 	Identifier   string
-	Program      program.Program
+	LastChange   stateChange
 }
 
 func (s *active) String() string {

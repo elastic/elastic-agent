@@ -21,11 +21,11 @@ import (
 // Option is the default options used to generate the encrypt and decrypt writer.
 // NOTE: the defined options need to be same for both the Reader and the writer.
 type Option struct {
+	Generator       bytesGen
 	IterationsCount int
 	KeyLength       int
 	SaltLength      int
 	IVLength        int
-	Generator       bytesGen
 
 	// BlockSize must be a factor of aes.BlockSize
 	BlockSize int
@@ -180,7 +180,6 @@ func (w *Writer) Write(b []byte) (int, error) {
 }
 
 func (w *Writer) writeBlock(b []byte) error {
-
 	// randomly generate the salt and the initialization vector, this information will be saved
 	// on disk in the file as part of the header
 	iv, err := w.generator(w.option.IVLength)
@@ -189,13 +188,17 @@ func (w *Writer) writeBlock(b []byte) error {
 		return w.err
 	}
 
-	w.writer.Write(iv)
+	if _, err := w.writer.Write(iv); err != nil {
+		return errors.Wrap(err, "failed to write IV")
+	}
 
 	encodedBytes := w.gcm.Seal(nil, iv, b, nil)
 
 	l := make([]byte, 4)
 	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes)))
-	w.writer.Write(l)
+	if _, err := w.writer.Write(l); err != nil {
+		return errors.Wrap(err, "failed to write length of encoded bytes")
+	}
 
 	_, err = w.writer.Write(encodedBytes)
 	if err != nil {
@@ -325,7 +328,7 @@ func (r *Reader) consumeBlock() error {
 	}
 
 	encodedBytes := make([]byte, l)
-	_, err = io.ReadAtLeast(r.reader, encodedBytes, int(l))
+	_, err = io.ReadAtLeast(r.reader, encodedBytes, l)
 	if err != nil {
 		r.err = errors.Wrapf(err, "fail read the block of %d bytes", l)
 	}
@@ -364,7 +367,6 @@ func (r *Reader) Close() error {
 func randomBytes(length int) ([]byte, error) {
 	r := make([]byte, length)
 	_, err := rand.Read(r)
-
 	if err != nil {
 		return nil, err
 	}

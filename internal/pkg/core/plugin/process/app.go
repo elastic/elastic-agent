@@ -35,34 +35,32 @@ var (
 
 // Application encapsulates a concrete application ran by elastic-agent e.g Beat.
 type Application struct {
-	bgContext    context.Context
-	id           string
-	name         string
-	pipelineID   string
-	logLevel     string
-	desc         *app.Descriptor
-	srv          *server.Server
-	srvState     *server.ApplicationState
-	limiter      *tokenbucket.Bucket
-	startContext context.Context
-	tag          app.Taggable
-	state        state.State
-	reporter     state.Reporter
-	watchClosers map[int]context.CancelFunc
+	state            state.State
+	startContext     context.Context
+	statusReporter   status.Reporter
+	monitor          monitoring.Monitor
+	reporter         state.Reporter
+	tag              app.Taggable
+	bgContext        context.Context
+	srvState         *server.ApplicationState
+	limiter          *tokenbucket.Bucket
+	srv              *server.Server
+	desc             *app.Descriptor
+	restartCanceller context.CancelFunc
+	logger           *logger.Logger
+	watchClosers     map[int]context.CancelFunc
+	processConfig    *process.Config
+	restartConfig    map[string]interface{}
+
+	name       string
+	id         string
+	pipelineID string
+	logLevel   string
 
 	uid int
 	gid int
 
-	monitor        monitoring.Monitor
-	statusReporter status.Reporter
-
-	processConfig *process.Config
-
-	logger *logger.Logger
-
-	appLock          sync.Mutex
-	restartCanceller context.CancelFunc
-	restartConfig    map[string]interface{}
+	appLock sync.Mutex
 }
 
 // ArgsDecorator decorates arguments before calling an application
@@ -79,8 +77,8 @@ func NewApplication(
 	logger *logger.Logger,
 	reporter state.Reporter,
 	monitor monitoring.Monitor,
-	statusController status.Controller) (*Application, error) {
-
+	statusController status.Controller,
+) (*Application, error) {
 	s := desc.ProcessSpec()
 	uid, gid, err := s.UserGroup()
 	if err != nil {
@@ -157,7 +155,6 @@ func (a *Application) Stop() {
 
 			a.logger.Error(err)
 		}
-
 	}
 
 	a.appLock.Lock()
@@ -231,7 +228,10 @@ func (a *Application) watch(ctx context.Context, p app.Taggable, proc *process.I
 		a.setState(state.Restarting, msg, nil)
 
 		// it was a crash
-		a.start(ctx, p, cfg, true)
+		if err := a.start(ctx, p, cfg, true); err != nil {
+			a.setState(state.Failed, err.Error(), nil)
+			return
+		}
 	}()
 }
 
@@ -277,7 +277,9 @@ func (a *Application) setState(s state.Status, msg string, payload map[string]in
 }
 
 func (a *Application) cleanUp() {
-	a.monitor.Cleanup(a.desc.Spec(), a.pipelineID)
+	if err := a.monitor.Cleanup(a.desc.Spec(), a.pipelineID); err != nil {
+		a.setState(state.Failed, fmt.Sprintf("cleanup failed: %s", err.Error()), nil)
+	}
 }
 
 func (a *Application) gracefulKill(proc *process.Info) {
