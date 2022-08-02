@@ -326,11 +326,6 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	return m, nil
 }
 
-type varsWait struct {
-	vars []*transpiler.Vars
-	err  error
-}
-
 func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config, wait time.Duration) ([]*transpiler.Vars, error) {
 	var cancel context.CancelFunc
 	var vars []*transpiler.Vars
