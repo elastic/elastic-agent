@@ -243,7 +243,7 @@ pipeline {
         // Only on Prs
         // Enable if k8s related changes.
         anyOf {
-          { changeRequest() }                           // If is PR
+          changeRequest()                          // If is PR
           expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
       }
