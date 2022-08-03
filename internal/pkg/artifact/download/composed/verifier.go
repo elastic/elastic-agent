@@ -5,10 +5,9 @@
 package composed
 
 import (
-	"errors"
-
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
@@ -63,7 +62,9 @@ func (e *Verifier) Reload(c *artifact.Config) error {
 			continue
 		}
 
-		reloadable.Reload(c)
+		if err := reloadable.Reload(c); err != nil {
+			return errors.New(err, "failed reloading artifact config")
+		}
 	}
 	return nil
 }

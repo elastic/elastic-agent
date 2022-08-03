@@ -20,7 +20,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"

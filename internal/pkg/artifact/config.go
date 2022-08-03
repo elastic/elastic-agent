@@ -80,7 +80,9 @@ func (r *Reloader) Reload(rawConfig *config.Config) error {
 	}
 
 	for _, reloader := range r.reloaders {
-		reloader.Reload(r.cfg)
+		if err := reloader.Reload(r.cfg); err != nil {
+			return errors.New(err, "failed reloading config")
+		}
 	}
 
 	return nil

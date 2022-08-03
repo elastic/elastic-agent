@@ -117,8 +117,8 @@ func NewOperator(
 
 	operator.initHandlerMap()
 
-	os.MkdirAll(config.DownloadConfig.TargetDirectory, 0755)
-	os.MkdirAll(config.DownloadConfig.InstallPath, 0755)
+	_ = os.MkdirAll(config.DownloadConfig.TargetDirectory, 0755)
+	_ = os.MkdirAll(config.DownloadConfig.InstallPath, 0755)
 
 	return operator, nil
 }
@@ -273,12 +273,12 @@ func (o *Operator) Shutdown() {
 			a.Shutdown()
 			wg.Done()
 			o.logger.Debugf("took %s to shutdown %s",
-				time.Now().Sub(started), a.Name())
+				time.Since(started), a.Name())
 		}(a)
 	}
 	wg.Wait()
 	o.logger.Debugf("took %s to shutdown %d apps",
-		time.Now().Sub(started), len(o.apps))
+		time.Since(started), len(o.apps))
 }
 
 // Start starts a new process based on a configuration
