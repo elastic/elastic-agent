@@ -182,7 +182,7 @@ func InstallGoTestTools() {
 func GoTest(ctx context.Context, params GoTestArgs) error {
 	mg.Deps(InstallGoTestTools)
 
-	fmt.Println(">> go test:", params.TestName, "Testing")
+	fmt.Println(">> go test:", params.TestName, "Testing", params)
 
 	// We use gotestsum to drive the tests and produce a junit report.
 	// The tool runs `go test -json` in order to produce a structured log which makes it easier
@@ -210,7 +210,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		CreateDir(params.OutputFile)
 		gotestsumArgs = append(gotestsumArgs, "--jsonfile", params.OutputFile+".json")
 	}
-
+	gotestsumArgs = append(gotestsumArgs, "--debug")
 	var testArgs []string
 
 	// -race is only supported on */amd64
@@ -223,21 +223,23 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		params := strings.Join(params.Tags, " ")
 		if params != "" {
 			testArgs = append(testArgs, "-tags", params)
+			fmt.Println("hereeeeeeeeeeeeeeeeee", params)
 		}
 	}
 	if params.CoverageProfileFile != "" {
 		params.CoverageProfileFile = createDir(filepath.Clean(params.CoverageProfileFile))
 		testArgs = append(testArgs,
 			"-covermode=atomic",
-			"-coverprofile="+params.CoverageProfileFile,
+			"-coverprofile="+params.CoverageProfileFile, "-tags=integration",
 		)
 	}
 	testArgs = append(testArgs, params.ExtraFlags...)
 	testArgs = append(testArgs, params.Packages...)
 
 	args := append(gotestsumArgs, append([]string{"--"}, testArgs...)...)
-
+	fmt.Println(args)
 	goTest := makeCommand(ctx, params.Env, "gotestsum", args...)
+	fmt.Println(goTest)
 	// Wire up the outputs.
 	var outputs []io.Writer
 	if params.Output != nil {

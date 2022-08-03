@@ -35,7 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 
 	// mage:import
-	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 )
@@ -349,6 +349,13 @@ func (Test) Unit(ctx context.Context) error {
 func (Test) Coverage() error {
 	mg.Deps(Prepare.Env, Build.TestBinaries)
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
+}
+
+// IntegrationTest executes integration tests (it uses Docker to run the tests).
+func (Test) Integration(ctx context.Context) error {
+	//mg.Deps(Prepare.Env, Build.TestBinaries)
+	params := devtools.DefaultGoTestIntegrationArgs()
+	return devtools.GoTest(ctx, params)
 }
 
 // All format automatically all the codes.
