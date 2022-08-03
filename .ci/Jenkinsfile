@@ -258,7 +258,7 @@ pipeline {
                 dir("${BASE_DIR}/deploy/kubernetes"){
                 sh(label: 'Create-Needed-Manifest', script: """
                   pwd
-                  ./creator_k8s_manifest.sh
+                  ./creator_k8s_manifest.sh .
                   WITHOUTCONFIG=true make generate-k8s """)
                 sh(label: 'Update-Kibana-kubernetes-templates [open PR]', script: """
                   DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request""")
