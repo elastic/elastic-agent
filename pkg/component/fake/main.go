@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
@@ -142,23 +142,27 @@ type runningUnit interface {
 
 type fakeInput struct {
 	unit *client.Unit
-	cfg  inputConfig
+	cfg  *proto.UnitExpectedConfig
 
 	state    client.UnitState
 	stateMsg string
 }
 
-func newFakeInput(unit *client.Unit, cfg inputConfig) *fakeInput {
+func newFakeInput(unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeInput, error) {
+	state, msg, err := getStateFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
 	i := &fakeInput{
 		unit:     unit,
 		cfg:      cfg,
-		state:    cfg.State,
-		stateMsg: cfg.Message,
+		state:    state,
+		stateMsg: msg,
 	}
 	unit.RegisterAction(&stateSetterAction{i})
 	unit.RegisterAction(&killAction{})
 	_ = unit.UpdateState(i.state, i.stateMsg, nil)
-	return i
+	return i, nil
 }
 
 func (f *fakeInput) Unit() *client.Unit {
@@ -166,7 +170,7 @@ func (f *fakeInput) Unit() *client.Unit {
 }
 
 func (f *fakeInput) Update(u *client.Unit) error {
-	expected, config := u.Expected()
+	expected, _, config := u.Expected()
 	if expected == client.UnitStateStopped {
 		// agent is requesting this input to stop
 		_ = u.UpdateState(client.UnitStateStopping, "Stopping", nil)
@@ -177,20 +181,14 @@ func (f *fakeInput) Update(u *client.Unit) error {
 		return nil
 	}
 
-	var cfg map[string]interface{}
-	err := yaml.Unmarshal([]byte(config), &cfg)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-	unitType, ok := cfg["type"]
-	if !ok {
+	if config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if unitType != fake {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", unitType)
+	if config.Type != fake {
+		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
 	}
 
-	state, stateMsg, err := getStateFromMap(cfg)
+	state, stateMsg, err := getStateFromConfig(config)
 	if err != nil {
 		return fmt.Errorf("unit config parsing error: %w", err)
 	}
@@ -232,20 +230,15 @@ func (s *killAction) Execute(_ context.Context, params map[string]interface{}) (
 }
 
 func newRunningUnit(unit *client.Unit) (runningUnit, error) {
-	_, config := unit.Expected()
-	var cfg inputConfig
-	err := yaml.Unmarshal([]byte(config), &cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-	if cfg.Type == "" {
+	_, _, config := unit.Expected()
+	if config.Type == "" {
 		return nil, fmt.Errorf("unit config type empty")
 	}
-	switch cfg.Type {
+	switch config.Type {
 	case fake:
-		return newFakeInput(unit, cfg), nil
+		return newFakeInput(unit, config)
 	}
-	return nil, fmt.Errorf("unknown unit config type: %s", cfg.Type)
+	return nil, fmt.Errorf("unknown unit config type: %s", config.Type)
 }
 
 func newUnitKey(unit *client.Unit) unitKey {
@@ -253,6 +246,10 @@ func newUnitKey(unit *client.Unit) unitKey {
 		unitType: unit.Type(),
 		unitID:   unit.ID(),
 	}
+}
+
+func getStateFromConfig(cfg *proto.UnitExpectedConfig) (client.UnitState, string, error) {
+	return getStateFromMap(cfg.Source.AsMap())
 }
 
 func getStateFromMap(cfg map[string]interface{}) (client.UnitState, string, error) {
@@ -276,10 +273,4 @@ func getStateFromMap(cfg map[string]interface{}) (client.UnitState, string, erro
 		stateMsgStr, _ = stateMsg.(string)
 	}
 	return stateType, stateMsgStr, nil
-}
-
-type inputConfig struct {
-	Type    string           `json:"type" yaml:"type"`
-	State   client.UnitState `json:"state" yaml:"state"`
-	Message string           `json:"message" yaml:"message"`
 }

@@ -12,8 +12,6 @@ import (
 	"os/exec"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -223,6 +221,11 @@ func (c *CommandRuntime) forceCompState(state client.UnitState, msg string) {
 		unit.Message = msg
 		unit.Payload = nil
 		unit.configStateIdx = 0
+		if unit.err != nil {
+			// must stay as failed as then unit config is in error
+			unit.State = client.UnitStateFailed
+			unit.Message = unit.err.Error()
+		}
 
 		// unit is a copy and must be set back into the map
 		c.observed.Units[k] = unit
@@ -349,28 +352,27 @@ func (c *CommandRuntime) mustSendExpected() bool {
 	return false
 }
 
-func (c *CommandRuntime) sendExpected(comm Communicator) error {
+func (c *CommandRuntime) sendExpected(comm Communicator) {
 	units := make([]*proto.UnitExpected, 0, len(c.expected.Units))
 	for k, u := range c.expected.Units {
+		if u.err != nil {
+			// don't send units that have a hard-coded error
+			continue
+		}
 		e := &proto.UnitExpected{
 			Id:             k.UnitID,
 			Type:           proto.UnitType(k.UnitType),
 			State:          proto.State(u.State),
 			ConfigStateIdx: u.configStateIdx,
-			Config:         "",
+			Config:         nil,
 		}
 		o, ok := c.observed.Units[k]
 		if !ok || o.configStateIdx != u.configStateIdx {
-			cfg, err := yaml.Marshal(u.config)
-			if err != nil {
-				return fmt.Errorf("failed to marshal YAML for unit %s: %w", k.UnitID, err)
-			}
-			e.Config = string(cfg)
+			e.Config = u.config
 		}
 		units = append(units, e)
 	}
 	comm.CheckinExpected(&proto.CheckinExpected{Units: units})
-	return nil
 }
 
 func (c *CommandRuntime) cleanupStopped() bool {

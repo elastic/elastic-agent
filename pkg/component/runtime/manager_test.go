@@ -65,7 +65,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 			{
 				ID:     "error-input",
 				Type:   client.UnitTypeInput,
-				Config: map[string]interface{}{},
+				Config: nil,
 			},
 		},
 	}
@@ -169,11 +169,11 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 			{
 				ID:   "fake-input",
 				Type: client.UnitTypeInput,
-				Config: map[string]interface{}{
+				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
-					"state":   client.UnitStateHealthy,
+					"state":   int(client.UnitStateHealthy),
 					"message": "Fake Healthy",
-				},
+				}),
 			},
 		},
 	}
@@ -253,6 +253,136 @@ LOOP:
 	require.NoError(t, err)
 }
 
+func TestManager_FakeInput_BadUnit(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		errCh <- m.Run(ctx)
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := m.WaitForReady(waitCtx); err != nil {
+		require.NoError(t, err)
+	}
+
+	binaryPath := filepath.Join("..", "fake", "fake")
+	if runtime.GOOS == component.Windows {
+		binaryPath += exeExt
+	}
+	comp := component.Component{
+		ID: "fake-default",
+		Spec: component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryName: "",
+			BinaryPath: binaryPath,
+			Spec:       fakeInputSpec,
+		},
+		Units: []component.Unit{
+			{
+				ID:   "fake-input",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy",
+				}),
+			},
+			{
+				ID:   "bad-input",
+				Type: client.UnitTypeInput,
+				Err:  errors.New("hard-error for config"),
+			},
+		},
+	}
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	subErrCh := make(chan error)
+	go func() {
+		sub := m.Subscribe(subCtx, "fake-default")
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case state := <-sub.Ch():
+				t.Logf("component state changed: %+v", state)
+				if state.State == client.UnitStateFailed {
+					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+				} else {
+					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
+					if ok {
+						if unit.State == client.UnitStateFailed {
+							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						} else if unit.State == client.UnitStateHealthy {
+							// remove the component which will stop it
+							err := m.Update([]component.Component{})
+							if err != nil {
+								subErrCh <- err
+							}
+						} else if unit.State == client.UnitStateStopped {
+							subErrCh <- nil
+						} else if unit.State == client.UnitStateStarting {
+							// acceptable
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					} else {
+						subErrCh <- errors.New("unit missing: fake-input")
+					}
+					unit, ok = state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "bad-input"}]
+					if ok {
+						if unit.State != client.UnitStateFailed {
+							subErrCh <- errors.New("bad-input unit should be failed")
+						}
+					} else {
+						subErrCh <- errors.New("unit missing: bad-input")
+					}
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(errCh)
+	defer drainErrChan(subErrCh)
+
+	startTimer := time.NewTimer(100 * time.Millisecond)
+	defer startTimer.Stop()
+	select {
+	case <-startTimer.C:
+		err = m.Update([]component.Component{comp})
+		require.NoError(t, err)
+	case err := <-errCh:
+		t.Fatalf("failed early: %s", err)
+	}
+
+	endTimer := time.NewTimer(30 * time.Second)
+	defer endTimer.Stop()
+LOOP:
+	for {
+		select {
+		case <-endTimer.C:
+			t.Fatalf("timed out after 30 seconds")
+		case err := <-errCh:
+			require.NoError(t, err)
+		case err := <-subErrCh:
+			require.NoError(t, err)
+			break LOOP
+		}
+	}
+
+	subCancel()
+	cancel()
+
+	err = <-errCh
+	require.NoError(t, err)
+}
+
 func TestManager_FakeInput_Configure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -286,11 +416,11 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 			{
 				ID:   "fake-input",
 				Type: client.UnitTypeInput,
-				Config: map[string]interface{}{
+				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
-					"state":   client.UnitStateHealthy,
+					"state":   int(client.UnitStateHealthy),
 					"message": "Fake Healthy",
-				},
+				}),
 			},
 		},
 	}
@@ -315,11 +445,11 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 						} else if unit.State == client.UnitStateHealthy {
 							// update config to change the state to degraded
-							comp.Units[0].Config = map[string]interface{}{
+							comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
 								"type":    "fake",
-								"state":   client.UnitStateDegraded,
+								"state":   int(client.UnitStateDegraded),
 								"message": "Fake Degraded",
-							}
+							})
 							err := m.Update([]component.Component{comp})
 							if err != nil {
 								subErrCh <- err
@@ -408,20 +538,20 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 			{
 				ID:   "fake-input-0",
 				Type: client.UnitTypeInput,
-				Config: map[string]interface{}{
+				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
-					"state":   client.UnitStateHealthy,
+					"state":   int(client.UnitStateHealthy),
 					"message": "Fake Healthy 0",
-				},
+				}),
 			},
 			{
 				ID:   "fake-input-1",
 				Type: client.UnitTypeInput,
-				Config: map[string]interface{}{
+				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
-					"state":   client.UnitStateHealthy,
+					"state":   int(client.UnitStateHealthy),
 					"message": "Fake Healthy 1",
-				},
+				}),
 			},
 		},
 	}
@@ -562,11 +692,11 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 			{
 				ID:   "fake-input",
 				Type: client.UnitTypeInput,
-				Config: map[string]interface{}{
+				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
-					"state":   client.UnitStateHealthy,
+					"state":   int(client.UnitStateHealthy),
 					"message": "Fake Healthy",
-				},
+				}),
 			},
 		},
 	}
@@ -595,7 +725,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 							go func() {
 								actionCtx, actionCancel := context.WithTimeout(context.Background(), 15*time.Second)
 								_, err := m.PerformAction(actionCtx, comp.Units[0], "set_state", map[string]interface{}{
-									"state":   client.UnitStateDegraded,
+									"state":   int(client.UnitStateDegraded),
 									"message": "Action Set Degraded",
 								})
 								actionCancel()
@@ -688,11 +818,11 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 			{
 				ID:   "fake-input",
 				Type: client.UnitTypeInput,
-				Config: map[string]interface{}{
+				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
-					"state":   client.UnitStateHealthy,
+					"state":   int(client.UnitStateHealthy),
 					"message": "Fake Healthy",
-				},
+				}),
 			},
 		},
 	}
@@ -832,11 +962,11 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 			{
 				ID:   "fake-input",
 				Type: client.UnitTypeInput,
-				Config: map[string]interface{}{
+				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
-					"state":   client.UnitStateHealthy,
+					"state":   int(client.UnitStateHealthy),
 					"message": "Fake Healthy",
-				},
+				}),
 			},
 		},
 	}
@@ -940,11 +1070,11 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 			{
 				ID:   "fake-input",
 				Type: client.UnitTypeInput,
-				Config: map[string]interface{}{
+				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
-					"state":   client.UnitStateHealthy,
+					"state":   int(client.UnitStateHealthy),
 					"message": "Fake Healthy",
-				},
+				}),
 			},
 		},
 	}
@@ -1062,29 +1192,29 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 				{
 					ID:   "fake-input-0-0",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 0-0",
-					},
+					}),
 				},
 				{
 					ID:   "fake-input-0-1",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 0-1",
-					},
+					}),
 				},
 				{
 					ID:   "fake-input-0-2",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 0-2",
-					},
+					}),
 				},
 			},
 		},
@@ -1095,29 +1225,29 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 				{
 					ID:   "fake-input-1-0",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 1-0",
-					},
+					}),
 				},
 				{
 					ID:   "fake-input-1-1",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 1-1",
-					},
+					}),
 				},
 				{
 					ID:   "fake-input-1-2",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 1-2",
-					},
+					}),
 				},
 			},
 		},
@@ -1128,29 +1258,29 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 				{
 					ID:   "fake-input-2-0",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 2-0",
-					},
+					}),
 				},
 				{
 					ID:   "fake-input-2-1",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 2-1",
-					},
+					}),
 				},
 				{
 					ID:   "fake-input-2-2",
 					Type: client.UnitTypeInput,
-					Config: map[string]interface{}{
+					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
-						"state":   client.UnitStateHealthy,
+						"state":   int(client.UnitStateHealthy),
 						"message": "Fake Healthy 2-2",
-					},
+					}),
 				},
 			},
 		},

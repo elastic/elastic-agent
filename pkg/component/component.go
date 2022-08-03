@@ -7,6 +7,8 @@ package component
 import (
 	"fmt"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -36,9 +38,18 @@ func (e *ErrInputRuntimeCheckFail) Error() string {
 
 // Unit is a single input or output that a component must run.
 type Unit struct {
-	ID     string                 `yaml:"id"`
-	Type   client.UnitType        `yaml:"type"`
-	Config map[string]interface{} `yaml:"config,omitempty"`
+	// ID is the unique ID of the unit.
+	ID string `yaml:"id"`
+
+	// Type is the unit type (either input or output).
+	Type client.UnitType `yaml:"type"`
+
+	// Config is the units expected configuration.
+	Config *proto.UnitExpectedConfig `yaml:"config,omitempty"`
+
+	// Err used when the Config cannot be marshalled from its value into a configuration that
+	// can actually be sent to a unit. All units with Err set should not be sent to the component.
+	Err error `yaml:"error,omitempty"`
 }
 
 // Component is a set of units that needs to run.
@@ -121,18 +132,22 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 					// skip; not enabled
 					continue
 				}
+				cfg, cfgErr := ExpectedConfig(input.input)
 				units = append(units, Unit{
 					ID:     fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id),
 					Type:   client.UnitTypeInput,
-					Config: input.input,
+					Config: cfg,
+					Err:    cfgErr,
 				})
 			}
 			if len(units) > 0 {
 				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
+				cfg, cfgErr := ExpectedConfig(output.output)
 				units = append(units, Unit{
 					ID:     componentID,
 					Type:   client.UnitTypeOutput,
-					Config: output.output,
+					Config: cfg,
+					Err:    cfgErr,
 				})
 				components = append(components, Component{
 					ID:    componentID,

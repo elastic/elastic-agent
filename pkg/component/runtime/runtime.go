@@ -25,7 +25,8 @@ type ComponentUnitState struct {
 
 	// internal
 	configStateIdx uint64
-	config         map[string]interface{}
+	config         *proto.UnitExpectedConfig
+	err            error
 	payloadStr     string
 }
 
@@ -87,6 +88,11 @@ func (s *ComponentState) syncComponent(comp *component.Component, initState clie
 		existing.Message = initMessage
 		existing.Payload = nil
 		existing.config = unit.Config
+		existing.err = unit.Err
+		if existing.err != nil {
+			existing.State = client.UnitStateFailed
+			existing.Message = existing.err.Error()
+		}
 		if ok {
 			existing.configStateIdx++
 		} else {
@@ -152,7 +158,7 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		_, ok := touched[key]
 		if !ok {
 			unit.configStateIdx = 0
-			if unit.State != client.UnitStateStarting {
+			if unit.State != client.UnitStateStarting && unit.err == nil {
 				state := client.UnitStateFailed
 				msg := "Failed: not reported in check-in"
 				payloadStr := ""
