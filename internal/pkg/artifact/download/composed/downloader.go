@@ -11,6 +11,7 @@ import (
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 )
 
@@ -49,4 +50,16 @@ func (e *Downloader) Download(ctx context.Context, spec program.Spec, version st
 	}
 
 	return "", err
+}
+
+func (e *Downloader) Reload(c *artifact.Config) error {
+	for _, d := range e.dd {
+		reloadable, ok := d.(download.Reloader)
+		if !ok {
+			continue
+		}
+
+		reloadable.Reload(c)
+	}
+	return nil
 }

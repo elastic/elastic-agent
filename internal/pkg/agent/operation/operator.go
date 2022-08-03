@@ -20,9 +20,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/stateresolver"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
@@ -119,6 +121,39 @@ func NewOperator(
 	os.MkdirAll(config.DownloadConfig.InstallPath, 0755)
 
 	return operator, nil
+}
+
+func (o *Operator) Reload(rawConfig *config.Config) error {
+	// save some unpacking in downloaders
+	type reloadConfig struct {
+		C *artifact.Config `json:"agent.download" config:"agent.download"`
+	}
+	tmp := &reloadConfig{
+		C: artifact.DefaultConfig(),
+	}
+	if err := rawConfig.Unpack(&tmp); err != nil {
+		return errors.New(err, "failed to unpack artifact config")
+	}
+
+	r, ok := o.downloader.(artifact.ConfigReloader)
+	if !ok {
+		return nil
+	}
+
+	if err := r.Reload(tmp.C); err != nil {
+		return errors.New(err, "failed reloading downloader config")
+	}
+
+	r, ok = o.verifier.(artifact.ConfigReloader)
+	if !ok {
+		return nil
+	}
+
+	if err := r.Reload(tmp.C); err != nil {
+		return errors.New(err, "failed reloading verifier config")
+	}
+
+	return nil
 }
 
 // State describes the current state of the system.

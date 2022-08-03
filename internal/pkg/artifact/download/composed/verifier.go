@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 )
 
@@ -53,4 +54,16 @@ func (e *Verifier) Verify(spec program.Spec, version string) error {
 	}
 
 	return err
+}
+
+func (e *Verifier) Reload(c *artifact.Config) error {
+	for _, v := range e.vv {
+		reloadable, ok := v.(download.Reloader)
+		if !ok {
+			continue
+		}
+
+		reloadable.Reload(c)
+	}
+	return nil
 }
