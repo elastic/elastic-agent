@@ -7,9 +7,8 @@ ELASTIC_AGENT_REPO_PATH=$(ELASTIC_AGENT_REPO)
 ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 
 .PHONY: generate-k8s $(ALL)
-
 generate-k8s: $(ALL)
-
+	
 test: generate-k8s
 	for FILE in $(shell ls *-kubernetes.yaml); do \
 		BEAT=$$(echo $$FILE | cut -d \- -f 1); \
@@ -19,13 +18,22 @@ test: generate-k8s
 clean:
 	@for f in $(ALL); do rm -f "$$f-kubernetes.yaml"; done
 
-$(ALL):
-	@echo "Generating $@-kubernetes.yaml"
-	@rm -f $@-kubernetes.yaml
+$(ALL): 
+ifdef WITHOUTCONFIG
+	@echo "Generating $@-kubernetes-without-configmap.yaml"
+	@rm -f $@-kubernetes-without-configmap.yaml
+	@for f in $(shell ls $@/*.yaml | grep -v configmap); do \
+		sed "s/%VERSION%/${BEAT_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
+		echo --- >> $@-kubernetes-without-configmap.yaml; \
+	done
+else
+	@echo "Generating $@-kubernetes.yaml" 
+	@rm -f $@-kubernetes.yaml 
 	@for f in $(shell ls $@/*.yaml); do \
 		sed "s/%VERSION%/${BEAT_VERSION}/g" $$f >> $@-kubernetes.yaml; \
 		echo --- >> $@-kubernetes.yaml; \
-	done
+	done 
+endif
 
 
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
