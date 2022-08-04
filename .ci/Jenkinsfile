@@ -261,13 +261,10 @@ pipeline {
                   ./creator_k8s_manifest.sh . """)
                 sh(label: '[Clone] Kibana-Repository', script: """
                   make ci-clone-kibana-repository
-                  cp Makefile ./kibana """)
-                dir("${BASE_DIR}/deploy/kubernetes/kibana"){  
-                  sh(label: '[PR open] Update-Kibana-kubernetes-templates', script: """
-                    pwd
-                    ls -lrt
-                    DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request """)
-                }  
+                  cp Makefile ./kibana 
+                  cd kibana
+                  ls -lrt
+                  DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request """)
                 }
             }
             post {
