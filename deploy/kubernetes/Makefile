@@ -43,14 +43,15 @@ define chdir
 endef
 
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
+.PHONY: ci-clone-kibana-repository
+ci-clone-kibana-repository:
+	git clone git@github.com:elastic/kibana.git
+	cp $(FILE_REPO)  $(ELASTIC_AGENT_REPO)/$(ELASTIC_AGENT_REPO_PATH)
+	
+## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
-
-	mkdir -p $(ELASTIC_AGENT_REPO)
-	git clone git@github.com:elastic/kibana.git
-	$(call chdir, $(ELASTIC_AGENT_REPO)/kibana)
-	pwd
-	cp ../../$(FILE_REPO) $(ELASTIC_AGENT_REPO_PATH)
+	$(call chdir, $(ELASTIC_AGENT_REPO))
 	pwd
 	HASDIFF=$$(git status | grep $(FILE_REPO) | wc -l); \
 	if [ $${HASDIFF} -ne 1 ]; \
