@@ -47,4 +47,7 @@ export const elasticAgentManagedManifest = \`---
 EOF
 
 cat $MANIFEST_PATH/$MANAGED >> $OUTPUT_FILE
-echo "\`;" >> $OUTPUT_FILE
+echo -n "\`;" >> $OUTPUT_FILE
+
+#Replacing all occurencies of elastic-agent-standalone
+sed -i -e 's/elastic-agent-standalone/elastic-agent/g' $OUTPUT_FILE

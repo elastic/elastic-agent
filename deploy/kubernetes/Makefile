@@ -2,8 +2,9 @@ ALL=elastic-agent-standalone elastic-agent-managed
 BEAT_VERSION=$(shell head -n 1 ../../version/docs/version.asciidoc | cut -c 17- )
 
 #variables needed for ci-create-kubernetes-templates-pull-request
-ELASTIC_AGENT_REPO=./
-ELASTIC_AGENT_REPO_PATH=$(ELASTIC_AGENT_REPO)
+ELASTIC_AGENT_REPO=kibana
+ELASTIC_AGENT_REPO_PATH=x-pack/plugins/fleet/server/services/
+FILE_REPO=elastic_agent_manifest.ts
 ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 
 .PHONY: generate-k8s $(ALL)
@@ -23,7 +24,7 @@ ifdef WITHOUTCONFIG
 	@echo "Generating $@-kubernetes-without-configmap.yaml"
 	@rm -f $@-kubernetes-without-configmap.yaml
 	@for f in $(shell ls $@/*.yaml | grep -v daemonset-configmap); do \
-		sed "s/%VERSION%/${BEAT_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
+		sed "s/%VERSION%/VERSION/g" $$f >> $@-kubernetes-without-configmap.yaml; \
 		echo --- >> $@-kubernetes-without-configmap.yaml; \
 	done
 else
@@ -35,12 +36,29 @@ else
 	done 
 endif
 
+CHDIR_SHELL := $(SHELL)
+define chdir
+   $(eval _D=$(firstword $(1) $(@D)))
+   $(info $(MAKE): cd $(_D)) $(eval SHELL = cd $(_D); $(CHDIR_SHELL))
+endef
 
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
-	cd $(ELASTIC_AGENT_REPO_PATH)
-	echo "INFO: create branch"
+
+	mkdir -p $(ELASTIC_AGENT_REPO)
+	# git clone git@github.com:elastic/kibana.git
+	$(call chdir, $(ELASTIC_AGENT_REPO)/kibana)
+	pwd
+	cp ../../$(FILE_REPO) $(ELASTIC_AGENT_REPO_PATH)
+	pwd
+	HASDIFF=$$(git status | grep $(FILE_REPO) | wc -l); \
+	if [ $${HASDIFF} -ne 1 ]; \
+	then \
+		echo "No differences found with kibana git repository" && \
+		exit 1; \
+	fi 
+	echo "INFO: Create branch to update k8s templates"
 	git checkout -b $(ELASTIC_AGENT_BRANCH)
 	echo "INFO: add files if any"
 	git add .
@@ -55,10 +73,11 @@ else
 		git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
 		echo "INFO: create pull request"
 		gh pr create \
-			--title "Update kubernetes templates for elastic-agent [templates.d]" \
+			--title "Update kubernetes templates for elastic-agent" \
 			--body "Automated by ${BUILD_URL}" \
 			--label automation \
 			--base main \
 			--head $(ELASTIC_AGENT_BRANCH) \
 			--reviewer elastic/obs-cloudnative-monitoring
 endif 
+
