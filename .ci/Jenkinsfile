@@ -260,6 +260,9 @@ pipeline {
                   pwd
                   WITHOUTCONFIG=true make generate-k8s
                   ./creator_k8s_manifest.sh . """)
+                sh(label: 'Clone-Kibana-repository [Clone Repo]', script: """
+                  DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request""")
+                }  
                 sh(label: 'Update-Kibana-kubernetes-templates [open PR]', script: """
                   DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request""")
                 }
