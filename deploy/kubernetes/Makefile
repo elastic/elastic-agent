@@ -47,7 +47,7 @@ endef
 ci-create-kubernetes-templates-pull-request:
 
 	mkdir -p $(ELASTIC_AGENT_REPO)
-	# git clone git@github.com:elastic/kibana.git
+	git clone git@github.com:elastic/kibana.git
 	$(call chdir, $(ELASTIC_AGENT_REPO)/kibana)
 	pwd
 	cp ../../$(FILE_REPO) $(ELASTIC_AGENT_REPO_PATH)
