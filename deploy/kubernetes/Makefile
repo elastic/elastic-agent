@@ -51,7 +51,6 @@ ci-clone-kibana-repository:
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
-	pwd
 	HASDIFF=$$(git status | grep $(FILE_REPO) | wc -l); \
 	if [ $${HASDIFF} -ne 1 ]; \
 	then \
@@ -61,9 +60,9 @@ ci-create-kubernetes-templates-pull-request:
 	echo "INFO: Create branch to update k8s templates"
 	git checkout -b $(ELASTIC_AGENT_BRANCH)
 	echo "INFO: add files if any"
-	git add .
+	git add $(ELASTIC_AGENT_REPO_PATH)/$(FILE_REPO)
 	echo "INFO: commit changes if any"
-	git diff --staged --quiet || git commit -m "[automation] Publish kubernetes templates for elastic-agent"
+	git diff --staged --quiet || git commit -m "[Automated PR] Publish kubernetes templates for elastic-agent"
 	echo "INFO: show remote details"
 	git remote -v
 ifeq ($(DRY_RUN),TRUE)

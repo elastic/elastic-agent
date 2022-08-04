@@ -243,7 +243,7 @@ pipeline {
         // Only on Prs
         // Enable if k8s related changes.
         anyOf {
-          changeRequest()                          // If is PR
+          changeRequest()                          // If is PR # This needs to be tested after merging in main with not { changeRequest() } and branch 'master' 
           expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
       }
@@ -256,15 +256,17 @@ pipeline {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                 dir("${BASE_DIR}/deploy/kubernetes"){
-                sh(label: '[File Creation]Create-Needed-Manifest', script: """
+                sh(label: '[File Creation] Create-Needed-Manifest', script: """
                   WITHOUTCONFIG=true make generate-k8s
                   ./creator_k8s_manifest.sh . """)
                 sh(label: '[Clone] Kibana-Repository', script: """
                   make ci-clone-kibana-repository
                   cp Makefile ./kibana
-                  cp elastic_agent_manifest.ts ./kibana""")
+                  """)
                 dir("${BASE_DIR}/deploy/kubernetes/kibana"){  
                   sh(label: '[PR open] Update-Kibana-kubernetes-templates', script: """
+                    pwd
+                    ls -lrt
                     DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request""")
                 }  
                 }
