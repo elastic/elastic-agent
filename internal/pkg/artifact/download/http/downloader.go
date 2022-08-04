@@ -78,7 +78,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 		httpcommon.WithAPMHTTPInstrumentation(),
 	)
 	if err != nil {
-		return errors.New(err, "failed to generate client out of config")
+		return errors.New(err, "http.downloader: failed to generate client out of config")
 	}
 
 	client.Transport = withHeaders(client.Transport, headers)
@@ -96,7 +96,9 @@ func (e *Downloader) Download(ctx context.Context, spec program.Spec, version st
 	defer func() {
 		if err != nil {
 			for _, path := range downloadedFiles {
-				_ = os.Remove(path)
+				if err := os.Remove(path); err != nil {
+					e.log.Warnf("failed to cleanup %s: %v", path, err)
+				}
 			}
 		}
 	}()

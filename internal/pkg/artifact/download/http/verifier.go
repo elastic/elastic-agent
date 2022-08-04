@@ -69,7 +69,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 		}),
 	)
 	if err != nil {
-		return errors.New(err, "failed to generate client out of config")
+		return errors.New(err, "http.verifier: failed to generate client out of config")
 	}
 
 	v.client = *client

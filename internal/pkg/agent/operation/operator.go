@@ -117,8 +117,14 @@ func NewOperator(
 
 	operator.initHandlerMap()
 
-	_ = os.MkdirAll(config.DownloadConfig.TargetDirectory, 0755)
-	_ = os.MkdirAll(config.DownloadConfig.InstallPath, 0755)
+	if err := os.MkdirAll(config.DownloadConfig.TargetDirectory, 0755); err != nil {
+		// can already exists from previous runs, not an error
+		logger.Warnf("failed creating %q: %v", config.DownloadConfig.TargetDirectory, err)
+	}
+	if err := os.MkdirAll(config.DownloadConfig.InstallPath, 0755); err != nil {
+		// can already exists from previous runs, not an error
+		logger.Warnf("failed creating %q: %v", config.DownloadConfig.InstallPath, err)
+	}
 
 	return operator, nil
 }
@@ -135,22 +141,22 @@ func (o *Operator) Reload(rawConfig *config.Config) error {
 		return errors.New(err, "failed to unpack artifact config")
 	}
 
-	r, ok := o.downloader.(artifact.ConfigReloader)
+	if err := o.reloadComponent(o.downloader, "downloader", tmp.C); err != nil {
+		return err
+	}
+
+	return o.reloadComponent(o.verifier, "verifier", tmp.C)
+}
+
+func (o *Operator) reloadComponent(component interface{}, name string, cfg *artifact.Config) error {
+	r, ok := component.(artifact.ConfigReloader)
 	if !ok {
-		return nil
+		o.logger.Debugf("failed reloading %q: component is not reloadable", name)
+		return nil // not an error, could be filesystem downloader/verifier
 	}
 
-	if err := r.Reload(tmp.C); err != nil {
-		return errors.New(err, "failed reloading downloader config")
-	}
-
-	r, ok = o.verifier.(artifact.ConfigReloader)
-	if !ok {
-		return nil
-	}
-
-	if err := r.Reload(tmp.C); err != nil {
-		return errors.New(err, "failed reloading verifier config")
+	if err := r.Reload(cfg); err != nil {
+		return errors.New(err, fmt.Sprintf("failed reloading %q config", component))
 	}
 
 	return nil

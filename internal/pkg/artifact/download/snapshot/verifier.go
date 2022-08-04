@@ -26,7 +26,7 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte, versio
 	}
 	v, err := http.NewVerifier(cfg, allowEmptyPgp, pgp)
 	if err != nil {
-		return nil, errors.New(err, "failed to create verifier")
+		return nil, errors.New(err, "failed to create snapshot verifier")
 	}
 
 	return &Verifier{
@@ -48,7 +48,7 @@ func (e *Verifier) Reload(c *artifact.Config) error {
 
 	cfg, err := snapshotConfig(c, e.versionOverride)
 	if err != nil {
-		return err
+		return errors.New(err, "snapshot.downloader: failed to generate snapshot config")
 	}
 
 	return reloader.Reload(cfg)

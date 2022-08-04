@@ -35,7 +35,7 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride 
 
 	httpDownloader, err := http.NewDownloader(log, cfg)
 	if err != nil {
-		return nil, errors.New(err, "failed to create downloader")
+		return nil, errors.New(err, "failed to create snapshot downloader")
 	}
 
 	return &Downloader{
@@ -52,7 +52,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 	cfg, err := snapshotConfig(c, e.versionOverride)
 	if err != nil {
-		return err
+		return errors.New(err, "snapshot.downloader: failed to generate snapshot config")
 	}
 
 	return reloader.Reload(cfg)

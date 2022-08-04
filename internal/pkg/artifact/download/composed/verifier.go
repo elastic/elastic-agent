@@ -63,7 +63,7 @@ func (e *Verifier) Reload(c *artifact.Config) error {
 		}
 
 		if err := reloadable.Reload(c); err != nil {
-			return errors.New(err, "failed reloading artifact config")
+			return errors.New(err, "failed reloading artifact config for composed verifier")
 		}
 	}
 	return nil
