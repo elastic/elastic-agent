@@ -263,6 +263,8 @@ pipeline {
                 sh(label: 'Clone-Kibana-repository [Clone Repo]', script: """
                   make ci-clone-kibana-repository""") 
                 sh(label: 'Update-Kibana-kubernetes-templates [open PR]', script: """
+                  pwd
+                  ls -lrt
                   DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request""")
                 }
             }
