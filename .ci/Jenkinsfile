@@ -263,7 +263,6 @@ pipeline {
                   make ci-clone-kibana-repository
                   cp Makefile ./kibana 
                   cd kibana
-                  ls -lrt
                   DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request """)
                 }
             }

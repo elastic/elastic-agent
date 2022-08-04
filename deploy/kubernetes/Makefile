@@ -42,7 +42,7 @@ define chdir
    $(info $(MAKE): cd $(_D)) $(eval SHELL = cd $(_D); $(CHDIR_SHELL))
 endef
 
-## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
+## ci-clone-kibana-repository : Clone Kibana Repository and copy new files for the PR
 .PHONY: ci-clone-kibana-repository
 ci-clone-kibana-repository:
 	git clone git@github.com:elastic/kibana.git
@@ -60,7 +60,7 @@ ci-create-kubernetes-templates-pull-request:
 	echo "INFO: Create branch to update k8s templates"
 	git checkout -b $(ELASTIC_AGENT_BRANCH)
 	echo "INFO: add files if any"
-	git add $(ELASTIC_AGENT_REPO_PATH)/$(FILE_REPO)
+	git add $(ELASTIC_AGENT_REPO_PATH)$(FILE_REPO)
 	echo "INFO: commit changes if any"
 	git diff --staged --quiet || git commit -m "[Automated PR] Publish kubernetes templates for elastic-agent"
 	echo "INFO: show remote details"
