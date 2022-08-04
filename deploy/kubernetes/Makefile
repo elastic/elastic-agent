@@ -51,7 +51,6 @@ ci-clone-kibana-repository:
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
-	$(call chdir, $(ELASTIC_AGENT_REPO))
 	pwd
 	HASDIFF=$$(git status | grep $(FILE_REPO) | wc -l); \
 	if [ $${HASDIFF} -ne 1 ]; \

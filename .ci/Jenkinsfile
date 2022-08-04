@@ -256,15 +256,17 @@ pipeline {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                 dir("${BASE_DIR}/deploy/kubernetes"){
-                sh(label: 'Create-Needed-Manifest', script: """
-                  pwd
+                sh(label: '[File Creation]Create-Needed-Manifest', script: """
                   WITHOUTCONFIG=true make generate-k8s
                   ./creator_k8s_manifest.sh . """)
-                sh(label: 'Update-Kibana-kubernetes-templates [open PR]', script: """
+                sh(label: '[Clone] Kibana-Repository', script: """
                   make ci-clone-kibana-repository
-                  pwd
-                  ls -lrt
-                  DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request""")
+                  cp Makefile ./kibana
+                  cp elastic_agent_manifest.ts ./kibana""")
+                dir("${BASE_DIR}/deploy/kubernetes/kibana"){  
+                  sh(label: '[PR open] Update-Kibana-kubernetes-templates', script: """
+                    DRY_RUN=TRUE make ci-create-kubernetes-templates-pull-request""")
+                }  
                 }
             }
             post {
