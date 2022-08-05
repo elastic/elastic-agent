@@ -118,6 +118,11 @@ func newLocal(
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+	routerArtifactReloader, ok := router.(emitter.Reloader)
+	if !ok {
+		return nil, errors.New("router not capable of artifact reload") // Needed for client reloading
+	}
+
 	discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
 	emit, err := emitter.New(
 		localApplication.bgContext,
@@ -131,6 +136,11 @@ func newLocal(
 		},
 		caps,
 		monitor,
+<<<<<<< HEAD
+=======
+		artifact.NewReloader(cfg.Settings.DownloadConfig, log),
+		routerArtifactReloader,
+>>>>>>> 6d830e88d (Reload downloader client on config change (#848))
 	)
 	if err != nil {
 		return nil, err

@@ -24,6 +24,10 @@ const (
 	defaultSourceURI = "https://artifacts.elastic.co/downloads/"
 )
 
+type ConfigReloader interface {
+	Reload(*Config) error
+}
+
 // Config is a configuration used for verifier and downloader
 type Config struct {
 	// OperatingSystem: operating system [linux, windows, darwin]
@@ -52,18 +56,65 @@ type Config struct {
 }
 
 type Reloader struct {
-	log *logger.Logger
-	cfg *Config
+	log       *logger.Logger
+	cfg       *Config
+	reloaders []ConfigReloader
 }
 
-func NewReloader(cfg *Config, log *logger.Logger) *Reloader {
+func NewReloader(cfg *Config, log *logger.Logger, rr ...ConfigReloader) *Reloader {
 	return &Reloader{
-		cfg: cfg,
-		log: log,
+		cfg:       cfg,
+		log:       log,
+		reloaders: rr,
 	}
 }
 
 func (r *Reloader) Reload(rawConfig *config.Config) error {
+<<<<<<< HEAD
+=======
+	if err := r.reloadConfig(rawConfig); err != nil {
+		return errors.New(err, "failed to reload config")
+	}
+
+	if err := r.reloadSourceURI(rawConfig); err != nil {
+		return errors.New(err, "failed to reload source URI")
+	}
+
+	for _, reloader := range r.reloaders {
+		if err := reloader.Reload(r.cfg); err != nil {
+			return errors.New(err, "failed reloading config")
+		}
+	}
+
+	return nil
+}
+
+func (r *Reloader) reloadConfig(rawConfig *config.Config) error {
+	type reloadConfig struct {
+		C *Config `json:"agent.download" config:"agent.download"`
+	}
+	tmp := &reloadConfig{
+		C: DefaultConfig(),
+	}
+	if err := rawConfig.Unpack(&tmp); err != nil {
+		return err
+	}
+
+	*(r.cfg) = Config{
+		OperatingSystem:       tmp.C.OperatingSystem,
+		Architecture:          tmp.C.Architecture,
+		SourceURI:             tmp.C.SourceURI,
+		TargetDirectory:       tmp.C.TargetDirectory,
+		InstallPath:           tmp.C.InstallPath,
+		DropPath:              tmp.C.DropPath,
+		HTTPTransportSettings: tmp.C.HTTPTransportSettings,
+	}
+
+	return nil
+}
+
+func (r *Reloader) reloadSourceURI(rawConfig *config.Config) error {
+>>>>>>> 6d830e88d (Reload downloader client on config change (#848))
 	type reloadConfig struct {
 		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
