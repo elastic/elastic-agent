@@ -253,7 +253,7 @@ pipeline {
         stages {
           stage('OpenKibanaPR') {
             steps {
-              withGithubNotify(context: "OpenKibanaPR") {
+              withGhEnv(version: '2.4.0') {
                 deleteDir()
                 unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
                   dir("${BASE_DIR}/deploy/kubernetes"){
