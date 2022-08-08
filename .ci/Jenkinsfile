@@ -253,19 +253,18 @@ pipeline {
         stages {
           stage('OpenKibanaPR') {
             steps {
-              deleteDir()
-              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-                dir("${BASE_DIR}/deploy/kubernetes"){
-                sh(label: '[File Creation] Create-Needed-Manifest', script: """
-                  WITHOUTCONFIG=true make generate-k8s
-                  ./creator_k8s_manifest.sh . """)
-                sh(label: '[Clone] Kibana-Repository', script: """
-                  make ci-clone-kibana-repository
-                  cp Makefile ./kibana 
-                  cd kibana
-                  yes | sudo apt install hub
-                  make ci-create-kubernetes-templates-pull-request """)
-                }
+              withGithubNotify(context: "OpenKibanaPR") {
+                  dir("${BASE_DIR}/deploy/kubernetes"){
+                    sh(label: '[File Creation] Create-Needed-Manifest', script: """
+                      WITHOUTCONFIG=true make generate-k8s
+                      ./creator_k8s_manifest.sh . """)
+                    sh(label: '[Clone] Kibana-Repository', script: """
+                      make ci-clone-kibana-repository
+                      cp Makefile ./kibana 
+                      cd kibana
+                      make ci-create-kubernetes-templates-pull-request """)
+                  }
+              }  
             }
             post {
               always {
