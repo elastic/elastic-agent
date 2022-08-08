@@ -263,6 +263,7 @@ pipeline {
                   make ci-clone-kibana-repository
                   cp Makefile ./kibana 
                   cd kibana
+                  env
                   make ci-create-kubernetes-templates-pull-request """)
                 }
             }

@@ -70,6 +70,7 @@ ifeq ($(DRY_RUN),TRUE)
 else
 		echo "INFO: push branch"
 		git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
+		gh auth login
 		echo "INFO: create pull request"
 		gh pr create \
 			--title "Update kubernetes templates for elastic-agent" \
