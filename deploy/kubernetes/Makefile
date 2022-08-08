@@ -71,10 +71,7 @@ else
 		echo "INFO: push branch"
 		@git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
 		echo "INFO: create pull request"
-		echo "$GITHUB_TOKEN" > .githubtoken
-		unset GITHUB_TOKEN
-		gh auth login --with-token < .githubtoken
-		rm .githubtoken
+		@cat "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" | gh auth login --with-token
 		gh pr create \
 			--title "Update kubernetes templates for elastic-agent" \
 			--body "Automated by ${BUILD_URL}" \
