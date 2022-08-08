@@ -263,7 +263,7 @@ pipeline {
                   make ci-clone-kibana-repository
                   cp Makefile ./kibana 
                   cd kibana
-                  env
+                  yes | sudo apt install hub
                   make ci-create-kubernetes-templates-pull-request """)
                 }
             }

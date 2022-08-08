@@ -72,12 +72,13 @@ else
 		git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
 		gh auth login
 		echo "INFO: create pull request"
-		gh pr create \
-			--title "Update kubernetes templates for elastic-agent" \
-			--body "Automated by ${BUILD_URL}" \
-			--label automation \
-			--base main \
-			--head $(ELASTIC_AGENT_BRANCH) \
-			--reviewer elastic/obs-cloudnative-monitoring
+		hub pull-request -m "Update kubernetes templates for elastic-agent \n Automated by PR " -l automation -r elastic/obs-cloudnative-monitoring
+		# gh pr create \
+		# 	--title "Update kubernetes templates for elastic-agent" \
+		# 	--body "Automated by ${BUILD_URL}" \
+		# 	--label automation \
+		# 	--base main \
+		# 	--head $(ELASTIC_AGENT_BRANCH) \
+		# 	--reviewer elastic/obs-cloudnative-monitoring
 endif 
 
