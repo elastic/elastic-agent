@@ -70,7 +70,6 @@ ifeq ($(DRY_RUN),TRUE)
 else
 		echo "INFO: push branch"
 		git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
-		gh auth login
 		echo "INFO: create pull request"
 		hub pull-request -m "Update kubernetes templates for elastic-agent \n Automated by PR " -l automation -r elastic/obs-cloudnative-monitoring
 		# gh pr create \
