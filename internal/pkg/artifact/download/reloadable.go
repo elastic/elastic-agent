@@ -2,6 +2,13 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package version
+package download
 
-const defaultBeatVersion = "8.5.0"
+import (
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+)
+
+// Reloader is an interface allowing to reload artifact config
+type Reloader interface {
+	Reload(*artifact.Config) error
+}

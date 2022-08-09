@@ -44,7 +44,7 @@ func TestPolicyChange(t *testing.T) {
 
 		conf := map[string]interface{}{"hello": "world"}
 		action := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123",
+			ActionID:   "TestPolicyChange-abc1",
 			ActionType: "POLICY_CHANGE",
 			Policy:     conf,
 		}
@@ -69,7 +69,7 @@ func TestPolicyChange(t *testing.T) {
 
 		conf := map[string]interface{}{"hello": "world"}
 		action := &fleetapi.ActionPolicyChange{
-			ActionID:   "abc123",
+			ActionID:   "TestPolicyChange-abc2",
 			ActionType: "POLICY_CHANGE",
 			Policy:     conf,
 		}
@@ -100,7 +100,7 @@ func TestPolicyAcked(t *testing.T) {
 		emitter := &mockEmitter{err: mockErr}
 
 		config := map[string]interface{}{"hello": "world"}
-		actionID := "abc123"
+		actionID := "TestPolicyAcked-abc1"
 		action := &fleetapi.ActionPolicyChange{
 			ActionID:   actionID,
 			ActionType: "POLICY_CHANGE",
@@ -129,7 +129,7 @@ func TestPolicyAcked(t *testing.T) {
 		emitter := &mockEmitter{}
 
 		config := map[string]interface{}{"hello": "world"}
-		actionID := "abc123"
+		actionID := "TestPolicyAcked-abc2"
 		action := &fleetapi.ActionPolicyChange{
 			ActionID:   actionID,
 			ActionType: "POLICY_CHANGE",
