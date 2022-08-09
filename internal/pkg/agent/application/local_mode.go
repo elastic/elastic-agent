@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -118,6 +119,11 @@ func newLocal(
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+	routerArtifactReloader, ok := router.(emitter.Reloader)
+	if !ok {
+		return nil, errors.New("router not capable of artifact reload") // Needed for client reloading
+	}
+
 	discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
 	emit, err := emitter.New(
 		localApplication.bgContext,
@@ -131,6 +137,8 @@ func newLocal(
 		},
 		caps,
 		monitor,
+		artifact.NewReloader(cfg.Settings.DownloadConfig, log),
+		routerArtifactReloader,
 	)
 	if err != nil {
 		return nil, err
@@ -203,7 +211,7 @@ func (l *Local) AgentInfo() *info.AgentInfo {
 }
 
 func discoverer(patterns ...string) discoverFunc {
-	var p []string
+	p := make([]string, 0, len(patterns))
 	for _, newP := range patterns {
 		if len(newP) == 0 {
 			continue
