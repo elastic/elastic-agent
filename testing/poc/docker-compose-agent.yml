@@ -1,0 +1,21 @@
+version: '3.9'
+services:
+  elastic-agent:
+    image: "docker.elastic.co/beats/elastic-agent:8.5.0-7dbc10f8-SNAPSHOT"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+    environment:
+      - "ELASTICSEARCH_USERNAME=admin"
+      - "ELASTICSEARCH_PASSWORD=changeme"
+      - "FLEET_SERVER_ENABLE=0"
+      - "FLEET_SERVER_INSECURE_HTTP=${fleetServerMode:-0}"
+      - "FLEET_ENROLL=${fleetEnroll:-1}"
+      - "FLEET_ENROLLMENT_TOKEN=${fleetEnrollmentToken:-}"
+      - "FLEET_INSECURE=${fleetInsecure:-0}"
+      - "FLEET_URL=${fleetUrl:-}"
+    platform: ${stackPlatform:-linux/amd64}
+    ports:
+      - "${fleetServerPort:-8220}:8220"

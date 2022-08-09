@@ -1,64 +1,76 @@
-//go:build integration
-// +build integration
-
 package cmd
 
 import (
-	"bytes"
-	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/spf13/cobra"
+	"github.com/elastic/elastic-agent/testing/poc"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDiagnostics(t *testing.T) {
-	//err, identifier := stackUp()
-	//if err != nil {
-	//	panic(err)
-	//}
+	poc.ElasticAgentUp()
+	//err, identifier := poc.StackUp()
+	//defer poc.StackDown(identifier)
+
 	//assert.NoError(t, err)
 	//assert.NotNil(t, identifier)
-	//cmd := NewCommand()
-	pwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	pwd = filepath.Dir(pwd)
-	pwd = filepath.Dir(pwd)
-	pwd = filepath.Dir(pwd)
-	pwd = filepath.Dir(pwd)
-	hel := filepath.Join(pwd, "build")
-	fmt.Println(hel)
-	paths.SetConfig(hel)
-	err = run(logToStderr)
-	assert.NoError(t, err)
+	rootDir := poc.ElasticAgentDirectory("")
+	paths.ConfigFilePath = filepath.Join(rootDir, "_meta", paths.DefaultConfigName)
 	streams := cli.NewIOStreams()
-	cmd := NewCommandWithArgs(os.Args, streams)
-
-	//output, err := executeCommand(cmd, "run")
-	//cmd.SetOut(streams.Out)
-	//contents, err := ioutil.ReadAll(out)
-	//assert.NoError(t, err)
-	//assert.True(t, strings.Contains(string(contents), "Hello I am running"))
-	output, _ := executeCommand(cmd, "diagnostics")
+	cmd := newDiagnosticsCommand(os.Args, streams)
+	output, _ := poc.ExecuteCommand(cmd)
 	assert.Equal(t, "test", output)
+
 }
 
-func executeCommand(root *cobra.Command, args ...string) (output string, err error) {
-	buf := new(bytes.Buffer)
-	root.SetOut(buf)
-	root.SetErr(buf)
-	root.SetArgs(args)
+func ElasticAgentUp() error {
+	rootDir := poc.ElasticAgentDirectory("")
+	paths.ConfigFilePath = filepath.Join(rootDir, "_meta", paths.DefaultConfigName)
+	streams := cli.NewIOStreams()
+	cmd := newRunCommandWithArgs(os.Args, streams)
+	output, _ := poc.ExecuteCommand(cmd)
+	_ = output
+	return nil
+}
 
-	err = root.Execute()
-	if err != nil {
-		fmt.Println(err)
-	}
+func TestAgent1(t *testing.T) {
+	rootDir := poc.ElasticAgentDirectory("")
+	paths.ConfigFilePath = filepath.Join(rootDir, "_meta", paths.DefaultConfigName)
+	t.Run("test agent with subcommand", func(t *testing.T) {
+		streams, _, _, _ := cli.NewTestingIOStreams()
+		cmd := NewCommandWithArgs([]string{}, streams)
+		cmd.SetOutput(streams.Out)
+		cmd.Execute()
+	})
 
-	return buf.String(), err
+	t.Run("test run subcommand", func(t *testing.T) {
+
+		streams, _, out, _ := cli.NewTestingIOStreams()
+		cmd := newRunCommandWithArgs([]string{}, streams)
+		cmd.SetOut(streams.Out)
+		go cmd.Execute()
+		contents, err := ioutil.ReadAll(out)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.True(t, strings.Contains(string(contents), "Hello I am running"))
+	})
+	t.Run("test diag subcommand", func(t *testing.T) {
+
+		streams, _, out, _ := cli.NewTestingIOStreams()
+		cmd := newDiagnosticsCommand([]string{}, streams)
+		cmd.SetOut(streams.Out)
+		cmd.Execute()
+		contents, err := ioutil.ReadAll(out)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.True(t, strings.Contains(string(contents), "Hello I am running"))
+	})
 }

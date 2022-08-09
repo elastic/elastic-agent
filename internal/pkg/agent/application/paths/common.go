@@ -26,7 +26,7 @@ const (
 var (
 	topPath         string
 	configPath      string
-	configFilePath  string
+	ConfigFilePath  string
 	logsPath        string
 	downloadsPath   string
 	installPath     string
@@ -44,7 +44,7 @@ func init() {
 	fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
 	fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
-	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
+	fs.StringVar(&ConfigFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
 	fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
 	fs.StringVar(&installPath, "path.install", installPath, "Install path contains binaries Agent extracts")
@@ -110,13 +110,13 @@ func SetConfig(path string) {
 
 // ConfigFile returns the path to the configuration file.
 func ConfigFile() string {
-	if configFilePath == "" || configFilePath == DefaultConfigName {
+	if ConfigFilePath == "" || ConfigFilePath == DefaultConfigName {
 		return filepath.Join(Config(), DefaultConfigName)
 	}
-	if filepath.IsAbs(configFilePath) {
-		return configFilePath
+	if filepath.IsAbs(ConfigFilePath) {
+		return ConfigFilePath
 	}
-	return filepath.Join(Config(), configFilePath)
+	return filepath.Join(Config(), ConfigFilePath)
 }
 
 // Data returns the data directory for Agent
