@@ -14,7 +14,14 @@ spec:
       labels:
         app: elastic-agent
     spec:
+<<<<<<< HEAD
+=======
+      # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
+      # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
+>>>>>>> 689aee33c (Add control-plane toleration to Agent K8S manifests. (#864))
       tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       serviceAccountName: elastic-agent
