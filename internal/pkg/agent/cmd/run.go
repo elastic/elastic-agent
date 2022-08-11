@@ -622,6 +622,8 @@ func startOldAgentConfigCleaner(ctx context.Context, log *logp.Logger) {
 		return
 	}
 
+	log.Warnf("Everything is magic")
+
 	c := cleaner.New(log, paths.AgentConfigFile(), []string{fp, fmt.Sprintf("%s.lock", fp)})
 	go func() {
 		err := c.Run(ctx)
