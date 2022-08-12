@@ -238,12 +238,12 @@ pipeline {
         }
       }
     }
-    stage('Sync K8s') {
+    stage('Sync K8s') { //This stage opens a PR to kibana Repository in order to sync k8s manifests
       when {
-        // Only on Prs
+        // Only on main branch 
         // Enable if k8s related changes.
-        anyOf {
-          changeRequest()                          // If is PR # This needs to be tested after merging in main with not { changeRequest() } and branch 'master' 
+        allOf {
+          branch 'main'         // Only runs for branch main        
           expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
       }
