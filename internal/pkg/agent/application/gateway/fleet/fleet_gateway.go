@@ -29,6 +29,9 @@ import (
 // Max number of times an invalid API Key is checked
 const maxUnauthCounter int = 6
 
+// Const for decraded state or linter complains
+const degraded = "degraded"
+
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
 	Duration: 1 * time.Second,        // time between successful calls
@@ -313,7 +316,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 		case eaclient.UnitStateHealthy:
 			return "healthy"
 		case eaclient.UnitStateDegraded:
-			return "degraded"
+			return degraded
 		case eaclient.UnitStateFailed:
 			return "failed"
 		case eaclient.UnitStateStopping:
@@ -446,5 +449,5 @@ func agentStateToString(state agentclient.State) string {
 	case agentclient.Failed:
 		return "error"
 	}
-	return "degraded"
+	return degraded
 }
