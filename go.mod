@@ -8,11 +8,11 @@ require (
 	github.com/billgraziano/dpapi v0.4.0
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliercoder/go-rpm v0.0.0-20190131055624-7a9c54e3d83e
-	github.com/coreos/go-systemd/v22 v22.3.2
+	github.com/coreos/go-systemd/v22 v22.3.3-0.20220203105225-a9a7ef127534
 	github.com/docker/go-units v0.4.0
 	github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4
 	github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220803131543-0c8804bd454c
+	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484
 	github.com/elastic/elastic-agent-libs v0.2.6
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
@@ -33,6 +33,7 @@ require (
 	github.com/otiai10/copy v1.2.0
 	github.com/pierrre/gotestcover v0.0.0-20160517101806-924dca7d15f0
 	github.com/pkg/errors v0.9.1
+	github.com/rs/zerolog v1.27.0
 	github.com/shirou/gopsutil/v3 v3.21.12
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.0

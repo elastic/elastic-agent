@@ -5,6 +5,7 @@
 package component
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -13,6 +14,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+)
+
+const (
+	sourceFieldName = "source"
 )
 
 // MustExpectedConfig returns proto.UnitExpectedConfig.
@@ -37,7 +42,7 @@ func ExpectedConfig(cfg map[string]interface{}) (*proto.UnitExpectedConfig, erro
 		IgnoreUntaggedFields: true,
 		Result:               result,
 		MatchName: func(mapKey, fieldName string) bool {
-			if fieldName == "source" {
+			if fieldName == sourceFieldName {
 				// never match for 'source' field that is set manually after
 				return false
 			}
@@ -61,10 +66,11 @@ func ExpectedConfig(cfg map[string]interface{}) (*proto.UnitExpectedConfig, erro
 func setSource(val interface{}, cfg map[string]interface{}) error {
 	// find the source field on the val
 	resVal := reflect.ValueOf(val).Elem()
-	sourceField := resVal.FieldByName("Source")
-	if !sourceField.IsValid() {
+	sourceFieldByTag, ok := getSourceField(resVal.Type())
+	if !ok {
 		return fmt.Errorf("%T does not define a source field", val)
 	}
+	sourceField := resVal.FieldByName(sourceFieldByTag.Name)
 	if !sourceField.CanSet() {
 		return fmt.Errorf("%T.source cannot be set", val)
 	}
@@ -83,7 +89,7 @@ func setSource(val interface{}, cfg map[string]interface{}) error {
 			continue
 		}
 		jsonName := getJSONFieldName(typeField)
-		if jsonName == "" || jsonName == "source" {
+		if jsonName == "" || jsonName == sourceFieldName {
 			// skip fields without a json name or named 'source'
 			continue
 		}
@@ -123,15 +129,20 @@ func setSource(val interface{}, cfg map[string]interface{}) error {
 	return nil
 }
 
-func hasSourceField(t reflect.Type) bool {
+func getSourceField(t reflect.Type) (reflect.StructField, bool) {
 	for i := 0; i < t.NumField(); i++ {
 		typeField := t.Field(i)
 		jsonName := getJSONFieldName(typeField)
-		if typeField.IsExported() && jsonName == "source" {
-			return true
+		if typeField.IsExported() && jsonName == sourceFieldName {
+			return typeField, true
 		}
 	}
-	return false
+	return reflect.StructField{}, false
+}
+
+func hasSourceField(t reflect.Type) bool {
+	_, ok := getSourceField(t)
+	return ok
 }
 
 func getJSONFieldName(field reflect.StructField) string {
@@ -147,8 +158,8 @@ func getJSONFieldName(field reflect.StructField) string {
 }
 
 func rewrapErr(err error) error {
-	me, ok := err.(*mapstructure.Error)
-	if !ok {
+	var me *mapstructure.Error
+	if !errors.As(err, &me) {
 		return err
 	}
 	errs := me.WrappedErrors()

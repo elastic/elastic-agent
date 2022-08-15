@@ -6,13 +6,18 @@ package component
 
 import (
 	"fmt"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"strings"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+)
+
+const (
+	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
+	defaultUnitLogLevel = client.UnitLogLevelInfo
 )
 
 var (
@@ -43,6 +48,9 @@ type Unit struct {
 
 	// Type is the unit type (either input or output).
 	Type client.UnitType `yaml:"type"`
+
+	// LogLevel is the unit's log level.
+	LogLevel client.UnitLogLevel `yaml:"log_level"`
 
 	// Config is the units expected configuration.
 	Config *proto.UnitExpectedConfig `yaml:"config,omitempty"`
@@ -134,20 +142,22 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 				}
 				cfg, cfgErr := ExpectedConfig(input.input)
 				units = append(units, Unit{
-					ID:     fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id),
-					Type:   client.UnitTypeInput,
-					Config: cfg,
-					Err:    cfgErr,
+					ID:       fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id),
+					Type:     client.UnitTypeInput,
+					LogLevel: input.logLevel,
+					Config:   cfg,
+					Err:      cfgErr,
 				})
 			}
 			if len(units) > 0 {
 				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
 				cfg, cfgErr := ExpectedConfig(output.output)
 				units = append(units, Unit{
-					ID:     componentID,
-					Type:   client.UnitTypeOutput,
-					Config: cfg,
-					Err:    cfgErr,
+					ID:       componentID,
+					Type:     client.UnitTypeOutput,
+					LogLevel: output.logLevel,
+					Config:   cfg,
+					Err:      cfgErr,
 				})
 				components = append(components, Component{
 					ID:    componentID,
@@ -165,12 +175,13 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 // of components.
 func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 	const (
-		outputsKey = "outputs"
-		enabledKey = "enabled"
-		inputsKey  = "inputs"
-		typeKey    = "type"
-		idKey      = "id"
-		useKey     = "use_output"
+		outputsKey  = "outputs"
+		enabledKey  = "enabled"
+		inputsKey   = "inputs"
+		typeKey     = "type"
+		idKey       = "id"
+		useKey      = "use_output"
+		logLevelKey = "log_level"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
@@ -208,9 +219,23 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 			enabled = enabledVal
 			delete(output, enabledKey)
 		}
+		logLevel := defaultUnitLogLevel
+		if logLevelRaw, ok := output[logLevelKey]; ok {
+			logLevelStr, ok := logLevelRaw.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid 'outputs.%s.log_level', expected a string not a %T", name, logLevelRaw)
+			}
+			var err error
+			logLevel, err = stringToLogLevel(logLevelStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", name, err)
+			}
+			delete(output, logLevelKey)
+		}
 		outputsMap[name] = outputI{
 			name:       name,
 			enabled:    enabled,
+			logLevel:   logLevel,
 			outputType: t,
 			output:     output,
 			inputs:     make(map[string][]inputI),
@@ -270,10 +295,24 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 			enabled = enabledVal
 			delete(input, enabledKey)
 		}
+		logLevel := defaultUnitLogLevel
+		if logLevelRaw, ok := input[logLevelKey]; ok {
+			logLevelStr, ok := logLevelRaw.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid 'inputs.%d.log_level', expected a string not a %T", idx, logLevelRaw)
+			}
+			var err error
+			logLevel, err = stringToLogLevel(logLevelStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
+			}
+			delete(input, logLevelKey)
+		}
 		output.inputs[t] = append(output.inputs[t], inputI{
 			idx:       idx,
 			id:        id,
 			enabled:   enabled,
+			logLevel:  logLevel,
 			inputType: t,
 			input:     input,
 		})
@@ -288,6 +327,7 @@ type inputI struct {
 	idx       int
 	id        string
 	enabled   bool
+	logLevel  client.UnitLogLevel
 	inputType string
 	input     map[string]interface{}
 }
@@ -295,6 +335,7 @@ type inputI struct {
 type outputI struct {
 	name       string
 	enabled    bool
+	logLevel   client.UnitLogLevel
 	outputType string
 	output     map[string]interface{}
 	inputs     map[string][]inputI
@@ -319,4 +360,21 @@ func validateRuntimeChecks(spec *InputSpec, store eql.VarStore) error {
 		}
 	}
 	return nil
+}
+
+func stringToLogLevel(val string) (client.UnitLogLevel, error) {
+	val = strings.ToLower(strings.TrimSpace(val))
+	switch val {
+	case "error":
+		return client.UnitLogLevelError, nil
+	case "warn", "warning":
+		return client.UnitLogLevelWarn, nil
+	case "info":
+		return client.UnitLogLevelInfo, nil
+	case "debug":
+		return client.UnitLogLevelDebug, nil
+	case "trace":
+		return client.UnitLogLevelTrace, nil
+	}
+	return client.UnitLogLevelError, fmt.Errorf("unknown log level type: %s", val)
 }

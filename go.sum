@@ -317,8 +317,9 @@ github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e h1:Wf6HqHfScWJN9
 github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/coreos/go-systemd/v22 v22.0.0/go.mod h1:xO0FLkIi5MaZafQlIrOotqXZ90ih+1atmu1JpKERPPk=
 github.com/coreos/go-systemd/v22 v22.1.0/go.mod h1:xO0FLkIi5MaZafQlIrOotqXZ90ih+1atmu1JpKERPPk=
-github.com/coreos/go-systemd/v22 v22.3.2 h1:D9/bQk5vlXQFZ6Kwuu6zaiXJ9oTPe68++AzAJc1DzSI=
 github.com/coreos/go-systemd/v22 v22.3.2/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
+github.com/coreos/go-systemd/v22 v22.3.3-0.20220203105225-a9a7ef127534 h1:rtAn27wIbmOGUs7RIbVgPEjb31ehTVniDwPGXyMxm5U=
+github.com/coreos/go-systemd/v22 v22.3.3-0.20220203105225-a9a7ef127534/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
 github.com/coreos/pkg v0.0.0-20160727233714-3ac0863d7acf/go.mod h1:E3G3o1h8I7cfcXa63jLwjI0eiQQMgzzUDFVpN/nH/eA=
 github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f/go.mod h1:E3G3o1h8I7cfcXa63jLwjI0eiQQMgzzUDFVpN/nH/eA=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
@@ -383,8 +384,10 @@ github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4 h1:uYT+Krd8
 github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4/go.mod h1:UcNuf4pX/qDVNQr0zybm1NL2YoWik+jKBaINZqQCA40=
 github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab h1:Jk6Mfk5BF8gtfE7X0bNCiDGBtwJVxRI79b4wLCAsP+A=
 github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab/go.mod h1:Gg1fsQI+rVms9FJ2DefBSojfPIzgkV8xlyG8fPG0DE8=
-github.com/elastic/elastic-agent-client/v7 v7.0.0-20220803131543-0c8804bd454c h1:mqPU9opI+q6Croc5DaUtb4iY41MV/QIb3pKIMkcvE4s=
-github.com/elastic/elastic-agent-client/v7 v7.0.0-20220803131543-0c8804bd454c/go.mod h1:fkvyUfFwyAG5OnMF0h+FV9sC0Xn9YLITwQpSuwungQs=
+github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804162404-39c0eb87ceeb h1:Sciti25gseNHXxNzG4BK4DP27FyPQKBLFuZaKwc4qO0=
+github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804162404-39c0eb87ceeb/go.mod h1:fkvyUfFwyAG5OnMF0h+FV9sC0Xn9YLITwQpSuwungQs=
+github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484 h1:uJIMfLgCenJvxsVmEjBjYGxt0JddCgw2IxgoNfcIXOk=
+github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484/go.mod h1:fkvyUfFwyAG5OnMF0h+FV9sC0Xn9YLITwQpSuwungQs=
 github.com/elastic/elastic-agent-libs v0.0.0-20220303160015-5b4e674da3dd/go.mod h1://82M1l73IHx0wDbS2Tzkq6Fx9fkmytS1KgkIyzvNTM=
 github.com/elastic/elastic-agent-libs v0.2.6 h1:DpcUcCVYZ7lNtHLUlyT1u/GtGAh49wpL15DTH7+8O5o=
 github.com/elastic/elastic-agent-libs v0.2.6/go.mod h1:chO3rtcLyGlKi9S0iGVZhYCzDfdDsAQYBc+ui588AFE=
@@ -1044,6 +1047,9 @@ github.com/rogpeppe/go-internal v1.1.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFR
 github.com/rogpeppe/go-internal v1.2.2/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.5.2/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
+github.com/rs/xid v1.3.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=
+github.com/rs/zerolog v1.27.0 h1:1T7qCieN22GVc8S4Q2yuexzBb1EqjbgjSH9RohbMjKs=
+github.com/rs/zerolog v1.27.0/go.mod h1:7frBqO0oezxmnO7GF86FY++uy8I0Tk/If5ni1G9Qc0U=
 github.com/rubenv/sql-migrate v0.0.0-20210614095031-55d5740dbbcc/go.mod h1:HFLT6i9iR4QBOF5rdCyjddC9t59ArqWJV2xx+jwcCMo=
 github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR/rfWxYHBV53g=
 github.com/russross/blackfriday/v2 v2.0.1/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
