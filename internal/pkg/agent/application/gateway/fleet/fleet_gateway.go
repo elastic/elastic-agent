@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
@@ -21,11 +22,15 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // Max number of times an invalid API Key is checked
 const maxUnauthCounter int = 6
+
+// Const for decraded state or linter complains
+const degraded = "degraded"
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
@@ -298,6 +303,73 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
+func (f *fleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
+	if components == nil {
+		return nil
+	}
+	stateString := func(s eaclient.UnitState) string {
+		switch s {
+		case eaclient.UnitStateStarting:
+			return "starting"
+		case eaclient.UnitStateConfiguring:
+			return "configuring"
+		case eaclient.UnitStateHealthy:
+			return "healthy"
+		case eaclient.UnitStateDegraded:
+			return degraded
+		case eaclient.UnitStateFailed:
+			return "failed"
+		case eaclient.UnitStateStopping:
+			return "stopping"
+		case eaclient.UnitStateStopped:
+			return "stopped"
+		}
+		return ""
+	}
+
+	unitTypeString := func(t eaclient.UnitType) string {
+		switch t {
+		case eaclient.UnitTypeInput:
+			return "input"
+		case eaclient.UnitTypeOutput:
+			return "output"
+		}
+		return ""
+	}
+
+	checkinComponents := make([]fleetapi.CheckinComponent, 0, len(components))
+
+	for _, item := range components {
+		component := item.Component
+		state := item.State
+
+		checkinComponent := fleetapi.CheckinComponent{
+			ID:      component.ID,
+			Type:    component.Spec.InputType,
+			Status:  stateString(state.State),
+			Message: state.Message,
+		}
+
+		if state.Units != nil {
+			units := make([]fleetapi.CheckinUnit, 0, len(state.Units))
+
+			for unitKey, unitState := range state.Units {
+				units = append(units, fleetapi.CheckinUnit{
+					ID:      unitKey.UnitID,
+					Type:    unitTypeString(unitKey.UnitType),
+					Status:  stateString(unitState.State),
+					Message: unitState.Message,
+					Payload: unitState.Payload,
+				})
+			}
+			checkinComponent.Units = units
+		}
+		checkinComponents = append(checkinComponents, checkinComponent)
+	}
+
+	return checkinComponents
+}
+
 func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, error) {
 	ecsMeta, err := info.Metadata()
 	if err != nil {
@@ -313,12 +385,17 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// get current state
 	state := f.stateFetcher.State()
 
+	// convert components into checkin components structure
+	components := f.convertToCheckinComponents(state.Components)
+
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken: ackToken,
-		Metadata: ecsMeta,
-		Status:   agentStateToString(state.State),
+		AckToken:   ackToken,
+		Metadata:   ecsMeta,
+		Status:     agentStateToString(state.State),
+		Message:    state.Message,
+		Components: components,
 	}
 
 	resp, err := cmd.Execute(ctx, req)
@@ -372,5 +449,5 @@ func agentStateToString(state agentclient.State) string {
 	case agentclient.Failed:
 		return "error"
 	}
-	return "degraded"
+	return degraded
 }

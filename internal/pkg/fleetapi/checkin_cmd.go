@@ -20,12 +20,30 @@ import (
 
 const checkingPath = "/api/fleet/agents/%s/checkin"
 
+type CheckinUnit struct {
+	ID      string                 `json:"id"`
+	Type    string                 `json:"type"`
+	Status  string                 `json:"status"`
+	Message string                 `json:"message"`
+	Payload map[string]interface{} `json:"payload,omitempty"`
+}
+
+type CheckinComponent struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Status  string        `json:"status"`
+	Message string        `json:"message"`
+	Units   []CheckinUnit `json:"units,omitempty"`
+}
+
 // CheckinRequest consists of multiple events reported to fleet ui.
 type CheckinRequest struct {
-	Status   string              `json:"status"`
-	AckToken string              `json:"ack_token,omitempty"`
-	Events   []SerializableEvent `json:"events"`
-	Metadata *info.ECSMeta       `json:"local_metadata,omitempty"`
+	Status     string              `json:"status"`
+	AckToken   string              `json:"ack_token,omitempty"`
+	Events     []SerializableEvent `json:"events"`
+	Metadata   *info.ECSMeta       `json:"local_metadata,omitempty"`
+	Message    string              `json:"message"`    // V2 Agent message
+	Components []CheckinComponent  `json:"components"` // V2 Agent components
 }
 
 // SerializableEvent is a representation of the event to be send to the Fleet Server API via the checkin
