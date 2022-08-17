@@ -238,6 +238,44 @@ pipeline {
         }
       }
     }
+    stage('Sync K8s') { //This stage opens a PR to kibana Repository in order to sync k8s manifests
+      when {
+        // Only on main branch 
+        // Enable if k8s related changes.
+        allOf {
+          branch 'main'         // Only runs for branch main        
+          expression { return env.K8S_CHANGES == "true" }   // If k8s changes
+        }
+      }
+      failFast false
+        agent {label 'ubuntu-20.04 && immutable'}
+        options { skipDefaultCheckout() }
+        stages {
+          stage('OpenKibanaPR') {
+            steps {
+              withGhEnv(version: '2.4.0') {
+                deleteDir()
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+                  dir("${BASE_DIR}/deploy/kubernetes"){
+                  sh(label: '[File Creation] Create-Needed-Manifest', script: """
+                    WITHOUTCONFIG=true make generate-k8s
+                    ./creator_k8s_manifest.sh . """)
+                  sh(label: '[Clone] Kibana-Repository', script: """
+                    make ci-clone-kibana-repository
+                    cp Makefile ./kibana 
+                    cd kibana
+                    make ci-create-kubernetes-templates-pull-request """)
+                  }
+              }  
+            }
+            post {
+              always {
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+              }
+            }
+          }
+      }
+    }
     stage('e2e tests') {
       when {
         // Always when running builds on branches/tags

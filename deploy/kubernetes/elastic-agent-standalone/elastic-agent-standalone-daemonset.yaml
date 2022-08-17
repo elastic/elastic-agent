@@ -1,3 +1,4 @@
+# For more information refer to https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -38,7 +39,7 @@ spec:
               value: "elastic"
             # The basic authentication password used to connect to Elasticsearch
             - name: ES_PASSWORD
-              value: ""
+              value: "changeme"
             # The Elasticsearch host to communicate with
             - name: ES_HOST
               value: ""
