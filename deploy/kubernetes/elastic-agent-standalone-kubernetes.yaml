@@ -640,9 +640,11 @@ spec:
       labels:
         app: elastic-agent-standalone
     spec:
-      # Tolerations are needed to run Elastic Agent on Kubernetes master nodes.
-      # Agents running on master nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
+      # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
+      # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       serviceAccountName: elastic-agent-standalone
