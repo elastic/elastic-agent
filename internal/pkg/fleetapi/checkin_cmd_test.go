@@ -173,6 +173,36 @@ func TestCheckin(t *testing.T) {
 		},
 	))
 
+	t.Run("Checkin receives bad policy change", withServerWithAuthClient(
+		func(t *testing.T) *http.ServeMux {
+			raw := `
+	{
+	    "actions": [
+	        {
+	            "type": "POLICY_CHANGE",
+	            "id": "id1",
+	            "data": ""
+	        }
+	    ]
+	}`
+			mux := http.NewServeMux()
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
+			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, raw)
+			}, withAPIKey))
+			return mux
+		}, withAPIKey,
+		func(t *testing.T, client client.Sender) {
+			cmd := NewCheckinCmd(agentInfo, client)
+
+			request := CheckinRequest{}
+
+			_, err := cmd.Execute(ctx, &request)
+			require.ErrorContains(t, err, "json: cannot unmarshal string into Go value of type fleetapi.ActionPolicyChange")
+		},
+	))
+
 	t.Run("When we receive no action", withServerWithAuthClient(
 		func(t *testing.T) *http.ServeMux {
 			raw := `{ "actions": [] }`

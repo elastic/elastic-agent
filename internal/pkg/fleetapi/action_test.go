@@ -135,3 +135,37 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		assert.NotNil(t, action.Policy)
 	})
 }
+
+func TestFleetActionJSONUnmarshal(t *testing.T) {
+	t.Run("all attributes", func(t *testing.T) {
+		p := []byte(`{
+"id": "test-action",
+"type": "TEST",
+"input_type": "test-input",
+"expiration": "2022-01-02T00:01:02Z",
+"start_time": "2022-01-01T00:01:02Z",
+"timeout": 1,
+"data": {"key": "value"}
+		}`)
+		var action FleetAction
+		err := json.Unmarshal(p, &action)
+		require.NoError(t, err)
+	})
+	t.Run("json data terminates early", func(t *testing.T) {
+		p := []byte(`{
+"id": "test-action",
+"data": {"key":`)
+		var action FleetAction
+		err := json.Unmarshal(p, &action)
+		require.Error(t, err, "unexpected end of JSON input")
+	})
+	t.Run("data attribute is garbage", func(t *testing.T) {
+		p := []byte(`{
+"id": "test-action",
+"data": {"key": val}
+}`)
+		var action FleetAction
+		err := json.Unmarshal(p, &action)
+		require.Error(t, err, "invalid character 'v' looking for beginning of value")
+	})
+}
