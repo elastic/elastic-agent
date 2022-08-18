@@ -153,11 +153,8 @@ func readMapString(m map[string]interface{}, key string, def string) string {
 func findUnitFromInputType(state coordinator.State, inputType string) (component.Unit, bool) {
 	for _, comp := range state.Components {
 		for _, unit := range comp.Component.Units {
-			if unit.Type == client.UnitTypeInput {
-				it, ok := unit.Config["type"]
-				if ok && it == inputType {
-					return unit, true
-				}
+			if unit.Type == client.UnitTypeInput && unit.Config != nil && unit.Config.Type == inputType {
+				return unit, true
 			}
 		}
 	}

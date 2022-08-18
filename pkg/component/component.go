@@ -6,11 +6,18 @@ package component
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+)
+
+const (
+	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
+	defaultUnitLogLevel = client.UnitLogLevelInfo
 )
 
 var (
@@ -36,9 +43,21 @@ func (e *ErrInputRuntimeCheckFail) Error() string {
 
 // Unit is a single input or output that a component must run.
 type Unit struct {
-	ID     string                 `yaml:"id"`
-	Type   client.UnitType        `yaml:"type"`
-	Config map[string]interface{} `yaml:"config,omitempty"`
+	// ID is the unique ID of the unit.
+	ID string `yaml:"id"`
+
+	// Type is the unit type (either input or output).
+	Type client.UnitType `yaml:"type"`
+
+	// LogLevel is the unit's log level.
+	LogLevel client.UnitLogLevel `yaml:"log_level"`
+
+	// Config is the units expected configuration.
+	Config *proto.UnitExpectedConfig `yaml:"config,omitempty"`
+
+	// Err used when the Config cannot be marshalled from its value into a configuration that
+	// can actually be sent to a unit. All units with Err set should not be sent to the component.
+	Err error `yaml:"error,omitempty"`
 }
 
 // Component is a set of units that needs to run.
@@ -121,18 +140,27 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 					// skip; not enabled
 					continue
 				}
+				cfg, cfgErr := ExpectedConfig(input.input)
+				if cfg != nil {
+					cfg.Type = inputType // ensure alias is replaced in the ExpectedConfig to be non-alias type
+				}
 				units = append(units, Unit{
-					ID:     fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id),
-					Type:   client.UnitTypeInput,
-					Config: input.input,
+					ID:       fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id),
+					Type:     client.UnitTypeInput,
+					LogLevel: input.logLevel,
+					Config:   cfg,
+					Err:      cfgErr,
 				})
 			}
 			if len(units) > 0 {
 				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
+				cfg, cfgErr := ExpectedConfig(output.output)
 				units = append(units, Unit{
-					ID:     componentID,
-					Type:   client.UnitTypeOutput,
-					Config: output.output,
+					ID:       componentID,
+					Type:     client.UnitTypeOutput,
+					LogLevel: output.logLevel,
+					Config:   cfg,
+					Err:      cfgErr,
 				})
 				components = append(components, Component{
 					ID:    componentID,
@@ -193,9 +221,14 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 			enabled = enabledVal
 			delete(output, enabledKey)
 		}
+		logLevel, err := getLogLevel(output)
+		if err != nil {
+			return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", name, err)
+		}
 		outputsMap[name] = outputI{
 			name:       name,
 			enabled:    enabled,
+			logLevel:   logLevel,
 			outputType: t,
 			output:     output,
 			inputs:     make(map[string][]inputI),
@@ -255,10 +288,15 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 			enabled = enabledVal
 			delete(input, enabledKey)
 		}
+		logLevel, err := getLogLevel(input)
+		if err != nil {
+			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
+		}
 		output.inputs[t] = append(output.inputs[t], inputI{
 			idx:       idx,
 			id:        id,
 			enabled:   enabled,
+			logLevel:  logLevel,
 			inputType: t,
 			input:     input,
 		})
@@ -273,6 +311,7 @@ type inputI struct {
 	idx       int
 	id        string
 	enabled   bool
+	logLevel  client.UnitLogLevel
 	inputType string
 	input     map[string]interface{}
 }
@@ -280,6 +319,7 @@ type inputI struct {
 type outputI struct {
 	name       string
 	enabled    bool
+	logLevel   client.UnitLogLevel
 	outputType string
 	output     map[string]interface{}
 	inputs     map[string][]inputI
@@ -304,4 +344,40 @@ func validateRuntimeChecks(spec *InputSpec, store eql.VarStore) error {
 		}
 	}
 	return nil
+}
+
+func getLogLevel(val map[string]interface{}) (client.UnitLogLevel, error) {
+	const logLevelKey = "log_level"
+
+	logLevel := defaultUnitLogLevel
+	if logLevelRaw, ok := val[logLevelKey]; ok {
+		logLevelStr, ok := logLevelRaw.(string)
+		if !ok {
+			return defaultUnitLogLevel, fmt.Errorf("expected a string not a %T", logLevelRaw)
+		}
+		var err error
+		logLevel, err = stringToLogLevel(logLevelStr)
+		if err != nil {
+			return defaultUnitLogLevel, err
+		}
+		delete(val, logLevelKey)
+	}
+	return logLevel, nil
+}
+
+func stringToLogLevel(val string) (client.UnitLogLevel, error) {
+	val = strings.ToLower(strings.TrimSpace(val))
+	switch val {
+	case "error":
+		return client.UnitLogLevelError, nil
+	case "warn", "warning":
+		return client.UnitLogLevelWarn, nil
+	case "info":
+		return client.UnitLogLevelInfo, nil
+	case "debug":
+		return client.UnitLogLevelDebug, nil
+	case "trace":
+		return client.UnitLogLevelTrace, nil
+	}
+	return client.UnitLogLevelError, fmt.Errorf("unknown log level type: %s", val)
 }

@@ -2,9 +2,13 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // duplicate code is in test cases
+
 package component
 
 import (
+	"errors"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -289,19 +293,21 @@ func TestToComponents(t *testing.T) {
 					Err:  ErrInputNotSupported,
 					Units: []Unit{
 						{
-							ID:   "unknown-default",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "unknown-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "unknown-default-unknown-0",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "unknown-default-unknown-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "unknown",
 								"id":   "unknown-0",
-							},
+							}),
 						},
 					},
 				},
@@ -339,19 +345,21 @@ func TestToComponents(t *testing.T) {
 					Err:  ErrInputNotSupportedOnPlatform,
 					Units: []Unit{
 						{
-							ID:   "endpoint-default",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "endpoint-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "endpoint-default-endpoint-0",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "endpoint-default-endpoint-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "endpoint",
 								"id":   "endpoint-0",
-							},
+							}),
 						},
 					},
 				},
@@ -380,19 +388,21 @@ func TestToComponents(t *testing.T) {
 					Err:  ErrOutputNotSupported,
 					Units: []Unit{
 						{
-							ID:   "endpoint-default",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "endpoint-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "logstash",
-							},
+							}),
 						},
 						{
-							ID:   "endpoint-default-endpoint-0",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "endpoint-default-endpoint-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "endpoint",
 								"id":   "endpoint-0",
-							},
+							}),
 						},
 					},
 				},
@@ -433,19 +443,87 @@ func TestToComponents(t *testing.T) {
 					Err:  NewErrInputRuntimeCheckFail("No support for RHEL7 on arm64"),
 					Units: []Unit{
 						{
-							ID:   "endpoint-default",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "endpoint-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "endpoint-default-endpoint-0",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "endpoint-default-endpoint-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "endpoint",
 								"id":   "endpoint-0",
+							}),
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "Invalid: single input failed to decode into config",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":       "filestream",
+						"id":         "filestream-0",
+						"use_output": "default",
+						"enabled":    true,
+					},
+					map[string]interface{}{
+						"type":       "filestream",
+						"id":         "filestream-1",
+						"use_output": "default",
+						"enabled":    true,
+						"meta": []interface{}{
+							map[string]interface{}{
+								"bad": "should not have been array of dicts",
 							},
+						},
+					},
+				},
+			},
+			Result: []Component{
+				{
+					ID: "filestream-default",
+					Spec: InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Err:      errors.New("1 decoding error(s): 'meta' expected a map, got 'slice'"),
 						},
 					},
 				},
@@ -521,19 +599,21 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:   "filestream-default",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "filestream-default-filestream-0",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
 								"id":   "filestream-0",
-							},
+							}),
 						},
 					},
 				},
@@ -621,27 +701,30 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:   "filestream-default",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "filestream-default-filestream-0",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
 								"id":   "filestream-0",
-							},
+							}),
 						},
 						{
-							ID:   "filestream-default-filestream-1",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "filestream-default-filestream-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
 								"id":   "filestream-1",
-							},
+							}),
 						},
 					},
 				},
@@ -653,27 +736,30 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:   "filestream-other",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "filestream-other",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "filestream-other-filestream-3",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "filestream-other-filestream-3",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
 								"id":   "filestream-3",
-							},
+							}),
 						},
 						{
-							ID:   "filestream-other-filestream-4",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "filestream-other-filestream-4",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
 								"id":   "filestream-4",
-							},
+							}),
 						},
 					},
 				},
@@ -685,27 +771,30 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:   "log-default",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "log-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "log-default-logfile-0",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "log-default-logfile-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: mustExpectedConfigForceType(map[string]interface{}{
 								"type": "logfile",
 								"id":   "logfile-0",
-							},
+							}, "log"),
 						},
 						{
-							ID:   "log-default-logfile-1",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "log-default-logfile-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "log",
 								"id":   "logfile-1",
-							},
+							}),
 						},
 					},
 				},
@@ -717,19 +806,21 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:   "log-other",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "log-other",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "log-other-logfile-2",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "log-other-logfile-2",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: mustExpectedConfigForceType(map[string]interface{}{
 								"type": "logfile",
 								"id":   "logfile-2",
-							},
+							}, "log"),
 						},
 					},
 				},
@@ -741,19 +832,21 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:   "log-stashit",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "log-stashit",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "logstash",
-							},
+							}),
 						},
 						{
-							ID:   "log-stashit-logfile-3",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "log-stashit-logfile-3",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: mustExpectedConfigForceType(map[string]interface{}{
 								"type": "logfile",
 								"id":   "logfile-3",
-							},
+							}, "log"),
 						},
 					},
 				},
@@ -765,19 +858,21 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:   "log-redis",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "log-redis",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "redis",
-							},
+							}),
 						},
 						{
-							ID:   "log-redis-logfile-4",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "log-redis-logfile-4",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: mustExpectedConfigForceType(map[string]interface{}{
 								"type": "logfile",
 								"id":   "logfile-4",
-							},
+							}, "log"),
 						},
 					},
 				},
@@ -789,19 +884,21 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:   "apm-default",
-							Type: client.UnitTypeOutput,
-							Config: map[string]interface{}{
+							ID:       "apm-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-							},
+							}),
 						},
 						{
-							ID:   "apm-default-apm-server-0",
-							Type: client.UnitTypeInput,
-							Config: map[string]interface{}{
+							ID:       "apm-default-apm-server-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "apm",
 								"id":   "apm-server-0",
-							},
+							}),
 						},
 					},
 				},
@@ -848,4 +945,10 @@ func sortComponents(components []Component) {
 	sort.Slice(components[:], func(i, j int) bool {
 		return components[i].Units[0].ID < components[j].Units[0].ID
 	})
+}
+
+func mustExpectedConfigForceType(cfg map[string]interface{}, forceType string) *proto.UnitExpectedConfig {
+	res := MustExpectedConfig(cfg)
+	res.Type = forceType
+	return res
 }

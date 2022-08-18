@@ -14,13 +14,17 @@ import (
 	"syscall"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 const (
 	fake = "fake"
+
+	stoppingMsg = "Stopping"
+	stoppedMsg  = "Stopped"
 )
 
 func main() {
@@ -32,6 +36,7 @@ func main() {
 }
 
 func run() error {
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	ver := client.VersionInfo{
 		Name:    fake,
 		Version: "1.0",
@@ -64,7 +69,7 @@ func run() error {
 		return fmt.Errorf("failed to start GRPC client: %w", err)
 	}
 
-	s := newStateManager()
+	s := newStateManager(logger)
 	for {
 		select {
 		case <-ctx.Done():
@@ -92,11 +97,12 @@ type unitKey struct {
 }
 
 type stateManager struct {
-	units map[unitKey]runningUnit
+	logger zerolog.Logger
+	units  map[unitKey]runningUnit
 }
 
-func newStateManager() *stateManager {
-	return &stateManager{units: make(map[unitKey]runningUnit)}
+func newStateManager(logger zerolog.Logger) *stateManager {
+	return &stateManager{logger: logger, units: make(map[unitKey]runningUnit)}
 }
 
 func (s *stateManager) added(unit *client.Unit) {
@@ -106,7 +112,7 @@ func (s *stateManager) added(unit *client.Unit) {
 		_ = unit.UpdateState(client.UnitStateFailed, "Error: duplicate unit", nil)
 		return
 	}
-	r, err := newRunningUnit(unit)
+	r, err := newRunningUnit(s.logger, unit)
 	if err != nil {
 		_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
 		return
@@ -141,24 +147,64 @@ type runningUnit interface {
 }
 
 type fakeInput struct {
-	unit *client.Unit
-	cfg  inputConfig
+	logger zerolog.Logger
+	unit   *client.Unit
+	cfg    *proto.UnitExpectedConfig
 
 	state    client.UnitState
 	stateMsg string
+
+	canceller context.CancelFunc
 }
 
-func newFakeInput(unit *client.Unit, cfg inputConfig) *fakeInput {
+func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeInput, error) {
+	logger = logger.Level(toZerologLevel(logLevel))
+	state, msg, err := getStateFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	i := &fakeInput{
+		logger:   logger,
 		unit:     unit,
 		cfg:      cfg,
-		state:    cfg.State,
-		stateMsg: cfg.Message,
+		state:    state,
+		stateMsg: msg,
 	}
+
+	logger.Trace().Msg("registering set_state action for unit")
 	unit.RegisterAction(&stateSetterAction{i})
-	unit.RegisterAction(&killAction{})
+	logger.Trace().Msg("registering kill action for unit")
+	unit.RegisterAction(&killAction{i})
+	logger.Debug().Str("state", i.state.String()).Str("message", i.stateMsg).Msg("updating unit state")
 	_ = unit.UpdateState(i.state, i.stateMsg, nil)
-	return i
+
+	logTimer := 10 * time.Second
+	if logTimerValue, ok := cfg.Source.Fields["log_timer"]; ok {
+		logTimeStr := logTimerValue.GetStringValue()
+		if logTimeStr != "" {
+			logTimer, err = time.ParseDuration(logTimeStr)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		t := time.NewTicker(logTimer)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				logger.Trace().Dur("log_timer", logTimer).Msg("trace log ticker")
+			}
+		}
+	}()
+	i.canceller = cancel
+
+	return i, nil
 }
 
 func (f *fakeInput) Unit() *client.Unit {
@@ -166,36 +212,34 @@ func (f *fakeInput) Unit() *client.Unit {
 }
 
 func (f *fakeInput) Update(u *client.Unit) error {
-	expected, config := u.Expected()
+	expected, _, config := u.Expected()
 	if expected == client.UnitStateStopped {
 		// agent is requesting this input to stop
-		_ = u.UpdateState(client.UnitStateStopping, "Stopping", nil)
+		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
+		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
+		f.canceller()
 		go func() {
 			<-time.After(1 * time.Second)
-			_ = u.UpdateState(client.UnitStateStopped, "Stopped", nil)
+			f.logger.Debug().Str("state", client.UnitStateStopped.String()).Str("message", stoppedMsg).Msg("updating unit state")
+			_ = u.UpdateState(client.UnitStateStopped, stoppedMsg, nil)
 		}()
 		return nil
 	}
 
-	var cfg map[string]interface{}
-	err := yaml.Unmarshal([]byte(config), &cfg)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-	unitType, ok := cfg["type"]
-	if !ok {
+	if config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if unitType != fake {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", unitType)
+	if config.Type != fake {
+		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
 	}
 
-	state, stateMsg, err := getStateFromMap(cfg)
+	state, stateMsg, err := getStateFromConfig(config)
 	if err != nil {
 		return fmt.Errorf("unit config parsing error: %w", err)
 	}
 	f.state = state
 	f.stateMsg = stateMsg
+	f.logger.Debug().Str("state", f.state.String()).Str("message", f.stateMsg).Msg("updating unit state")
 	_ = u.UpdateState(f.state, f.stateMsg, nil)
 	return nil
 }
@@ -209,43 +253,42 @@ func (s *stateSetterAction) Name() string {
 }
 
 func (s *stateSetterAction) Execute(_ context.Context, params map[string]interface{}) (map[string]interface{}, error) {
+	s.input.logger.Trace().Msg("executing set_state action")
 	state, stateMsg, err := getStateFromMap(params)
 	if err != nil {
 		return nil, err
 	}
 	s.input.state = state
 	s.input.stateMsg = stateMsg
+	s.input.logger.Debug().Str("state", s.input.state.String()).Str("message", s.input.stateMsg).Msg("updating unit state")
 	_ = s.input.unit.UpdateState(s.input.state, s.input.stateMsg, nil)
 	return nil, nil
 }
 
 type killAction struct {
+	input *fakeInput
 }
 
 func (s *killAction) Name() string {
 	return "kill"
 }
 
-func (s *killAction) Execute(_ context.Context, params map[string]interface{}) (map[string]interface{}, error) {
+func (s *killAction) Execute(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
+	s.input.logger.Trace().Msg("executing kill action")
 	os.Exit(1)
 	return nil, nil
 }
 
-func newRunningUnit(unit *client.Unit) (runningUnit, error) {
-	_, config := unit.Expected()
-	var cfg inputConfig
-	err := yaml.Unmarshal([]byte(config), &cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-	if cfg.Type == "" {
+func newRunningUnit(logger zerolog.Logger, unit *client.Unit) (runningUnit, error) {
+	_, logLevel, config := unit.Expected()
+	if config.Type == "" {
 		return nil, fmt.Errorf("unit config type empty")
 	}
-	switch cfg.Type {
+	switch config.Type {
 	case fake:
-		return newFakeInput(unit, cfg), nil
+		return newFakeInput(logger, logLevel, unit, config)
 	}
-	return nil, fmt.Errorf("unknown unit config type: %s", cfg.Type)
+	return nil, fmt.Errorf("unknown unit config type: %s", config.Type)
 }
 
 func newUnitKey(unit *client.Unit) unitKey {
@@ -253,6 +296,10 @@ func newUnitKey(unit *client.Unit) unitKey {
 		unitType: unit.Type(),
 		unitID:   unit.ID(),
 	}
+}
+
+func getStateFromConfig(cfg *proto.UnitExpectedConfig) (client.UnitState, string, error) {
+	return getStateFromMap(cfg.Source.AsMap())
 }
 
 func getStateFromMap(cfg map[string]interface{}) (client.UnitState, string, error) {
@@ -278,8 +325,18 @@ func getStateFromMap(cfg map[string]interface{}) (client.UnitState, string, erro
 	return stateType, stateMsgStr, nil
 }
 
-type inputConfig struct {
-	Type    string           `json:"type" yaml:"type"`
-	State   client.UnitState `json:"state" yaml:"state"`
-	Message string           `json:"message" yaml:"message"`
+func toZerologLevel(level client.UnitLogLevel) zerolog.Level {
+	switch level {
+	case client.UnitLogLevelError:
+		return zerolog.ErrorLevel
+	case client.UnitLogLevelWarn:
+		return zerolog.WarnLevel
+	case client.UnitLogLevelInfo:
+		return zerolog.InfoLevel
+	case client.UnitLogLevelDebug:
+		return zerolog.DebugLevel
+	case client.UnitLogLevelTrace:
+		return zerolog.TraceLevel
+	}
+	return zerolog.InfoLevel
 }

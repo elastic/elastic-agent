@@ -12,12 +12,7 @@ import (
 	"os/exec"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -46,8 +41,7 @@ type CommandRuntime struct {
 	actionState actionMode
 	proc        *process.Info
 
-	expected       ComponentState
-	observed       ComponentState
+	state          ComponentState
 	lastCheckin    time.Time
 	missedCheckins int
 }
@@ -57,8 +51,6 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 	if comp.Spec.Spec.Command == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
-	expected := newComponentState(&comp, client.UnitStateHealthy, "", 1)
-	observed := newComponentState(&comp, client.UnitStateStarting, "Starting", 0)
 	return &CommandRuntime{
 		current:     comp,
 		ch:          make(chan ComponentState),
@@ -66,8 +58,7 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 		procCh:      make(chan procState),
 		compCh:      make(chan component.Component),
 		actionState: actionStart,
-		expected:    expected,
-		observed:    observed,
+		state:       newComponentState(&comp),
 	}, nil
 }
 
@@ -111,17 +102,21 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				t.Reset(checkinPeriod)
 			}
 		case newComp := <-c.compCh:
-			c.expected.syncComponent(&newComp, client.UnitStateHealthy, "Healthy", 1)
-			if c.mustSendExpected() {
-				c.sendExpected(comm)
+			sendExpected := c.state.syncExpected(&newComp)
+			changed := c.state.syncUnits(&newComp)
+			if sendExpected || c.state.unsettled() {
+				comm.CheckinExpected(c.state.toCheckinExpected())
+			}
+			if changed {
+				c.sendObserved()
 			}
 		case checkin := <-comm.CheckinObserved():
 			sendExpected := false
 			changed := false
-			if c.observed.State == client.UnitStateStarting {
+			if c.state.State == client.UnitStateStarting {
 				// first observation after start set component to healthy
-				c.observed.State = client.UnitStateHealthy
-				c.observed.Message = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
+				c.state.State = client.UnitStateHealthy
+				c.state.Message = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
 				changed = true
 			}
 			if c.lastCheckin.IsZero() {
@@ -129,19 +124,19 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				sendExpected = true
 			}
 			c.lastCheckin = time.Now().UTC()
-			if c.observed.syncCheckin(checkin) {
+			if c.state.syncCheckin(checkin) {
 				changed = true
 			}
-			if c.mustSendExpected() {
+			if c.state.unsettled() {
 				sendExpected = true
 			}
 			if sendExpected {
-				c.sendExpected(comm)
+				comm.CheckinExpected(c.state.toCheckinExpected())
 			}
 			if changed {
 				c.sendObserved()
 			}
-			if c.cleanupStopped() {
+			if c.state.cleanupStopped() {
 				c.sendObserved()
 			}
 		case <-t.C:
@@ -216,18 +211,9 @@ func (c *CommandRuntime) Teardown() error {
 
 // forceCompState force updates the state for the entire component, forcing that state on all units.
 func (c *CommandRuntime) forceCompState(state client.UnitState, msg string) {
-	c.observed.State = state
-	c.observed.Message = msg
-	for k, unit := range c.observed.Units {
-		unit.State = state
-		unit.Message = msg
-		unit.Payload = nil
-		unit.configStateIdx = 0
-
-		// unit is a copy and must be set back into the map
-		c.observed.Units[k] = unit
+	if c.state.forceState(state, msg) {
+		c.sendObserved()
 	}
-	c.sendObserved()
 }
 
 // compState updates just the component state not all the units.
@@ -242,15 +228,13 @@ func (c *CommandRuntime) compState(state client.UnitState) {
 			msg = fmt.Sprintf("Degraded: pid '%d' missed %d check-ins", c.proc.PID, c.missedCheckins)
 		}
 	}
-	if c.observed.State != state || c.observed.Message != msg {
-		c.observed.State = state
-		c.observed.Message = msg
+	if c.state.compState(state, msg) {
 		c.sendObserved()
 	}
 }
 
 func (c *CommandRuntime) sendObserved() {
-	c.ch <- c.observed.Copy()
+	c.ch <- c.state.Copy()
 }
 
 func (c *CommandRuntime) start(comm Communicator) error {
@@ -259,7 +243,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 		return nil
 	}
 	cmdSpec := c.current.Spec.Spec.Command
-	var env []string
+	env := make([]string, 0, len(cmdSpec.Env))
 	for _, e := range cmdSpec.Env {
 		env = append(env, fmt.Sprintf("%s=%s", e.Name, e.Value))
 	}
@@ -301,7 +285,7 @@ func (c *CommandRuntime) startWatcher(info *process.Info, comm Communicator) {
 		if err != nil {
 			c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err))
 			// kill instantly
-			info.Kill()
+			_ = info.Kill()
 		} else {
 			_ = info.Stdin.Close()
 		}
@@ -328,66 +312,6 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 		c.forceCompState(client.UnitStateStopped, stopMsg)
 	}
 	return false
-}
-
-func (c *CommandRuntime) mustSendExpected() bool {
-	if len(c.expected.Units) != len(c.observed.Units) {
-		// mismatch on unit count
-		return true
-	}
-	for ek, e := range c.expected.Units {
-		o, ok := c.observed.Units[ek]
-		if !ok {
-			// unit missing
-			return true
-		}
-		if o.configStateIdx != e.configStateIdx || e.State != o.State {
-			// config or state mismatch
-			return true
-		}
-	}
-	return false
-}
-
-func (c *CommandRuntime) sendExpected(comm Communicator) error {
-	units := make([]*proto.UnitExpected, 0, len(c.expected.Units))
-	for k, u := range c.expected.Units {
-		e := &proto.UnitExpected{
-			Id:             k.UnitID,
-			Type:           proto.UnitType(k.UnitType),
-			State:          proto.State(u.State),
-			ConfigStateIdx: u.configStateIdx,
-			Config:         "",
-		}
-		o, ok := c.observed.Units[k]
-		if !ok || o.configStateIdx != u.configStateIdx {
-			cfg, err := yaml.Marshal(u.config)
-			if err != nil {
-				return fmt.Errorf("failed to marshal YAML for unit %s: %w", k.UnitID, err)
-			}
-			e.Config = string(cfg)
-		}
-		units = append(units, e)
-	}
-	comm.CheckinExpected(&proto.CheckinExpected{Units: units})
-	return nil
-}
-
-func (c *CommandRuntime) cleanupStopped() bool {
-	cleaned := false
-	for ek, e := range c.expected.Units {
-		if e.State == client.UnitStateStopped {
-			// should be stopped; check if observed is also reporting stopped
-			o, ok := c.observed.Units[ek]
-			if ok && o.State == client.UnitStateStopped {
-				// its also stopped; so it can now be removed from both
-				delete(c.expected.Units, ek)
-				delete(c.observed.Units, ek)
-				cleaned = true
-			}
-		}
-	}
-	return cleaned
 }
 
 func attachOutErr(cmd *exec.Cmd) error {
