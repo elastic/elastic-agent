@@ -8,6 +8,7 @@ package component
 
 import (
 	"errors"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -781,10 +782,10 @@ func TestToComponents(t *testing.T) {
 							ID:       "log-default-logfile-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
+							Config: mustExpectedConfigForceType(map[string]interface{}{
 								"type": "logfile",
 								"id":   "logfile-0",
-							}),
+							}, "log"),
 						},
 						{
 							ID:       "log-default-logfile-1",
@@ -816,10 +817,10 @@ func TestToComponents(t *testing.T) {
 							ID:       "log-other-logfile-2",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
+							Config: mustExpectedConfigForceType(map[string]interface{}{
 								"type": "logfile",
 								"id":   "logfile-2",
-							}),
+							}, "log"),
 						},
 					},
 				},
@@ -842,10 +843,10 @@ func TestToComponents(t *testing.T) {
 							ID:       "log-stashit-logfile-3",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
+							Config: mustExpectedConfigForceType(map[string]interface{}{
 								"type": "logfile",
 								"id":   "logfile-3",
-							}),
+							}, "log"),
 						},
 					},
 				},
@@ -868,10 +869,10 @@ func TestToComponents(t *testing.T) {
 							ID:       "log-redis-logfile-4",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
+							Config: mustExpectedConfigForceType(map[string]interface{}{
 								"type": "logfile",
 								"id":   "logfile-4",
-							}),
+							}, "log"),
 						},
 					},
 				},
@@ -944,4 +945,10 @@ func sortComponents(components []Component) {
 	sort.Slice(components[:], func(i, j int) bool {
 		return components[i].Units[0].ID < components[j].Units[0].ID
 	})
+}
+
+func mustExpectedConfigForceType(cfg map[string]interface{}, forceType string) *proto.UnitExpectedConfig {
+	res := MustExpectedConfig(cfg)
+	res.Type = forceType
+	return res
 }

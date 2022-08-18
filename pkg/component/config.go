@@ -43,7 +43,7 @@ func ExpectedConfig(cfg map[string]interface{}) (*proto.UnitExpectedConfig, erro
 		Result:               result,
 		MatchName: func(mapKey, fieldName string) bool {
 			if fieldName == sourceFieldName {
-				// never match for 'source' field that is set manually after
+				// never match for 'source' field that is set manually later
 				return false
 			}
 			return strings.EqualFold(mapKey, fieldName)

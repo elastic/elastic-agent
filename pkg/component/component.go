@@ -141,6 +141,9 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 					continue
 				}
 				cfg, cfgErr := ExpectedConfig(input.input)
+				if cfg != nil {
+					cfg.Type = inputType // ensure alias is replaced in the ExpectedConfig to be non-alias type
+				}
 				units = append(units, Unit{
 					ID:       fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id),
 					Type:     client.UnitTypeInput,
@@ -175,13 +178,12 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 // of components.
 func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 	const (
-		outputsKey  = "outputs"
-		enabledKey  = "enabled"
-		inputsKey   = "inputs"
-		typeKey     = "type"
-		idKey       = "id"
-		useKey      = "use_output"
-		logLevelKey = "log_level"
+		outputsKey = "outputs"
+		enabledKey = "enabled"
+		inputsKey  = "inputs"
+		typeKey    = "type"
+		idKey      = "id"
+		useKey     = "use_output"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
@@ -219,18 +221,9 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 			enabled = enabledVal
 			delete(output, enabledKey)
 		}
-		logLevel := defaultUnitLogLevel
-		if logLevelRaw, ok := output[logLevelKey]; ok {
-			logLevelStr, ok := logLevelRaw.(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid 'outputs.%s.log_level', expected a string not a %T", name, logLevelRaw)
-			}
-			var err error
-			logLevel, err = stringToLogLevel(logLevelStr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", name, err)
-			}
-			delete(output, logLevelKey)
+		logLevel, err := getLogLevel(output)
+		if err != nil {
+			return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", name, err)
 		}
 		outputsMap[name] = outputI{
 			name:       name,
@@ -295,18 +288,9 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 			enabled = enabledVal
 			delete(input, enabledKey)
 		}
-		logLevel := defaultUnitLogLevel
-		if logLevelRaw, ok := input[logLevelKey]; ok {
-			logLevelStr, ok := logLevelRaw.(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid 'inputs.%d.log_level', expected a string not a %T", idx, logLevelRaw)
-			}
-			var err error
-			logLevel, err = stringToLogLevel(logLevelStr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
-			}
-			delete(input, logLevelKey)
+		logLevel, err := getLogLevel(input)
+		if err != nil {
+			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
 		}
 		output.inputs[t] = append(output.inputs[t], inputI{
 			idx:       idx,
@@ -360,6 +344,25 @@ func validateRuntimeChecks(spec *InputSpec, store eql.VarStore) error {
 		}
 	}
 	return nil
+}
+
+func getLogLevel(val map[string]interface{}) (client.UnitLogLevel, error) {
+	const logLevelKey = "log_level"
+
+	logLevel := defaultUnitLogLevel
+	if logLevelRaw, ok := val[logLevelKey]; ok {
+		logLevelStr, ok := logLevelRaw.(string)
+		if !ok {
+			return defaultUnitLogLevel, fmt.Errorf("expected a string not a %T", logLevelRaw)
+		}
+		var err error
+		logLevel, err = stringToLogLevel(logLevelStr)
+		if err != nil {
+			return defaultUnitLogLevel, err
+		}
+		delete(val, logLevelKey)
+	}
+	return logLevel, nil
 }
 
 func stringToLogLevel(val string) (client.UnitLogLevel, error) {
