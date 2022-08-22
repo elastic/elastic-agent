@@ -75,7 +75,7 @@ func Uninstall(cfgFile string) error {
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(paths.InstallPath)
+	err = os.RemoveAll(paths.InstallDirectoryPath())
 	if err != nil {
 		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
 			// possible to fail on Windows, because elastic-agent.exe is running from
@@ -84,8 +84,8 @@ func Uninstall(cfgFile string) error {
 		}
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to remove installation directory (%s)", paths.InstallPath),
-			errors.M("directory", paths.InstallPath))
+			fmt.Sprintf("failed to remove installation directory (%s)", paths.InstallDirectoryPath()),
+			errors.M("directory", paths.InstallDirectoryPath()))
 	}
 
 	return nil

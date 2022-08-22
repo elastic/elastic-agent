@@ -27,14 +27,15 @@ const (
 )
 
 var (
-	topPath         string
-	configPath      string
-	configFilePath  string
-	logsPath        string
-	downloadsPath   string
-	installPath     string
-	unversionedHome bool
-	tmpCreator      sync.Once
+	topPath              string
+	configPath           string
+	configFilePath       string
+	logsPath             string
+	downloadsPath        string
+	installPath          string
+	unversionedHome      bool
+	tmpCreator           sync.Once
+	installDirectoryPath string
 )
 
 func init() {
@@ -51,6 +52,7 @@ func init() {
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
 	fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
 	fs.StringVar(&installPath, "path.install", installPath, "Install path contains binaries Agent extracts")
+	fs.StringVar(&installDirectoryPath, "path.prefix.install", installDirectoryPath, "Install elastic agent directory path")
 }
 
 // Top returns the top directory for Elastic Agent, all the versioned
@@ -159,6 +161,14 @@ func Downloads() string {
 // SetDownloads updates the path for the downloads.
 func SetDownloads(path string) {
 	downloadsPath = path
+}
+
+// InstallDirectoryPath installs elastic agent.
+func InstallDirectoryPath() string {
+	if installDirectoryPath == "" {
+		installDirectoryPath = DefaultInstallPrefixPath
+	}
+	return filepath.Join(installDirectoryPath, InstallSubPath)
 }
 
 // Install returns the install directory for Agent

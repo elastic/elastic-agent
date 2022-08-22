@@ -24,7 +24,7 @@ const (
 // This verifies the running executable path based on hard-coded paths
 // for each platform type.
 func RunningInstalled() bool {
-	expectedPaths := []string{filepath.Join(paths.InstallPath, paths.BinaryName)}
+	expectedPaths := []string{filepath.Join(paths.InstallDirectoryPath(), paths.BinaryName)}
 	if runtime.GOOS == darwin {
 		// For the symlink on darwin the execPath is /usr/local/bin/elastic-agent
 		expectedPaths = append(expectedPaths, paths.ShellWrapperPath)

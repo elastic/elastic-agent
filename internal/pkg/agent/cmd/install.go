@@ -58,7 +58,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	status, reason := install.Status()
 	force, _ := cmd.Flags().GetBool("force")
 	if status == install.Installed && !force {
-		return fmt.Errorf("already installed at: %s", paths.InstallPath)
+		return fmt.Errorf("already installed at: %s", paths.InstallDirectoryPath())
 	}
 
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
@@ -83,7 +83,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if status == install.Broken {
 		if !force && !nonInteractive {
 			fmt.Fprintf(streams.Out, "Elastic Agent is installed but currently broken: %s\n", reason)
-			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will re-install Elastic Agent over the current installation at %s. Do you want to continue?", paths.InstallPath), true)
+			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will re-install Elastic Agent over the current installation at %s. Do you want to continue?", paths.InstallDirectoryPath()), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
 			}
@@ -93,7 +93,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	} else if status != install.PackageInstall {
 		if !force && !nonInteractive {
-			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be installed at %s and will run as a service. Do you want to continue?", paths.InstallPath), true)
+			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be installed at %s and will run as a service. Do you want to continue?", paths.InstallDirectoryPath()), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
 			}

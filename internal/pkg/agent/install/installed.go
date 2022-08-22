@@ -29,7 +29,7 @@ const (
 
 // Status returns the installation status of Agent.
 func Status() (StatusType, string) {
-	expected := filepath.Join(paths.InstallPath, paths.BinaryName)
+	expected := filepath.Join(paths.InstallDirectoryPath(), paths.BinaryName)
 	status, reason := checkService()
 	if checkPackageInstall() {
 		if status == Installed {
@@ -37,13 +37,20 @@ func Status() (StatusType, string) {
 		}
 		return PackageInstall, "service not running"
 	}
+	//check for binary in default install location
 	_, err := os.Stat(expected)
 	if os.IsNotExist(err) {
-		if status == Installed {
-			// service installed, but no install path
-			return Broken, "service exists but installation path is missing"
+		//custom prefix install path could have been used to install the agent, the installation status will be checked from the exact executable path
+		execPath, _ := os.Executable()
+		execPath, _ = filepath.Abs(execPath)
+		_, err = os.Stat(execPath)
+		if os.IsNotExist(err) {
+			if status == Installed {
+				// service installed, but no install path
+				return Broken, "service exists but installation path is missing"
+			}
+			return NotInstalled, "no install path or service"
 		}
-		return NotInstalled, "no install path or service"
 	}
 	if status == NotInstalled {
 		// install path present, but not service

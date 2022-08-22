@@ -57,9 +57,10 @@ type StateStore struct {
 }
 
 type stateT struct {
-	action   action
-	ackToken string
-	queue    []action
+	action      action
+	ackToken    string
+	queue       []action
+	installPath string
 }
 
 // actionSerializer is a combined yml serializer for the ActionPolicyChange and ActionUnenroll
@@ -77,9 +78,10 @@ type actionSerializer struct {
 // queue serialization is handled through yaml struct tags or the actions unmarshaller defined in fleetapi
 // TODO clean up action serialization (have it be part of the fleetapi?)
 type stateSerializer struct {
-	Action   *actionSerializer `yaml:"action,omitempty"`
-	AckToken string            `yaml:"ack_token,omitempty"`
-	Queue    fleetapi.Actions  `yaml:"action_queue,omitempty"`
+	Action      *actionSerializer `yaml:"action,omitempty"`
+	AckToken    string            `yaml:"ack_token,omitempty"`
+	Queue       fleetapi.Actions  `yaml:"action_queue,omitempty"`
+	InstallPath string            `yaml:"install_path,omitempty"`
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
@@ -123,8 +125,9 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	}
 
 	state := stateT{
-		ackToken: sr.AckToken,
-		queue:    sr.Queue,
+		ackToken:    sr.AckToken,
+		queue:       sr.Queue,
+		installPath: sr.InstallPath,
 	}
 
 	if sr.Action != nil {
@@ -255,6 +258,15 @@ func (s *StateStore) SetQueue(q []action) {
 
 }
 
+// SetInstallPath sets the action_queue to agent state
+func (s *StateStore) SetInstallPath(installPath string) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	s.state.installPath = installPath
+	s.dirty = true
+
+}
+
 // Save saves the actions into a state store.
 func (s *StateStore) Save() error {
 	s.mx.Lock()
@@ -267,8 +279,9 @@ func (s *StateStore) Save() error {
 
 	var reader io.Reader
 	serialize := stateSerializer{
-		AckToken: s.state.ackToken,
-		Queue:    s.state.queue,
+		AckToken:    s.state.ackToken,
+		Queue:       s.state.queue,
+		InstallPath: s.state.installPath,
 	}
 
 	if s.state.action != nil {
@@ -320,6 +333,13 @@ func (s *StateStore) AckToken() string {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
 	return s.state.ackToken
+}
+
+// InstallPath return the agent state persisted ack_token
+func (s *StateStore) InstallPath() string {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+	return s.state.installPath
 }
 
 // StateStoreActionAcker wraps an existing acker and will send any acked event to the action store,
