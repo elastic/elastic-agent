@@ -46,6 +46,7 @@ rules:
     - log/redis_slowlog
     - log/syslog
     - logfile
+    - lumberjack
     - mqtt
     - netflow
     - o365audit
