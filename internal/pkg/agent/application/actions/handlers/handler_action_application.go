@@ -78,7 +78,7 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 		h.log.Debugf("handlerAppAction: action '%v' started with timeout: %v", action.ActionType, timeout)
 		ctx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
-		res, err = h.coord.PerformAction(ctx, unit, action.ActionType, params)
+		res, err = h.coord.PerformAction(ctx, unit, action.InputType, params)
 	}
 	end := time.Now().UTC()
 
@@ -111,11 +111,12 @@ var (
 )
 
 // appendActionResponse appends the action response property with all the action response values excluding the ones specified in excludeActionResponseFields
-// "action_response": {
-// 	   "endpoint": {
-// 		   "acked": true
-// 	   }
-//  }
+//
+//	"action_response": {
+//		   "endpoint": {
+//			   "acked": true
+//		   }
+//	 }
 func appendActionResponse(action *fleetapi.ActionApp, inputType string, res map[string]interface{}) {
 	if len(res) == 0 {
 		return
