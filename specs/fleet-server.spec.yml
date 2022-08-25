@@ -15,3 +15,5 @@ inputs:
     command:
       args:
         - "--agent-mode"
+        - "-E"
+        - "logging.to_stderr=true"

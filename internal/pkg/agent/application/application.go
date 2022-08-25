@@ -65,7 +65,7 @@ func New(
 
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
 
-	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), tracer)
+	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), agentInfo, tracer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
@@ -85,13 +85,6 @@ func New(
 			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
-	} else if configuration.IsFleetServerBootstrap(cfg.Fleet) {
-		log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
-		compModifiers = append(compModifiers, FleetServerComponentModifier)
-		configMgr, err = newFleetServerBootstrapManager(log)
-		if err != nil {
-			return nil, err
-		}
 	} else {
 		var store storage.Store
 		store, cfg, err = mergeFleetConfig(rawConfig)
@@ -99,14 +92,24 @@ func New(
 			return nil, err
 		}
 
-		log.Info("Parsed configuration and determined agent is managed by Fleet")
+		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
+			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
-		compModifiers = append(compModifiers, FleetServerComponentModifier)
-		managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
-		if err != nil {
-			return nil, err
+			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
+			configMgr, err = newFleetServerBootstrapManager(log)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			log.Info("Parsed configuration and determined agent is managed by Fleet")
+
+			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
+			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
+			if err != nil {
+				return nil, err
+			}
+			configMgr = managed
 		}
-		configMgr = managed
 	}
 
 	composable, err := composable.New(log, rawConfig)

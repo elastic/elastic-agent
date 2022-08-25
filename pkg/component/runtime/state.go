@@ -5,7 +5,6 @@
 package runtime
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -227,9 +226,6 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		_, inExpected := s.expectedUnits[key]
 		existing, _ := s.Units[key]
 		existing.unitState = client.UnitState(unit.State)
-		if existing.unitState == client.UnitStateStopped {
-			fmt.Printf("stopped")
-		}
 		existing.unitMessage = unit.Message
 		existing.unitPayload = payload
 		existing.configStateIdx = unit.ConfigStateIdx
@@ -273,7 +269,7 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 					unit.Message = errMsg
 					unit.Payload = nil
 				}
-			} else if unit.State != client.UnitStateStarting {
+			} else if unit.State != client.UnitStateStarting && unit.State != client.UnitStateStopped {
 				if unit.State != client.UnitStateFailed || unit.Message != missingMsg || diffPayload(unit.Payload, nil) {
 					changed = true
 					unit.State = client.UnitStateFailed
@@ -362,6 +358,14 @@ func (s *ComponentState) cleanupStopped() bool {
 				delete(s.Units, ek)
 				cleaned = true
 			}
+		}
+	}
+	for k, u := range s.Units {
+		_, ok := s.expectedUnits[k]
+		if !ok && u.State == client.UnitStateStopped {
+			// stopped unit that is not expected (remove it)
+			delete(s.Units, k)
+			cleaned = true
 		}
 	}
 	return cleaned

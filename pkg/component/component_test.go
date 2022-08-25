@@ -8,10 +8,11 @@ package component
 
 import (
 	"errors"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"path/filepath"
 	"sort"
 	"testing"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
