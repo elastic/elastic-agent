@@ -20,8 +20,7 @@ import (
 
 func TestFleetServerBootstrapManager(t *testing.T) {
 	l := testutils.NewErrorLogger(t)
-	mgr, err := newFleetServerBootstrapManager(l)
-	require.NoError(t, err)
+	mgr := newFleetServerBootstrapManager(l)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -47,7 +46,7 @@ func TestFleetServerBootstrapManager(t *testing.T) {
 		return mgr.Run(ctx)
 	})
 
-	err = g.Wait()
+	err := g.Wait()
 	if err != nil && !errors.Is(err, context.Canceled) {
 		require.NoError(t, err)
 	}

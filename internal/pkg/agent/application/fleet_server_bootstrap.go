@@ -91,12 +91,12 @@ type fleetServerBootstrapManager struct {
 
 func newFleetServerBootstrapManager(
 	log *logger.Logger,
-) (*fleetServerBootstrapManager, error) {
+) *fleetServerBootstrapManager {
 	return &fleetServerBootstrapManager{
 		log:   log,
 		ch:    make(chan coordinator.ConfigChange),
 		errCh: make(chan error),
-	}, nil
+	}
 }
 
 func (m *fleetServerBootstrapManager) Run(ctx context.Context) error {

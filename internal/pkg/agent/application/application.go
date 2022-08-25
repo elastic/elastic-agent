@@ -96,10 +96,7 @@ func New(
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
-			configMgr, err = newFleetServerBootstrapManager(log)
-			if err != nil {
-				return nil, err
-			}
+			configMgr = newFleetServerBootstrapManager(log)
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
