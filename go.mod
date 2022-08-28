@@ -152,6 +152,8 @@ replace (
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
 	github.com/fsnotify/fsnotify => github.com/adriansr/fsnotify v1.4.8-0.20211018144411-a81f2b630e7c
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
+	//github.com/elastic/beats/v7 => github.com/fearful-symmetry/beats/v7 v1.2.2-0.20220825171527-b0d25807e2ab+incompatible
+	github.com/elastic/beats/v7 => github.com/eyalkraft/beats/v7 v7.0.0-testv2 // forked from ^
 )
 
 // Exclude this version because the version has an invalid checksum.
