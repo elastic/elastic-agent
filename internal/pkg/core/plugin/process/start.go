@@ -23,6 +23,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
+const (
+	levelInfo    = "info"
+	levelDebug   = "debug"
+	levelWarning = "warning"
+	levelError   = "error"
+)
+
 // Start starts the application with a specified config.
 func (a *Application) Start(ctx context.Context, t app.Taggable, cfg map[string]interface{}) error {
 	a.appLock.Lock()
@@ -167,14 +174,14 @@ func injectLogLevel(logLevel string, args []string) []string {
 	var level string
 	// Translate to level beat understands
 	switch logLevel {
-	case "info":
-		level = "info"
-	case "debug":
-		level = "debug"
-	case "warning":
-		level = "warning"
-	case "error":
-		level = "error"
+	case levelInfo:
+		level = levelInfo
+	case levelDebug:
+		level = levelDebug
+	case levelWarning:
+		level = levelWarning
+	case levelError:
+		level = levelError
 	}
 
 	if args == nil || level == "" {
