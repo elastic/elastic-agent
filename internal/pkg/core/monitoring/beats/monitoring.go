@@ -27,10 +27,18 @@ const (
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
 	// agentMbEndpointHTTP is used with cloud and exposes metrics on http endpoint
 	agentMbEndpointHTTP = "http://%s:%d"
+
+	monitorSuffix = "_monitor"
 )
 
 // MonitoringEndpoint is an endpoint where process is exposing its metrics.
-func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string) string {
+func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string, isSidecar bool) (endpointPath string) {
+	defer func() {
+		if isSidecar && endpointPath != "" {
+			endpointPath += monitorSuffix
+		}
+	}()
+
 	if endpoint, ok := spec.MetricEndpoints[operatingSystem]; ok {
 		return endpoint
 	}
@@ -39,7 +47,7 @@ func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string) s
 	}
 	// unix socket path must be less than 104 characters
 	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), pipelineID, spec.Cmd, spec.Cmd))
-	if len(path) < 104 {
+	if (isSidecar && len(path) < 104-len(monitorSuffix)) || (!isSidecar && len(path) < 104) {
 		return path
 	}
 	// place in global /tmp (or /var/tmp on Darwin) to ensure that its small enough to fit; current path is way to long

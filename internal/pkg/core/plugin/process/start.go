@@ -119,8 +119,7 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 	spec.Args = injectLogLevel(a.logLevel, spec.Args)
 
 	// use separate file
-	isSidecar := app.IsSidecar(t)
-	spec.Args = a.monitor.EnrichArgs(a.desc.Spec(), a.pipelineID, spec.Args, isSidecar)
+	spec.Args = a.monitor.EnrichArgs(a.desc.Spec(), a.pipelineID, spec.Args)
 
 	// specify beat name to avoid data lock conflicts
 	// as for https://github.com/elastic/beats/v7/pull/14030 more than one instance

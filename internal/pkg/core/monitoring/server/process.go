@@ -25,7 +25,7 @@ import (
 
 const (
 	processIDKey      = "processID"
-	monitoringSuffix  = "-monitoring"
+	monitoringSuffix  = "_monitoring"
 	separator         = "-"
 	timeout           = 10 * time.Second
 	errTypeUnexpected = "UNEXPECTED"
@@ -150,15 +150,12 @@ func generateEndpoint(id string) (string, error) {
 		return "", err
 	}
 
-	endpoint := beats.MonitoringEndpoint(detail.spec, artifact.DefaultConfig().OS(), detail.output)
+	endpoint := beats.MonitoringEndpoint(detail.spec, artifact.DefaultConfig().OS(), detail.output, detail.isMonitoring)
 	if !strings.HasPrefix(endpoint, httpPlusPrefix) && !strings.HasPrefix(endpoint, "http") {
 		// add prefix for npipe and unix
 		endpoint = httpPlusPrefix + endpoint
 	}
 
-	if detail.isMonitoring {
-		endpoint += "_monitor"
-	}
 	return endpoint, nil
 }
 

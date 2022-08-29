@@ -27,7 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	"github.com/elastic/elastic-agent/internal/pkg/core/plugin/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/plugin/service"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
@@ -387,7 +387,7 @@ func (o *Operator) getApp(p Descriptor) (Application, error) {
 	appName := p.BinaryName()
 	if app.IsSidecar(p) {
 		// make watchers unmonitorable
-		monitor = noop.NewMonitor()
+		monitor = beats.NewSidecarMonitor(o.config.DownloadConfig, o.config.MonitoringConfig)
 		appName += "_monitoring"
 	}
 

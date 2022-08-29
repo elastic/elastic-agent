@@ -5,7 +5,6 @@
 package beats
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -99,7 +98,7 @@ func (b *Monitor) WatchLogs() bool { return b.config.Enabled && b.config.Monitor
 func (b *Monitor) WatchMetrics() bool { return b.config.Enabled && b.config.MonitorMetrics }
 
 func (b *Monitor) generateMonitoringEndpoint(spec program.Spec, pipelineID string) string {
-	return MonitoringEndpoint(spec, b.operatingSystem, pipelineID)
+	return MonitoringEndpoint(spec, b.operatingSystem, pipelineID, false)
 }
 
 func (b *Monitor) generateLoggingFile(spec program.Spec, pipelineID string) string {
@@ -118,15 +117,10 @@ func (b *Monitor) ownLoggingPath(spec program.Spec) bool {
 
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
-func (b *Monitor) EnrichArgs(spec program.Spec, pipelineID string, args []string, isSidecar bool) []string {
+func (b *Monitor) EnrichArgs(spec program.Spec, pipelineID string, args []string) []string {
 	appendix := make([]string, 0, 7)
 
-	monitoringEndpoint := b.generateMonitoringEndpoint(spec, pipelineID)
-	if monitoringEndpoint != "" {
-		endpoint := monitoringEndpoint
-		if isSidecar {
-			endpoint += "_monitor"
-		}
+	if endpoint := b.generateMonitoringEndpoint(spec, pipelineID); endpoint != "" {
 		appendix = append(appendix,
 			"-E", "http.enabled=true",
 			"-E", "http.host="+endpoint,
@@ -146,10 +140,6 @@ func (b *Monitor) EnrichArgs(spec program.Spec, pipelineID string, args []string
 	loggingPath := b.generateLoggingPath(spec, pipelineID)
 	if loggingPath != "" {
 		logFile := spec.Cmd
-		if isSidecar {
-			logFile += "_monitor"
-		}
-		logFile = fmt.Sprintf("%s", logFile)
 		appendix = append(appendix,
 			"-E", "logging.files.path="+loggingPath,
 			"-E", "logging.files.name="+logFile,

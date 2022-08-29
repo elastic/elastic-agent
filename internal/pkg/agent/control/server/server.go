@@ -225,7 +225,8 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 	// gather spec data for all rk/apps running
 	specs := s.getSpecInfo("", "")
 	for _, si := range specs {
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
+		isSidecar := strings.HasSuffix(si.app, "_monitoring")
+		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, isSidecar)
 		client := newSocketRequester(si.app, si.rk, endpoint)
 
 		procMeta := client.procMeta(ctx)
@@ -277,7 +278,7 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 		specs = s.getSpecInfo(req.RouteKey, req.AppName)
 	}
 	for _, si := range specs {
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
+		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, false)
 		c := newSocketRequester(si.app, si.rk, endpoint)
 		// Launch a concurrent goroutine to gather all pprof endpoints from a socket.
 		for _, opt := range req.PprofType {
@@ -326,7 +327,8 @@ func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMe
 	// gather metrics buffer data from all other processes
 	specs := s.getSpecInfo("", "")
 	for _, si := range specs {
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
+		isSidecar := strings.HasSuffix(si.app, "_monitoring")
+		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, isSidecar)
 		client := newSocketRequester(si.app, si.rk, endpoint)
 
 		s.logger.Infof("gather metrics from %s", endpoint)
