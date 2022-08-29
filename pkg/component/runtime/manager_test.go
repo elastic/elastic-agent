@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+
 	"go.elastic.co/apm/apmtest"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -47,11 +49,16 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -142,11 +149,16 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -259,11 +271,16 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -426,11 +443,16 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -576,11 +598,16 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -698,11 +725,16 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -852,11 +884,16 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -978,11 +1015,16 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -1113,11 +1155,16 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -1230,11 +1277,16 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -1350,11 +1402,16 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
@@ -1558,11 +1615,16 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	m, err := NewManager(newErrorLogger(t), "localhost:0", apmtest.DiscardTracer)
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
-		errCh <- m.Run(ctx)
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
 	}()
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)

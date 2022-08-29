@@ -113,7 +113,7 @@ type VarsManager interface {
 
 // ComponentsModifier is a function that takes the computed components model and modifies it before
 // passing it into the components runtime manager.
-type ComponentsModifier func(comps []component.Component, policy map[string]interface{}) ([]component.Component, error)
+type ComponentsModifier func(comps []component.Component) ([]component.Component, error)
 
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
@@ -492,7 +492,7 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	}
 
 	for _, modifier := range c.modifiers {
-		comps, err = modifier(comps, cfg)
+		comps, err = modifier(comps)
 		if err != nil {
 			return fmt.Errorf("failed to modify components: %w", err)
 		}

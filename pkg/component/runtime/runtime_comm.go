@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+
 	protobuf "google.golang.org/protobuf/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -40,6 +42,7 @@ type runtimeComm struct {
 	logger     *logger.Logger
 	listenAddr string
 	ca         *authority.CertificateAuthority
+	agentInfo  *info.AgentInfo
 
 	name  string
 	token string
@@ -58,7 +61,7 @@ type runtimeComm struct {
 	actionsResponse chan *proto.ActionResponse
 }
 
-func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.CertificateAuthority) (*runtimeComm, error) {
+func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.CertificateAuthority, agentInfo *info.AgentInfo) (*runtimeComm, error) {
 	token, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
@@ -75,6 +78,7 @@ func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.Cert
 		logger:          logger,
 		listenAddr:      listenAddr,
 		ca:              ca,
+		agentInfo:       agentInfo,
 		name:            name,
 		token:           token.String(),
 		cert:            pair,
@@ -123,6 +127,15 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 }
 
 func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected) {
+	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
+		expected.AgentInfo = &proto.CheckinAgentInfo{
+			Id:       c.agentInfo.AgentID(),
+			Version:  c.agentInfo.Version(),
+			Snapshot: c.agentInfo.Snapshot(),
+		}
+	} else {
+		expected.AgentInfo = nil
+	}
 	c.checkinExpected <- expected
 }
 

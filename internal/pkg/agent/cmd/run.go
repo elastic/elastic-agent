@@ -50,7 +50,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Use:   "run",
 		Short: "Start the elastic-agent.",
 		Run: func(_ *cobra.Command, _ []string) {
-			if err := run(nil); err != nil {
+			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
@@ -181,53 +181,53 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	*/
 
 	appDone := make(chan bool)
-	appErrCh := make(chan error)
-	ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
+	appErr := make(chan error)
 	go func() {
 		err := app.Run(ctx)
 		close(appDone)
-		appErrCh <- err
+		appErr <- err
 	}()
 
 	// listen for signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
-	reexecing := false
+	isRex := false
+	logShutdown := true
+LOOP:
 	for {
-		breakout := false
 		select {
 		case <-stop:
-			breakout = true
+			break LOOP
 		case <-appDone:
-			breakout = true
+			logShutdown = false
+			break LOOP
 		case <-rex.ShutdownChan():
-			reexecing = true
-			breakout = true
+			isRex = true
+			logShutdown = false
+			break LOOP
 		case sig := <-signals:
 			if sig == syscall.SIGHUP {
 				rexLogger.Infof("SIGHUP triggered re-exec")
+				isRex = true
 				rex.ReExec(nil)
 			} else {
-				breakout = true
+				break LOOP
 			}
-		}
-		if breakout {
-			if !reexecing {
-				logger.Info("Shutting down Elastic Agent and sending last events...")
-			}
-			break
 		}
 	}
 
+	if logShutdown {
+		logger.Info("Shutting down Elastic Agent and sending last events...")
+	}
 	cancel()
-	err = <-appErrCh
+	err = <-appErr
 
-	if !reexecing {
+	if logShutdown {
 		logger.Info("Shutting down completed.")
-		return err
 	}
-	rex.ShutdownComplete()
+	if isRex {
+		rex.ShutdownComplete()
+	}
 	return err
 }
 

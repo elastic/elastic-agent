@@ -146,12 +146,19 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		stateRestored = true
 	}
 
-	// In the case this is the first start and this Elastic Agent is running a Fleet Server; we need to ensure that
+	// In the case this Elastic Agent is running a Fleet Server; we need to ensure that
 	// the Fleet Server is running before the Fleet gateway is started.
-	if !stateRestored && m.cfg.Fleet.Server != nil {
-		err = m.initFleetServer(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to initialize Fleet Server: %w", err)
+	if m.cfg.Fleet.Server != nil {
+		if stateRestored {
+			err = m.waitForFleetServer(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
+			}
+		} else {
+			err = m.initFleetServer(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
+			}
 		}
 	}
 
@@ -233,31 +240,42 @@ func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
 	case m.ch <- &localConfigChange{injectFleetServerInput}:
 	}
 
-	m.log.Debugf("watching fleet-server-default component state")
-	sub := m.runtime.Subscribe(ctx, "fleet-server-default")
+	return m.waitForFleetServer(ctx)
+}
+
+func (m *managedConfigManager) waitForFleetServer(ctx context.Context) error {
+	m.log.Debugf("watching Fleet Server component state")
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	sub := m.runtime.SubscribeAll(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case state := <-sub.Ch():
-			if fleetServerRunning(state) {
-				m.log.With("state", state).Debugf("fleet-server-default component is running")
-				return nil
+		case compState := <-sub.Ch():
+			if compState.Component.Spec.InputType == "fleet-server" {
+				if fleetServerRunning(compState.State) {
+					m.log.With("state", compState.State).Debugf("Fleet Server is running")
+					return nil
+				}
+				m.log.With("state", compState.State).Debugf("Fleet Server is not running")
 			}
-			m.log.With("state", state).Debugf("fleet-server-default component is not running")
 		}
 	}
 }
 
 func fleetServerRunning(state runtime.ComponentState) bool {
-	if state.State == client.UnitStateHealthy || state.State == client.UnitStateDegraded {
-		for key, unit := range state.Units {
-			if key.UnitType == client.UnitTypeInput && key.UnitID == "fleet-server-default-fleet-server" {
-				if unit.State == client.UnitStateHealthy || unit.State == client.UnitStateDegraded {
-					return true
-				}
+	if state.State == client.UnitStateHealthy {
+		if len(state.Units) == 0 {
+			return false
+		}
+		for _, unit := range state.Units {
+			if unit.State != client.UnitStateHealthy {
+				return false
 			}
 		}
+		return true
 	}
 	return false
 }

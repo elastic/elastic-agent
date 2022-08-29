@@ -88,7 +88,7 @@ type componentRuntimeState struct {
 }
 
 func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.Component) (*componentRuntimeState, error) {
-	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca)
+	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca, m.agentInfo)
 	if err != nil {
 		return nil, err
 	}

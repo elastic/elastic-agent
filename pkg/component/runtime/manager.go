@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+
 	"github.com/gofrs/uuid"
 
 	"go.elastic.co/apm"
@@ -61,6 +63,7 @@ type Manager struct {
 	logger     *logger.Logger
 	ca         *authority.CertificateAuthority
 	listenAddr string
+	agentInfo  *info.AgentInfo
 	tracer     *apm.Tracer
 
 	netMx    sync.RWMutex
@@ -85,7 +88,7 @@ type Manager struct {
 }
 
 // NewManager creates a new manager.
-func NewManager(logger *logger.Logger, listenAddr string, tracer *apm.Tracer) (*Manager, error) {
+func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentInfo, tracer *apm.Tracer) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
 		return nil, err
@@ -94,6 +97,7 @@ func NewManager(logger *logger.Logger, listenAddr string, tracer *apm.Tracer) (*
 		logger:        logger,
 		ca:            ca,
 		listenAddr:    listenAddr,
+		agentInfo:     agentInfo,
 		tracer:        tracer,
 		waitReady:     make(map[string]waitForReady),
 		current:       make(map[string]*componentRuntimeState),
@@ -143,23 +147,32 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.shuttingDown.Store(false)
 
 	// start serving GRPC connections
-	errCh := make(chan error)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		errCh <- server.Serve(lis)
+		defer wg.Done()
+		for {
+			err := server.Serve(lis)
+			if err != nil {
+				m.logger.Errorf("control protocol failed: %w", err)
+			}
+			if ctx.Err() != nil {
+				// context has an error don't start again
+				return
+			}
+		}
 	}()
 
-	select {
-	case <-ctx.Done():
-		server.Stop()
-		err = <-errCh
-	case err = <-errCh:
-	}
+	<-ctx.Done()
 	m.shutdown()
+
+	server.Stop()
+	wg.Wait()
 	m.netMx.Lock()
 	m.listener = nil
 	m.server = nil
 	m.netMx.Unlock()
-	return err
+	return ctx.Err()
 }
 
 // WaitForReady waits until the manager is ready to be used.
