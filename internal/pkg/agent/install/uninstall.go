@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/kardianos/service"
 
@@ -233,11 +234,20 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
 		varsArray := make([]*transpiler.Vars, 0)
-		var wg sync.WaitGroup
-		wg.Add(1)
+
+		// Give some time for the providers to replace the variables
+		const timeout = 15 * time.Second
+		var doOnce sync.Once
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		// The composable system will continuously run, we are only interested in the first run on of the
+		// renderer to collect the variables we should stop the execution.
 		varsCallback := func(vv []*transpiler.Vars) {
-			varsArray = vv
-			wg.Done()
+			doOnce.Do(func() {
+				varsArray = vv
+				cancel()
+			})
 		}
 
 		ctrl, err := composable.New(log, cfg)
@@ -245,7 +255,14 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			return nil, err
 		}
 		_ = ctrl.Run(ctx, varsCallback)
-		wg.Wait()
+
+		// Wait for the first callback to retrieve the variables from the providers.
+		<-ctx.Done()
+
+		// Bail out if callback was not executed in time.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, errors.New("failed to get transpiler vars", err)
+		}
 
 		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {
