@@ -243,7 +243,7 @@ pipeline {
         // Only on main branch 
         // Enable if k8s related changes.
         allOf {
-          branch 'main'         // Only runs for branch main        
+          //branch 'main'         // Only runs for branch main        
           expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
       }
