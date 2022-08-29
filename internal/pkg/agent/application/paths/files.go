@@ -88,5 +88,5 @@ func AgentStateStoreFile() string {
 
 // AgentInputsDPath is directory that contains the fragment of inputs yaml for K8s deployment.
 func AgentInputsDPath() string {
-	return filepath.Join(Home(), defaultInputsDPath)
+	return filepath.Join(Config(), defaultInputsDPath)
 }
