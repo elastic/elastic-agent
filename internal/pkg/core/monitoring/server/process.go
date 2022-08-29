@@ -25,7 +25,7 @@ import (
 
 const (
 	processIDKey      = "processID"
-	monitoringSuffix  = "_monitoring"
+	monitoringSuffix  = "-monitoring"
 	separator         = "-"
 	timeout           = 10 * time.Second
 	errTypeUnexpected = "UNEXPECTED"
