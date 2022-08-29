@@ -25,6 +25,10 @@ const (
 	defaultSourceURI = "https://artifacts.elastic.co/downloads/"
 )
 
+type ConfigReloader interface {
+	Reload(*Config) error
+}
+
 // Config is a configuration used for verifier and downloader
 type Config struct {
 	// OperatingSystem: operating system [linux, windows, darwin]
@@ -53,14 +57,16 @@ type Config struct {
 }
 
 type Reloader struct {
-	log *logger.Logger
-	cfg *Config
+	log       *logger.Logger
+	cfg       *Config
+	reloaders []ConfigReloader
 }
 
-func NewReloader(cfg *Config, log *logger.Logger) *Reloader {
+func NewReloader(cfg *Config, log *logger.Logger, rr ...ConfigReloader) *Reloader {
 	return &Reloader{
-		cfg: cfg,
-		log: log,
+		cfg:       cfg,
+		log:       log,
+		reloaders: rr,
 	}
 }
 
@@ -71,6 +77,12 @@ func (r *Reloader) Reload(rawConfig *config.Config) error {
 
 	if err := r.reloadSourceURI(rawConfig); err != nil {
 		return errors.New(err, "failed to reload source URI")
+	}
+
+	for _, reloader := range r.reloaders {
+		if err := reloader.Reload(r.cfg); err != nil {
+			return errors.New(err, "failed reloading config")
+		}
 	}
 
 	return nil

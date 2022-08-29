@@ -20,9 +20,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/stateresolver"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
@@ -115,10 +117,49 @@ func NewOperator(
 
 	operator.initHandlerMap()
 
-	os.MkdirAll(config.DownloadConfig.TargetDirectory, 0755)
-	os.MkdirAll(config.DownloadConfig.InstallPath, 0755)
+	if err := os.MkdirAll(config.DownloadConfig.TargetDirectory, 0755); err != nil {
+		// can already exists from previous runs, not an error
+		logger.Warnf("failed creating %q: %v", config.DownloadConfig.TargetDirectory, err)
+	}
+	if err := os.MkdirAll(config.DownloadConfig.InstallPath, 0755); err != nil {
+		// can already exists from previous runs, not an error
+		logger.Warnf("failed creating %q: %v", config.DownloadConfig.InstallPath, err)
+	}
 
 	return operator, nil
+}
+
+func (o *Operator) Reload(rawConfig *config.Config) error {
+	// save some unpacking in downloaders
+	type reloadConfig struct {
+		C *artifact.Config `json:"agent.download" config:"agent.download"`
+	}
+	tmp := &reloadConfig{
+		C: artifact.DefaultConfig(),
+	}
+	if err := rawConfig.Unpack(&tmp); err != nil {
+		return errors.New(err, "failed to unpack artifact config")
+	}
+
+	if err := o.reloadComponent(o.downloader, "downloader", tmp.C); err != nil {
+		return err
+	}
+
+	return o.reloadComponent(o.verifier, "verifier", tmp.C)
+}
+
+func (o *Operator) reloadComponent(component interface{}, name string, cfg *artifact.Config) error {
+	r, ok := component.(artifact.ConfigReloader)
+	if !ok {
+		o.logger.Debugf("failed reloading %q: component is not reloadable", name)
+		return nil // not an error, could be filesystem downloader/verifier
+	}
+
+	if err := r.Reload(cfg); err != nil {
+		return errors.New(err, fmt.Sprintf("failed reloading %q config", component))
+	}
+
+	return nil
 }
 
 // State describes the current state of the system.
@@ -238,12 +279,12 @@ func (o *Operator) Shutdown() {
 			a.Shutdown()
 			wg.Done()
 			o.logger.Debugf("took %s to shutdown %s",
-				time.Now().Sub(started), a.Name())
+				time.Since(started), a.Name())
 		}(a)
 	}
 	wg.Wait()
 	o.logger.Debugf("took %s to shutdown %d apps",
-		time.Now().Sub(started), len(o.apps))
+		time.Since(started), len(o.apps))
 }
 
 // Start starts a new process based on a configuration

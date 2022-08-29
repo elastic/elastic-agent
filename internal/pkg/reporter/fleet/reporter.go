@@ -18,7 +18,7 @@ import (
 type event struct {
 	AgentID   string                 `json:"agent_id"`
 	EventType string                 `json:"type"`
-	Ts        fleetapi.Time          `json:"timestamp"`
+	TS        fleetapi.Time          `json:"timestamp"`
 	SubType   string                 `json:"subtype"`
 	Msg       string                 `json:"message"`
 	Payload   map[string]interface{} `json:"payload,omitempty"`
@@ -29,7 +29,7 @@ func (e *event) Type() string {
 }
 
 func (e *event) Timestamp() time.Time {
-	return time.Time(e.Ts)
+	return time.Time(e.TS)
 }
 
 func (e *event) Message() string {
@@ -38,12 +38,12 @@ func (e *event) Message() string {
 
 // Reporter is a reporter without any effects, serves just as a showcase for further implementations.
 type Reporter struct {
+	lastAck   time.Time
 	info      agentInfo
 	logger    *logger.Logger
 	queue     []fleetapi.SerializableEvent
-	qlock     sync.Mutex
 	threshold int
-	lastAck   time.Time
+	qlock     sync.Mutex
 }
 
 type agentInfo interface {
@@ -70,7 +70,7 @@ func (r *Reporter) Report(ctx context.Context, e reporter.Event) error {
 	r.queue = append(r.queue, &event{
 		AgentID:   r.info.AgentID(),
 		EventType: e.Type(),
-		Ts:        fleetapi.Time(e.Time()),
+		TS:        fleetapi.Time(e.Time()),
 		SubType:   e.SubType(),
 		Msg:       e.Message(),
 		Payload:   e.Payload(),

@@ -18,8 +18,8 @@ import (
 // if nth operation fails all preceding are retried as well
 type retryableOperations struct {
 	logger      *logger.Logger
-	operations  []operation
 	retryConfig *retry.Config
+	operations  []operation
 }
 
 func newRetryableOperations(
