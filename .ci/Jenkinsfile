@@ -42,7 +42,7 @@ pipeline {
 
     // disabled by default, but required for merge:
     // opt-in with 'ci:extended-windows' tag on PR
-    booleanParam(name: 'extended_windows_ci', defaultValue: false, description: 'Enable Extended Windows tests')  
+    booleanParam(name: 'extended_windows_ci', defaultValue: false, description: 'Enable Extended Windows tests')
   }
   stages {
     stage('Checkout') {
@@ -303,7 +303,8 @@ pipeline {
                propagate: true,
                wait: true)
       }
-      stage('extended windows') {
+    }
+    stage('extended windows') {
       when {
         // Always when running builds on branches/tags
         // Enable if extended windows support related changes.
