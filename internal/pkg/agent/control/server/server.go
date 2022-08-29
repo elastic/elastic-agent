@@ -26,7 +26,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	monitoring "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/socket"
@@ -35,6 +34,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+)
+
+const (
+	agentName = "elastic-agent"
 )
 
 // Server is the daemon side of the control protocol.
@@ -178,6 +181,7 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 	}
 	cb, err := u.Upgrade(ctx, &upgradeRequest{request}, false)
 	if err != nil {
+		//nolint:nilerr // ignore the error, it's part of the response
 		return &proto.UpgradeResponse{
 			Status: proto.ActionStatus_FAILURE,
 			Error:  err.Error(),
@@ -259,9 +263,9 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 	ch := make(chan *proto.PprofResult, 1)
 
 	// retrieve elastic-agent pprof data if requested or application is unspecified.
-	if req.AppName == "" || req.AppName == "elastic-agent" {
-		endpoint := beats.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
-		c := newSocketRequester("elastic-agent", "", endpoint)
+	if req.AppName == "" || req.AppName == agentName {
+		endpoint := monitoring.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
+		c := newSocketRequester(agentName, "", endpoint)
 		for _, opt := range req.PprofType {
 			wg.Add(1)
 			go func(opt proto.PprofOption) {
@@ -274,7 +278,7 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 
 	// get requested rk/appname spec or all specs
 	var specs []specInfo
-	if req.AppName != "elastic-agent" {
+	if req.AppName != agentName {
 		specs = s.getSpecInfo(req.RouteKey, req.AppName)
 	}
 	for _, si := range specs {
@@ -316,8 +320,8 @@ func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMe
 	}
 
 	// gather metrics buffer data from the elastic-agent
-	endpoint := beats.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
-	c := newSocketRequester("elastic-agent", "", endpoint)
+	endpoint := monitoring.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
+	c := newSocketRequester(agentName, "", endpoint)
 	metrics := c.procMetrics(ctx)
 
 	resp := &proto.ProcMetricsResponse{

@@ -53,11 +53,6 @@ func (b *SidecarMonitor) Reload(rawConfig *config.Config) error {
 			cfg.Settings.MonitoringConfig.HTTP.Buffer = b.config.HTTP.Buffer
 		}
 		b.config = cfg.Settings.MonitoringConfig
-		logMetrics := true
-		if cfg.Settings.LoggingConfig != nil {
-			logMetrics = cfg.Settings.LoggingConfig.Metrics.Enabled
-		}
-		b.config.LogMetrics = logMetrics
 	}
 
 	return nil

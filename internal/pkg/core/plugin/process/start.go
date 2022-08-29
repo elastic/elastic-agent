@@ -74,8 +74,8 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 	// Failed applications can be started again.
 	if srvState != nil {
 		a.setState(state.Starting, "Starting", nil)
-		srvState.SetStatus(proto.StateObserved_STARTING, a.state.Message, a.state.Payload)
-		srvState.UpdateConfig(srvState.Config())
+		_ = srvState.SetStatus(proto.StateObserved_STARTING, a.state.Message, a.state.Payload)
+		_ = srvState.UpdateConfig(srvState.Config())
 	} else {
 		a.srvState, err = a.srv.Register(a, string(cfgStr))
 		if err != nil {

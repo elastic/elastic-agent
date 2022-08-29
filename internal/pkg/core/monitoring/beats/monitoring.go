@@ -42,7 +42,7 @@ func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string, i
 	if endpoint, ok := spec.MetricEndpoints[operatingSystem]; ok {
 		return endpoint
 	}
-	if operatingSystem == "windows" {
+	if operatingSystem == windowsOS {
 		return fmt.Sprintf(mbEndpointFileFormatWin, pipelineID, spec.Cmd)
 	}
 	// unix socket path must be less than 104 characters
@@ -55,11 +55,11 @@ func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string, i
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
 }
 
-func getLoggingFile(spec program.Spec, operatingSystem, installPath, pipelineID string) string {
+func getLoggingFile(spec program.Spec, operatingSystem, pipelineID string) string {
 	if path, ok := spec.LogPaths[operatingSystem]; ok {
 		return path
 	}
-	if operatingSystem == "windows" {
+	if operatingSystem == windowsOS {
 		return fmt.Sprintf(logFileFormatWin, paths.Home(), pipelineID, spec.Cmd)
 	}
 	return fmt.Sprintf(logFileFormat, paths.Home(), pipelineID, spec.Cmd)
@@ -71,7 +71,7 @@ func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringConfig.Monit
 		return fmt.Sprintf(agentMbEndpointHTTP, cfg.Host, cfg.Port)
 	}
 
-	if operatingSystem == "windows" {
+	if operatingSystem == windowsOS {
 		return agentMbEndpointFileFormatWin
 	}
 	// unix socket path must be less than 104 characters

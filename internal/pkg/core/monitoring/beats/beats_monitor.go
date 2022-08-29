@@ -19,8 +19,13 @@ import (
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )
 
-const httpPlusPrefix = "http+"
-const defaultMonitoringNamespace = "default"
+const (
+	httpPlusPrefix             = "http+"
+	defaultMonitoringNamespace = "default"
+	fileSchemePrefix           = "file"
+	unixSchemePrefix           = "unix"
+	windowsOS                  = "windows"
+)
 
 // Monitor implements the monitoring.Monitor interface providing information
 // about beats.
@@ -101,12 +106,8 @@ func (b *Monitor) generateMonitoringEndpoint(spec program.Spec, pipelineID strin
 	return MonitoringEndpoint(spec, b.operatingSystem, pipelineID, false)
 }
 
-func (b *Monitor) generateLoggingFile(spec program.Spec, pipelineID string) string {
-	return getLoggingFile(spec, b.operatingSystem, b.installPath, pipelineID)
-}
-
 func (b *Monitor) generateLoggingPath(spec program.Spec, pipelineID string) string {
-	return filepath.Dir(b.generateLoggingFile(spec, pipelineID))
+	return filepath.Dir(getLoggingFile(spec, b.operatingSystem, pipelineID))
 }
 
 func (b *Monitor) ownLoggingPath(spec program.Spec) bool {
@@ -214,7 +215,7 @@ func (b *Monitor) LogPath(spec program.Spec, pipelineID string) string {
 		return ""
 	}
 
-	return b.generateLoggingFile(spec, pipelineID)
+	return getLoggingFile(spec, b.operatingSystem, pipelineID)
 }
 
 // MetricsPath describes a location where application exposes metrics
@@ -262,15 +263,15 @@ func monitoringDrop(path string) (drop string) {
 	}
 
 	u, _ := url.Parse(path)
-	if u == nil || (u.Scheme != "" && u.Scheme != "file" && u.Scheme != "unix") {
+	if u == nil || (u.Scheme != "" && u.Scheme != fileSchemePrefix && u.Scheme != unixSchemePrefix) {
 		return ""
 	}
 
-	if u.Scheme == "file" {
+	if u.Scheme == fileSchemePrefix {
 		return strings.TrimPrefix(path, "file://")
 	}
 
-	if u.Scheme == "unix" {
+	if u.Scheme == unixSchemePrefix {
 		return strings.TrimPrefix(path, "unix://")
 	}
 
@@ -289,7 +290,7 @@ func isWindowsPath(path string) bool {
 }
 
 func changeOwner(path string, uid, gid int) error {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsOS {
 		// on windows it always returns the syscall.EWINDOWS error, wrapped in *PathError
 		return nil
 	}
