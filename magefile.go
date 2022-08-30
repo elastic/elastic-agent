@@ -776,7 +776,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			}
 		}
 
-		files, err := filepath.Glob(filepath.Join(versionedFlatPath, "*"))
+		files, err := filepath.Glob(filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", version)))
 		if err != nil {
 			panic(err)
 		}
