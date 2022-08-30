@@ -6,7 +6,10 @@ package component
 
 import (
 	"fmt"
+	"os"
 	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -87,6 +90,10 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 	}
 
 	// set the runtime variables that are available in the input specification runtime checks
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return nil, err
+	}
 	vars, err := transpiler.NewVars(map[string]interface{}{
 		"runtime": map[string]interface{}{
 			"platform": r.platform.String(),
@@ -95,6 +102,11 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 			"family":   r.platform.Family,
 			"major":    r.platform.Major,
 			"minor":    r.platform.Minor,
+		},
+		"user": map[string]interface{}{
+			"uid":  os.Geteuid(),
+			"gid":  os.Getgid(),
+			"root": hasRoot,
 		},
 	}, nil)
 	if err != nil {

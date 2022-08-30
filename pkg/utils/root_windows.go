@@ -5,7 +5,7 @@
 //go:build windows
 // +build windows
 
-package install
+package utils
 
 import (
 	"github.com/pkg/errors"

@@ -10,7 +10,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -22,6 +26,11 @@ type actionMode int
 const (
 	actionStart = actionMode(0)
 	actionStop  = actionMode(1)
+
+	runDirMod = 0770
+
+	envAgentComponentID        = "AGENT_COMPONENT_ID"
+	envAgentComponentInputType = "AGENT_COMPONENT_INPUT_TYPE"
 )
 
 type procState struct {
@@ -243,11 +252,26 @@ func (c *CommandRuntime) start(comm Communicator) error {
 		return nil
 	}
 	cmdSpec := c.current.Spec.Spec.Command
-	env := make([]string, 0, len(cmdSpec.Env))
+	env := make([]string, 0, len(cmdSpec.Env)+2)
 	for _, e := range cmdSpec.Env {
 		env = append(env, fmt.Sprintf("%s=%s", e.Name, e.Value))
 	}
-	proc, err := process.Start(c.current.Spec.BinaryPath, os.Geteuid(), os.Getgid(), cmdSpec.Args, env, attachOutErr)
+	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
+	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentInputType, c.current.Spec.InputType))
+	uid, gid := os.Geteuid(), os.Getgid()
+	workDir, err := c.workDir(uid, gid)
+	if err != nil {
+		return err
+	}
+	path, err := filepath.Abs(c.current.Spec.BinaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to determine absolute path: %w", err)
+	}
+	err = utils.HasStrictExecPerms(path, uid)
+	if err != nil {
+		return fmt.Errorf("strict execution permisions failed: %w", err)
+	}
+	proc, err := process.Start(path, uid, gid, cmdSpec.Args, env, attachOutErr, dirPath(workDir))
 	if err != nil {
 		return err
 	}
@@ -314,8 +338,32 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 	return false
 }
 
+func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
+	path := filepath.Join(paths.Run(), c.current.ID)
+	err := os.MkdirAll(path, runDirMod)
+	if err != nil {
+		return "", fmt.Errorf("failed to create path: %s, %w", path, err)
+	}
+	err = os.Chown(path, uid, gid)
+	if err != nil {
+		return "", fmt.Errorf("failed to chown %s: %w", path, err)
+	}
+	err = os.Chmod(path, runDirMod)
+	if err != nil {
+		return "", fmt.Errorf("failed to chmod: %s, %w", path, err)
+	}
+	return path, nil
+}
+
 func attachOutErr(cmd *exec.Cmd) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return nil
+}
+
+func dirPath(path string) process.Option {
+	return func(cmd *exec.Cmd) error {
+		cmd.Dir = path
+		return nil
+	}
 }

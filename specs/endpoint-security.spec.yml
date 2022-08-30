@@ -12,8 +12,73 @@ inputs:
       - elasticsearch
     runtime:
       preventions:
+        - condition: ${runtime.user.root} == false
+          message: "Elastic Agent must be running as root"
         - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
           message: "No support for RHEL7 on arm64"
+    service:
+      operations:
+        check:
+          args:
+            - "verify"
+            - "--log"
+            - "stderr"
+          timeout: 30
+        install:
+          args:
+            - "install"
+            - "--log"
+            - "stderr"
+            - "--upgrade"
+            - "--resources"
+            - "endpoint-security-resources.zip"
+          timeout: 600
+        uninstall:
+          args:
+            - "uninstall"
+            - "--log"
+            - "stderr"
+          timeout: 600
+  - name: endpoint
+    description: "Endpoint Security"
+    platforms:
+      - darwin/amd64
+      - darwin/arm64
+    outputs:
+      - elasticsearch
+    service:
+      operations:
+        check:
+          args:
+            - "verify"
+            - "--log"
+            - "stderr"
+          timeout: 30
+        install:
+          args:
+            - "install"
+            - "--log"
+            - "stderr"
+            - "--upgrade"
+            - "--resources"
+            - "endpoint-security-resources.zip"
+          timeout: 600
+        uninstall:
+          args:
+            - "uninstall"
+            - "--log"
+            - "stderr"
+          timeout: 600
+  - name: endpoint
+    description: "Endpoint Security"
+    platforms:
+      - windows/amd64
+    outputs:
+      - elasticsearch
+    runtime:
+      preventions:
+        - condition: ${runtime.user.root} == false
+          message: "Elastic Agent must be running as Administrator or SYSTEM"
     service:
       operations:
         check:

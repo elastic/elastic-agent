@@ -10,23 +10,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-
+	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -146,6 +145,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_StartStop(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -167,10 +168,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -268,6 +266,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -289,10 +289,7 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -440,6 +437,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -461,10 +460,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -595,6 +591,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_Configure(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -616,10 +614,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -722,6 +717,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_RemoveUnit(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -743,10 +740,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -881,6 +875,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_ActionState(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -902,10 +898,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -1012,6 +1005,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_Restarts(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1033,10 +1028,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -1152,6 +1144,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1173,10 +1167,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -1274,6 +1265,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_InvalidAction(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1295,10 +1288,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -1399,6 +1389,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_MultiComponent(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1420,10 +1412,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	runtimeSpec := component.InputRuntimeSpec{
 		InputType:  "fake",
 		BinaryName: "",
@@ -1612,6 +1601,8 @@ LOOP:
 }
 
 func TestManager_FakeInput_LogLevel(t *testing.T) {
+	testPaths(t)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1633,10 +1624,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := filepath.Join("..", "fake", "fake")
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
+	binaryPath := testBinary(t)
 	comp := component.Component{
 		ID: "fake-default",
 		Spec: component.InputRuntimeSpec{
@@ -1794,4 +1782,45 @@ func signalState(subErrCh chan error, state *ComponentState) {
 			subErrCh <- nil
 		}
 	}
+}
+
+func testPaths(t *testing.T) {
+	t.Helper()
+
+	versioned := paths.IsVersionHome()
+	topPath := paths.Top()
+
+	tmpDir := t.TempDir()
+	paths.SetVersionHome(false)
+	paths.SetTop(tmpDir)
+
+	t.Cleanup(func() {
+		paths.SetVersionHome(versioned)
+		paths.SetTop(topPath)
+		_ = os.RemoveAll(tmpDir)
+	})
+}
+
+func testBinary(t *testing.T) string {
+	t.Helper()
+
+	var err error
+	binaryPath := filepath.Join("..", "fake", "fake")
+	binaryPath, err = filepath.Abs(binaryPath)
+	if err != nil {
+		t.Fatalf("failed abs %s: %s", binaryPath, err)
+	}
+	if runtime.GOOS == component.Windows {
+		binaryPath += exeExt
+	} else {
+		err = os.Chown(binaryPath, os.Geteuid(), os.Getgid())
+		if err != nil {
+			t.Fatalf("failed chown %s: %s", binaryPath, err)
+		}
+		err = os.Chmod(binaryPath, 0770)
+		if err != nil {
+			t.Fatalf("failed chmod %s: %s", binaryPath, err)
+		}
+	}
+	return binaryPath
 }
