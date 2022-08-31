@@ -272,11 +272,15 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 		}
 		idRaw, ok := input[idKey]
 		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d', 'id' missing", idx)
+			// no ID; fallback to type
+			idRaw = t
 		}
 		id, ok := idRaw.(string)
 		if !ok {
 			return nil, fmt.Errorf("invalid 'inputs.%d.id', expected a string not a %T", idx, idRaw)
+		}
+		if hasDuplicate(outputsMap, id) {
+			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id (id is required to be unique)", idx)
 		}
 		outputName := "default"
 		if outputRaw, ok := input[useKey]; ok {
@@ -356,6 +360,19 @@ func validateRuntimeChecks(spec *InputSpec, store eql.VarStore) error {
 		}
 	}
 	return nil
+}
+
+func hasDuplicate(outputsMap map[string]outputI, id string) bool {
+	for _, o := range outputsMap {
+		for _, i := range o.inputs {
+			for _, j := range i {
+				if j.id == id {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func getLogLevel(val map[string]interface{}) (client.UnitLogLevel, error) {
