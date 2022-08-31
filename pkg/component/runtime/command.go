@@ -78,6 +78,7 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 // ever be called again.
 func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 	checkinPeriod := c.current.Spec.Spec.Command.Timeouts.Checkin
+	restartPeriod := c.current.Spec.Spec.Command.Timeouts.Restart
 	c.forceCompState(client.UnitStateStarting, "Starting")
 	t := time.NewTicker(checkinPeriod)
 	defer t.Stop()
@@ -90,12 +91,12 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 			switch as {
 			case actionStart:
 				if err := c.start(comm); err != nil {
-					c.forceCompState(client.UnitStateFailed, err.Error())
+					c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
 				}
 				t.Reset(checkinPeriod)
 			case actionStop:
 				if err := c.stop(ctx); err != nil {
-					c.forceCompState(client.UnitStateFailed, err.Error())
+					c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
 				}
 			}
 		case ps := <-c.procCh:
@@ -103,12 +104,9 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 			if ps.proc == c.proc {
 				c.proc = nil
 				if c.handleProc(ps.state) {
-					// start again
-					if err := c.start(comm); err != nil {
-						c.forceCompState(client.UnitStateFailed, err.Error())
-					}
+					// start again after restart period
+					t.Reset(restartPeriod)
 				}
-				t.Reset(checkinPeriod)
 			}
 		case newComp := <-c.compCh:
 			sendExpected := c.state.syncExpected(&newComp)
@@ -149,30 +147,37 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				c.sendObserved()
 			}
 		case <-t.C:
-			if c.proc != nil && c.actionState == actionStart {
-				// running and should be running
-				now := time.Now().UTC()
-				if c.lastCheckin.IsZero() {
-					// never checked-in
-					c.missedCheckins++
-				} else if now.Sub(c.lastCheckin) > checkinPeriod {
-					// missed check-in during required period
-					c.missedCheckins++
-				} else if now.Sub(c.lastCheckin) <= checkinPeriod {
-					c.missedCheckins = 0
-				}
-				if c.missedCheckins == 0 {
-					c.compState(client.UnitStateHealthy)
-				} else if c.missedCheckins > 0 && c.missedCheckins < maxCheckinMisses {
-					c.compState(client.UnitStateDegraded)
-				} else if c.missedCheckins >= maxCheckinMisses {
-					// something is wrong; the command should be checking in
-					//
-					// at this point it is assumed the sub-process has locked up and will not respond to a nice
-					// termination signal, so we jump directly to killing the process
-					msg := fmt.Sprintf("Failed: pid '%d' missed %d check-ins and will be killed", c.proc.PID, maxCheckinMisses)
-					c.forceCompState(client.UnitStateFailed, msg)
-					_ = c.proc.Kill() // watcher will handle it from here
+			if c.actionState == actionStart {
+				if c.proc == nil {
+					// not running, but should be running
+					if err := c.start(comm); err != nil {
+						c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
+					}
+				} else {
+					// running and should be running
+					now := time.Now().UTC()
+					if c.lastCheckin.IsZero() {
+						// never checked-in
+						c.missedCheckins++
+					} else if now.Sub(c.lastCheckin) > checkinPeriod {
+						// missed check-in during required period
+						c.missedCheckins++
+					} else if now.Sub(c.lastCheckin) <= checkinPeriod {
+						c.missedCheckins = 0
+					}
+					if c.missedCheckins == 0 {
+						c.compState(client.UnitStateHealthy)
+					} else if c.missedCheckins > 0 && c.missedCheckins < maxCheckinMisses {
+						c.compState(client.UnitStateDegraded)
+					} else if c.missedCheckins >= maxCheckinMisses {
+						// something is wrong; the command should be checking in
+						//
+						// at this point it is assumed the sub-process has locked up and will not respond to a nice
+						// termination signal, so we jump directly to killing the process
+						msg := fmt.Sprintf("Failed: pid '%d' missed %d check-ins and will be killed", c.proc.PID, maxCheckinMisses)
+						c.forceCompState(client.UnitStateFailed, msg)
+						_ = c.proc.Kill() // watcher will handle it from here
+					}
 				}
 			}
 		}
@@ -269,7 +274,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	}
 	err = utils.HasStrictExecPerms(path, uid)
 	if err != nil {
-		return fmt.Errorf("strict execution permisions failed: %w", err)
+		return fmt.Errorf("execution of component prevented: %w", err)
 	}
 	proc, err := process.Start(path, uid, gid, cmdSpec.Args, env, attachOutErr, dirPath(workDir))
 	if err != nil {
@@ -285,7 +290,14 @@ func (c *CommandRuntime) start(comm Communicator) error {
 
 func (c *CommandRuntime) stop(ctx context.Context) error {
 	if c.proc == nil {
-		// already stopped
+		// already stopped ensure that state of the component is also stopped
+		if c.state.State != client.UnitStateStopped {
+			if c.state.State == client.UnitStateFailed {
+				c.forceCompState(client.UnitStateStopped, "Stopped: never started successfully")
+			} else {
+				c.forceCompState(client.UnitStateStopped, "Stopped: already stopped")
+			}
+		}
 		return nil
 	}
 	cmdSpec := c.current.Spec.Spec.Command

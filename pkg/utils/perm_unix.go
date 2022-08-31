@@ -10,7 +10,6 @@ package utils
 import (
 	"errors"
 	"os"
-	"syscall"
 )
 
 // HasStrictExecPerms ensures that the path is executable by the owner, cannot be written by anyone other than the
@@ -28,13 +27,6 @@ func HasStrictExecPerms(path string, uid int) error {
 	}
 	if info.Mode()&0100 == 0 {
 		return errors.New("not executable by owner")
-	}
-	statT, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return errors.New("failed to stat")
-	}
-	if statT.Uid != 0 && statT.Uid != uint32(uid) {
-		return errors.New("must be owned by root or executing user")
 	}
 	return nil
 }
