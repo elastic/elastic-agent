@@ -894,8 +894,13 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 				continue
 			}
 
-			targetPath := filepath.Join(archivePath, rp)
-			if err := os.Rename(f, filepath.Join(targetPath, filepath.Base(f))); err != nil {
+			targetDir := filepath.Join(archivePath, rp, filepath.Base(f))
+			targetPath := filepath.Join(targetDir, filepath.Base(f))
+			if err := os.MkdirAll(targetDir, 0750); err != nil {
+				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
+			}
+
+			if err := os.Rename(f, targetPath); err != nil {
 				panic(errors.Wrap(err, "failed renaming file"))
 			}
 		}
