@@ -13,8 +13,8 @@ import (
 	"syscall"
 )
 
-// HasStrictExecPerms ensures that the path is executable by the owner and that the owner of the file
-// is the same as the UID or root.
+// HasStrictExecPerms ensures that the path is executable by the owner, cannot be written by anyone other than the
+// owner of the file and that the owner of the file is the same as the UID or root.
 func HasStrictExecPerms(path string, uid int) error {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -22,6 +22,9 @@ func HasStrictExecPerms(path string, uid int) error {
 	}
 	if info.IsDir() {
 		return errors.New("is a directory")
+	}
+	if info.Mode()&0022 != 0 {
+		return errors.New("cannot be writeable by group or other")
 	}
 	if info.Mode()&0100 == 0 {
 		return errors.New("not executable by owner")
