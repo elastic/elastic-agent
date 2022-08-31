@@ -1,3 +1,4 @@
+# For more information refer to https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -14,7 +15,11 @@ spec:
       labels:
         app: elastic-agent-standalone
     spec:
+      # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
+      # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       serviceAccountName: elastic-agent-standalone
@@ -28,10 +33,14 @@ spec:
             "-e",
           ]
           env:
+            # The basic authentication username used to connect to Elasticsearch
+            # This user needs the privileges required to publish events to Elasticsearch.
             - name: ES_USERNAME
               value: "elastic"
+            # The basic authentication password used to connect to Elasticsearch
             - name: ES_PASSWORD
-              value: ""
+              value: "changeme"
+            # The Elasticsearch host to communicate with
             - name: ES_HOST
               value: ""
             - name: NODE_NAME
@@ -99,18 +108,23 @@ spec:
         - name: varlog
           hostPath:
             path: /var/log
+        # Needed for cloudbeat
         - name: etc-kubernetes
           hostPath:
             path: /etc/kubernetes
+        # Needed for cloudbeat
         - name: var-lib
           hostPath:
             path: /var/lib
+        # Needed for cloudbeat
         - name: passwd
           hostPath:
             path: /etc/passwd
+        # Needed for cloudbeat
         - name: group
           hostPath:
             path: /etc/group
+        # Needed for cloudbeat
         - name: etcsysmd
           hostPath:
             path: /etc/systemd

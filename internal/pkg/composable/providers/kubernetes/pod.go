@@ -24,15 +24,15 @@ import (
 )
 
 type pod struct {
-	logger           *logp.Logger
-	cleanupTimeout   time.Duration
-	comm             composable.DynamicProviderComm
-	scope            string
-	config           *Config
-	metagen          metadata.MetaGen
 	watcher          kubernetes.Watcher
 	nodeWatcher      kubernetes.Watcher
+	comm             composable.DynamicProviderComm
+	metagen          metadata.MetaGen
 	namespaceWatcher kubernetes.Watcher
+	config           *Config
+	logger           *logp.Logger
+	scope            string
+	cleanupTimeout   time.Duration
 
 	// Mutex used by configuration updates not triggered by the main watcher,
 	// to avoid race conditions between cross updates and deletions.

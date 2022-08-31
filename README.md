@@ -1,4 +1,6 @@
-# Elastic Agent developer docs
+# Elastic Agent
+
+## Developer docs
 
 The source files for the general Elastic Agent documentation are currently stored
 in the [observability-docs](https://github.com/elastic/observability-docs) repo. The following docs are only focused on getting developers started building code for Elastic Agent.
@@ -10,6 +12,13 @@ Prerequisites:
 - [Docker](https://docs.docker.com/get-docker/)
 - [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
 
+If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
+```
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
 In Linux operating systems that you can not run docker as a root user you need to follow [linux-postinstall steps](https://docs.docker.com/engine/install/linux-postinstall/)
 
 ### Testing docker container
@@ -17,7 +26,7 @@ In Linux operating systems that you can not run docker as a root user you need t
 Running Elastic Agent in a docker container is a common use case. To build the Elastic Agent and create a docker image run the following command:
 
 ```
-DEV=true SNAPSHOT=true PLATFORMS=linux/amd64 TYPES=docker mage package
+DEV=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
 ```
 
 If you are in the 7.13 branch, this will create the `docker.elastic.co/beats/elastic-agent:7.13.0-SNAPSHOT` image in your local environment. Now you can use this to for example test this container with the stack in elastic-package:
@@ -45,7 +54,7 @@ for the standard variant.
 
 1. Build elastic-agent:
 ```bash
-DEV=true PLATFORMS=linux/amd64 TYPES=docker mage package
+DEV=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
 ```
 
 Use environmental variables `GOHOSTOS` and `GOHOSTARCH` to specify PLATFORMS variable accordingly. eg.

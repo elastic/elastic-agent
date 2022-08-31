@@ -2,10 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package secret manages application secrets.
 package secret
 
 import (
 	"encoding/json"
+	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -52,7 +54,7 @@ func Create(key string, opts ...OptionFunc) error {
 	options := applyOptions(opts...)
 	v, err := vault.New(options.vaultPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create new vault: %w", err)
 	}
 	defer v.Close()
 
@@ -80,12 +82,7 @@ func Create(key string, opts ...OptionFunc) error {
 		CreatedOn: time.Now().UTC(),
 	}
 
-	b, err := json.Marshal(secret)
-	if err != nil {
-		return err
-	}
-
-	return v.Set(key, b)
+	return set(v, key, secret)
 }
 
 // GetAgentSecret read the agent secret from the vault
@@ -93,10 +90,17 @@ func GetAgentSecret(opts ...OptionFunc) (secret Secret, err error) {
 	return Get(agentSecretKey, opts...)
 }
 
+// SetAgentSecret saves the agent secret from the vault
+// This is needed for migration from 8.3.0-8.3.2 to higher versions
+func SetAgentSecret(secret Secret, opts ...OptionFunc) error {
+	return Set(agentSecretKey, secret, opts...)
+}
+
 // Get reads the secret key from the vault
 func Get(key string, opts ...OptionFunc) (secret Secret, err error) {
 	options := applyOptions(opts...)
-	v, err := vault.New(options.vaultPath)
+	// open vault readonly, will not create the vault directory or the seed it was not created before
+	v, err := vault.New(options.vaultPath, vault.WithReadonly(true))
 	if err != nil {
 		return secret, err
 	}
@@ -111,12 +115,32 @@ func Get(key string, opts ...OptionFunc) (secret Secret, err error) {
 	return secret, err
 }
 
+// Set saves the secret key to the vault
+func Set(key string, secret Secret, opts ...OptionFunc) error {
+	options := applyOptions(opts...)
+	v, err := vault.New(options.vaultPath)
+	if err != nil {
+		return fmt.Errorf("could not create new vault: %w", err)
+	}
+	defer v.Close()
+	return set(v, key, secret)
+}
+
+func set(v *vault.Vault, key string, secret Secret) error {
+	b, err := json.Marshal(secret)
+	if err != nil {
+		return fmt.Errorf("could not marshal secret: %w", err)
+	}
+
+	return v.Set(key, b)
+}
+
 // Remove removes the secret key from the vault
 func Remove(key string, opts ...OptionFunc) error {
 	options := applyOptions(opts...)
 	v, err := vault.New(options.vaultPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create new vault: %w", err)
 	}
 	defer v.Close()
 

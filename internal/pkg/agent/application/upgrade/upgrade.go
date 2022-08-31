@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/otiai10/copy"
@@ -33,7 +32,6 @@ const (
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
-	darwin          = "darwin"
 )
 
 var (
@@ -46,15 +44,15 @@ var (
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	agentInfo   *info.AgentInfo
-	settings    *artifact.Config
-	log         *logger.Logger
-	closers     []context.CancelFunc
+	reporter    stateReporter
+	caps        capabilities.Capability
 	reexec      reexecManager
 	acker       acker
-	reporter    stateReporter
+	settings    *artifact.Config
+	agentInfo   *info.AgentInfo
+	log         *logger.Logger
+	closers     []context.CancelFunc
 	upgradeable bool
-	caps        capabilities.Capability
 }
 
 // Action is the upgrade action state.
@@ -128,6 +126,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 				"running under control of the systems supervisor")
 	}
 
+	err = preUpgradeCleanup(u.agentInfo.Version())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q before update: %v", paths.Downloads(), err)
+	}
+
 	if u.caps != nil {
 		if _, err := u.caps.Apply(a); errors.Is(err, capabilities.ErrBlocked) {
 			return nil, nil
@@ -139,6 +142,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	sourceURI := u.sourceURI(a.SourceURI())
 	archivePath, err := u.downloadArtifact(ctx, a.Version(), sourceURI)
 	if err != nil {
+		// Run the same preUpgradeCleanup task to get rid of any newly downloaded files
+		// This may have an issue if users are upgrading to the same version number.
+		if dErr := preUpgradeCleanup(u.agentInfo.Version()); dErr != nil {
+			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
+		}
 		return nil, err
 	}
 
@@ -159,11 +167,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		}
 		u.log.Warn("upgrading to same version")
 		return nil, nil
-	}
-
-	// Copy vault directory for linux/windows only
-	if err := copyVault(newHash); err != nil {
-		return nil, errors.New(err, "failed to copy vault")
 	}
 
 	if err := copyActionStore(newHash); err != nil {
@@ -187,8 +190,18 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), release.TrimCommit(newHash))
 	if reexecNow {
+		err = os.RemoveAll(paths.Downloads())
+		if err != nil {
+			u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
+		}
 		u.reexec.ReExec(cb)
 		return nil, nil
+	}
+
+	// Clean everything from the downloads dir
+	err = os.RemoveAll(paths.Downloads())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
 	}
 
 	return cb, nil
@@ -295,36 +308,6 @@ func copyActionStore(newHash string) error {
 		if err := ioutil.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func getVaultPath(newHash string) string {
-	vaultPath := paths.AgentVaultPath()
-	if runtime.GOOS == darwin {
-		return vaultPath
-	}
-	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	return filepath.Join(newHome, filepath.Base(vaultPath))
-}
-
-// Copies the vault files for windows and linux
-func copyVault(newHash string) error {
-	// No vault files to copy on darwin
-	if runtime.GOOS == darwin {
-		return nil
-	}
-
-	vaultPath := paths.AgentVaultPath()
-	newVaultPath := getVaultPath(newHash)
-
-	err := copyDir(vaultPath, newVaultPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
 	}
 
 	return nil
