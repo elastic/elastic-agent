@@ -77,7 +77,7 @@ func TestController(t *testing.T) {
 
 	log, err := logger.New("", false)
 	require.NoError(t, err)
-	c, err := composable.New(log, cfg)
+	c, err := composable.New(log, cfg, false)
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup

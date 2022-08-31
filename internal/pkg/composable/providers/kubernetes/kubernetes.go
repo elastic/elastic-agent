@@ -34,12 +34,13 @@ func init() {
 }
 
 type dynamicProvider struct {
-	logger *logger.Logger
-	config *Config
+	logger  *logger.Logger
+	config  *Config
+	managed bool
 }
 
 // DynamicProviderBuilder builds the dynamic provider.
-func DynamicProviderBuilder(logger *logger.Logger, c *config.Config) (composable.DynamicProvider, error) {
+func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (composable.DynamicProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()
@@ -49,7 +50,7 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config) (composable
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
 
-	return &dynamicProvider{logger, &cfg}, nil
+	return &dynamicProvider{logger, &cfg, managed}, nil
 }
 
 // Run runs the kubernetes context provider.
@@ -139,19 +140,19 @@ func (p *dynamicProvider) newEventer(
 	client k8s.Interface) (Eventer, error) {
 	switch resourceType {
 	case "pod":
-		eventer, err := NewPodEventer(comm, p.config, p.logger, client, p.config.Scope)
+		eventer, err := NewPodEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}
 		return eventer, nil
 	case nodeScope:
-		eventer, err := NewNodeEventer(comm, p.config, p.logger, client, p.config.Scope)
+		eventer, err := NewNodeEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}
 		return eventer, nil
 	case "service":
-		eventer, err := NewServiceEventer(comm, p.config, p.logger, client, p.config.Scope)
+		eventer, err := NewServiceEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}

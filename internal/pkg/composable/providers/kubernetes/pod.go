@@ -6,12 +6,12 @@ package kubernetes
 
 import (
 	"fmt"
+	"github.com/elastic/elastic-agent-autodiscover/utils"
 	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
-	"github.com/elastic/elastic-agent-autodiscover/utils"
 	c "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -32,6 +32,7 @@ type pod struct {
 	config           *Config
 	logger           *logp.Logger
 	scope            string
+	managed          bool
 	cleanupTimeout   time.Duration
 
 	// Mutex used by configuration updates not triggered by the main watcher,
@@ -52,7 +53,8 @@ func NewPodEventer(
 	cfg *Config,
 	logger *logp.Logger,
 	client k8s.Interface,
-	scope string) (Eventer, error) {
+	scope string,
+	managed bool) (Eventer, error) {
 	watcher, err := kubernetes.NewNamedWatcher("agent-pod", client, &kubernetes.Pod{}, kubernetes.WatchOptions{
 		SyncTimeout:  cfg.SyncPeriod,
 		Node:         cfg.Node,
@@ -96,6 +98,7 @@ func NewPodEventer(
 		watcher:          watcher,
 		nodeWatcher:      nodeWatcher,
 		namespaceWatcher: namespaceWatcher,
+		managed:          managed,
 	}
 
 	watcher.AddEventHandler(p)
@@ -152,19 +155,21 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 	data.mapping["scope"] = p.scope
 
 	if p.config.Hints.Enabled() { // This is "hints based autodiscovery flow"
-		if ann, ok := data.mapping["annotations"]; ok {
-			annotations := ann.(mapstr.M)
-			hints := utils.GenerateHints(annotations, "", p.config.Prefix)
-			if len(hints) > 0 {
-				p.logger.Errorf("Extracted hints are :%v", hints)
-				hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger)
-				p.logger.Errorf("Generated hints mappings are :%v", hintsMapping)
-				_ = p.comm.AddOrUpdate(
-					data.uid,
-					PodPriority,
-					map[string]interface{}{"hints": hintsMapping},
-					data.processors, // TODO: add processors here explicitely ->>> NOOOO
-				)
+		if !p.managed {
+			if ann, ok := data.mapping["annotations"]; ok {
+				annotations := ann.(mapstr.M)
+				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
+				if len(hints) > 0 {
+					p.logger.Errorf("Extracted hints are :%v", hints)
+					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger)
+					p.logger.Errorf("Generated hints mappings are :%v", hintsMapping)
+					_ = p.comm.AddOrUpdate(
+						data.uid,
+						PodPriority,
+						map[string]interface{}{"hints": hintsMapping},
+						data.processors, // TODO: add processors here explicitely ->>> NOOOO
+					)
+				}
 			}
 		}
 	} else { // This is the "template-based autodiscovery" flow

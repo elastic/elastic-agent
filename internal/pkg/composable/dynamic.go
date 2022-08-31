@@ -34,7 +34,7 @@ type DynamicProvider interface {
 }
 
 // DynamicProviderBuilder creates a new dynamic provider based on the given config and returns it.
-type DynamicProviderBuilder func(log *logger.Logger, config *config.Config) (DynamicProvider, error)
+type DynamicProviderBuilder func(log *logger.Logger, config *config.Config, managed bool) (DynamicProvider, error)
 
 // AddDynamicProvider adds a new DynamicProviderBuilder
 func (r *providerRegistry) AddDynamicProvider(name string, builder DynamicProviderBuilder) error {

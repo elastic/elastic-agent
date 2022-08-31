@@ -41,7 +41,7 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 }
 
 // DynamicProviderBuilder builds the dynamic provider.
-func DynamicProviderBuilder(_ *logger.Logger, c *config.Config) (composable.DynamicProvider, error) {
+func DynamicProviderBuilder(_ *logger.Logger, c *config.Config, managed bool) (composable.DynamicProvider, error) {
 	p := &dynamicProvider{}
 	if c != nil {
 		err := c.Unpack(p)
