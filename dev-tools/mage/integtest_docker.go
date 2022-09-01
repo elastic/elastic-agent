@@ -256,12 +256,12 @@ func dockerComposeBuildImages() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(composeEnv)
+
 	args := []string{"-p", dockerComposeProjectName(), "build", "--force-rm"}
 	if _, noCache := os.LookupEnv("DOCKER_NOCACHE"); noCache {
 		args = append(args, "--no-cache")
 	}
-	fmt.Println(args)
+
 	if _, forcePull := os.LookupEnv("DOCKER_PULL"); forcePull {
 		args = append(args, "--pull")
 	}
