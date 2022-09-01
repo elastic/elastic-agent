@@ -15,72 +15,23 @@ outputs:
     # username: "elastic"
     # password: "changeme"
 
-providers:
-  local_dynamic:
-    items:
-      - vars:
-          key: value1
-          proc:
-            - add_fields:
-                fields:
-                  custom: match424242
-                target: dynamic
-            - add_fields:
-                fields:
-                  hints: true
-                target: kubernetes
-
 inputs:
-  - type: logfile
-    enabled: true
+  - type: system/metrics
+
+    # Namespace name must conform to the naming conventions for Elasticsearch indices, cannot contain dashes (-), and cannot exceed 100 bytes
+    # For index naming restrictions, see https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-create-index.html#indices-create-api-path-params
+    data_stream.namespace: default
+    use_output: default
     streams:
-      - paths:
-          - /var/log/${local_dynamic.key}
-        processors:
-          ${local_dynamic.proc}
-#        processors:
-#          - ${local_dynamic.proc|'~'}
-
-
-#providers:
-#  kubernetes:
-#    kube_config: /Users/chrismark/.kube/config
-#    node: "kind-control-plane"
-#    hints.enabled: true
-#
-#inputs:
-#  - name: templates.d/redis/0.3.6
-#    type: redis/metrics
-#    data_stream.namespace: default
-#    use_output: default
-#    streams:
-#      - data_stream:
-#          dataset: redis.info
-#          type: metrics
-#        metricsets:
-#         - info
-#        hosts:
-#          - "${kubernetes.hints.redis.info.host|kubernetes.hints.redis.host|'127.0.0.1:6379'}"
-#        idle_timeout: 20s
-#        maxconn: 10
-#        network: tcp
-#        period: "${kubernetes.hints.redis.info.period|kubernetes.hints.redis.period|'10s'}"
-#        condition: ${kubernetes.hints.redis.info.enabled} == true or ${kubernetes.hints.redis.enabled} == true
-#      - data_stream:
-#          dataset: redis.key
-#          type: metrics
-#        metricsets:
-#          - key
-#        hosts:
-#          - "${kubernetes.hints.redis.key.host|kubernetes.hints.redis.host|'127.0.0.1'}:${kubernetes.hints.redis.info.port|'6379'}"
-#        idle_timeout: 20s
-#        key.patterns:
-#          - limit: 20
-#            pattern: '*'
-#        maxconn: 10
-#        network: tcp
-#        period: "${kubernetes.hints.redis.key.period|kubernetes.hints.redis.period|'10s'}"
-#        condition: ${kubernetes.hints.redis.key.enabled} == true and ${kubernetes.hints.redis.enabled} == true
+      - metricset: cpu
+        # Dataset name must conform to the naming conventions for Elasticsearch indices, cannot contain dashes (-), and cannot exceed 100 bytes
+        data_stream.dataset: system.cpu
+      - metricset: memory
+        data_stream.dataset: system.memory
+      - metricset: network
+        data_stream.dataset: system.network
+      - metricset: filesystem
+        data_stream.dataset: system.filesystem
 
 # agent.monitoring:
 #   # enabled turns on monitoring of running processes
