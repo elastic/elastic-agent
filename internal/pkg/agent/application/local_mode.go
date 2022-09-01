@@ -119,6 +119,11 @@ func newLocal(
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+	routerArtifactReloader, ok := router.(emitter.Reloader)
+	if !ok {
+		return nil, errors.New("router not capable of artifact reload") // Needed for client reloading
+	}
+
 	discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
 	emit, err := emitter.New(
 		localApplication.bgContext,
@@ -133,6 +138,7 @@ func newLocal(
 		caps,
 		monitor,
 		artifact.NewReloader(cfg.Settings.DownloadConfig, log),
+		routerArtifactReloader,
 	)
 	if err != nil {
 		return nil, err
@@ -167,7 +173,7 @@ func newLocal(
 }
 
 func externalConfigsGlob() string {
-	return filepath.Join(paths.Config(), configuration.ExternalInputsPattern)
+	return filepath.Join(paths.AgentInputsDPath(), "*.yml")
 }
 
 // Routes returns a list of routes handled by agent.

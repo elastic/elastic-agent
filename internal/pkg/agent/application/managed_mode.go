@@ -146,6 +146,11 @@ func newManaged(
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+	routerArtifactReloader, ok := router.(emitter.Reloader)
+	if !ok {
+		return nil, errors.New("router not capable of artifact reload") // Needed for client reloading
+	}
+
 	emit, err := emitter.New(
 		managedApplication.bgContext,
 		log,
@@ -159,6 +164,7 @@ func newManaged(
 		caps,
 		monitor,
 		artifact.NewReloader(cfg.Settings.DownloadConfig, log),
+		routerArtifactReloader,
 	)
 	if err != nil {
 		return nil, err
