@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -19,16 +21,26 @@ func TestEnrollCmd(t *testing.T) {
 	assert.NotNil(t, identifier)
 	rootDir := poc.ElasticAgentDirectory("")
 	paths.ConfigFilePath = filepath.Join(rootDir, "_meta", paths.DefaultConfigName)
-	streams := cli.NewIOStreams()
+	streams, _, out, _ := cli.NewTestingIOStreams()
 	cmd := newEnrollCommandWithArgs(os.Args, streams)
 	cmd.Flags().Set("url", "https://localhost:8220")
 	enrollment, err := poc.CreateEnrollmentAPIKey()
 	assert.NoError(t, err)
 	cmd.Flags().Set("enrollment-token", enrollment)
 	cmd.Flags().Set("insecure", "true")
-	assert.NoError(t, err)
-
-	output, _ := poc.ExecuteCommand(cmd)
-	assert.Equal(t, "test", output)
+	cmd.Flags().Set("force", "true")
+	if !assert.NoError(t, err) {
+		return
+	}
+	cmd.SetOut(streams.Out)
+	err = cmd.Execute()
+	if !assert.NoError(t, err) {
+		return
+	}
+	contents, err := ioutil.ReadAll(out)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.True(t, strings.Contains(string(contents), "Successfully enrolled the Elastic Agent."))
 
 }
