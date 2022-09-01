@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -364,6 +365,9 @@ func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
 	err := os.MkdirAll(path, runDirMod)
 	if err != nil {
 		return "", fmt.Errorf("failed to create path: %s, %w", path, err)
+	}
+	if runtime.GOOS == component.Windows {
+		return path, nil
 	}
 	err = os.Chown(path, uid, gid)
 	if err != nil {
