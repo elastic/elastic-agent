@@ -149,6 +149,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				c.sendObserved()
 			}
 		case <-t.C:
+			t.Reset(checkinPeriod)
 			if c.actionState == actionStart {
 				if c.proc == nil {
 					// not running, but should be running
