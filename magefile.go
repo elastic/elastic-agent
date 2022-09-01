@@ -280,7 +280,7 @@ func (Build) TestBinaries() error {
 	if err != nil {
 		return err
 	}
-	return os.Chmod(outputName, 755)
+	return os.Chmod(outputName, 0755)
 }
 
 // All run all the code checks.

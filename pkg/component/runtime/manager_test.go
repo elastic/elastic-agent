@@ -38,6 +38,7 @@ var (
 		Command: &component.CommandSpec{
 			Timeouts: component.CommandTimeoutSpec{
 				Checkin: 30 * time.Second,
+				Restart: 10 * time.Millisecond, // quick restart during tests
 				Stop:    30 * time.Second,
 			},
 		},
@@ -263,6 +264,10 @@ LOOP:
 
 	err = <-errCh
 	require.NoError(t, err)
+
+	workDir := filepath.Join(paths.Run(), comp.ID)
+	_, err = os.Stat(workDir)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
@@ -1817,7 +1822,7 @@ func testBinary(t *testing.T) string {
 		if err != nil {
 			t.Fatalf("failed chown %s: %s", binaryPath, err)
 		}
-		err = os.Chmod(binaryPath, 0770)
+		err = os.Chmod(binaryPath, 0755)
 		if err != nil {
 			t.Fatalf("failed chmod %s: %s", binaryPath, err)
 		}

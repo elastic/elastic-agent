@@ -24,8 +24,9 @@ import (
 type actionMode int
 
 const (
-	actionStart = actionMode(0)
-	actionStop  = actionMode(1)
+	actionStart    = actionMode(0)
+	actionStop     = actionMode(1)
+	actionTeardown = actionMode(2)
 
 	runDirMod = 0770
 
@@ -94,7 +95,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 					c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
 				}
 				t.Reset(checkinPeriod)
-			case actionStop:
+			case actionStop, actionTeardown:
 				if err := c.stop(ctx); err != nil {
 					c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
 				}
@@ -219,8 +220,8 @@ func (c *CommandRuntime) Stop() error {
 //
 // Non-blocking and never returns an error.
 func (c *CommandRuntime) Teardown() error {
-	// teardown is not different from stop for command runtime
-	return c.Stop()
+	c.actionCh <- actionTeardown
+	return nil
 }
 
 // forceCompState force updates the state for the entire component, forcing that state on all units.
@@ -342,16 +343,24 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 		stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		c.forceCompState(client.UnitStateFailed, stopMsg)
 		return true
-	case actionStop:
+	case actionStop, actionTeardown:
 		// stopping (should have exited)
 		stopMsg := fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		c.forceCompState(client.UnitStateStopped, stopMsg)
+		if c.actionState == actionTeardown {
+			// teardown so the entire component has been removed (cleanup work directory)
+			_ = os.RemoveAll(c.workDirPath())
+		}
 	}
 	return false
 }
 
+func (c *CommandRuntime) workDirPath() string {
+	return filepath.Join(paths.Run(), c.current.ID)
+}
+
 func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
-	path := filepath.Join(paths.Run(), c.current.ID)
+	path := c.workDirPath()
 	err := os.MkdirAll(path, runDirMod)
 	if err != nil {
 		return "", fmt.Errorf("failed to create path: %s, %w", path, err)
