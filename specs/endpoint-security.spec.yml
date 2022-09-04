@@ -15,6 +15,9 @@ inputs:
         - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
           message: "No support for RHEL7 on arm64"
     service:
+      name: ElasticEndpoint # Windows and Linux service name
+      label: co.elastic.endpoint # macOS plist identifier
+      service: 6788 # Comms discovery port
       operations:
         check:
           args:

@@ -53,13 +53,13 @@ type ComponentRuntime interface {
 }
 
 // NewComponentRuntime creates the proper runtime based on the input specification for the component.
-func NewComponentRuntime(comp component.Component) (ComponentRuntime, error) {
+func NewComponentRuntime(comp component.Component, logger *logger.Logger) (ComponentRuntime, error) {
 	if comp.Err != nil {
 		return NewFailedRuntime(comp)
 	} else if comp.Spec.Spec.Command != nil {
 		return NewCommandRuntime(comp)
 	} else if comp.Spec.Spec.Service != nil {
-		return nil, errors.New("service component runtime not implemented")
+		return NewServiceRuntime(comp, logger)
 	}
 	return nil, errors.New("unknown component runtime")
 }
@@ -92,7 +92,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := NewComponentRuntime(comp)
+	runtime, err := NewComponentRuntime(comp, logger)
 	if err != nil {
 		return nil, err
 	}
