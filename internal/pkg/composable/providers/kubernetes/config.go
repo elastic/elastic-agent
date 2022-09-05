@@ -5,8 +5,9 @@
 package kubernetes
 
 import (
-	"github.com/elastic/elastic-agent-libs/config"
 	"time"
+
+	"github.com/elastic/elastic-agent-libs/config"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"

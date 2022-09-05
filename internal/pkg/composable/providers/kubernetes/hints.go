@@ -6,27 +6,29 @@ package kubernetes
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/elastic/elastic-agent-autodiscover/utils"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"regexp"
-	"strings"
 )
 
 const (
 	integration = "package"
-	namespace   = "namespace"
-	host        = "host"
 	datastreams = "data_streams"
+
+	host        = "host"
 	period      = "period"
 	timeout     = "timeout"
-	// TODO: Do we support more complext values in dynamic variables resolution in Agent
+	metricspath = "metrics_path"
+	username    = "username"
+	password    = "password"
+
+	// Just placeholders, not supported yet.
+	namespace      = "namespace"
 	ssl            = "ssl"
 	metricsfilters = "metrics_filters"
-	metricspath    = "metrics_path"
-	username       = "username"
-	password       = "password"
-	// TODO: Verify how streams and container logs work and add that option here
 
 	defaultTimeout = "3s"
 	defaultPeriod  = "1m"
@@ -103,9 +105,8 @@ func (m *hintsBuilder) getStreamUsername(hints mapstr.M, streamName string) stri
 	return utils.GetHintString(hints, m.Key, key)
 }
 
-func (m *hintsBuilder) getPassword(hints mapstr.M, streamName string) string {
-	key := fmt.Sprintf("%v.%v", streamName, password)
-	return utils.GetHintString(hints, m.Key, key)
+func (m *hintsBuilder) getPassword(hints mapstr.M) string {
+	return utils.GetHintString(hints, m.Key, password)
 }
 
 func (m *hintsBuilder) getStreamPassword(hints mapstr.M, streamName string) string {
@@ -162,6 +163,7 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 	//	  target: kubernetes
 	//	  fields:
 	//	    hints: true
+	// Blocked by https://github.com/elastic/elastic-agent/issues/735
 
 	integrationHost := builder.getFromMeta(builder.getHost(hints), kubeMeta)
 	if integrationHost != "" {
@@ -171,8 +173,22 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 	if integrationPeriod != "" {
 		integrationHints.Put("period", integrationPeriod)
 	}
-
-	// TODO: add more hints here
+	integrationTimeout := builder.getFromMeta(builder.getTimeout(hints), kubeMeta)
+	if integrationTimeout != "" {
+		integrationHints.Put("timeout", integrationTimeout)
+	}
+	integrationMetricsPath := builder.getFromMeta(builder.getMetricspath(hints), kubeMeta)
+	if integrationMetricsPath != "" {
+		integrationHints.Put("metrics_path", integrationMetricsPath)
+	}
+	integrationUsername := builder.getFromMeta(builder.getUsername(hints), kubeMeta)
+	if integrationMetricsPath != "" {
+		integrationHints.Put("username", integrationUsername)
+	}
+	integrationPassword := builder.getFromMeta(builder.getPassword(hints), kubeMeta)
+	if integrationMetricsPath != "" {
+		integrationHints.Put("password", integrationPassword)
+	}
 
 	dataStreams := builder.getDataStreams(hints)
 	for _, dataStream := range dataStreams {
@@ -185,6 +201,18 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 		if integrationHost != "" {
 			streamHints.Put("host", integrationHost)
 		}
+		if integrationTimeout != "" {
+			streamHints.Put("timeout", integrationTimeout)
+		}
+		if integrationMetricsPath != "" {
+			streamHints.Put(metricspath, integrationMetricsPath)
+		}
+		if integrationUsername != "" {
+			streamHints.Put(username, integrationUsername)
+		}
+		if integrationPassword != "" {
+			streamHints.Put(password, integrationPassword)
+		}
 
 		streamPeriod := builder.getFromMeta(builder.getStreamPeriod(hints, dataStream), kubeMeta)
 		if streamPeriod != "" {
@@ -194,9 +222,24 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 		if streamHost != "" {
 			streamHints.Put("host", streamHost)
 		}
+		streamTimeout := builder.getFromMeta(builder.getStreamTimeout(hints, dataStream), kubeMeta)
+		if streamTimeout != "" {
+			streamHints.Put("timeout", streamTimeout)
+		}
+		streamMetricsPath := builder.getFromMeta(builder.getStreamMetricspath(hints, dataStream), kubeMeta)
+		if streamHost != "" {
+			streamHints.Put("metrics_path", streamMetricsPath)
+		}
+		streamUsername := builder.getFromMeta(builder.getStreamUsername(hints, dataStream), kubeMeta)
+		if streamPeriod != "" {
+			streamHints.Put("username", streamUsername)
+		}
+		streamPassword := builder.getFromMeta(builder.getStreamPassword(hints, dataStream), kubeMeta)
+		if streamHost != "" {
+			streamHints.Put("password", streamPassword)
+		}
 		integrationHints.Put(dataStream, streamHints)
 
-		// TODO: add more hints here
 	}
 
 	hintsMapping.Put(integration, integrationHints)

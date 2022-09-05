@@ -6,9 +6,10 @@ package kubernetes
 
 import (
 	"fmt"
-	"github.com/elastic/elastic-agent-autodiscover/utils"
 	"sync"
 	"time"
+
+	"github.com/elastic/elastic-agent-autodiscover/utils"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
@@ -163,6 +164,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 					p.logger.Errorf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger)
 					p.logger.Errorf("Generated hints mappings are :%v", hintsMapping)
+					fmt.Println(hintsMapping)
 					_ = p.comm.AddOrUpdate(
 						data.uid,
 						PodPriority,
