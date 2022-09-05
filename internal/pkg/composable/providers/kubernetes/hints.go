@@ -145,7 +145,9 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 		logger: logger,
 	}
 
-	hintsMapping := mapstr.M{}
+	hintsMapping := mapstr.M{
+		"container_id": "asdfg",
+	}
 
 	integration := builder.getIntegration(hints)
 	if integration == "" {
@@ -167,27 +169,27 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 
 	integrationHost := builder.getFromMeta(builder.getHost(hints), kubeMeta)
 	if integrationHost != "" {
-		integrationHints.Put("host", integrationHost)
+		integrationHints.Put(host, integrationHost)
 	}
 	integrationPeriod := builder.getFromMeta(builder.getPeriod(hints), kubeMeta)
 	if integrationPeriod != "" {
-		integrationHints.Put("period", integrationPeriod)
+		integrationHints.Put(period, integrationPeriod)
 	}
 	integrationTimeout := builder.getFromMeta(builder.getTimeout(hints), kubeMeta)
 	if integrationTimeout != "" {
-		integrationHints.Put("timeout", integrationTimeout)
+		integrationHints.Put(timeout, integrationTimeout)
 	}
 	integrationMetricsPath := builder.getFromMeta(builder.getMetricspath(hints), kubeMeta)
 	if integrationMetricsPath != "" {
-		integrationHints.Put("metrics_path", integrationMetricsPath)
+		integrationHints.Put(metricspath, integrationMetricsPath)
 	}
 	integrationUsername := builder.getFromMeta(builder.getUsername(hints), kubeMeta)
-	if integrationMetricsPath != "" {
-		integrationHints.Put("username", integrationUsername)
+	if integrationUsername != "" {
+		integrationHints.Put(username, integrationUsername)
 	}
 	integrationPassword := builder.getFromMeta(builder.getPassword(hints), kubeMeta)
-	if integrationMetricsPath != "" {
-		integrationHints.Put("password", integrationPassword)
+	if integrationPassword != "" {
+		integrationHints.Put(password, integrationPassword)
 	}
 
 	dataStreams := builder.getDataStreams(hints)
@@ -196,13 +198,13 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 			"enabled": true,
 		}
 		if integrationPeriod != "" {
-			streamHints.Put("period", integrationPeriod)
+			streamHints.Put(period, integrationPeriod)
 		}
 		if integrationHost != "" {
-			streamHints.Put("host", integrationHost)
+			streamHints.Put(host, integrationHost)
 		}
 		if integrationTimeout != "" {
-			streamHints.Put("timeout", integrationTimeout)
+			streamHints.Put(timeout, integrationTimeout)
 		}
 		if integrationMetricsPath != "" {
 			streamHints.Put(metricspath, integrationMetricsPath)
@@ -216,27 +218,27 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 
 		streamPeriod := builder.getFromMeta(builder.getStreamPeriod(hints, dataStream), kubeMeta)
 		if streamPeriod != "" {
-			streamHints.Put("period", streamPeriod)
+			streamHints.Put(period, streamPeriod)
 		}
 		streamHost := builder.getFromMeta(builder.getStreamHost(hints, dataStream), kubeMeta)
 		if streamHost != "" {
-			streamHints.Put("host", streamHost)
+			streamHints.Put(host, streamHost)
 		}
 		streamTimeout := builder.getFromMeta(builder.getStreamTimeout(hints, dataStream), kubeMeta)
 		if streamTimeout != "" {
-			streamHints.Put("timeout", streamTimeout)
+			streamHints.Put(timeout, streamTimeout)
 		}
 		streamMetricsPath := builder.getFromMeta(builder.getStreamMetricspath(hints, dataStream), kubeMeta)
-		if streamHost != "" {
-			streamHints.Put("metrics_path", streamMetricsPath)
+		if streamMetricsPath != "" {
+			streamHints.Put(metricspath, streamMetricsPath)
 		}
 		streamUsername := builder.getFromMeta(builder.getStreamUsername(hints, dataStream), kubeMeta)
-		if streamPeriod != "" {
-			streamHints.Put("username", streamUsername)
+		if streamUsername != "" {
+			streamHints.Put(username, streamUsername)
 		}
 		streamPassword := builder.getFromMeta(builder.getStreamPassword(hints, dataStream), kubeMeta)
-		if streamHost != "" {
-			streamHints.Put("password", streamPassword)
+		if streamPassword != "" {
+			streamHints.Put(password, streamPassword)
 		}
 		integrationHints.Put(dataStream, streamHints)
 
