@@ -7,7 +7,7 @@ package runtime
 import (
 	"context"
 	"errors"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -76,12 +76,12 @@ func prepareTestProg(ctx context.Context, dir string, cfg progConfig) (string, e
 	progPath := filepath.Join(dir, name+".go")
 
 	prog := renderTestProg(cfg)
-	err := ioutil.WriteFile(progPath, []byte(prog), 0640)
+	err := os.WriteFile(progPath, []byte(prog), 0600)
 	if err != nil {
 		return "", err
 	}
 
-	err = ioutil.WriteFile(filepath.Join(dir, "go.mod"), []byte(testModFile), 0640)
+	err = os.WriteFile(filepath.Join(dir, "go.mod"), []byte(testModFile), 0600)
 	if err != nil {
 		return "", err
 	}

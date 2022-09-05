@@ -34,7 +34,7 @@ func executeCommand(ctx context.Context, binaryPath string, args []string, env [
 		cmd.Env = append(os.Environ(), env...)
 	}
 
-	// Set the command working direcotry from binary
+	// Set the command working directory from binary
 	// This is needed because the endpoint installer was looking for it's resources in the current working directory
 	wdir := filepath.Dir(binaryPath)
 	if wdir != "." {

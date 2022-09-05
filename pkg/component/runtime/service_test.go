@@ -75,6 +75,7 @@ func TestServiceStart(t *testing.T) {
 		for {
 			select {
 			case state := <-service.Watch():
+				//nolint:forbidigo // leave it here, not a real unit test, but super useful code for development
 				fmt.Printf("Got State: %#v\n", state)
 				switch state.State {
 				case client.UnitStateHealthy, client.UnitStateStopped:

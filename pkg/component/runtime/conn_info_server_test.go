@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"syscall"
 	"testing"
@@ -23,13 +22,13 @@ import (
 
 type mockCommunicator struct {
 	ch       chan *proto.CheckinObserved
-	connInfo proto.ConnInfo
+	connInfo *proto.ConnInfo
 }
 
 func newMockCommunicator() *mockCommunicator {
 	return &mockCommunicator{
 		ch: make(chan *proto.CheckinObserved),
-		connInfo: proto.ConnInfo{
+		connInfo: &proto.ConnInfo{
 			Addr:       "127.0.0.1:12345",
 			ServerName: "endpoint",
 			Token:      "some token",
@@ -42,7 +41,7 @@ func newMockCommunicator() *mockCommunicator {
 }
 
 func (c *mockCommunicator) WriteConnInfo(w io.Writer, services ...client.Service) error {
-	infoBytes, err := protobuf.Marshal(&c.connInfo)
+	infoBytes, err := protobuf.Marshal(c.connInfo)
 	if err != nil {
 		return fmt.Errorf("failed to marshal connection information: %w", err)
 	}
@@ -88,7 +87,7 @@ func TestConnInfoNormal(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		b, err := ioutil.ReadAll(conn)
+		b, err := io.ReadAll(conn)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,7 +99,7 @@ func TestConnInfoNormal(t *testing.T) {
 		}
 
 		// Check the received result
-		diff := cmp.Diff(connInfo, comm.connInfo, cmpopts.IgnoreUnexported(proto.ConnInfo{}))
+		diff := cmp.Diff(&connInfo, comm.connInfo, cmpopts.IgnoreUnexported(proto.ConnInfo{}))
 		if diff != "" {
 			t.Error(diff)
 		}
@@ -137,7 +136,7 @@ func TestConnInfoConnCloseThenAnotherConn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b, err := ioutil.ReadAll(conn)
+	b, err := io.ReadAll(conn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +148,7 @@ func TestConnInfoConnCloseThenAnotherConn(t *testing.T) {
 	}
 
 	// Check the received result
-	diff := cmp.Diff(connInfo, comm.connInfo, cmpopts.IgnoreUnexported(proto.ConnInfo{}))
+	diff := cmp.Diff(&connInfo, comm.connInfo, cmpopts.IgnoreUnexported(proto.ConnInfo{}))
 	if diff != "" {
 		t.Error(diff)
 	}

@@ -138,7 +138,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 			case serviceStart:
 				err = s.start(ctx, cli)
 			case serviceStop:
-				err = s.stop(ctx, cli)
+				err = s.stop(cli)
 			case serviceTeardown:
 				err = s.teardown(ctx, cli)
 			}
@@ -173,7 +173,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 			}
 
 		case <-t.C:
-			s.checkStatus(ctx, cli, checkinPeriod)
+			s.checkStatus(cli, checkinPeriod)
 		case newComp := <-s.compCh:
 			sendExpected := s.state.syncExpected(&newComp)
 			changed := s.state.syncUnits(&newComp)
@@ -219,7 +219,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 }
 
 // checkStatus checks service status, called on timer
-func (s *ServiceRuntime) checkStatus(ctx context.Context, cli service.Service, checkinPeriod time.Duration) {
+func (s *ServiceRuntime) checkStatus(cli service.Service, checkinPeriod time.Duration) {
 	status, err := cli.Status()
 	if err != nil {
 		s.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: service status check error: %v", err))
@@ -354,7 +354,7 @@ func (s *ServiceRuntime) start(ctx context.Context, cli service.Service) error {
 }
 
 // stop stops the service
-func (s *ServiceRuntime) stop(ctx context.Context, cli service.Service) error {
+func (s *ServiceRuntime) stop(cli service.Service) error {
 	s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Stopping: %s service", cli))
 
 	// Check service status if it's already stopped
@@ -389,7 +389,7 @@ func (s *ServiceRuntime) stop(ctx context.Context, cli service.Service) error {
 
 // teardown stops and uninstalls the service
 func (s *ServiceRuntime) teardown(ctx context.Context, cli service.Service) error {
-	err := s.stop(ctx, cli)
+	err := s.stop(cli)
 	if err != nil {
 		s.log.Errorf("failed stop the service %s: %v, continue with uninstall", s.current.Spec.BinaryName, err)
 	}
