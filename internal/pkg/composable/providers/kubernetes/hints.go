@@ -26,12 +26,7 @@ const (
 	password    = "password"
 
 	// Just placeholders, not supported yet.
-	namespace      = "namespace"
-	ssl            = "ssl"
-	metricsfilters = "metrics_filters"
-
-	defaultTimeout = "3s"
-	defaultPeriod  = "1m"
+	namespace = "namespace"
 )
 
 type hintsBuilder struct {
@@ -159,7 +154,6 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 	}
 
 	// TODO: add support for processors
-	// is processor input specific or data_stream specific ???
 	// Processors should be data_stream specific.
 	// Add a basic processor as a base like:
 	//- add_fields:

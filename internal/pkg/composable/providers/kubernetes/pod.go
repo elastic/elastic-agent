@@ -164,12 +164,11 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 					p.logger.Errorf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
 					p.logger.Errorf("Generated hints mappings are :%v", hintsMapping)
-					fmt.Println(hintsMapping)
 					_ = p.comm.AddOrUpdate(
 						data.uid,
 						PodPriority,
 						map[string]interface{}{"hints": hintsMapping},
-						data.processors, // TODO: add processors here explicitely ->>> NOOOO
+						data.processors,
 					)
 				}
 			}
@@ -385,7 +384,6 @@ func generateContainerData(
 								logger.Errorf("Extracted hints are :%v", hints)
 								hintsMapping := GenerateHintsMapping(hints, k8sMapping, logger, c.ID)
 								logger.Errorf("Generated hints mappings are :%v", hintsMapping)
-								fmt.Println(hintsMapping)
 								_ = comm.AddOrUpdate(
 									eventID,
 									PodPriority,
