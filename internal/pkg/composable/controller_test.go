@@ -99,14 +99,14 @@ func TestController(t *testing.T) {
 	_, envExists := setVars[0].Lookup("env")
 	assert.False(t, envExists)
 	local, _ := setVars[0].Lookup("local")
-	localMap := local.(map[string]interface{})
+	localMap, _ := local.(map[string]interface{})
 	assert.Equal(t, "value1", localMap["key1"])
 
 	local, _ = setVars[1].Lookup("local_dynamic")
-	localMap = local.(map[string]interface{})
+	localMap, _ = local.(map[string]interface{})
 	assert.Equal(t, "value1", localMap["key1"])
 
 	local, _ = setVars[2].Lookup("local_dynamic")
-	localMap = local.(map[string]interface{})
+	localMap, _ = local.(map[string]interface{})
 	assert.Equal(t, "value2", localMap["key1"])
 }

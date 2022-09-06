@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	composable.Providers.AddContextProvider("local", ContextProviderBuilder)
+	_ = composable.Providers.AddContextProvider("local", ContextProviderBuilder)
 }
 
 type contextProvider struct {

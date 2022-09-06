@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	composable.Providers.AddContextProvider("agent", ContextProviderBuilder)
+	_ = composable.Providers.AddContextProvider("agent", ContextProviderBuilder)
 }
 
 type contextProvider struct{}
