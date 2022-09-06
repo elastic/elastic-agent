@@ -519,6 +519,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 							} else if unit.State == client.UnitStateHealthy {
 								// good unit it; now make it bad
+								t.Logf("marking good-input as having a hard-error for config")
 								updatedComp := comp
 								updatedComp.Units = make([]component.Unit, len(comp.Units))
 								copy(updatedComp.Units, comp.Units)
