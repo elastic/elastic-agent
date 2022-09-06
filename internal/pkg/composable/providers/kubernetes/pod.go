@@ -158,7 +158,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 	if p.config.Hints.Enabled() { // This is "hints based autodiscovery flow"
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
-				annotations := ann.(mapstr.M)
+				annotations, _ := ann.(mapstr.M)
 				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
 				if len(hints) > 0 {
 					p.logger.Errorf("Extracted hints are :%v", hints)
@@ -378,7 +378,7 @@ func generateContainerData(
 				if config.Hints.Enabled() { // This is "hints based autodiscovery flow"
 					if !managed {
 						if ann, ok := k8sMapping["annotations"]; ok {
-							annotations := ann.(mapstr.M)
+							annotations, _ := ann.(mapstr.M)
 							hints := utils.GenerateHints(annotations, "", config.Prefix)
 							if len(hints) > 0 {
 								logger.Errorf("Extracted hints are :%v", hints)

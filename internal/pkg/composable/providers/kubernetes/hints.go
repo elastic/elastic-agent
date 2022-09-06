@@ -24,9 +24,6 @@ const (
 	metricspath = "metrics_path"
 	username    = "username"
 	password    = "password"
-
-	// Just placeholders, not supported yet.
-	namespace = "namespace"
 )
 
 type hintsBuilder struct {
@@ -40,9 +37,7 @@ func (m *hintsBuilder) getIntegration(hints mapstr.M) string {
 }
 
 func (m *hintsBuilder) getDataStreams(hints mapstr.M) []string {
-	var ds []string
-	ds = utils.GetHintAsList(hints, m.Key, datastreams)
-
+	ds := utils.GetHintAsList(hints, m.Key, datastreams)
 	return ds
 }
 
