@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"go.elastic.co/apm"
 
@@ -19,6 +20,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+type persistedQueue interface {
+	Add(fleetapi.Action, int64)
+	DequeueActions() []fleetapi.Action
+	Save() error
+}
+
 type actionHandlers map[string]actions.Handler
 
 // ActionDispatcher processes actions coming from fleet using registered set of handlers.
@@ -27,10 +34,11 @@ type ActionDispatcher struct {
 	log      *logger.Logger
 	handlers actionHandlers
 	def      actions.Handler
+	queue    persistedQueue
 }
 
 // New creates a new action dispatcher.
-func New(ctx context.Context, log *logger.Logger, def actions.Handler) (*ActionDispatcher, error) {
+func New(ctx context.Context, log *logger.Logger, def actions.Handler, queue persistedQueue) (*ActionDispatcher, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("action_dispatcher", false)
@@ -48,6 +56,7 @@ func New(ctx context.Context, log *logger.Logger, def actions.Handler) (*ActionD
 		log:      log,
 		handlers: make(actionHandlers),
 		def:      def,
+		queue:    queue,
 	}, nil
 }
 
@@ -91,16 +100,27 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 	defer cancel()
 	ctx = apm.ContextWithSpan(ctx, span)
 
-	if len(actions) == 0 {
-		ad.log.Debug("No action to dispatch")
-		return nil
-	}
-
 	ad.log.Debugf(
 		"Dispatch %d actions of types: %s",
 		len(actions),
 		strings.Join(detectTypes(actions), ", "),
 	)
+
+	actions = ad.queueScheduledActions(actions)
+	actions = ad.dispatchCancelActions(actions, acker)
+	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
+	ad.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
+	ad.log.Debugf("Expired actions: %v", expired)
+	actions = append(actions, queued...)
+
+	if err := ad.queue.Save(); err != nil {
+		return fmt.Errorf("failed to persist action_queue: %w", err)
+	}
+
+	if len(actions) == 0 {
+		ad.log.Debug("No action to dispatch")
+		return nil
+	}
 
 	for _, action := range actions {
 		if err := ad.ctx.Err(); err != nil {
@@ -132,4 +152,53 @@ func detectTypes(actions []fleetapi.Action) []string {
 		str[idx] = reflect.TypeOf(action).String()
 	}
 	return str
+}
+
+// queueScheduledActions will add any action in actions with a valid start time to the queue and return the rest.
+// start time to current time comparisons are purposefully not made in case of cancel actions.
+func (ad *ActionDispatcher) queueScheduledActions(input []fleetapi.Action) []fleetapi.Action {
+	actions := make([]fleetapi.Action, 0, len(input))
+	for _, action := range input {
+		start, err := action.StartTime()
+		if err == nil {
+			ad.log.Debugf("Adding action id: %s to queue.", action.ID())
+			ad.queue.Add(action, start.Unix())
+			continue
+		}
+		if !errors.Is(err, fleetapi.ErrNoStartTime) {
+			ad.log.Warnf("Issue gathering start time from action id %s: %v", action.ID(), err)
+		}
+		actions = append(actions, action)
+	}
+	return actions
+}
+
+// dispatchCancelActions will separate and dispatch any cancel actions from the actions list and return the rest of the list.
+// cancel actions are dispatched seperatly as they may remove items from the queue.
+func (ad *ActionDispatcher) dispatchCancelActions(actions []fleetapi.Action, acker store.FleetAcker) []fleetapi.Action {
+	for i := len(actions) - 1; i >= 0; i-- {
+		action := actions[i]
+		// If it is a cancel action, remove from list and dispatch
+		if action.Type() == fleetapi.ActionTypeCancel {
+			actions = append(actions[:i], actions[i+1:]...)
+			if err := ad.dispatchAction(action, acker); err != nil {
+				ad.log.Errorf("Unable to dispatch cancel action: %v", err)
+			}
+		}
+	}
+	return actions
+}
+
+// gatherQueuedActions will dequeue actions from the action queue and separate those that have already expired.
+func (ad *ActionDispatcher) gatherQueuedActions(ts time.Time) (queued, expired []fleetapi.Action) {
+	actions := ad.queue.DequeueActions()
+	for _, action := range actions {
+		exp, _ := action.Expiration()
+		if ts.After(exp) {
+			expired = append(expired, action)
+			continue
+		}
+		queued = append(queued, action)
+	}
+	return queued, expired
 }

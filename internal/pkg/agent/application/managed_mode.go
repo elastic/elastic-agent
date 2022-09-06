@@ -193,8 +193,9 @@ func newManaged(
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
+	pQueue := queue.NewPersistedQueue(actionQueue, stateStore)
 
-	actionDispatcher, err := dispatcher.New(managedApplication.bgContext, log, handlers.NewDefault(log))
+	actionDispatcher, err := dispatcher.New(managedApplication.bgContext, log, handlers.NewDefault(log), pQueue)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +293,6 @@ func newManaged(
 		actionAcker,
 		statusCtrl,
 		stateStore,
-		actionQueue,
 	)
 	if err != nil {
 		return nil, err
