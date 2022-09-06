@@ -162,7 +162,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
 				if len(hints) > 0 {
 					p.logger.Errorf("Extracted hints are :%v", hints)
-					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger)
+					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
 					p.logger.Errorf("Generated hints mappings are :%v", hintsMapping)
 					fmt.Println(hintsMapping)
 					_ = p.comm.AddOrUpdate(
@@ -188,7 +188,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 }
 
 func (p *pod) emitContainers(pod *kubernetes.Pod, namespaceAnnotations mapstr.M) {
-	generateContainerData(p.comm, pod, p.metagen, namespaceAnnotations)
+	generateContainerData(p.comm, pod, p.metagen, namespaceAnnotations, p.logger, p.managed, p.config)
 }
 
 func (p *pod) emitStopped(pod *kubernetes.Pod) {
@@ -293,7 +293,10 @@ func generateContainerData(
 	comm composable.DynamicProviderComm,
 	pod *kubernetes.Pod,
 	kubeMetaGen metadata.MetaGen,
-	namespaceAnnotations mapstr.M) {
+	namespaceAnnotations mapstr.M,
+	logger *logp.Logger,
+	managed bool,
+	config *Config) {
 
 	containers := kubernetes.GetContainersInPod(pod)
 
@@ -372,7 +375,29 @@ func generateContainerData(
 				_, _ = containerMeta.Put("port", fmt.Sprintf("%v", port.ContainerPort))
 				_, _ = containerMeta.Put("port_name", port.Name)
 				k8sMapping["container"] = containerMeta
-				_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+
+				if config.Hints.Enabled() { // This is "hints based autodiscovery flow"
+					if !managed {
+						if ann, ok := k8sMapping["annotations"]; ok {
+							annotations := ann.(mapstr.M)
+							hints := utils.GenerateHints(annotations, "", config.Prefix)
+							if len(hints) > 0 {
+								logger.Errorf("Extracted hints are :%v", hints)
+								hintsMapping := GenerateHintsMapping(hints, k8sMapping, logger, c.ID)
+								logger.Errorf("Generated hints mappings are :%v", hintsMapping)
+								fmt.Println(hintsMapping)
+								_ = comm.AddOrUpdate(
+									eventID,
+									PodPriority,
+									map[string]interface{}{"hints": hintsMapping},
+									processors,
+								)
+							}
+						}
+					}
+				} else { // This is the "template-based autodiscovery" flow
+					_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+				}
 			}
 		} else {
 			k8sMapping["container"] = containerMeta

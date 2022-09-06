@@ -139,14 +139,15 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 
 // GenerateHintsMapping gets a hint's map extracted from the annotations and constructs the final
 // hints' mapping to be emmited.
-func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger) mapstr.M {
+func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger, containerID string) mapstr.M {
 	builder := hintsBuilder{
 		Key:    "hints", // consider doing it a configurable,
 		logger: logger,
 	}
 
-	hintsMapping := mapstr.M{
-		"container_id": "asdfg",
+	hintsMapping := mapstr.M{}
+	if containerID != "" {
+		hintsMapping.Put("container_id", containerID)
 	}
 
 	integration := builder.getIntegration(hints)
