@@ -25,9 +25,9 @@ import (
 type actionMode int
 
 const (
-	actionStart    = actionMode(0)
-	actionStop     = actionMode(1)
-	actionTeardown = actionMode(2)
+	actionTeardown = actionMode(-1)
+	actionStop     = actionMode(0)
+	actionStart    = actionMode(1)
 
 	runDirMod = 0770
 
@@ -68,7 +68,7 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 		actionCh:    make(chan actionMode),
 		procCh:      make(chan procState),
 		compCh:      make(chan component.Component),
-		actionState: actionStart,
+		actionState: actionStop,
 		state:       newComponentState(&comp),
 	}, nil
 }
@@ -266,7 +266,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentInputType, c.current.Spec.InputType))
-	uid, gid := os.Geteuid(), os.Getgid()
+	uid, gid := os.Geteuid(), os.Getegid()
 	workDir, err := c.workDir(uid, gid)
 	if err != nil {
 		return err
@@ -347,12 +347,12 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 		return true
 	case actionStop, actionTeardown:
 		// stopping (should have exited)
-		stopMsg := fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
-		c.forceCompState(client.UnitStateStopped, stopMsg)
 		if c.actionState == actionTeardown {
 			// teardown so the entire component has been removed (cleanup work directory)
 			_ = os.RemoveAll(c.workDirPath())
 		}
+		stopMsg := fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+		c.forceCompState(client.UnitStateStopped, stopMsg)
 	}
 	return false
 }

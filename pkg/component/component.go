@@ -9,13 +9,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/utils"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -105,7 +104,7 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 		},
 		"user": map[string]interface{}{
 			"uid":  os.Geteuid(),
-			"gid":  os.Getgid(),
+			"gid":  os.Getegid(),
 			"root": hasRoot,
 		},
 	}, nil)
