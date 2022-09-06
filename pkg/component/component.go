@@ -279,7 +279,7 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 			return nil, fmt.Errorf("invalid 'inputs.%d.id', expected a string not a %T", idx, idRaw)
 		}
 		if hasDuplicate(outputsMap, id) {
-			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id (id is required to be unique)", idx)
+			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id %q (id is required to be unique)", idx, id)
 		}
 		outputName := "default"
 		if outputRaw, ok := input[useKey]; ok {

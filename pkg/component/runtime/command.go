@@ -293,7 +293,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 
 func (c *CommandRuntime) stop(ctx context.Context) error {
 	if c.proc == nil {
-		// already stopped ensure that state of the component is also stopped
+		// already stopped, ensure that state of the component is also stopped
 		if c.state.State != client.UnitStateStopped {
 			if c.state.State == client.UnitStateFailed {
 				c.forceCompState(client.UnitStateStopped, "Stopped: never started successfully")
@@ -365,18 +365,18 @@ func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
 	path := c.workDirPath()
 	err := os.MkdirAll(path, runDirMod)
 	if err != nil {
-		return "", fmt.Errorf("failed to create path: %s, %w", path, err)
+		return "", fmt.Errorf("failed to create path %q: %w", path, err)
 	}
 	if runtime.GOOS == component.Windows {
 		return path, nil
 	}
 	err = os.Chown(path, uid, gid)
 	if err != nil {
-		return "", fmt.Errorf("failed to chown %s: %w", path, err)
+		return "", fmt.Errorf("failed to chown %q: %w", path, err)
 	}
 	err = os.Chmod(path, runDirMod)
 	if err != nil {
-		return "", fmt.Errorf("failed to chmod: %s, %w", path, err)
+		return "", fmt.Errorf("failed to chmod %q: %w", path, err)
 	}
 	return path, nil
 }
