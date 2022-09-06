@@ -7,6 +7,8 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,11 +16,19 @@ import (
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+func getLogger() *logger.Logger {
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.ErrorLevel
+	l, _ := logger.NewFromConfig("", loggerCfg, false)
+	return l
+}
 
 func TestGeneratePodData(t *testing.T) {
 	pod := &kubernetes.Pod{
@@ -153,13 +163,21 @@ func TestGenerateContainerPodData(t *testing.T) {
 		context.TODO(),
 		providerDataChan,
 	}
+	logger := getLogger()
+	var cfg Config
+	c := config.New()
+	_ = c.Unpack(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
 		&podMeta{},
 		mapstr.M{
 			"nsa": "nsb",
-		})
+		},
+		logger,
+		true,
+		&cfg,
+	)
 
 	mapping := map[string]interface{}{
 		"namespace": pod.GetNamespace(),
@@ -274,13 +292,21 @@ func TestEphemeralContainers(t *testing.T) {
 		context.TODO(),
 		providerDataChan,
 	}
+
+	logger := getLogger()
+	var cfg Config
+	c := config.New()
+	_ = c.Unpack(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
 		&podMeta{},
 		mapstr.M{
 			"nsa": "nsb",
-		})
+		},
+		logger,
+		true,
+		&cfg)
 
 	mapping := map[string]interface{}{
 		"namespace": pod.GetNamespace(),
