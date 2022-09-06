@@ -16,7 +16,7 @@ import (
 // ContextProviderBuilder creates a new context provider based on the given config and returns it.
 type ContextProviderBuilder func(log *logger.Logger, config *config.Config, managed bool) (corecomp.ContextProvider, error)
 
-//nolint:dupl,goimports // false positive
+//nolint:dupl,goimports,nolintlint // false positive
 // AddContextProvider adds a new ContextProviderBuilder
 func (r *providerRegistry) AddContextProvider(name string, builder ContextProviderBuilder) error {
 	r.lock.Lock()
