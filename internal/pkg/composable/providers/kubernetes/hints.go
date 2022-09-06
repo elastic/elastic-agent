@@ -142,7 +142,7 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 
 	hintsMapping := mapstr.M{}
 	if containerID != "" {
-		hintsMapping.Put("container_id", containerID)
+		_, _ = hintsMapping.Put("container_id", containerID)
 	}
 
 	integration := builder.getIntegration(hints)
@@ -164,27 +164,27 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 
 	integrationHost := builder.getFromMeta(builder.getHost(hints), kubeMeta)
 	if integrationHost != "" {
-		integrationHints.Put(host, integrationHost)
+		_, _ = integrationHints.Put(host, integrationHost)
 	}
 	integrationPeriod := builder.getFromMeta(builder.getPeriod(hints), kubeMeta)
 	if integrationPeriod != "" {
-		integrationHints.Put(period, integrationPeriod)
+		_, _ = integrationHints.Put(period, integrationPeriod)
 	}
 	integrationTimeout := builder.getFromMeta(builder.getTimeout(hints), kubeMeta)
 	if integrationTimeout != "" {
-		integrationHints.Put(timeout, integrationTimeout)
+		_, _ = integrationHints.Put(timeout, integrationTimeout)
 	}
 	integrationMetricsPath := builder.getFromMeta(builder.getMetricspath(hints), kubeMeta)
 	if integrationMetricsPath != "" {
-		integrationHints.Put(metricspath, integrationMetricsPath)
+		_, _ = integrationHints.Put(metricspath, integrationMetricsPath)
 	}
 	integrationUsername := builder.getFromMeta(builder.getUsername(hints), kubeMeta)
 	if integrationUsername != "" {
-		integrationHints.Put(username, integrationUsername)
+		_, _ = integrationHints.Put(username, integrationUsername)
 	}
 	integrationPassword := builder.getFromMeta(builder.getPassword(hints), kubeMeta)
 	if integrationPassword != "" {
-		integrationHints.Put(password, integrationPassword)
+		_, _ = integrationHints.Put(password, integrationPassword)
 	}
 
 	dataStreams := builder.getDataStreams(hints)
@@ -193,53 +193,53 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 			"enabled": true,
 		}
 		if integrationPeriod != "" {
-			streamHints.Put(period, integrationPeriod)
+			_, _ = streamHints.Put(period, integrationPeriod)
 		}
 		if integrationHost != "" {
-			streamHints.Put(host, integrationHost)
+			_, _ = streamHints.Put(host, integrationHost)
 		}
 		if integrationTimeout != "" {
-			streamHints.Put(timeout, integrationTimeout)
+			_, _ = streamHints.Put(timeout, integrationTimeout)
 		}
 		if integrationMetricsPath != "" {
-			streamHints.Put(metricspath, integrationMetricsPath)
+			_, _ = streamHints.Put(metricspath, integrationMetricsPath)
 		}
 		if integrationUsername != "" {
-			streamHints.Put(username, integrationUsername)
+			_, _ = streamHints.Put(username, integrationUsername)
 		}
 		if integrationPassword != "" {
-			streamHints.Put(password, integrationPassword)
+			_, _ = streamHints.Put(password, integrationPassword)
 		}
 
 		streamPeriod := builder.getFromMeta(builder.getStreamPeriod(hints, dataStream), kubeMeta)
 		if streamPeriod != "" {
-			streamHints.Put(period, streamPeriod)
+			_, _ = streamHints.Put(period, streamPeriod)
 		}
 		streamHost := builder.getFromMeta(builder.getStreamHost(hints, dataStream), kubeMeta)
 		if streamHost != "" {
-			streamHints.Put(host, streamHost)
+			_, _ = streamHints.Put(host, streamHost)
 		}
 		streamTimeout := builder.getFromMeta(builder.getStreamTimeout(hints, dataStream), kubeMeta)
 		if streamTimeout != "" {
-			streamHints.Put(timeout, streamTimeout)
+			_, _ = streamHints.Put(timeout, streamTimeout)
 		}
 		streamMetricsPath := builder.getFromMeta(builder.getStreamMetricspath(hints, dataStream), kubeMeta)
 		if streamMetricsPath != "" {
-			streamHints.Put(metricspath, streamMetricsPath)
+			_, _ = streamHints.Put(metricspath, streamMetricsPath)
 		}
 		streamUsername := builder.getFromMeta(builder.getStreamUsername(hints, dataStream), kubeMeta)
 		if streamUsername != "" {
-			streamHints.Put(username, streamUsername)
+			_, _ = streamHints.Put(username, streamUsername)
 		}
 		streamPassword := builder.getFromMeta(builder.getStreamPassword(hints, dataStream), kubeMeta)
 		if streamPassword != "" {
-			streamHints.Put(password, streamPassword)
+			_, _ = streamHints.Put(password, streamPassword)
 		}
-		integrationHints.Put(dataStream, streamHints)
+		_, _ = integrationHints.Put(dataStream, streamHints)
 
 	}
 
-	hintsMapping.Put(integration, integrationHints)
+	_, _ = hintsMapping.Put(integration, integrationHints)
 
 	return hintsMapping
 }
