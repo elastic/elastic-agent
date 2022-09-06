@@ -11,8 +11,10 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/queue"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -28,6 +30,19 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+type mockStateStore struct {
+	mock.Mock
+}
+
+func (m *mockStateStore) SetQueue(a []fleetapi.Action) {
+	m.Called(a)
+}
+
+func (m *mockStateStore) Save() error {
+	args := m.Called()
+	return args.Error(0)
+}
 
 func TestManagedModeRouting(t *testing.T) {
 	streams := make(map[pipeline.RoutingKey]pipeline.Stream)
@@ -49,7 +64,13 @@ func TestManagedModeRouting(t *testing.T) {
 	emit, err := emitter.New(ctx, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
 	require.NoError(t, err)
 
-	actionDispatcher, err := dispatcher.New(ctx, log, handlers.NewDefault(log))
+	aq, err := queue.NewActionQueue([]fleetapi.Action{})
+	require.NoError(t, err)
+	stateStore := &mockStateStore{}
+	stateStore.On("SetQueue", mock.Anything).Once()
+	stateStore.On("Save").Return(nil).Once()
+	queue := queue.NewPersistedQueue(aq, stateStore)
+	actionDispatcher, err := dispatcher.New(ctx, log, handlers.NewDefault(log), queue)
 	require.NoError(t, err)
 
 	cfg := configuration.DefaultConfiguration()

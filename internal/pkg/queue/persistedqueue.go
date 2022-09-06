@@ -27,7 +27,7 @@ func NewPersistedQueue(q *ActionQueue, qs persistor) *PersistedQueue {
 	}
 }
 
-// Save persistes the queue to disk.
+// Save persists the queue to disk.
 func (q *PersistedQueue) Save() error {
 	q.qs.SetQueue(q.Actions())
 	return q.qs.Save()
