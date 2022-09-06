@@ -64,15 +64,6 @@ func (m *hintsBuilder) getStreamPeriod(hints mapstr.M, streamName string) string
 	return utils.GetHintString(hints, m.Key, key)
 }
 
-func (m *hintsBuilder) getNamespace(hints mapstr.M) string {
-	return utils.GetHintString(hints, m.Key, namespace)
-}
-
-func (m *hintsBuilder) getStreamNamespace(hints mapstr.M, streamName string) string {
-	key := fmt.Sprintf("%v.%v", streamName, namespace)
-	return utils.GetHintString(hints, m.Key, key)
-}
-
 func (m *hintsBuilder) getTimeout(hints mapstr.M) string {
 	return utils.GetHintString(hints, m.Key, timeout)
 }
@@ -133,7 +124,7 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 }
 
 // GenerateHintsMapping gets a hint's map extracted from the annotations and constructs the final
-// hints' mapping to be emmited.
+// hints' mapping to be emitted.
 func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger, containerID string) mapstr.M {
 	builder := hintsBuilder{
 		Key:    "hints", // consider doing it a configurable,

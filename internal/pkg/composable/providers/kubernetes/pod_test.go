@@ -7,9 +7,10 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 
