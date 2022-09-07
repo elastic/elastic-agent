@@ -6,10 +6,12 @@ package kubernetes
 
 import (
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/logp"
-	k8s "k8s.io/client-go/kubernetes"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-libs/logp"
+
+	k8s "k8s.io/client-go/kubernetes"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
