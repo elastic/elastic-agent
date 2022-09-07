@@ -136,6 +136,11 @@ func Data() string {
 	return filepath.Join(Top(), "data")
 }
 
+// Run returns the run directory for Agent
+func Run() string {
+	return filepath.Join(Home(), "run")
+}
+
 // Components returns the component directory for Agent
 func Components() string {
 	return filepath.Join(Home(), "components")

@@ -134,7 +134,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	}
 
 	if allowEmptyPgp, _ := release.PGP(); allowEmptyPgp {
-		logger.Info("Artifact has been built with security disabled. Elastic Agent will not verify signatures of the artifacts.")
+		logger.Info("Elastic Agent has been built with security disabled. Elastic Agent will not verify signatures of upgrade artifact.")
 	}
 
 	execPath, err := reexecPath()

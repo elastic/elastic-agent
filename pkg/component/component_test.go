@@ -171,7 +171,7 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.type', expected a string not a int",
 		},
 		{
-			Name:     "Invalid: inputs entry missing id",
+			Name:     "Invalid: inputs entry duplicate because of missing id",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -184,9 +184,12 @@ func TestToComponents(t *testing.T) {
 					map[string]interface{}{
 						"type": "filestream",
 					},
+					map[string]interface{}{
+						"type": "filestream",
+					},
 				},
 			},
-			Err: "invalid 'inputs.0', 'id' missing",
+			Err: `invalid 'inputs.1.id', has a duplicate id "filestream" (id is required to be unique)`,
 		},
 		{
 			Name:     "Invalid: inputs entry id not a string",
