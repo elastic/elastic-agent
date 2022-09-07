@@ -270,18 +270,17 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	p := filepath.Join("internal", "pkg", "agent", "transpiler", "tests")
-	p2 := filepath.Join("pkg", "component")
-	execName := "exec"
-	fakeName := "fake"
+	p := filepath.Join("pkg", "component")
+	fakeBinary := "fake"
 	if runtime.GOOS == "windows" {
-		execName += ".exe"
-		fakeName += ".exe"
+		fakeBinary += ".exe"
 	}
-	return combineErr(
-		RunGo("build", "-o", filepath.Join(p, "exec-1.0-darwin-x86_64", execName), filepath.Join(p, "exec-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p2, "fake", fakeName), filepath.Join(p2, "fake", "main.go")),
-	)
+	outputName := filepath.Join(p, "fake", fakeBinary)
+	err := RunGo("build", "-o", outputName, filepath.Join(p, "fake", "main.go"))
+	if err != nil {
+		return err
+	}
+	return os.Chmod(outputName, 0755)
 }
 
 // All run all the code checks.

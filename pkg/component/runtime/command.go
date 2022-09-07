@@ -10,7 +10,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -20,8 +25,14 @@ import (
 type actionMode int
 
 const (
-	actionStart = actionMode(0)
-	actionStop  = actionMode(1)
+	actionTeardown = actionMode(-1)
+	actionStop     = actionMode(0)
+	actionStart    = actionMode(1)
+
+	runDirMod = 0770
+
+	envAgentComponentID        = "AGENT_COMPONENT_ID"
+	envAgentComponentInputType = "AGENT_COMPONENT_INPUT_TYPE"
 )
 
 type procState struct {
@@ -57,7 +68,7 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 		actionCh:    make(chan actionMode),
 		procCh:      make(chan procState),
 		compCh:      make(chan component.Component),
-		actionState: actionStart,
+		actionState: actionStop,
 		state:       newComponentState(&comp),
 	}, nil
 }
@@ -69,6 +80,7 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 // ever be called again.
 func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 	checkinPeriod := c.current.Spec.Spec.Command.Timeouts.Checkin
+	restartPeriod := c.current.Spec.Spec.Command.Timeouts.Restart
 	c.forceCompState(client.UnitStateStarting, "Starting")
 	t := time.NewTicker(checkinPeriod)
 	defer t.Stop()
@@ -81,12 +93,12 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 			switch as {
 			case actionStart:
 				if err := c.start(comm); err != nil {
-					c.forceCompState(client.UnitStateFailed, err.Error())
+					c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
 				}
 				t.Reset(checkinPeriod)
-			case actionStop:
+			case actionStop, actionTeardown:
 				if err := c.stop(ctx); err != nil {
-					c.forceCompState(client.UnitStateFailed, err.Error())
+					c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
 				}
 			}
 		case ps := <-c.procCh:
@@ -94,12 +106,9 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 			if ps.proc == c.proc {
 				c.proc = nil
 				if c.handleProc(ps.state) {
-					// start again
-					if err := c.start(comm); err != nil {
-						c.forceCompState(client.UnitStateFailed, err.Error())
-					}
+					// start again after restart period
+					t.Reset(restartPeriod)
 				}
-				t.Reset(checkinPeriod)
 			}
 		case newComp := <-c.compCh:
 			sendExpected := c.state.syncExpected(&newComp)
@@ -140,30 +149,38 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				c.sendObserved()
 			}
 		case <-t.C:
-			if c.proc != nil && c.actionState == actionStart {
-				// running and should be running
-				now := time.Now().UTC()
-				if c.lastCheckin.IsZero() {
-					// never checked-in
-					c.missedCheckins++
-				} else if now.Sub(c.lastCheckin) > checkinPeriod {
-					// missed check-in during required period
-					c.missedCheckins++
-				} else if now.Sub(c.lastCheckin) <= checkinPeriod {
-					c.missedCheckins = 0
-				}
-				if c.missedCheckins == 0 {
-					c.compState(client.UnitStateHealthy)
-				} else if c.missedCheckins > 0 && c.missedCheckins < maxCheckinMisses {
-					c.compState(client.UnitStateDegraded)
-				} else if c.missedCheckins >= maxCheckinMisses {
-					// something is wrong; the command should be checking in
-					//
-					// at this point it is assumed the sub-process has locked up and will not respond to a nice
-					// termination signal, so we jump directly to killing the process
-					msg := fmt.Sprintf("Failed: pid '%d' missed %d check-ins and will be killed", c.proc.PID, maxCheckinMisses)
-					c.forceCompState(client.UnitStateFailed, msg)
-					_ = c.proc.Kill() // watcher will handle it from here
+			t.Reset(checkinPeriod)
+			if c.actionState == actionStart {
+				if c.proc == nil {
+					// not running, but should be running
+					if err := c.start(comm); err != nil {
+						c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
+					}
+				} else {
+					// running and should be running
+					now := time.Now().UTC()
+					if c.lastCheckin.IsZero() {
+						// never checked-in
+						c.missedCheckins++
+					} else if now.Sub(c.lastCheckin) > checkinPeriod {
+						// missed check-in during required period
+						c.missedCheckins++
+					} else if now.Sub(c.lastCheckin) <= checkinPeriod {
+						c.missedCheckins = 0
+					}
+					if c.missedCheckins == 0 {
+						c.compState(client.UnitStateHealthy)
+					} else if c.missedCheckins > 0 && c.missedCheckins < maxCheckinMisses {
+						c.compState(client.UnitStateDegraded)
+					} else if c.missedCheckins >= maxCheckinMisses {
+						// something is wrong; the command should be checking in
+						//
+						// at this point it is assumed the sub-process has locked up and will not respond to a nice
+						// termination signal, so we jump directly to killing the process
+						msg := fmt.Sprintf("Failed: pid '%d' missed %d check-ins and will be killed", c.proc.PID, maxCheckinMisses)
+						c.forceCompState(client.UnitStateFailed, msg)
+						_ = c.proc.Kill() // watcher will handle it from here
+					}
 				}
 			}
 		}
@@ -205,8 +222,8 @@ func (c *CommandRuntime) Stop() error {
 //
 // Non-blocking and never returns an error.
 func (c *CommandRuntime) Teardown() error {
-	// teardown is not different from stop for command runtime
-	return c.Stop()
+	c.actionCh <- actionTeardown
+	return nil
 }
 
 // forceCompState force updates the state for the entire component, forcing that state on all units.
@@ -243,11 +260,26 @@ func (c *CommandRuntime) start(comm Communicator) error {
 		return nil
 	}
 	cmdSpec := c.current.Spec.Spec.Command
-	env := make([]string, 0, len(cmdSpec.Env))
+	env := make([]string, 0, len(cmdSpec.Env)+2)
 	for _, e := range cmdSpec.Env {
 		env = append(env, fmt.Sprintf("%s=%s", e.Name, e.Value))
 	}
-	proc, err := process.Start(c.current.Spec.BinaryPath, os.Geteuid(), os.Getgid(), cmdSpec.Args, env, attachOutErr)
+	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
+	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentInputType, c.current.Spec.InputType))
+	uid, gid := os.Geteuid(), os.Getegid()
+	workDir, err := c.workDir(uid, gid)
+	if err != nil {
+		return err
+	}
+	path, err := filepath.Abs(c.current.Spec.BinaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to determine absolute path: %w", err)
+	}
+	err = utils.HasStrictExecPerms(path, uid)
+	if err != nil {
+		return fmt.Errorf("execution of component prevented: %w", err)
+	}
+	proc, err := process.Start(path, uid, gid, cmdSpec.Args, env, attachOutErr, dirPath(workDir))
 	if err != nil {
 		return err
 	}
@@ -261,7 +293,14 @@ func (c *CommandRuntime) start(comm Communicator) error {
 
 func (c *CommandRuntime) stop(ctx context.Context) error {
 	if c.proc == nil {
-		// already stopped
+		// already stopped, ensure that state of the component is also stopped
+		if c.state.State != client.UnitStateStopped {
+			if c.state.State == client.UnitStateFailed {
+				c.forceCompState(client.UnitStateStopped, "Stopped: never started successfully")
+			} else {
+				c.forceCompState(client.UnitStateStopped, "Stopped: already stopped")
+			}
+		}
 		return nil
 	}
 	cmdSpec := c.current.Spec.Spec.Command
@@ -306,16 +345,51 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 		stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		c.forceCompState(client.UnitStateFailed, stopMsg)
 		return true
-	case actionStop:
+	case actionStop, actionTeardown:
 		// stopping (should have exited)
+		if c.actionState == actionTeardown {
+			// teardown so the entire component has been removed (cleanup work directory)
+			_ = os.RemoveAll(c.workDirPath())
+		}
 		stopMsg := fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		c.forceCompState(client.UnitStateStopped, stopMsg)
 	}
 	return false
 }
 
+func (c *CommandRuntime) workDirPath() string {
+	return filepath.Join(paths.Run(), c.current.ID)
+}
+
+func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
+	path := c.workDirPath()
+	err := os.MkdirAll(path, runDirMod)
+	if err != nil {
+		return "", fmt.Errorf("failed to create path %q: %w", path, err)
+	}
+	if runtime.GOOS == component.Windows {
+		return path, nil
+	}
+	err = os.Chown(path, uid, gid)
+	if err != nil {
+		return "", fmt.Errorf("failed to chown %q: %w", path, err)
+	}
+	err = os.Chmod(path, runDirMod)
+	if err != nil {
+		return "", fmt.Errorf("failed to chmod %q: %w", path, err)
+	}
+	return path, nil
+}
+
 func attachOutErr(cmd *exec.Cmd) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return nil
+}
+
+func dirPath(path string) process.Option {
+	return func(cmd *exec.Cmd) error {
+		cmd.Dir = path
+		return nil
+	}
 }

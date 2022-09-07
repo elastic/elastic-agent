@@ -108,7 +108,7 @@ func (p *periodic) work() error {
 		return nil
 	}
 
-	p.log.Info("No configuration change")
+	p.log.Debug("No configuration change")
 	return nil
 }
 

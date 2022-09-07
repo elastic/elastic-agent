@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -48,12 +49,12 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return err
 	}
 
-	isAdmin, err := install.HasRoot()
+	isAdmin, err := utils.HasRoot()
 	if err != nil {
 		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
 	}
 	if !isAdmin {
-		return fmt.Errorf("unable to perform install command, not executed with %s permissions", install.PermissionUser)
+		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 	status, reason := install.Status()
 	force, _ := cmd.Flags().GetBool("force")
