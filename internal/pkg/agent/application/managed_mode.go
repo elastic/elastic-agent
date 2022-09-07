@@ -32,15 +32,15 @@ import (
 )
 
 type managedConfigManager struct {
-	log         *logger.Logger
-	agentInfo   *info.AgentInfo
-	cfg         *configuration.Configuration
-	client      *remote.Client
-	store       storage.Store
-	stateStore  *store.StateStore
-	actionQueue *queue.ActionQueue
-	runtime     *runtime.Manager
-	coord       *coordinator.Coordinator
+	log            *logger.Logger
+	agentInfo      *info.AgentInfo
+	cfg            *configuration.Configuration
+	client         *remote.Client
+	store          storage.Store
+	stateStore     *store.StateStore
+	persistedQueue *queue.PersistedQueue
+	runtime        *runtime.Manager
+	coord          *coordinator.Coordinator
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
@@ -71,18 +71,19 @@ func newManagedConfigManager(
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
+	pQueue := queue.NewPersistedQueue(actionQueue, stateStore)
 
 	return &managedConfigManager{
-		log:         log,
-		agentInfo:   agentInfo,
-		cfg:         cfg,
-		client:      client,
-		store:       storeSaver,
-		stateStore:  stateStore,
-		actionQueue: actionQueue,
-		runtime:     runtime,
-		ch:          make(chan coordinator.ConfigChange),
-		errCh:       make(chan error),
+		log:            log,
+		agentInfo:      agentInfo,
+		cfg:            cfg,
+		client:         client,
+		store:          storeSaver,
+		stateStore:     stateStore,
+		persistedQueue: pQueue,
+		runtime:        runtime,
+		ch:             make(chan coordinator.ConfigChange),
+		errCh:          make(chan error),
 	}, nil
 }
 
@@ -170,7 +171,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		actionAcker,
 		m.coord,
 		m.stateStore,
-		m.actionQueue,
 	)
 	if err != nil {
 		return err
@@ -281,7 +281,7 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 }
 
 func newManagedActionDispatcher(m *managedConfigManager, canceller context.CancelFunc) (*dispatcher.ActionDispatcher, *handlers.PolicyChange, error) {
-	actionDispatcher, err := dispatcher.New(m.log, handlers.NewDefault(m.log))
+	actionDispatcher, err := dispatcher.New(m.log, handlers.NewDefault(m.log), m.persistedQueue)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -332,7 +332,7 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 		&fleetapi.ActionCancel{},
 		handlers.NewCancel(
 			m.log,
-			m.actionQueue,
+			m.persistedQueue,
 		),
 	)
 

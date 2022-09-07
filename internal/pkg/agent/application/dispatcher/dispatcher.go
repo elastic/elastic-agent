@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"go.elastic.co/apm"
 
@@ -21,6 +22,12 @@ import (
 
 type actionHandlers map[string]actions.Handler
 
+type persistedQueue interface {
+	Add(fleetapi.Action, int64)
+	DequeueActions() []fleetapi.Action
+	Save() error
+}
+
 // Dispatcher processes actions coming from fleet api.
 type Dispatcher interface {
 	Dispatch(context.Context, acker.Acker, ...fleetapi.Action) error
@@ -31,10 +38,11 @@ type ActionDispatcher struct {
 	log      *logger.Logger
 	handlers actionHandlers
 	def      actions.Handler
+	queue    persistedQueue
 }
 
 // New creates a new action dispatcher.
-func New(log *logger.Logger, def actions.Handler) (*ActionDispatcher, error) {
+func New(log *logger.Logger, def actions.Handler, queue persistedQueue) (*ActionDispatcher, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("action_dispatcher", false)
@@ -51,6 +59,7 @@ func New(log *logger.Logger, def actions.Handler) (*ActionDispatcher, error) {
 		log:      log,
 		handlers: make(actionHandlers),
 		def:      def,
+		queue:    queue,
 	}, nil
 }
 
@@ -85,6 +94,17 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
+
+	actions = ad.queueScheduledActions(actions)
+	actions = ad.dispatchCancelActions(ctx, actions, acker)
+	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
+	ad.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
+	ad.log.Debugf("Expired actions: %v", expired)
+	actions = append(actions, queued...)
+
+	if err := ad.queue.Save(); err != nil {
+		return fmt.Errorf("failed to persist action_queue: %w", err)
+	}
 
 	if len(actions) == 0 {
 		ad.log.Debug("No action to dispatch")
@@ -127,4 +147,53 @@ func detectTypes(actions []fleetapi.Action) []string {
 		str[idx] = reflect.TypeOf(action).String()
 	}
 	return str
+}
+
+// queueScheduledActions will add any action in actions with a valid start time to the queue and return the rest.
+// start time to current time comparisons are purposefully not made in case of cancel actions.
+func (ad *ActionDispatcher) queueScheduledActions(input []fleetapi.Action) []fleetapi.Action {
+	actions := make([]fleetapi.Action, 0, len(input))
+	for _, action := range input {
+		start, err := action.StartTime()
+		if err == nil {
+			ad.log.Debugf("Adding action id: %s to queue.", action.ID())
+			ad.queue.Add(action, start.Unix())
+			continue
+		}
+		if !errors.Is(err, fleetapi.ErrNoStartTime) {
+			ad.log.Warnf("Issue gathering start time from action id %s: %v", action.ID(), err)
+		}
+		actions = append(actions, action)
+	}
+	return actions
+}
+
+// dispatchCancelActions will separate and dispatch any cancel actions from the actions list and return the rest of the list.
+// cancel actions are dispatched seperatly as they may remove items from the queue.
+func (ad *ActionDispatcher) dispatchCancelActions(ctx context.Context, actions []fleetapi.Action, acker acker.Acker) []fleetapi.Action {
+	for i := len(actions) - 1; i >= 0; i-- {
+		action := actions[i]
+		// If it is a cancel action, remove from list and dispatch
+		if action.Type() == fleetapi.ActionTypeCancel {
+			actions = append(actions[:i], actions[i+1:]...)
+			if err := ad.dispatchAction(ctx, action, acker); err != nil {
+				ad.log.Errorf("Unable to dispatch cancel action: %v", err)
+			}
+		}
+	}
+	return actions
+}
+
+// gatherQueuedActions will dequeue actions from the action queue and separate those that have already expired.
+func (ad *ActionDispatcher) gatherQueuedActions(ts time.Time) (queued, expired []fleetapi.Action) {
+	actions := ad.queue.DequeueActions()
+	for _, action := range actions {
+		exp, _ := action.Expiration()
+		if ts.After(exp) {
+			expired = append(expired, action)
+			continue
+		}
+		queued = append(queued, action)
+	}
+	return queued, expired
 }
