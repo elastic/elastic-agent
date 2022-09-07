@@ -20,6 +20,7 @@
 - Remove username/password for fleet-server authentication. {pull-beats}[29458]
 
 ==== Bugfixes
+- Fix race condition on `mage notice` {pull}[1108]
 - Fix rename *ConfigChange to *PolicyChange to align on changes in the UI. {pull-beats}[20779]
 - Thread safe sorted set {pull-beats}[21290]
 - Copy Action store on upgrade {pull-beats}[21298]

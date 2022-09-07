@@ -8,6 +8,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -111,8 +112,22 @@ func Notice() error {
 		return errors.Wrap(err, "failed running go list, please fix the issues reported")
 	}
 	fmt.Println(">> fmt - go run")
-	cmd := exec.Command("go", "run", "go.elastic.co/go-licence-detector", "-includeIndirect", "-rules", "dev-tools/notice/rules.json", "-overrides", "dev-tools/notice/overrides.json", "-noticeTemplate", "dev-tools/notice/NOTICE.txt.tmpl",
-		"-noticeOut", "NOTICE.txt", "-depsOut", "\"\"")
+	goLicenceDetectorCMD := []string{"go",
+		"run",
+		"go.elastic.co/go-licence-detector",
+		"-includeIndirect",
+		"-rules",
+		"dev-tools/notice/rules.json",
+		"-overrides",
+		"dev-tools/notice/overrides.json",
+		"-noticeTemplate",
+		"dev-tools/notice/NOTICE.txt.tmpl",
+		"-noticeOut",
+		"NOTICE.txt",
+		"-depsOut",
+		"\"\""}
+	printCMD(goLicenceDetectorCMD)
+	cmd := exec.Command(goLicenceDetectorCMD[0], goLicenceDetectorCMD[1:]...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return errors.Wrap(err, "failed running go run, please fix the issues reported")
@@ -126,10 +141,10 @@ func Notice() error {
 			fmt.Println(err)
 		}
 	}()
+	out, err := cmd.CombinedOutput()
 	wg.Wait()
-	_, err = cmd.CombinedOutput()
 	if err != nil {
-		return errors.Wrap(err, "failed combined output, please fix the issues reported")
+		return fmt.Errorf("calling go-licence-detector returned an error: '%w'. Its output is: '%s'", err, string(out))
 	}
 	return nil
 }
@@ -924,4 +939,22 @@ func majorMinor() string {
 		return parts[0] + "." + parts[1]
 	}
 	return ""
+}
+
+// printCMD prints the command in the same format than when
+// using the functions from the `sh` package. It also respects
+// the mage verbose flag
+func printCMD(cmd []string) {
+	if !mg.Verbose() {
+		return
+	}
+
+	buff := &bytes.Buffer{}
+
+	fmt.Fprintf(buff, "exec: %s", cmd[0])
+	for _, arg := range cmd[1:] {
+		fmt.Fprintf(buff, " %q", arg)
+	}
+
+	fmt.Println(buff.String())
 }
