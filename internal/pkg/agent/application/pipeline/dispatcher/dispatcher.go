@@ -100,12 +100,6 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 	defer cancel()
 	ctx = apm.ContextWithSpan(ctx, span)
 
-	ad.log.Debugf(
-		"Dispatch %d actions of types: %s",
-		len(actions),
-		strings.Join(detectTypes(actions), ", "),
-	)
-
 	actions = ad.queueScheduledActions(actions)
 	actions = ad.dispatchCancelActions(actions, acker)
 	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
@@ -116,6 +110,12 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 	if err := ad.queue.Save(); err != nil {
 		return fmt.Errorf("failed to persist action_queue: %w", err)
 	}
+
+	ad.log.Debugf(
+		"Dispatch %d actions of types: %s",
+		len(actions),
+		strings.Join(detectTypes(actions), ", "),
+	)
 
 	if len(actions) == 0 {
 		ad.log.Debug("No action to dispatch")

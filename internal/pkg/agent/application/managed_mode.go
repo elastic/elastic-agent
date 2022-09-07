@@ -257,7 +257,7 @@ func newManaged(
 		&fleetapi.ActionCancel{},
 		handlers.NewCancel(
 			log,
-			actionQueue,
+			pQueue,
 		),
 	)
 
