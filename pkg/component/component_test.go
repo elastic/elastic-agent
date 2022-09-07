@@ -189,7 +189,7 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 			},
-			Err: "invalid 'inputs.1.id', has a duplicate id (id is required to be unique)",
+			Err: `invalid 'inputs.1.id', has a duplicate id "filestream" (id is required to be unique)`,
 		},
 		{
 			Name:     "Invalid: inputs entry id not a string",
