@@ -43,6 +43,10 @@ pipeline {
     // disabled by default, but required for merge:
     // opt-in with 'ci:extended-windows' tag on PR
     booleanParam(name: 'extended_windows_ci', defaultValue: false, description: 'Enable Extended Windows tests')
+
+    // disabled by default, but required for merge:
+    // opt-in with 'ci:extended-m1' tag on PR
+    booleanParam(name: 'extended_m1_ci', defaultValue: false, description: 'Enable M1 tests')
   }
   stages {
     stage('Checkout') {
@@ -56,6 +60,7 @@ pipeline {
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('EXT_WINDOWS_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
+          setEnvVar('EXT_M1_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
         }
       }
     }
@@ -245,10 +250,10 @@ pipeline {
     }
     stage('Sync K8s') { //This stage opens a PR to kibana Repository in order to sync k8s manifests
       when {
-        // Only on main branch 
+        // Only on main branch
         // Enable if k8s related changes.
         allOf {
-          branch 'main'         // Only runs for branch main        
+          branch 'main'         // Only runs for branch main
           expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
       }
@@ -267,11 +272,11 @@ pipeline {
                     ./creator_k8s_manifest.sh . """)
                   sh(label: '[Clone] Kibana-Repository', script: """
                     make ci-clone-kibana-repository
-                    cp Makefile ./kibana 
+                    cp Makefile ./kibana
                     cd kibana
                     make ci-create-kubernetes-templates-pull-request """)
                   }
-              }  
+              }
             }
             post {
               always {
@@ -358,6 +363,54 @@ pipeline {
                 whenTrue(isCodeCoverageEnabled()) {
                   coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
                 }
+              }
+            }
+          }
+        }
+      }
+    }
+    stage('m1') {
+      agent { label 'orka && darwin && aarch64' }
+      when {
+        // Always when running builds on branches/tags
+        // Enable if extended M1 support related changes.
+        beforeAgent true
+        anyOf {
+          not { changeRequest() }
+          expression { return isExtendedM1Enabled() && env.ONLY_DOCS == "false"}
+        }
+      }
+      stages {
+        stage('build'){
+          steps {
+            withGithubNotify(context: "Build-${PLATFORM}") {
+              deleteDir()
+              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+              withMageEnv(){
+                dir("${BASE_DIR}"){
+                  cmd(label: 'Go build', script: 'mage build')
+                }
+              }
+            }
+          }
+        }
+        stage('Test') {
+          steps {
+            withGithubNotify(context: "Test-${PLATFORM}") {
+              withMageEnv(){
+                dir("${BASE_DIR}"){
+                  withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                    cmd(label: 'Go unitTest', script: 'mage unitTest')
+                  }
+                }
+              }
+            }
+          }
+          post {
+            always {
+              junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+              whenTrue(isCodeCoverageEnabled()) {
+                coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
               }
             }
           }
@@ -483,4 +536,11 @@ def isPackageEnabled() {
 */
 def isExtendedWindowsEnabled() {
   return env.EXT_WINDOWS_CHANGES == "true" || params.extended_windows_ci || env.GITHUB_COMMENT?.contains('extended windows') || matchesPrLabel(label: 'ci:extended-windows')
+}
+
+/**
+* Wrapper to know if the build should enable the M1 extended support
+*/
+def isExtendedM1Enabled() {
+  return env.EXT_M1_CHANGES == "true" || params.extended_m1_ci || env.GITHUB_COMMENT?.contains('extended m1') || matchesPrLabel(label: 'ci:extended-m1')
 }
