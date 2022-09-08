@@ -22,7 +22,7 @@ import (
 
 type actionHandlers map[string]actions.Handler
 
-type persistedQueue interface {
+type priorityQueue interface {
 	Add(fleetapi.Action, int64)
 	DequeueActions() []fleetapi.Action
 	Save() error
@@ -38,11 +38,11 @@ type ActionDispatcher struct {
 	log      *logger.Logger
 	handlers actionHandlers
 	def      actions.Handler
-	queue    persistedQueue
+	queue    priorityQueue
 }
 
 // New creates a new action dispatcher.
-func New(log *logger.Logger, def actions.Handler, queue persistedQueue) (*ActionDispatcher, error) {
+func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionDispatcher, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("action_dispatcher", false)
