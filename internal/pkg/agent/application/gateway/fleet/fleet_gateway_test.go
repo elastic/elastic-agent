@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
-	repo "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -594,8 +593,6 @@ func TestFleetGateway(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				require.Equal(t, 1, len(cr.Events))
-
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
 			}),
@@ -759,8 +756,6 @@ func TestRetriesOnFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				require.Equal(t, 1, len(cr.Events))
-
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
 			}),
@@ -810,14 +805,4 @@ type testAgentInfo struct{}
 
 func (testAgentInfo) AgentID() string { return "agent-secret" }
 
-type testStateEvent struct{}
-
-func (testStateEvent) Type() string                    { return repo.EventTypeState }
-func (testStateEvent) SubType() string                 { return repo.EventSubTypeInProgress }
-func (testStateEvent) Time() time.Time                 { return time.Unix(0, 1) }
-func (testStateEvent) Message() string                 { return "hello" }
-func (testStateEvent) Payload() map[string]interface{} { return map[string]interface{}{"key": 1} }
-
-type request struct {
-	Events []interface{} `json:"events"`
-}
+type request struct{}

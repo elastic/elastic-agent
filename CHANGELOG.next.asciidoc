@@ -114,6 +114,7 @@
 - Agent updates will clean up unneeded artifacts. {issue}693[693] {issue}694[694] {pull}752[752]
 - Use the Elastic Agent configuration directory as the root of the `inputs.d` folder. {issues}663[663]
 - Fix a panic caused by a race condition when installing the Elastic Agent. {issues}806[806]
+- Remove fleet event reporter and events from checkin body. {issue}993[993]
 
 ==== New features
 
