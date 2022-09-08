@@ -145,6 +145,22 @@ func Notice() error {
 	if err != nil {
 		return fmt.Errorf("calling go-licence-detector returned an error: '%w'. Its output is: '%s'", err, string(out))
 	}
+
+	noticeFile, err := os.OpenFile("NOTICE.txt", os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("cannot open NOTICE.txt for appending: %w", err)
+	}
+	defer noticeFile.Close()
+
+	toAppendNotice, err := os.ReadFile(filepath.Join("dev-tools", "notice", "NOTICE.txt.append"))
+	if err != nil {
+		return fmt.Errorf("cannot read notice file to be appended: %w", err)
+	}
+
+	if _, err := noticeFile.Write(toAppendNotice); err != nil {
+		return fmt.Errorf("cannot append data to NOTICE.txt: %w", err)
+	}
+
 	return nil
 }
 
