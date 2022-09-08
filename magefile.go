@@ -124,8 +124,7 @@ func Notice() error {
 		"dev-tools/notice/NOTICE.txt.tmpl",
 		"-noticeOut",
 		"NOTICE.txt",
-		"-depsOut",
-		"\"\""}
+	}
 	printCMD(goLicenceDetectorCMD)
 	cmd := exec.Command(goLicenceDetectorCMD[0], goLicenceDetectorCMD[1:]...)
 	stdin, err := cmd.StdinPipe()
