@@ -30,6 +30,8 @@ import (
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
+	devtoolslibs "github.com/elastic/elastic-agent-libs/dev-tools/mage"
+
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 
@@ -972,4 +974,13 @@ func printCMD(cmd []string) {
 	}
 
 	fmt.Println(buff.String())
+}
+
+// Notice generates a NOTICE.txt file for the module.
+func NoticeLib() error {
+	return devtoolslibs.GenerateNotice(
+		filepath.Join("dev-tools", "notice", "overrides.json"),
+		filepath.Join("dev-tools", "notice", "rules.json"),
+		filepath.Join("dev-tools", "notice", "NOTICE.txt.tmpl"),
+	)
 }
