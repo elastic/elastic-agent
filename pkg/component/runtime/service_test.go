@@ -29,8 +29,8 @@ func TestServiceStart(t *testing.T) {
 			BinaryPath: "/Users/amaus/elastic/elastic-agent/build/distributions/elastic-agent-8.5.0-SNAPSHOT-darwin-x86_64/data/elastic-agent-2099aa/components/endpoint-security",
 			Spec: component.InputSpec{
 				Service: &component.ServiceSpec{
-					Name:  "ElasticEndpoint",
-					Label: "co.elastic.endpoint",
+					// Name:  "ElasticEndpoint",
+					Name: "co.elastic.endpoint",
 					Operations: component.ServiceOperationsSpec{
 						Check: &component.ServiceOperationsCommandSpec{
 							Args: []string{"verify", "--log", "stderr"}, Env: []component.CommandEnvSpec(nil), Timeout: 30000000000,

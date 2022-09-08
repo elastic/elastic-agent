@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -423,13 +422,6 @@ func (s *ServiceRuntime) platformService() (service.Service, error) {
 }
 
 func platformServiceName(serviceSpec *component.ServiceSpec) (string, error) {
-	if runtime.GOOS == "darwin" {
-		if serviceSpec.Label == "" {
-			return "", fmt.Errorf("missing service label for macOS: %w", ErrInvalidServiceSpec)
-		}
-		return serviceSpec.Label, nil
-	}
-
 	if serviceSpec.Name == "" {
 		return "", fmt.Errorf("missing service name: %w", ErrInvalidServiceSpec)
 	}
