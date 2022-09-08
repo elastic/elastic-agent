@@ -63,25 +63,52 @@ func TestGenerateHintsMapping(t *testing.T) {
 	}
 	hints := mapstr.M{
 		"hints": mapstr.M{
-			"data_streams": "info, key",
+			"data_streams": "info, key, keyspace",
 			"host":         "${kubernetes.pod.ip}:6379",
-			"info":         mapstr.M{"period": "1m"},
+			"info":         mapstr.M{"period": "1m", "timeout": "41s"},
 			"key":          mapstr.M{"period": "10m"},
 			"package":      "redis",
+			"password":     "password",
+			"username":     "username",
+			"metrics_path": "/metrics",
+			"timeout":      "42s",
+			"period":       "42s",
 		},
 	}
+
 	expected := mapstr.M{
 		"redis": mapstr.M{
-			"enabled": true,
-			"host":    "127.0.0.5:6379",
+			"enabled":      true,
+			"host":         "127.0.0.5:6379",
+			"metrics_path": "/metrics",
+			"username":     "username",
+			"password":     "password",
+			"timeout":      "42s",
+			"period":       "42s",
 			"info": mapstr.M{
-				"enabled": true,
-				"host":    "127.0.0.5:6379",
-				"period":  "1m",
+				"enabled":      true,
+				"host":         "127.0.0.5:6379",
+				"period":       "1m",
+				"metrics_path": "/metrics",
+				"username":     "username",
+				"password":     "password",
+				"timeout":      "41s",
 			}, "key": mapstr.M{
-				"enabled": true,
-				"host":    "127.0.0.5:6379",
-				"period":  "10m",
+				"enabled":      true,
+				"host":         "127.0.0.5:6379",
+				"period":       "10m",
+				"metrics_path": "/metrics",
+				"username":     "username",
+				"password":     "password",
+				"timeout":      "42s",
+			}, "keyspace": mapstr.M{
+				"enabled":      true,
+				"host":         "127.0.0.5:6379",
+				"period":       "42s",
+				"metrics_path": "/metrics",
+				"username":     "username",
+				"password":     "password",
+				"timeout":      "42s",
 			},
 		},
 	}
