@@ -95,6 +95,9 @@ func (m *hintsBuilder) getStreamPassword(hints mapstr.M, streamName string) stri
 	return utils.GetHintString(hints, m.Key, key)
 }
 
+// Replace hints like `'${kubernetes.pod.ip}:6379'` with the actual values from the resource metadata.
+// So if you replace the `${kubernetes.pod.ip}` part with the value from the Pod's metadata
+// you end up with sth like `10.28.90.345:6379`
 func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 	if value == "" {
 		return ""
