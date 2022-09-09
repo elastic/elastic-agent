@@ -371,6 +371,7 @@ pipeline {
     }
     stage('m1') {
       agent { label 'orka && darwin && aarch64' }
+      options { skipDefaultCheckout() }
       when {
         // Always when running builds on branches/tags
         // Enable if extended M1 support related changes.
