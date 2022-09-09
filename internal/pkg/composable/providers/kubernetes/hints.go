@@ -127,16 +127,19 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 	}
 
 	hintsMapping := mapstr.M{}
-	if containerID != "" {
-		_, _ = hintsMapping.Put("container_id", containerID)
-	}
-
 	integration := builder.getIntegration(hints)
 	if integration == "" {
 		return hintsMapping
 	}
 	integrationHints := mapstr.M{
 		"enabled": true,
+	}
+
+	if containerID != "" {
+		_, _ = hintsMapping.Put("container_id", containerID)
+		// Add the default container log fallback to enable any template which defines
+		// a log input with a `"${kubernetes.hints.container_logs.enabled} == true"` condition
+		_, _ = integrationHints.Put("container_logs.enabled", true)
 	}
 
 	// TODO: add support for processors
