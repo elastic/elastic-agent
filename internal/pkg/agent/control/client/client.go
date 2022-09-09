@@ -7,6 +7,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -51,10 +52,19 @@ const (
 
 // Version is the current running version of the daemon.
 type Version struct {
-	Version   string
-	Commit    string
-	BuildTime time.Time
-	Snapshot  bool
+	Version   string    `json:"version" yaml:"version"`
+	Commit    string    `json:"commit" yaml:"commit"`
+	BuildTime time.Time `json:"build_time" yaml:"build_time"`
+	Snapshot  bool      `json:"snapshot" yaml:"snapshot"`
+}
+
+type ComponentVersionInfo struct {
+	// Name of the component.
+	Name string `json:"name" yaml:"name"`
+	// Version of the component.
+	Version string `json:"version" yaml:"version"`
+	// Extra meta information about the version.
+	Meta map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
 
 // ComponentUnitState is a state of a unit running inside a component.
@@ -68,45 +78,54 @@ type ComponentUnitState struct {
 
 // ComponentState is a state of a component managed by the Elastic Agent.
 type ComponentState struct {
-	ID      string               `json:"id" yaml:"id"`
-	Name    string               `json:"name" yaml:"name"`
-	State   State                `json:"state" yaml:"state"`
-	Message string               `json:"message" yaml:"message"`
-	Units   []ComponentUnitState `json:"units" yaml:"units"`
+	ID          string               `json:"id" yaml:"id"`
+	Name        string               `json:"name" yaml:"name"`
+	State       State                `json:"state" yaml:"state"`
+	Message     string               `json:"message" yaml:"message"`
+	Units       []ComponentUnitState `json:"units" yaml:"units"`
+	VersionInfo ComponentVersionInfo `json:"version_info" yaml:"version_info"`
+}
+
+// AgentStateInfo is the overall information about the Elastic Agent.
+type AgentStateInfo struct {
+	ID        string `json:"id" yaml:"id"`
+	Version   string `json:"version" yaml:"version"`
+	Commit    string `json:"commit" yaml:"commit"`
+	BuildTime string `json:"build_time" yaml:"build_time"`
+	Snapshot  bool   `json:"snapshot" yaml:"snapshot"`
 }
 
 // AgentState is the current state of the Elastic Agent.
 type AgentState struct {
+	Info       AgentStateInfo   `json:"info" yaml:"info"`
 	State      State            `json:"state" yaml:"state"`
 	Message    string           `json:"message" yaml:"message"`
 	Components []ComponentState `json:"components" yaml:"components"`
 }
 
-// ProcMeta is the running version and ID information for a running process.
-type ProcMeta struct {
-	Process            string
-	Name               string
-	Hostname           string
-	ID                 string
-	EphemeralID        string
-	Version            string
-	BuildCommit        string
-	BuildTime          time.Time
-	Username           string
-	UserID             string
-	UserGID            string
-	BinaryArchitecture string
-	RouteKey           string
-	ElasticLicensed    bool
-	Error              string
+// DiagnosticFileResult is a diagnostic file result.
+type DiagnosticFileResult struct {
+	Name        string
+	Filename    string
+	Description string
+	ContentType string
+	Content     []byte
+	Generated   time.Time
 }
 
-// ProcPProf returns pprof data for a process.
-type ProcPProf struct {
-	Name     string
-	RouteKey string
-	Result   []byte
-	Error    string
+// DiagnosticUnitRequest allows a specific unit to be targeted for diagnostics.
+type DiagnosticUnitRequest struct {
+	UnitID   string
+	UnitType UnitType
+}
+
+// DiagnosticUnitResult is a set of results for a unit.
+type DiagnosticUnitResult struct {
+	ComponentID string
+	UnitID      string
+	UnitType    UnitType
+	Err         error
+	Results     []DiagnosticFileResult
 }
 
 // Client communicates to Elastic Agent through the control protocol.
@@ -123,12 +142,10 @@ type Client interface {
 	Restart(ctx context.Context) error
 	// Upgrade triggers upgrade of the current running daemon.
 	Upgrade(ctx context.Context, version string, sourceURI string) (string, error)
-	// ProcMeta gathers running process meta-data.
-	ProcMeta(ctx context.Context) ([]ProcMeta, error)
-	// Pprof gathers data from the /debug/pprof/ endpoints specified.
-	Pprof(ctx context.Context, d time.Duration, pprofTypes []cproto.PprofOption, appName, routeKey string) (map[string][]ProcPProf, error)
-	// ProcMetrics gathers /buffer data and from the agent and each running process and returns the result.
-	ProcMetrics(ctx context.Context) (*cproto.ProcMetricsResponse, error)
+	// DiagnosticAgent gathers diagnostics information for the running Elastic Agent.
+	DiagnosticAgent(ctx context.Context) ([]DiagnosticFileResult, error)
+	// DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).
+	DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitRequest) ([]DiagnosticUnitResult, error)
 }
 
 // client manages the state and communication to the Elastic Agent.
@@ -190,6 +207,13 @@ func (c *client) State(ctx context.Context) (*AgentState, error) {
 		return nil, err
 	}
 	s := &AgentState{
+		Info: AgentStateInfo{
+			ID:        res.Info.Id,
+			Version:   res.Info.Version,
+			Commit:    res.Info.Commit,
+			BuildTime: res.Info.BuildTime,
+			Snapshot:  res.Info.Snapshot,
+		},
 		State:      res.State,
 		Message:    res.Message,
 		Components: make([]ComponentState, 0, len(res.Components)),
@@ -212,13 +236,21 @@ func (c *client) State(ctx context.Context) (*AgentState, error) {
 				Payload:  payload,
 			})
 		}
-		s.Components = append(s.Components, ComponentState{
+		cs := ComponentState{
 			ID:      comp.Id,
 			Name:    comp.Name,
 			State:   comp.State,
 			Message: comp.Message,
 			Units:   units,
-		})
+		}
+		if comp.VersionInfo != nil {
+			cs.VersionInfo = ComponentVersionInfo{
+				Name:    comp.VersionInfo.Name,
+				Version: comp.VersionInfo.Version,
+				Meta:    comp.VersionInfo.Meta,
+			}
+		}
+		s.Components = append(s.Components, cs)
 	}
 	return s, nil
 }
@@ -250,75 +282,66 @@ func (c *client) Upgrade(ctx context.Context, version string, sourceURI string) 
 	return res.Version, nil
 }
 
-// ProcMeta gathers running beat metadata.
-func (c *client) ProcMeta(ctx context.Context) ([]ProcMeta, error) {
-	resp, err := c.client.ProcMeta(ctx, &cproto.Empty{})
+// DiagnosticAgent gathers diagnostics information for the running Elastic Agent.
+func (c *client) DiagnosticAgent(ctx context.Context) ([]DiagnosticFileResult, error) {
+	resp, err := c.client.DiagnosticAgent(ctx, &cproto.DiagnosticAgentRequest{})
 	if err != nil {
 		return nil, err
 	}
-	procMeta := []ProcMeta{}
 
-	for _, proc := range resp.Procs {
-		meta := ProcMeta{
-			Process:            proc.Process,
-			Name:               proc.Name,
-			Hostname:           proc.Hostname,
-			ID:                 proc.Id,
-			EphemeralID:        proc.EphemeralId,
-			Version:            proc.Version,
-			BuildCommit:        proc.BuildCommit,
-			Username:           proc.Username,
-			UserID:             proc.UserId,
-			UserGID:            proc.UserGid,
-			BinaryArchitecture: proc.Architecture,
-			RouteKey:           proc.RouteKey,
-			ElasticLicensed:    proc.ElasticLicensed,
-			Error:              proc.Error,
-		}
-		if proc.BuildTime != "" {
-			ts, err := time.Parse(time.RFC3339, proc.BuildTime)
-			if err != nil {
-				if meta.Error != "" {
-					meta.Error += ", " + err.Error()
-				} else {
-					meta.Error = err.Error()
-				}
-			} else {
-				meta.BuildTime = ts
-			}
-		}
-		procMeta = append(procMeta, meta)
-	}
-	return procMeta, nil
-}
-
-// Pprof gathers /debug/pprof data and returns a map of pprof-type: ProcPProf data
-func (c *client) Pprof(ctx context.Context, d time.Duration, pprofTypes []cproto.PprofOption, appName, routeKey string) (map[string][]ProcPProf, error) {
-	resp, err := c.client.Pprof(ctx, &cproto.PprofRequest{
-		PprofType:     pprofTypes,
-		TraceDuration: d.String(),
-		AppName:       appName,
-		RouteKey:      routeKey,
-	})
-	if err != nil {
-		return nil, err
-	}
-	res := map[string][]ProcPProf{}
-	for _, pType := range pprofTypes {
-		res[pType.String()] = make([]ProcPProf, 0)
-	}
-	for _, r := range resp.Results {
-		res[r.PprofType.String()] = append(res[r.PprofType.String()], ProcPProf{
-			Name:     r.AppName,
-			RouteKey: r.RouteKey,
-			Result:   r.Result,
-			Error:    r.Error,
+	files := make([]DiagnosticFileResult, 0, len(resp.Results))
+	for _, f := range resp.Results {
+		files = append(files, DiagnosticFileResult{
+			Name:        f.Name,
+			Filename:    f.Filename,
+			Description: f.Description,
+			ContentType: f.ContentType,
+			Content:     f.Content,
+			Generated:   f.Generated.AsTime(),
 		})
 	}
-	return res, nil
+	return files, nil
 }
 
-// ProcMetrics gathers /buffer data and from the agent and each running process and returns the result.
-func (c *client) ProcMetrics(ctx context.Context) (*cproto.ProcMetricsResponse, error) {
-	return c.client.ProcMetrics(ctx, &cproto.Empty{})
+// DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).
+func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitRequest) ([]DiagnosticUnitResult, error) {
+	reqs := make([]*cproto.DiagnosticUnitRequest, 0, len(units))
+	for _, u := range units {
+		reqs = append(reqs, &cproto.DiagnosticUnitRequest{
+			UnitType: u.UnitType,
+			UnitId:   u.UnitID,
+		})
+	}
+
+	resp, err := c.client.DiagnosticUnits(ctx, &cproto.DiagnosticUnitsRequest{Units: reqs})
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]DiagnosticUnitResult, 0, len(resp.Units))
+	for _, u := range resp.Units {
+		files := make([]DiagnosticFileResult, 0, len(u.Results))
+		for _, f := range u.Results {
+			files = append(files, DiagnosticFileResult{
+				Name:        f.Name,
+				Filename:    f.Filename,
+				Description: f.Description,
+				ContentType: f.ContentType,
+				Content:     f.Content,
+				Generated:   f.Generated.AsTime(),
+			})
+		}
+		var err error
+		if u.Error != "" {
+			err = errors.New(u.Error)
+		}
+		results = append(results, DiagnosticUnitResult{
+			ComponentID: u.ComponentId,
+			UnitID:      u.UnitId,
+			UnitType:    u.UnitType,
+			Err:         err,
+			Results:     files,
+		})
+	}
+	return results, nil
 }
