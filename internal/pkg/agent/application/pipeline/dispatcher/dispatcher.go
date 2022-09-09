@@ -111,16 +111,16 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 		ad.log.Errorf("failed to persist action_queue: %v", err)
 	}
 
+	if len(actions) == 0 {
+		ad.log.Debug("No action to dispatch")
+		return nil
+	}
+
 	ad.log.Debugf(
 		"Dispatch %d actions of types: %s",
 		len(actions),
 		strings.Join(detectTypes(actions), ", "),
 	)
-
-	if len(actions) == 0 {
-		ad.log.Debug("No action to dispatch")
-		return nil
-	}
 
 	for _, action := range actions {
 		if err := ad.ctx.Err(); err != nil {
