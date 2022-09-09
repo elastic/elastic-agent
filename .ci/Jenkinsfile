@@ -383,7 +383,7 @@ pipeline {
       stages {
         stage('build'){
           steps {
-            withGithubNotify(context: "Build-${PLATFORM}") {
+            withGithubNotify(context: "Build-darwin-aarch64") {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
               withMageEnv(){
@@ -396,7 +396,7 @@ pipeline {
         }
         stage('Test') {
           steps {
-            withGithubNotify(context: "Test-${PLATFORM}") {
+            withGithubNotify(context: "Test-darwin-aarch64") {
               withMageEnv(){
                 dir("${BASE_DIR}"){
                   withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
