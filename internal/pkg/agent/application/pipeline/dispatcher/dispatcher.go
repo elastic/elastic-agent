@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type persistedQueue interface {
+type priorityQueue interface {
 	Add(fleetapi.Action, int64)
 	DequeueActions() []fleetapi.Action
 	Save() error
@@ -34,11 +34,11 @@ type ActionDispatcher struct {
 	log      *logger.Logger
 	handlers actionHandlers
 	def      actions.Handler
-	queue    persistedQueue
+	queue    priorityQueue
 }
 
 // New creates a new action dispatcher.
-func New(ctx context.Context, log *logger.Logger, def actions.Handler, queue persistedQueue) (*ActionDispatcher, error) {
+func New(ctx context.Context, log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionDispatcher, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("action_dispatcher", false)
@@ -108,7 +108,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker store.FleetAcker
 	actions = append(actions, queued...)
 
 	if err := ad.queue.Save(); err != nil {
-		return fmt.Errorf("failed to persist action_queue: %w", err)
+		ad.log.Errorf("failed to persist action_queue: %v", err)
 	}
 
 	ad.log.Debugf(

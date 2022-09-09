@@ -64,13 +64,12 @@ func TestManagedModeRouting(t *testing.T) {
 	emit, err := emitter.New(ctx, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
 	require.NoError(t, err)
 
-	aq, err := queue.NewActionQueue([]fleetapi.Action{})
-	require.NoError(t, err)
 	stateStore := &mockStateStore{}
 	stateStore.On("SetQueue", mock.Anything).Once()
 	stateStore.On("Save").Return(nil).Once()
-	queue := queue.NewPersistedQueue(aq, stateStore)
-	actionDispatcher, err := dispatcher.New(ctx, log, handlers.NewDefault(log), queue)
+	aq, err := queue.NewActionQueue([]fleetapi.Action{}, stateStore)
+	require.NoError(t, err)
+	actionDispatcher, err := dispatcher.New(ctx, log, handlers.NewDefault(log), aq)
 	require.NoError(t, err)
 
 	cfg := configuration.DefaultConfiguration()

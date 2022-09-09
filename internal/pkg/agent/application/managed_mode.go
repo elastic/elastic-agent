@@ -189,13 +189,12 @@ func newManaged(
 	managedApplication.stateStore = stateStore
 	actionAcker := store.NewStateStoreActionAcker(batchedAcker, stateStore)
 
-	actionQueue, err := queue.NewActionQueue(stateStore.Queue())
+	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
-	pQueue := queue.NewPersistedQueue(actionQueue, stateStore)
 
-	actionDispatcher, err := dispatcher.New(managedApplication.bgContext, log, handlers.NewDefault(log), pQueue)
+	actionDispatcher, err := dispatcher.New(managedApplication.bgContext, log, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +256,7 @@ func newManaged(
 		&fleetapi.ActionCancel{},
 		handlers.NewCancel(
 			log,
-			pQueue,
+			actionQueue,
 		),
 	)
 

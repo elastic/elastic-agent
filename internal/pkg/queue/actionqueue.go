@@ -11,6 +11,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
+// saver is an the minimal interface needed for state storage.
+type saver interface {
+	SetQueue(a []fleetapi.Action)
+	Save() error
+}
+
 // item tracks an action in the action queue
 type item struct {
 	action   fleetapi.Action
@@ -18,23 +24,28 @@ type item struct {
 	index    int
 }
 
-// ActionQueue uses the standard library's container/heap to implement a priority queue
-// This queue should not be indexed directly, instead use the provided Add, DequeueActions, or Cancel methods to add or remove items
-// Actions() is indended to get the list of actions in the queue for serialization.
-type ActionQueue []*item
+// queue uses the standard library's container/heap to implement a priority queue
+// This queue should not be used directly, instead the exported ActionQueue should be used.
+type queue []*item
+
+// ActionQueue is a priority queue with the ability to persist to disk.
+type ActionQueue struct {
+	q *queue
+	s saver
+}
 
 // Len returns the length of the queue
-func (q ActionQueue) Len() int {
+func (q queue) Len() int {
 	return len(q)
 }
 
 // Less will determine if item i's priority is less then item j's
-func (q ActionQueue) Less(i, j int) bool {
+func (q queue) Less(i, j int) bool {
 	return q[i].priority < q[j].priority
 }
 
 // Swap will swap the items at index i and j
-func (q ActionQueue) Swap(i, j int) {
+func (q queue) Swap(i, j int) {
 	q[i], q[j] = q[j], q[i]
 	q[i].index = i
 	q[j].index = j
@@ -42,7 +53,7 @@ func (q ActionQueue) Swap(i, j int) {
 
 // Push will add x as an item to the queue
 // When using the queue, the Add method should be used instead.
-func (q *ActionQueue) Push(x interface{}) {
+func (q *queue) Push(x interface{}) {
 	n := len(*q)
 	e := x.(*item) //nolint:errcheck // should be an *item
 	e.index = n
@@ -51,7 +62,7 @@ func (q *ActionQueue) Push(x interface{}) {
 
 // Pop will return the last item from the queue
 // When using the queue, DequeueActions should be used instead
-func (q *ActionQueue) Pop() interface{} {
+func (q *queue) Pop() interface{} {
 	old := *q
 	n := len(old)
 	e := old[n-1]
@@ -61,10 +72,10 @@ func (q *ActionQueue) Pop() interface{} {
 	return e
 }
 
-// NewActionQueue creates a new ActionQueue initialized with the passed actions.
+// newQueue creates a new priority queue using container/heap.
 // Will return an error if StartTime fails for any action.
-func NewActionQueue(actions []fleetapi.Action) (*ActionQueue, error) {
-	q := make(ActionQueue, len(actions))
+func newQueue(actions []fleetapi.Action) (*queue, error) {
+	q := make(queue, len(actions))
 	for i, action := range actions {
 		ts, err := action.StartTime()
 		if err != nil {
@@ -80,6 +91,18 @@ func NewActionQueue(actions []fleetapi.Action) (*ActionQueue, error) {
 	return &q, nil
 }
 
+// NewActionQueue creates a new queue with the passed actions using the persistor for state storage.
+func NewActionQueue(actions []fleetapi.Action, s saver) (*ActionQueue, error) {
+	q, err := newQueue(actions)
+	if err != nil {
+		return nil, err
+	}
+	return &ActionQueue{
+		q: q,
+		s: s,
+	}, nil
+}
+
 // Add will add an action to the queue with the associated priority.
 // The priority is meant to be the start-time of the action as a unix epoch time.
 // Complexity: O(log n)
@@ -88,7 +111,7 @@ func (q *ActionQueue) Add(action fleetapi.Action, priority int64) {
 		action:   action,
 		priority: priority,
 	}
-	heap.Push(q, e)
+	heap.Push(q.q, e)
 }
 
 // DequeueActions will dequeue all actions that have a priority less then time.Now().
@@ -96,11 +119,11 @@ func (q *ActionQueue) Add(action fleetapi.Action, priority int64) {
 func (q *ActionQueue) DequeueActions() []fleetapi.Action {
 	ts := time.Now().Unix()
 	actions := make([]fleetapi.Action, 0)
-	for q.Len() != 0 {
-		if (*q)[0].priority > ts {
+	for q.q.Len() != 0 {
+		if (*q.q)[0].priority > ts {
 			break
 		}
-		item := heap.Pop(q).(*item) //nolint:errcheck // should be an *item
+		item := heap.Pop(q.q).(*item) //nolint:errcheck // should be an *item
 		actions = append(actions, item.action)
 	}
 	return actions
@@ -110,22 +133,28 @@ func (q *ActionQueue) DequeueActions() []fleetapi.Action {
 // Complexity: O(n*log n)
 func (q *ActionQueue) Cancel(actionID string) int {
 	items := make([]*item, 0)
-	for _, item := range *q {
+	for _, item := range *q.q {
 		if item.action.ID() == actionID {
 			items = append(items, item)
 		}
 	}
 	for _, item := range items {
-		heap.Remove(q, item.index)
+		heap.Remove(q.q, item.index)
 	}
 	return len(items)
 }
 
 // Actions returns all actions in the queue, item 0 is garunteed to be the min, the rest may not be in sorted order.
 func (q *ActionQueue) Actions() []fleetapi.Action {
-	actions := make([]fleetapi.Action, q.Len())
-	for i, item := range *q {
+	actions := make([]fleetapi.Action, q.q.Len())
+	for i, item := range *q.q {
 		actions[i] = item.action
 	}
 	return actions
+}
+
+// Save persists the queue to disk.
+func (q *ActionQueue) Save() error {
+	q.s.SetQueue(q.Actions())
+	return q.s.Save()
 }
