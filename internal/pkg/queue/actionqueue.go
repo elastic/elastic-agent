@@ -11,8 +11,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
-// persistor is an the minimal interface needed for state storage.
-type persistor interface {
+// saver is an the minimal interface needed for state storage.
+type saver interface {
 	SetQueue(a []fleetapi.Action)
 	Save() error
 }
@@ -31,7 +31,7 @@ type queue []*item
 // ActionQueue is a priority queue with the ability to persist to disk.
 type ActionQueue struct {
 	q *queue
-	p persistor
+	s saver
 }
 
 // Len returns the length of the queue
@@ -72,7 +72,7 @@ func (q *queue) Pop() interface{} {
 	return e
 }
 
-// newQueue creates a new priority queue using contianer/heap.
+// newQueue creates a new priority queue using container/heap.
 // Will return an error if StartTime fails for any action.
 func newQueue(actions []fleetapi.Action) (*queue, error) {
 	q := make(queue, len(actions))
@@ -92,14 +92,14 @@ func newQueue(actions []fleetapi.Action) (*queue, error) {
 }
 
 // NewActionQueue creates a new queue with the passed actions using the persistor for state storage.
-func NewActionQueue(actions []fleetapi.Action, p persistor) (*ActionQueue, error) {
+func NewActionQueue(actions []fleetapi.Action, s saver) (*ActionQueue, error) {
 	q, err := newQueue(actions)
 	if err != nil {
 		return nil, err
 	}
 	return &ActionQueue{
 		q: q,
-		p: p,
+		s: s,
 	}, nil
 }
 
@@ -155,6 +155,6 @@ func (q *ActionQueue) Actions() []fleetapi.Action {
 
 // Save persists the queue to disk.
 func (q *ActionQueue) Save() error {
-	q.p.SetQueue(q.Actions())
-	return q.p.Save()
+	q.s.SetQueue(q.Actions())
+	return q.s.Save()
 }

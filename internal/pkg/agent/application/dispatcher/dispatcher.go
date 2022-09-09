@@ -177,7 +177,7 @@ func (ad *ActionDispatcher) dispatchCancelActions(ctx context.Context, actions [
 		if action.Type() == fleetapi.ActionTypeCancel {
 			actions = append(actions[:i], actions[i+1:]...)
 			if err := ad.dispatchAction(ctx, action, acker); err != nil {
-				ad.log.Errorf("Unable to dispatch cancel action: %v", err)
+				ad.log.Errorf("Unable to dispatch cancel action id %s: %v", action.ID(), err)
 			}
 		}
 	}
