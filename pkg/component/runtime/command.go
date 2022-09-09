@@ -24,6 +24,12 @@ const (
 	actionStop  = actionMode(1)
 )
 
+type MonitoringManager interface {
+	EnrichArgs(string, []string) []string
+	Prepare() error
+	Cleanup(string) error
+}
+
 type procState struct {
 	proc  *process.Info
 	state *os.ProcessState
@@ -32,6 +38,7 @@ type procState struct {
 // CommandRuntime provides the command runtime for running a component as a subprocess.
 type CommandRuntime struct {
 	current component.Component
+	monitor MonitoringManager
 
 	ch       chan ComponentState
 	actionCh chan actionMode
@@ -47,7 +54,7 @@ type CommandRuntime struct {
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
-func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
+func NewCommandRuntime(comp component.Component, monitor MonitoringManager) (ComponentRuntime, error) {
 	if comp.Spec.Spec.Command == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
@@ -59,6 +66,7 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 		compCh:      make(chan component.Component),
 		actionState: actionStart,
 		state:       newComponentState(&comp),
+		monitor:     monitor,
 	}, nil
 }
 
@@ -247,7 +255,13 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	for _, e := range cmdSpec.Env {
 		env = append(env, fmt.Sprintf("%s=%s", e.Name, e.Value))
 	}
-	proc, err := process.Start(c.current.Spec.BinaryPath, os.Geteuid(), os.Getgid(), cmdSpec.Args, env, attachOutErr)
+
+	if err := c.monitor.Prepare(); err != nil {
+		return err
+	}
+
+	args := c.monitor.EnrichArgs(c.current.ID, cmdSpec.Args)
+	proc, err := process.Start(c.current.Spec.BinaryPath, os.Geteuid(), os.Getgid(), args, env, attachOutErr)
 	if err != nil {
 		return err
 	}
@@ -264,6 +278,10 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 		// already stopped
 		return nil
 	}
+
+	// cleanup reserved resources related to monitoring
+	defer c.monitor.Cleanup(c.current.ID)
+
 	cmdSpec := c.current.Spec.Spec.Command
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)

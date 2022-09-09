@@ -895,6 +895,7 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 			}
 
 			targetPath := filepath.Join(archivePath, rp)
+			os.MkdirAll(targetPath, 0755)
 			if err := os.Rename(f, filepath.Join(targetPath, filepath.Base(f))); err != nil {
 				panic(errors.Wrap(err, "failed renaming file"))
 			}

@@ -174,6 +174,58 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 	return components, nil
 }
 
+// ToComponentIDs returns the component IDs that should be running based on the policy and the current runtime specification.
+func (r *RuntimeSpecs) ToComponentIDs(policy map[string]interface{}) ([]string, error) {
+	outputsMap, err := toIntermediate(policy)
+	if err != nil {
+		return nil, err
+	}
+	if outputsMap == nil {
+		return nil, nil
+	}
+
+	var componentIDs []string
+	for outputName, output := range outputsMap {
+		if !output.enabled {
+			// skip; not enabled
+			continue
+		}
+
+		// merge aliases into same input type
+		inputsMap := make(map[string][]inputI)
+		for inputType, inputs := range output.inputs {
+			realInputType, ok := r.aliasMapping[inputType]
+			if ok {
+				inputsMap[realInputType] = append(inputsMap[realInputType], inputs...)
+			} else {
+				inputsMap[inputType] = append(inputsMap[inputType], inputs...)
+			}
+		}
+
+		for inputType, inputs := range inputsMap {
+			inputSpec, err := r.GetInput(inputType)
+			if err == nil {
+				// update the inputType to match the spec; as it could have been alias
+				inputType = inputSpec.InputType
+			}
+			units := make([]string, 0, len(inputs)+1)
+			for _, input := range inputs {
+				if !input.enabled {
+					// skip; not enabled
+					continue
+				}
+				units = append(units, fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id))
+			}
+			if len(units) > 0 {
+				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
+				componentIDs = append(componentIDs, componentID)
+			}
+		}
+	}
+
+	return componentIDs, nil
+}
+
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
 // of components.
 func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {

@@ -21,18 +21,20 @@ type SettingsConfig struct {
 	LoggingConfig    *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
 
 	// standalone config
-	Reload *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
-	Path   string        `config:"path" yaml:"path" json:"path"`
+	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
+	Path                string        `config:"path" yaml:"path" json:"path"`
+	V1MonitoringEnabled bool          `config:"v1_monitoring_enabled" yaml:"v1_monitoring_enabled" json:"v1_monitoring_enabled"`
 }
 
 // DefaultSettingsConfig creates a config with pre-set default values.
 func DefaultSettingsConfig() *SettingsConfig {
 	return &SettingsConfig{
-		ProcessConfig:    process.DefaultConfig(),
-		DownloadConfig:   artifact.DefaultConfig(),
-		LoggingConfig:    logger.DefaultLoggingConfig(),
-		MonitoringConfig: monitoringCfg.DefaultConfig(),
-		GRPC:             DefaultGRPCConfig(),
-		Reload:           DefaultReloadConfig(),
+		ProcessConfig:       process.DefaultConfig(),
+		DownloadConfig:      artifact.DefaultConfig(),
+		LoggingConfig:       logger.DefaultLoggingConfig(),
+		MonitoringConfig:    monitoringCfg.DefaultConfig(),
+		GRPC:                DefaultGRPCConfig(),
+		Reload:              DefaultReloadConfig(),
+		V1MonitoringEnabled: true,
 	}
 }
