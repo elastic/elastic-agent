@@ -103,7 +103,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 	actions = append(actions, queued...)
 
 	if err := ad.queue.Save(); err != nil {
-		return fmt.Errorf("failed to persist action_queue: %w", err)
+		ad.log.Errorf("failed to persist action_queue: %v", err)
 	}
 
 	if len(actions) == 0 {
