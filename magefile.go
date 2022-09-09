@@ -8,17 +8,14 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -29,8 +26,6 @@ import (
 	"github.com/elastic/e2e-testing/pkg/downloads"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
-
-	devtoolslibs "github.com/elastic/elastic-agent-libs/dev-tools/mage"
 
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
@@ -94,77 +89,6 @@ type Demo mg.Namespace
 
 // Dev runs package and build for dev purposes.
 type Dev mg.Namespace
-
-// Notice regenerates the NOTICE.txt file.
-func Notice() error {
-	fmt.Println(">> Generating NOTICE")
-	fmt.Println(">> fmt - go mod tidy")
-	err := sh.RunV("go", "mod", "tidy", "-v")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go mod download")
-	err = sh.RunV("go", "mod", "download")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod download, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go list")
-	str, err := sh.Output("go", "list", "-m", "-json", "all")
-	if err != nil {
-		return errors.Wrap(err, "failed running go list, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go run")
-	goLicenceDetectorCMD := []string{"go",
-		"run",
-		"go.elastic.co/go-licence-detector",
-		"-includeIndirect",
-		"-rules",
-		"dev-tools/notice/rules.json",
-		"-overrides",
-		"dev-tools/notice/overrides.json",
-		"-noticeTemplate",
-		"dev-tools/notice/NOTICE.txt.tmpl",
-		"-noticeOut",
-		"NOTICE.txt",
-	}
-	printCMD(goLicenceDetectorCMD)
-	cmd := exec.Command(goLicenceDetectorCMD[0], goLicenceDetectorCMD[1:]...)
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return errors.Wrap(err, "failed running go run, please fix the issues reported")
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer stdin.Close()
-		defer wg.Done()
-		if _, err := io.WriteString(stdin, str); err != nil {
-			fmt.Println(err)
-		}
-	}()
-	out, err := cmd.CombinedOutput()
-	wg.Wait()
-	if err != nil {
-		return fmt.Errorf("calling go-licence-detector returned an error: '%w'. Its output is: '%s'", err, string(out))
-	}
-
-	noticeFile, err := os.OpenFile("NOTICE.txt", os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("cannot open NOTICE.txt for appending: %w", err)
-	}
-	defer noticeFile.Close()
-
-	toAppendNotice, err := os.ReadFile(filepath.Join("dev-tools", "notice", "NOTICE.txt.append"))
-	if err != nil {
-		return fmt.Errorf("cannot read notice file to be appended: %w", err)
-	}
-
-	if _, err := noticeFile.Write(toAppendNotice); err != nil {
-		return fmt.Errorf("cannot append data to NOTICE.txt: %w", err)
-	}
-
-	return nil
-}
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -956,31 +880,4 @@ func majorMinor() string {
 		return parts[0] + "." + parts[1]
 	}
 	return ""
-}
-
-// printCMD prints the command in the same format than when
-// using the functions from the `sh` package. It also respects
-// the mage verbose flag
-func printCMD(cmd []string) {
-	if !mg.Verbose() {
-		return
-	}
-
-	buff := &bytes.Buffer{}
-
-	fmt.Fprintf(buff, "exec: %s", cmd[0])
-	for _, arg := range cmd[1:] {
-		fmt.Fprintf(buff, " %q", arg)
-	}
-
-	fmt.Println(buff.String())
-}
-
-// Notice generates a NOTICE.txt file for the module.
-func NoticeLib() error {
-	return devtoolslibs.GenerateNotice(
-		filepath.Join("dev-tools", "notice", "overrides.json"),
-		filepath.Join("dev-tools", "notice", "rules.json"),
-		filepath.Join("dev-tools", "notice", "NOTICE.txt.tmpl"),
-	)
 }
