@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func newUninstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -38,12 +39,12 @@ Unless -f is used this command will ask confirmation before performing removal.
 }
 
 func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
-	isAdmin, err := install.HasRoot()
+	isAdmin, err := utils.HasRoot()
 	if err != nil {
 		return fmt.Errorf("unable to perform command while checking for administrator rights, %w", err)
 	}
 	if !isAdmin {
-		return fmt.Errorf("unable to perform command, not executed with %s permissions", install.PermissionUser)
+		return fmt.Errorf("unable to perform command, not executed with %s permissions", utils.PermissionUser)
 	}
 	status, reason := install.Status()
 	if status == install.NotInstalled {

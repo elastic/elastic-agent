@@ -6,6 +6,7 @@ package component
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -87,6 +89,10 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 	}
 
 	// set the runtime variables that are available in the input specification runtime checks
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return nil, err
+	}
 	vars, err := transpiler.NewVars(map[string]interface{}{
 		"runtime": map[string]interface{}{
 			"platform": r.platform.String(),
@@ -95,6 +101,11 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 			"family":   r.platform.Family,
 			"major":    r.platform.Major,
 			"minor":    r.platform.Minor,
+		},
+		"user": map[string]interface{}{
+			"uid":  os.Geteuid(),
+			"gid":  os.Getegid(),
+			"root": hasRoot,
 		},
 	}, nil)
 	if err != nil {
@@ -312,11 +323,15 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 		}
 		idRaw, ok := input[idKey]
 		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d', 'id' missing", idx)
+			// no ID; fallback to type
+			idRaw = t
 		}
 		id, ok := idRaw.(string)
 		if !ok {
 			return nil, fmt.Errorf("invalid 'inputs.%d.id', expected a string not a %T", idx, idRaw)
+		}
+		if hasDuplicate(outputsMap, id) {
+			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id %q (id is required to be unique)", idx, id)
 		}
 		outputName := "default"
 		if outputRaw, ok := input[useKey]; ok {
@@ -396,6 +411,19 @@ func validateRuntimeChecks(spec *InputSpec, store eql.VarStore) error {
 		}
 	}
 	return nil
+}
+
+func hasDuplicate(outputsMap map[string]outputI, id string) bool {
+	for _, o := range outputsMap {
+		for _, i := range o.inputs {
+			for _, j := range i {
+				if j.id == id {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func getLogLevel(val map[string]interface{}) (client.UnitLogLevel, error) {
