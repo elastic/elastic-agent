@@ -55,10 +55,6 @@ type agentInfo interface {
 	AgentID() string
 }
 
-type fleetReporter interface {
-	Events() ([]fleetapi.SerializableEvent, func())
-}
-
 type stateStore interface {
 	Add(fleetapi.Action)
 	AckToken() string
@@ -76,7 +72,6 @@ type fleetGateway struct {
 	backoff            backoff.Backoff
 	settings           *fleetGatewaySettings
 	agentInfo          agentInfo
-	reporter           fleetReporter
 	done               chan struct{}
 	wg                 sync.WaitGroup
 	acker              store.FleetAcker
@@ -94,7 +89,6 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	d pipeline.Dispatcher,
-	r fleetReporter,
 	acker store.FleetAcker,
 	statusController status.Controller,
 	stateStore stateStore,
@@ -109,7 +103,6 @@ func New(
 		client,
 		d,
 		scheduler,
-		r,
 		acker,
 		statusController,
 		stateStore,
@@ -124,7 +117,6 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	d pipeline.Dispatcher,
 	scheduler scheduler.Scheduler,
-	r fleetReporter,
 	acker store.FleetAcker,
 	statusController status.Controller,
 	stateStore stateStore,
@@ -149,7 +141,6 @@ func newFleetGatewayWithScheduler(
 			settings.Backoff.Max,
 		),
 		done:             done,
-		reporter:         r,
 		acker:            acker,
 		statusReporter:   statusController.RegisterComponent("gateway"),
 		statusController: statusController,
@@ -239,9 +230,6 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 }
 
 func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, error) {
-	// get events
-	ee, ack := f.reporter.Events()
-
 	ecsMeta, err := info.Metadata()
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -257,7 +245,6 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
 		AckToken: ackToken,
-		Events:   ee,
 		Metadata: ecsMeta,
 		Status:   f.statusController.StatusString(),
 	}
@@ -290,8 +277,6 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		}
 	}
 
-	// ack events so they are dropped from queue
-	ack()
 	return resp, nil
 }
 

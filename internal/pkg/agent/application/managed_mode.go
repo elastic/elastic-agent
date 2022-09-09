@@ -44,7 +44,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
-	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -124,12 +123,7 @@ func newManaged(
 	}
 
 	logR := logreporter.NewReporter(log)
-	fleetR, err := fleetreporter.NewReporter(agentInfo, log, cfg.Fleet.Reporting)
-	if err != nil {
-		return nil, errors.New(err, "fail to create reporters")
-	}
-
-	combinedReporter := reporting.NewReporter(managedApplication.bgContext, log, agentInfo, logR, fleetR)
+	combinedReporter := reporting.NewReporter(managedApplication.bgContext, log, agentInfo, logR)
 	monitor, err := monitoring.NewMonitor(cfg.Settings)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize monitoring")
@@ -288,7 +282,6 @@ func newManaged(
 		agentInfo,
 		client,
 		actionDispatcher,
-		fleetR,
 		actionAcker,
 		statusCtrl,
 		stateStore,
