@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -29,9 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
-	repo "github.com/elastic/elastic-agent/internal/pkg/reporter"
-	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
-	fleetreporterConfig "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet/config"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -137,7 +133,7 @@ func (m *mockQueue) Actions() []fleetapi.Action {
 	return args.Get(0).([]fleetapi.Action)
 }
 
-type withGatewayFunc func(*testing.T, gateway.FleetGateway, *testingClient, *testingDispatcher, *scheduler.Stepper, repo.Backend)
+type withGatewayFunc func(*testing.T, gateway.FleetGateway, *testingClient, *testingDispatcher, *scheduler.Stepper)
 
 func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
@@ -146,8 +142,6 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 		dispatcher := newTestingDispatcher()
 
 		log, _ := logger.New("fleet_gateway", false)
-		rep := getReporter(agentInfo, log, t)
-
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -167,7 +161,6 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 			client,
 			dispatcher,
 			scheduler,
-			rep,
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
@@ -176,7 +169,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 
 		require.NoError(t, err)
 
-		fn(t, gateway, client, dispatcher, scheduler, rep)
+		fn(t, gateway, client, dispatcher, scheduler)
 	}
 }
 
@@ -214,7 +207,6 @@ func TestFleetGateway(t *testing.T) {
 		client *testingClient,
 		dispatcher *testingDispatcher,
 		scheduler *scheduler.Stepper,
-		rep repo.Backend,
 	) {
 		waitFn := ackSeq(
 			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
@@ -240,7 +232,6 @@ func TestFleetGateway(t *testing.T) {
 		client *testingClient,
 		dispatcher *testingDispatcher,
 		scheduler *scheduler.Stepper,
-		rep repo.Backend,
 	) {
 		waitFn := ackSeq(
 			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
@@ -305,7 +296,6 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
@@ -366,7 +356,6 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
@@ -432,7 +421,6 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
@@ -487,7 +475,6 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
@@ -544,7 +531,6 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
@@ -594,9 +580,7 @@ func TestFleetGateway(t *testing.T) {
 		client *testingClient,
 		dispatcher *testingDispatcher,
 		scheduler *scheduler.Stepper,
-		rep repo.Backend,
 	) {
-		_ = rep.Report(context.Background(), &testStateEvent{})
 		waitFn := ackSeq(
 			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
 				cr := &request{}
@@ -608,8 +592,6 @@ func TestFleetGateway(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-
-				require.Equal(t, 1, len(cr.Events))
 
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
@@ -657,7 +639,6 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			dispatcher,
 			scheduler,
-			getReporter(agentInfo, log, t),
 			noopacker.NewAcker(),
 			&noopController{},
 			stateStore,
@@ -712,8 +693,6 @@ func TestRetriesOnFailures(t *testing.T) {
 		client := newTestingClient()
 		dispatcher := newTestingDispatcher()
 		log, _ := logger.New("fleet_gateway", false)
-		rep := getReporter(agentInfo, log, t)
-
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -742,7 +721,6 @@ func TestRetriesOnFailures(t *testing.T) {
 			client,
 			dispatcher,
 			scheduler,
-			rep,
 			noopacker.NewAcker(),
 			statusController,
 			stateStore,
@@ -756,8 +734,6 @@ func TestRetriesOnFailures(t *testing.T) {
 		clientWaitFn := client.Answer(fail)
 		err = gateway.Start()
 		require.NoError(t, err)
-
-		_ = rep.Report(context.Background(), &testStateEvent{})
 
 		// Initial tick is done out of bound so we can block on channels.
 		scheduler.Next()
@@ -779,8 +755,6 @@ func TestRetriesOnFailures(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-
-				require.Equal(t, 1, len(cr.Events))
 
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
@@ -807,7 +781,6 @@ func TestRetriesOnFailures(t *testing.T) {
 			client *testingClient,
 			dispatcher *testingDispatcher,
 			scheduler *scheduler.Stepper,
-			rep repo.Backend,
 		) {
 			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
@@ -815,8 +788,6 @@ func TestRetriesOnFailures(t *testing.T) {
 			waitChan := client.Answer(fail)
 			err := gateway.Start()
 			require.NoError(t, err)
-
-			_ = rep.Report(context.Background(), &testStateEvent{})
 
 			// Initial tick is done out of bound so we can block on channels.
 			scheduler.Next()
@@ -830,27 +801,8 @@ func TestRetriesOnFailures(t *testing.T) {
 		}))
 }
 
-func getReporter(info agentInfo, log *logger.Logger, t *testing.T) *fleetreporter.Reporter {
-	fleetR, err := fleetreporter.NewReporter(info, log, fleetreporterConfig.DefaultConfig())
-	if err != nil {
-		t.Fatal(errors.Wrap(err, "fail to create reporters"))
-	}
-
-	return fleetR
-}
-
 type testAgentInfo struct{}
 
 func (testAgentInfo) AgentID() string { return "agent-secret" }
 
-type testStateEvent struct{}
-
-func (testStateEvent) Type() string                    { return repo.EventTypeState }
-func (testStateEvent) SubType() string                 { return repo.EventSubTypeInProgress }
-func (testStateEvent) Time() time.Time                 { return time.Unix(0, 1) }
-func (testStateEvent) Message() string                 { return "hello" }
-func (testStateEvent) Payload() map[string]interface{} { return map[string]interface{}{"key": 1} }
-
-type request struct {
-	Events []interface{} `json:"events"`
-}
+type request struct{}
