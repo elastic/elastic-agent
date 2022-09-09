@@ -108,12 +108,12 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 		key := strings.TrimSuffix(strings.TrimPrefix(match, "${kubernetes."), "}")
 		val, err := kubeMeta.GetValue(key)
 		if err != nil {
-			// TODO: add logging here
+			m.logger.Debugf("cannot retrieve key from k8smeta: %v", key)
 			return ""
 		}
 		hintVal, ok := val.(string)
 		if !ok {
-			// TODO: add logging here
+			m.logger.Debugf("cannot convert value into string: %v", val)
 			return ""
 		}
 		value = strings.Replace(value, match, hintVal, -1)
