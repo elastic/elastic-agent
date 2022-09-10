@@ -16,8 +16,6 @@ import (
 	"github.com/kardianos/service"
 )
 
-type serviceAction int
-
 const (
 	defaultCheckServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
 )
@@ -105,7 +103,7 @@ func (s *ServiceRuntime) uninstall(ctx context.Context) error {
 // Called by Manager inside a goroutine. Run should not return until the passed in context is done. Run should always
 // be called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
-func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
+func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error) {
 	cli, err := s.platformService()
 	if err != nil {
 		return fmt.Errorf("failed create service client %s: %w", cli, err)
@@ -116,7 +114,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 	)
 	defer func() {
 		if cis != nil {
-			cis.stop()
+			_ = cis.stop()
 		}
 	}()
 
@@ -166,7 +164,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 			case actionStop, actionTeardown:
 				// Stop connection info service
 				if cis != nil {
-					cis.stop()
+					_ = cis.stop()
 					cis = nil
 				}
 
@@ -403,7 +401,7 @@ func (s *ServiceRuntime) teardown(ctx context.Context, cli service.Service) erro
 }
 
 func (s *ServiceRuntime) compState(state client.UnitState, cli service.Service) {
-	msg := "Unknown"
+	msg := stateUnknownMessage
 	if state == client.UnitStateHealthy {
 		msg = fmt.Sprintf("Healthy: communicating with %s service", cli)
 	} else if state == client.UnitStateDegraded {

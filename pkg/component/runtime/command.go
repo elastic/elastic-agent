@@ -33,6 +33,8 @@ const (
 
 	envAgentComponentID        = "AGENT_COMPONENT_ID"
 	envAgentComponentInputType = "AGENT_COMPONENT_INPUT_TYPE"
+
+	stateUnknownMessage = "Unknown"
 )
 
 type procState struct {
@@ -235,7 +237,7 @@ func (c *CommandRuntime) forceCompState(state client.UnitState, msg string) {
 
 // compState updates just the component state not all the units.
 func (c *CommandRuntime) compState(state client.UnitState) {
-	msg := "Unknown"
+	msg := stateUnknownMessage
 	if state == client.UnitStateHealthy {
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
 	} else if state == client.UnitStateDegraded {

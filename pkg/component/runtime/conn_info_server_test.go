@@ -62,10 +62,6 @@ func (c *mockCommunicator) CheckinObserved() <-chan *proto.CheckinObserved {
 	return c.ch
 }
 
-func (c *mockCommunicator) sendCheckin(checkin *proto.CheckinObserved) {
-	c.ch <- checkin
-}
-
 const testPort = 6788
 
 func getAddress() string {
@@ -82,7 +78,12 @@ func TestConnInfoNormal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer srv.stop()
+	defer func() {
+		err := srv.stop()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	const count = 2 // read connection info a couple of times to make sure the server keeps working for multiple calls
 
@@ -122,7 +123,12 @@ func TestConnInfoConnCloseThenAnotherConn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer srv.stop()
+	defer func() {
+		err := srv.stop()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Connect to the server
 	conn, err := net.Dial("tcp", getAddress())
@@ -170,7 +176,11 @@ func TestConnInfoClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv.stop()
+
+	err = srv.stop()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = net.Dial("tcp", getAddress())
 
@@ -191,8 +201,16 @@ func TestConnInfoDoubleStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv.stop()
-	srv.stop()
+
+	err = srv.stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = srv.stop()
+	if err == nil {
+		t.Fatal("want err, got nil ")
+	}
 }
 
 func TestConnInfoStopTimeout(t *testing.T) {
