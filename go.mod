@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.18
+go 1.17
 
 require (
 	github.com/Microsoft/go-winio v0.5.2
@@ -10,7 +10,7 @@ require (
 	github.com/cavaliercoder/go-rpm v0.0.0-20190131055624-7a9c54e3d83e
 	github.com/coreos/go-systemd/v22 v22.3.3-0.20220203105225-a9a7ef127534
 	github.com/docker/go-units v0.4.0
-	github.com/dolmen-go/contextio v0.0.0-20220721205359-112526b910cd
+	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/beats/v7 v7.17.6
 	github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4
 	github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab
@@ -61,7 +61,7 @@ require (
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0 // indirect
-	github.com/Shopify/sarama v1.27.0 // indirect
+	github.com/Shopify/sarama v0.0.0-00010101000000-000000000000 // indirect
 	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.1 // indirect

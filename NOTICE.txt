@@ -604,11 +604,11 @@ Contents of probable licence file $GOMODCACHE/github.com/docker/go-units@v0.4.0/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/dolmen-go/contextio
-Version: v0.0.0-20220721205359-112526b910cd
+Version: v0.0.0-20200217195037-68fc5150bcd5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v0.0.0-20220721205359-112526b910cd/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v0.0.0-20200217195037-68fc5150bcd5/LICENSE:
 
 
                                  Apache License
