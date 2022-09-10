@@ -75,8 +75,8 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 
 // Run starts the runtime for the component.
 //
-// Called by Manager inside a go-routine. Run should not return until the passed in context is done. Run is always
-// called before any of the other methods in the interface and once the context is done none of those methods will
+// Called by Manager inside a goroutine. Run should not return until the passed in context is done. Run should always
+// be called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
 func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 	checkinPeriod := c.current.Spec.Spec.Command.Timeouts.Checkin

@@ -19,7 +19,7 @@ import (
 type serviceAction int
 
 const (
-	checkServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
+	defaultCheckServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
 )
 
 var (
@@ -102,11 +102,9 @@ func (s *ServiceRuntime) uninstall(ctx context.Context) error {
 
 // Run starts the runtime for the component.
 //
-// Called by Manager inside a go-routine. Run should not return until the passed in context is done. Run is always
-// called before any of the other methods in the interface and once the context is done none of those methods will
+// Called by Manager inside a goroutine. Run should not return until the passed in context is done. Run should always
+// be called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
-// The communicator is currently is not used with the service/daemon component.
-// Perform the basic service status checks until we figure out the comms with the Endpoint.
 func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 	cli, err := s.platformService()
 	if err != nil {
@@ -124,10 +122,11 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 
 	checkinPeriod := s.current.Spec.Spec.Service.Timeouts.Checkin
 	if checkinPeriod == 0 {
-		checkinPeriod = checkServiceStatusInterval
+		checkinPeriod = defaultCheckServiceStatusInterval
 	}
 
 	t := time.NewTimer(checkinPeriod)
+	// Stop the check-ins timer. It is started stopped upon the service start/stop.
 	t.Stop()
 
 	for {
@@ -171,7 +170,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 					cis = nil
 				}
 
-				// Stop period service status checks
+				// Stop periodic service status checks
 				t.Stop()
 			}
 
@@ -195,7 +194,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 			sendExpected := false
 			changed := false
 			if s.state.State == client.UnitStateStarting {
-				// first observation after start set component to healthy
+				// first observation after start, set component to healthy
 				s.state.State = client.UnitStateHealthy
 				s.state.Message = fmt.Sprintf("Healthy: communicating with %s service", cli)
 				changed = true
@@ -264,9 +263,9 @@ func (s *ServiceRuntime) checkStatus(cli service.Service, checkinPeriod time.Dur
 	s.lastServiceStatus = status
 }
 
-// Watch returns the channel that sends component state.
+// Watch returns a channel to watch for component state changes.
 //
-// Channel should send a new state anytime a state for a unit or the whole component changes.
+// A new state is sent anytime the state for a unit or the whole component changes.
 func (s *ServiceRuntime) Watch() <-chan ComponentState {
 	return s.ch
 }
