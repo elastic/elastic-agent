@@ -5,18 +5,23 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
-	"sync"
+	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+const defaultStopTimeout = 15 * time.Second
+
 type connInfoServer struct {
-	listener net.Listener
-	wg       sync.WaitGroup
+	log         *logger.Logger
+	listener    net.Listener
+	waitCtx     context.Context
+	stopTimeout time.Duration
 }
 
 func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connInfoServer, error) {
@@ -25,11 +30,12 @@ func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connIn
 		return nil, fmt.Errorf("failed to start connection credentials listener: %w", err)
 	}
 
-	s := &connInfoServer{listener: listener}
+	s := &connInfoServer{log: log, listener: listener, stopTimeout: defaultStopTimeout}
 
-	s.wg.Add(1)
+	var cn context.CancelFunc
+	s.waitCtx, cn = context.WithCancel(context.Background())
 	go func() {
-		defer s.wg.Done()
+		defer cn()
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
@@ -52,7 +58,27 @@ func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connIn
 	return s, nil
 }
 
-func (s *connInfoServer) stop() {
-	s.listener.Close()
-	s.wg.Wait()
+func (s *connInfoServer) stop() error {
+	err := s.listener.Close()
+	if err != nil {
+		s.log.Errorf("failed close conn info connection: %v", err)
+	}
+
+	// wait service stop with timeout
+	ctx, cn := context.WithTimeout(s.waitCtx, s.stopTimeout)
+	defer cn()
+
+	<-ctx.Done()
+	cerr := ctx.Err()
+	if errors.Is(cerr, context.Canceled) {
+		cerr = nil
+	}
+
+	if errors.Is(cerr, context.DeadlineExceeded) {
+		s.log.Errorf("timeout while stopping conn info server: %v", err)
+	}
+	if err != nil {
+		return err
+	}
+	return cerr
 }

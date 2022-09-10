@@ -5,12 +5,14 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -191,4 +193,29 @@ func TestConnInfoDoubleStop(t *testing.T) {
 	}
 	srv.stop()
 	srv.stop()
+}
+
+func TestConnInfoStopTimeout(t *testing.T) {
+	log := testutils.NewErrorLogger(t)
+
+	comm := newMockCommunicator()
+
+	// Start server
+	srv, err := newConnInfoServer(log, comm, testPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// inject the context for wait that we can control to emulate timeout
+	var cn context.CancelFunc
+	srv.waitCtx, cn = context.WithCancel(context.Background())
+	defer cn()
+
+	srv.stopTimeout = 100 * time.Millisecond
+
+	err = srv.stop()
+	// Expected timeout on stop
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal(err)
+	}
 }
