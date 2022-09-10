@@ -31,7 +31,7 @@ func newMockCommunicator() *mockCommunicator {
 	return &mockCommunicator{
 		ch: make(chan *proto.CheckinObserved, 1),
 		connInfo: &proto.ConnInfo{
-			Addr:       "127.0.0.1:12345",
+			Addr:       getAddress(),
 			ServerName: "endpoint",
 			Token:      "some token",
 			CaCert:     []byte("some CA cert"),
