@@ -84,7 +84,7 @@ func TestConnInfoNormal(t *testing.T) {
 	}
 	defer srv.stop()
 
-	const count = 2 // read connection info a couple of time to make sure the server keeps working
+	const count = 2 // read connection info a couple of times to make sure the server keeps working for multiple calls
 
 	for i := 0; i < count; i++ {
 		// Connect to the server
