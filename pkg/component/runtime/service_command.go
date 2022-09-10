@@ -5,10 +5,10 @@
 package runtime
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,11 +17,11 @@ import (
 
 	"github.com/dolmen-go/contextio"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const maxErrOutputLen = 1024
-
-func executeCommand(ctx context.Context, binaryPath string, args []string, env []string, timeout time.Duration) error {
+func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, args []string, env []string, timeout time.Duration) error {
+	log = log.With("context", "command output")
 	// Create context with timeout if the timeout is greater than 0
 	if timeout > 0 {
 		var cn context.CancelFunc
@@ -51,16 +51,27 @@ func executeCommand(ctx context.Context, binaryPath string, args []string, env [
 		return fmt.Errorf("failed starting the command: %w", err)
 	}
 
-	var errbuf strings.Builder
+	// channel for the last error message from the stderr output
+	errch := make(chan string, 1)
 	ctxstderr := contextio.NewReader(ctx, stderr)
-	if _, err := io.CopyN(&errbuf, ctxstderr, maxErrOutputLen); err != nil {
-		if !errors.Is(err, io.EOF) {
-			return err
+	go func() {
+		var errtext string
+		scanner := bufio.NewScanner(ctxstderr)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if len(line) > 0 {
+				txt := strings.TrimSpace(string(line))
+				if len(txt) > 0 {
+					errtext = strings.TrimSpace(string(line))
+					// Log error output line
+					log.Error(errtext)
+				}
+			}
 		}
-	}
+		errch <- errtext
+	}()
 
 	err = cmd.Wait()
-
 	if err != nil {
 		var exerr *exec.ExitError
 		// If the process was killed, check if timeout
@@ -68,23 +79,28 @@ func executeCommand(ctx context.Context, binaryPath string, args []string, env [
 			err = ctx.Err()
 		}
 
-		errmsg := strings.TrimSpace(errbuf.String())
-		if errmsg != "" {
-			err = fmt.Errorf("%s: %w", errmsg, err)
+		select {
+		case errmsg := <-errch:
+			errmsg = strings.TrimSpace(errmsg)
+			if errmsg != "" {
+				err = fmt.Errorf("%s: %w", errmsg, err)
+			}
+		default:
 		}
 	}
+
 	return err
 }
 
-func executeServiceCommand(ctx context.Context, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
+func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
 	if spec == nil {
 		return nil
 	}
-	return executeCommand(ctx, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+	return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
 }
 
 func envSpecToEnv(envSpecs []component.CommandEnvSpec) []string {
-	if envSpecs == nil {
+	if len(envSpecs) == 0 {
 		return nil
 	}
 

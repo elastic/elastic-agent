@@ -16,6 +16,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
@@ -70,7 +72,7 @@ func getExeName(name string) string {
 	return name
 }
 
-func prepareTestProg(ctx context.Context, dir string, cfg progConfig) (string, error) {
+func prepareTestProg(ctx context.Context, log *logger.Logger, dir string, cfg progConfig) (string, error) {
 	const name = "prog"
 
 	progPath := filepath.Join(dir, name+".go")
@@ -81,12 +83,14 @@ func prepareTestProg(ctx context.Context, dir string, cfg progConfig) (string, e
 		return "", err
 	}
 
+	//fmt.Println(prog)
+
 	err = os.WriteFile(filepath.Join(dir, "go.mod"), []byte(testModFile), 0600)
 	if err != nil {
 		return "", err
 	}
 
-	err = executeCommand(ctx, "go", []string{"build", "-o", dir, progPath}, nil, 0)
+	err = executeCommand(ctx, log, "go", []string{"build", "-o", dir, progPath}, nil, 0)
 	if err != nil {
 		return "", err
 	}
@@ -95,6 +99,8 @@ func prepareTestProg(ctx context.Context, dir string, cfg progConfig) (string, e
 }
 
 func TestExecuteCommand(t *testing.T) {
+	log := logp.NewLogger("test_service")
+
 	tests := []struct {
 		name    string
 		cfg     progConfig
@@ -128,12 +134,12 @@ func TestExecuteCommand(t *testing.T) {
 			dir := t.TempDir()
 
 			// Prepare test program with expected param
-			exePath, err := prepareTestProg(ctx, dir, tc.cfg)
+			exePath, err := prepareTestProg(ctx, log, dir, tc.cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			err = executeCommand(ctx, exePath, nil, nil, tc.timeout)
+			err = executeCommand(ctx, log, exePath, nil, nil, tc.timeout)
 
 			if tc.wantErr != nil {
 				diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())

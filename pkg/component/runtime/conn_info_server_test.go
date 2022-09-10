@@ -27,7 +27,7 @@ type mockCommunicator struct {
 
 func newMockCommunicator() *mockCommunicator {
 	return &mockCommunicator{
-		ch: make(chan *proto.CheckinObserved),
+		ch: make(chan *proto.CheckinObserved, 1),
 		connInfo: &proto.ConnInfo{
 			Addr:       "127.0.0.1:12345",
 			ServerName: "endpoint",
@@ -60,6 +60,10 @@ func (c *mockCommunicator) CheckinObserved() <-chan *proto.CheckinObserved {
 	return c.ch
 }
 
+func (c *mockCommunicator) sendCheckin(checkin *proto.CheckinObserved) {
+	c.ch <- checkin
+}
+
 const testPort = 6788
 
 func getAddress() string {
@@ -72,7 +76,7 @@ func TestConnInfoNormal(t *testing.T) {
 	comm := newMockCommunicator()
 
 	// Start server
-	srv, err := newConnInfoServer(comm, testPort, log)
+	srv, err := newConnInfoServer(log, comm, testPort)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +116,7 @@ func TestConnInfoConnCloseThenAnotherConn(t *testing.T) {
 	comm := newMockCommunicator()
 
 	// Start server
-	srv, err := newConnInfoServer(comm, testPort, log)
+	srv, err := newConnInfoServer(log, comm, testPort)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +164,7 @@ func TestConnInfoClosed(t *testing.T) {
 	comm := newMockCommunicator()
 
 	// Start server
-	srv, err := newConnInfoServer(comm, testPort, log)
+	srv, err := newConnInfoServer(log, comm, testPort)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +185,7 @@ func TestConnInfoDoubleStop(t *testing.T) {
 	comm := newMockCommunicator()
 
 	// Start server
-	srv, err := newConnInfoServer(comm, testPort, log)
+	srv, err := newConnInfoServer(log, comm, testPort)
 	if err != nil {
 		t.Fatal(err)
 	}

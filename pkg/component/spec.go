@@ -94,7 +94,7 @@ func (t *ServiceTimeoutSpec) InitDefaults() {
 // ServiceSpec is the specification for an input that executes as a service.
 type ServiceSpec struct {
 	Name       string                `config:"name" yaml:"name" validate:"required"`
-	Service    int                   `config:"service" yaml:"service" validate:"required"`
+	CPort      int                   `config:"cport" yaml:"cport" validate:"required"`
 	Operations ServiceOperationsSpec `config:"operations" yaml:"operations" validate:"required"`
 	Timeouts   ServiceTimeoutSpec    `config:"timeouts" yaml:"timeouts"`
 }

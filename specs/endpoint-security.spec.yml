@@ -15,7 +15,7 @@ inputs:
           message: "No support for RHEL7 on arm64"
     service:
       name: "ElasticEndpoint"
-      service: 6788
+      cport: 6788
       operations:
         check:
           args:
@@ -47,7 +47,7 @@ inputs:
       - elasticsearch
     service:
       name: "co.elastic.endpoint"
-      service: 6788
+      cport: 6788
       operations:
         check:
           args:
@@ -82,7 +82,7 @@ inputs:
           message: "Elastic Agent must be running as Administrator or SYSTEM"
     service:
       name: "ElasticEndpoint"
-      service: 6788
+      cport: 6788
       operations:
         check:
           args:

@@ -19,12 +19,6 @@ import (
 type serviceAction int
 
 const (
-	serviceStart serviceAction = iota
-	serviceStop
-	serviceTeardown
-)
-
-const (
 	checkServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
 )
 
@@ -33,13 +27,16 @@ var (
 	ErrInvalidServiceSpec     = errors.New("invalid service spec")
 )
 
+type platformServiceFunc func(name string) (service.Service, error)
+type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error
+
 // ServiceRuntime provides the command runtime for running a component as a service.
 type ServiceRuntime struct {
 	current component.Component
 	log     *logger.Logger
 
 	ch       chan ComponentState
-	actionCh chan serviceAction
+	actionCh chan actionMode
 	compCh   chan component.Component
 	statusCh chan service.Status
 
@@ -48,6 +45,9 @@ type ServiceRuntime struct {
 	missedCheckins int
 
 	lastServiceStatus service.Status
+
+	platformServiceImpl       platformServiceFunc
+	executeServiceCommandImpl executeServiceCommandFunc
 }
 
 // NewServiceRuntime creates a new command runtime for the provided component.
@@ -57,14 +57,16 @@ func NewServiceRuntime(comp component.Component, logger *logger.Logger) (Compone
 	}
 
 	return &ServiceRuntime{
-		current:           comp,
-		log:               logger,
-		ch:                make(chan ComponentState),
-		actionCh:          make(chan serviceAction),
-		compCh:            make(chan component.Component),
-		statusCh:          make(chan service.Status),
-		state:             newComponentState(&comp),
-		lastServiceStatus: service.StatusUnknown,
+		current:                   comp,
+		log:                       logger,
+		ch:                        make(chan ComponentState),
+		actionCh:                  make(chan actionMode),
+		compCh:                    make(chan component.Component),
+		statusCh:                  make(chan service.Status),
+		state:                     newComponentState(&comp),
+		lastServiceStatus:         service.StatusUnknown,
+		platformServiceImpl:       platformService,
+		executeServiceCommandImpl: executeServiceCommand,
 	}, nil
 }
 
@@ -75,7 +77,7 @@ func (s *ServiceRuntime) check(ctx context.Context) error {
 		return ErrOperationSpecUndefined
 	}
 	s.log.Debugf("check if the %s is installed", s.current.Spec.BinaryName)
-	return executeServiceCommand(ctx, s.current.Spec.BinaryPath, s.current.Spec.Spec.Service.Operations.Check)
+	return s.executeServiceCommandImpl(ctx, s.log, s.current.Spec.BinaryPath, s.current.Spec.Spec.Service.Operations.Check)
 }
 
 // install executes the service install command
@@ -85,7 +87,7 @@ func (s *ServiceRuntime) install(ctx context.Context) error {
 		return ErrOperationSpecUndefined
 	}
 	s.log.Debugf("install %s service", s.current.Spec.BinaryName)
-	return executeServiceCommand(ctx, s.current.Spec.BinaryPath, s.current.Spec.Spec.Service.Operations.Install)
+	return s.executeServiceCommandImpl(ctx, s.log, s.current.Spec.BinaryPath, s.current.Spec.Spec.Service.Operations.Install)
 }
 
 // uninstall executes the service uninstall command
@@ -95,7 +97,7 @@ func (s *ServiceRuntime) uninstall(ctx context.Context) error {
 		return ErrOperationSpecUndefined
 	}
 	s.log.Debugf("uninstall %s service", s.current.Spec.BinaryName)
-	return executeServiceCommand(ctx, s.current.Spec.BinaryPath, s.current.Spec.Spec.Service.Operations.Uninstall)
+	return s.executeServiceCommandImpl(ctx, s.log, s.current.Spec.BinaryPath, s.current.Spec.Spec.Service.Operations.Uninstall)
 }
 
 // Run starts the runtime for the component.
@@ -106,8 +108,6 @@ func (s *ServiceRuntime) uninstall(ctx context.Context) error {
 // The communicator is currently is not used with the service/daemon component.
 // Perform the basic service status checks until we figure out the comms with the Endpoint.
 func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
-	s.forceCompState(client.UnitStateStarting, "Starting")
-
 	cli, err := s.platformService()
 	if err != nil {
 		return fmt.Errorf("failed create service client %s: %w", cli, err)
@@ -122,7 +122,11 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 		}
 	}()
 
-	checkinPeriod := checkServiceStatusInterval // TODO: make configurable?
+	checkinPeriod := s.current.Spec.Spec.Service.Timeouts.Checkin
+	if checkinPeriod == 0 {
+		checkinPeriod = checkServiceStatusInterval
+	}
+
 	t := time.NewTimer(checkinPeriod)
 	t.Stop()
 
@@ -134,11 +138,11 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 			// Process action
 			var err error
 			switch as {
-			case serviceStart:
+			case actionStart:
 				err = s.start(ctx, cli)
-			case serviceStop:
+			case actionStop:
 				err = s.stop(cli)
-			case serviceTeardown:
+			case actionTeardown:
 				err = s.teardown(ctx, cli)
 			}
 
@@ -149,18 +153,18 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 
 			// Enable/disable periodic status checks
 			switch as {
-			case serviceStart:
+			case actionStart:
 				// Kick off periodic service status checks
-				t.Reset(checkServiceStatusInterval)
+				t.Reset(checkinPeriod)
 				if cis == nil {
-					cis, err = newConnInfoServer(comm, s.current.Spec.Spec.Service.Service, s.log)
+					cis, err = newConnInfoServer(s.log, comm, s.current.Spec.Spec.Service.CPort)
 					if err != nil {
 						return fmt.Errorf("failed to start connection info service %s: %w", cli, err)
 					}
 				}
 				s.lastCheckin = time.Time{}
 				s.missedCheckins = 0
-			case serviceStop, serviceTeardown:
+			case actionStop, actionTeardown:
 				// Stop connection info service
 				if cis != nil {
 					cis.stop()
@@ -173,7 +177,10 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 
 		case <-t.C:
 			s.checkStatus(cli, checkinPeriod)
+			t.Reset(checkinPeriod)
 		case newComp := <-s.compCh:
+			// TODO: switch to debug
+			s.log.Infof("observed component update for %s service", cli)
 			sendExpected := s.state.syncExpected(&newComp)
 			changed := s.state.syncUnits(&newComp)
 			if sendExpected || s.state.unsettled() {
@@ -184,7 +191,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) error {
 			}
 		case checkin := <-comm.CheckinObserved():
 			// TODO: switch to debug
-			s.log.Infof("observer checkin for %s service", cli)
+			s.log.Infof("observed check-in for %s service", cli)
 			sendExpected := false
 			changed := false
 			if s.state.State == client.UnitStateStarting {
@@ -268,7 +275,7 @@ func (s *ServiceRuntime) Watch() <-chan ComponentState {
 //
 // Non-blocking and never returns an error.
 func (s *ServiceRuntime) Start() error {
-	s.actionCh <- serviceStart
+	s.actionCh <- actionStart
 	return nil
 }
 
@@ -284,7 +291,7 @@ func (s *ServiceRuntime) Update(comp component.Component) error {
 //
 // Non-blocking and never returns an error.
 func (s *ServiceRuntime) Stop() error {
-	s.actionCh <- serviceStop
+	s.actionCh <- actionStop
 	return nil
 }
 
@@ -292,7 +299,7 @@ func (s *ServiceRuntime) Stop() error {
 //
 // Non-blocking and never returns an error.
 func (s *ServiceRuntime) Teardown() error {
-	s.actionCh <- serviceTeardown
+	s.actionCh <- actionTeardown
 	return nil
 }
 
@@ -354,7 +361,7 @@ func (s *ServiceRuntime) start(ctx context.Context, cli service.Service) error {
 
 // stop stops the service
 func (s *ServiceRuntime) stop(cli service.Service) error {
-	s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Stopping: %s service", cli))
+	s.forceCompState(client.UnitStateStopping, fmt.Sprintf("Stopping: %s service", cli))
 
 	// Check service status if it's already stopped
 	status, err := cli.Status()
@@ -382,6 +389,7 @@ func (s *ServiceRuntime) stop(cli service.Service) error {
 	if status == service.StatusStopped {
 		s.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: %s service", cli))
 	}
+	// TODO: what to do if not stopped?
 
 	return nil
 }
@@ -411,21 +419,13 @@ func (s *ServiceRuntime) compState(state client.UnitState, cli service.Service) 
 	}
 }
 
-// platformService returns the service.Service client that allows to start/stop/check status of the service
+// platformService returns the service.Service client that allows to manage the lifecycle of the service
 func (s *ServiceRuntime) platformService() (service.Service, error) {
-	name, err := platformServiceName(s.current.Spec.Spec.Service)
-	if err != nil {
-		return nil, err
+	if s.current.Spec.Spec.Service.Name == "" {
+		return nil, fmt.Errorf("missing service name: %w", ErrInvalidServiceSpec)
 	}
 
-	return platformService(name)
-}
-
-func platformServiceName(serviceSpec *component.ServiceSpec) (string, error) {
-	if serviceSpec.Name == "" {
-		return "", fmt.Errorf("missing service name: %w", ErrInvalidServiceSpec)
-	}
-	return serviceSpec.Name, nil
+	return s.platformServiceImpl(s.current.Spec.Spec.Service.Name)
 }
 
 func platformService(name string) (service.Service, error) {
@@ -433,9 +433,9 @@ func platformService(name string) (service.Service, error) {
 		Name: name,
 	}
 
-	svc, err := service.New(nil, svcConfig)
+	cli, err := service.New(nil, svcConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to service %s: %w", svcConfig.Name, err)
 	}
-	return svc, nil
+	return cli, nil
 }

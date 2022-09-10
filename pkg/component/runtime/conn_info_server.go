@@ -19,7 +19,7 @@ type connInfoServer struct {
 	wg       sync.WaitGroup
 }
 
-func newConnInfoServer(comm Communicator, port int, log *logger.Logger) (*connInfoServer, error) {
+func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connInfoServer, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to start connection credentials listener: %w", err)

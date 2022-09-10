@@ -1,1 +1,0 @@
-{"log.level":"error","@timestamp":"2022-09-05T10:36:53.114-0400","log.origin":{"file.name":"runtime/conn_info_server.go","file.line":36},"message":"failed accept conn info connection: accept tcp 127.0.0.1:6788: use of closed network connection","ecs.version":"1.6.0"}
