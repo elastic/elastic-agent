@@ -248,47 +248,6 @@ pipeline {
         }
       }
     }
-<<<<<<< HEAD
-=======
-    stage('Sync K8s') { //This stage opens a PR to kibana Repository in order to sync k8s manifests
-      when {
-        // Only on main branch
-        // Enable if k8s related changes.
-        allOf {
-          branch 'main'         // Only runs for branch main
-          expression { return env.K8S_CHANGES == "true" }   // If k8s changes
-        }
-      }
-      failFast false
-        agent {label 'ubuntu-20.04 && immutable'}
-        options { skipDefaultCheckout() }
-        stages {
-          stage('OpenKibanaPR') {
-            steps {
-              withGhEnv(version: '2.4.0') {
-                deleteDir()
-                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-                  dir("${BASE_DIR}/deploy/kubernetes"){
-                  sh(label: '[File Creation] Create-Needed-Manifest', script: """
-                    WITHOUTCONFIG=true make generate-k8s
-                    ./creator_k8s_manifest.sh . """)
-                  sh(label: '[Clone] Kibana-Repository', script: """
-                    make ci-clone-kibana-repository
-                    cp Makefile ./kibana
-                    cd kibana
-                    make ci-create-kubernetes-templates-pull-request """)
-                  }
-              }
-            }
-            post {
-              always {
-                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
-              }
-            }
-          }
-      }
-    }
->>>>>>> c8c313d47 (ci: enable MacOS M1 stages (#1123))
     stage('e2e tests') {
       when {
         // Always when running builds on branches/tags
@@ -541,8 +500,6 @@ def isPackageEnabled() {
 def isExtendedWindowsEnabled() {
   return env.EXT_WINDOWS_CHANGES == "true" || params.extended_windows_ci || env.GITHUB_COMMENT?.contains('extended windows') || matchesPrLabel(label: 'ci:extended-windows')
 }
-<<<<<<< HEAD
-=======
 
 /**
 * Wrapper to know if the build should enable the M1 extended support
@@ -550,4 +507,3 @@ def isExtendedWindowsEnabled() {
 def isExtendedM1Enabled() {
   return env.EXT_M1_CHANGES == "true" || params.extended_m1_ci || env.GITHUB_COMMENT?.contains('extended m1') || matchesPrLabel(label: 'ci:extended-m1')
 }
->>>>>>> c8c313d47 (ci: enable MacOS M1 stages (#1123))
