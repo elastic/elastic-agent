@@ -291,15 +291,13 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 				)
 
 				f.log.Error(err)
-				f.statusReporter.Update(state.Failed, err.Error(), nil)
 				return nil, err
 			}
 			if f.checkinFailCounter > 1 {
-				// Update status reporter for gateway to degraded when there are two consecutive failures.
-				// Note that this may not propagate to fleet-server as the agent is having issues checking in.
-				// It may also (falsely) report a degraded session for 30s if it is eventually successful.
-				// However this component will allow the agent to report fleet gateway degredation locally.
-				f.statusReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
+				// do not update status reporter with failure
+				// status reporter would report connection failure on first successfull connection, leading to
+				// stale result for certain period causing slight confusion.
+				f.log.Error(fmt.Sprintf("checking number %d failed: %s", f.checkinFailCounter, err.Error()))
 			}
 			continue
 		}
