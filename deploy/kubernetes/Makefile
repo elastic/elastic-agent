@@ -58,6 +58,8 @@ ci-create-kubernetes-templates-pull-request:
 		exit 1; \
 	fi 
 	echo "INFO: Create branch to update k8s templates"
+	git config user.name obscloudnativemonitoring
+	git config user.email obs-cloudnative-monitoring@elastic.co
 	git checkout -b $(ELASTIC_AGENT_BRANCH)
 	echo "INFO: add files if any"
 	git add $(ELASTIC_AGENT_REPO_PATH)$(FILE_REPO)

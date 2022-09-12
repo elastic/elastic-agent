@@ -173,7 +173,7 @@ func newLocal(
 }
 
 func externalConfigsGlob() string {
-	return filepath.Join(paths.Config(), configuration.ExternalInputsPattern)
+	return filepath.Join(paths.AgentInputsDPath(), "*.yml")
 }
 
 // Routes returns a list of routes handled by agent.
