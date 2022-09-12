@@ -54,22 +54,24 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 	// channel for the last error message from the stderr output
 	errch := make(chan string, 1)
 	ctxstderr := contextio.NewReader(ctx, proc.Stderr)
-	go func() {
-		var errtext string
-		scanner := bufio.NewScanner(ctxstderr)
-		for scanner.Scan() {
-			line := scanner.Bytes()
-			if len(line) > 0 {
-				txt := strings.TrimSpace(string(line))
-				if len(txt) > 0 {
-					errtext = strings.TrimSpace(string(line))
-					// Log error output line
-					log.Error(errtext)
+	if ctxstderr != nil {
+		go func() {
+			var errtext string
+			scanner := bufio.NewScanner(ctxstderr)
+			for scanner.Scan() {
+				line := scanner.Bytes()
+				if len(line) > 0 {
+					txt := strings.TrimSpace(string(line))
+					if len(txt) > 0 {
+						errtext = strings.TrimSpace(string(line))
+						// Log error output line
+						log.Error(errtext)
+					}
 				}
 			}
-		}
-		errch <- errtext
-	}()
+			errch <- errtext
+		}()
+	}
 
 	procState := <-proc.Wait()
 	if procState.ExitCode() == -1 && ctx.Err() != nil {

@@ -143,9 +143,12 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 		return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
 	}
 
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stderr for %q: %w", path, err)
+	var stderr io.ReadCloser
+	if cmd.Stderr == nil {
+		stderr, err = cmd.StderrPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stderr for %q: %w", path, err)
+		}
 	}
 
 	// start process
