@@ -5,17 +5,18 @@
 package beats
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )
 
-// Monitor is a monitoring interface providing information about the way
-// how beat is monitored
+// SidecarMonitor is a provides information about the way how beat is monitored
 type SidecarMonitor struct {
 	operatingSystem string
 	config          *monitoringConfig.MonitoringConfig
@@ -104,11 +105,11 @@ func (b *SidecarMonitor) Prepare(spec program.Spec, pipelineID string, uid, gid 
 	drop := monitoringDrop(endpoint)
 
 	if err := os.MkdirAll(drop, 0775); err != nil {
-		return err
+		return errors.New(err, fmt.Sprintf("failed to create a directory %q", drop))
 	}
 
 	if err := changeOwner(drop, uid, gid); err != nil {
-		return err
+		return errors.New(err, fmt.Sprintf("failed to change owner of a directory %q", drop))
 	}
 
 	return nil

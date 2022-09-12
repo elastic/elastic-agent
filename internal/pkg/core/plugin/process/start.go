@@ -171,24 +171,18 @@ func (a *Application) writeToStdin(as *server.ApplicationState, wc io.WriteClose
 }
 
 func injectLogLevel(logLevel string, args []string) []string {
-	var level string
-	// Translate to level beat understands
-	switch logLevel {
-	case levelInfo:
-		level = levelInfo
-	case levelDebug:
-		level = levelDebug
-	case levelWarning:
-		level = levelWarning
-	case levelError:
-		level = levelError
-	}
-
-	if args == nil || level == "" {
+	if args == nil || logLevel == "" {
 		return args
 	}
 
-	return append(args, "-E", "logging.level="+level)
+	if logLevel == levelDebug ||
+		logLevel == levelInfo ||
+		logLevel == levelWarning ||
+		logLevel == levelError {
+		return append(args, "-E", "logging.level="+logLevel)
+	}
+
+	return args
 }
 
 func injectDataPath(args []string, pipelineID, id string) []string {
