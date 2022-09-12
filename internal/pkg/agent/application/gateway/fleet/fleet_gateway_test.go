@@ -25,7 +25,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
@@ -705,7 +704,6 @@ func TestRetriesOnFailures(t *testing.T) {
 		queue.On("Actions").Return([]fleetapi.Action{})
 
 		fleetReporter := &testutils.MockReporter{}
-		fleetReporter.On("Update", state.Degraded, mock.Anything, mock.Anything).Times(2)
 		fleetReporter.On("Update", mock.Anything, mock.Anything, mock.Anything).Maybe()
 		fleetReporter.On("Unregister").Maybe()
 
