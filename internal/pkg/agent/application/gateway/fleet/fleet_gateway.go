@@ -295,7 +295,7 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 			}
 			if f.checkinFailCounter > 1 {
 				// do not update status reporter with failure
-				// status reporter would report connection failure on first successfull connection, leading to
+				// status reporter would report connection failure on first successful connection, leading to
 				// stale result for certain period causing slight confusion.
 				f.log.Errorf("checking number %d failed: %s", f.checkinFailCounter, err.Error())
 			}
