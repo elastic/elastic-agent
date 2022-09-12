@@ -162,9 +162,7 @@ func (f *fleetGateway) worker() {
 				continue
 			}
 			actions := make([]fleetapi.Action, len(resp.Actions))
-			for idx, a := range resp.Actions {
-				actions[idx] = a
-			}
+			copy(actions, resp.Actions)
 
 			var errMsg string
 			if err := f.dispatcher.Dispatch(context.Background(), f.acker, actions...); err != nil {
