@@ -10,10 +10,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kardianos/service"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/kardianos/service"
 )
 
 const (

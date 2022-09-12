@@ -281,7 +281,10 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	if err != nil {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}
-	proc, err := process.Start(path, uid, gid, cmdSpec.Args, env, attachOutErr, dirPath(workDir))
+	proc, err := process.Start(path,
+		process.WithArgs(cmdSpec.Args),
+		process.WithEnv(env),
+		process.WithCmdOptions(attachOutErr, dirPath(workDir)))
 	if err != nil {
 		return err
 	}
@@ -389,7 +392,7 @@ func attachOutErr(cmd *exec.Cmd) error {
 	return nil
 }
 
-func dirPath(path string) process.Option {
+func dirPath(path string) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
 		cmd.Dir = path
 		return nil

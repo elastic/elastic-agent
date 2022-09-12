@@ -17,18 +17,74 @@ type Info struct {
 	PID     int
 	Process *os.Process
 	Stdin   io.WriteCloser
+	Stderr  io.ReadCloser
 }
 
-// Option is an option func to change the underlying command
-type Option func(c *exec.Cmd) error
+// CmdOption is an option func to change the underlying command
+type CmdOption func(c *exec.Cmd) error
+
+type StartConfig struct {
+	ctx       context.Context
+	uid, gid  int
+	args, env []string
+	cmdOpts   []CmdOption
+}
+
+type StartOptionFunc func(cfg *StartConfig)
 
 // Start starts a new process
-func Start(path string, uid, gid int, args []string, env []string, opts ...Option) (proc *Info, err error) {
-	return StartContext(nil, path, uid, gid, args, env, opts...) //nolint:staticcheck // calls a different function if no ctx
+func Start(path string, opts ...StartOptionFunc) (proc *Info, err error) {
+	// Apply options
+	c := StartConfig{
+		uid: os.Geteuid(),
+		gid: os.Getegid(),
+	}
+
+	for _, opt := range opts {
+		opt(&c)
+	}
+
+	return startContext(c.ctx, path, c.uid, c.gid, c.args, c.env, c.cmdOpts...)
 }
 
-// StartContext starts a new process with context.
-func StartContext(ctx context.Context, path string, uid, gid int, args []string, env []string, opts ...Option) (*Info, error) {
+func WithCmdOptions(cmdOpts ...CmdOption) StartOptionFunc {
+	return func(cfg *StartConfig) {
+		cfg.cmdOpts = cmdOpts
+	}
+}
+
+func WithContext(ctx context.Context) StartOptionFunc {
+	return func(cfg *StartConfig) {
+		cfg.ctx = ctx
+	}
+}
+
+func WithUID(uid int) StartOptionFunc {
+	return func(cfg *StartConfig) {
+		cfg.uid = uid
+	}
+}
+
+func WithGID(gid int) StartOptionFunc {
+	return func(cfg *StartConfig) {
+		cfg.gid = gid
+	}
+}
+
+func WithArgs(args []string) StartOptionFunc {
+	return func(cfg *StartConfig) {
+		cfg.args = args
+	}
+}
+
+func WithEnv(env []string) StartOptionFunc {
+	return func(cfg *StartConfig) {
+		cfg.env = env
+	}
+}
+
+// startContext starts a new process with context.
+func startContext(ctx context.Context, path string, uid, gid int, args []string, env []string, opts ...CmdOption) (*Info, error) {
 	cmd, err := getCmd(ctx, path, env, uid, gid, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command for %q: %w", path, err)
@@ -41,6 +97,11 @@ func StartContext(ctx context.Context, path string, uid, gid int, args []string,
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stderr for %q: %w", path, err)
 	}
 
 	// start process
@@ -61,6 +122,7 @@ func StartContext(ctx context.Context, path string, uid, gid int, args []string,
 		PID:     cmd.Process.Pid,
 		Process: cmd.Process,
 		Stdin:   stdin,
+		Stderr:  stderr,
 	}, err
 }
 

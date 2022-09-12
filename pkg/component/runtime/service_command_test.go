@@ -16,10 +16,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type progConfig struct {

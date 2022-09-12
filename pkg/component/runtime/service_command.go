@@ -7,17 +7,17 @@ package runtime
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/dolmen-go/contextio"
+
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, args []string, env []string, timeout time.Duration) error {
@@ -29,31 +29,31 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 		defer cn()
 	}
 
-	cmd := exec.CommandContext(ctx, binaryPath, args...)
-	if len(env) > 0 {
-		cmd.Env = append(os.Environ(), env...)
+	opts := []process.StartOptionFunc{
+		process.WithContext(ctx),
+		process.WithArgs(args),
+		process.WithEnv(env),
 	}
 
 	// Set the command working directory from binary
 	// This is needed because the endpoint installer was looking for it's resources in the current working directory
 	wdir := filepath.Dir(binaryPath)
 	if wdir != "." {
-		cmd.Dir = wdir
+		opts = append(opts,
+			process.WithCmdOptions(func(c *exec.Cmd) error {
+				c.Dir = wdir
+				return nil
+			}))
 	}
 
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("failed getting stderr for the command: %w", err)
-	}
-
-	err = cmd.Start()
+	proc, err := process.Start(binaryPath, opts...)
 	if err != nil {
 		return fmt.Errorf("failed starting the command: %w", err)
 	}
 
 	// channel for the last error message from the stderr output
 	errch := make(chan string, 1)
-	ctxstderr := contextio.NewReader(ctx, stderr)
+	ctxstderr := contextio.NewReader(ctx, proc.Stderr)
 	go func() {
 		var errtext string
 		scanner := bufio.NewScanner(ctxstderr)
@@ -71,22 +71,20 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 		errch <- errtext
 	}()
 
-	err = cmd.Wait()
-	if err != nil {
-		var exerr *exec.ExitError
-		// If the process was killed, check if timeout
-		if errors.As(err, &exerr) && exerr.ExitCode() == -1 && ctx.Err() != nil {
-			err = ctx.Err()
-		}
+	procState := <-proc.Wait()
+	if procState.ExitCode() == -1 && ctx.Err() != nil {
+		err = ctx.Err() // Process was killed due to timeout
+	} else if !procState.Success() {
+		err = &exec.ExitError{ProcessState: procState}
+	}
 
-		select {
-		case errmsg := <-errch:
-			errmsg = strings.TrimSpace(errmsg)
-			if errmsg != "" {
-				err = fmt.Errorf("%s: %w", errmsg, err)
-			}
-		default:
+	select {
+	case errmsg := <-errch:
+		errmsg = strings.TrimSpace(errmsg)
+		if errmsg != "" {
+			err = fmt.Errorf("%s: %w", errmsg, err)
 		}
+	default:
 	}
 
 	return err

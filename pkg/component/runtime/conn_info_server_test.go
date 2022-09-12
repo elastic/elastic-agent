@@ -14,12 +14,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	protobuf "google.golang.org/protobuf/proto"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 )
 
 type mockCommunicator struct {

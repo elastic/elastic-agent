@@ -740,7 +740,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	addEnv("--httpprof", "HTTPPROF")
 	addSettingEnv("gc_percent", "APMSERVER_GOGC")
 	logInfo(streams, "Starting legacy apm-server daemon as a subprocess.")
-	return process.Start(spec.BinaryPath, os.Geteuid(), os.Getegid(), args, nil)
+	return process.Start(spec.BinaryPath, process.WithArgs(args))
 }
 
 func logToStderr(cfg *configuration.Configuration) {

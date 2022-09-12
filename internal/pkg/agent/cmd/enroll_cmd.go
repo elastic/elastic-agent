@@ -598,12 +598,15 @@ func (c *enrollCmd) startAgent(ctx context.Context) (<-chan *os.ProcessState, er
 	if !paths.IsVersionHome() {
 		args = append(args, "--path.home.unversioned")
 	}
-	proc, err := process.StartContext(
-		ctx, cmd, os.Geteuid(), os.Getegid(), args, nil, func(c *exec.Cmd) error {
+	proc, err := process.Start(
+		cmd,
+		process.WithContext(ctx),
+		process.WithArgs(args),
+		process.WithCmdOptions(func(c *exec.Cmd) error {
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
 			return nil
-		})
+		}))
 	if err != nil {
 		return nil, err
 	}
