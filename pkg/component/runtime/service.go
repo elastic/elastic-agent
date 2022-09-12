@@ -350,6 +350,7 @@ func (s *ServiceRuntime) start(ctx context.Context, cli service.Service) error {
 		return fmt.Errorf("failed checking %s service status: %w", cli, err)
 	}
 
+	// Set the state to healthy if the service running after start, otherwise wait for periodic check-ins status reported
 	if status == service.StatusRunning {
 		s.forceCompState(client.UnitStateHealthy, fmt.Sprintf("Healthy: %s service is running", cli))
 	}
@@ -384,10 +385,12 @@ func (s *ServiceRuntime) stop(cli service.Service) error {
 		return fmt.Errorf("failed checking %s service status: %w", cli, err)
 	}
 
+	// Set service state to stopped is the service is stopped
 	if status == service.StatusStopped {
 		s.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: %s service", cli))
+	} else {
+		s.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: while stopping %s service", cli))
 	}
-	// TODO: what to do if not stopped?
 
 	return nil
 }
