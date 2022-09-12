@@ -29,7 +29,7 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 		defer cn()
 	}
 
-	opts := []process.StartOptionFunc{
+	opts := []process.StartOption{
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithEnv(env),

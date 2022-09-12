@@ -23,6 +23,7 @@ type Info struct {
 // CmdOption is an option func to change the underlying command
 type CmdOption func(c *exec.Cmd) error
 
+// StartConfig configuration for start set by the StartOption funcitons
 type StartConfig struct {
 	ctx       context.Context
 	uid, gid  int
@@ -30,10 +31,11 @@ type StartConfig struct {
 	cmdOpts   []CmdOption
 }
 
-type StartOptionFunc func(cfg *StartConfig)
+// StartOption start options function
+type StartOption func(cfg *StartConfig)
 
 // Start starts a new process
-func Start(path string, opts ...StartOptionFunc) (proc *Info, err error) {
+func Start(path string, opts ...StartOption) (proc *Info, err error) {
 	// Apply options
 	c := StartConfig{
 		uid: os.Geteuid(),
@@ -47,43 +49,85 @@ func Start(path string, opts ...StartOptionFunc) (proc *Info, err error) {
 	return startContext(c.ctx, path, c.uid, c.gid, c.args, c.env, c.cmdOpts...)
 }
 
-func WithCmdOptions(cmdOpts ...CmdOption) StartOptionFunc {
-	return func(cfg *StartConfig) {
-		cfg.cmdOpts = cmdOpts
-	}
-}
-
-func WithContext(ctx context.Context) StartOptionFunc {
+// WithContext sets an optional context
+func WithContext(ctx context.Context) StartOption {
 	return func(cfg *StartConfig) {
 		cfg.ctx = ctx
 	}
 }
 
-func WithUID(uid int) StartOptionFunc {
-	return func(cfg *StartConfig) {
-		cfg.uid = uid
-	}
-}
-
-func WithGID(gid int) StartOptionFunc {
-	return func(cfg *StartConfig) {
-		cfg.gid = gid
-	}
-}
-
-func WithArgs(args []string) StartOptionFunc {
+// WithArgs sets arguments
+func WithArgs(args []string) StartOption {
 	return func(cfg *StartConfig) {
 		cfg.args = args
 	}
 }
 
-func WithEnv(env []string) StartOptionFunc {
+// WithEnv sets the environment variables
+func WithEnv(env []string) StartOption {
 	return func(cfg *StartConfig) {
 		cfg.env = env
 	}
 }
 
-// startContext starts a new process with context.
+// WithUID sets UID
+func WithUID(uid int) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.uid = uid
+	}
+}
+
+// WithGID sets GID
+func WithGID(gid int) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.gid = gid
+	}
+}
+
+// WithCmdOptions sets the exec.Cmd options
+func WithCmdOptions(cmdOpts ...CmdOption) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.cmdOpts = cmdOpts
+	}
+}
+
+// Kill kills the process.
+func (i *Info) Kill() error {
+	return killCmd(i.Process)
+}
+
+// Stop stops the process cleanly.
+func (i *Info) Stop() error {
+	return terminateCmd(i.Process)
+}
+
+// StopWait stops the process and waits for it to exit.
+func (i *Info) StopWait() error {
+	err := i.Stop()
+	if err != nil {
+		return err
+	}
+	_, err = i.Process.Wait()
+	return err
+}
+
+// Wait returns a channel that will send process state once it exits.
+func (i *Info) Wait() <-chan *os.ProcessState {
+	ch := make(chan *os.ProcessState)
+
+	go func() {
+		procState, err := i.Process.Wait()
+		if err != nil {
+			// process is not a child - some OSs requires process to be child
+			externalProcess(i.Process)
+		}
+		ch <- procState
+	}()
+
+	return ch
+}
+
+// startContext starts a new process with context. The context is optional and can be nil.
 func startContext(ctx context.Context, path string, uid, gid int, args []string, env []string, opts ...CmdOption) (*Info, error) {
 	cmd, err := getCmd(ctx, path, env, uid, gid, args...)
 	if err != nil {
@@ -124,40 +168,4 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 		Stdin:   stdin,
 		Stderr:  stderr,
 	}, err
-}
-
-// Kill kills the process.
-func (i *Info) Kill() error {
-	return killCmd(i.Process)
-}
-
-// Stop stops the process cleanly.
-func (i *Info) Stop() error {
-	return terminateCmd(i.Process)
-}
-
-// StopWait stops the process and waits for it to exit.
-func (i *Info) StopWait() error {
-	err := i.Stop()
-	if err != nil {
-		return err
-	}
-	_, err = i.Process.Wait()
-	return err
-}
-
-// Wait returns a channel that will send process state once it exits.
-func (i *Info) Wait() <-chan *os.ProcessState {
-	ch := make(chan *os.ProcessState)
-
-	go func() {
-		procState, err := i.Process.Wait()
-		if err != nil {
-			// process is not a child - some OSs requires process to be child
-			externalProcess(i.Process)
-		}
-		ch <- procState
-	}()
-
-	return ch
 }
