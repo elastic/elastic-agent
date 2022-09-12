@@ -23,7 +23,7 @@ type Info struct {
 // CmdOption is an option func to change the underlying command
 type CmdOption func(c *exec.Cmd) error
 
-// StartConfig configuration for start set by the StartOption funcitons
+// StartConfig configuration for the process start set by the StartOption functions
 type StartConfig struct {
 	ctx       context.Context
 	uid, gid  int

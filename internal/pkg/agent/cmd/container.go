@@ -231,12 +231,12 @@ func containerCmd(streams *cli.IOStreams) error {
 				wg.Done()
 				// sending kill signal to current process (elastic-agent)
 				logInfo(streams, "Initiate shutdown elastic-agent.")
-				mainProc.Signal(syscall.SIGTERM) // nolint:errcheck //not required
+				mainProc.Signal(syscall.SIGTERM) //nolint:errcheck //not required
 			}()
 
 			defer func() {
 				if apmProc != nil {
-					apmProc.Stop() // nolint:errcheck //not required
+					apmProc.Stop() //nolint:errcheck //not required
 					logInfo(streams, "Initiate shutdown legacy apm-server.")
 				}
 			}()
