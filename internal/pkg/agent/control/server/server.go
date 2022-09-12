@@ -181,7 +181,7 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 	}
 	cb, err := u.Upgrade(ctx, &upgradeRequest{request}, false)
 	if err != nil {
-		//nolint:nilerr // ignore the error, it's part of the response
+		//nolint:nilerr
 		return &proto.UpgradeResponse{
 			Status: proto.ActionStatus_FAILURE,
 			Error:  err.Error(),
