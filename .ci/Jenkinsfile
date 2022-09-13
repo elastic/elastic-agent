@@ -286,29 +286,6 @@ pipeline {
           }
       }
     }
-    stage('e2e tests') {
-      when {
-        // Always when running builds on branches/tags
-        // Enable if e2e related changes.
-        beforeAgent true
-        anyOf {
-          not { changeRequest() }
-          // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
-          expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
-        }
-      }
-      steps {
-        // TODO: what's the testMatrixFile to be used if any
-        runE2E(testMatrixFile: '.ci/.e2e-tests-for-elastic-agent.yaml',
-               beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
-               elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
-               gitHubCheckName: "e2e-tests",
-               gitHubCheckRepo: env.REPO,
-               gitHubCheckSha1: env.GIT_BASE_COMMIT,
-               propagate: true,
-               wait: true)
-      }
-    }
     stage('extended windows') {
       when {
         // Always when running builds on branches/tags
@@ -416,6 +393,28 @@ pipeline {
             }
           }
         }
+      }
+    }
+    stage('e2e tests') {
+      when {
+        // Always when running builds on branches/tags
+        // Enable if e2e related changes.
+        beforeAgent true
+        anyOf {
+          not { changeRequest() }
+          // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
+          expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
+        }
+      }
+      steps {
+        runE2E(testMatrixFile: '.ci/.e2e-tests-for-elastic-agent.yaml',
+               beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
+               elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
+               gitHubCheckName: "e2e-tests",
+               gitHubCheckRepo: env.REPO,
+               gitHubCheckSha1: env.GIT_BASE_COMMIT,
+               propagate: true,
+               wait: true)
       }
     }
   }
