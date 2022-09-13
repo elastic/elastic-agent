@@ -24,6 +24,7 @@ const (
 	metricspath = "metrics_path"
 	username    = "username"
 	password    = "password"
+	stream      = "stream" // this is the container stream: stdout/stderr
 )
 
 type hintsBuilder struct {
@@ -92,6 +93,15 @@ func (m *hintsBuilder) getPassword(hints mapstr.M) string {
 
 func (m *hintsBuilder) getStreamPassword(hints mapstr.M, streamName string) string {
 	key := fmt.Sprintf("%v.%v", streamName, password)
+	return utils.GetHintString(hints, m.Key, key)
+}
+
+func (m *hintsBuilder) getContainerStream(hints mapstr.M) string {
+	return utils.GetHintString(hints, m.Key, stream)
+}
+
+func (m *hintsBuilder) getStreamContainerStream(hints mapstr.M, streamName string) string {
+	key := fmt.Sprintf("%v.%v", streamName, stream)
 	return utils.GetHintString(hints, m.Key, key)
 }
 
@@ -178,6 +188,10 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 	if integrationPassword != "" {
 		_, _ = integrationHints.Put(password, integrationPassword)
 	}
+	integrationContainerStream := builder.getFromMeta(builder.getContainerStream(hints), kubeMeta)
+	if integrationPassword != "" {
+		_, _ = integrationHints.Put(stream, integrationContainerStream)
+	}
 
 	dataStreams := builder.getDataStreams(hints)
 	for _, dataStream := range dataStreams {
@@ -201,6 +215,9 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 		}
 		if integrationPassword != "" {
 			_, _ = streamHints.Put(password, integrationPassword)
+		}
+		if integrationContainerStream != "" {
+			_, _ = streamHints.Put(stream, integrationContainerStream)
 		}
 
 		streamPeriod := builder.getFromMeta(builder.getStreamPeriod(hints, dataStream), kubeMeta)
@@ -226,6 +243,10 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 		streamPassword := builder.getFromMeta(builder.getStreamPassword(hints, dataStream), kubeMeta)
 		if streamPassword != "" {
 			_, _ = streamHints.Put(password, streamPassword)
+		}
+		streamContainerStream := builder.getFromMeta(builder.getStreamContainerStream(hints, dataStream), kubeMeta)
+		if streamContainerStream != "" {
+			_, _ = streamHints.Put(stream, streamContainerStream)
 		}
 		_, _ = integrationHints.Put(dataStream, streamHints)
 
