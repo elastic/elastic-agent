@@ -43,6 +43,10 @@ pipeline {
     // disabled by default, but required for merge:
     // opt-in with 'ci:extended-windows' tag on PR
     booleanParam(name: 'extended_windows_ci', defaultValue: false, description: 'Enable Extended Windows tests')
+
+    // disabled by default, but required for merge:
+    // opt-in with 'ci:extended-m1' tag on PR
+    booleanParam(name: 'extended_m1_ci', defaultValue: false, description: 'Enable M1 tests')
   }
   stages {
     stage('Checkout') {
@@ -56,6 +60,7 @@ pipeline {
           setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('EXT_WINDOWS_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
+          setEnvVar('EXT_M1_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
         }
       }
     }
@@ -326,6 +331,55 @@ pipeline {
         }
       }
     }
+    stage('m1') {
+      agent { label 'orka && darwin && aarch64' }
+      options { skipDefaultCheckout() }
+      when {
+        // Always when running builds on branches/tags
+        // Enable if extended M1 support related changes.
+        beforeAgent true
+        anyOf {
+          not { changeRequest() }
+          expression { return isExtendedM1Enabled() && env.ONLY_DOCS == "false"}
+        }
+      }
+      stages {
+        stage('build'){
+          steps {
+            withGithubNotify(context: "Build-darwin-aarch64") {
+              deleteDir()
+              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+              withMageEnv(){
+                dir("${BASE_DIR}"){
+                  cmd(label: 'Go build', script: 'mage build')
+                }
+              }
+            }
+          }
+        }
+        stage('Test') {
+          steps {
+            withGithubNotify(context: "Test-darwin-aarch64") {
+              withMageEnv(){
+                dir("${BASE_DIR}"){
+                  withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                    cmd(label: 'Go unitTest', script: 'mage unitTest')
+                  }
+                }
+              }
+            }
+          }
+          post {
+            always {
+              junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+              whenTrue(isCodeCoverageEnabled()) {
+                coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
+              }
+            }
+          }
+        }
+      }
+    }
   }
   post {
     cleanup {
@@ -445,4 +499,11 @@ def isPackageEnabled() {
 */
 def isExtendedWindowsEnabled() {
   return env.EXT_WINDOWS_CHANGES == "true" || params.extended_windows_ci || env.GITHUB_COMMENT?.contains('extended windows') || matchesPrLabel(label: 'ci:extended-windows')
+}
+
+/**
+* Wrapper to know if the build should enable the M1 extended support
+*/
+def isExtendedM1Enabled() {
+  return env.EXT_M1_CHANGES == "true" || params.extended_m1_ci || env.GITHUB_COMMENT?.contains('extended m1') || matchesPrLabel(label: 'ci:extended-m1')
 }
