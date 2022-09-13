@@ -381,9 +381,9 @@ func generateContainerData(
 							annotations, _ := ann.(mapstr.M)
 							hints := utils.GenerateHints(annotations, "", config.Prefix)
 							if len(hints) > 0 {
-								logger.Errorf("Extracted hints are :%v", hints)
+								logger.Debugf("Extracted hints are :%v", hints)
 								hintsMapping := GenerateHintsMapping(hints, k8sMapping, logger, c.ID)
-								logger.Errorf("Generated hints mappings are :%v", hintsMapping)
+								logger.Debugf("Generated hints mappings are :%v", hintsMapping)
 								_ = comm.AddOrUpdate(
 									eventID,
 									PodPriority,
