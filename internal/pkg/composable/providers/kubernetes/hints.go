@@ -189,7 +189,7 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 		_, _ = integrationHints.Put(password, integrationPassword)
 	}
 	integrationContainerStream := builder.getFromMeta(builder.getContainerStream(hints), kubeMeta)
-	if integrationPassword != "" {
+	if integrationContainerStream != "" {
 		_, _ = integrationHints.Put(stream, integrationContainerStream)
 	}
 
