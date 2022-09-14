@@ -114,7 +114,7 @@ func newLocal(
 	}
 	localApplication.router = router
 
-	composableCtrl, err := composable.New(log, rawConfig)
+	composableCtrl, err := composable.New(log, rawConfig, false)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
