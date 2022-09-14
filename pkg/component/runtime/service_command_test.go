@@ -84,8 +84,6 @@ func prepareTestProg(ctx context.Context, log *logger.Logger, dir string, cfg pr
 		return "", err
 	}
 
-	//fmt.Println(prog)
-
 	err = os.WriteFile(filepath.Join(dir, "go.mod"), []byte(testModFile), 0600)
 	if err != nil {
 		return "", err
