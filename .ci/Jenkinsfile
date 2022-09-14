@@ -30,6 +30,7 @@ pipeline {
   }
   triggers {
     issueCommentTrigger("(${obltGitHubComments()}|^run (integration|end-to-end) tests|/package)")
+    cron('@hourly')
   }
   parameters {
     // disabled by default, but required for merge, there are two GH checks:
