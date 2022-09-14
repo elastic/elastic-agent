@@ -209,10 +209,10 @@ OSStatus RemoveKeychainItem(SecKeychainRef keychain, const char *name, const cha
 char* GetOSStatusMessage(OSStatus status) {
     CFStringRef s = SecCopyErrorMessageString(status, NULL);
     char *p;
-	int n;
-	n = CFStringGetLength(s)*8;	
-	p = malloc(n);
-	CFStringGetCString(s, p, n, kCFStringEncodingUTF8);
+    int n;
+    n = CFStringGetLength(s)*8;
+    p = malloc(n);
+    CFStringGetCString(s, p, n, kCFStringEncodingUTF8);
     CFRelease(s);
-	return p;
+    return p;
 }
