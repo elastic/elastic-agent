@@ -1,0 +1,2271 @@
+inputs:
+    - name: filestream-zeek
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.zeek.capture_loss.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.capture_loss
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.capture_loss.stream|'all'}
+          paths:
+            - /var/log/bro/current/capture_loss.log
+            - /opt/zeek/logs/current/capture_loss.log
+            - /usr/local/var/spool/zeek/capture_loss.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-capture-loss
+        - condition: ${kubernetes.hints.zeek.connection.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.connection
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.connection.stream|'all'}
+          paths:
+            - /var/log/bro/current/conn.log
+            - /opt/zeek/logs/current/conn.log
+            - /usr/local/var/spool/zeek/conn.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-connection
+        - condition: ${kubernetes.hints.zeek.dce_rpc.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.dce_rpc
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.dce_rpc.stream|'all'}
+          paths:
+            - /var/log/bro/current/dce_rpc.log
+            - /opt/zeek/logs/current/dce_rpc.log
+            - /usr/local/var/spool/zeek/dce_rpc.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-dce-rpc
+        - condition: ${kubernetes.hints.zeek.dhcp.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.dhcp
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.dhcp.stream|'all'}
+          paths:
+            - /var/log/bro/current/dhcp.log
+            - /opt/zeek/logs/current/dhcp.log
+            - /usr/local/var/spool/zeek/dhcp.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-dhcp
+        - condition: ${kubernetes.hints.zeek.dnp3.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.dnp3
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.dnp3.stream|'all'}
+          paths:
+            - /var/log/bro/current/dnp3.log
+            - /opt/zeek/logs/current/dnp3.log
+            - /usr/local/var/spool/zeek/dnp3.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - zeek-dnp3
+        - condition: ${kubernetes.hints.zeek.dns.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.dns
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.dns.stream|'all'}
+          paths:
+            - /var/log/bro/current/dns.log
+            - /opt/zeek/logs/current/dns.log
+            - /usr/local/var/spool/zeek/dns.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-dns
+        - condition: ${kubernetes.hints.zeek.dpd.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.dpd
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.dpd.stream|'all'}
+          paths:
+            - /var/log/bro/current/dpd.log
+            - /opt/zeek/logs/current/dpd.log
+            - /usr/local/var/spool/zeek/dpd.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - zeek-dpd
+        - condition: ${kubernetes.hints.zeek.files.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.files
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.files.stream|'all'}
+          paths:
+            - /var/log/bro/current/files.log
+            - /opt/zeek/logs/current/files.log
+            - /usr/local/var/spool/zeek/files.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - zeek-files
+        - condition: ${kubernetes.hints.zeek.ftp.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.ftp
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.ftp.stream|'all'}
+          paths:
+            - /var/log/bro/current/ftp.log
+            - /opt/zeek/logs/current/ftp.log
+            - /usr/local/var/spool/zeek/ftp.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-ftp
+        - condition: ${kubernetes.hints.zeek.http.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.http
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.http.stream|'all'}
+          paths:
+            - /var/log/bro/current/http.log
+            - /opt/zeek/logs/current/http.log
+            - /usr/local/var/spool/zeek/http.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-http
+        - condition: ${kubernetes.hints.zeek.intel.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.intel
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.intel.stream|'all'}
+          paths:
+            - /var/log/bro/current/intel.log
+            - /opt/zeek/logs/current/intel.log
+            - /usr/local/var/spool/zeek/intel.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-intel
+        - condition: ${kubernetes.hints.zeek.irc.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.irc
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.irc.stream|'all'}
+          paths:
+            - /var/log/bro/current/irc.log
+            - /opt/zeek/logs/current/irc.log
+            - /usr/local/var/spool/zeek/irc.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-irc
+        - condition: ${kubernetes.hints.zeek.kerberos.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.kerberos
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.kerberos.stream|'all'}
+          paths:
+            - /var/log/bro/current/kerberos.log
+            - /opt/zeek/logs/current/kerberos.log
+            - /usr/local/var/spool/zeek/kerberos.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-kerberos
+        - condition: ${kubernetes.hints.zeek.known_certs.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.known_certs
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.known_certs.stream|'all'}
+          paths:
+            - /var/log/bro/current/known_certs.log
+            - /opt/zeek/logs/current/known_certs.log
+            - /usr/local/var/spool/zeek/known_certs.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-known_certs
+        - condition: ${kubernetes.hints.zeek.known_hosts.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.known_hosts
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.known_hosts.stream|'all'}
+          paths:
+            - /var/log/bro/current/known_hosts.log
+            - /opt/zeek/logs/current/known_hosts.log
+            - /usr/local/var/spool/zeek/known_hosts.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-known_hosts
+        - condition: ${kubernetes.hints.zeek.known_services.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.known_services
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.known_services.stream|'all'}
+          paths:
+            - /var/log/bro/current/known_services.log
+            - /opt/zeek/logs/current/known_services.log
+            - /usr/local/var/spool/zeek/known_services.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-known_services
+        - condition: ${kubernetes.hints.zeek.modbus.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.modbus
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.modbus.stream|'all'}
+          paths:
+            - /var/log/bro/current/modbus.log
+            - /opt/zeek/logs/current/modbus.log
+            - /usr/local/var/spool/zeek/modbus.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-modbus
+        - condition: ${kubernetes.hints.zeek.mysql.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.mysql
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.mysql.stream|'all'}
+          paths:
+            - /var/log/bro/current/mysql.log
+            - /opt/zeek/logs/current/mysql.log
+            - /usr/local/var/spool/zeek/mysql.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-mysql
+        - condition: ${kubernetes.hints.zeek.notice.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.notice
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.notice.stream|'all'}
+          paths:
+            - /var/log/bro/current/notice.log
+            - /opt/zeek/logs/current/notice.log
+            - /usr/local/var/spool/zeek/notice.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-notice
+        - condition: ${kubernetes.hints.zeek.ntlm.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.ntlm
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.ntlm.stream|'all'}
+          paths:
+            - /var/log/bro/current/ntlm.log
+            - /opt/zeek/logs/current/ntlm.log
+            - /usr/local/var/spool/zeek/ntlm.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-ntlm
+        - condition: ${kubernetes.hints.zeek.ntp.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.ntp
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.ntp.stream|'all'}
+          paths:
+            - /var/log/bro/current/ntp.log
+            - /opt/zeek/logs/current/ntp.log
+            - /usr/local/var/spool/zeek/ntp.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-ntp
+        - condition: ${kubernetes.hints.zeek.ocsp.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.ocsp
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.ocsp.stream|'all'}
+          paths:
+            - /var/log/bro/current/ocsp.log
+            - /opt/zeek/logs/current/ocsp.log
+            - /usr/local/var/spool/zeek/ocsp.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-ocsp
+        - condition: ${kubernetes.hints.zeek.pe.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.pe
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.pe.stream|'all'}
+          paths:
+            - /var/log/bro/current/pe.log
+            - /opt/zeek/logs/current/pe.log
+            - /usr/local/var/spool/zeek/pe.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-pe
+        - condition: ${kubernetes.hints.zeek.radius.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.radius
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.radius.stream|'all'}
+          paths:
+            - /var/log/bro/current/radius.log
+            - /opt/zeek/logs/current/radius.log
+            - /usr/local/var/spool/zeek/radius.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-radius
+        - condition: ${kubernetes.hints.zeek.rdp.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.rdp
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.rdp.stream|'all'}
+          paths:
+            - /var/log/bro/current/rdp.log
+            - /opt/zeek/logs/current/rdp.log
+            - /usr/local/var/spool/zeek/rdp.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-rdp
+        - condition: ${kubernetes.hints.zeek.rfb.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.rfb
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.rfb.stream|'all'}
+          paths:
+            - /var/log/bro/current/rfb.log
+            - /opt/zeek/logs/current/rfb.log
+            - /usr/local/var/spool/zeek/rfb.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-rfb
+        - condition: ${kubernetes.hints.zeek.signature.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.signature
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.signature.stream|'all'}
+          paths:
+            - /var/log/bro/current/signature.log
+            - /opt/zeek/logs/current/signature.log
+            - /usr/local/var/spool/zeek/signature.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-signature
+        - condition: ${kubernetes.hints.zeek.sip.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.sip
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.sip.stream|'all'}
+          paths:
+            - /var/log/bro/current/sip.log
+            - /opt/zeek/logs/current/sip.log
+            - /usr/local/var/spool/zeek/sip.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-sip
+        - condition: ${kubernetes.hints.zeek.smb_cmd.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.smb_cmd
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.smb_cmd.stream|'all'}
+          paths:
+            - /var/log/bro/current/smb_cmd.log
+            - /opt/zeek/logs/current/smb_cmd.log
+            - /usr/local/var/spool/zeek/smb_cmd.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-smb-cmd
+        - condition: ${kubernetes.hints.zeek.smb_files.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.smb_files
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.smb_files.stream|'all'}
+          paths:
+            - /var/log/bro/current/smb_files.log
+            - /opt/zeek/logs/current/smb_files.log
+            - /usr/local/var/spool/zeek/smb_files.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-smb-files
+        - condition: ${kubernetes.hints.zeek.smb_mapping.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.smb_mapping
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.smb_mapping.stream|'all'}
+          paths:
+            - /var/log/bro/current/smb_mapping.log
+            - /opt/zeek/logs/current/smb_mapping.log
+            - /usr/local/var/spool/zeek/smb_mapping.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek.smb_mapping
+        - condition: ${kubernetes.hints.zeek.smtp.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.smtp
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.smtp.stream|'all'}
+          paths:
+            - /var/log/bro/current/smtp.log
+            - /opt/zeek/logs/current/smtp.log
+            - /usr/local/var/spool/zeek/smtp.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-smtp
+        - condition: ${kubernetes.hints.zeek.snmp.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.snmp
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.snmp.stream|'all'}
+          paths:
+            - /var/log/bro/current/snmp.log
+            - /opt/zeek/logs/current/snmp.log
+            - /usr/local/var/spool/zeek/snmp.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-snmp
+        - condition: ${kubernetes.hints.zeek.socks.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.socks
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.socks.stream|'all'}
+          paths:
+            - /var/log/bro/current/socks.log
+            - /opt/zeek/logs/current/socks.log
+            - /usr/local/var/spool/zeek/socks.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-socks
+        - condition: ${kubernetes.hints.zeek.software.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.software
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.software.stream|'all'}
+          paths:
+            - /var/log/bro/current/software.log
+            - /opt/zeek/logs/current/software.log
+            - /usr/local/var/spool/zeek/software.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-software
+        - condition: ${kubernetes.hints.zeek.ssh.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.ssh
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.ssh.stream|'all'}
+          paths:
+            - /var/log/bro/current/ssh.log
+            - /opt/zeek/logs/current/ssh.log
+            - /usr/local/var/spool/zeek/ssh.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-ssh
+        - condition: ${kubernetes.hints.zeek.ssl.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.ssl
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.ssl.stream|'all'}
+          paths:
+            - /var/log/bro/current/ssl.log
+            - /opt/zeek/logs/current/ssl.log
+            - /usr/local/var/spool/zeek/ssl.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-ssl
+        - condition: ${kubernetes.hints.zeek.stats.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.stats
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.stats.stream|'all'}
+          paths:
+            - /var/log/bro/current/stats.log
+            - /opt/zeek/logs/current/stats.log
+            - /usr/local/var/spool/zeek/stats.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-stats
+        - condition: ${kubernetes.hints.zeek.syslog.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.syslog
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.syslog.stream|'all'}
+          paths:
+            - /var/log/bro/current/syslog.log
+            - /opt/zeek/logs/current/syslog.log
+            - /usr/local/var/spool/zeek/syslog.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-syslog
+        - condition: ${kubernetes.hints.zeek.traceroute.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.traceroute
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.traceroute.stream|'all'}
+          paths:
+            - /var/log/bro/current/traceroute.log
+            - /opt/zeek/logs/current/traceroute.log
+            - /usr/local/var/spool/zeek/traceroute.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-traceroute
+        - condition: ${kubernetes.hints.zeek.tunnel.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.tunnel
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.tunnel.stream|'all'}
+          paths:
+            - /var/log/bro/current/tunnel.log
+            - /opt/zeek/logs/current/tunnel.log
+            - /usr/local/var/spool/zeek/tunnel.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-tunnel
+        - condition: ${kubernetes.hints.zeek.weird.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.weird
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.weird.stream|'all'}
+          paths:
+            - /var/log/bro/current/weird.log
+            - /opt/zeek/logs/current/weird.log
+            - /usr/local/var/spool/zeek/weird.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-weird
+        - condition: ${kubernetes.hints.zeek.x509.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          data_stream:
+            dataset: zeek.x509
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.zeek.x509.stream|'all'}
+          paths:
+            - /var/log/bro/current/x509.log
+            - /opt/zeek/logs/current/x509.log
+            - /usr/local/var/spool/zeek/x509.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - zeek-x509
+      data_stream.namespace: default
+    - name: httpjson-zeek
+      type: httpjson
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.zeek.capture_loss.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.capture_loss
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="capture_loss-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-capture-loss
+        - condition: ${kubernetes.hints.zeek.connection.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.connection
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="conn-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-connection
+        - condition: ${kubernetes.hints.zeek.dce_rpc.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.dce_rpc
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="dce_rpc-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-dce-rpc
+        - condition: ${kubernetes.hints.zeek.dhcp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.dhcp
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="dhcp-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-dhcp
+        - condition: ${kubernetes.hints.zeek.dnp3.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.dnp3
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="dnp3-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-dnp3
+        - condition: ${kubernetes.hints.zeek.dns.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.dns
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="dns-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-dns
+        - condition: ${kubernetes.hints.zeek.dpd.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.dpd
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="dpd-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-dpd
+        - condition: ${kubernetes.hints.zeek.files.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.files
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="files-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-files
+        - condition: ${kubernetes.hints.zeek.ftp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.ftp
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="ftp-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-ftp
+        - condition: ${kubernetes.hints.zeek.http.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.http
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="http-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-http
+        - condition: ${kubernetes.hints.zeek.intel.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.intel
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="intel-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-intel
+        - condition: ${kubernetes.hints.zeek.irc.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.irc
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="irc-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-irc
+        - condition: ${kubernetes.hints.zeek.kerberos.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.kerberos
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="kerberos-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-kerberos
+        - condition: ${kubernetes.hints.zeek.modbus.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.modbus
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="modbus-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-modbus
+        - condition: ${kubernetes.hints.zeek.mysql.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.mysql
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="mysql-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-mysql
+        - condition: ${kubernetes.hints.zeek.notice.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.notice
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="notice-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-notice
+        - condition: ${kubernetes.hints.zeek.ntlm.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.ntlm
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="ntlm-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-ntlm
+        - condition: ${kubernetes.hints.zeek.ntp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.ntp
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="ntp-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-ntp
+        - condition: ${kubernetes.hints.zeek.ocsp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.ocsp
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="ocsp-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-ocsp
+        - condition: ${kubernetes.hints.zeek.pe.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.pe
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="pe-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-pe
+        - condition: ${kubernetes.hints.zeek.radius.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.radius
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="radius-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-radius
+        - condition: ${kubernetes.hints.zeek.rdp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.rdp
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="rdp-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-rdp
+        - condition: ${kubernetes.hints.zeek.rfb.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.rfb
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="rfb-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-rfb
+        - condition: ${kubernetes.hints.zeek.signature.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.signature
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="signature-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-signature
+        - condition: ${kubernetes.hints.zeek.sip.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.sip
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="sip-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-sip
+        - condition: ${kubernetes.hints.zeek.smb_cmd.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.smb_cmd
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="smb_cmd-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-smb-cmd
+        - condition: ${kubernetes.hints.zeek.smb_files.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.smb_files
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="smb_files-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-smb-files
+        - condition: ${kubernetes.hints.zeek.smb_mapping.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.smb_mapping
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="smb_mapping-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+        - condition: ${kubernetes.hints.zeek.smtp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.smtp
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="smtp-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-smtp
+        - condition: ${kubernetes.hints.zeek.snmp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.snmp
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="snmp-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-snmp
+        - condition: ${kubernetes.hints.zeek.socks.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.socks
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="socks-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-socks
+        - condition: ${kubernetes.hints.zeek.ssh.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.ssh
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="ssh-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-ssh
+        - condition: ${kubernetes.hints.zeek.ssl.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.ssl
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="ssl-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-ssl
+        - condition: ${kubernetes.hints.zeek.stats.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.stats
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="stats-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-stats
+        - condition: ${kubernetes.hints.zeek.syslog.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.syslog
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="syslog-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-syslog
+        - condition: ${kubernetes.hints.zeek.traceroute.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.traceroute
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="traceroute-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-traceroute
+        - condition: ${kubernetes.hints.zeek.tunnel.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.tunnel
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="tunnel-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-tunnel
+        - condition: ${kubernetes.hints.zeek.weird.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.weird
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="weird-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-weird
+        - condition: ${kubernetes.hints.zeek.x509.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+          config_version: 2
+          cursor:
+            index_earliest:
+                value: '[[.last_event.result.max_indextime]]'
+          data_stream:
+            dataset: zeek.x509
+            type: logs
+          interval: 10s
+          request.method: POST
+          request.transforms:
+            - set:
+                target: url.params.search
+                value: search sourcetype="x509-*" | streamstats max(_indextime) AS max_indextime
+            - set:
+                target: url.params.output_mode
+                value: json
+            - set:
+                default: '[[(now (parseDuration "-10s")).Unix]]'
+                target: url.params.index_earliest
+                value: '[[ .cursor.index_earliest ]]'
+            - set:
+                target: url.params.index_latest
+                value: '[[(now).Unix]]'
+            - set:
+                target: header.Content-Type
+                value: application/x-www-form-urlencoded
+          request.url: https://server.example.com:8089/services/search/jobs/export
+          response.decode_as: application/x-ndjson
+          response.split:
+            delimiter: |4+
+            target: body.result._raw
+            type: string
+          tags:
+            - forwarded
+            - zeek-x509
+      data_stream.namespace: default
