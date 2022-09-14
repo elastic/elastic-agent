@@ -161,9 +161,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 			}
 
 			actions := make([]fleetapi.Action, len(resp.Actions))
-			for idx, a := range resp.Actions {
-				actions[idx] = a
-			}
+			copy(actions, resp.Actions)
 
 			// Persist state
 			hadErr := false
