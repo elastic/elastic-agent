@@ -218,7 +218,7 @@ pipeline {
       when {
         // Always when running builds on branches/tags
         // Enable if k8s related changes.
-        anyOf {
+        allOf {
           not { changeRequest() }                           // If no PR
           expression { return env.K8S_CHANGES == "true" }   // If k8s changes
         }
@@ -292,7 +292,7 @@ pipeline {
         // Always when running builds on branches/tags
         // Enable if extended windows support related changes.
         beforeAgent true
-        anyOf {
+        allOf {
           not { changeRequest() }
           expression { return isExtendedWindowsEnabled() && env.ONLY_DOCS == "false"}
         }
@@ -354,7 +354,7 @@ pipeline {
         // Always when running builds on branches/tags
         // Enable if extended M1 support related changes.
         beforeAgent true
-        anyOf {
+        allOf {
           not { changeRequest() }
           expression { return isExtendedM1Enabled() && env.ONLY_DOCS == "false"}
         }
@@ -401,7 +401,7 @@ pipeline {
         // Always when running builds on branches/tags
         // Enable if e2e related changes.
         beforeAgent true
-        anyOf {
+        allOf {
           not { changeRequest() }
           // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
           expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
