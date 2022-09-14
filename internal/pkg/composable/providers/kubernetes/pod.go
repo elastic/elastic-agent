@@ -161,9 +161,9 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 				annotations, _ := ann.(mapstr.M)
 				hints := utils.GenerateHints(annotations, "", p.config.Prefix)
 				if len(hints) > 0 {
-					p.logger.Errorf("Extracted hints are :%v", hints)
+					p.logger.Debugf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
-					p.logger.Errorf("Generated hints mappings are :%v", hintsMapping)
+					p.logger.Debugf("Generated hints mappings are :%v", hintsMapping)
 					_ = p.comm.AddOrUpdate(
 						data.uid,
 						PodPriority,
