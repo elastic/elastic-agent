@@ -25,6 +25,7 @@ spec:
       serviceAccountName: elastic-agent-standalone
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      # Uncomment if using hints feature
       #initContainers:
       #  - name: k8s-templates-downloader
       #    image: busybox:1.28
