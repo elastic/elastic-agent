@@ -250,7 +250,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			})
 		}
 
-		ctrl, err := composable.New(log, cfg)
+		ctrl, err := composable.New(log, cfg, false)
 		if err != nil {
 			return nil, err
 		}

@@ -135,7 +135,7 @@ func newManaged(
 	}
 	managedApplication.router = router
 
-	composableCtrl, err := composable.New(log, rawConfig)
+	composableCtrl, err := composable.New(log, rawConfig, true)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}

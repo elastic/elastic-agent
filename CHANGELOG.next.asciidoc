@@ -201,3 +201,4 @@
 - Redact sensitive information on diagnostics collect command. {issue}[241] {pull}[566]
 - Fix incorrectly creating a filebeat redis input when a policy contains a packetbeat redis input. {issue}[427] {pull}[700]
 - Add `lumberjack` input type to the Filebeat spec. {pull}[959]
+- Add support for hints' based autodiscovery in kubernetes provider. {pull}[698]
