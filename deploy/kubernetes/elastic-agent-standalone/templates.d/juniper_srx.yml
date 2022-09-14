@@ -1,0 +1,49 @@
+inputs:
+    - name: udp-juniper_srx
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.juniper_srx.log.enabled} == true or ${kubernetes.hints.juniper_srx.enabled} == true
+          data_stream:
+            dataset: juniper_srx.log
+            type: logs
+          host: localhost:9006
+          processors:
+            - add_locale: null
+          tags:
+            - juniper-srx
+            - forwarded
+      data_stream.namespace: default
+    - name: tcp-juniper_srx
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.juniper_srx.log.enabled} == true or ${kubernetes.hints.juniper_srx.enabled} == true
+          data_stream:
+            dataset: juniper_srx.log
+            type: logs
+          host: localhost:9006
+          processors:
+            - add_locale: null
+          tags:
+            - juniper-srx
+            - forwarded
+      data_stream.namespace: default
+    - name: filestream-juniper_srx
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.juniper_srx.log.enabled} == true and ${kubernetes.hints.juniper_srx.enabled} == true
+          data_stream:
+            dataset: juniper_srx.log
+            type: logs
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale: null
+          prospector.scanner.exclude_files:
+            - \.gz$
+          tags:
+            - juniper-srx
+            - forwarded
+      data_stream.namespace: default
