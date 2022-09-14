@@ -67,6 +67,10 @@ pipeline {
       }
     }
     stage('Check'){
+      when {
+        beforeAgent true
+        expression { return false }
+      }
       steps {
         withGithubNotify(context: "Check") {
           withMageEnv(){
