@@ -1,0 +1,18 @@
+inputs:
+    - name: filestream-log
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.log.log.enabled} == true or ${kubernetes.hints.log.enabled} == true
+          data_stream:
+            dataset: log.log
+            type: logs
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.log.log.stream|'all'}
+          paths: null
+          prospector:
+            scanner:
+                symlinks: true
+      data_stream.namespace: default
