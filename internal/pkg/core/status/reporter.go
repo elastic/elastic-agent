@@ -250,10 +250,9 @@ func (r *controller) updateStatus() {
 }
 
 func (r *controller) logStatus(status AgentStatusCode, message string) {
-	logFn := r.log.Infof
-	if status == Degraded {
-		logFn = r.log.Warnf
-	} else if status == Failed {
+	// Use at least warning level log for all statuses to make sure they are visible in the logs
+	logFn := r.log.Warnf
+	if status == Failed {
 		logFn = r.log.Errorf
 	}
 
