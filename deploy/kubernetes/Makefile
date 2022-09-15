@@ -51,12 +51,9 @@ ci-clone-kibana-repository:
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
-	HASDIFF=$$(git status | grep $(FILE_REPO) | wc -l); \
-	if [ $${HASDIFF} -ne 1 ]; \
-	then \
-		echo "No differences found with kibana git repository" && \
-		exit 1; \
-	fi 
+	HASDIFF=`git status | grep $(FILE_REPO) | wc -l`; \
+	echo $${HASDIFF}
+ifeq ($${HASDIFF},1)
 	echo "INFO: Create branch to update k8s templates"
 	git config user.name obscloudnativemonitoring
 	git config user.email obs-cloudnative-monitoring@elastic.co
@@ -67,18 +64,24 @@ ci-create-kubernetes-templates-pull-request:
 	git diff --staged --quiet || git commit -m "[Automated PR] Publish kubernetes templates for elastic-agent"
 	echo "INFO: show remote details"
 	git remote -v
+
 ifeq ($(DRY_RUN),TRUE)
-		echo "INFO: skip pushing branch"
+	echo "INFO: skip pushing branch"
 else
-		echo "INFO: push branch"
-		@git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
-		echo "INFO: create pull request"
-		@gh pr create \
-			--title "Update kubernetes templates for elastic-agent" \
-			--body "Automated by ${BUILD_URL}" \
-			--label automation \
-			--base main \
-			--head $(ELASTIC_AGENT_BRANCH) \
-			--reviewer elastic/obs-cloudnative-monitoring
+	echo "INFO: push branch"
+	@git push --set-upstream origin $(ELASTIC_AGENT_BRANCH)
+	echo "INFO: create pull request"
+	@gh pr create \
+		--title "Update kubernetes templates for elastic-agent" \
+		--body "Automated by ${BUILD_URL}" \
+		--label automation \
+		--label release_note:automation \
+		--base main \
+		--head $(ELASTIC_AGENT_BRANCH) \
+		--reviewer elastic/obs-cloudnative-monitoring
 endif 
+
+else
+	echo "No differences found with kibana git repository"
+endif
 

@@ -115,6 +115,7 @@
 - Use the Elastic Agent configuration directory as the root of the `inputs.d` folder. {issues}663[663]
 - Fix a panic caused by a race condition when installing the Elastic Agent. {issues}806[806]
 - Use at least warning level for all status logs {pull}1218[1218]
+- Remove fleet event reporter and events from checkin body. {issue}993[993]
 
 ==== New features
 
@@ -201,3 +202,4 @@
 - Redact sensitive information on diagnostics collect command. {issue}[241] {pull}[566]
 - Fix incorrectly creating a filebeat redis input when a policy contains a packetbeat redis input. {issue}[427] {pull}[700]
 - Add `lumberjack` input type to the Filebeat spec. {pull}[959]
+- Add support for hints' based autodiscovery in kubernetes provider. {pull}[698]

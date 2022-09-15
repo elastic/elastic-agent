@@ -1,0 +1,73 @@
+inputs:
+    - name: mongodb/metrics-mongodb
+      type: mongodb/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mongodb.collstats.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
+          data_stream:
+            dataset: mongodb.collstats
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mongodb.collstats.host|'localhost:27017'}
+          metricsets:
+            - collstats
+          period: ${kubernetes.hints.mongodb.collstats.period|'10s'}
+        - condition: ${kubernetes.hints.mongodb.dbstats.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
+          data_stream:
+            dataset: mongodb.dbstats
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mongodb.dbstats.host|'localhost:27017'}
+          metricsets:
+            - dbstats
+          period: ${kubernetes.hints.mongodb.dbstats.period|'10s'}
+        - condition: ${kubernetes.hints.mongodb.metrics.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
+          data_stream:
+            dataset: mongodb.metrics
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mongodb.metrics.host|'localhost:27017'}
+          metricsets:
+            - metrics
+          period: ${kubernetes.hints.mongodb.metrics.period|'10s'}
+        - condition: ${kubernetes.hints.mongodb.replstatus.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
+          data_stream:
+            dataset: mongodb.replstatus
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mongodb.replstatus.host|'localhost:27017'}
+          metricsets:
+            - replstatus
+          period: ${kubernetes.hints.mongodb.replstatus.period|'10s'}
+        - condition: ${kubernetes.hints.mongodb.status.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
+          data_stream:
+            dataset: mongodb.status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.mongodb.status.host|'localhost:27017'}
+          metricsets:
+            - status
+          period: ${kubernetes.hints.mongodb.status.period|'10s'}
+      data_stream.namespace: default
+    - name: filestream-mongodb
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mongodb.log.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
+          data_stream:
+            dataset: mongodb.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.mongodb.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - mongodb-logs
+      data_stream.namespace: default

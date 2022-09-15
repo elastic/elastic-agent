@@ -22,10 +22,9 @@ const checkingPath = "/api/fleet/agents/%s/checkin"
 
 // CheckinRequest consists of multiple events reported to fleet ui.
 type CheckinRequest struct {
-	Status   string              `json:"status"`
-	AckToken string              `json:"ack_token,omitempty"`
-	Events   []SerializableEvent `json:"events"`
-	Metadata *info.ECSMeta       `json:"local_metadata,omitempty"`
+	Status   string        `json:"status"`
+	AckToken string        `json:"ack_token,omitempty"`
+	Metadata *info.ECSMeta `json:"local_metadata,omitempty"`
 }
 
 // SerializableEvent is a representation of the event to be send to the Fleet Server API via the checkin

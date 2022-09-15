@@ -49,7 +49,7 @@ func Test_K8sSecretsProvider_Fetch(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]string{"a": "b"})
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg)
+	p, err := ContextProviderBuilder(logger, cfg, true)
 	require.NoError(t, err)
 
 	fp, _ := p.(corecomp.FetchContextProvider)
@@ -86,7 +86,7 @@ func Test_K8sSecretsProvider_FetchWrongSecret(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]string{"a": "b"})
 	require.NoError(t, err)
 
-	p, err := ContextProviderBuilder(logger, cfg)
+	p, err := ContextProviderBuilder(logger, cfg, true)
 	require.NoError(t, err)
 
 	fp, _ := p.(corecomp.FetchContextProvider)
