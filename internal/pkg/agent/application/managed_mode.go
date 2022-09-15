@@ -67,7 +67,7 @@ func newManagedConfigManager(
 		return nil, errors.New(err, fmt.Sprintf("fail to read action store '%s'", paths.AgentActionStoreFile()))
 	}
 
-	actionQueue, err := queue.NewActionQueue(stateStore.Queue())
+	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
@@ -170,7 +170,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		actionAcker,
 		m.coord,
 		m.stateStore,
-		m.actionQueue,
 	)
 	if err != nil {
 		return err
@@ -281,7 +280,7 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 }
 
 func newManagedActionDispatcher(m *managedConfigManager, canceller context.CancelFunc) (*dispatcher.ActionDispatcher, *handlers.PolicyChange, error) {
-	actionDispatcher, err := dispatcher.New(m.log, handlers.NewDefault(m.log))
+	actionDispatcher, err := dispatcher.New(m.log, handlers.NewDefault(m.log), m.actionQueue)
 	if err != nil {
 		return nil, nil, err
 	}
