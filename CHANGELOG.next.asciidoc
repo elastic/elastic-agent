@@ -18,6 +18,7 @@
 - Remove deprecated/undocumented IncludeCreatorMetadata setting from kubernetes metadata config options {pull-beats}[28006]
 - The `/processes/<subprocess>` endpoint proxies to the subprocess's monitoring endpoint, instead of querying its `/stats` endpoint {pull-beats}[28165]
 - Remove username/password for fleet-server authentication. {pull-beats}[29458]
+- Upgrade to Go 1.18. Certificates signed with SHA-1 are now rejected. See the Go 1.18 https://tip.golang.org/doc/go1.18#sha1[release notes] for details. {pull}32493[32493]
 
 ==== Bugfixes
 - Fix rename *ConfigChange to *PolicyChange to align on changes in the UI. {pull-beats}[20779]
