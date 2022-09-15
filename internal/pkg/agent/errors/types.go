@@ -24,6 +24,8 @@ const (
 	TypeFilesystem
 	// TypeSecurity represents set of errors related to security, encryption, etc.
 	TypeSecurity
+	// TypeRetryable represents an error that is returned by an action that may be retried.
+	TypeRetryableAction
 )
 
 const (
@@ -46,4 +48,5 @@ var readableTypes = map[ErrorType]string{
 	TypeNetwork:          "NETWORK",
 	TypeFilesystem:       "FILESYSTEM",
 	TypeSecurity:         "SECURITY",
+	TypeRetryableAction:  "RETRY",
 }

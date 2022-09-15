@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
@@ -23,8 +24,8 @@ import (
 type actionHandlers map[string]actions.Handler
 
 type priorityQueue interface {
-	Add(fleetapi.Action, int64)
-	DequeueActions() []fleetapi.Action
+	Add(fleetapi.ScheduledAction, int64)
+	DequeueActions() []fleetapi.ScheduledAction
 	Save() error
 }
 
@@ -39,6 +40,7 @@ type ActionDispatcher struct {
 	handlers actionHandlers
 	def      actions.Handler
 	queue    priorityQueue
+	rt       *retryConfig
 }
 
 // New creates a new action dispatcher.
@@ -60,6 +62,7 @@ func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionD
 		handlers: make(actionHandlers),
 		def:      def,
 		queue:    queue,
+		rt:       defaultRetryConfig(),
 	}, nil
 }
 
@@ -117,16 +120,33 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 		strings.Join(detectTypes(actions), ", "),
 	)
 
+	var mErr error
 	for _, action := range actions {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
 		if err := ad.dispatchAction(ctx, action, acker); err != nil {
+			var e errors.Error
+			if errors.As(err, &e) && e.Type() == errors.TypeRetryableAction {
+				rAction, ok := action.(fleetapi.RetryableAction)
+				if !ok {
+					// This line should only occur if an action hander returns a retryable error
+					// but the action defined in fleetapi/action.go does not implement the required methods.
+					ad.log.Warnf("action ID %s is not a retryable action, handler retuned error: %v", action.ID(), err)
+					continue
+				}
+				rAction.SetError(e) // set the retryable action error to what the dispatcher returned
+				ad.scheduleRetry(ctx, rAction, acker)
+				continue
+			}
 			ad.log.Debugf("Failed to dispatch action '%+v', error: %+v", action, err)
-			return err
+			mErr = multierror.Append(mErr, err)
 		}
 		ad.log.Debugf("Successfully dispatched action: '%+v'", action)
+	}
+	if mErr != nil {
+		return mErr
 	}
 
 	return acker.Commit(ctx)
@@ -154,14 +174,16 @@ func detectTypes(actions []fleetapi.Action) []string {
 func (ad *ActionDispatcher) queueScheduledActions(input []fleetapi.Action) []fleetapi.Action {
 	actions := make([]fleetapi.Action, 0, len(input))
 	for _, action := range input {
-		start, err := action.StartTime()
-		if err == nil {
-			ad.log.Debugf("Adding action id: %s to queue.", action.ID())
-			ad.queue.Add(action, start.Unix())
+		sAction, ok := action.(fleetapi.ScheduledAction)
+		if ok {
+			start, err := sAction.StartTime()
+			if err != nil {
+				// actions with errors will be scheduled with priority 0.
+				ad.log.Warnf("Issue gathering start time from action id %s: %v", sAction.ID(), err)
+			}
+			ad.log.Debugf("Adding action id: %s to queue.", sAction.ID())
+			ad.queue.Add(sAction, start.Unix())
 			continue
-		}
-		if !errors.Is(err, fleetapi.ErrNoStartTime) {
-			ad.log.Warnf("Issue gathering start time from action id %s: %v", action.ID(), err)
 		}
 		actions = append(actions, action)
 	}
@@ -196,4 +218,40 @@ func (ad *ActionDispatcher) gatherQueuedActions(ts time.Time) (queued, expired [
 		queued = append(queued, action)
 	}
 	return queued, expired
+}
+
+func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.RetryableAction, acker acker.Acker) {
+	attempt := action.RetryAttempt()
+	d, err := ad.rt.GetWait(attempt)
+	if err != nil {
+		ad.log.Errorf("No more reties for action id %s: %v", action.ID(), err)
+		// Construct a "new" error with the existing action error
+		// the errors.New will clear the error type indicator so the ack will not flag it as retryable.
+		action.SetError(errors.New(action.GetError()))
+		if err := acker.Ack(ctx, action); err != nil {
+			ad.log.Errorf("Unable to ack action failure (id %s) to fleet-server: %v", action.ID(), err)
+			return
+		}
+		if err := acker.Commit(ctx); err != nil {
+			ad.log.Errorf("Unable to commit action failure (id %s) to fleet-server: %v", action.ID(), err)
+		}
+		return
+	}
+	attempt = attempt + 1
+	startTime := time.Now().UTC().Add(d)
+	action.SetRetryAttempt(attempt)
+	action.SetStartTime(startTime)
+	ad.log.Debugf("Adding action id: %s to queue.", action.ID())
+	ad.queue.Add(action, startTime.Unix())
+	err = ad.queue.Save()
+	if err != nil {
+		ad.log.Errorf("retry action id %s attempt %d failed to persist action_queue: %v", action.ID(), attempt, err)
+	}
+	if err := acker.Ack(ctx, action); err != nil {
+		ad.log.Errorf("Unable to ack action retry (id %s) to fleet-server: %v", action.ID(), err)
+		return
+	}
+	if err := acker.Commit(ctx); err != nil {
+		ad.log.Errorf("Unable to commit action retry (id %s) to fleet-server: %v", action.ID(), err)
+	}
 }

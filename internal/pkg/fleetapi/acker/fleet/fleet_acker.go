@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -125,6 +126,23 @@ func constructEvent(action fleetapi.Action, agentID string) fleetapi.AckEvent {
 		ActionID:  action.ID(),
 		AgentID:   agentID,
 		Message:   fmt.Sprintf("Action '%s' of type '%s' acknowledged.", action.ID(), action.Type()),
+	}
+
+	if a, ok := action.(fleetapi.RetryableAction); ok {
+		if err := a.GetError(); err != nil {
+			ackev.Error = err.Error()
+			var payload struct {
+				Retry   bool `json:"retry"`
+				Attempt int  `json:"retry_attempt,omitempty"`
+			}
+			var e errors.Error
+			if errors.As(err, &e) && e.Type() == errors.TypeRetryableAction {
+				payload.Retry = true
+				payload.Attempt = a.RetryAttempt()
+			}
+			p, _ := json.Marshal(payload)
+			ackev.Payload = p
+		}
 	}
 
 	if a, ok := action.(*fleetapi.ActionApp); ok {

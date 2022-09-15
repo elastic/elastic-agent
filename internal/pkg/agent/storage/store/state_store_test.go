@@ -132,7 +132,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.Empty(t, store1.Actions())
 			require.Len(t, store1.Queue(), 1)
 			require.Equal(t, "test", store1.Queue()[0].ID())
-			start, err := store1.Queue()[0].StartTime()
+			scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
+			require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
+			start, err := scheduledAction.StartTime()
 			require.NoError(t, err)
 			require.Equal(t, ts, start)
 		}))
@@ -146,6 +148,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				ActionStartTime: ts.Format(time.RFC3339),
 				Version:         "1.2.3",
 				SourceURI:       "https://example.com",
+				Retry:           1,
 			}, &fleetapi.ActionPolicyChange{
 				ActionID:   "abc123",
 				ActionType: "POLICY_CHANGE",
@@ -172,13 +175,18 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			require.Len(t, store1.Queue(), 2)
 
 			require.Equal(t, "test", store1.Queue()[0].ID())
-			start, err := store1.Queue()[0].StartTime()
+			scheduledAction, ok := store1.Queue()[0].(fleetapi.ScheduledAction)
+			require.True(t, ok, "expected to be able to cast Action as ScheduledAction")
+			start, err := scheduledAction.StartTime()
 			require.NoError(t, err)
 			require.Equal(t, ts, start)
+			retryableAction, ok := store1.Queue()[0].(fleetapi.RetryableAction)
+			require.True(t, ok, "expected to be able to cast Action as RetryableAction")
+			require.Equal(t, 1, retryableAction.RetryAttempt())
 
 			require.Equal(t, "abc123", store1.Queue()[1].ID())
-			_, err = store1.Queue()[1].StartTime()
-			require.ErrorIs(t, err, fleetapi.ErrNoStartTime)
+			_, ok = store1.Queue()[1].(fleetapi.ScheduledAction)
+			require.False(t, ok, "expected cast to ScheduledAction to fail")
 		}))
 
 	t.Run("can save to disk unenroll action type",

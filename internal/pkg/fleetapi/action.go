@@ -46,12 +46,36 @@ type Action interface {
 	fmt.Stringer
 	Type() string
 	ID() string
-	// StartTime returns the earliest time an action should start (for schduled actions)
-	// Only ActionUpgrade implements this at the moment
+}
+
+// ScheduledAction is an Action that may be executed at a later date
+// Only ActionUpgrade implements this at the moment
+type ScheduledAction interface {
+	Action
+	// StartTime returns the earliest time an action should start.
 	StartTime() (time.Time, error)
-	// Expiration returns the time where an action is expired and should not be ran (for scheduled actions)
-	// Only ActionUpgrade implements this at the moment
+	// Expiration returns the time where an action is expired and should not be ran.
 	Expiration() (time.Time, error)
+}
+
+// RetryableAction is an Action that may be scheduled for a retry.
+type RetryableAction interface {
+	ScheduledAction
+	// RetryAttempt returns the retry-attempt number of the action
+	// the retry_attempt number is meant to be an interal counter for the elastic-agent and not communicated to fleet-server or ES.
+	RetryAttempt() int
+	// SetRetryAttempt sets the retry-attempt number of the action
+	// the retry_attempt number is meant to be an interal counter for the elastic-agent and not communicated to fleet-server or ES.
+	SetRetryAttempt(int)
+	// SetStartTime sets the start_time of the action to the specified value.
+	// this is used by the action-retry mechanism.
+	SetStartTime(t time.Time)
+	// GetError returns the error that is associated with the retry.
+	// If it is a retryable action fleet-server should mark it as such.
+	// Otherwise fleet-server should mark the action as failed.
+	GetError() error
+	// SetError sets the retryable action error
+	SetError(error)
 }
 
 // FleetAction represents an action from fleet-server.
@@ -64,6 +88,7 @@ type FleetAction struct {
 	ActionStartTime  string          `yaml:"start_time,omitempty" json:"start_time,omitempty"`
 	Timeout          int64           `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	Data             json.RawMessage `yaml:"data,omitempty" json:"data,omitempty"`
+	Retry            int             `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"` // used internally for serialization by elastic-agent.
 	//Agents []string // disabled, fleet-server uses this to generate each agent's actions
 	//Timestamp string // disabled, agent does not care when the document was created
 	//UserID string // disabled, agent does not care
@@ -89,16 +114,6 @@ func (a *ActionUnknown) Type() string {
 // ID returns the ID of the Action.
 func (a *ActionUnknown) ID() string {
 	return a.ActionID
-}
-
-// StartTime returns ErrNoStartTime
-func (a *ActionUnknown) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionUnknown) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
 }
 
 func (a *ActionUnknown) String() string {
@@ -143,16 +158,6 @@ func (a *ActionPolicyReassign) ID() string {
 	return a.ActionID
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionPolicyReassign) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionPolicyReassign) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
-}
-
 // ActionPolicyChange is a request to apply a new
 type ActionPolicyChange struct {
 	ActionID   string                 `yaml:"action_id"`
@@ -179,16 +184,6 @@ func (a *ActionPolicyChange) ID() string {
 	return a.ActionID
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionPolicyChange) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionPolicyChange) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
-}
-
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
 	ActionID         string `yaml:"action_id"`
@@ -197,6 +192,8 @@ type ActionUpgrade struct {
 	ActionExpiration string `json:"expiration" yaml:"expiration,omitempty"`
 	Version          string `json:"version" yaml:"version,omitempty"`
 	SourceURI        string `json:"source_uri,omitempty" yaml:"source_uri,omitempty"`
+	Retry            int    `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"`
+	err              error
 }
 
 func (a *ActionUpgrade) String() string {
@@ -242,6 +239,31 @@ func (a *ActionUpgrade) Expiration() (time.Time, error) {
 	return ts.UTC(), nil
 }
 
+// RetryAttempt will return the retry_attempt of the action
+func (a *ActionUpgrade) RetryAttempt() int {
+	return a.Retry
+}
+
+// SetRetryAttempt sets the retry_attempt of the action
+func (a *ActionUpgrade) SetRetryAttempt(n int) {
+	a.Retry = n
+}
+
+// GetError returns the error associated with the attempt to run the action.
+func (a *ActionUpgrade) GetError() error {
+	return a.err
+}
+
+// SetError sets the error associated with the attempt to run the action.
+func (a *ActionUpgrade) SetError(err error) {
+	a.err = err
+}
+
+// SetStartTime sets the start time of the action.
+func (a *ActionUpgrade) SetStartTime(t time.Time) {
+	a.ActionStartTime = t.Format(time.RFC3339)
+}
+
 // ActionUnenroll is a request for agent to unhook from fleet.
 type ActionUnenroll struct {
 	ActionID   string `yaml:"action_id"`
@@ -268,16 +290,6 @@ func (a *ActionUnenroll) ID() string {
 	return a.ActionID
 }
 
-// StartTime returns ErrNoStartTime
-func (a *ActionUnenroll) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionUnenroll) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
-}
-
 // ActionSettings is a request to change agent settings.
 type ActionSettings struct {
 	ActionID   string `yaml:"action_id"`
@@ -293,16 +305,6 @@ func (a *ActionSettings) ID() string {
 // Type returns the type of the Action.
 func (a *ActionSettings) Type() string {
 	return a.ActionType
-}
-
-// StartTime returns ErrNoStartTime
-func (a *ActionSettings) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionSettings) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
 }
 
 func (a *ActionSettings) String() string {
@@ -331,16 +333,6 @@ func (a *ActionCancel) ID() string {
 // Type returns the type of the Action.
 func (a *ActionCancel) Type() string {
 	return a.ActionType
-}
-
-// StartTime returns ErrNoStartTime
-func (a *ActionCancel) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrNoExpiration
-func (a *ActionCancel) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
 }
 
 func (a *ActionCancel) String() string {
@@ -386,16 +378,6 @@ func (a *ActionApp) ID() string {
 // Type returns the type of the Action.
 func (a *ActionApp) Type() string {
 	return a.ActionType
-}
-
-// StartTime returns ErrNoStartTime
-func (a *ActionApp) StartTime() (time.Time, error) {
-	return time.Time{}, ErrNoStartTime
-}
-
-// Expiration returns ErrExpiration
-func (a *ActionApp) Expiration() (time.Time, error) {
-	return time.Time{}, ErrNoExpiration
 }
 
 // MarshalMap marshals ActionApp into a corresponding map
@@ -544,6 +526,7 @@ func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				ActionType:       n.ActionType,
 				ActionStartTime:  n.ActionStartTime,
 				ActionExpiration: n.ActionExpiration,
+				Retry:            n.Retry,
 			}
 			if err := yaml.Unmarshal(n.Data, &action); err != nil {
 				return errors.New(err,
