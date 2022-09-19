@@ -653,8 +653,13 @@ func performGET(cfg setupConfig, client *kibana.Client, path string, response in
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
 		code, result, err := client.Connection.Request("GET", path, nil, nil, nil)
 		if err != nil || code != 200 {
-			err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
-				client.Connection.URL, path, err, truncateString(result))
+			if err != nil {
+				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
+					client.Connection.URL, path, err, truncateString(result))
+			} else {
+				err = fmt.Errorf("http GET request to %s%s fails. Response: %s",
+					client.Connection.URL, path, truncateString(result))
+			}
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
 			continue
@@ -672,8 +677,13 @@ func performPOST(cfg setupConfig, client *kibana.Client, path string, writer io.
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
 		code, result, err := client.Connection.Request("POST", path, nil, nil, nil)
 		if err != nil || code >= 400 {
-			err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
-				client.Connection.URL, path, err, truncateString(result))
+			if err != nil {
+				err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
+					client.Connection.URL, path, err, truncateString(result))
+			} else {
+				err = fmt.Errorf("http POST request to %s%s fails. Response: %s",
+					client.Connection.URL, path, truncateString(result))
+			}
 			lastErr = err
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
