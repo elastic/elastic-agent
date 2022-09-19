@@ -116,8 +116,7 @@ spec:
             name: agent-node-datastreams
         # Uncomment if using hints feature
         #- name: external-inputs
-        #  hostPath:
-        #    path: /etc/elastic-agent/inputs.d
+        #  emptyDir: {}
         - name: proc
           hostPath:
             path: /proc
