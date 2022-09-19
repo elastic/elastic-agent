@@ -1,4 +1,31 @@
 inputs:
+    - name: filestream-cassandra
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cassandra.log.enabled} == true or ${kubernetes.hints.cassandra.enabled} == true
+          data_stream:
+            dataset: cassandra.log
+            type: logs
+          exclude_files:
+            - .gz$
+          multiline:
+            match: after
+            negate: true
+            pattern: ^([A-Z])
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.cassandra.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - cassandra-systemlogs
+      data_stream.namespace: default
     - name: jolokia/metrics-cassandra
       type: jolokia/metrics
       use_output: default
@@ -297,31 +324,4 @@ inputs:
           path: /jolokia/?ignoreErrors=true&amp;canonicalNaming=false
           period: ${kubernetes.hints.cassandra.metrics.period|'10s'}
           username: ${kubernetes.hints.cassandra.metrics.username|'admin'}
-      data_stream.namespace: default
-    - name: filestream-cassandra
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.cassandra.log.enabled} == true or ${kubernetes.hints.cassandra.enabled} == true
-          data_stream:
-            dataset: cassandra.log
-            type: logs
-          exclude_files:
-            - .gz$
-          multiline:
-            match: after
-            negate: true
-            pattern: ^([A-Z])
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.cassandra.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags:
-            - forwarded
-            - cassandra-systemlogs
       data_stream.namespace: default

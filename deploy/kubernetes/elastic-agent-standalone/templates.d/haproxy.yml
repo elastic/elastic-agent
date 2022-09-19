@@ -1,4 +1,20 @@
 inputs:
+    - name: syslog-haproxy
+      type: syslog
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.haproxy.log.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
+          data_stream:
+            dataset: haproxy.log
+            type: logs
+          processors:
+            - add_locale: null
+          protocol.udp:
+            host: localhost:9001
+          tags:
+            - forwarded
+            - haproxy-log
+      data_stream.namespace: default
     - name: haproxy/metrics-haproxy
       type: haproxy/metrics
       use_output: default
@@ -48,21 +64,5 @@ inputs:
             scanner:
                 symlinks: true
           tags:
-            - haproxy-log
-      data_stream.namespace: default
-    - name: syslog-haproxy
-      type: syslog
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.haproxy.log.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
-          data_stream:
-            dataset: haproxy.log
-            type: logs
-          processors:
-            - add_locale: null
-          protocol.udp:
-            host: localhost:9001
-          tags:
-            - forwarded
             - haproxy-log
       data_stream.namespace: default
