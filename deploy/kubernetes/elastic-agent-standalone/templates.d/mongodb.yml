@@ -1,4 +1,26 @@
 inputs:
+    - name: filestream-mongodb
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mongodb.log.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
+          data_stream:
+            dataset: mongodb.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.mongodb.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - mongodb-logs
+      data_stream.namespace: default
     - name: mongodb/metrics-mongodb
       type: mongodb/metrics
       use_output: default
@@ -48,26 +70,4 @@ inputs:
           metricsets:
             - status
           period: ${kubernetes.hints.mongodb.status.period|'10s'}
-      data_stream.namespace: default
-    - name: filestream-mongodb
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.mongodb.log.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
-          data_stream:
-            dataset: mongodb.log
-            type: logs
-          exclude_files:
-            - .gz$
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.mongodb.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags:
-            - mongodb-logs
       data_stream.namespace: default

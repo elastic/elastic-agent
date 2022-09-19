@@ -1,4 +1,19 @@
 inputs:
+    - name: nginx/metrics-nginx
+      type: nginx/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.nginx.stubstatus.enabled} == true or ${kubernetes.hints.nginx.enabled} == true
+          data_stream:
+            dataset: nginx.stubstatus
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.nginx.stubstatus.host|'http://127.0.0.1:80'}
+          metricsets:
+            - stubstatus
+          period: ${kubernetes.hints.nginx.stubstatus.period|'10s'}
+          server_status_path: /nginx_status
+      data_stream.namespace: default
     - name: filestream-nginx
       type: filestream
       use_output: default
@@ -124,19 +139,4 @@ inputs:
           tags:
             - forwarded
             - nginx-error
-      data_stream.namespace: default
-    - name: nginx/metrics-nginx
-      type: nginx/metrics
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.nginx.stubstatus.enabled} == true or ${kubernetes.hints.nginx.enabled} == true
-          data_stream:
-            dataset: nginx.stubstatus
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.nginx.stubstatus.host|'http://127.0.0.1:80'}
-          metricsets:
-            - stubstatus
-          period: ${kubernetes.hints.nginx.stubstatus.period|'10s'}
-          server_status_path: /nginx_status
       data_stream.namespace: default

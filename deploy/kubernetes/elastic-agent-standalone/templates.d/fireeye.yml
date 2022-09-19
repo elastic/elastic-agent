@@ -1,21 +1,4 @@
 inputs:
-    - name: tcp-fireeye
-      type: tcp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.fireeye.nx.enabled} == true or ${kubernetes.hints.fireeye.enabled} == true
-          data_stream:
-            dataset: fireeye.nx
-            type: logs
-          fields_under_root: true
-          host: localhost:9523
-          processors:
-            - add_locale: null
-          tags:
-            - fireeye-nx
-            - forwarded
-          tcp: null
-      data_stream.namespace: default
     - name: filestream-fireeye
       type: filestream
       use_output: default
@@ -56,4 +39,21 @@ inputs:
             - fireeye-nx
             - forwarded
           udp: null
+      data_stream.namespace: default
+    - name: tcp-fireeye
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.fireeye.nx.enabled} == true or ${kubernetes.hints.fireeye.enabled} == true
+          data_stream:
+            dataset: fireeye.nx
+            type: logs
+          fields_under_root: true
+          host: localhost:9523
+          processors:
+            - add_locale: null
+          tags:
+            - fireeye-nx
+            - forwarded
+          tcp: null
       data_stream.namespace: default
