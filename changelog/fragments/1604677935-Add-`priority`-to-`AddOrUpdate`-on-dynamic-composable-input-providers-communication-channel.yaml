@@ -1,0 +1,3 @@
+kind: feature
+summary: Add `priority` to `AddOrUpdate` on dynamic composable input providers communication channel
+pr: https://github.com/elastic/beats/pull/22352

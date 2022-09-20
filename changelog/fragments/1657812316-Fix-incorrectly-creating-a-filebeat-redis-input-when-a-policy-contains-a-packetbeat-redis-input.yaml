@@ -1,0 +1,4 @@
+kind: feature
+summary: Fix incorrectly creating a filebeat redis input when a policy contains a packetbeat redis input.
+issue: https://github.com/elastic/elastic-agent/issues/427
+pr: https://github.com/elastic/elastic-agent/pull/700

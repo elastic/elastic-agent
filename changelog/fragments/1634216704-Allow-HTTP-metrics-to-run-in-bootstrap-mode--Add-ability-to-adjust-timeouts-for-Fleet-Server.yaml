@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Allow HTTP metrics to run in bootstrap mode. Add ability to adjust timeouts for Fleet Server.
+pr: https://github.com/elastic/beats/pull/28260

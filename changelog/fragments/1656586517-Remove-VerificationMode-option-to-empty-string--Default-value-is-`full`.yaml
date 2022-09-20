@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Remove VerificationMode option to empty string. Default value is `full`.
+issue: https://github.com/elastic/elastic-agent/issues/184

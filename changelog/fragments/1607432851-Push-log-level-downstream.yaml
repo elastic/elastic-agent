@@ -1,0 +1,3 @@
+kind: feature
+summary: Push log level downstream
+pr: https://github.com/elastic/beats/pull/22815

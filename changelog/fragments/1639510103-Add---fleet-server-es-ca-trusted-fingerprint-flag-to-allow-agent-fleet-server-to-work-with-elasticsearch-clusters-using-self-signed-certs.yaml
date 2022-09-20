@@ -1,0 +1,3 @@
+kind: feature
+summary: Add --fleet-server-es-ca-trusted-fingerprint flag to allow agent/fleet-server to work with elasticsearch clusters using self signed certs.
+pr: https://github.com/elastic/beats/pull/29128

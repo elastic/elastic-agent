@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Remove fleet event reporter and events from checkin body.
+issue: https://github.com/elastic/elastic-agent/issues/993

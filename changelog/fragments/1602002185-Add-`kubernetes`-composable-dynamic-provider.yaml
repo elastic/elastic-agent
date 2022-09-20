@@ -1,0 +1,3 @@
+kind: feature
+summary: Add `kubernetes` composable dynamic provider.
+pr: https://github.com/elastic/beats/pull/21480

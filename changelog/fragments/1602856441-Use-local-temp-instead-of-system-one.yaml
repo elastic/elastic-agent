@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Use local temp instead of system one
+pr: https://github.com/elastic/beats/pull/21883

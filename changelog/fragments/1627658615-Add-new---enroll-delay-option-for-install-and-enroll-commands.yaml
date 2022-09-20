@@ -1,0 +1,3 @@
+kind: feature
+summary: Add new --enroll-delay option for install and enroll commands.
+pr: https://github.com/elastic/beats/pull/27118

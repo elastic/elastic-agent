@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Update API calls that the agent makes to Kibana when running the container command.
+pr: https://github.com/elastic/elastic-agent/pull/253

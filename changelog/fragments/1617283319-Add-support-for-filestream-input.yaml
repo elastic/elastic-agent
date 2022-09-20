@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Add support for filestream input.
+pr: https://github.com/elastic/beats/pull/24820

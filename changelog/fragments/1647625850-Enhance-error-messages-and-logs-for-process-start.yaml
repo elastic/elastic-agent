@@ -1,0 +1,3 @@
+kind: feature
+summary: Enhance error messages and logs for process start
+pr: https://github.com/elastic/elastic-agent/pull/225

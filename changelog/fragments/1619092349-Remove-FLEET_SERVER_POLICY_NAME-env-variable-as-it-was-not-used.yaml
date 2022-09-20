@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Remove FLEET_SERVER_POLICY_NAME env variable as it was not used
+pr: https://github.com/elastic/beats/pull/25149

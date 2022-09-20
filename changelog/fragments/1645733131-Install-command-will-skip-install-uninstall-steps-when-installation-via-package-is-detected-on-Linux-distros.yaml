@@ -1,0 +1,3 @@
+kind: feature
+summary: Install command will skip install/uninstall steps when installation via package is detected on Linux distros.
+pr: https://github.com/elastic/beats/pull/30289

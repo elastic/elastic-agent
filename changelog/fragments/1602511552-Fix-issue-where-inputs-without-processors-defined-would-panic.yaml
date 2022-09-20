@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix issue where inputs without processors defined would panic
+pr: https://github.com/elastic/beats/pull/21628

@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Improve log on failure of Endpoint Security installation.
+pr: https://github.com/elastic/beats/pull/24429

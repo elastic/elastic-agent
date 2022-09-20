@@ -1,0 +1,3 @@
+kind: feature
+summary: Keep http and logging config during enroll
+pr: https://github.com/elastic/beats/pull/25132

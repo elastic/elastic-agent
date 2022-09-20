@@ -1,0 +1,3 @@
+kind: feature
+summary: Update `install` command to perform enroll before starting Elastic Agent
+pr: https://github.com/elastic/beats/pull/21772

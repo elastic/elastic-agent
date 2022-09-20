@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Ignore ErrNotExists when fixing permissions.
+issue: https://github.com/elastic/beats/issues/27836
+pr: https://github.com/elastic/beats/pull/27846

@@ -1,0 +1,3 @@
+kind: breaking-change
+summary: Beats build for 32Bit Windows or Linux system will refuse to run on a 64bit system.
+pr: https://github.com/elastic/beats/pull/25186

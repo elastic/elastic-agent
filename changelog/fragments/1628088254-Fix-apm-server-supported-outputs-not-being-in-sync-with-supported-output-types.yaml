@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix apm-server supported outputs not being in sync with supported output types.
+pr: https://github.com/elastic/beats/pull/26885

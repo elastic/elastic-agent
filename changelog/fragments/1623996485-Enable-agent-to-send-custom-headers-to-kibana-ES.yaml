@@ -1,0 +1,3 @@
+kind: feature
+summary: Enable agent to send custom headers to kibana/ES
+pr: https://github.com/elastic/beats/pull/26275

@@ -1,0 +1,3 @@
+kind: feature
+summary: Add `--pprof` flag to `elastic-agent diagnostics` and an `elastic-agent pprof` command to allow operators to gather pprof data from the agent and beats running under it.
+pr: https://github.com/elastic/beats/pull/28798

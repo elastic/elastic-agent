@@ -1,0 +1,3 @@
+kind: feature
+summary: Add action_input_type for the .fleet-actions-results
+pr: https://github.com/elastic/beats/pull/30562

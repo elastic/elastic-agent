@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Reduce log level for listener cleanup to debug
+pr: https://github.com/elastic/beats/pull/25274

@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix issue with named pipes on Windows 7
+pr: https://github.com/elastic/beats/pull/21931

@@ -1,0 +1,3 @@
+kind: feature
+summary: Add diagnostics command to gather beat metadata.
+pr: https://github.com/elastic/beats/pull/28265

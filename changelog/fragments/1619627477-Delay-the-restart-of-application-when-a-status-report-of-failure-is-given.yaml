@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Delay the restart of application when a status report of failure is given
+pr: https://github.com/elastic/beats/pull/25339

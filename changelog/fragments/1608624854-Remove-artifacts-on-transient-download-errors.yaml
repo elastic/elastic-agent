@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Remove artifacts on transient download errors
+pr: https://github.com/elastic/beats/pull/23235

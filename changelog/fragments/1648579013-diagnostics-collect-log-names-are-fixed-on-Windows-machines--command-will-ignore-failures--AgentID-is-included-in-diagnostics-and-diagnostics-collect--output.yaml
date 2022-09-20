@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: diagnostics collect log names are fixed on Windows machines, command will ignore failures. AgentID is included in diagnostics(and diagnostics collect) output.
+pr: https://github.com/elastic/elastic-agent/pull/262

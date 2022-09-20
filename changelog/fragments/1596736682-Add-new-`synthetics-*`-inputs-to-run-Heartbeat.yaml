@@ -1,0 +1,3 @@
+kind: feature
+summary: Add new `synthetics/*` inputs to run Heartbeat
+pr: https://github.com/elastic/beats/pull/20387

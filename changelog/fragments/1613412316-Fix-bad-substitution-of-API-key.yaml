@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix bad substitution of API key.
+pr: https://github.com/elastic/beats/pull/24036

@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix shell wrapper for deb/rpm packaging
+pr: https://github.com/elastic/beats/pull/23038

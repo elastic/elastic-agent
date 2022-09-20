@@ -1,0 +1,3 @@
+kind: feature
+summary: Removed `install-service.ps1` and `uninstall-service.ps1` from Windows .zip packaging
+pr: https://github.com/elastic/beats/pull/21694

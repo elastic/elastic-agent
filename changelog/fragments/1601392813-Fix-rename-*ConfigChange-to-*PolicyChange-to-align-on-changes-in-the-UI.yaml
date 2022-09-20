@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix rename *ConfigChange to *PolicyChange to align on changes in the UI.
+pr: https://github.com/elastic/beats/pull/20779

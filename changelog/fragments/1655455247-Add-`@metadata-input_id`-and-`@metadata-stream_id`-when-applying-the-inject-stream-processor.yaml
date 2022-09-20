@@ -1,0 +1,3 @@
+kind: feature
+summary: Add `@metadata.input_id` and `@metadata.stream_id` when applying the inject stream processor
+pr: https://github.com/elastic/elastic-agent/pull/527

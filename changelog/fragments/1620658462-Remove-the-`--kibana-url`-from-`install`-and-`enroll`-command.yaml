@@ -1,0 +1,3 @@
+kind: breaking-change
+summary: Remove the `--kibana-url` from `install` and `enroll` command.
+pr: https://github.com/elastic/beats/pull/25529

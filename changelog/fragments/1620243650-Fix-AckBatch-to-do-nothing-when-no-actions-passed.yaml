@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix AckBatch to do nothing when no actions passed
+pr: https://github.com/elastic/beats/pull/25562

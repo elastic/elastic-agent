@@ -1,0 +1,3 @@
+kind: feature
+summary: Add `elastic.agent.id` and `elastic.agent.version` to published events from filebeat and metricbeat
+pr: https://github.com/elastic/beats/pull/21543

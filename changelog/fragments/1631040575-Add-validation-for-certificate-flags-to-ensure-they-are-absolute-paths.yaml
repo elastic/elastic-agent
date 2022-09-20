@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Add validation for certificate flags to ensure they are absolute paths.
+pr: https://github.com/elastic/beats/pull/27779

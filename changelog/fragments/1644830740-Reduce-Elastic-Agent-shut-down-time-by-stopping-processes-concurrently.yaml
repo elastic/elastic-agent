@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Reduce Elastic Agent shut down time by stopping processes concurrently
+pr: https://github.com/elastic/beats/pull/29650

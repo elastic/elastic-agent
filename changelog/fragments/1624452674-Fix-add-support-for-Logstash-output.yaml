@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix add support for Logstash output.
+pr: https://github.com/elastic/beats/pull/24305

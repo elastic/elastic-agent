@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Set --inscure in container when FLEET_SERVER_ENABLE and FLEET_INSECURE set
+pr: https://github.com/elastic/beats/pull/25137

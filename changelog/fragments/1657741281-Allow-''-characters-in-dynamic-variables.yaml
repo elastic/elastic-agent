@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Allow '' characters in dynamic variables
+issue: https://github.com/elastic/elastic-agent/issues/624
+pr: https://github.com/elastic/elastic-agent/pull/680

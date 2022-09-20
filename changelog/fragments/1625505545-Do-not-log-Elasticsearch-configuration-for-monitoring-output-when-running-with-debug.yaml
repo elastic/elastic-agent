@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Do not log Elasticsearch configuration for monitoring output when running with debug.
+pr: https://github.com/elastic/beats/pull/26583

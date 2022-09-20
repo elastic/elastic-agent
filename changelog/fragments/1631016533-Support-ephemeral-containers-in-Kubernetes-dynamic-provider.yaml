@@ -1,0 +1,4 @@
+kind: feature
+summary: Support ephemeral containers in Kubernetes dynamic provider.
+issue: https://github.com/elastic/beats/issues/27020
+pr: https://github.com/elastic/beats/pull/27707

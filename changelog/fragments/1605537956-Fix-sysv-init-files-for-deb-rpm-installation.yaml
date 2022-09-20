@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix sysv init files for deb/rpm installation
+pr: https://github.com/elastic/beats/pull/22543

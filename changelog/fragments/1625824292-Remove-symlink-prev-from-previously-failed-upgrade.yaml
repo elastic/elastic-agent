@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Remove symlink.prev from previously failed upgrade
+pr: https://github.com/elastic/beats/pull/26785

@@ -1,0 +1,3 @@
+kind: feature
+summary: Changed the default policy selection logic. When the agent has no policy id or name defined, it will fall back to defaults (defined by $FLEET_SERVER_POLICY_ID and $FLEET_DEFAULT_TOKEN_POLICY_NAME environment variables respectively).
+pr: https://github.com/elastic/elastic-agent/pull/226

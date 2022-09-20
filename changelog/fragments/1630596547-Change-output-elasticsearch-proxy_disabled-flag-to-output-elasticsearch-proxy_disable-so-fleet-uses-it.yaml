@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Change output.elasticsearch.proxy_disabled flag to output.elasticsearch.proxy_disable so fleet uses it.
+issue: https://github.com/elastic/beats/issues/27670
+pr: https://github.com/elastic/beats/pull/27671

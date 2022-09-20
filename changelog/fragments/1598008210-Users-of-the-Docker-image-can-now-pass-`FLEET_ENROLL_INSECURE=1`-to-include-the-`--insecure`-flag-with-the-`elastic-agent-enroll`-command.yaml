@@ -1,0 +1,4 @@
+kind: feature
+summary: Users of the Docker image can now pass `FLEET_ENROLL_INSECURE=1` to include the `--insecure` flag with the `elastic-agent enroll` command
+issue: https://github.com/elastic/beats/issues/20312
+pr: https://github.com/elastic/beats/pull/20713

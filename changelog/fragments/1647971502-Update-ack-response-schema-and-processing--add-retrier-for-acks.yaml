@@ -1,0 +1,3 @@
+kind: feature
+summary: Update ack response schema and processing, add retrier for acks
+pr: https://github.com/elastic/elastic-agent/pull/200

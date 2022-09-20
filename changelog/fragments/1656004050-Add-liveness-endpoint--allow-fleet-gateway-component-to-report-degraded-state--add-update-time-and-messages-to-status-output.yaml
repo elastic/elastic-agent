@@ -1,0 +1,4 @@
+kind: feature
+summary: Add liveness endpoint, allow fleet-gateway component to report degraded state, add update time and messages to status output.
+issue: https://github.com/elastic/elastic-agent/issues/390
+pr: https://github.com/elastic/elastic-agent/pull/569

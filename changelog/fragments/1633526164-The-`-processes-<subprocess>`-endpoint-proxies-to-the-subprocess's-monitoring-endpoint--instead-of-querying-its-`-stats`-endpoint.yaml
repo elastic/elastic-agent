@@ -1,0 +1,3 @@
+kind: breaking-change
+summary: The `/processes/<subprocess>` endpoint proxies to the subprocess's monitoring endpoint, instead of querying its `/stats` endpoint
+pr: https://github.com/elastic/beats/pull/28165

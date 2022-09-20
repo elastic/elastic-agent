@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix lazy acker to only add new actions to the batch.
+pr: https://github.com/elastic/beats/pull/27981

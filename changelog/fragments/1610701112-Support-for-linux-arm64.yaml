@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Support for linux/arm64
+pr: https://github.com/elastic/beats/pull/23479

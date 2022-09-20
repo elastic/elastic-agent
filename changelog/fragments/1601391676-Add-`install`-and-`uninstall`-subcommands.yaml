@@ -1,0 +1,3 @@
+kind: feature
+summary: Add `install` and `uninstall` subcommands
+pr: https://github.com/elastic/beats/pull/21206

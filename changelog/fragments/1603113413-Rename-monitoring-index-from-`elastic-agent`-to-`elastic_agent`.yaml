@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Rename monitoring index from `elastic.agent` to `elastic_agent`
+pr: https://github.com/elastic/beats/pull/21932

@@ -1,0 +1,3 @@
+kind: feature
+summary: Add support for Fleet Server running under Elastic Agent
+pr: https://github.com/elastic/beats/pull/24220

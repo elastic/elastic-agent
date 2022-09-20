@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Handle case where policy doesn't contain Fleet connection information
+pr: https://github.com/elastic/beats/pull/25707

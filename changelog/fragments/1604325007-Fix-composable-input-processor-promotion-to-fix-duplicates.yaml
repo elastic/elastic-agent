@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix composable input processor promotion to fix duplicates
+pr: https://github.com/elastic/beats/pull/22344

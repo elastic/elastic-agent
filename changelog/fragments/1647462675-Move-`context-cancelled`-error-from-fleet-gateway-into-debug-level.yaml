@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Move `context cancelled` error from fleet gateway into debug level.
+pr: https://github.com/elastic/elastic-agent/pull/187

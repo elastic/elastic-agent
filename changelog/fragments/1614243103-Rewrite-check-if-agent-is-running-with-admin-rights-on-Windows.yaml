@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Rewrite check if agent is running with admin rights on Windows
+pr: https://github.com/elastic/beats/pull/23970

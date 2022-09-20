@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Increase checkin grace period to 30 seconds
+pr: https://github.com/elastic/beats/pull/23568

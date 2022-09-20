@@ -1,0 +1,3 @@
+kind: feature
+summary: Log level reloadable from fleet
+pr: https://github.com/elastic/beats/pull/22690

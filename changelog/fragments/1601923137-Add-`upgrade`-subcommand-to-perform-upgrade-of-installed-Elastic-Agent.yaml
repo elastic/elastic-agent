@@ -1,0 +1,3 @@
+kind: feature
+summary: Add `upgrade` subcommand to perform upgrade of installed Elastic Agent
+pr: https://github.com/elastic/beats/pull/21425

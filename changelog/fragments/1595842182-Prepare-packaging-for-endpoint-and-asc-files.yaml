@@ -1,0 +1,3 @@
+kind: feature
+summary: Prepare packaging for endpoint and asc files
+pr: https://github.com/elastic/beats/pull/20186

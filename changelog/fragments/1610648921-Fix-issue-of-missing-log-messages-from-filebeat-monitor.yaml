@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix issue of missing log messages from filebeat monitor
+pr: https://github.com/elastic/beats/pull/23514

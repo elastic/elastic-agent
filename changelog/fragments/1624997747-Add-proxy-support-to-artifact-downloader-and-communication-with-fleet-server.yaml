@@ -1,0 +1,3 @@
+kind: feature
+summary: Add proxy support to artifact downloader and communication with fleet server.
+pr: https://github.com/elastic/beats/pull/25219

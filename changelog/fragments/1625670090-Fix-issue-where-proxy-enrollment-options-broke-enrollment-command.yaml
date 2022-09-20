@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix issue where proxy enrollment options broke enrollment command.
+pr: https://github.com/elastic/beats/pull/26749

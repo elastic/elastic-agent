@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fixed fetching DBus service PID
+pr: https://github.com/elastic/beats/pull/23496

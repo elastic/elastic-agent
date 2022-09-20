@@ -1,0 +1,4 @@
+kind: feature
+summary: Pass logging.metrics.enabled to beats to stop beats from adding metrics into their logs.
+issue: https://github.com/elastic/beats/issues/26758
+pr: https://github.com/elastic/beats/pull/26828

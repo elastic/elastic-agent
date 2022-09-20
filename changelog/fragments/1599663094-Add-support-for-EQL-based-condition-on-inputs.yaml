@@ -1,0 +1,3 @@
+kind: feature
+summary: Add support for EQL based condition on inputs
+pr: https://github.com/elastic/beats/pull/20994

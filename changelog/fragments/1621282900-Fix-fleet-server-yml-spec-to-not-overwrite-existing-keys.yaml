@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix fleet-server.yml spec to not overwrite existing keys
+pr: https://github.com/elastic/beats/pull/25741

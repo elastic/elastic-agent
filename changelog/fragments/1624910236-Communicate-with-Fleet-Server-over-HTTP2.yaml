@@ -1,0 +1,3 @@
+kind: feature
+summary: Communicate with Fleet Server over HTTP2.
+pr: https://github.com/elastic/beats/pull/26474

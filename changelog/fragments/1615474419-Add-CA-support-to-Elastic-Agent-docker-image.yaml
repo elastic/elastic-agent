@@ -1,0 +1,3 @@
+kind: feature
+summary: Add CA support to Elastic Agent docker image
+pr: https://github.com/elastic/beats/pull/24486
