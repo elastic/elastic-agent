@@ -134,6 +134,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 					// This line should only occur if an action hander returns a retryable error
 					// but the action defined in fleetapi/action.go does not implement the required methods.
 					ad.log.Warnf("action ID %s is not a retryable action, handler retuned error: %v", action.ID(), err)
+					mErr = multierror.Append(mErr, err)
 					continue
 				}
 				rAction.SetError(e) // set the retryable action error to what the dispatcher returned
@@ -178,8 +179,9 @@ func (ad *ActionDispatcher) queueScheduledActions(input []fleetapi.Action) []fle
 		if ok {
 			start, err := sAction.StartTime()
 			if err != nil {
-				// actions with errors will be scheduled with priority 0.
-				ad.log.Warnf("Issue gathering start time from action id %s: %v", sAction.ID(), err)
+				ad.log.Warnf("Skipping addition to action-queue, issue gathering start time from action id %s: %v", sAction.ID(), err)
+				actions = append(actions, action)
+				continue
 			}
 			ad.log.Debugf("Adding action id: %s to queue.", sAction.ID())
 			ad.queue.Add(sAction, start.Unix())

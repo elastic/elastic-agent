@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
@@ -59,6 +60,23 @@ func (m *mockScheduledAction) StartTime() (time.Time, error) {
 func (m *mockScheduledAction) Expiration() (time.Time, error) {
 	args := m.Called()
 	return args.Get(0).(time.Time), args.Error(1)
+}
+func (m *mockRetryableAction) RetryAttempt() int {
+	args := m.Called()
+	return args.Int(0)
+}
+func (m *mockRetryableAction) SetRetryAttempt(n int) {
+	m.Called(n)
+}
+func (m *mockRetryableAction) SetStartTime(ts time.Time) {
+	m.Called(ts)
+}
+func (m *mockRetryableAction) GetError() error {
+	args := m.Called()
+	return args.Error(0)
+}
+func (m *mockRetryableAction) SetError(err error) {
+	m.Called(err)
 }
 
 type mockQueue struct {
@@ -252,5 +270,126 @@ func TestActionDispatcher(t *testing.T) {
 		err = d.Dispatch(context.Background(), ack)
 		require.NoError(t, err)
 		def.AssertNotCalled(t, "Handle", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Dispatch of a retryable action returns a retry-error", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error", errors.TypeRetryableAction)).Once()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Twice()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+		queue.On("Add", mock.Anything, mock.Anything).Once()
+
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+		err = d.Register(&mockRetryableAction{}, def)
+		require.NoError(t, err)
+
+		action := &mockRetryableAction{}
+		action.On("Type").Return("action")
+		action.On("ID").Return("id")
+		action.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime).Once()
+		action.On("SetError", mock.Anything).Once()
+		action.On("RetryAttempt").Return(0).Once()
+		action.On("SetRetryAttempt", 1).Once()
+		action.On("SetStartTime", mock.Anything).Once()
+
+		err = d.Dispatch(context.Background(), ack, action)
+		require.NoError(t, err)
+		def.AssertExpectations(t)
+		queue.AssertExpectations(t)
+		action.AssertExpectations(t)
+	})
+
+	t.Run("Dispatch of a non-retryable action returns a retry-error", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error", errors.TypeRetryableAction)).Once()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+		err = d.Register(&mockAction{}, def)
+		require.NoError(t, err)
+
+		action := &mockAction{}
+		action.On("Type").Return("action")
+		action.On("ID").Return("id")
+
+		err = d.Dispatch(context.Background(), ack, action)
+		require.Error(t, err)
+		def.AssertExpectations(t)
+		queue.AssertExpectations(t)
+		action.AssertExpectations(t)
+	})
+
+	t.Run("Dispatch multiples events returns one error", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+		err = d.Register(&mockAction{}, def)
+		require.NoError(t, err)
+
+		action1 := &mockAction{}
+		action1.On("Type").Return("action")
+		action1.On("ID").Return("id")
+		action2 := &mockAction{}
+		action2.On("Type").Return("action")
+		action2.On("ID").Return("id")
+
+		err = d.Dispatch(context.Background(), ack, action1, action2)
+		require.Error(t, err)
+
+		def.AssertExpectations(t)
+		queue.AssertExpectations(t)
+	})
+}
+
+func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
+	ack := noop.New()
+	def := &mockHandler{}
+
+	t.Run("no more attmpts", func(t *testing.T) {
+		queue := &mockQueue{}
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+
+		action := &mockRetryableAction{}
+		action.On("ID").Return("id")
+		action.On("RetryAttempt").Return(len(d.rt.steps)).Once()
+		action.On("GetError").Return(errors.New("test error")).Once()
+		action.On("SetError", mock.Anything).Once()
+
+		d.scheduleRetry(context.Background(), action, ack)
+		queue.AssertExpectations(t)
+		action.AssertExpectations(t)
+	})
+
+	t.Run("schedule an attempt", func(t *testing.T) {
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("Add", mock.Anything, mock.Anything).Once()
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+
+		action := &mockRetryableAction{}
+		action.On("ID").Return("id")
+		action.On("RetryAttempt").Return(0).Once()
+		action.On("SetRetryAttempt", 1).Once()
+		action.On("SetStartTime", mock.Anything).Once()
+
+		d.scheduleRetry(context.Background(), action, ack)
+		queue.AssertExpectations(t)
+		action.AssertExpectations(t)
 	})
 }

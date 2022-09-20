@@ -21,12 +21,8 @@ func defaultRetryConfig() *retryConfig {
 	}
 }
 
-func (r *retryConfig) HasRetryAttempt(step int) bool {
-	return step < len(r.steps)
-}
-
 func (r *retryConfig) GetWait(step int) (time.Duration, error) {
-	if step > len(r.steps) {
+	if step < 0 || step >= len(r.steps) {
 		return time.Duration(0), ErrNoRetry
 	}
 	return r.steps[step], nil

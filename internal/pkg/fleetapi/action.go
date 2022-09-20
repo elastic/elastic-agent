@@ -193,7 +193,7 @@ type ActionUpgrade struct {
 	Version          string `json:"version" yaml:"version,omitempty"`
 	SourceURI        string `json:"source_uri,omitempty" yaml:"source_uri,omitempty"`
 	Retry            int    `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"`
-	err              error
+	Err              error
 }
 
 func (a *ActionUpgrade) String() string {
@@ -251,12 +251,12 @@ func (a *ActionUpgrade) SetRetryAttempt(n int) {
 
 // GetError returns the error associated with the attempt to run the action.
 func (a *ActionUpgrade) GetError() error {
-	return a.err
+	return a.Err
 }
 
 // SetError sets the error associated with the attempt to run the action.
 func (a *ActionUpgrade) SetError(err error) {
-	a.err = err
+	a.Err = err
 }
 
 // SetStartTime sets the start time of the action.
