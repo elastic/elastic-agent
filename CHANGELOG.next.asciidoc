@@ -115,6 +115,7 @@
 - Use the Elastic Agent configuration directory as the root of the `inputs.d` folder. {issues}663[663]
 - Fix a panic caused by a race condition when installing the Elastic Agent. {issues}806[806]
 - Remove fleet event reporter and events from checkin body. {issue}993[993]
+- Source uri reload for download/verify components {pull}1252[1252]
 
 ==== New features
 
