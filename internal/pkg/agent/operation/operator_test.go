@@ -406,7 +406,7 @@ func TestConfigurableService(t *testing.T) {
 
 	// emulating a service, so we need to start the binary here in the test
 	spec := p.ProcessSpec()
-	cmd := exec.Command(spec.BinaryPath, fmt.Sprintf("%d", p.ServicePort()))
+	cmd := exec.Command(spec.BinaryPath, fmt.Sprintf("%d", p.ServicePort())) //nolint:gosec,G204 // this is fine
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Dir = filepath.Dir(spec.BinaryPath)
 	cmd.Stdout = os.Stdout
