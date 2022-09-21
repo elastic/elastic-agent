@@ -141,7 +141,7 @@ func (o *Operator) Reload(rawConfig *config.Config) error {
 		return errors.New(err, "failed to unpack artifact config")
 	}
 
-	sourceURI, err := o.reloadSourceURI(rawConfig)
+	sourceURI, err := reloadSourceURI(o.logger, rawConfig)
 	if err != nil {
 		return errors.New(err, "failed to parse source URI")
 	}
@@ -154,7 +154,7 @@ func (o *Operator) Reload(rawConfig *config.Config) error {
 	return o.reloadComponent(o.verifier, "verifier", tmp.C)
 }
 
-func (o *Operator) reloadSourceURI(rawConfig *config.Config) (string, error) {
+func reloadSourceURI(logger *logger.Logger, rawConfig *config.Config) (string, error) {
 	type reloadConfig struct {
 		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
@@ -177,12 +177,12 @@ func (o *Operator) reloadSourceURI(rawConfig *config.Config) (string, error) {
 	}
 
 	if newSourceURI != "" {
-		o.logger.Infof("Source URI in operator changed to %q", newSourceURI)
+		logger.Infof("Source URI in operator changed to %q", newSourceURI)
 		return newSourceURI, nil
 	}
 
 	// source uri unset, reset to default
-	o.logger.Infof("Source URI in reset %q", artifact.DefaultSourceURI)
+	logger.Infof("Source URI in reset %q", artifact.DefaultSourceURI)
 	return artifact.DefaultSourceURI, nil
 
 }
