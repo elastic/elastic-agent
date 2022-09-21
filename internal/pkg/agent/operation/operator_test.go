@@ -74,7 +74,7 @@ func TestConfigurableRun(t *testing.T) {
 	if err := operator.start(p, nil); err != nil {
 		t.Fatal(err)
 	}
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	waitFor(t, func() error {
 		items := operator.State()
@@ -90,6 +90,7 @@ func TestConfigurableRun(t *testing.T) {
 
 	// try to configure
 	cfg := make(map[string]interface{})
+	//nolint:gosec
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	if err := operator.pushConfig(p, cfg); err != nil {
@@ -148,7 +149,7 @@ func TestConfigurableFailed(t *testing.T) {
 	if err := operator.start(p, nil); err != nil {
 		t.Fatal(err)
 	}
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	var pid int
 	waitFor(t, func() error {
@@ -175,6 +176,7 @@ func TestConfigurableFailed(t *testing.T) {
 
 	// try to configure (with failed status)
 	cfg := make(map[string]interface{})
+	//nolint:gosec
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	cfg["Status"] = proto.StateObserved_FAILED
@@ -257,7 +259,7 @@ func TestConfigurableCrash(t *testing.T) {
 	if err := operator.start(p, nil); err != nil {
 		t.Fatal(err)
 	}
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	var pid int
 	waitFor(t, func() error {
@@ -275,6 +277,7 @@ func TestConfigurableCrash(t *testing.T) {
 
 	// try to configure (with failed status)
 	cfg := make(map[string]interface{})
+	//nolint:gosec
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	cfg["Crash"] = true
@@ -355,7 +358,7 @@ func TestConfigurableStartStop(t *testing.T) {
 	p := getProgram("configurable", "1.0")
 
 	operator := getTestOperator(t, downloadPath, installPath, p)
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	// start and stop it 3 times
 	for i := 0; i < 3; i++ {
@@ -399,7 +402,7 @@ func TestConfigurableService(t *testing.T) {
 	if err := operator.start(p, nil); err != nil {
 		t.Fatal(err)
 	}
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	// emulating a service, so we need to start the binary here in the test
 	spec := p.ProcessSpec()
@@ -426,6 +429,7 @@ func TestConfigurableService(t *testing.T) {
 
 	// try to configure
 	cfg := make(map[string]interface{})
+	//nolint:gosec
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	if err := operator.pushConfig(p, cfg); err != nil {
