@@ -90,7 +90,7 @@ func TestConfigurableRun(t *testing.T) {
 
 	// try to configure
 	cfg := make(map[string]interface{})
-	//nolint:gosec
+	//nolint:gosec // rand is ok for test
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	if err := operator.pushConfig(p, cfg); err != nil {
@@ -176,7 +176,7 @@ func TestConfigurableFailed(t *testing.T) {
 
 	// try to configure (with failed status)
 	cfg := make(map[string]interface{})
-	//nolint:gosec
+	//nolint:gosec // rand is ok for test
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	cfg["Status"] = proto.StateObserved_FAILED
@@ -277,7 +277,7 @@ func TestConfigurableCrash(t *testing.T) {
 
 	// try to configure (with failed status)
 	cfg := make(map[string]interface{})
-	//nolint:gosec
+	//nolint:gosec // rand is ok for test
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	cfg["Crash"] = true
@@ -429,7 +429,7 @@ func TestConfigurableService(t *testing.T) {
 
 	// try to configure
 	cfg := make(map[string]interface{})
-	//nolint:gosec
+	//nolint:gosec // rand is ok for test
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	if err := operator.pushConfig(p, cfg); err != nil {
