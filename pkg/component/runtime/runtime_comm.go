@@ -83,7 +83,7 @@ func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.Cert
 		token:           token.String(),
 		cert:            pair,
 		checkinConn:     true,
-		checkinExpected: make(chan *proto.CheckinExpected),
+		checkinExpected: make(chan *proto.CheckinExpected, 1),
 		checkinObserved: make(chan *proto.CheckinObserved),
 		actionsConn:     true,
 		actionsRequest:  make(chan *proto.ActionRequest),

@@ -176,7 +176,10 @@ func (s *componentRuntimeState) destroy() {
 	if s.watchCanceller != nil {
 		s.watchCanceller()
 		s.watchCanceller = nil
-		<-s.watchChan
+		// Do not wait on watchChan here
+		// the watch loop calls stateChanged that calls "destroy" (this function) and will block forever
+		// since the watch channel will never be closed because the watch loop is blocked on stateChanged call
+		// <-s.watchChan
 	}
 }
 
