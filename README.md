@@ -10,7 +10,7 @@ in the [observability-docs](https://github.com/elastic/observability-docs) repo.
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
 - [Docker](https://docs.docker.com/get-docker/)
-- [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
+- [X-pack](https://github.com/elastic/beats/tree/8.5/x-pack) to pre-exist in the parent folder of the local Git repository checkout
 
 If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
 ```
@@ -42,10 +42,10 @@ for the standard variant.
 ### Testing Elastic Agent on Kubernetes
 
 #### Prerequisites
-- create kubernetes cluster using kind, check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
-- deploy kube-state-metrics, check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+- create kubernetes cluster using kind, check [here](https://github.com/elastic/beats/blob/8.5/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+- deploy kube-state-metrics, check [here](https://github.com/elastic/beats/blob/8.5/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
 - deploy required infrastructure:
-    - for elastic agent in standalone mode: EK stack or use [elastic cloud](https://cloud.elastic.co), check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+    - for elastic agent in standalone mode: EK stack or use [elastic cloud](https://cloud.elastic.co), check [here](https://github.com/elastic/beats/blob/8.5/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
     - for managed mode: use [elastic cloud](https://cloud.elastic.co) or bring up the stack on docker and then connect docker network with kubernetes kind nodes:
   ```
   elastic-package stack up -d -v
