@@ -16,7 +16,7 @@ import (
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )
 
-// SidecarMonitor is a provides information about the way how beat is monitored
+// SidecarMonitor provides information about the way how beat is monitored
 type SidecarMonitor struct {
 	operatingSystem string
 	config          *monitoringConfig.MonitoringConfig
