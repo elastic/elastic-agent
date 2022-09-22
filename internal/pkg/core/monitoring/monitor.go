@@ -19,7 +19,7 @@ type Monitor interface {
 	MetricsPathPrefixed(spec program.Spec, pipelineID string) string
 
 	Prepare(spec program.Spec, pipelineID string, uid, gid int) error
-	EnrichArgs(spec program.Spec, pipelineID string, args []string, isSidecar bool) []string
+	EnrichArgs(spec program.Spec, pipelineID string, args []string) []string
 	Cleanup(spec program.Spec, pipelineID string) error
 	Reload(cfg *config.Config) error
 	IsMonitoringEnabled() bool

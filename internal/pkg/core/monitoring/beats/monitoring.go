@@ -27,19 +27,27 @@ const (
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
 	// agentMbEndpointHTTP is used with cloud and exposes metrics on http endpoint
 	agentMbEndpointHTTP = "http://%s:%d"
+
+	monitorSuffix = "_monitor"
 )
 
 // MonitoringEndpoint is an endpoint where process is exposing its metrics.
-func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string) string {
+func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string, isSidecar bool) (endpointPath string) {
+	defer func() {
+		if isSidecar && endpointPath != "" {
+			endpointPath += monitorSuffix
+		}
+	}()
+
 	if endpoint, ok := spec.MetricEndpoints[operatingSystem]; ok {
 		return endpoint
 	}
-	if operatingSystem == "windows" {
+	if operatingSystem == windowsOS {
 		return fmt.Sprintf(mbEndpointFileFormatWin, pipelineID, spec.Cmd)
 	}
 	// unix socket path must be less than 104 characters
 	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), pipelineID, spec.Cmd, spec.Cmd))
-	if len(path) < 104 {
+	if (isSidecar && len(path) < 104-len(monitorSuffix)) || (!isSidecar && len(path) < 104) {
 		return path
 	}
 	// place in global /tmp (or /var/tmp on Darwin) to ensure that its small enough to fit; current path is way to long
@@ -47,11 +55,11 @@ func MonitoringEndpoint(spec program.Spec, operatingSystem, pipelineID string) s
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
 }
 
-func getLoggingFile(spec program.Spec, operatingSystem, installPath, pipelineID string) string {
+func getLoggingFile(spec program.Spec, operatingSystem, pipelineID string) string {
 	if path, ok := spec.LogPaths[operatingSystem]; ok {
 		return path
 	}
-	if operatingSystem == "windows" {
+	if operatingSystem == windowsOS {
 		return fmt.Sprintf(logFileFormatWin, paths.Home(), pipelineID, spec.Cmd)
 	}
 	return fmt.Sprintf(logFileFormat, paths.Home(), pipelineID, spec.Cmd)
@@ -63,7 +71,7 @@ func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringConfig.Monit
 		return fmt.Sprintf(agentMbEndpointHTTP, cfg.Host, cfg.Port)
 	}
 
-	if operatingSystem == "windows" {
+	if operatingSystem == windowsOS {
 		return agentMbEndpointFileFormatWin
 	}
 	// unix socket path must be less than 104 characters
