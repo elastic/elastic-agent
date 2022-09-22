@@ -23,6 +23,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
+const (
+	levelInfo    = "info"
+	levelDebug   = "debug"
+	levelWarning = "warning"
+	levelError   = "error"
+)
+
 // Start starts the application with a specified config.
 func (a *Application) Start(ctx context.Context, t app.Taggable, cfg map[string]interface{}) error {
 	a.appLock.Lock()
@@ -74,8 +81,8 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 	// Failed applications can be started again.
 	if srvState != nil {
 		a.setState(state.Starting, "Starting", nil)
-		srvState.SetStatus(proto.StateObserved_STARTING, a.state.Message, a.state.Payload)
-		srvState.UpdateConfig(srvState.Config())
+		_ = srvState.SetStatus(proto.StateObserved_STARTING, a.state.Message, a.state.Payload)
+		_ = srvState.UpdateConfig(srvState.Config())
 	} else {
 		a.srvState, err = a.srv.Register(a, string(cfgStr))
 		if err != nil {
@@ -119,8 +126,7 @@ func (a *Application) start(ctx context.Context, t app.Taggable, cfg map[string]
 	spec.Args = injectLogLevel(a.logLevel, spec.Args)
 
 	// use separate file
-	isSidecar := app.IsSidecar(t)
-	spec.Args = a.monitor.EnrichArgs(a.desc.Spec(), a.pipelineID, spec.Args, isSidecar)
+	spec.Args = a.monitor.EnrichArgs(a.desc.Spec(), a.pipelineID, spec.Args)
 
 	// specify beat name to avoid data lock conflicts
 	// as for https://github.com/elastic/beats/v7/pull/14030 more than one instance
@@ -165,24 +171,18 @@ func (a *Application) writeToStdin(as *server.ApplicationState, wc io.WriteClose
 }
 
 func injectLogLevel(logLevel string, args []string) []string {
-	var level string
-	// Translate to level beat understands
-	switch logLevel {
-	case "info":
-		level = "info"
-	case "debug":
-		level = "debug"
-	case "warning":
-		level = "warning"
-	case "error":
-		level = "error"
-	}
-
-	if args == nil || level == "" {
+	if args == nil || logLevel == "" {
 		return args
 	}
 
-	return append(args, "-E", "logging.level="+level)
+	if logLevel == levelDebug ||
+		logLevel == levelInfo ||
+		logLevel == levelWarning ||
+		logLevel == levelError {
+		return append(args, "-E", "logging.level="+logLevel)
+	}
+
+	return args
 }
 
 func injectDataPath(args []string, pipelineID, id string) []string {
