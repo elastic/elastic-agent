@@ -11,8 +11,7 @@ import (
 
 // Monitor is a monitoring interface providing information about the way
 // how beat is monitored
-type Monitor struct {
-}
+type Monitor struct{}
 
 // NewMonitor creates a beats monitor.
 func NewMonitor() *Monitor {
@@ -21,7 +20,7 @@ func NewMonitor() *Monitor {
 
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
-func (b *Monitor) EnrichArgs(_ program.Spec, _ string, args []string, _ bool) []string {
+func (b *Monitor) EnrichArgs(_ program.Spec, _ string, args []string) []string {
 	return args
 }
 
