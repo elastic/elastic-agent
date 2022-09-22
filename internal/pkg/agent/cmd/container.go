@@ -657,8 +657,8 @@ func performGET(cfg setupConfig, client *kibana.Client, path string, response in
 				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
 					client.Connection.URL, path, err, truncateString(result))
 			} else {
-				err = fmt.Errorf("http GET request to %s%s fails. Response: %s",
-					client.Connection.URL, path, truncateString(result))
+				err = fmt.Errorf("http GET request to %s%s fails. StatusCode: %d Response: %s",
+					client.Connection.URL, path, code, truncateString(result))
 			}
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
@@ -681,8 +681,8 @@ func performPOST(cfg setupConfig, client *kibana.Client, path string, writer io.
 				err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
 					client.Connection.URL, path, err, truncateString(result))
 			} else {
-				err = fmt.Errorf("http POST request to %s%s fails. Response: %s",
-					client.Connection.URL, path, truncateString(result))
+				err = fmt.Errorf("http POST request to %s%s fails. StatusCode: %d Response: %s",
+					client.Connection.URL, path, code, truncateString(result))
 			}
 			lastErr = err
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
