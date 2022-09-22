@@ -40,7 +40,14 @@ type Spec struct {
 	When                  string               `yaml:"when"`
 	Constraints           string               `yaml:"constraints"`
 	RestartOnOutputChange bool                 `yaml:"restart_on_output_change,omitempty"`
-	ExprtedMetrics        []string             `yaml:"exported_metrics,omitempty"`
+	ExportedMetrics       []string             `yaml:"exported_metrics,omitempty"`
+	Process               *ProcessSettings     `yaml:"process,omitempty"`
+}
+
+// ProcessSettings process specific settings
+type ProcessSettings struct {
+	// Allows to override the agent stop timeout settings and specify a different stop timeout for Endpoint service
+	StopTimeoutSecs int `yaml:"stop_timeout"`
 }
 
 // ReadSpecs reads all the specs that match the provided globbing path.

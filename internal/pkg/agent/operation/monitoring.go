@@ -668,7 +668,7 @@ func normalizeHTTPCopyRules(name string) []map[string]interface{} {
 		return fromToMap
 	}
 
-	for _, exportedMetric := range spec.ExprtedMetrics {
+	for _, exportedMetric := range spec.ExportedMetrics {
 		fromToMap = append(fromToMap, map[string]interface{}{
 			"from": fmt.Sprintf("http.agent.%s", exportedMetric),
 			"to":   exportedMetric,

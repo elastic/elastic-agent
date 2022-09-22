@@ -37,7 +37,7 @@ import (
 func TestExportedMetrics(t *testing.T) {
 	programName := "testing"
 	expectedMetricsName := "metric_name"
-	program.SupportedMap[programName] = program.Spec{ExprtedMetrics: []string{expectedMetricsName}}
+	program.SupportedMap[programName] = program.Spec{ExportedMetrics: []string{expectedMetricsName}}
 
 	exportedMetrics := normalizeHTTPCopyRules(programName)
 

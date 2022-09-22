@@ -247,6 +247,14 @@ func (a *Application) Configure(ctx context.Context, config map[string]interface
 	return err
 }
 
+func (a *Application) getStopTimeout() time.Duration {
+	if a.desc.Spec().Process != nil && a.desc.Spec().Process.StopTimeoutSecs > 0 {
+		to := time.Duration(a.desc.Spec().Process.StopTimeoutSecs) * time.Second
+		return to
+	}
+	return a.processConfig.StopTimeout
+}
+
 // Stop stops the current application.
 func (a *Application) Stop() {
 	a.appLock.Lock()
@@ -256,15 +264,15 @@ func (a *Application) Stop() {
 	if srvState == nil {
 		return
 	}
-
-	if err := srvState.Stop(a.processConfig.StopTimeout); err != nil {
-		a.appLock.Lock()
+	to := a.getStopTimeout()
+	a.logger.Infof("Stop %v service, with %v timeout", a.desc.Spec().Name, to)
+	a.appLock.Lock()
+	if err := srvState.Stop(to); err != nil {
 		a.setState(
 			state.Failed,
-			fmt.Errorf("failed to stop after %s: %w", a.processConfig.StopTimeout, err).Error(),
+			fmt.Errorf("failed to stop after %s: %w", to, err).Error(),
 			nil)
 	} else {
-		a.appLock.Lock()
 		a.setState(state.Stopped, "Stopped", nil)
 	}
 	a.srvState = nil
