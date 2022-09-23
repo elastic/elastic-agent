@@ -227,7 +227,7 @@ func (r *controller) Status() AgentStatus {
 	}
 }
 
-// LocalStatus returns the status from the local registed components if they are different from the agent status.
+// LocalStatus returns the status from the local registered components if they are different from the agent status.
 // If the agent status is more severe then the local status (failed vs degraded for example) agent status is used.
 // If they are equal (healthy and healthy) agent status is used.
 func (r *controller) LocalStatus() AgentStatus {
