@@ -40,6 +40,10 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		}
 	}
 
+	u.log.Infow("Downloading upgrade artifact", "version", version,
+		"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
+		"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
+
 	verifier, err := newVerifier(version, u.log, &settings)
 	if err != nil {
 		return "", errors.New(err, "initiating verifier")

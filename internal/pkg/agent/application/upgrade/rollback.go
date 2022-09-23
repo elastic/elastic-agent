@@ -31,14 +31,14 @@ const (
 )
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
-func Rollback(ctx context.Context, prevHash, currentHash string) error {
+func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentHash string) error {
 	// change symlink
-	if err := ChangeSymlink(ctx, prevHash); err != nil {
+	if err := ChangeSymlink(ctx, log, prevHash); err != nil {
 		return err
 	}
 
 	// revert active commit
-	if err := UpdateActiveCommit(prevHash); err != nil {
+	if err := UpdateActiveCommit(log, prevHash); err != nil {
 		return err
 	}
 
@@ -113,6 +113,7 @@ func InvokeWatcher(log *logger.Logger) error {
 		}
 	}()
 
+	log.Debugw("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
 	return cmd.Start()
 }
 

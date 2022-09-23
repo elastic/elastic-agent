@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -40,8 +41,13 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Short: "Watch watches Elastic Agent for failures and initiates rollback.",
 		Long:  `Watch watches Elastic Agent for failures and initiates rollback.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			if err := watchCmd(); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+			log, err := configuredLogger()
+			if err != nil {
+				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
+			}
+			if err := watchCmd(log); err != nil {
+				log.Errorw("Watch command failed", "error.message", err)
+				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
 		},
@@ -50,12 +56,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 	return cmd
 }
 
-func watchCmd() error {
-	log, err := configuredLogger()
-	if err != nil {
-		return err
-	}
-
+func watchCmd(log *logp.Logger) error {
 	marker, err := upgrade.LoadMarker()
 	if err != nil {
 		log.Error("failed to load marker", err)
@@ -97,8 +98,8 @@ func watchCmd() error {
 
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, log); err != nil {
-		log.Debugf("Error detected proceeding to rollback: %v", err)
-		err = upgrade.Rollback(ctx, marker.PrevHash, marker.Hash)
+		log.Debug("Error detected proceeding to rollback: %v", err)
+		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
 		}
