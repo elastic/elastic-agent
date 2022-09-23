@@ -117,6 +117,7 @@
 - Fix a panic caused by a race condition when installing the Elastic Agent. {issues}806[806]
 - Use at least warning level for all status logs {pull}1218[1218]
 - Remove fleet event reporter and events from checkin body. {issue}993[993]
+- Create separate status reporter for local only events so that degraded fleet-checkins no longer affect health on successful fleet-checkins. {issue}1157[1157] {pull}1285[1285]
 
 ==== New features
 
