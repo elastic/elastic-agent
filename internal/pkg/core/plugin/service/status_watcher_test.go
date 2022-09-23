@@ -7,34 +7,43 @@ package service
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/kardianos/service"
 )
 
+// Useful test to keep the code around.
+// Marked as skipped, because can't really use as unit test with CI since it relies on actual endpoint service to be present
 func TestStatusWatcher(t *testing.T) {
+	t.Skip()
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	sw, err := newServiceWatcher("co.elastic.endpoint")
+	name := "ElasticEndpoint"
+	if runtime.GOOS == "darwin" {
+		name = "co.elastic.endpoint"
+	}
+	sw, err := newServiceWatcher(name)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sw.checkDuration = time.Minute
+	sw.checkDuration = 2 * time.Minute
 	sw.checkInterval = 2 * time.Second
+	sw.stopOnError = false
 
 	go func() {
 		sw.run(ctx)
 	}()
 
 	for r := range sw.status() {
-		if r.err != nil {
-			fmt.Println("watch err:")
+		if r.Err != nil {
+			fmt.Println("watch err:", r.Err)
 		} else {
 			var s string
-			switch r.status {
+			switch r.Status {
 			case service.StatusUnknown:
 				s = "Unknown"
 			case service.StatusRunning:

@@ -10,10 +10,12 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/kardianos/service"
 
 	"gopkg.in/yaml.v2"
 
@@ -272,6 +274,11 @@ func (a *Application) Stop() {
 			state.Failed,
 			fmt.Errorf("failed to stop after %s: %w", to, err).Error(),
 			nil)
+
+		// Start service status watcher if service haven't responded over RPC within the allowed duration.
+		// This monitors the service status over the platform specific service interfaces
+		// Set the state into stopped if the service has stopped
+		a.stopAndWatch()
 	} else {
 		a.setState(state.Stopped, "Stopped", nil)
 	}
@@ -280,6 +287,78 @@ func (a *Application) Stop() {
 	a.cleanUp()
 	a.stopCredsListener()
 	a.appLock.Unlock()
+}
+
+func (a *Application) stopAndWatch() {
+	var err error
+
+	name := a.desc.Spec().ServiceInfo.Name
+	if runtime.GOOS == "darwin" {
+		name = a.desc.Spec().ServiceInfo.Label
+	}
+
+	svc, err := getService(name)
+	if err != nil {
+		a.logger.Errorf("failed to get %s service: %v", name, err)
+		a.setState(state.Stopped, "Stopped", nil)
+	}
+
+	// Attempt to stop the service, log any errors and continue to watch the service status anyways
+	err = svc.Stop()
+	if err != nil {
+		a.logger.Errorf("failed to stop %s service, err: %v, ", name, err)
+	}
+
+	// Attempt to stop the service, log any errors and set the service to stopped to allow the agent health to recover
+	sw, err := newServiceWatcher(name)
+	if err != nil {
+		a.logger.Errorf("failed to create the %s service watcher, setting service status to stopped", name)
+		a.setState(state.Stopped, "Stopped", nil)
+		return
+	}
+
+	// Run service watcher
+	ctx, cn := context.WithCancel(a.bgContext)
+	defer cn()
+	go func() {
+		sw.run(ctx)
+	}()
+
+	var lastStatus service.Status
+LOOP:
+	for r := range sw.status() {
+		if r.Err != nil {
+			err = r.Err
+			// If service watcher returned the error, log the error and exit the loop
+			a.logger.Errorf("%s service watcher returned err: %v", name, r.Err)
+			break LOOP
+		} else {
+			lastStatus = r.Status
+			switch lastStatus {
+			case service.StatusUnknown:
+				a.logger.Debugf("%s service watcher status: Unknown", name)
+			case service.StatusRunning:
+				a.logger.Debugf("%s service watcher status: Running", name)
+			case service.StatusStopped:
+				a.logger.Debugf("%s service watcher status: Stopped", name)
+				break LOOP
+			}
+		}
+	}
+
+	if lastStatus != service.StatusStopped && err == nil {
+		var s string
+		switch lastStatus {
+		case service.StatusUnknown:
+			s = "Unknown"
+		case service.StatusRunning:
+			s = "Running"
+		}
+		a.logger.Errorf("%s service failed to stop within %v, last reported service status: %s", name, sw.checkDuration, s)
+	}
+
+	a.logger.Infof("setting %s service status to Stopped", name)
+	a.setState(state.Stopped, "Stopped", nil)
 }
 
 // Shutdown disconnects the service, but doesn't signal it to stop.
