@@ -277,7 +277,7 @@ func (a *Application) Stop() {
 
 		// Start service status watcher if service haven't responded over RPC within the allowed duration.
 		// This monitors the service status over the platform specific service interfaces
-		// Set the state into stopped if the service has stopped
+		// and sets the state into stopped if the service has stopped or the grace period ended.
 		a.stopAndWatch()
 	} else {
 		a.setState(state.Stopped, "Stopped", nil)
@@ -295,21 +295,24 @@ func (a *Application) stopAndWatch() {
 	name := a.desc.Spec().ServiceInfo.Name
 	if runtime.GOOS == "darwin" {
 		name = a.desc.Spec().ServiceInfo.Label
+	} else {
+		// Attempt to stop the service on non-windows platforms
+		svc, err := getService(name)
+		if err != nil {
+			a.logger.Errorf("failed to get %s service: %v", name, err)
+			a.setState(state.Stopped, "Stopped", nil)
+		}
+
+		// Attempt to stop the service, log any errors and continue to watch the service status anyways.
+		// The Endpoint service implements a protection from being stopped on windows
+		// and this call can result in "Access denied" error at the moment.
+		err = svc.Stop()
+		if err != nil {
+			a.logger.Debugf("failed to stop %s service, err: %v, ", name, err)
+		}
 	}
 
-	svc, err := getService(name)
-	if err != nil {
-		a.logger.Errorf("failed to get %s service: %v", name, err)
-		a.setState(state.Stopped, "Stopped", nil)
-	}
-
-	// Attempt to stop the service, log any errors and continue to watch the service status anyways
-	err = svc.Stop()
-	if err != nil {
-		a.logger.Errorf("failed to stop %s service, err: %v, ", name, err)
-	}
-
-	// Attempt to stop the service, log any errors and set the service to stopped to allow the agent health to recover
+	// Watch the service status, log errors and set the state to stopped in order to allow the agent health to recover.
 	sw, err := newServiceWatcher(name)
 	if err != nil {
 		a.logger.Errorf("failed to create the %s service watcher, setting service status to stopped", name)
@@ -317,7 +320,7 @@ func (a *Application) stopAndWatch() {
 		return
 	}
 
-	// Run service watcher
+	// Run service watcher.
 	ctx, cn := context.WithCancel(a.bgContext)
 	defer cn()
 	go func() {
@@ -326,6 +329,7 @@ func (a *Application) stopAndWatch() {
 
 	var lastStatus service.Status
 LOOP:
+	// The service watcher stops by closing the status update channel
 	for r := range sw.status() {
 		if r.Err != nil {
 			err = r.Err
@@ -346,6 +350,7 @@ LOOP:
 		}
 	}
 
+	// The service watcher exited at this point. Log the error if the status of the service is still not stopped.
 	if lastStatus != service.StatusStopped && err == nil {
 		var s string
 		switch lastStatus {
@@ -357,6 +362,7 @@ LOOP:
 		a.logger.Errorf("%s service failed to stop within %v, last reported service status: %s", name, sw.checkDuration, s)
 	}
 
+	// Set the service state to "stopped"
 	a.logger.Infof("setting %s service status to Stopped", name)
 	a.setState(state.Stopped, "Stopped", nil)
 }
