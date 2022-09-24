@@ -59,6 +59,7 @@ type ServiceInfo struct {
 
 // ReadSpecs reads all the specs that match the provided globbing path.
 func ReadSpecs(path string) ([]Spec, error) {
+	//nolint:prealloc // do not lint
 	var specs []Spec
 	files, err := filepath.Glob(path)
 	if err != nil {

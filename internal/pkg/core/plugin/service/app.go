@@ -34,6 +34,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
+const (
+	darwin  = "darwin"
+	unknown = "Unknown"
+	running = "Running"
+)
+
 var (
 	// ErrAppNotInstalled is returned when configuration is performed on not installed application.
 	ErrAppNotInstalled = errors.New("application is not installed", errors.TypeApplication)
@@ -167,8 +173,8 @@ func (a *Application) Start(ctx context.Context, _ app.Taggable, cfg map[string]
 	// already started
 	if a.srvState != nil {
 		a.setState(state.Starting, "Starting", nil)
-		a.srvState.SetStatus(proto.StateObserved_STARTING, a.state.Message, a.state.Payload)
-		a.srvState.UpdateConfig(a.srvState.Config())
+		_ = a.srvState.SetStatus(proto.StateObserved_STARTING, a.state.Message, a.state.Payload)
+		_ = a.srvState.UpdateConfig(a.srvState.Config())
 	} else {
 		a.setState(state.Starting, "Starting", nil)
 		a.srvState, err = a.srv.Register(a, string(cfgStr))
@@ -293,7 +299,7 @@ func (a *Application) stopAndWatch() {
 	var err error
 
 	name := a.desc.Spec().ServiceInfo.Name
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == darwin {
 		name = a.desc.Spec().ServiceInfo.Label
 	} else {
 		// Attempt to stop the service on non-windows platforms
@@ -355,9 +361,9 @@ LOOP:
 		var s string
 		switch lastStatus {
 		case service.StatusUnknown:
-			s = "Unknown"
+			s = unknown
 		case service.StatusRunning:
-			s = "Running"
+			s = running
 		}
 		a.logger.Errorf("%s service failed to stop within %v, last reported service status: %s", name, sw.checkDuration, s)
 	}
@@ -420,7 +426,7 @@ func (a *Application) setState(s state.Status, msg string, payload map[string]in
 }
 
 func (a *Application) cleanUp() {
-	a.monitor.Cleanup(a.desc.Spec(), a.pipelineID)
+	_ = a.monitor.Cleanup(a.desc.Spec(), a.pipelineID)
 }
 
 func (a *Application) startCredsListener() error {

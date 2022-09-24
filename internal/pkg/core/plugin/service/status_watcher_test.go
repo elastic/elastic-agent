@@ -22,7 +22,7 @@ func TestStatusWatcher(t *testing.T) {
 	defer cn()
 
 	name := "ElasticEndpoint"
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == darwin {
 		name = "co.elastic.endpoint"
 	}
 	sw, err := newServiceWatcher(name)
@@ -40,19 +40,22 @@ func TestStatusWatcher(t *testing.T) {
 
 	for r := range sw.status() {
 		if r.Err != nil {
+			//nolint:forbidigo // ok for interractive test code
 			fmt.Println("watch err:", r.Err)
 		} else {
 			var s string
 			switch r.Status {
 			case service.StatusUnknown:
-				s = "Unknown"
+				s = unknown
 			case service.StatusRunning:
-				s = "Running"
+				s = running
 			case service.StatusStopped:
 				s = "Stopped"
 			}
+			//nolint:forbidigo // ok for interractive test code
 			fmt.Println("status:", s)
 		}
 	}
+	//nolint:forbidigo // ok for interractive test code
 	fmt.Println("watch done")
 }
