@@ -335,7 +335,7 @@ func (a *Application) stopAndWatch() {
 
 	var lastStatus service.Status
 LOOP:
-	// The service watcher stops by closing the status update channel
+	// The status update channel is closed when the service watcher stops
 	for r := range sw.status() {
 		if r.Err != nil {
 			err = r.Err
