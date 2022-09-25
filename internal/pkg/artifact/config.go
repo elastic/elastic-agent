@@ -22,7 +22,7 @@ const (
 	linux   = "linux"
 	windows = "windows"
 
-	defaultSourceURI = "https://artifacts.elastic.co/downloads/"
+	defaultSourceURI = "https://artifacts.elastic.co/downloads/" //Make source local 
 )
 
 type ConfigReloader interface {
