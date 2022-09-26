@@ -24,13 +24,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 // FleetServerBootstrap application, does just enough to get a Fleet Server up and running so enrollment

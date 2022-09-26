@@ -25,8 +25,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestManagedModeRouting(t *testing.T) {
@@ -45,7 +45,7 @@ func TestManagedModeRouting(t *testing.T) {
 	router, _ := router.New(log, streamFn)
 	agentInfo, _ := info.NewAgentInfo(true)
 	nullStore := &storage.NullStore{}
-	composableCtrl, _ := composable.New(log, nil)
+	composableCtrl, _ := composable.New(log, nil, true)
 	emit, err := emitter.New(ctx, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
 	require.NoError(t, err)
 

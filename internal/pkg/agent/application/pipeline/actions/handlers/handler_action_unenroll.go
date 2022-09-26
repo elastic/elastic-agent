@@ -11,8 +11,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type stateStore interface {
@@ -26,11 +26,11 @@ type stateStore interface {
 // Unenroll results in  running agent entering idle state, non managed non standalone.
 // For it to be operational again it needs to be either enrolled or reconfigured.
 type Unenroll struct {
+	dispatcher pipeline.Router
+	stateStore stateStore
 	log        *logger.Logger
 	emitter    pipeline.EmitterFunc
-	dispatcher pipeline.Router
 	closers    []context.CancelFunc
-	stateStore stateStore
 }
 
 // NewUnenroll creates a new Unenroll handler.
@@ -63,7 +63,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker store.Fl
 	_ = h.dispatcher.Route(ctx, a.ID(), noPrograms)
 
 	if !action.IsDetected {
-		// ACK only events comming from fleet
+		// ACK only events received from fleet.
 		if err := acker.Ack(ctx, action); err != nil {
 			return err
 		}
@@ -75,6 +75,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker store.Fl
 	} else if h.stateStore != nil {
 		// backup action for future start to avoid starting fleet gateway loop
 		h.stateStore.Add(a)
+		// nolint: errcheck // Ignore the error at this point.
 		h.stateStore.Save()
 	}
 

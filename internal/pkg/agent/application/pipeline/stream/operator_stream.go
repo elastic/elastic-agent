@@ -10,10 +10,12 @@ import (
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type operatorStream struct {
@@ -27,6 +29,15 @@ type stater interface {
 
 type specer interface {
 	Specs() map[string]program.Spec
+}
+
+func (b *operatorStream) Reload(c *config.Config) error {
+	r, ok := b.configHandler.(emitter.Reloader)
+	if !ok {
+		return nil
+	}
+
+	return r.Reload(c)
 }
 
 func (b *operatorStream) Close() error {

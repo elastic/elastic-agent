@@ -31,22 +31,23 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
-	fleetreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/fleet"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 type stateStore interface {
@@ -55,6 +56,7 @@ type stateStore interface {
 	SetAckToken(ackToken string)
 	Save() error
 	Actions() []fleetapi.Action
+	Queue() []fleetapi.Action
 }
 
 // Managed application, when the application is run in managed mode, most of the configuration are
@@ -121,12 +123,7 @@ func newManaged(
 	}
 
 	logR := logreporter.NewReporter(log)
-	fleetR, err := fleetreporter.NewReporter(agentInfo, log, cfg.Fleet.Reporting)
-	if err != nil {
-		return nil, errors.New(err, "fail to create reporters")
-	}
-
-	combinedReporter := reporting.NewReporter(managedApplication.bgContext, log, agentInfo, logR, fleetR)
+	combinedReporter := reporting.NewReporter(managedApplication.bgContext, log, agentInfo, logR)
 	monitor, err := monitoring.NewMonitor(cfg.Settings)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize monitoring")
@@ -138,9 +135,14 @@ func newManaged(
 	}
 	managedApplication.router = router
 
-	composableCtrl, err := composable.New(log, rawConfig)
+	composableCtrl, err := composable.New(log, rawConfig, true)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize composable controller")
+	}
+
+	routerArtifactReloader, ok := router.(emitter.Reloader)
+	if !ok {
+		return nil, errors.New("router not capable of artifact reload") // Needed for client reloading
 	}
 
 	emit, err := emitter.New(
@@ -155,6 +157,8 @@ func newManaged(
 		},
 		caps,
 		monitor,
+		artifact.NewReloader(cfg.Settings.DownloadConfig, log),
+		routerArtifactReloader,
 	)
 	if err != nil {
 		return nil, err
@@ -178,6 +182,11 @@ func newManaged(
 	}
 	managedApplication.stateStore = stateStore
 	actionAcker := store.NewStateStoreActionAcker(batchedAcker, stateStore)
+
+	actionQueue, err := queue.NewActionQueue(stateStore.Queue())
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
+	}
 
 	actionDispatcher, err := dispatcher.New(managedApplication.bgContext, log, handlers.NewDefault(log))
 	if err != nil {
@@ -238,6 +247,14 @@ func newManaged(
 	)
 
 	actionDispatcher.MustRegister(
+		&fleetapi.ActionCancel{},
+		handlers.NewCancel(
+			log,
+			actionQueue,
+		),
+	)
+
+	actionDispatcher.MustRegister(
 		&fleetapi.ActionApp{},
 		handlers.NewAppAction(log, managedApplication.srv),
 	)
@@ -265,10 +282,10 @@ func newManaged(
 		agentInfo,
 		client,
 		actionDispatcher,
-		fleetR,
 		actionAcker,
 		statusCtrl,
 		stateStore,
+		actionQueue,
 	)
 	if err != nil {
 		return nil, err

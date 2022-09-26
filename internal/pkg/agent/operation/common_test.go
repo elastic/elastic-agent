@@ -14,7 +14,7 @@ import (
 
 	"go.elastic.co/apm/apmtest"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
@@ -24,12 +24,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 var downloadPath = getAbsPath("tests/downloads")
@@ -150,8 +150,8 @@ var _ download.Downloader = &DummyDownloader{}
 
 type DummyVerifier struct{}
 
-func (*DummyVerifier) Verify(_ program.Spec, _ string, _ bool) (bool, error) {
-	return true, nil
+func (*DummyVerifier) Verify(_ program.Spec, _ string) error {
+	return nil
 }
 
 var _ download.Verifier = &DummyVerifier{}

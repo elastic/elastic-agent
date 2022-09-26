@@ -5,13 +5,14 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // ActionStore receives multiples actions to persist to disk, the implementation of the store only
@@ -40,7 +41,7 @@ func NewActionStore(log *logger.Logger, store storeLoad) (*ActionStore, error) {
 
 	dec := yaml.NewDecoder(reader)
 	err = dec.Decode(&action)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return &ActionStore{
 			log:   log,
 			store: store,

@@ -5,40 +5,79 @@
 package snapshot
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+type Downloader struct {
+	downloader      download.Downloader
+	versionOverride string
+}
 
 // NewDownloader creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
-func NewDownloader(config *artifact.Config, versionOverride string) (download.Downloader, error) {
+func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride string) (download.Downloader, error) {
 	cfg, err := snapshotConfig(config, versionOverride)
 	if err != nil {
 		return nil, err
 	}
-	return http.NewDownloader(cfg)
+
+	httpDownloader, err := http.NewDownloader(log, cfg)
+	if err != nil {
+		return nil, errors.New(err, "failed to create snapshot downloader")
+	}
+
+	return &Downloader{
+		downloader:      httpDownloader,
+		versionOverride: versionOverride,
+	}, nil
+}
+
+func (e *Downloader) Reload(c *artifact.Config) error {
+	reloader, ok := e.downloader.(artifact.ConfigReloader)
+	if !ok {
+		return nil
+	}
+
+	cfg, err := snapshotConfig(c, e.versionOverride)
+	if err != nil {
+		return errors.New(err, "snapshot.downloader: failed to generate snapshot config")
+	}
+
+	return reloader.Reload(cfg)
+}
+
+// Download fetches the package from configured source.
+// Returns absolute path to downloaded package and an error.
+func (e *Downloader) Download(ctx context.Context, spec program.Spec, version string) (string, error) {
+	return e.downloader.Download(ctx, spec, version)
 }
 
 func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.Config, error) {
 	snapshotURI, err := snapshotURI(versionOverride, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to detect remote snapshot repo, proceeding with configured: %v", err)
+		return nil, fmt.Errorf("failed to detect remote snapshot repo, proceeding with configured: %w", err)
 	}
 
 	return &artifact.Config{
-		OperatingSystem:       config.OperatingSystem,
-		Architecture:          config.Architecture,
-		SourceURI:             snapshotURI,
-		TargetDirectory:       config.TargetDirectory,
-		InstallPath:           config.InstallPath,
-		DropPath:              config.DropPath,
+		OperatingSystem: config.OperatingSystem,
+		Architecture:    config.Architecture,
+		SourceURI:       snapshotURI,
+		TargetDirectory: config.TargetDirectory,
+		InstallPath:     config.InstallPath,
+		DropPath:        config.DropPath,
+
 		HTTPTransportSettings: config.HTTPTransportSettings,
 	}, nil
 }
@@ -46,9 +85,7 @@ func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.
 func snapshotURI(versionOverride string, config *artifact.Config) (string, error) {
 	version := release.Version()
 	if versionOverride != "" {
-		if strings.HasSuffix(versionOverride, "-SNAPSHOT") {
-			versionOverride = strings.TrimSuffix(versionOverride, "-SNAPSHOT")
-		}
+		versionOverride = strings.TrimSuffix(versionOverride, "-SNAPSHOT")
 		version = versionOverride
 	}
 

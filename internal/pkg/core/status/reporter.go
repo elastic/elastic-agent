@@ -2,18 +2,22 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package status handles process status reporting.
 package status
 
 import (
+	"fmt"
+	"net/http"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // AgentStatusCode is the status code for the Elastic Agent overall.
@@ -35,22 +39,24 @@ func (s AgentStatusCode) String() string {
 
 // AgentApplicationStatus returns the status of specific application.
 type AgentApplicationStatus struct {
+	Payload map[string]interface{}
 	ID      string
 	Name    string
-	Status  state.Status
 	Message string
-	Payload map[string]interface{}
+	Status  state.Status
 }
 
 // AgentStatus returns the overall status of the Elastic Agent.
 type AgentStatus struct {
-	Status       AgentStatusCode
+	UpdateTime   time.Time
 	Message      string
 	Applications []AgentApplicationStatus
+	Status       AgentStatusCode
 }
 
 // Controller takes track of component statuses.
 type Controller interface {
+	SetAgentID(string)
 	RegisterComponent(string) Reporter
 	RegisterComponentWithPersistance(string, bool) Reporter
 	RegisterApp(id string, name string) Reporter
@@ -58,15 +64,19 @@ type Controller interface {
 	StatusCode() AgentStatusCode
 	StatusString() string
 	UpdateStateID(string)
+	ServeHTTP(http.ResponseWriter, *http.Request)
 }
 
 type controller struct {
-	mx           sync.Mutex
-	status       AgentStatusCode
+	updateTime   time.Time
+	log          *logger.Logger
 	reporters    map[string]*reporter
 	appReporters map[string]*reporter
-	log          *logger.Logger
 	stateID      string
+	message      string
+	agentID      string
+	status       AgentStatusCode
+	mx           sync.Mutex
 }
 
 // NewController creates a new reporter.
@@ -77,6 +87,14 @@ func NewController(log *logger.Logger) Controller {
 		appReporters: make(map[string]*reporter),
 		log:          log,
 	}
+}
+
+// SetAgentID sets the agentID of the controller
+// The AgentID may be used in the handler output.
+func (r *controller) SetAgentID(agentID string) {
+	r.mx.Lock()
+	defer r.mx.Unlock()
+	r.agentID = agentID
 }
 
 // UpdateStateID cleans health when new configuration is received.
@@ -175,8 +193,9 @@ func (r *controller) Status() AgentStatus {
 	}
 	return AgentStatus{
 		Status:       r.status,
-		Message:      "",
+		Message:      r.message,
 		Applications: apps,
+		UpdateTime:   r.updateTime,
 	}
 }
 
@@ -189,12 +208,14 @@ func (r *controller) StatusCode() AgentStatusCode {
 
 func (r *controller) updateStatus() {
 	status := Healthy
+	message := ""
 
 	r.mx.Lock()
 	for id, rep := range r.reporters {
 		s := statusToAgentStatus(rep.status)
 		if s > status {
 			status = s
+			message = fmt.Sprintf("component %s: %s", id, rep.message)
 		}
 
 		r.log.Debugf("'%s' has status '%s'", id, s)
@@ -207,6 +228,7 @@ func (r *controller) updateStatus() {
 			s := statusToAgentStatus(rep.status)
 			if s > status {
 				status = s
+				message = fmt.Sprintf("app %s: %s", id, rep.message)
 			}
 
 			r.log.Debugf("'%s' has status '%s'", id, s)
@@ -217,23 +239,24 @@ func (r *controller) updateStatus() {
 	}
 
 	if r.status != status {
-		r.logStatus(status)
+		r.logStatus(status, message)
 		r.status = status
+		r.message = message
+		r.updateTime = time.Now().UTC()
 	}
 
 	r.mx.Unlock()
 
 }
 
-func (r *controller) logStatus(status AgentStatusCode) {
-	logFn := r.log.Infof
-	if status == Degraded {
-		logFn = r.log.Warnf
-	} else if status == Failed {
+func (r *controller) logStatus(status AgentStatusCode, message string) {
+	// Use at least warning level log for all statuses to make sure they are visible in the logs
+	logFn := r.log.Warnf
+	if status == Failed {
 		logFn = r.log.Errorf
 	}
 
-	logFn("Elastic Agent status changed to: '%s'", status)
+	logFn("Elastic Agent status changed to %q: %q", status, message)
 }
 
 // StatusString retrieves human readable string of current agent status.
@@ -248,15 +271,15 @@ type Reporter interface {
 }
 
 type reporter struct {
-	name             string
-	mx               sync.Mutex
-	isPersistent     bool
-	isRegistered     bool
-	status           state.Status
-	message          string
 	payload          map[string]interface{}
 	unregisterFunc   func()
 	notifyChangeFunc func()
+	message          string
+	name             string
+	status           state.Status
+	mx               sync.Mutex
+	isRegistered     bool
+	isPersistent     bool
 }
 
 // Update updates the status of a component.

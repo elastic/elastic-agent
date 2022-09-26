@@ -6,11 +6,12 @@ package status
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestReporter(t *testing.T) {
@@ -97,5 +98,57 @@ func TestReporter(t *testing.T) {
 
 		assert.Equal(t, Degraded, r.StatusCode())
 		assert.Equal(t, "degraded", r.StatusString())
+	})
+
+	t.Run("Check agent status components healthy", func(t *testing.T) {
+		r := NewController(l)
+		r1 := r.RegisterComponent("r1")
+		r2 := r.RegisterComponent("r2")
+		r3 := r.RegisterComponent("r3")
+
+		r1.Update(state.Healthy, "", nil)
+		r2.Update(state.Healthy, "", nil)
+		r3.Update(state.Healthy, "", nil)
+
+		s := r.Status()
+		assert.Equal(t, Healthy, s.Status)
+		assert.Equal(t, "", s.Message)
+		assert.Equal(t, time.Time{}, s.UpdateTime)
+	})
+
+	//nolint:dupl // test case
+	t.Run("Check agent status one component degraded", func(t *testing.T) {
+		r := NewController(l)
+		r1 := r.RegisterComponent("r1")
+		r2 := r.RegisterComponent("r2")
+		r3 := r.RegisterComponent("r3")
+
+		r1.Update(state.Healthy, "", nil)
+		r2.Update(state.Degraded, "degraded", nil)
+		r3.Update(state.Healthy, "", nil)
+
+		s := r.Status()
+		assert.Equal(t, Degraded, s.Status)
+		assert.Contains(t, s.Message, "component r2")
+		assert.Contains(t, s.Message, "degraded")
+		assert.NotEqual(t, time.Time{}, s.UpdateTime)
+	})
+
+	//nolint:dupl // test case
+	t.Run("Check agent status one component failed", func(t *testing.T) {
+		r := NewController(l)
+		r1 := r.RegisterComponent("r1")
+		r2 := r.RegisterComponent("r2")
+		r3 := r.RegisterComponent("r3")
+
+		r1.Update(state.Healthy, "", nil)
+		r2.Update(state.Failed, "failed", nil)
+		r3.Update(state.Degraded, "degraded", nil)
+
+		s := r.Status()
+		assert.Equal(t, Failed, s.Status)
+		assert.Contains(t, s.Message, "component r2")
+		assert.Contains(t, s.Message, "failed")
+		assert.NotEqual(t, time.Time{}, s.UpdateTime)
 	})
 }

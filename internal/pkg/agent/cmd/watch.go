@@ -22,8 +22,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -39,8 +39,8 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Use:   "watch",
 		Short: "Watch watches Elastic Agent for failures and initiates rollback.",
 		Long:  `Watch watches Elastic Agent for failures and initiates rollback.`,
-		Run: func(c *cobra.Command, args []string) {
-			if err := watchCmd(streams, c, args); err != nil {
+		Run: func(_ *cobra.Command, _ []string) {
+			if err := watchCmd(); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
@@ -50,7 +50,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 	return cmd
 }
 
-func watchCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+func watchCmd() error {
 	log, err := configuredLogger()
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func watchCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 
 	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
 	if err := locker.TryLock(); err != nil {
-		if err == filelock.ErrAppAlreadyRunning {
+		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			log.Debugf("exiting, lock already exists")
 			return nil
 		}
@@ -77,7 +77,9 @@ func watchCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 		log.Error("failed to acquire lock", err)
 		return err
 	}
-	defer locker.Unlock()
+	defer func() {
+		_ = locker.Unlock()
+	}()
 
 	isWithinGrace, tilGrace := gracePeriod(marker)
 	if !isWithinGrace {
@@ -106,12 +108,16 @@ func watchCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 	// cleanup older versions,
 	// in windows it might leave self untouched, this will get cleaned up
 	// later at the start, because for windows we leave marker untouched.
-	removeMarker := runtime.GOOS != "windows"
+	removeMarker := !isWindows()
 	err = upgrade.Cleanup(marker.Hash, removeMarker)
 	if err != nil {
 		log.Error("rollback failed", err)
 	}
 	return err
+}
+
+func isWindows() bool {
+	return runtime.GOOS == "windows"
 }
 
 func watch(ctx context.Context, tilGrace time.Duration, log *logger.Logger) error {
@@ -141,7 +147,7 @@ func watch(ctx context.Context, tilGrace time.Duration, log *logger.Logger) erro
 	go crashChecker.Run(ctx)
 
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	t := time.NewTimer(tilGrace)
 	defer t.Stop()

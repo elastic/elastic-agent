@@ -21,11 +21,11 @@ import (
 // Option is the default options used to generate the encrypt and decrypt writer.
 // NOTE: the defined options need to be same for both the Reader and the writer.
 type Option struct {
+	Generator       bytesGen
 	IterationsCount int
 	KeyLength       int
 	SaltLength      int
 	IVLength        int
-	Generator       bytesGen
 
 	// BlockSize must be a factor of aes.BlockSize
 	BlockSize int
@@ -63,7 +63,7 @@ var DefaultOptions = &Option{
 	BlockSize:       bytes.MinRead,
 }
 
-// versionMagicHeader is the format version that will be added at the begining of the header and
+// versionMagicHeader is the format version that will be added at the beginning of the header and
 // can be used to change how the decryption work in future version.
 var versionMagicHeader = []byte("v2")
 
@@ -180,7 +180,6 @@ func (w *Writer) Write(b []byte) (int, error) {
 }
 
 func (w *Writer) writeBlock(b []byte) error {
-
 	// randomly generate the salt and the initialization vector, this information will be saved
 	// on disk in the file as part of the header
 	iv, err := w.generator(w.option.IVLength)
@@ -189,12 +188,14 @@ func (w *Writer) writeBlock(b []byte) error {
 		return w.err
 	}
 
+	// nolint: errcheck // Ignore the error at this point.
 	w.writer.Write(iv)
 
 	encodedBytes := w.gcm.Seal(nil, iv, b, nil)
 
 	l := make([]byte, 4)
 	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes)))
+	// nolint: errcheck // Ignore the error at this point.
 	w.writer.Write(l)
 
 	_, err = w.writer.Write(encodedBytes)
@@ -296,7 +297,7 @@ func (r *Reader) readTo(b []byte) (int, error) {
 	if !r.eof {
 		if err := r.consumeBlock(); err != nil {
 			// We read all the blocks
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				r.eof = true
 			} else {
 				r.err = err
@@ -325,7 +326,7 @@ func (r *Reader) consumeBlock() error {
 	}
 
 	encodedBytes := make([]byte, l)
-	_, err = io.ReadAtLeast(r.reader, encodedBytes, int(l))
+	_, err = io.ReadAtLeast(r.reader, encodedBytes, l)
 	if err != nil {
 		r.err = errors.Wrapf(err, "fail read the block of %d bytes", l)
 	}
@@ -364,7 +365,6 @@ func (r *Reader) Close() error {
 func randomBytes(length int) ([]byte, error) {
 	r := make([]byte, length)
 	_, err := rand.Read(r)
-
 	if err != nil {
 		return nil, err
 	}

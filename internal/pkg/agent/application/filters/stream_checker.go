@@ -9,7 +9,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // ErrInvalidNamespace is error returned when namespace value provided is invalid.

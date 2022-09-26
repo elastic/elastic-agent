@@ -1,0 +1,23 @@
+inputs:
+    - name: filestream-santa
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.santa.log.enabled} == true or ${kubernetes.hints.santa.enabled} == true
+          data_stream:
+            dataset: santa.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.santa.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - santa-log
+      data_stream.namespace: default

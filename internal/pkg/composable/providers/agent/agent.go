@@ -10,12 +10,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func init() {
-	composable.Providers.AddContextProvider("agent", ContextProviderBuilder)
+	_ = composable.Providers.AddContextProvider("agent", ContextProviderBuilder)
 }
 
 type contextProvider struct{}
@@ -42,6 +42,6 @@ func (*contextProvider) Run(comm corecomp.ContextProviderComm) error {
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(_ *logger.Logger, _ *config.Config) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(_ *logger.Logger, _ *config.Config, managed bool) (corecomp.ContextProvider, error) {
 	return &contextProvider{}, nil
 }

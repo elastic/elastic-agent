@@ -17,14 +17,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // DefaultCheckInterval is the default timeout used to check if any host information has changed.
 const DefaultCheckInterval = 5 * time.Minute
 
 func init() {
-	composable.Providers.AddContextProvider("host", ContextProviderBuilder)
+	_ = composable.Providers.AddContextProvider("host", ContextProviderBuilder)
 }
 
 type infoFetcher func() (map[string]interface{}, error)
@@ -81,7 +81,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(log *logger.Logger, c *config.Config) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(log *logger.Logger, c *config.Config, managed bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{
 		logger:  log,
 		fetcher: getHostInfo,
@@ -89,7 +89,7 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config) (corecomp.Cont
 	if c != nil {
 		err := c.Unpack(p)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unpack config: %s", err)
+			return nil, fmt.Errorf("failed to unpack config: %w", err)
 		}
 	}
 	if p.CheckInterval <= 0 {

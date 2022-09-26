@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // DynamicProviderComm is the interface that an dynamic provider uses to communicate back to Elastic Agent.
@@ -34,30 +34,31 @@ type DynamicProvider interface {
 }
 
 // DynamicProviderBuilder creates a new dynamic provider based on the given config and returns it.
-type DynamicProviderBuilder func(log *logger.Logger, config *config.Config) (DynamicProvider, error)
+type DynamicProviderBuilder func(log *logger.Logger, config *config.Config, managed bool) (DynamicProvider, error)
 
+//nolint:dupl,goimports,nolintlint // false positive
 // AddDynamicProvider adds a new DynamicProviderBuilder
-func (r *providerRegistry) AddDynamicProvider(name string, builder DynamicProviderBuilder) error {
+func (r *providerRegistry) AddDynamicProvider(providerName string, builder DynamicProviderBuilder) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	if name == "" {
-		return fmt.Errorf("provider name is required")
+	if providerName == "" {
+		return fmt.Errorf("provider providerName is required")
 	}
-	if strings.ToLower(name) != name {
-		return fmt.Errorf("provider name must be lowercase")
+	if strings.ToLower(providerName) != providerName {
+		return fmt.Errorf("provider providerName must be lowercase")
 	}
-	_, contextExists := r.contextProviders[name]
-	_, dynamicExists := r.dynamicProviders[name]
+	_, contextExists := r.contextProviders[providerName]
+	_, dynamicExists := r.dynamicProviders[providerName]
 	if contextExists || dynamicExists {
-		return fmt.Errorf("provider '%s' is already registered", name)
+		return fmt.Errorf("provider '%s' is already registered", providerName)
 	}
 	if builder == nil {
-		return fmt.Errorf("provider '%s' cannot be registered with a nil factory", name)
+		return fmt.Errorf("provider '%s' cannot be registered with a nil factory", providerName)
 	}
 
-	r.dynamicProviders[name] = builder
-	r.logger.Debugf("Registered provider: %s", name)
+	r.dynamicProviders[providerName] = builder
+	r.logger.Debugf("Registered provider: %s", providerName)
 	return nil
 }
 

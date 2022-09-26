@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // retryableOperations consists of multiple operations which are
@@ -18,8 +18,8 @@ import (
 // if nth operation fails all preceding are retried as well
 type retryableOperations struct {
 	logger      *logger.Logger
-	operations  []operation
 	retryConfig *retry.Config
+	operations  []operation
 }
 
 func newRetryableOperations(

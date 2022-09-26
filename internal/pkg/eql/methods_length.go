@@ -9,7 +9,7 @@ import "fmt"
 // length returns the length of the string, array, or dictionary
 func length(args []interface{}) (interface{}, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("length: accepts exactly 1 argument; recieved %d", len(args))
+		return nil, fmt.Errorf("length: accepts exactly 1 argument; received %d", len(args))
 	}
 	switch a := args[0].(type) {
 	case *null:
@@ -21,5 +21,5 @@ func length(args []interface{}) (interface{}, error) {
 	case map[string]interface{}:
 		return len(a), nil
 	}
-	return nil, fmt.Errorf("length: accepts only a string, array, or dictionary; recieved %T", args[0])
+	return nil, fmt.Errorf("length: accepts only a string, array, or dictionary; received %T", args[0])
 }

@@ -14,19 +14,19 @@ import (
 	"go.elastic.co/apm/apmtest"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
-
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestCmdBinaryOnly(t *testing.T) {
 	streams, _, out, _ := cli.NewTestingIOStreams()
 	cmd := NewCommandWithArgs(streams)
-	cmd.Flags().Set("binary-only", "true")
-	err := cmd.Execute()
+	err := cmd.Flags().Set("binary-only", "true")
+	require.NoError(t, err)
+	err = cmd.Execute()
 	require.NoError(t, err)
 	version, err := ioutil.ReadAll(out)
 
@@ -38,9 +38,11 @@ func TestCmdBinaryOnly(t *testing.T) {
 func TestCmdBinaryOnlyYAML(t *testing.T) {
 	streams, _, out, _ := cli.NewTestingIOStreams()
 	cmd := NewCommandWithArgs(streams)
-	cmd.Flags().Set("binary-only", "true")
-	cmd.Flags().Set("yaml", "true")
-	err := cmd.Execute()
+	err := cmd.Flags().Set("binary-only", "true")
+	require.NoError(t, err)
+	err = cmd.Flags().Set("yaml", "true")
+	require.NoError(t, err)
+	err = cmd.Execute()
 	require.NoError(t, err)
 	version, err := ioutil.ReadAll(out)
 
@@ -77,8 +79,9 @@ func TestCmdDaemonYAML(t *testing.T) {
 
 	streams, _, out, _ := cli.NewTestingIOStreams()
 	cmd := NewCommandWithArgs(streams)
-	cmd.Flags().Set("yaml", "true")
-	err := cmd.Execute()
+	err := cmd.Flags().Set("yaml", "true")
+	require.NoError(t, err)
+	err = cmd.Execute()
 	require.NoError(t, err)
 	version, err := ioutil.ReadAll(out)
 
@@ -109,8 +112,9 @@ func TestCmdDaemonErrYAML(t *testing.T) {
 	// srv not started
 	streams, _, out, _ := cli.NewTestingIOStreams()
 	cmd := NewCommandWithArgs(streams)
-	cmd.Flags().Set("yaml", "true")
-	err := cmd.Execute()
+	err := cmd.Flags().Set("yaml", "true")
+	require.NoError(t, err)
+	err = cmd.Execute()
 	require.Error(t, err)
 	version, err := ioutil.ReadAll(out)
 

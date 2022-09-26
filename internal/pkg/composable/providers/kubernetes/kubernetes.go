@@ -7,13 +7,15 @@ package kubernetes
 import (
 	"fmt"
 
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	k8s "k8s.io/client-go/kubernetes"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -27,17 +29,20 @@ const (
 	ServicePriority = 3
 )
 
+const nodeScope = "node"
+
 func init() {
-	composable.Providers.AddDynamicProvider("kubernetes", DynamicProviderBuilder)
+	_ = composable.Providers.AddDynamicProvider("kubernetes", DynamicProviderBuilder)
 }
 
 type dynamicProvider struct {
-	logger *logger.Logger
-	config *Config
+	logger  *logger.Logger
+	config  *Config
+	managed bool
 }
 
 // DynamicProviderBuilder builds the dynamic provider.
-func DynamicProviderBuilder(logger *logger.Logger, c *config.Config) (composable.DynamicProvider, error) {
+func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (composable.DynamicProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()
@@ -47,11 +52,15 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config) (composable
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
 
-	return &dynamicProvider{logger, &cfg}, nil
+	return &dynamicProvider{logger, &cfg, managed}, nil
 }
 
 // Run runs the kubernetes context provider.
 func (p *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
+	if p.config.Hints.Enabled() {
+		betalogger := logp.NewLogger("cfgwarn")
+		betalogger.Warnf("BETA: Hints' feature is beta.")
+	}
 	if p.config.Resources.Pod.Enabled {
 		err := p.watchResource(comm, "pod")
 		if err != nil {
@@ -59,7 +68,7 @@ func (p *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 		}
 	}
 	if p.config.Resources.Node.Enabled {
-		err := p.watchResource(comm, "node")
+		err := p.watchResource(comm, nodeScope)
 		if err != nil {
 			return err
 		}
@@ -88,7 +97,7 @@ func (p *dynamicProvider) watchResource(
 	// Ensure that node is set correctly whenever the scope is set to "node". Make sure that node is empty
 	// when cluster scope is enforced.
 	p.logger.Infof("Kubernetes provider started for resource %s with %s scope", resourceType, p.config.Scope)
-	if p.config.Scope == "node" {
+	if p.config.Scope == nodeScope {
 
 		p.logger.Debugf(
 			"Initializing Kubernetes watcher for resource %s using node: %v",
@@ -137,19 +146,19 @@ func (p *dynamicProvider) newEventer(
 	client k8s.Interface) (Eventer, error) {
 	switch resourceType {
 	case "pod":
-		eventer, err := NewPodEventer(comm, p.config, p.logger, client, p.config.Scope)
+		eventer, err := NewPodEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}
 		return eventer, nil
-	case "node":
-		eventer, err := NewNodeEventer(comm, p.config, p.logger, client, p.config.Scope)
+	case nodeScope:
+		eventer, err := NewNodeEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}
 		return eventer, nil
 	case "service":
-		eventer, err := NewServiceEventer(comm, p.config, p.logger, client, p.config.Scope)
+		eventer, err := NewServiceEventer(comm, p.config, p.logger, client, p.config.Scope, p.managed)
 		if err != nil {
 			return nil, err
 		}

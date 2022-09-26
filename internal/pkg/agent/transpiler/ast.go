@@ -271,11 +271,11 @@ func (k *Key) Apply(vars *Vars) (Node, error) {
 		case *StrVal:
 			cond, err := eql.Eval(v.value, vars)
 			if err != nil {
-				return nil, fmt.Errorf(`condition "%s" evaluation failed: %s`, v.value, err)
+				return nil, fmt.Errorf(`condition "%s" evaluation failed: %w`, v.value, err)
 			}
 			return &Key{k.name, NewBoolVal(cond)}, nil
 		}
-		return nil, fmt.Errorf("condition key's value must be a string; recieved %T", k.value)
+		return nil, fmt.Errorf("condition key's value must be a string; received %T", k.value)
 	}
 	v, err := k.value.Apply(vars)
 	if err != nil {
@@ -706,7 +706,7 @@ func NewASTFromConfig(cfg *ucfg.Config) (*AST, error) {
 func loadForNew(val interface{}) (Node, error) {
 	root, err := load(reflect.ValueOf(val))
 	if err != nil {
-		return nil, fmt.Errorf("could not parse configuration into a tree, error: %+v", err)
+		return nil, fmt.Errorf("could not parse configuration into a tree, error: %w", err)
 	}
 	return root, nil
 }

@@ -7,7 +7,9 @@ package composed
 import (
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 )
 
@@ -30,17 +32,39 @@ func NewVerifier(verifiers ...download.Verifier) *Verifier {
 }
 
 // Verify checks the package from configured source.
-func (e *Verifier) Verify(spec program.Spec, version string, removeOnFailure bool) (bool, error) {
+func (e *Verifier) Verify(spec program.Spec, version string) error {
 	var err error
+	var checksumMismatchErr *download.ChecksumMismatchError
+	var invalidSignatureErr *download.InvalidSignatureError
 
 	for _, v := range e.vv {
-		b, e := v.Verify(spec, version, removeOnFailure)
+		e := v.Verify(spec, version)
 		if e == nil {
-			return b, nil
+			// Success
+			return nil
 		}
 
 		err = multierror.Append(err, e)
+
+		if errors.As(e, &checksumMismatchErr) || errors.As(err, &invalidSignatureErr) {
+			// Stop verification chain on checksum/signature errors.
+			break
+		}
 	}
 
-	return false, err
+	return err
+}
+
+func (e *Verifier) Reload(c *artifact.Config) error {
+	for _, v := range e.vv {
+		reloadable, ok := v.(download.Reloader)
+		if !ok {
+			continue
+		}
+
+		if err := reloadable.Reload(c); err != nil {
+			return errors.New(err, "failed reloading artifact config for composed verifier")
+		}
+	}
+	return nil
 }

@@ -7,7 +7,7 @@ package composable
 import (
 	"sync"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // providerRegistry is a registry of providers

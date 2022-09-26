@@ -10,12 +10,13 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // ContextProviderBuilder creates a new context provider based on the given config and returns it.
-type ContextProviderBuilder func(log *logger.Logger, config *config.Config) (corecomp.ContextProvider, error)
+type ContextProviderBuilder func(log *logger.Logger, config *config.Config, managed bool) (corecomp.ContextProvider, error)
 
+//nolint:dupl,goimports,nolintlint // false positive
 // AddContextProvider adds a new ContextProviderBuilder
 func (r *providerRegistry) AddContextProvider(name string, builder ContextProviderBuilder) error {
 	r.lock.Lock()
@@ -24,11 +25,14 @@ func (r *providerRegistry) AddContextProvider(name string, builder ContextProvid
 	if name == "" {
 		return fmt.Errorf("provider name is required")
 	}
+
 	if strings.ToLower(name) != name {
 		return fmt.Errorf("provider name must be lowercase")
 	}
+
 	_, contextExists := r.contextProviders[name]
 	_, dynamicExists := r.dynamicProviders[name]
+
 	if contextExists || dynamicExists {
 		return fmt.Errorf("provider '%s' is already registered", name)
 	}

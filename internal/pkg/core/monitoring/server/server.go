@@ -16,13 +16,12 @@ import (
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgorilla"
 
-	"github.com/elastic/beats/v7/libbeat/api"
-	"github.com/elastic/beats/v7/libbeat/beat"
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/monitoring"
-	"github.com/elastic/beats/v7/libbeat/monitoring/report/buffer"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent-libs/api"
+	"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/elastic-agent-libs/monitoring/report/buffer"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // New creates a new server exposing metrics and process information.
@@ -34,28 +33,30 @@ func New(
 	enableProcessStats bool,
 	enableBuffer bool,
 	tracer *apm.Tracer,
+	statusController http.Handler,
 ) (*api.Server, error) {
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
 		log.Errorf("failed to create monitoring drop: %v", err)
 	}
 
-	cfg, err := common.NewConfigFrom(endpointConfig)
+	cfg, err := config.NewConfigFrom(endpointConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return exposeMetricsEndpoint(log, cfg, ns, routesFetchFn, enableProcessStats, enableBuffer, tracer)
+	return exposeMetricsEndpoint(log, cfg, ns, routesFetchFn, enableProcessStats, enableBuffer, tracer, statusController)
 }
 
 func exposeMetricsEndpoint(
 	log *logger.Logger,
-	config *common.Config,
+	config *config.C,
 	ns func(string) *monitoring.Namespace,
 	routesFetchFn func() *sorted.Set,
 	enableProcessStats bool,
 	enableBuffer bool,
 	tracer *apm.Tracer,
+	statusController http.Handler,
 ) (*api.Server, error) {
 	r := mux.NewRouter()
 	if tracer != nil {
@@ -63,6 +64,8 @@ func exposeMetricsEndpoint(
 	}
 	statsHandler := statsHandler(ns("stats"))
 	r.Handle("/stats", createHandler(statsHandler))
+
+	r.Handle("/liveness", statusController)
 
 	if enableProcessStats {
 		r.HandleFunc("/processes", processesHandler(routesFetchFn))
@@ -72,7 +75,7 @@ func exposeMetricsEndpoint(
 	}
 
 	if enableBuffer {
-		bufferReporter, err := buffer.MakeReporter(beat.Info{}, config) // beat.Info is not used by buffer reporter
+		bufferReporter, err := buffer.MakeReporter(config) // beat.Info is not used by buffer reporter
 		if err != nil {
 			return nil, fmt.Errorf("unable to create buffer reporter for elastic-agent: %w", err)
 		}

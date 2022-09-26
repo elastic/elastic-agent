@@ -52,7 +52,7 @@ func updateLogLevel(level string) error {
 	}
 
 	agentConfigFile := paths.AgentConfigFile()
-	diskStore := storage.NewDiskStore(agentConfigFile)
+	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)
 
 	ai.LogLevel = level
 	return updateAgentInfo(diskStore, ai)
@@ -61,7 +61,7 @@ func updateLogLevel(level string) error {
 func generateAgentID() (string, error) {
 	uid, err := uuid.NewV4()
 	if err != nil {
-		return "", fmt.Errorf("error while generating UUID for agent: %v", err)
+		return "", fmt.Errorf("error while generating UUID for agent: %w", err)
 	}
 
 	return uid.String(), nil
@@ -71,7 +71,7 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, error) 
 	agentConfigFile := paths.AgentConfigFile()
 	reader, err := s.Load()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load from ioStore: %w", err)
 	}
 
 	// reader is closed by this function
@@ -175,7 +175,7 @@ func loadAgentInfoWithBackoff(forceUpdate bool, logLevel string, createAgentID b
 	for i := 0; i <= maxRetriesloadAgentInfo; i++ {
 		backExp.Wait()
 		ai, err = loadAgentInfo(forceUpdate, logLevel, createAgentID)
-		if err != filelock.ErrAppAlreadyRunning {
+		if !errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			break
 		}
 	}
@@ -189,25 +189,26 @@ func loadAgentInfo(forceUpdate bool, logLevel string, createAgentID bool) (*pers
 	if err := idLock.TryLock(); err != nil {
 		return nil, err
 	}
+	//nolint:errcheck // keeping the same behavior, and making linter happy
 	defer idLock.Unlock()
 
 	agentConfigFile := paths.AgentConfigFile()
-	diskStore := storage.NewDiskStore(agentConfigFile)
+	diskStore := storage.NewEncryptedDiskStore(agentConfigFile)
 
-	agentinfo, err := getInfoFromStore(diskStore, logLevel)
+	agentInfo, err := getInfoFromStore(diskStore, logLevel)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get agent info from store: %w", err)
 	}
 
-	if agentinfo != nil && !forceUpdate && (agentinfo.ID != "" || !createAgentID) {
-		return agentinfo, nil
+	if agentInfo != nil && !forceUpdate && (agentInfo.ID != "" || !createAgentID) {
+		return agentInfo, nil
 	}
 
-	if err := updateID(agentinfo, diskStore); err != nil {
-		return nil, err
+	if err := updateID(agentInfo, diskStore); err != nil {
+		return nil, fmt.Errorf("could not update agent ID on disk store: %w", err)
 	}
 
-	return agentinfo, nil
+	return agentInfo, nil
 }
 
 func updateID(agentInfo *persistentAgentInfo, s ioStore) error {

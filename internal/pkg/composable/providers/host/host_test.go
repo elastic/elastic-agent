@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestContextProvider(t *testing.T) {
@@ -33,10 +33,10 @@ func TestContextProvider(t *testing.T) {
 	builder, _ := composable.Providers.GetContextProvider("host")
 	log, err := logger.New("host_test", false)
 	require.NoError(t, err)
-	provider, err := builder(log, c)
+	provider, err := builder(log, c, true)
 	require.NoError(t, err)
 
-	hostProvider := provider.(*contextProvider)
+	hostProvider, _ := provider.(*contextProvider)
 	hostProvider.fetcher = returnHostMapping()
 	require.Equal(t, 100*time.Millisecond, hostProvider.CheckInterval)
 

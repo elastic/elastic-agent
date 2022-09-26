@@ -35,5 +35,6 @@ rules:
     - inputs
     - output
 
-when: length(${inputs}) > 0 and hasKey(${output}, 'elasticsearch')
+when: length(${inputs}) > 0 and hasKey(${output}, 'elasticsearch', 'redis',
+  'kafka', 'logstash')
 constraints: ${runtime.arch} != '386'

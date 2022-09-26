@@ -9,26 +9,38 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes/metadata"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
+func getLogger() *logger.Logger {
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.ErrorLevel
+	l, _ := logger.NewFromConfig("", loggerCfg, false)
+	return l
+}
+
 func TestGeneratePodData(t *testing.T) {
-	uid := "005f3b90-4b9d-12f8-acf0-31020a840133"
 	pod := &kubernetes.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testpod",
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo": "bar",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
 				"app": "production",
@@ -44,57 +56,60 @@ func TestGeneratePodData(t *testing.T) {
 		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
 	}
 
-	namespaceAnnotations := common.MapStr{
+	namespaceAnnotations := mapstr.M{
 		"nsa": "nsb",
 	}
-	data := generatePodData(pod, &Config{}, &podMeta{}, namespaceAnnotations)
+	data := generatePodData(pod, &podMeta{}, namespaceAnnotations)
 
 	mapping := map[string]interface{}{
 		"namespace": pod.GetNamespace(),
-		"pod": common.MapStr{
+		"pod": mapstr.M{
 			"uid":  string(pod.GetUID()),
 			"name": pod.GetName(),
 			"ip":   pod.Status.PodIP,
 		},
-		"namespace_annotations": common.MapStr{
+		"namespace_annotations": mapstr.M{
 			"nsa": "nsb",
 		},
-		"labels": common.MapStr{
-			"foo": "bar",
+		"labels": mapstr.M{
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
-		"annotations": common.MapStr{
+		"annotations": mapstr.M{
 			"app": "production",
 		},
 	}
 
 	processors := map[string]interface{}{
-		"orchestrator": common.MapStr{
-			"cluster": common.MapStr{
+		"orchestrator": mapstr.M{
+			"cluster": mapstr.M{
 				"name": "devcluster",
 				"url":  "8.8.8.8:9090"},
-		}, "kubernetes": common.MapStr{
+		}, "kubernetes": mapstr.M{
 			"namespace": "testns",
-			"labels": common.MapStr{
-				"foo": "bar",
+			"labels": mapstr.M{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
-			"annotations": common.MapStr{"app": "production"},
-			"pod": common.MapStr{
+			"annotations": mapstr.M{"app": "production"},
+			"pod": mapstr.M{
 				"ip":   "127.0.0.5",
 				"name": "testpod",
-				"uid":  "005f3b90-4b9d-12f8-acf0-31020a840133"}},
+				"uid":  uid}},
 	}
 	assert.Equal(t, string(pod.GetUID()), data.uid)
 	assert.Equal(t, mapping, data.mapping)
 	for _, v := range data.processors {
-		k := v["add_fields"].(map[string]interface{})
-		target := k["target"].(string)
+		k, _ := v["add_fields"].(map[string]interface{})
+		target, _ := k["target"].(string)
 		fields := k["fields"]
 		assert.Equal(t, processors[target], fields)
 	}
 }
 
 func TestGenerateContainerPodData(t *testing.T) {
-	uid := "005f3b90-4b9d-12f8-acf0-31020a840133"
 	containers := []kubernetes.Container{
 		{
 			Name:  "nginx",
@@ -121,7 +136,9 @@ func TestGenerateContainerPodData(t *testing.T) {
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo": "bar",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
 				"app": "production",
@@ -147,23 +164,30 @@ func TestGenerateContainerPodData(t *testing.T) {
 		context.TODO(),
 		providerDataChan,
 	}
+	logger := getLogger()
+	var cfg Config
+	c := config.New()
+	_ = c.Unpack(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
-		&Config{},
 		&podMeta{},
-		common.MapStr{
+		mapstr.M{
 			"nsa": "nsb",
-		})
+		},
+		logger,
+		true,
+		&cfg,
+	)
 
 	mapping := map[string]interface{}{
 		"namespace": pod.GetNamespace(),
-		"pod": common.MapStr{
+		"pod": mapstr.M{
 			"uid":  string(pod.GetUID()),
 			"name": pod.GetName(),
 			"ip":   pod.Status.PodIP,
 		},
-		"container": common.MapStr{
+		"container": mapstr.M{
 			"id":        "asdfghdeadbeef",
 			"name":      "nginx",
 			"image":     "nginx:1.120",
@@ -171,42 +195,48 @@ func TestGenerateContainerPodData(t *testing.T) {
 			"port":      "80",
 			"port_name": "http",
 		},
-		"namespace_annotations": common.MapStr{
+		"namespace_annotations": mapstr.M{
 			"nsa": "nsb",
 		},
-		"annotations": common.MapStr{
+		"annotations": mapstr.M{
 			"app": "production",
 		},
-		"labels": common.MapStr{
-			"foo": "bar",
+		"labels": mapstr.M{
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 	}
 
 	processors := map[string]interface{}{
-		"container": common.MapStr{
+		"container": mapstr.M{
 			"id":      "asdfghdeadbeef",
-			"image":   common.MapStr{"name": "nginx:1.120"},
+			"image":   mapstr.M{"name": "nginx:1.120"},
 			"runtime": "crio",
-		}, "orchestrator": common.MapStr{
-			"cluster": common.MapStr{
+		}, "orchestrator": mapstr.M{
+			"cluster": mapstr.M{
 				"name": "devcluster",
 				"url":  "8.8.8.8:9090"},
-		}, "kubernetes": common.MapStr{
+		}, "kubernetes": mapstr.M{
 			"namespace":   "testns",
-			"annotations": common.MapStr{"app": "production"},
-			"labels":      common.MapStr{"foo": "bar"},
-			"pod": common.MapStr{
+			"annotations": mapstr.M{"app": "production"},
+			"labels": mapstr.M{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
+			},
+			"pod": mapstr.M{
 				"ip":   "127.0.0.5",
 				"name": "testpod",
-				"uid":  "005f3b90-4b9d-12f8-acf0-31020a840133"}},
+				"uid":  uid}},
 	}
 	cuid := fmt.Sprintf("%s.%s", pod.GetObjectMeta().GetUID(), "nginx")
 	data := <-providerDataChan
 	assert.Equal(t, cuid, data.uid)
 	assert.Equal(t, mapping, data.mapping)
 	for _, v := range data.processors {
-		k := v["add_fields"].(map[string]interface{})
-		target := k["target"].(string)
+		k, _ := v["add_fields"].(map[string]interface{})
+		target, _ := k["target"].(string)
 		fields := k["fields"]
 		assert.Equal(t, processors[target], fields)
 	}
@@ -214,7 +244,6 @@ func TestGenerateContainerPodData(t *testing.T) {
 }
 
 func TestEphemeralContainers(t *testing.T) {
-	uid := "005f3b90-4b9d-12f8-acf0-31020a840133"
 	containers := []v1.EphemeralContainer{
 		{
 			EphemeralContainerCommon: v1.EphemeralContainerCommon{
@@ -236,7 +265,9 @@ func TestEphemeralContainers(t *testing.T) {
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo": "bar",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
 				"app": "production",
@@ -262,64 +293,77 @@ func TestEphemeralContainers(t *testing.T) {
 		context.TODO(),
 		providerDataChan,
 	}
+
+	logger := getLogger()
+	var cfg Config
+	c := config.New()
+	_ = c.Unpack(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
-		&Config{},
 		&podMeta{},
-		common.MapStr{
+		mapstr.M{
 			"nsa": "nsb",
-		})
+		},
+		logger,
+		true,
+		&cfg)
 
 	mapping := map[string]interface{}{
 		"namespace": pod.GetNamespace(),
-		"pod": common.MapStr{
+		"pod": mapstr.M{
 			"uid":  string(pod.GetUID()),
 			"name": pod.GetName(),
 			"ip":   pod.Status.PodIP,
 		},
-		"labels": common.MapStr{
-			"foo": "bar",
+		"labels": mapstr.M{
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
-		"container": common.MapStr{
+		"container": mapstr.M{
 			"id":      "asdfghdeadbeef",
 			"name":    "nginx",
 			"image":   "nginx:1.120",
 			"runtime": "crio",
 		},
-		"namespace_annotations": common.MapStr{
+		"namespace_annotations": mapstr.M{
 			"nsa": "nsb",
 		},
-		"annotations": common.MapStr{
+		"annotations": mapstr.M{
 			"app": "production",
 		},
 	}
 
 	processors := map[string]interface{}{
-		"container": common.MapStr{
+		"container": mapstr.M{
 			"id":      "asdfghdeadbeef",
-			"image":   common.MapStr{"name": "nginx:1.120"},
+			"image":   mapstr.M{"name": "nginx:1.120"},
 			"runtime": "crio",
-		}, "orchestrator": common.MapStr{
-			"cluster": common.MapStr{
+		}, "orchestrator": mapstr.M{
+			"cluster": mapstr.M{
 				"name": "devcluster",
 				"url":  "8.8.8.8:9090"},
-		}, "kubernetes": common.MapStr{
-			"namespace":   "testns",
-			"labels":      common.MapStr{"foo": "bar"},
-			"annotations": common.MapStr{"app": "production"},
-			"pod": common.MapStr{
+		}, "kubernetes": mapstr.M{
+			"namespace": "testns",
+			"labels": mapstr.M{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
+			},
+			"annotations": mapstr.M{"app": "production"},
+			"pod": mapstr.M{
 				"ip":   "127.0.0.5",
 				"name": "testpod",
-				"uid":  "005f3b90-4b9d-12f8-acf0-31020a840133"}},
+				"uid":  uid}},
 	}
 	cuid := fmt.Sprintf("%s.%s", pod.GetObjectMeta().GetUID(), "nginx")
 	data := <-providerDataChan
 	assert.Equal(t, cuid, data.uid)
 	assert.Equal(t, mapping, data.mapping)
 	for _, v := range data.processors {
-		k := v["add_fields"].(map[string]interface{})
-		target := k["target"].(string)
+		k, _ := v["add_fields"].(map[string]interface{})
+		target, _ := k["target"].(string)
 		fields := k["fields"]
 		assert.Equal(t, processors[target], fields)
 	}
@@ -349,16 +393,11 @@ func (t *MockDynamicComm) Remove(id string) {
 type podMeta struct{}
 
 // Generate generates pod metadata from a resource object
-// Metadata map is in the following form:
-// {
-// 	  "kubernetes": {},
-//    "some.ecs.field": "asdf"
-// }
 // All Kubernetes fields that need to be stored under kubernetes. prefix are populated by
 // GenerateK8s method while fields that are part of ECS are generated by GenerateECS method
-func (p *podMeta) Generate(obj kubernetes.Resource, opts ...metadata.FieldOptions) common.MapStr {
+func (p *podMeta) Generate(obj kubernetes.Resource, opts ...metadata.FieldOptions) mapstr.M {
 	ecsFields := p.GenerateECS(obj)
-	meta := common.MapStr{
+	meta := mapstr.M{
 		"kubernetes": p.GenerateK8s(obj, opts...),
 	}
 	meta.DeepUpdate(ecsFields)
@@ -366,10 +405,10 @@ func (p *podMeta) Generate(obj kubernetes.Resource, opts ...metadata.FieldOption
 }
 
 // GenerateECS generates pod ECS metadata from a resource object
-func (p *podMeta) GenerateECS(obj kubernetes.Resource) common.MapStr {
-	return common.MapStr{
-		"orchestrator": common.MapStr{
-			"cluster": common.MapStr{
+func (p *podMeta) GenerateECS(obj kubernetes.Resource) mapstr.M {
+	return mapstr.M{
+		"orchestrator": mapstr.M{
+			"cluster": mapstr.M{
 				"name": "devcluster",
 				"url":  "8.8.8.8:9090",
 			},
@@ -378,25 +417,27 @@ func (p *podMeta) GenerateECS(obj kubernetes.Resource) common.MapStr {
 }
 
 // GenerateK8s generates pod metadata from a resource object
-func (p *podMeta) GenerateK8s(obj kubernetes.Resource, opts ...metadata.FieldOptions) common.MapStr {
-	k8sPod := obj.(*kubernetes.Pod)
-	return common.MapStr{
+func (p *podMeta) GenerateK8s(obj kubernetes.Resource, opts ...metadata.FieldOptions) mapstr.M {
+	k8sPod, _ := obj.(*kubernetes.Pod)
+	return mapstr.M{
 		"namespace": k8sPod.GetNamespace(),
-		"pod": common.MapStr{
+		"pod": mapstr.M{
 			"uid":  string(k8sPod.GetUID()),
 			"name": k8sPod.GetName(),
 			"ip":   k8sPod.Status.PodIP,
 		},
-		"labels": common.MapStr{
-			"foo": "bar",
+		"labels": mapstr.M{
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
-		"annotations": common.MapStr{
+		"annotations": mapstr.M{
 			"app": "production",
 		},
 	}
 }
 
 // GenerateFromName generates pod metadata from a node name
-func (p *podMeta) GenerateFromName(name string, opts ...metadata.FieldOptions) common.MapStr {
+func (p *podMeta) GenerateFromName(name string, opts ...metadata.FieldOptions) mapstr.M {
 	return nil
 }

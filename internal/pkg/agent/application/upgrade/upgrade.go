@@ -22,10 +22,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -44,15 +44,15 @@ var (
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	agentInfo   *info.AgentInfo
-	settings    *artifact.Config
-	log         *logger.Logger
-	closers     []context.CancelFunc
+	reporter    stateReporter
+	caps        capabilities.Capability
 	reexec      reexecManager
 	acker       acker
-	reporter    stateReporter
+	settings    *artifact.Config
+	agentInfo   *info.AgentInfo
+	log         *logger.Logger
+	closers     []context.CancelFunc
 	upgradeable bool
-	caps        capabilities.Capability
 }
 
 // Action is the upgrade action state.
@@ -126,17 +126,27 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 				"running under control of the systems supervisor")
 	}
 
+	err = preUpgradeCleanup(u.agentInfo.Version())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q before update: %v", paths.Downloads(), err)
+	}
+
 	if u.caps != nil {
-		if _, err := u.caps.Apply(a); err == capabilities.ErrBlocked {
+		if _, err := u.caps.Apply(a); errors.Is(err, capabilities.ErrBlocked) {
 			return nil, nil
 		}
 	}
 
 	u.reportUpdating(a.Version())
 
-	sourceURI, err := u.sourceURI(a.Version(), a.SourceURI())
+	sourceURI := u.sourceURI(a.SourceURI())
 	archivePath, err := u.downloadArtifact(ctx, a.Version(), sourceURI)
 	if err != nil {
+		// Run the same preUpgradeCleanup task to get rid of any newly downloaded files
+		// This may have an issue if users are upgrading to the same version number.
+		if dErr := preUpgradeCleanup(u.agentInfo.Version()); dErr != nil {
+			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
+		}
 		return nil, err
 	}
 
@@ -152,6 +162,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	if strings.HasPrefix(release.Commit(), newHash) {
 		// not an error
 		if action := a.FleetAction(); action != nil {
+			//nolint:errcheck // keeping the same behavior, and making linter happy
 			u.ackAction(ctx, action)
 		}
 		u.log.Warn("upgrading to same version")
@@ -179,8 +190,18 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), release.TrimCommit(newHash))
 	if reexecNow {
+		err = os.RemoveAll(paths.Downloads())
+		if err != nil {
+			u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
+		}
 		u.reexec.ReExec(cb)
 		return nil, nil
+	}
+
+	// Clean everything from the downloads dir
+	err = os.RemoveAll(paths.Downloads())
+	if err != nil {
+		u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
 	}
 
 	return cb, nil
@@ -205,15 +226,17 @@ func (u *Upgrader) Ack(ctx context.Context) error {
 		return err
 	}
 
+	marker.Acked = true
+
 	return saveMarker(marker)
 }
 
-func (u *Upgrader) sourceURI(version, retrievedURI string) (string, error) {
+func (u *Upgrader) sourceURI(retrievedURI string) string {
 	if retrievedURI != "" {
-		return retrievedURI, nil
+		return retrievedURI
 	}
 
-	return u.settings.SourceURI, nil
+	return u.settings.SourceURI
 }
 
 // ackAction is used for successful updates, it was either updated successfully or to the same version
@@ -240,7 +263,7 @@ func (u *Upgrader) ackAction(ctx context.Context, action fleetapi.Action) error 
 // and state is changed to FAILED
 func (u *Upgrader) reportFailure(ctx context.Context, action fleetapi.Action, err error) {
 	// ack action
-	u.acker.Ack(ctx, action)
+	_ = u.acker.Ack(ctx, action)
 
 	// report failure
 	u.reporter.OnStateChange(
@@ -262,11 +285,12 @@ func (u *Upgrader) reportUpdating(version string) {
 
 func rollbackInstall(ctx context.Context, hash string) {
 	os.RemoveAll(filepath.Join(paths.Data(), fmt.Sprintf("%s-%s", agentName, hash)))
-	ChangeSymlink(ctx, release.ShortCommit())
+	_ = ChangeSymlink(ctx, release.ShortCommit())
 }
 
 func copyActionStore(newHash string) error {
-	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreFile()}
+	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
+	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
 
 	for _, currentActionStorePath := range storePaths {
 		newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
@@ -292,7 +316,7 @@ func copyActionStore(newHash string) error {
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.
 // this goes through runtime directory of agent and copies all the state files created by processes to new versioned
 // home directory with updated process name to match new version.
-func shutdownCallback(log *logger.Logger, homePath, prevVersion, newVersion, newHash string) reexec.ShutdownCallbackFn {
+func shutdownCallback(_ *logger.Logger, homePath, prevVersion, newVersion, newHash string) reexec.ShutdownCallbackFn {
 	if release.Snapshot() {
 		// SNAPSHOT is part of newVersion
 		prevVersion += "-SNAPSHOT"
@@ -300,7 +324,7 @@ func shutdownCallback(log *logger.Logger, homePath, prevVersion, newVersion, new
 
 	return func() error {
 		runtimeDir := filepath.Join(homePath, "run")
-		processDirs, err := readProcessDirs(log, runtimeDir)
+		processDirs, err := readProcessDirs(runtimeDir)
 		if err != nil {
 			return err
 		}
@@ -318,15 +342,15 @@ func shutdownCallback(log *logger.Logger, homePath, prevVersion, newVersion, new
 	}
 }
 
-func readProcessDirs(log *logger.Logger, runtimeDir string) ([]string, error) {
-	pipelines, err := readDirs(log, runtimeDir)
+func readProcessDirs(runtimeDir string) ([]string, error) {
+	pipelines, err := readDirs(runtimeDir)
 	if err != nil {
 		return nil, err
 	}
 
 	processDirs := make([]string, 0)
 	for _, p := range pipelines {
-		dirs, err := readDirs(log, p)
+		dirs, err := readDirs(p)
 		if err != nil {
 			return nil, err
 		}
@@ -338,7 +362,7 @@ func readProcessDirs(log *logger.Logger, runtimeDir string) ([]string, error) {
 }
 
 // readDirs returns list of absolute paths to directories inside specified path.
-func readDirs(log *logger.Logger, dir string) ([]string, error) {
+func readDirs(dir string) ([]string, error) {
 	dirEntries, err := os.ReadDir(dir)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err

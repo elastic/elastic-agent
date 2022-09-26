@@ -23,10 +23,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -151,7 +151,7 @@ func (h *PolicyChange) handleFleetServerHosts(ctx context.Context, c *config.Con
 			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
 	}
 	// discard body for proper cancellation and connection reuse
-	io.Copy(ioutil.Discard, resp.Body)
+	_, _ = io.Copy(ioutil.Discard, resp.Body)
 	resp.Body.Close()
 
 	reader, err := fleetToReader(h.agentInfo, h.config)

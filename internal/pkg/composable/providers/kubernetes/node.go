@@ -11,11 +11,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	k8s "k8s.io/client-go/kubernetes"
 
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes/metadata"
-	"github.com/elastic/beats/v7/libbeat/common/safemapstr"
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	c "github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-libs/safemapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 )
@@ -42,7 +43,8 @@ func NewNodeEventer(
 	cfg *Config,
 	logger *logp.Logger,
 	client k8s.Interface,
-	scope string) (Eventer, error) {
+	scope string,
+	managed bool) (Eventer, error) {
 	watcher, err := kubernetes.NewNamedWatcher("agent-node", client, &kubernetes.Node{}, kubernetes.WatchOptions{
 		SyncTimeout:  cfg.SyncPeriod,
 		Node:         cfg.Node,
@@ -53,7 +55,7 @@ func NewNodeEventer(
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
 
-	rawConfig, err := common.NewConfigFrom(cfg)
+	rawConfig, err := c.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
@@ -72,14 +74,14 @@ func NewNodeEventer(
 }
 
 func (n *node) emitRunning(node *kubernetes.Node) {
-	data := generateNodeData(node, n.config, n.metagen)
+	data := generateNodeData(node, n.metagen)
 	if data == nil {
 		return
 	}
 	data.mapping["scope"] = n.scope
 
 	// Emit the node
-	n.comm.AddOrUpdate(string(node.GetUID()), NodePriority, data.mapping, data.processors)
+	_ = n.comm.AddOrUpdate(string(node.GetUID()), NodePriority, data.mapping, data.processors)
 }
 
 func (n *node) emitStopped(node *kubernetes.Node) {
@@ -104,7 +106,7 @@ func (n *node) OnAdd(obj interface{}) {
 
 // OnUpdate ensures processing of node objects that are updated
 func (n *node) OnUpdate(obj interface{}) {
-	node := obj.(*kubernetes.Node)
+	node, _ := obj.(*kubernetes.Node)
 	if node.GetObjectMeta().GetDeletionTimestamp() != nil {
 		n.logger.Debugf("Watcher Node update (terminating): %+v", obj)
 		// Node is terminating, don't reload its configuration and ignore the event as long as node is Ready.
@@ -121,7 +123,7 @@ func (n *node) OnUpdate(obj interface{}) {
 // OnDelete ensures processing of node objects that are deleted
 func (n *node) OnDelete(obj interface{}) {
 	n.logger.Debugf("Watcher Node delete: %+v", obj)
-	node := obj.(*kubernetes.Node)
+	node, _ := obj.(*kubernetes.Node)
 	time.AfterFunc(n.cleanupTimeout, func() { n.emitStopped(node) })
 }
 
@@ -192,7 +194,7 @@ func isNodeReady(node *kubernetes.Node) bool {
 	return false
 }
 
-func generateNodeData(node *kubernetes.Node, cfg *Config, kubeMetaGen metadata.MetaGen) *nodeData {
+func generateNodeData(node *kubernetes.Node, kubeMetaGen metadata.MetaGen) *nodeData {
 	host := getAddress(node)
 
 	// If a node doesn't have an IP then dont monitor it
@@ -212,14 +214,14 @@ func generateNodeData(node *kubernetes.Node, cfg *Config, kubeMetaGen metadata.M
 	}
 
 	// Pass annotations to all events so that it can be used in templating and by annotation builders.
-	annotations := common.MapStr{}
+	annotations := mapstr.M{}
 	for k, v := range node.GetObjectMeta().GetAnnotations() {
-		safemapstr.Put(annotations, k, v)
+		_ = safemapstr.Put(annotations, k, v)
 	}
 
 	// k8sMapping includes only the metadata that fall under kubernetes.*
 	// and these are available as dynamic vars through the provider
-	k8sMapping := map[string]interface{}(kubemetaMap.(common.MapStr).Clone())
+	k8sMapping := map[string]interface{}(kubemetaMap.(mapstr.M).Clone())
 
 	// add annotations to be discoverable by templates
 	k8sMapping["annotations"] = annotations

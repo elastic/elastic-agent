@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type router struct {
@@ -33,6 +35,27 @@ func New(log *logger.Logger, factory pipeline.StreamFunc) (pipeline.Router, erro
 		}
 	}
 	return &router{log: log, streamFactory: factory, routes: sorted.NewSet()}, nil
+}
+
+func (r *router) Reload(c *config.Config) error {
+	keys := r.routes.Keys()
+	for _, key := range keys {
+		route, found := r.routes.Get(key)
+		if !found {
+			continue
+		}
+
+		routeReloader, ok := route.(emitter.Reloader)
+		if !ok {
+			continue
+		}
+
+		if err := routeReloader.Reload(c); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *router) Routes() *sorted.Set {

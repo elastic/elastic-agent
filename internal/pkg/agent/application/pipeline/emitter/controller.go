@@ -18,10 +18,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type reloadable interface {
+type Reloader interface {
 	Reload(cfg *config.Config) error
 }
 
@@ -32,7 +32,7 @@ type Controller struct {
 	controller  composable.Controller
 	router      pipeline.Router
 	modifiers   *pipeline.ConfigModifiers
-	reloadables []reloadable
+	reloadables []Reloader
 	caps        capabilities.Capability
 
 	// state
@@ -51,7 +51,7 @@ func NewController(
 	router pipeline.Router,
 	modifiers *pipeline.ConfigModifiers,
 	caps capabilities.Capability,
-	reloadables ...reloadable,
+	reloadables ...Reloader,
 ) *Controller {
 	init, _ := transpiler.NewVars(map[string]interface{}{}, nil)
 

@@ -3,7 +3,7 @@ COVERAGE_DIR=$(BUILD_DIR)/coverage
 BEATS?=elastic-agent
 PROJECTS= $(BEATS)
 PYTHON_ENV?=$(BUILD_DIR)/python-env
-MAGE_VERSION     ?= v1.11.0
+MAGE_VERSION     ?= v1.13.0
 MAGE_PRESENT     := $(shell mage --version 2> /dev/null | grep $(MAGE_VERSION))
 MAGE_IMPORT_PATH ?= github.com/magefile/mage
 NOTICE_TEMPLATE  ?= NOTICE.txt.tmpl
@@ -17,7 +17,7 @@ export MAGE_IMPORT_PATH
 mage:
 ifndef MAGE_PRESENT
 	@echo Installing mage $(MAGE_VERSION).
-	@go get -ldflags="-X $(MAGE_IMPORT_PATH)/mage.gitTag=$(MAGE_VERSION)" ${MAGE_IMPORT_PATH}@$(MAGE_VERSION)
+	@go install ${MAGE_IMPORT_PATH}@$(MAGE_VERSION)
 	@-mage -clean
 endif
 	@true
@@ -43,13 +43,14 @@ notice:
 		-noticeTemplate dev-tools/notice/$(NOTICE_TEMPLATE) \
 		-noticeOut $(NOTICE_FILE) \
 		-depsOut ""
+	cat dev-tools/notice/NOTICE.txt.append >> NOTICE.txt
 
 ## check-ci: Run all the checks under the ci, this doesn't include the linter which is run via a github action.
 .PHONY: check-ci
 check-ci:
 	@mage update
-	@mage check
 	@$(MAKE) notice
+	@$(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) check-no-changes
 
 ## check: run all the checks including linting using golangci-lint.

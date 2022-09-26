@@ -1,0 +1,4 @@
+# Team responsible for Fleet Server
+* @elastic/elastic-agent-control-plane
+
+/deploy/kubernetes @elastic/obs-cloudnative-monitoring

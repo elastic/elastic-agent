@@ -108,10 +108,10 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 	},
 	"darwin": map[PackageType]map[string]string{
 		TarGz: map[string]string{
-			"386":       "x86",
-			"amd64":     "x86_64",
-			"arm64":     "aarch64",
-			"universal": "universal",
+			"386":   "x86",
+			"amd64": "x86_64",
+			"arm64": "aarch64",
+			// "universal": "universal",
 		},
 	},
 	"linux": map[PackageType]map[string]string{
@@ -579,26 +579,26 @@ func PackageTarGz(spec PackageSpec) error {
 	w := tar.NewWriter(buf)
 	baseDir := spec.rootDir()
 
-	// Replace the darwin-universal by darwin-x86_64 and darwin-arm64. Also
-	// keep the other files.
-	if spec.Name == "elastic-agent" && spec.OS == "darwin" && spec.Arch == "universal" {
-		newFiles := map[string]PackageFile{}
-		for filename, pkgFile := range spec.Files {
-			if strings.Contains(pkgFile.Target, "darwin-universal") &&
-				strings.Contains(pkgFile.Target, "downloads") {
-
-				amdFilename, amdpkgFile := replaceFileArch(filename, pkgFile, "x86_64")
-				armFilename, armpkgFile := replaceFileArch(filename, pkgFile, "aarch64")
-
-				newFiles[amdFilename] = amdpkgFile
-				newFiles[armFilename] = armpkgFile
-			} else {
-				newFiles[filename] = pkgFile
-			}
-		}
-
-		spec.Files = newFiles
-	}
+	// // Replace the darwin-universal by darwin-x86_64 and darwin-arm64. Also
+	// // keep the other files.
+	// if spec.Name == "elastic-agent" && spec.OS == "darwin" && spec.Arch == "universal" {
+	// 	newFiles := map[string]PackageFile{}
+	// 	for filename, pkgFile := range spec.Files {
+	// 		if strings.Contains(pkgFile.Target, "darwin-universal") &&
+	// 			strings.Contains(pkgFile.Target, "downloads") {
+	//
+	// 			amdFilename, amdpkgFile := replaceFileArch(filename, pkgFile, "x86_64")
+	// 			armFilename, armpkgFile := replaceFileArch(filename, pkgFile, "aarch64")
+	//
+	// 			newFiles[amdFilename] = amdpkgFile
+	// 			newFiles[armFilename] = armpkgFile
+	// 		} else {
+	// 			newFiles[filename] = pkgFile
+	// 		}
+	// 	}
+	//
+	// 	spec.Files = newFiles
+	// }
 
 	// Add files to tar.
 	for _, pkgFile := range spec.Files {
@@ -698,7 +698,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 
 	if err := HaveDocker(); err != nil {
-		return fmt.Errorf("packaging %v files requires docker: %v", fpmPackageType, err)
+		return fmt.Errorf("packaging %v files requires docker: %w", fpmPackageType, err)
 	}
 
 	// Build a tar file as the input to FPM.

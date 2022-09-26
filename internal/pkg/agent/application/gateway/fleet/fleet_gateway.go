@@ -2,10 +2,13 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package fleet handles interactions between the elastic-agent and fleet-server.
+// Specifically it will handle agent checkins, and action queueing/dispatch.
 package fleet
 
 import (
 	"context"
+	stderr "errors"
 	"fmt"
 	"sync"
 	"time"
@@ -19,10 +22,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // Max number of times an invalid API Key is checked
@@ -53,35 +56,40 @@ type agentInfo interface {
 	AgentID() string
 }
 
-type fleetReporter interface {
-	Events() ([]fleetapi.SerializableEvent, func())
-}
-
 type stateStore interface {
 	Add(fleetapi.Action)
 	AckToken() string
 	SetAckToken(ackToken string)
 	Save() error
+	SetQueue([]fleetapi.Action)
+	Actions() []fleetapi.Action
+}
+
+type actionQueue interface {
+	Add(fleetapi.Action, int64)
+	DequeueActions() []fleetapi.Action
+	Cancel(string) int
 	Actions() []fleetapi.Action
 }
 
 type fleetGateway struct {
-	bgContext        context.Context
-	log              *logger.Logger
-	dispatcher       pipeline.Dispatcher
-	client           client.Sender
-	scheduler        scheduler.Scheduler
-	backoff          backoff.Backoff
-	settings         *fleetGatewaySettings
-	agentInfo        agentInfo
-	reporter         fleetReporter
-	done             chan struct{}
-	wg               sync.WaitGroup
-	acker            store.FleetAcker
-	unauthCounter    int
-	statusController status.Controller
-	statusReporter   status.Reporter
-	stateStore       stateStore
+	bgContext          context.Context
+	log                *logger.Logger
+	dispatcher         pipeline.Dispatcher
+	client             client.Sender
+	scheduler          scheduler.Scheduler
+	backoff            backoff.Backoff
+	settings           *fleetGatewaySettings
+	agentInfo          agentInfo
+	done               chan struct{}
+	wg                 sync.WaitGroup
+	acker              store.FleetAcker
+	unauthCounter      int
+	checkinFailCounter int
+	statusController   status.Controller
+	statusReporter     status.Reporter
+	stateStore         stateStore
+	queue              actionQueue
 }
 
 // New creates a new fleet gateway
@@ -91,10 +99,10 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	d pipeline.Dispatcher,
-	r fleetReporter,
 	acker store.FleetAcker,
 	statusController status.Controller,
 	stateStore stateStore,
+	queue actionQueue,
 ) (gateway.FleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
@@ -106,10 +114,10 @@ func New(
 		client,
 		d,
 		scheduler,
-		r,
 		acker,
 		statusController,
 		stateStore,
+		queue,
 	)
 }
 
@@ -121,10 +129,10 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	d pipeline.Dispatcher,
 	scheduler scheduler.Scheduler,
-	r fleetReporter,
 	acker store.FleetAcker,
 	statusController status.Controller,
 	stateStore stateStore,
+	queue actionQueue,
 ) (gateway.FleetGateway, error) {
 
 	// Backoff implementation doesn't support the use of a context [cancellation]
@@ -146,18 +154,18 @@ func newFleetGatewayWithScheduler(
 			settings.Backoff.Max,
 		),
 		done:             done,
-		reporter:         r,
 		acker:            acker,
 		statusReporter:   statusController.RegisterComponent("gateway"),
 		statusController: statusController,
 		stateStore:       stateStore,
+		queue:            queue,
 	}, nil
 }
 
 func (f *fleetGateway) worker() {
 	for {
 		select {
-		case <-f.scheduler.WaitTick():
+		case ts := <-f.scheduler.WaitTick():
 			f.log.Debug("FleetGateway calling Checkin API")
 
 			// Execute the checkin call and for any errors returned by the fleet-server API
@@ -168,12 +176,27 @@ func (f *fleetGateway) worker() {
 				continue
 			}
 
-			actions := make([]fleetapi.Action, len(resp.Actions))
-			for idx, a := range resp.Actions {
-				actions[idx] = a
+			actions := f.queueScheduledActions(resp.Actions)
+			actions, err = f.dispatchCancelActions(actions)
+			if err != nil {
+				f.log.Error(err.Error())
 			}
 
+			queued, expired := f.gatherQueuedActions(ts.UTC())
+			f.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
+			f.log.Debugf("Expired actions: %v", expired)
+
+			actions = append(actions, queued...)
+
 			var errMsg string
+			// Persist state
+			f.stateStore.SetQueue(f.queue.Actions())
+			if err := f.stateStore.Save(); err != nil {
+				errMsg = fmt.Sprintf("failed to persist action_queue, error: %s", err)
+				f.log.Error(errMsg)
+				f.statusReporter.Update(state.Failed, errMsg, nil)
+			}
+
 			if err := f.dispatcher.Dispatch(context.Background(), f.acker, actions...); err != nil {
 				errMsg = fmt.Sprintf("failed to dispatch actions, error: %s", err)
 				f.log.Error(errMsg)
@@ -194,6 +217,60 @@ func (f *fleetGateway) worker() {
 	}
 }
 
+// queueScheduledActions will add any action in actions with a valid start time to the queue and return the rest.
+// start time to current time comparisons are purposefully not made in case of cancel actions.
+func (f *fleetGateway) queueScheduledActions(input fleetapi.Actions) []fleetapi.Action {
+	actions := make([]fleetapi.Action, 0, len(input))
+	for _, action := range input {
+		start, err := action.StartTime()
+		if err == nil {
+			f.log.Debugf("Adding action id: %s to queue.", action.ID())
+			f.queue.Add(action, start.Unix())
+			continue
+		}
+		if !stderr.Is(err, fleetapi.ErrNoStartTime) {
+			f.log.Warnf("Issue gathering start time from action id %s: %v", action.ID(), err)
+		}
+		actions = append(actions, action)
+	}
+	return actions
+}
+
+// dispatchCancelActions will separate and dispatch any cancel actions from the actions list and return the rest of the list.
+// cancel actions are dispatched seperatly as they may remove items from the queue.
+func (f *fleetGateway) dispatchCancelActions(actions []fleetapi.Action) ([]fleetapi.Action, error) {
+	// separate cancel actions from the actions list
+	cancelActions := make([]fleetapi.Action, 0, len(actions))
+	for i := len(actions) - 1; i >= 0; i-- {
+		action := actions[i]
+		if action.Type() == fleetapi.ActionTypeCancel {
+			cancelActions = append(cancelActions, action)
+			actions = append(actions[:i], actions[i+1:]...)
+		}
+	}
+	// Dispatch cancel actions
+	if len(cancelActions) > 0 {
+		if err := f.dispatcher.Dispatch(context.Background(), f.acker, cancelActions...); err != nil {
+			return actions, fmt.Errorf("failed to dispatch cancel actions: %w", err)
+		}
+	}
+	return actions, nil
+}
+
+// gatherQueuedActions will dequeue actions from the action queue and separate those that have already expired.
+func (f *fleetGateway) gatherQueuedActions(ts time.Time) (queued, expired []fleetapi.Action) {
+	actions := f.queue.DequeueActions()
+	for _, action := range actions {
+		exp, _ := action.Expiration()
+		if ts.After(exp) {
+			expired = append(expired, action)
+			continue
+		}
+		queued = append(queued, action)
+	}
+	return queued, expired
+}
+
 func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 	f.backoff.Reset()
 
@@ -203,6 +280,7 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 		f.log.Debugf("Checking started")
 		resp, err := f.execute(f.bgContext)
 		if err != nil {
+			f.checkinFailCounter++
 			f.log.Errorf("Could not communicate with fleet-server Checking API will retry, error: %s", err)
 			if !f.backoff.Wait() {
 				// Something bad has happened and we log it and we should update our current state.
@@ -213,11 +291,17 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 				)
 
 				f.log.Error(err)
-				f.statusReporter.Update(state.Failed, err.Error(), nil)
 				return nil, err
+			}
+			if f.checkinFailCounter > 1 {
+				// do not update status reporter with failure
+				// status reporter would report connection failure on first successful connection, leading to
+				// stale result for certain period causing slight confusion.
+				f.log.Errorf("checking number %d failed: %s", f.checkinFailCounter, err.Error())
 			}
 			continue
 		}
+		f.checkinFailCounter = 0
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}
@@ -228,9 +312,6 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 }
 
 func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, error) {
-	// get events
-	ee, ack := f.reporter.Events()
-
 	ecsMeta, err := info.Metadata()
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -246,7 +327,6 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
 		AckToken: ackToken,
-		Events:   ee,
 		Metadata: ecsMeta,
 		Status:   f.statusController.StatusString(),
 	}
@@ -279,8 +359,6 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		}
 	}
 
-	// ack events so they are dropped from queue
-	ack()
 	return resp, nil
 }
 

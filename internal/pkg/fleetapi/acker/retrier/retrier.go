@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -32,19 +32,19 @@ type Option func(*Retrier)
 
 // Retrier implements retrier for actions acks
 type Retrier struct {
-	log   *logger.Logger
 	acker BatchAcker // AckBatch provider
+	log   *logger.Logger
 
-	initialRetryInterval time.Duration // initial retry interval
-	maxRetryInterval     time.Duration // max retry interval
-	maxRetries           int           // configurable maxNumber of retries per action
+	doneCh chan struct{} // signal channel to kickoff retry loop if not running
+	kickCh chan struct{} // signal channel when retry loop is done
 
 	actions []fleetapi.Action // pending actions
-	mx      sync.Mutex
 
-	kickCh chan struct{} // signal channel to kickoff retry loop if not running
+	maxRetryInterval     time.Duration // max retry interval
+	maxRetries           int           // configurable maxNumber of retries per action
+	initialRetryInterval time.Duration // initial retry interval
 
-	doneCh chan struct{} // signal channel when retry loop is done
+	mx sync.Mutex
 }
 
 // New creates new instance of retrier
@@ -173,7 +173,6 @@ func (r *Retrier) runRetries(ctx context.Context) {
 	default:
 	}
 	r.log.Debug("ack retrier: exit retry loop")
-
 }
 
 func (r *Retrier) updateRetriesMap(retries map[string]int, actions []fleetapi.Action, resp *fleetapi.AckResponse) (failed []fleetapi.Action) {

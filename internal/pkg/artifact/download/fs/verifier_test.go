@@ -15,10 +15,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 const (
@@ -65,9 +68,9 @@ func TestFetchVerify(t *testing.T) {
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	matches, err := verifier.Verify(s, version, true)
-	assert.NoError(t, err)
-	assert.Equal(t, false, matches)
+	err = verifier.Verify(s, version)
+	var checksumErr *download.ChecksumMismatchError
+	assert.ErrorAs(t, err, &checksumErr)
 
 	_, err = os.Stat(targetFilePath)
 	assert.True(t, os.IsNotExist(err))
@@ -88,9 +91,50 @@ func TestFetchVerify(t *testing.T) {
 	_, err = os.Stat(hashTargetFilePath)
 	assert.NoError(t, err)
 
-	matches, err = verifier.Verify(s, version, true)
+	err = verifier.Verify(s, version)
 	assert.NoError(t, err)
-	assert.Equal(t, true, matches)
+
+	// Enable GPG signature validation.
+	verifier.allowEmptyPgp = false
+
+	// Bad GPG public key.
+	{
+		verifier.pgpBytes = []byte("garbage")
+
+		// Don't delete anything.
+		assertFileExists(t, targetFilePath)
+		assertFileExists(t, targetFilePath+".sha512")
+	}
+
+	// Setup proper GPG public key.
+	_, verifier.pgpBytes = release.PGP()
+
+	// Missing .asc file.
+	{
+		err = verifier.Verify(s, version)
+		require.Error(t, err)
+
+		// Don't delete these files when GPG validation failure.
+		assertFileExists(t, targetFilePath)
+		assertFileExists(t, targetFilePath+".sha512")
+	}
+
+	// Invalid signature.
+	{
+		err = ioutil.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
+		require.NoError(t, err)
+
+		err = verifier.Verify(s, version)
+		var invalidSigErr *download.InvalidSignatureError
+		assert.ErrorAs(t, err, &invalidSigErr)
+
+		// Don't delete these files when GPG validation failure.
+		assertFileExists(t, targetFilePath)
+		assertFileExists(t, targetFilePath+".sha512")
+
+		// Bad .asc file should be removed.
+		assertFileNotExists(t, targetFilePath+".asc")
+	}
 }
 
 func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFilePath string) error {
@@ -123,7 +167,7 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 	}
 
 	corruptedHash := append([]byte{1, 2, 3, 4, 5, 6}, hashContent[6:]...)
-	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666)
+	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666) //nolint:gosec // no sweat, it's a test
 }
 
 func TestVerify(t *testing.T) {
@@ -164,14 +208,8 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	isOk, err := testVerifier.Verify(beatSpec, version, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !isOk {
-		t.Fatal("verify failed")
-	}
+	err = testVerifier.Verify(beatSpec, version)
+	require.NoError(t, err)
 
 	os.Remove(artifact)
 	os.Remove(artifact + ".sha512")
@@ -192,9 +230,21 @@ func prepareTestCase(beatSpec program.Spec, version string, cfg *artifact.Config
 	hash := sha512.Sum512(content)
 	hashContent := fmt.Sprintf("%x %s", hash, filename)
 
-	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), []byte(content), 0644); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), content, 0644); err != nil { //nolint:gosec // no sweat, it's a test
 		return err
 	}
 
-	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644)
+	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644) //nolint:gosec // no sweat, it's a test
+}
+
+func assertFileExists(t testing.TB, path string) {
+	t.Helper()
+	_, err := os.Stat(path)
+	assert.NoError(t, err, "file %s does not exist", path)
+}
+
+func assertFileNotExists(t testing.TB, path string) {
+	t.Helper()
+	_, err := os.Stat(path)
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }

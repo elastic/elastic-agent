@@ -15,7 +15,7 @@ import (
 
 // PackageSystemTests packages the python system tests results
 func PackageSystemTests() error {
-	excludeds := []string{".ci", ".git", ".github", "vendor", "dev-tools"}
+	excludes := []string{".ci", ".git", ".github", "vendor", "dev-tools"}
 
 	// include run and docker-logs as they are the directories we want to compress
 	systemTestsDir := filepath.Join("build", "system-tests")
@@ -23,8 +23,8 @@ func PackageSystemTests() error {
 	systemTestsLogDir := filepath.Join(systemTestsDir, "docker-logs")
 	files, err := devtools.FindFilesRecursive(func(path string, _ os.FileInfo) bool {
 		base := filepath.Base(path)
-		for _, excluded := range excludeds {
-			if strings.HasPrefix(base, excluded) {
+		for _, ex := range excludes {
+			if strings.HasPrefix(base, ex) {
 				return false
 			}
 		}

@@ -14,6 +14,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -28,20 +30,37 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 )
 
+const (
+	HUMAN    = "human"
+	JSON     = "json"
+	YAML     = "yaml"
+	REDACTED = "<REDACTED>"
+)
+
 var diagOutputs = map[string]outputter{
-	"human": humanDiagnosticsOutput,
-	"json":  jsonOutput,
-	"yaml":  yamlOutput,
+	HUMAN: humanDiagnosticsOutput,
+	JSON:  jsonOutput,
+	YAML:  yamlOutput,
 }
 
 // DiagnosticsInfo a struct to track all information related to diagnostics for the agent.
 type DiagnosticsInfo struct {
-	ProcMeta     []client.ProcMeta
-	AgentVersion client.Version
+	ProcMeta  []client.ProcMeta
+	AgentInfo AgentInfo
+}
+
+// AgentInfo contains all information about the running Agent.
+type AgentInfo struct {
+	ID        string
+	Version   string
+	Commit    string
+	BuildTime time.Time
+	Snapshot  bool
 }
 
 // AgentConfig tracks all configuration that the agent uses, local files, rendered policies, beat inputs etc.
@@ -72,6 +91,7 @@ func newDiagnosticsCommand(s []string, streams *cli.IOStreams) *cobra.Command {
 }
 
 func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
+
 	cmd := &cobra.Command{
 		Use:   "collect",
 		Short: "Collect diagnostics information from the elastic-agent and write it to a zip archive.",
@@ -86,10 +106,7 @@ func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *c
 			}
 
 			output, _ := c.Flags().GetString("output")
-			switch output {
-			case "yaml":
-			case "json":
-			default:
+			if _, ok := diagOutputs[output]; !ok {
 				return fmt.Errorf("unsupported output: %s", output)
 			}
 
@@ -107,7 +124,7 @@ func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *c
 	}
 
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
-	cmd.Flags().String("output", "yaml", "Output the collected information in either json, or yaml (default: yaml)") // replace output flag with different options
+	cmd.Flags().String("output", YAML, "Output the collected information in either json, or yaml (default: yaml)") // replace output flag with different options
 	cmd.Flags().Bool("pprof", false, "Collect all pprof data from all running applications.")
 	cmd.Flags().Duration("pprof-duration", time.Second*30, "The duration to collect trace and profiling data from the debug/pprof endpoints. (default: 30s)")
 	cmd.Flags().Duration("timeout", time.Second*30, "The timeout for the diagnostics collect command, will be either 30s or 30s+pprof-duration by default. Should be longer then pprof-duration when pprof is enabled as the command needs time to process/archive the response.")
@@ -149,7 +166,7 @@ func newDiagnosticsPprofCommandWithArgs(_ []string, streams *cli.IOStreams) *cob
 	return cmd
 }
 
-func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command, _ []string) error {
 	err := tryContainerLoadPaths()
 	if err != nil {
 		return err
@@ -166,12 +183,12 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) er
 	defer cancel()
 
 	diag, err := getDiagnostics(innerCtx)
-	if err == context.DeadlineExceeded {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if err == context.Canceled {
+	} else if errors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %s", err)
+		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
 	}
 
 	return outputFunc(streams.Out, diag)
@@ -195,13 +212,15 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 	innerCtx, cancel := context.WithTimeout(ctx, cmdTimeout)
 	defer cancel()
 
+	errs := make([]error, 0)
 	diag, err := getDiagnostics(innerCtx)
-	if err == context.DeadlineExceeded {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if err == context.Canceled {
+	} else if errors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather diagnostics data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather diagnostics data from elastic-agent: %v\n", err)
 	}
 
 	metrics, err := gatherMetrics(innerCtx)
@@ -212,23 +231,26 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon when gathering metrics: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather metrics data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather metrics data from elastic-agent: %v\n", err)
 	}
 
 	cfg, err := gatherConfig()
 	if err != nil {
-		return fmt.Errorf("unable to gather config data: %w", err)
+		errs = append(errs, fmt.Errorf("unable to gather config data: %w", err))
+		fmt.Fprintf(streams.Err, "Failed to gather config data from elastic-agent: %v\n", err)
 	}
 
 	var pprofData map[string][]client.ProcPProf
 	if pprof {
 		pprofData, err = getAllPprof(innerCtx, pprofDur)
 		if err != nil {
-			return fmt.Errorf("unable to gather pprof data: %w", err)
+			errs = append(errs, fmt.Errorf("unable to gather pprof data: %w", err))
+			fmt.Fprintf(streams.Err, "Failed to gather pprof data from elastic-agent: %v\n", err)
 		}
 	}
 
-	err = createZip(fileName, outputFormat, diag, cfg, pprofData, metrics)
+	err = createZip(fileName, outputFormat, diag, cfg, pprofData, metrics, errs)
 	if err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
 	}
@@ -273,7 +295,7 @@ func diagnosticsPprofCmd(streams *cli.IOStreams, dur, cmdTimeout time.Duration, 
 		return fmt.Errorf("route key %q not found in response data (map length: %d)", rk, len(pprofData))
 	}
 	if len(pArr) != 1 {
-		return fmt.Errorf("pprof type length 1 expected, recieved %d", len(pArr))
+		return fmt.Errorf("pprof type length 1 expected, received %d", len(pArr))
 	}
 	res := pArr[0]
 
@@ -318,7 +340,18 @@ func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
 	if err != nil {
 		return diag, err
 	}
-	diag.AgentVersion = version
+	diag.AgentInfo = AgentInfo{
+		Version:   version.Version,
+		Commit:    version.Commit,
+		BuildTime: version.BuildTime,
+		Snapshot:  version.Snapshot,
+	}
+
+	agentInfo, err := info.NewAgentInfo(false)
+	if err != nil {
+		return diag, err
+	}
+	diag.AgentInfo.ID = agentInfo.AgentID()
 
 	return diag, nil
 }
@@ -344,8 +377,8 @@ func humanDiagnosticsOutput(w io.Writer, obj interface{}) error {
 
 func outputDiagnostics(w io.Writer, d DiagnosticsInfo) error {
 	tw := tabwriter.NewWriter(w, 4, 1, 2, ' ', 0)
-	fmt.Fprintf(tw, "elastic-agent\tversion: %s\n", d.AgentVersion.Version)
-	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", d.AgentVersion.Commit, d.AgentVersion.BuildTime, d.AgentVersion.Snapshot)
+	fmt.Fprintf(tw, "elastic-agent\tid: %s\tversion: %s\n", d.AgentInfo.ID, d.AgentInfo.Version)
+	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
 	if len(d.ProcMeta) == 0 {
 		fmt.Fprintf(tw, "Applications: (none)\n")
 	} else {
@@ -378,6 +411,16 @@ func gatherConfig() (AgentConfig, error) {
 	if err != nil {
 		return cfg, err
 	}
+
+	agentInfo, err := info.NewAgentInfo(false)
+	if err != nil {
+		return cfg, err
+	}
+
+	if cfg.ConfigLocal.Fleet.Info.ID == "" {
+		cfg.ConfigLocal.Fleet.Info.ID = agentInfo.AgentID()
+	}
+
 	// Must force *config.Config to map[string]interface{} in order to write to a file.
 	mapCFG, err := renderedCFG.ToMapStr()
 	if err != nil {
@@ -387,11 +430,6 @@ func gatherConfig() (AgentConfig, error) {
 
 	// Gather vars to render process config
 	isStandalone, err := isStandalone(renderedCFG)
-	if err != nil {
-		return AgentConfig{}, err
-	}
-
-	agentInfo, err := info.NewAgentInfo(false)
 	if err != nil {
 		return AgentConfig{}, err
 	}
@@ -421,28 +459,56 @@ func gatherConfig() (AgentConfig, error) {
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse) error {
+func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *proto.ProcMetricsResponse, errs []error) error {
+	ts := time.Now().UTC()
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
 	zw := zip.NewWriter(f)
 
-	zf, err := zw.Create("meta/")
+	if len(errs) > 0 {
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     "errors.txt",
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
+		if err != nil {
+			return closeHandlers(err, zw, f)
+		}
+		for i, e := range errs {
+			fmt.Fprintf(zf, "Error %d: %v\n", i+1, e)
+		}
+	}
+
+	_, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "meta/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
-	zf, err = zw.Create("meta/elastic-agent-version." + outputFormat)
+	zf, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "meta/elastic-agent-version" + outputFormat,
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
-	if err := writeFile(zf, outputFormat, diag.AgentVersion); err != nil {
+
+	if err := writeFile(zf, outputFormat, diag.AgentInfo); err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
 	for _, m := range diag.ProcMeta {
-		zf, err = zw.Create("meta/" + m.Name + "-" + m.RouteKey + "." + outputFormat)
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     "meta/" + m.Name + "-" + m.RouteKey + "." + outputFormat,
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -452,12 +518,20 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		}
 	}
 
-	zf, err = zw.Create("config/")
+	_, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "config/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
-	zf, err = zw.Create("config/elastic-agent-local." + outputFormat)
+	zf, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "config/elastic-agent-local." + outputFormat,
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
@@ -465,7 +539,11 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		return closeHandlers(err, zw, f)
 	}
 
-	zf, err = zw.Create("config/elastic-agent-policy." + outputFormat)
+	zf, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "config/elastic-agent-policy." + outputFormat,
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
@@ -473,7 +551,11 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		return closeHandlers(err, zw, f)
 	}
 	for name, appCfg := range cfg.AppConfig {
-		zf, err := zw.Create("config/" + name + "." + outputFormat)
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     "config/" + name + "." + outputFormat,
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -482,19 +564,19 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 		}
 	}
 
-	if err := zipLogs(zw); err != nil {
+	if err := zipLogs(zw, ts); err != nil {
 		return closeHandlers(err, zw, f)
 	}
 
 	if pprof != nil {
-		err := zipProfs(zw, pprof)
+		err := zipProfs(zw, pprof, ts)
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
 	}
 
 	if metrics != nil && len(metrics.Result) > 0 {
-		err := zipMetrics(zw, metrics)
+		err := zipMetrics(zw, metrics, ts)
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -504,10 +586,18 @@ func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentCon
 }
 
 // zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
-func zipLogs(zw *zip.Writer) error {
-	_, err := zw.Create("logs/")
+func zipLogs(zw *zip.Writer, ts time.Time) error {
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return err
+	}
+
+	if err := collectEndpointSecurityLogs(zw, program.SupportedMap); err != nil {
+		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
 	}
 
 	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
@@ -520,46 +610,164 @@ func zipLogs(zw *zip.Writer) error {
 			return fmt.Errorf("unable to walk log dir: %w", fErr)
 		}
 
-		name := strings.TrimPrefix(path, logPath)
+		// name is the relative dir/file name replacing any filepath seperators with /
+		// this will clean log names on windows machines and will nop on *nix
+		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
 		if name == "" {
 			return nil
 		}
 
 		if d.IsDir() {
-			_, err := zw.Create("logs/" + name + "/")
+			dirTS := ts
+			di, err := d.Info()
+			if err == nil {
+				dirTS = di.ModTime()
+			}
+			_, err = zw.CreateHeader(&zip.FileHeader{
+				Name:     "logs/" + name + "/",
+				Method:   zip.Deflate,
+				Modified: dirTS,
+			})
 			if err != nil {
 				return fmt.Errorf("unable to create log directory in archive: %w", err)
 			}
 			return nil
 		}
 
-		lf, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("unable to open log file: %w", err)
-		}
-		zf, err := zw.Create("logs/" + name)
-		if err != nil {
-			return closeHandlers(fmt.Errorf("unable to create log file in archive: %w", err), lf)
-		}
-		_, err = io.Copy(zf, lf)
-		if err != nil {
-			return closeHandlers(fmt.Errorf("log file copy failed: %w", err), lf)
+		return saveLogs(name, path, zw)
+	})
+}
+
+func collectEndpointSecurityLogs(zw *zip.Writer, specs map[string]program.Spec) error {
+	spec, ok := specs["endpoint-security"]
+	if !ok {
+		return nil
+	}
+
+	logs, ok := spec.LogPaths[runtime.GOOS]
+	if !ok {
+		return nil
+	}
+
+	logPath := filepath.Dir(logs) + string(filepath.Separator)
+	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+		if fErr != nil {
+			if stderrors.Is(fErr, fs.ErrNotExist) {
+				return nil
+			}
+
+			return fmt.Errorf("unable to walk log dir: %w", fErr)
 		}
 
-		return lf.Close()
+		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
+		if name == "" {
+			return nil
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		return saveLogs(name, path, zw)
 	})
+}
+
+func saveLogs(name string, logPath string, zw *zip.Writer) error {
+	lf, err := os.Open(logPath)
+	if err != nil {
+		return fmt.Errorf("unable to open log file: %w", err)
+	}
+	lfs, err := lf.Stat()
+	if err != nil {
+		return closeHandlers(fmt.Errorf("unable to stat log file: %w", err), lf)
+	}
+	zf, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/" + name,
+		Method:   zip.Deflate,
+		Modified: lfs.ModTime(),
+	})
+	if err != nil {
+		return closeHandlers(fmt.Errorf("unable to create log file in archive: %w", err), lf)
+	}
+	_, err = io.Copy(zf, lf)
+	if err != nil {
+		return closeHandlers(fmt.Errorf("log file copy failed: %w", err), lf)
+	}
+
+	return lf.Close()
 }
 
 // writeFile writes json or yaml data from the interface to the writer.
 func writeFile(w io.Writer, outputFormat string, v interface{}) error {
-	if outputFormat == "json" {
+	redacted, err := redact(v)
+	if err != nil {
+		return err
+	}
+
+	if outputFormat == JSON {
 		je := json.NewEncoder(w)
 		je.SetIndent("", "  ")
-		return je.Encode(v)
+		return je.Encode(redacted)
 	}
+
 	ye := yaml.NewEncoder(w)
-	err := ye.Encode(v)
+	err = ye.Encode(redacted)
 	return closeHandlers(err, ye)
+}
+
+func redact(v interface{}) (map[string]interface{}, error) {
+	redacted := map[string]interface{}{}
+	bs, err := yaml.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal data to redact: %w", err)
+	}
+
+	err = yaml.Unmarshal(bs, &redacted)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal data to redact: %w", err)
+	}
+
+	return redactMap(redacted), nil
+}
+
+func toMapStr(v interface{}) map[string]interface{} {
+	mm := map[string]interface{}{}
+	m, ok := v.(map[interface{}]interface{})
+	if !ok {
+		return mm
+	}
+
+	for k, v := range m {
+		mm[k.(string)] = v
+	}
+	return mm
+}
+
+func redactMap(m map[string]interface{}) map[string]interface{} {
+	for k, v := range m {
+		if v != nil && reflect.TypeOf(v).Kind() == reflect.Map {
+			v = redactMap(toMapStr(v))
+		}
+		if redactKey(k) {
+			v = REDACTED
+		}
+		m[k] = v
+	}
+	return m
+}
+
+func redactKey(k string) bool {
+	// "routekey" shouldn't be redacted.
+	// Add any other exceptions here.
+	if k == "routekey" {
+		return false
+	}
+
+	return strings.Contains(k, "certificate") ||
+		strings.Contains(k, "passphrase") ||
+		strings.Contains(k, "password") ||
+		strings.Contains(k, "token") ||
+		strings.Contains(k, "key")
 }
 
 // closeHandlers will close all passed closers attaching any errors to the passed err and returning the result
@@ -594,19 +802,32 @@ func getAllPprof(ctx context.Context, d time.Duration) (map[string][]client.Proc
 	return daemon.Pprof(ctx, d, pprofTypes, "", "")
 }
 
-func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
-	zf, err := zw.Create("pprof/")
+func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf, ts time.Time) error {
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "pprof/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return err
 	}
+
 	for pType, profs := range pprof {
-		zf, err = zw.Create("pprof/" + pType + "/")
+		_, err = zw.CreateHeader(&zip.FileHeader{
+			Name:     "pprof/" + pType + "/",
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return err
 		}
 		for _, p := range profs {
 			if p.Error != "" {
-				zf, err = zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + "_error.txt")
+				zf, err := zw.CreateHeader(&zip.FileHeader{
+					Name:     "pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + "_error.txt",
+					Method:   zip.Deflate,
+					Modified: ts,
+				})
 				if err != nil {
 					return err
 				}
@@ -616,7 +837,11 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 				}
 				continue
 			}
-			zf, err = zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + ".pprof")
+			zf, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     "pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + ".pprof",
+				Method:   zip.Deflate,
+				Modified: ts,
+			})
 			if err != nil {
 				return err
 			}
@@ -629,16 +854,23 @@ func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
 	return nil
 }
 
-func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse) error {
-	//nolint:staticcheck,wastedassign // false positive
-	zf, err := zw.Create("metrics/")
+func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse, ts time.Time) error {
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "metrics/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return err
 	}
 
 	for _, m := range metrics.Result {
 		if m.Error != "" {
-			zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt")
+			zf, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     "metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt",
+				Method:   zip.Deflate,
+				Modified: ts,
+			})
 			if err != nil {
 				return err
 			}
@@ -648,7 +880,11 @@ func zipMetrics(zw *zip.Writer, metrics *proto.ProcMetricsResponse) error {
 			}
 			continue
 		}
-		zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + ".json")
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     "metrics/" + m.AppName + "_" + m.RouteKey + ".json",
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return err
 		}

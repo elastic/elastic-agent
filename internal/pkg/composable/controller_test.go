@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 
@@ -77,7 +77,7 @@ func TestController(t *testing.T) {
 
 	log, err := logger.New("", false)
 	require.NoError(t, err)
-	c, err := composable.New(log, cfg)
+	c, err := composable.New(log, cfg, false)
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -99,14 +99,14 @@ func TestController(t *testing.T) {
 	_, envExists := setVars[0].Lookup("env")
 	assert.False(t, envExists)
 	local, _ := setVars[0].Lookup("local")
-	localMap := local.(map[string]interface{})
+	localMap, _ := local.(map[string]interface{})
 	assert.Equal(t, "value1", localMap["key1"])
 
 	local, _ = setVars[1].Lookup("local_dynamic")
-	localMap = local.(map[string]interface{})
+	localMap, _ = local.(map[string]interface{})
 	assert.Equal(t, "value1", localMap["key1"])
 
 	local, _ = setVars[2].Lookup("local_dynamic")
-	localMap = local.(map[string]interface{})
+	localMap, _ = local.(map[string]interface{})
 	assert.Equal(t, "value2", localMap["key1"])
 }

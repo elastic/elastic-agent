@@ -7,10 +7,11 @@ package kubernetes
 import (
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes"
+	"github.com/elastic/elastic-agent-libs/config"
 
-	"github.com/elastic/beats/v7/libbeat/common/kubernetes/metadata"
-	"github.com/elastic/beats/v7/libbeat/logp"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // Config for kubernetes provider
@@ -35,6 +36,9 @@ type Config struct {
 
 	LabelsDedot      bool `config:"labels.dedot"`
 	AnnotationsDedot bool `config:"annotations.dedot"`
+
+	Hints  *config.C `config:"hints"`
+	Prefix string    `config:"prefix"`
 }
 
 // Resources config section for resources' config blocks
@@ -53,17 +57,18 @@ type Enabled struct {
 func (c *Config) InitDefaults() {
 	c.CleanupTimeout = 60 * time.Second
 	c.SyncPeriod = 10 * time.Minute
-	c.Scope = "node"
+	c.Scope = nodeScope
 	c.LabelsDedot = true
 	c.AnnotationsDedot = true
 	c.AddResourceMetadata = metadata.GetDefaultResourceMetadataConfig()
+	c.Prefix = "co.elastic"
 }
 
 // Validate ensures correctness of config
 func (c *Config) Validate() error {
 	// Check if resource is service. If yes then default the scope to "cluster".
 	if c.Resources.Service.Enabled {
-		if c.Scope == "node" {
+		if c.Scope == nodeScope {
 			logp.L().Warnf("can not set scope to `node` when using resource `Service`. resetting scope to `cluster`")
 		}
 		c.Scope = "cluster"

@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/elastic/beats/v7/libbeat/monitoring"
+	"github.com/elastic/elastic-agent-libs/monitoring"
 )
 
 func statsHandler(ns *monitoring.Namespace) func(http.ResponseWriter, *http.Request) error {

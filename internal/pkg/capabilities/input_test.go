@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestMultiInput(t *testing.T) {
@@ -236,7 +236,7 @@ func TestInput(t *testing.T) {
 		runInputTest(t, l, r, expectedInputs, initialInputs)
 	})
 
-	t.Run("valid action - multiple inputs 1 explicitely allowed", func(t *testing.T) {
+	t.Run("valid action - multiple inputs 1 explicitly allowed", func(t *testing.T) {
 		r := &inputCapability{
 			Type:  "allow",
 			Input: "system/metrics",

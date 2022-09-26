@@ -14,6 +14,7 @@ import (
 	"go.elastic.co/apm/apmtest"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
@@ -28,9 +29,9 @@ import (
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/retry"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 func TestExportedMetrics(t *testing.T) {
@@ -66,6 +67,8 @@ func TestExportedMetrics(t *testing.T) {
 }
 
 func TestGenerateSteps(t *testing.T) {
+	testutils.InitStorage(t)
+
 	const sampleOutput = "sample-output"
 	const outputType = "logstash"
 
@@ -209,7 +212,7 @@ type testMonitor struct {
 
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
-func (b *testMonitor) EnrichArgs(_ program.Spec, _ string, args []string, _ bool) []string {
+func (b *testMonitor) EnrichArgs(_ program.Spec, _ string, args []string) []string {
 	return args
 }
 
@@ -222,13 +225,15 @@ func (b *testMonitor) Close() {}
 // Prepare executes steps in order for monitoring to work correctly
 func (b *testMonitor) Prepare(program.Spec, string, int, int) error { return nil }
 
+const testPath = "path"
+
 // LogPath describes a path where application stores logs. Empty if
 // application is not monitorable
 func (b *testMonitor) LogPath(program.Spec, string) string {
 	if !b.monitorLogs {
 		return ""
 	}
-	return "path"
+	return testPath
 }
 
 // MetricsPath describes a location where application exposes metrics
@@ -237,7 +242,7 @@ func (b *testMonitor) MetricsPath(program.Spec, string) string {
 	if !b.monitorMetrics {
 		return ""
 	}
-	return "path"
+	return testPath
 }
 
 // MetricsPathPrefixed return metrics path prefixed with http+ prefix.

@@ -20,18 +20,20 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/stateresolver"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/install"
 	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	"github.com/elastic/elastic-agent/internal/pkg/core/plugin/process"
 	"github.com/elastic/elastic-agent/internal/pkg/core/plugin/service"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 const (
@@ -115,10 +117,88 @@ func NewOperator(
 
 	operator.initHandlerMap()
 
-	os.MkdirAll(config.DownloadConfig.TargetDirectory, 0755)
-	os.MkdirAll(config.DownloadConfig.InstallPath, 0755)
+	if err := os.MkdirAll(config.DownloadConfig.TargetDirectory, 0755); err != nil {
+		// can already exists from previous runs, not an error
+		logger.Warnf("failed creating %q: %v", config.DownloadConfig.TargetDirectory, err)
+	}
+	if err := os.MkdirAll(config.DownloadConfig.InstallPath, 0755); err != nil {
+		// can already exists from previous runs, not an error
+		logger.Warnf("failed creating %q: %v", config.DownloadConfig.InstallPath, err)
+	}
 
 	return operator, nil
+}
+
+func (o *Operator) Reload(rawConfig *config.Config) error {
+	// save some unpacking in downloaders
+	type reloadConfig struct {
+		C *artifact.Config `json:"agent.download" config:"agent.download"`
+	}
+	tmp := &reloadConfig{
+		C: artifact.DefaultConfig(),
+	}
+	if err := rawConfig.Unpack(&tmp); err != nil {
+		return errors.New(err, "failed to unpack artifact config")
+	}
+
+	sourceURI, err := reloadSourceURI(o.logger, rawConfig)
+	if err != nil {
+		return errors.New(err, "failed to parse source URI")
+	}
+	tmp.C.SourceURI = sourceURI
+
+	if err := o.reloadComponent(o.downloader, "downloader", tmp.C); err != nil {
+		return err
+	}
+
+	return o.reloadComponent(o.verifier, "verifier", tmp.C)
+}
+
+func reloadSourceURI(logger *logger.Logger, rawConfig *config.Config) (string, error) {
+	type reloadConfig struct {
+		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
+		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
+
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
+		// different naming.
+		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
+	}
+	cfg := &reloadConfig{}
+	if err := rawConfig.Unpack(&cfg); err != nil {
+		return "", errors.New(err, "failed to unpack config during reload")
+	}
+
+	var newSourceURI string
+	if fleetURI := strings.TrimSpace(cfg.FleetSourceURI); fleetURI != "" {
+		// fleet configuration takes precedence
+		newSourceURI = fleetURI
+	} else if sourceURI := strings.TrimSpace(cfg.SourceURI); sourceURI != "" {
+		newSourceURI = sourceURI
+	}
+
+	if newSourceURI != "" {
+		logger.Infof("Source URI in operator changed to %q", newSourceURI)
+		return newSourceURI, nil
+	}
+
+	// source uri unset, reset to default
+	logger.Infof("Source URI in reset %q", artifact.DefaultSourceURI)
+	return artifact.DefaultSourceURI, nil
+
+}
+
+func (o *Operator) reloadComponent(component interface{}, name string, cfg *artifact.Config) error {
+	r, ok := component.(artifact.ConfigReloader)
+	if !ok {
+		o.logger.Debugf("failed reloading %q: component is not reloadable", name)
+		return nil // not an error, could be filesystem downloader/verifier
+	}
+
+	if err := r.Reload(cfg); err != nil {
+		return errors.New(err, fmt.Sprintf("failed reloading %q config", component))
+	}
+
+	return nil
 }
 
 // State describes the current state of the system.
@@ -164,7 +244,7 @@ func (o *Operator) Close() error {
 func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) (err error) {
 	span, ctx := apm.StartSpan(ctx, "route", "app.internal")
 	defer func() {
-		if err = filterContextCancelled(err); err != nil {
+		if !errors.Is(err, context.Canceled) {
 			apm.CaptureError(ctx, err).Send()
 		}
 		span.End()
@@ -172,7 +252,7 @@ func (o *Operator) HandleConfig(ctx context.Context, cfg configrequest.Request) 
 
 	_, stateID, steps, ack, err := o.stateResolver.Resolve(cfg)
 	if err != nil {
-		if err == filterContextCancelled(err) {
+		if !errors.Is(err, context.Canceled) {
 			// error is not filtered and should be reported
 			o.statusReporter.Update(state.Failed, err.Error(), nil)
 			err = errors.New(err, errors.TypeConfig, fmt.Sprintf("operator: failed to resolve configuration %s, error: %v", cfg, err))
@@ -238,12 +318,12 @@ func (o *Operator) Shutdown() {
 			a.Shutdown()
 			wg.Done()
 			o.logger.Debugf("took %s to shutdown %s",
-				time.Now().Sub(started), a.Name())
+				time.Since(started), a.Name())
 		}(a)
 	}
 	wg.Wait()
 	o.logger.Debugf("took %s to shutdown %d apps",
-		time.Now().Sub(started), len(o.apps))
+		time.Since(started), len(o.apps))
 }
 
 // Start starts a new process based on a configuration
@@ -346,7 +426,7 @@ func (o *Operator) getApp(p Descriptor) (Application, error) {
 	appName := p.BinaryName()
 	if app.IsSidecar(p) {
 		// make watchers unmonitorable
-		monitor = noop.NewMonitor()
+		monitor = beats.NewSidecarMonitor(o.config.DownloadConfig, o.config.MonitoringConfig)
 		appName += "_monitoring"
 	}
 
@@ -400,11 +480,4 @@ func (o *Operator) deleteApp(p Descriptor) {
 
 	o.logger.Debugf("operator is removing %s from app collection: %v", p.ID(), o.apps)
 	delete(o.apps, id)
-}
-
-func filterContextCancelled(err error) error {
-	if errors.Is(err, context.Canceled) {
-		return nil
-	}
-	return err
 }

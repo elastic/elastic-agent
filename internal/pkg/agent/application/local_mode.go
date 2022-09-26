@@ -22,18 +22,19 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/core/server"
 	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/dir"
 	acker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
 	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
 type discoverFunc func() ([]string, error)
@@ -113,9 +114,14 @@ func newLocal(
 	}
 	localApplication.router = router
 
-	composableCtrl, err := composable.New(log, rawConfig)
+	composableCtrl, err := composable.New(log, rawConfig, false)
 	if err != nil {
 		return nil, errors.New(err, "failed to initialize composable controller")
+	}
+
+	routerArtifactReloader, ok := router.(emitter.Reloader)
+	if !ok {
+		return nil, errors.New("router not capable of artifact reload") // Needed for client reloading
 	}
 
 	discover := discoverer(pathConfigFile, cfg.Settings.Path, externalConfigsGlob())
@@ -131,6 +137,8 @@ func newLocal(
 		},
 		caps,
 		monitor,
+		artifact.NewReloader(cfg.Settings.DownloadConfig, log),
+		routerArtifactReloader,
 	)
 	if err != nil {
 		return nil, err
@@ -165,7 +173,7 @@ func newLocal(
 }
 
 func externalConfigsGlob() string {
-	return filepath.Join(paths.Config(), configuration.ExternalInputsPattern)
+	return filepath.Join(paths.AgentInputsDPath(), "*.yml")
 }
 
 // Routes returns a list of routes handled by agent.
@@ -203,7 +211,7 @@ func (l *Local) AgentInfo() *info.AgentInfo {
 }
 
 func discoverer(patterns ...string) discoverFunc {
-	var p []string
+	p := make([]string, 0, len(patterns))
 	for _, newP := range patterns {
 		if len(newP) == 0 {
 			continue

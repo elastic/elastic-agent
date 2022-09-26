@@ -10,14 +10,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -92,48 +90,6 @@ type Demo mg.Namespace
 // Dev runs package and build for dev purposes.
 type Dev mg.Namespace
 
-// Notice regenerates the NOTICE.txt file.
-func Notice() error {
-	fmt.Println(">> Generating NOTICE")
-	fmt.Println(">> fmt - go mod tidy")
-	err := sh.RunV("go", "mod", "tidy", "-v")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go mod download")
-	err = sh.RunV("go", "mod", "download")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod download, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go list")
-	str, err := sh.Output("go", "list", "-m", "-json", "all")
-	if err != nil {
-		return errors.Wrap(err, "failed running go list, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go run")
-	cmd := exec.Command("go", "run", "go.elastic.co/go-licence-detector", "-includeIndirect", "-rules", "dev-tools/notice/rules.json", "-overrides", "dev-tools/notice/overrides.json", "-noticeTemplate", "dev-tools/notice/NOTICE.txt.tmpl",
-		"-noticeOut", "NOTICE.txt", "-depsOut", "\"\"")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return errors.Wrap(err, "failed running go run, please fix the issues reported")
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer stdin.Close()
-		defer wg.Done()
-		if _, err := io.WriteString(stdin, str); err != nil {
-			fmt.Println(err)
-		}
-	}()
-	wg.Wait()
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		return errors.Wrap(err, "failed combined output, please fix the issues reported")
-	}
-	return nil
-}
-
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
@@ -175,7 +131,7 @@ func (Dev) Build() {
 	mg.Deps(Build.All)
 }
 
-// Package packages the agent binary with DEV flag set.
+// Package bundles the agent binary with DEV flag set.
 func (Dev) Package() {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
@@ -671,16 +627,6 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		}
 
 		os.Setenv(agentDropPath, dropPath)
-		if runtime.GOARCH == "arm64" {
-			const platformsVar = "PLATFORMS"
-			oldPlatforms := os.Getenv(platformsVar)
-			os.Setenv(platformsVar, runtime.GOOS+"/"+runtime.GOARCH)
-			if oldPlatforms != "" {
-				defer os.Setenv(platformsVar, oldPlatforms)
-			} else {
-				defer os.Unsetenv(oldPlatforms)
-			}
-		}
 
 		// cleanup after build
 		defer os.RemoveAll(dropPath)
@@ -826,4 +772,112 @@ func injectBuildVars(m map[string]string) {
 	for k, v := range buildVars() {
 		m[k] = v
 	}
+}
+
+// Package packages elastic-agent for the IronBank distribution, relying on the
+// binaries having already been built.
+//
+// Use SNAPSHOT=true to build snapshots.
+func Ironbank() error {
+	if runtime.GOARCH != "amd64" {
+		fmt.Printf(">> IronBank images are only supported for amd64 arch (%s is not supported)\n", runtime.GOARCH)
+		return nil
+	}
+	if err := prepareIronbankBuild(); err != nil {
+		return errors.Wrap(err, "failed to prepare the IronBank context")
+	}
+	if err := saveIronbank(); err != nil {
+		return errors.Wrap(err, "failed to save artifacts for IronBank")
+	}
+	return nil
+}
+
+func saveIronbank() error {
+	fmt.Println(">> saveIronbank: save the IronBank container context.")
+
+	ironbank := getIronbankContextName()
+	buildDir := filepath.Join("build", ironbank)
+	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
+		return fmt.Errorf("cannot find the folder with the ironbank context: %+v", err)
+	}
+
+	distributionsDir := "build/distributions"
+	if _, err := os.Stat(distributionsDir); os.IsNotExist(err) {
+		err := os.MkdirAll(distributionsDir, 0750)
+		if err != nil {
+			return fmt.Errorf("cannot create folder for docker artifacts: %+v", err)
+		}
+	}
+
+	// change dir to the buildDir location where the ironbank folder exists
+	// this will generate a tar.gz without some nested folders.
+	wd, _ := os.Getwd()
+	os.Chdir(buildDir)
+	defer os.Chdir(wd)
+
+	// move the folder to the parent folder, there are two parent folder since
+	// buildDir contains a two folders dir.
+	tarGzFile := filepath.Join("..", "..", distributionsDir, ironbank+".tar.gz")
+
+	// Save the build context as tar.gz artifact
+	err := devtools.Tar("./", tarGzFile)
+	if err != nil {
+		return fmt.Errorf("cannot compress the tar.gz file: %+v", err)
+	}
+
+	return errors.Wrap(devtools.CreateSHA512File(tarGzFile), "failed to create .sha512 file")
+}
+
+func getIronbankContextName() string {
+	version, _ := devtools.BeatQualifiedVersion()
+	defaultBinaryName := "{{.Name}}-ironbank-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}"
+	outputDir, _ := devtools.Expand(defaultBinaryName+"-docker-build-context", map[string]interface{}{
+		"Name":    "elastic-agent",
+		"Version": version,
+	})
+	return outputDir
+}
+
+func prepareIronbankBuild() error {
+	fmt.Println(">> prepareIronbankBuild: prepare the IronBank container context.")
+	buildDir := filepath.Join("build", getIronbankContextName())
+	templatesDir := filepath.Join("dev-tools", "packaging", "templates", "ironbank")
+
+	data := map[string]interface{}{
+		"MajorMinor": majorMinor(),
+	}
+
+	err := filepath.Walk(templatesDir, func(path string, info os.FileInfo, _ error) error {
+		if !info.IsDir() {
+			target := strings.TrimSuffix(
+				filepath.Join(buildDir, filepath.Base(path)),
+				".tmpl",
+			)
+
+			err := devtools.ExpandFile(path, target, data)
+			if err != nil {
+				return errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("cannot create templates for the IronBank: %+v", err)
+	}
+
+	// copy files
+	sourcePath := filepath.Join("dev-tools", "packaging", "files", "ironbank")
+	if err := devtools.Copy(sourcePath, buildDir); err != nil {
+		return fmt.Errorf("cannot create files for the IronBank: %+v", err)
+	}
+	return nil
+}
+
+func majorMinor() string {
+	if v, _ := devtools.BeatQualifiedVersion(); v != "" {
+		parts := strings.SplitN(v, ".", 3)
+		return parts[0] + "." + parts[1]
+	}
+	return ""
 }
