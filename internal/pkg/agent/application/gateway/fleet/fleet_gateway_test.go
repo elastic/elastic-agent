@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
@@ -703,12 +704,18 @@ func TestRetriesOnFailures(t *testing.T) {
 		queue.On("DequeueActions").Return([]fleetapi.Action{})
 		queue.On("Actions").Return([]fleetapi.Action{})
 
+		localReporter := &testutils.MockReporter{}
+		localReporter.On("Update", state.Degraded, mock.Anything, mock.Anything).Times(2)
+		localReporter.On("Update", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		localReporter.On("Unregister").Maybe()
+
 		fleetReporter := &testutils.MockReporter{}
 		fleetReporter.On("Update", mock.Anything, mock.Anything, mock.Anything).Maybe()
 		fleetReporter.On("Unregister").Maybe()
 
 		statusController := &testutils.MockController{}
 		statusController.On("RegisterComponent", "gateway").Return(fleetReporter).Once()
+		statusController.On("RegisterLocalComponent", "gateway-checkin").Return(localReporter).Once()
 		statusController.On("StatusString").Return("string")
 
 		gateway, err := newFleetGatewayWithScheduler(
@@ -767,6 +774,7 @@ func TestRetriesOnFailures(t *testing.T) {
 		waitFn()
 		statusController.AssertExpectations(t)
 		fleetReporter.AssertExpectations(t)
+		localReporter.AssertExpectations(t)
 	})
 
 	t.Run("The retry loop is interruptible",
