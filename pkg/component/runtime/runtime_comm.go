@@ -203,7 +203,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 			err := server.Send(expected)
 			if err != nil {
 				if reportableErr(err) {
-					c.logger.Infof("check-in stream failed to send expected state: %s", err)
+					c.logger.Debugf("check-in stream failed to send expected state: %s", err)
 				}
 				return
 			}
@@ -217,7 +217,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 			checkin, err := server.Recv()
 			if err != nil {
 				if reportableErr(err) {
-					c.logger.Infof("check-in stream failed to receive data: %s", err)
+					c.logger.Debugf("check-in stream failed to receive data: %s", err)
 				}
 				close(recvDone)
 				return

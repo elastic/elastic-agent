@@ -310,7 +310,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	runtimeWatcher := c.runtimeMgr
 	runtimeRun := make(chan bool)
-	runtimeErrCh := make(chan error, 1)
+	runtimeErrCh := make(chan error)
 	go func(manager Runner) {
 		err := manager.Run(ctx)
 		close(runtimeRun)
@@ -319,7 +319,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	configWatcher := c.configMgr
 	configRun := make(chan bool)
-	configErrCh := make(chan error, 1)
+	configErrCh := make(chan error)
 	go func(manager Runner) {
 		err := manager.Run(ctx)
 		close(configRun)
@@ -328,7 +328,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	varsWatcher := c.varsMgr
 	varsRun := make(chan bool)
-	varsErrCh := make(chan error, 1)
+	varsErrCh := make(chan error)
 	go func(manager Runner) {
 		err := manager.Run(ctx)
 		close(varsRun)
