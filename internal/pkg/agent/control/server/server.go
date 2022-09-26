@@ -181,6 +181,7 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 	}
 	cb, err := u.Upgrade(ctx, &upgradeRequest{request}, false)
 	if err != nil {
+		s.logger.Errorw("Upgrade failed", "error.message", err, "version", request.Version, "source_uri", request.SourceURI)
 		return &proto.UpgradeResponse{
 			Status: proto.ActionStatus_FAILURE,
 			Error:  err.Error(),
@@ -190,6 +191,7 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 	// this ensures that the upgrade response over GRPC is returned
 	go func() {
 		<-time.After(time.Second)
+		s.logger.Info("Restarting after upgrade", "version", request.Version)
 		s.rex.ReExec(cb)
 	}()
 	return &proto.UpgradeResponse{
