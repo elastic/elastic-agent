@@ -101,7 +101,7 @@ func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionRes
 func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateResponse, error) {
 	var err error
 
-	state := s.coord.State()
+	state := s.coord.State(true)
 	components := make([]*cproto.ComponentState, 0, len(state.Components))
 	for _, comp := range state.Components {
 		units := make([]*cproto.ComponentUnitState, 0, len(comp.State.Units))

@@ -207,6 +207,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 				f.errCh <- err
 				return nil, err
 			}
+			f.errCh <- err
 			continue
 		}
 		// Request was successful, return the collected actions.
@@ -298,7 +299,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher.State()
+	state := f.stateFetcher.State(false)
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components)

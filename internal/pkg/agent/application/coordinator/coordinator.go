@@ -125,7 +125,7 @@ type State struct {
 // StateFetcher provides an interface to fetch the current state of the coordinator.
 type StateFetcher interface {
 	// State returns the current state of the coordinator.
-	State() State
+	State(bool) State
 }
 
 // Coordinator manages the entire state of the Elastic Agent.
@@ -173,7 +173,8 @@ func New(logger *logger.Logger, agentInfo *info.AgentInfo, specs component.Runti
 }
 
 // State returns the current state for the coordinator.
-func (c *Coordinator) State() (s State) {
+// local indicates if local configMgr errors should be reported as part of the state.
+func (c *Coordinator) State(local bool) (s State) {
 	s.State = c.state.state
 	s.Message = c.state.message
 	s.Components = c.runtimeMgr.State()
@@ -189,7 +190,7 @@ func (c *Coordinator) State() (s State) {
 		if c.runtimeMgrErr != nil {
 			s.State = agentclient.Failed
 			s.Message = c.runtimeMgrErr.Error()
-		} else if c.configMgrErr != nil {
+		} else if local && c.configMgrErr != nil {
 			s.State = agentclient.Failed
 			s.Message = c.configMgrErr.Error()
 		} else if c.varsMgrErr != nil {
