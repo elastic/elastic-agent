@@ -22,7 +22,7 @@ const (
 	linux   = "linux"
 	windows = "windows"
 
-	defaultSourceURI = "https://artifacts.elastic.co/downloads/"
+	DefaultSourceURI = "https://artifacts.elastic.co/downloads/"
 )
 
 type ConfigReloader interface {
@@ -139,8 +139,8 @@ func (r *Reloader) reloadSourceURI(rawConfig *config.Config) error {
 		r.cfg.SourceURI = newSourceURI
 	} else {
 		// source uri unset, reset to default
-		r.log.Infof("Source URI reset from %q to %q", r.cfg.SourceURI, defaultSourceURI)
-		r.cfg.SourceURI = defaultSourceURI
+		r.log.Infof("Source URI reset from %q to %q", r.cfg.SourceURI, DefaultSourceURI)
+		r.cfg.SourceURI = DefaultSourceURI
 	}
 
 	return nil
@@ -156,7 +156,7 @@ func DefaultConfig() *Config {
 	transport.Timeout = 10 * time.Minute
 
 	return &Config{
-		SourceURI:             defaultSourceURI,
+		SourceURI:             DefaultSourceURI,
 		TargetDirectory:       paths.Downloads(),
 		InstallPath:           paths.Install(),
 		HTTPTransportSettings: transport,

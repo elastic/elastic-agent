@@ -141,11 +141,50 @@ func (o *Operator) Reload(rawConfig *config.Config) error {
 		return errors.New(err, "failed to unpack artifact config")
 	}
 
+	sourceURI, err := reloadSourceURI(o.logger, rawConfig)
+	if err != nil {
+		return errors.New(err, "failed to parse source URI")
+	}
+	tmp.C.SourceURI = sourceURI
+
 	if err := o.reloadComponent(o.downloader, "downloader", tmp.C); err != nil {
 		return err
 	}
 
 	return o.reloadComponent(o.verifier, "verifier", tmp.C)
+}
+
+func reloadSourceURI(logger *logger.Logger, rawConfig *config.Config) (string, error) {
+	type reloadConfig struct {
+		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
+		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
+
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
+		// different naming.
+		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
+	}
+	cfg := &reloadConfig{}
+	if err := rawConfig.Unpack(&cfg); err != nil {
+		return "", errors.New(err, "failed to unpack config during reload")
+	}
+
+	var newSourceURI string
+	if fleetURI := strings.TrimSpace(cfg.FleetSourceURI); fleetURI != "" {
+		// fleet configuration takes precedence
+		newSourceURI = fleetURI
+	} else if sourceURI := strings.TrimSpace(cfg.SourceURI); sourceURI != "" {
+		newSourceURI = sourceURI
+	}
+
+	if newSourceURI != "" {
+		logger.Infof("Source URI in operator changed to %q", newSourceURI)
+		return newSourceURI, nil
+	}
+
+	// source uri unset, reset to default
+	logger.Infof("Source URI in reset %q", artifact.DefaultSourceURI)
+	return artifact.DefaultSourceURI, nil
+
 }
 
 func (o *Operator) reloadComponent(component interface{}, name string, cfg *artifact.Config) error {
