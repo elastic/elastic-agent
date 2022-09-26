@@ -76,11 +76,10 @@ type Manager struct {
 	mx      sync.RWMutex
 	current map[string]*componentRuntimeState
 
-	subMx            sync.RWMutex
-	subscriptions    map[string][]*Subscription
-	subAllMx         sync.RWMutex
-	subscribeAll     []*SubscriptionAll
-	subscribeAllInit chan *SubscriptionAll
+	subMx         sync.RWMutex
+	subscriptions map[string][]*Subscription
+	subAllMx      sync.RWMutex
+	subscribeAll  []*SubscriptionAll
 
 	errCh chan error
 
@@ -202,6 +201,7 @@ func (m *Manager) WaitForReady(ctx context.Context) error {
 		ServerName:   name,
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
+		MinVersion:   tls.VersionTLS12,
 	})
 
 	m.waitMx.Lock()
@@ -565,7 +565,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 			continue
 		}
 		// component was removed (time to clean it up)
-		existing.stop(teardown)
+		_ = existing.stop(teardown)
 	}
 	return nil
 }
