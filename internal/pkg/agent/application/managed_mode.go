@@ -27,6 +27,7 @@ import (
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -182,32 +183,26 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	}
 
 	// Proxy errors from the gateway to our own channel.
-	go func() {
+	gatewayErrorsRunner := runner.Start(context.Background(), func(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return nil
 			case err := <-gateway.Errors():
 				m.errCh <- err
 			}
 		}
-	}()
+	})
+	defer gatewayErrorsRunner.Stop()
 
 	// Run the gateway.
-	gatewayRun := make(chan bool)
-	gatewayErrCh := make(chan error)
-	defer func() {
-		gatewayCancel()
-		<-gatewayRun
-	}()
-	go func() {
-		err := gateway.Run(gatewayCtx)
-		close(gatewayRun)
-		gatewayErrCh <- err
-	}()
+	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
+		defer gatewayErrorsRunner.Stop()
+		return gateway.Run(ctx)
+	})
 
 	<-ctx.Done()
-	return <-gatewayErrCh
+	return gatewayRunner.Err()
 }
 
 func (m *managedConfigManager) Errors() <-chan error {
