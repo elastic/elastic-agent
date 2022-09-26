@@ -70,17 +70,6 @@ type Controller interface {
 }
 
 type controller struct {
-<<<<<<< HEAD
-	mx           sync.Mutex
-	status       AgentStatusCode
-	message      string
-	updateTime   time.Time
-	reporters    map[string]*reporter
-	appReporters map[string]*reporter
-	log          *logger.Logger
-	stateID      string
-	agentID      string
-=======
 	updateTime     time.Time
 	log            *logger.Logger
 	reporters      map[string]*reporter
@@ -94,7 +83,6 @@ type controller struct {
 	localMessage   string
 	localTime      time.Time
 	mx             sync.Mutex
->>>>>>> 717708a72 (Expand status reporter/controller interfaces to allow local reporters (#1285))
 }
 
 // NewController creates a new reporter.
