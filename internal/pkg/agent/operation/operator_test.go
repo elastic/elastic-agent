@@ -15,10 +15,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
+	"github.com/elastic/elastic-agent/internal/pkg/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 )
 
@@ -71,7 +74,7 @@ func TestConfigurableRun(t *testing.T) {
 	if err := operator.start(p, nil); err != nil {
 		t.Fatal(err)
 	}
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	waitFor(t, func() error {
 		items := operator.State()
@@ -87,6 +90,7 @@ func TestConfigurableRun(t *testing.T) {
 
 	// try to configure
 	cfg := make(map[string]interface{})
+	//nolint:gosec // rand is ok for test
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	if err := operator.pushConfig(p, cfg); err != nil {
@@ -145,7 +149,7 @@ func TestConfigurableFailed(t *testing.T) {
 	if err := operator.start(p, nil); err != nil {
 		t.Fatal(err)
 	}
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	var pid int
 	waitFor(t, func() error {
@@ -172,6 +176,7 @@ func TestConfigurableFailed(t *testing.T) {
 
 	// try to configure (with failed status)
 	cfg := make(map[string]interface{})
+	//nolint:gosec // rand is ok for test
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	cfg["Status"] = proto.StateObserved_FAILED
@@ -254,7 +259,7 @@ func TestConfigurableCrash(t *testing.T) {
 	if err := operator.start(p, nil); err != nil {
 		t.Fatal(err)
 	}
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	var pid int
 	waitFor(t, func() error {
@@ -272,6 +277,7 @@ func TestConfigurableCrash(t *testing.T) {
 
 	// try to configure (with failed status)
 	cfg := make(map[string]interface{})
+	//nolint:gosec // rand is ok for test
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	cfg["Crash"] = true
@@ -352,7 +358,7 @@ func TestConfigurableStartStop(t *testing.T) {
 	p := getProgram("configurable", "1.0")
 
 	operator := getTestOperator(t, downloadPath, installPath, p)
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	// start and stop it 3 times
 	for i := 0; i < 3; i++ {
@@ -396,11 +402,11 @@ func TestConfigurableService(t *testing.T) {
 	if err := operator.start(p, nil); err != nil {
 		t.Fatal(err)
 	}
-	defer operator.stop(p) // failure catch, to ensure no sub-process stays running
+	defer func() { _ = operator.stop(p) }() // failure catch, to ensure no sub-process stays running
 
 	// emulating a service, so we need to start the binary here in the test
 	spec := p.ProcessSpec()
-	cmd := exec.Command(spec.BinaryPath, fmt.Sprintf("%d", p.ServicePort()))
+	cmd := exec.Command(spec.BinaryPath, fmt.Sprintf("%d", p.ServicePort())) //nolint:gosec,G204 // this is fine
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Dir = filepath.Dir(spec.BinaryPath)
 	cmd.Stdout = os.Stdout
@@ -423,6 +429,7 @@ func TestConfigurableService(t *testing.T) {
 
 	// try to configure
 	cfg := make(map[string]interface{})
+	//nolint:gosec // rand is ok for test
 	tstFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("tmp%d", rand.Uint32()))
 	cfg["TestFile"] = tstFilePath
 	if err := operator.pushConfig(p, cfg); err != nil {
@@ -459,6 +466,51 @@ func TestConfigurableService(t *testing.T) {
 
 	if err := cmd.Wait(); err != nil {
 		t.Fatalf("Process failed: %v", err)
+	}
+}
+
+func TestReloadSourceURI(t *testing.T) {
+	testCases := map[string]struct {
+		IncomingConfig    map[string]interface{}
+		ExpectedSourceURI string
+	}{
+		"no-config": {
+			IncomingConfig:    map[string]interface{}{},
+			ExpectedSourceURI: artifact.DefaultSourceURI,
+		},
+		"source-uri-provided": {
+			IncomingConfig: map[string]interface{}{
+				"agent.download.sourceURI": "http://source-uri",
+			},
+			ExpectedSourceURI: "http://source-uri",
+		},
+		"fleet-source-uri-provided": {
+			IncomingConfig: map[string]interface{}{
+				"agent.download.source_uri": "http://fleet-source-uri",
+			},
+			ExpectedSourceURI: "http://fleet-source-uri",
+		},
+		"both-source-uri-provided": {
+			IncomingConfig: map[string]interface{}{
+				"agent.download.sourceURI":  "http://source-uri",
+				"agent.download.source_uri": "http://fleet-source-uri",
+			},
+			ExpectedSourceURI: "http://fleet-source-uri",
+		},
+	}
+
+	l := getLogger()
+	for testName, tc := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(tc.IncomingConfig)
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+
+			sourceUri, err := reloadSourceURI(l, cfg) // nolint:stylecheck // sourceUri in main, consistency
+			require.NoError(t, err)
+			require.Equal(t, tc.ExpectedSourceURI, sourceUri)
+
+		})
 	}
 }
 
