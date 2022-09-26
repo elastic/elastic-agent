@@ -33,6 +33,10 @@ func (c *Coordinator) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		// TODO(blakerouse): Coordinator should be changed to store the last timestamp that the state has changed.
 		UpdateTime: time.Now().UTC(),
 	}
+	// If there is a local error on an otherwise healthy agent set state to degraded.
+	if s.Local != "" && s.State != client.Healthy {
+		s.State = client.Degraded
+	}
 	status := http.StatusOK
 	if s.State != client.Healthy {
 		status = http.StatusServiceUnavailable

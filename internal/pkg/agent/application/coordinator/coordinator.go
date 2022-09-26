@@ -118,6 +118,7 @@ type ComponentsModifier func(comps []component.Component) ([]component.Component
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
 	State      agentclient.State
+	Local      string // local only error message
 	Message    string
 	Components []runtime.ComponentComponentState
 }
@@ -190,6 +191,10 @@ func (c *Coordinator) State() (s State) {
 			s.State = agentclient.Failed
 			s.Message = c.runtimeMgrErr.Error()
 		} else if c.configMgrErr != nil {
+			if errors.IsType(c.configMgrError, errors.TypeLocal) {
+				s.Local = c.configMgrErr.Error()
+				return s
+			}
 			s.State = agentclient.Failed
 			s.Message = c.configMgrErr.Error()
 		} else if c.varsMgrErr != nil {

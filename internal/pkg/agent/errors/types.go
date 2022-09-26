@@ -24,6 +24,8 @@ const (
 	TypeFilesystem
 	// TypeSecurity represents set of errors related to security, encryption, etc.
 	TypeSecurity
+	// TypeLocal represents set of errors that are used only for local reporting and should not be sent to fleet-server
+	TypeLocal
 )
 
 const (
@@ -46,4 +48,5 @@ var readableTypes = map[ErrorType]string{
 	TypeNetwork:          "NETWORK",
 	TypeFilesystem:       "FILESYSTEM",
 	TypeSecurity:         "SECURITY",
+	TypeLocal:            "LOCAL",
 }

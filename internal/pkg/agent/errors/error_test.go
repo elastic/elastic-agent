@@ -200,3 +200,29 @@ func TestMetaCallDoesNotModifyCollection(t *testing.T) {
 		t.Fatalf("err4.meta modified by calling Meta(): %v", resultingErr.meta)
 	}
 }
+
+func TestIsType(t *testing.T) {
+	tests := []struct {
+		name   string
+		err    error
+		expect bool
+	}{{
+		name:   "error has type",
+		err:    New("an error", TypeLocal),
+		expect: true,
+	}, {
+		name:   "error does not have type",
+		err:    New("an error"),
+		expect: false,
+	}, {
+		name:   "error does not have Error interface",
+		err:    fmt.Errorf("an error"),
+		expect: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ok := IsType(tt.err, TypeLocal)
+			assert.Equal(t, tt.expect, ok)
+		})
+	}
+}

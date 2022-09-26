@@ -13,6 +13,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// IsType returns if the passed error has the specified error type
+func IsType(err error, t ErrorType) bool {
+	var e Error
+	if goerrors.As(err, &e) && e.Type() == t {
+		return true
+	}
+	return false
+}
+
 // As is just a helper so user dont have to use multiple imports for errors.
 func As(err error, target interface{}) bool {
 	return goerrors.As(err, target)
