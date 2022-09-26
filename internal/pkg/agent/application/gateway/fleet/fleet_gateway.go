@@ -173,7 +173,7 @@ func (f *fleetGateway) worker() {
 			// Execute the checkin call and for any errors returned by the fleet-server API
 			// the function will retry to communicate with fleet-server with an exponential delay and some
 			// jitter to help better distribute the load from a fleet of agents.
-			resp, err := f.doExecute()
+			resp, err := f.executeCheckinWithRetries()
 			if err != nil {
 				continue
 			}
@@ -274,21 +274,34 @@ func (f *fleetGateway) gatherQueuedActions(ts time.Time) (queued, expired []flee
 	return queued, expired
 }
 
-func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
+func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, error) {
 	f.backoff.Reset()
 
 	// Guard if the context is stopped by a out of bound call,
 	// this mean we are rebooting to change the log level or the system is shutting us down.
 	for f.bgContext.Err() == nil {
-		f.log.Debugf("Checkin started")
-		resp, err := f.execute(f.bgContext)
+		f.log.Debugf("Checking started")
+		resp, took, err := f.executeCheckin(f.bgContext)
 		if err != nil {
+			// Only update the local status on failure: https://github.com/elastic/elastic-agent/issues/1148
+			f.localReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
 			f.checkinFailCounter++
-			f.log.Errorf("Could not communicate with fleet-server checkin API will retry, error: %s", err)
+
+			// Report the first two failures at warn level as they may be recoverable with retries.
+			if f.checkinFailCounter <= 2 {
+				f.log.Warnw("Possible transient error during checkin with fleet-server, retrying",
+					"error.message", err, "request_duration", took, "failed_checkins", f.checkinFailCounter,
+					"retry_after", f.backoff.NextWait())
+			} else {
+				f.log.Errorw("Cannot checkin in with fleet-server, retrying",
+					"error.message", err, "request_duration", took, "failed_checkins", f.checkinFailCounter,
+					"retry_after", f.backoff.NextWait())
+			}
+
 			if !f.backoff.Wait() {
 				// Something bad has happened and we log it and we should update our current state.
 				err := errors.New(
-					"execute retry loop was stopped",
+					"checkin retry loop was stopped",
 					errors.TypeNetwork,
 					errors.M(errors.MetaKeyURI, f.client.URI()),
 				)
@@ -296,10 +309,6 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 				f.log.Error(err)
 				f.localReporter.Update(state.Failed, err.Error(), nil)
 				return nil, err
-			}
-			if f.checkinFailCounter > 1 {
-				f.localReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
-				f.log.Errorf("checkin number %d failed: %s", f.checkinFailCounter, err.Error())
 			}
 			continue
 		}
@@ -319,7 +328,7 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 	return nil, f.bgContext.Err()
 }
 
-func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, error) {
+func (f *fleetGateway) executeCheckin(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
 	ecsMeta, err := info.Metadata()
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -340,7 +349,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		Message:  f.statusController.Status().Message,
 	}
 
-	resp, err := cmd.Execute(ctx, req)
+	resp, took, err := cmd.Execute(ctx, req)
 	if isUnauth(err) {
 		f.unauthCounter++
 
@@ -348,15 +357,15 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 			f.log.Warnf("received an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
 			return &fleetapi.CheckinResponse{
 				Actions: []fleetapi.Action{&fleetapi.ActionUnenroll{ActionID: "", ActionType: "UNENROLL", IsDetected: true}},
-			}, nil
+			}, took, nil
 		}
 
-		return nil, err
+		return nil, took, err
 	}
 
 	f.unauthCounter = 0
 	if err != nil {
-		return nil, err
+		return nil, took, err
 	}
 
 	// Save the latest ackToken
@@ -368,7 +377,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		}
 	}
 
-	return resp, nil
+	return resp, took, nil
 }
 
 // shouldUnenroll checks if the max number of trying an invalid key is reached
