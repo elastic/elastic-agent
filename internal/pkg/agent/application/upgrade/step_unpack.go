@@ -37,7 +37,7 @@ func (u *Upgrader) unpack(ctx context.Context, version, archivePath string) (str
 	}
 
 	if err != nil {
-		u.log.Infow("Failed to unpack upgrade artifact", "error.message", err, "version", version, "file.path", archivePath, "hash", hash)
+		u.log.Errorw("Failed to unpack upgrade artifact", "error.message", err, "version", version, "file.path", archivePath, "hash", hash)
 		return "", err
 	}
 
