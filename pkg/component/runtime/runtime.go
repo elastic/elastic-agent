@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/atomic"
+	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -77,12 +78,6 @@ type componentRuntimeState struct {
 	latestMx    sync.RWMutex
 	latestState ComponentState
 
-	watchChan      chan bool
-	watchCanceller context.CancelFunc
-
-	runChan      chan bool
-	runCanceller context.CancelFunc
-
 	actionsMx sync.Mutex
 	actions   map[string]func(*proto.ActionResponse)
 }
@@ -97,8 +92,6 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 		return nil, err
 	}
 
-	watchChan := make(chan bool)
-	runChan := make(chan bool)
 	state := &componentRuntimeState{
 		manager:  m,
 		logger:   logger,
@@ -110,25 +103,33 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 			Message: "Starting",
 			Units:   nil,
 		},
-		watchChan: watchChan,
-		runChan:   runChan,
-		actions:   make(map[string]func(response *proto.ActionResponse)),
+		actions: make(map[string]func(response *proto.ActionResponse)),
 	}
 
+	// start the go-routine that operates the runtime for the component
+	runtimeRunner := runner.Start(context.Background(), func(ctx context.Context) error {
+		defer comm.destroy()
+		_ = runtime.Run(ctx, comm)
+		return nil
+	})
+
 	// start the go-routine that watches for updates from the component
-	watchCtx, watchCanceller := context.WithCancel(context.Background())
-	state.watchCanceller = watchCanceller
-	go func() {
-		defer close(watchChan)
+	runner.Start(context.Background(), func(ctx context.Context) error {
 		for {
 			select {
-			case <-watchCtx.Done():
-				return
+			case <-ctx.Done():
+				runtimeRunner.Stop()
+			case <-runtimeRunner.Done():
+				// Exit from the watcher loop only when the runner is done
+				// This is the same behvaour as before this change, just refactored
+				return nil
 			case s := <-runtime.Watch():
 				state.latestMx.Lock()
 				state.latestState = s
 				state.latestMx.Unlock()
-				state.manager.stateChanged(state, s)
+				if state.manager.stateChanged(state, s) {
+					runtimeRunner.Stop()
+				}
 			case ar := <-comm.actionsResponse:
 				state.actionsMx.Lock()
 				callback, ok := state.actions[ar.Id]
@@ -141,16 +142,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 				}
 			}
 		}
-	}()
-
-	// start the go-routine that operates the runtime for the component
-	runCtx, runCanceller := context.WithCancel(context.Background())
-	state.runCanceller = runCanceller
-	go func() {
-		defer close(runChan)
-		defer comm.destroy()
-		_ = runtime.Run(runCtx, comm)
-	}()
+	})
 
 	return state, nil
 }
@@ -165,22 +157,6 @@ func (s *componentRuntimeState) stop(teardown bool) error {
 		return s.runtime.Teardown()
 	}
 	return s.runtime.Stop()
-}
-
-func (s *componentRuntimeState) destroy() {
-	if s.runCanceller != nil {
-		s.runCanceller()
-		s.runCanceller = nil
-		<-s.runChan
-	}
-	if s.watchCanceller != nil {
-		s.watchCanceller()
-		s.watchCanceller = nil
-		// Do not wait on watchChan here
-		// the watch loop calls stateChanged that calls "destroy" (this function) and will block forever
-		// since the watch channel will never be closed because the watch loop is blocked on stateChanged call
-		// <-s.watchChan
-	}
 }
 
 func (s *componentRuntimeState) performAction(ctx context.Context, req *proto.ActionRequest) (*proto.ActionResponse, error) {

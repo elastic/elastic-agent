@@ -589,7 +589,8 @@ func (m *Manager) shutdown() {
 	}
 }
 
-func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentState) {
+// stateChanged notifies of the state change and returns true if the state is final (stopped)
+func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentState) (exit bool) {
 	m.subAllMx.RLock()
 	for _, sub := range m.subscribeAll {
 		select {
@@ -621,8 +622,9 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 		delete(m.current, state.currComp.ID)
 		m.mx.Unlock()
 
-		state.destroy()
+		exit = true
 	}
+	return exit
 }
 
 func (m *Manager) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
