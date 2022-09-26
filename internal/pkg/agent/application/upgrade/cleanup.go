@@ -13,11 +13,15 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// preUpgradeCleanup will remove files that do not have the passed version number from the downloads directory.
-func preUpgradeCleanup(version string) error {
-	files, err := os.ReadDir(paths.Downloads())
+// cleanNonMatchingVersionsFromDownloads will remove files that do not have the passed version number from the downloads directory.
+func cleanNonMatchingVersionsFromDownloads(log *logger.Logger, version string) error {
+	downloadsPath := paths.Downloads()
+	log.Debugw("Cleaning up non-matching downloaded versions", "version", version, "downloads.path", downloadsPath)
+
+	files, err := os.ReadDir(downloadsPath)
 	if err != nil {
 		return fmt.Errorf("unable to read directory %q: %w", paths.Downloads(), err)
 	}
