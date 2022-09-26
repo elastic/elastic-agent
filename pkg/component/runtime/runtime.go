@@ -121,7 +121,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 				runtimeRunner.Stop()
 			case <-runtimeRunner.Done():
 				// Exit from the watcher loop only when the runner is done
-				// This is the same behvaour as before this change, just refactored
+				// This is the same behaviour as before this change, just refactored and cleaned up
 				return nil
 			case s := <-runtime.Watch():
 				state.latestMx.Lock()
