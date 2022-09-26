@@ -195,7 +195,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	trimmedNewHash := release.TrimCommit(newHash)
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), trimmedNewHash)
 	if reexecNow {
-		u.log.Infow("Removing downloads directory", "file.path", paths.Downloads(), "rexec", reexecNow)
+		u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads(), "rexec", reexecNow)
 		err = os.RemoveAll(paths.Downloads())
 		if err != nil {
 			u.log.Errorw("Unable to clean downloads after update", "error.message", err, "downloads.path", paths.Downloads())
@@ -207,7 +207,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	}
 
 	// Clean everything from the downloads dir
-	u.log.Infow("Removing downloads directory", "file.path", paths.Downloads(), "rexec", reexecNow)
+	u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads(), "rexec", reexecNow)
 	err = os.RemoveAll(paths.Downloads())
 	if err != nil {
 		u.log.Errorw("Unable to clean downloads after update", "error.message", err, "file.path", paths.Downloads())
