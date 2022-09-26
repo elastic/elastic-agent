@@ -506,7 +506,7 @@ func TestReloadSourceURI(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
 
-			sourceUri, err := reloadSourceURI(l, cfg)
+			sourceUri, err := reloadSourceURI(l, cfg) // nolint:stylecheck // sourceUri in main, consistency
 			require.NoError(t, err)
 			require.Equal(t, tc.ExpectedSourceURI, sourceUri)
 
