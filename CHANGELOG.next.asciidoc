@@ -117,6 +117,7 @@
 - Fix a panic caused by a race condition when installing the Elastic Agent. {issues}806[806]
 - Use at least warning level for all status logs {pull}1218[1218]
 - Remove fleet event reporter and events from checkin body. {issue}993[993]
+- Fix unintended reset of source URI when downloading components {pull}1252[1252]
 
 ==== New features
 
