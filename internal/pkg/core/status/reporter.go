@@ -58,9 +58,11 @@ type AgentStatus struct {
 type Controller interface {
 	SetAgentID(string)
 	RegisterComponent(string) Reporter
+	RegisterLocalComponent(string) Reporter
 	RegisterComponentWithPersistance(string, bool) Reporter
 	RegisterApp(id string, name string) Reporter
 	Status() AgentStatus
+	LocalStatus() AgentStatus
 	StatusCode() AgentStatusCode
 	StatusString() string
 	UpdateStateID(string)
@@ -68,15 +70,19 @@ type Controller interface {
 }
 
 type controller struct {
-	mx           sync.Mutex
-	status       AgentStatusCode
-	message      string
-	updateTime   time.Time
-	reporters    map[string]*reporter
-	appReporters map[string]*reporter
-	log          *logger.Logger
-	stateID      string
-	agentID      string
+	updateTime     time.Time
+	log            *logger.Logger
+	reporters      map[string]*reporter
+	localReporters map[string]*reporter
+	appReporters   map[string]*reporter
+	stateID        string
+	message        string
+	agentID        string
+	status         AgentStatusCode
+	localStatus    AgentStatusCode
+	localMessage   string
+	localTime      time.Time
+	mx             sync.Mutex
 }
 
 // NewController creates a new reporter.
@@ -124,6 +130,28 @@ func (r *controller) UpdateStateID(stateID string) {
 	r.mx.Unlock()
 
 	r.updateStatus()
+}
+
+// RegisterLocalComponent registers new component for local-only status updates.
+func (r *controller) RegisterLocalComponent(componentIdentifier string) Reporter {
+	id := componentIdentifier + "-" + uuid.New().String()[:8]
+	rep := &reporter{
+		name:         componentIdentifier,
+		isRegistered: true,
+		unregisterFunc: func() {
+			r.mx.Lock()
+			delete(r.localReporters, id)
+			r.mx.Unlock()
+		},
+		notifyChangeFunc: r.updateStatus,
+		isPersistent:     false,
+	}
+
+	r.mx.Lock()
+	r.localReporters[id] = rep
+	r.mx.Unlock()
+
+	return rep
 }
 
 // Register registers new component for status updates.
@@ -199,6 +227,25 @@ func (r *controller) Status() AgentStatus {
 	}
 }
 
+// LocalStatus returns the status from the local registered components if they are different from the agent status.
+// If the agent status is more severe then the local status (failed vs degraded for example) agent status is used.
+// If they are equal (healthy and healthy) agent status is used.
+func (r *controller) LocalStatus() AgentStatus {
+	status := r.Status()
+	r.mx.Lock()
+	defer r.mx.Unlock()
+
+	if r.localStatus > status.Status {
+		return AgentStatus{
+			Status:     r.localStatus,
+			Message:    r.localMessage,
+			UpdateTime: r.localTime,
+		}
+	}
+	return status
+
+}
+
 // StatusCode retrieves current agent status code.
 func (r *controller) StatusCode() AgentStatusCode {
 	r.mx.Lock()
@@ -208,9 +255,23 @@ func (r *controller) StatusCode() AgentStatusCode {
 
 func (r *controller) updateStatus() {
 	status := Healthy
+	lStatus := Healthy
 	message := ""
+	lMessage := ""
 
 	r.mx.Lock()
+	for id, rep := range r.localReporters {
+		s := statusToAgentStatus(rep.status)
+		if s > lStatus {
+			lStatus = s
+			lMessage = fmt.Sprintf("component %s: %s", id, rep.message)
+		}
+		r.log.Debugf("local component '%s' has status '%s'", id, s)
+		if status == Failed {
+			break
+		}
+	}
+
 	for id, rep := range r.reporters {
 		s := statusToAgentStatus(rep.status)
 		if s > status {
@@ -243,6 +304,11 @@ func (r *controller) updateStatus() {
 		r.status = status
 		r.message = message
 		r.updateTime = time.Now().UTC()
+	}
+	if r.localStatus != lStatus {
+		r.localStatus = lStatus
+		r.localMessage = lMessage
+		r.localTime = time.Now().UTC()
 	}
 
 	r.mx.Unlock()

@@ -19,10 +19,11 @@ type LivenessResponse struct {
 }
 
 // ServeHTTP is an HTTP Handler for the status controller.
+// It uses the local agent status so it is able to report a degraded state if the fleet-server checkin has issues.
 // Respose code is 200 for a healthy agent, and 503 otherwise.
 // Response body is a JSON object that contains the agent ID, status, message, and the last status update time.
 func (r *controller) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	s := r.Status()
+	s := r.LocalStatus()
 	lr := LivenessResponse{
 		ID:         r.agentID,
 		Status:     s.Status.String(),
