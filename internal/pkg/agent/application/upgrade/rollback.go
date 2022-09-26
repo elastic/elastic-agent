@@ -54,7 +54,7 @@ func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentH
 
 // Cleanup removes all artifacts and files related to a specified version.
 func Cleanup(log *logger.Logger, currentHash string, removeMarker bool) error {
-	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
+	log.Debugw("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
 
 	// remove upgrade marker
