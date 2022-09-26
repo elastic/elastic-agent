@@ -373,6 +373,7 @@ func (o *Operator) getMonitoringMetricbeatConfig(outputType string, output inter
 	if len(hosts) == 0 {
 		return nil, false
 	}
+	//nolint:prealloc // false positive
 	var modules []interface{}
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 
