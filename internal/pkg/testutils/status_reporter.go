@@ -25,6 +25,11 @@ func (m *MockController) RegisterComponent(id string) status.Reporter {
 	return args.Get(0).(status.Reporter)
 }
 
+func (m *MockController) RegisterLocalComponent(id string) status.Reporter {
+	args := m.Called(id)
+	return args.Get(0).(status.Reporter)
+}
+
 func (m *MockController) RegisterComponentWithPersistance(id string, b bool) status.Reporter {
 	args := m.Called(id, b)
 	return args.Get(0).(status.Reporter)
@@ -36,6 +41,11 @@ func (m *MockController) RegisterApp(id, name string) status.Reporter {
 }
 
 func (m *MockController) Status() status.AgentStatus {
+	args := m.Called()
+	return args.Get(0).(status.AgentStatus)
+}
+
+func (m *MockController) LocalStatus() status.AgentStatus {
 	args := m.Called()
 	return args.Get(0).(status.AgentStatus)
 }
