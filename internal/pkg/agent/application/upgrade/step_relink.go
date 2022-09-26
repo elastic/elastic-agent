@@ -14,10 +14,11 @@ import (
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // ChangeSymlink updates symlink paths to match current version.
-func ChangeSymlink(ctx context.Context, targetHash string) error {
+func ChangeSymlink(ctx context.Context, log *logger.Logger, targetHash string) error {
 	// create symlink to elastic-agent-{hash}
 	hashedDir := fmt.Sprintf("%s-%s", agentName, targetHash)
 
@@ -31,6 +32,7 @@ func ChangeSymlink(ctx context.Context, targetHash string) error {
 	}
 
 	prevNewPath := prevSymlinkPath()
+	log.Infow("Changing symlink", "symlink_path", symlinkPath, "new_path", newPath, "prev_path", prevNewPath)
 
 	// remove symlink to avoid upgrade failures
 	if err := os.Remove(prevNewPath); !os.IsNotExist(err) {

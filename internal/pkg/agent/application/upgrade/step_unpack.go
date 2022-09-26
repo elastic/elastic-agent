@@ -21,6 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
@@ -30,18 +31,21 @@ func (u *Upgrader) unpack(ctx context.Context, version, archivePath string) (str
 	var hash string
 	var err error
 	if runtime.GOOS == "windows" {
-		hash, err = unzip(version, archivePath)
+		hash, err = unzip(u.log, version, archivePath)
 	} else {
-		hash, err = untar(version, archivePath)
+		hash, err = untar(u.log, version, archivePath)
 	}
+
 	if err != nil {
+		u.log.Errorw("Failed to unpack upgrade artifact", "error.message", err, "version", version, "file.path", archivePath, "hash", hash)
 		return "", err
 	}
 
+	u.log.Infow("Unpacked upgrade artifact", "version", version, "file.path", archivePath, "hash", hash)
 	return hash, nil
 }
 
-func unzip(version, archivePath string) (string, error) {
+func unzip(log *logger.Logger, version string, archivePath string) (string, error) {
 	var hash, rootDir string
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -82,8 +86,10 @@ func unzip(version, archivePath string) (string, error) {
 		path := filepath.Join(paths.Data(), strings.TrimPrefix(fileName, "data/"))
 
 		if f.FileInfo().IsDir() {
+			log.Debugw("Unpacking directory", "archive", "zip", "file.path", path)
 			os.MkdirAll(path, f.Mode())
 		} else {
+			log.Debugw("Unpacking file", "archive", "zip", "file.path", path)
 			os.MkdirAll(filepath.Dir(path), f.Mode())
 			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
@@ -119,7 +125,7 @@ func unzip(version, archivePath string) (string, error) {
 	return hash, nil
 }
 
-func untar(version, archivePath string) (string, error) {
+func untar(log *logger.Logger, version string, archivePath string) (string, error) {
 	r, err := os.Open(archivePath)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("artifact for 'elastic-agent' version '%s' could not be found at '%s'", version, archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
@@ -183,6 +189,7 @@ func untar(version, archivePath string) (string, error) {
 		mode := fi.Mode()
 		switch {
 		case mode.IsRegular():
+			log.Debugw("Unpacking file", "archive", "tar", "file.path", abs)
 			// just to be sure, it should already be created by Dir type
 			if err := os.MkdirAll(filepath.Dir(abs), 0755); err != nil {
 				return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
@@ -201,6 +208,7 @@ func untar(version, archivePath string) (string, error) {
 				return "", fmt.Errorf("TarInstaller: error writing to %s: %w", abs, err)
 			}
 		case mode.IsDir():
+			log.Debugw("Unpacking directory", "archive", "tar", "file.path", abs)
 			if err := os.MkdirAll(abs, 0755); err != nil {
 				return "", errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
