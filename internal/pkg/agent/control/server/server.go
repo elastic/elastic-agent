@@ -181,11 +181,8 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 	}
 	cb, err := u.Upgrade(ctx, &upgradeRequest{request}, false)
 	if err != nil {
-<<<<<<< HEAD
-		//nolint:nilerr // error is exposed in a response
-=======
 		s.logger.Errorw("Upgrade failed", "error.message", err, "version", request.Version, "source_uri", request.SourceURI)
->>>>>>> 5225e5408 (Improve logging for agent upgrades. (#1287))
+		//nolint:nilerr // error is exposed in a response
 		return &proto.UpgradeResponse{
 			Status: proto.ActionStatus_FAILURE,
 			Error:  err.Error(),
