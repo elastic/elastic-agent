@@ -89,7 +89,7 @@ func watchCmd(log *logp.Logger) error {
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		if err := upgrade.Cleanup(release.ShortCommit(), true); err != nil {
+		if err := upgrade.Cleanup(log, release.ShortCommit(), true); err != nil {
 			log.Error("rollback failed", err)
 		}
 		// exit nicely
@@ -98,7 +98,7 @@ func watchCmd(log *logp.Logger) error {
 
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, log); err != nil {
-		log.Debug("Error detected proceeding to rollback: %v", err)
+		log.Error("Error detected proceeding to rollback: %v", err)
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
@@ -110,7 +110,7 @@ func watchCmd(log *logp.Logger) error {
 	// in windows it might leave self untouched, this will get cleaned up
 	// later at the start, because for windows we leave marker untouched.
 	removeMarker := !isWindows()
-	err = upgrade.Cleanup(marker.Hash, removeMarker)
+	err = upgrade.Cleanup(log, marker.Hash, removeMarker)
 	if err != nil {
 		log.Error("rollback failed", err)
 	}

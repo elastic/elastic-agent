@@ -43,21 +43,23 @@ func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentH
 	}
 
 	// Restart
+	log.Info("Restarting the agent after rollback")
 	if err := restartAgent(ctx); err != nil {
 		return err
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(prevHash, true)
+	return Cleanup(log, prevHash, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(currentHash string, removeMarker bool) error {
+func Cleanup(log *logger.Logger, currentHash string, removeMarker bool) error {
+	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
 
 	// remove upgrade marker
 	if removeMarker {
-		if err := CleanMarker(); err != nil {
+		if err := CleanMarker(log); err != nil {
 			return err
 		}
 	}
@@ -74,7 +76,9 @@ func Cleanup(currentHash string, removeMarker bool) error {
 	}
 
 	// remove symlink to avoid upgrade failures, ignore error
-	_ = os.Remove(prevSymlinkPath())
+	prevSymlink := prevSymlinkPath()
+	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath())
+	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)
 	currentDir := fmt.Sprintf("%s-%s", agentName, currentHash)
@@ -88,6 +92,7 @@ func Cleanup(currentHash string, removeMarker bool) error {
 		}
 
 		hashedDir := filepath.Join(paths.Data(), dir)
+		log.Debugw("Removing hashed data directory", "file.path", hashedDir)
 		if cleanupErr := install.RemovePath(hashedDir); cleanupErr != nil {
 			err = multierror.Append(err, cleanupErr)
 		}
