@@ -301,7 +301,7 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
 	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
-	log.Infow("Copying action store", "new_home_path", newHome)
+	log.Debugw("Copying action store", "new_home_path", newHome)
 
 	for _, currentActionStorePath := range storePaths {
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
