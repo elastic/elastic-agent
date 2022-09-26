@@ -88,6 +88,7 @@ type fleetGateway struct {
 	checkinFailCounter int
 	statusController   status.Controller
 	statusReporter     status.Reporter
+	localReporter      status.Reporter
 	stateStore         stateStore
 	queue              actionQueue
 }
@@ -156,6 +157,7 @@ func newFleetGatewayWithScheduler(
 		done:             done,
 		acker:            acker,
 		statusReporter:   statusController.RegisterComponent("gateway"),
+		localReporter:    statusController.RegisterLocalComponent("gateway-checkin"),
 		statusController: statusController,
 		stateStore:       stateStore,
 		queue:            queue,
@@ -208,6 +210,7 @@ func (f *fleetGateway) worker() {
 				f.statusReporter.Update(state.Failed, errMsg, nil)
 			} else {
 				f.statusReporter.Update(state.Healthy, "", nil)
+				f.localReporter.Update(state.Healthy, "", nil) // we don't need to specifically set the local reporter to failed above, but it needs to be reset to healthy if a checking succeeds
 			}
 
 		case <-f.bgContext.Done():
@@ -291,12 +294,11 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 				)
 
 				f.log.Error(err)
+				f.localReporter.Update(state.Failed, err.Error(), nil)
 				return nil, err
 			}
 			if f.checkinFailCounter > 1 {
-				// do not update status reporter with failure
-				// status reporter would report connection failure on first successful connection, leading to
-				// stale result for certain period causing slight confusion.
+				f.localReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
 				f.log.Errorf("checking number %d failed: %s", f.checkinFailCounter, err.Error())
 			}
 			continue
@@ -386,6 +388,7 @@ func (f *fleetGateway) stop() {
 	f.log.Info("Fleet gateway is stopping")
 	defer f.scheduler.Stop()
 	f.statusReporter.Unregister()
+	f.localReporter.Unregister()
 	close(f.done)
 	f.wg.Wait()
 }
