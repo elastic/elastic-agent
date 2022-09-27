@@ -31,7 +31,10 @@ func (r *Runner) Stop() {
 }
 
 func (r *Runner) Err() error {
-	return r.err
+	r.mx.Lock()
+	err := r.err
+	r.mx.Unlock()
+	return err
 }
 
 func (r *Runner) Done() <-chan struct{} {
