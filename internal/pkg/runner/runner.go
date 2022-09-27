@@ -77,6 +77,7 @@ func Start(ctx context.Context, fn RunnerFunc) *Runner {
 
 func (r *Runner) setError(err error) {
 	r.mx.Lock()
+	// Only set the error if it was not set before. Capturing the first error.
 	if r.err == nil {
 		r.err = err
 	}

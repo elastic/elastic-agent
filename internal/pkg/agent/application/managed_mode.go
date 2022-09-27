@@ -193,7 +193,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 			}
 		}
 	})
-	defer gatewayErrorsRunner.Stop()
 
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
