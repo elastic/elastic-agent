@@ -140,8 +140,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
-		if err := store.ReplayActions(ctx, m.log, actionDispatcher, actionAcker, actions...); err != nil {
+		m.log.Info("restoring current policy from disk")
+		actionDispatcher.Dispatch(ctx, actionAcker, actions...)
+		select {
+		case err := <-actionDispatcher.Errors():
 			m.log.Errorf("could not recover state, error %+v, skipping...", err)
+		default:
 		}
 		stateRestored = true
 	}
@@ -166,7 +170,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.log,
 		m.agentInfo,
 		m.client,
-		actionDispatcher,
 		actionAcker,
 		m.coord,
 		m.stateStore,
@@ -193,6 +196,17 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	}()
 
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case err := <-actionDispatcher.Errors():
+				m.errCh <- err // err is one or more failures from dispatching an action
+			}
+		}
+	}()
+
 	// Run the gateway.
 	gatewayRun := make(chan bool)
 	gatewayErrCh := make(chan error)
@@ -204,6 +218,18 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		err := gateway.Run(gatewayCtx)
 		close(gatewayRun)
 		gatewayErrCh <- err
+	}()
+
+	// pass actions collected from gateway to dispatcher
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case actions := <-gateway.Actions():
+				actionDispatcher.Dispatch(ctx, actionAcker, actions...)
+			}
+		}
 	}()
 
 	<-ctx.Done()

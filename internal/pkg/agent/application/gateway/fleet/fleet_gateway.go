@@ -6,12 +6,10 @@ package fleet
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
@@ -66,7 +64,6 @@ type stateStore interface {
 
 type fleetGateway struct {
 	log           *logger.Logger
-	dispatcher    dispatcher.Dispatcher
 	client        client.Sender
 	scheduler     scheduler.Scheduler
 	settings      *fleetGatewaySettings
@@ -76,6 +73,7 @@ type fleetGateway struct {
 	stateFetcher  coordinator.StateFetcher
 	stateStore    stateStore
 	errCh         chan error
+	actionCh      chan []fleetapi.Action
 }
 
 // New creates a new fleet gateway
@@ -83,7 +81,6 @@ func New(
 	log *logger.Logger,
 	agentInfo agentInfo,
 	client client.Sender,
-	d dispatcher.Dispatcher,
 	acker acker.Acker,
 	stateFetcher coordinator.StateFetcher,
 	stateStore stateStore,
@@ -95,7 +92,6 @@ func New(
 		defaultGatewaySettings,
 		agentInfo,
 		client,
-		d,
 		scheduler,
 		acker,
 		stateFetcher,
@@ -108,7 +104,6 @@ func newFleetGatewayWithScheduler(
 	settings *fleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
-	d dispatcher.Dispatcher,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
 	stateFetcher coordinator.StateFetcher,
@@ -116,7 +111,6 @@ func newFleetGatewayWithScheduler(
 ) (gateway.FleetGateway, error) {
 	return &fleetGateway{
 		log:          log,
-		dispatcher:   d,
 		client:       client,
 		settings:     settings,
 		agentInfo:    agentInfo,
@@ -125,7 +119,12 @@ func newFleetGatewayWithScheduler(
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
 		errCh:        make(chan error),
+		actionCh:     make(chan []fleetapi.Action),
 	}, nil
+}
+
+func (f *fleetGateway) Actions() <-chan fleetapi.Actions {
+	return f.actionCh
 }
 
 func (f *fleetGateway) Run(ctx context.Context) error {
@@ -162,19 +161,8 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 
 			actions := make([]fleetapi.Action, len(resp.Actions))
 			copy(actions, resp.Actions)
-
-			// Persist state
-			hadErr := false
-			if err := f.dispatcher.Dispatch(context.Background(), f.acker, actions...); err != nil {
-				err = fmt.Errorf("failed to dispatch actions, error: %w", err)
-				f.log.Error(err)
-				f.errCh <- err
-				hadErr = true
-			}
-
-			f.log.Debugf("FleetGateway is sleeping, next update in %s", f.settings.Duration)
-			if !hadErr {
-				f.errCh <- nil
+			if len(actions) > 0 {
+				f.actionCh <- actions
 			}
 		}
 	}

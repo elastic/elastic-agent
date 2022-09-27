@@ -31,7 +31,8 @@ type priorityQueue interface {
 
 // Dispatcher processes actions coming from fleet api.
 type Dispatcher interface {
-	Dispatch(context.Context, acker.Acker, ...fleetapi.Action) error
+	Dispatch(context.Context, acker.Acker, ...fleetapi.Action)
+	Errors() <-chan error
 }
 
 // ActionDispatcher processes actions coming from fleet using registered set of handlers.
@@ -41,6 +42,7 @@ type ActionDispatcher struct {
 	def      actions.Handler
 	queue    priorityQueue
 	rt       *retryConfig
+	errCh    chan error
 }
 
 // New creates a new action dispatcher.
@@ -63,7 +65,12 @@ func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionD
 		def:      def,
 		queue:    queue,
 		rt:       defaultRetryConfig(),
+		errCh:    make(chan error),
 	}, nil
+}
+
+func (ad *ActionDispatcher) Errors() <-chan error {
+	return m.errCh
 }
 
 // Register registers a new handler for action.
@@ -91,7 +98,7 @@ func (ad *ActionDispatcher) key(a fleetapi.Action) string {
 }
 
 // Dispatch dispatches an action using pre-registered set of handlers.
-func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, actions ...fleetapi.Action) (err error) {
+func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, actions ...fleetapi.Action) {
 	span, ctx := apm.StartSpan(ctx, "dispatch", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -111,7 +118,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 
 	if len(actions) == 0 {
 		ad.log.Debug("No action to dispatch")
-		return nil
+		return
 	}
 
 	ad.log.Debugf(
@@ -123,7 +130,8 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 	var mErr error
 	for _, action := range actions {
 		if err := ctx.Err(); err != nil {
-			return err
+			ad.errCh <- err
+			return
 		}
 
 		if err := ad.dispatchAction(ctx, action, acker); err != nil {
@@ -147,10 +155,13 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 		ad.log.Debugf("Successfully dispatched action: '%+v'", action)
 	}
 	if mErr != nil {
-		return mErr
+		ad.errCh <- mErr
+		return
 	}
 
-	return acker.Commit(ctx)
+	if err := acker.Commit(ctx); err != nil {
+		ad.errCh <- err
+	}
 }
 
 func (ad *ActionDispatcher) dispatchAction(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {

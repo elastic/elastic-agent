@@ -14,7 +14,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -335,23 +334,6 @@ func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action)
 // Commit commits acks.
 func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 	return a.acker.Commit(ctx)
-}
-
-// ReplayActions replays list of actions.
-func ReplayActions(
-	ctx context.Context,
-	log *logger.Logger,
-	dispatcher dispatcher.Dispatcher,
-	acker acker.Acker,
-	actions ...action,
-) error {
-	log.Info("restoring current policy from disk")
-
-	if err := dispatcher.Dispatch(ctx, acker, actions...); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func yamlToReader(in interface{}) (io.Reader, error) {
