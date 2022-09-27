@@ -119,11 +119,11 @@ func newFleetGatewayWithScheduler(
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
 		errCh:        make(chan error),
-		actionCh:     make(chan []fleetapi.Action),
+		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
 }
 
-func (f *fleetGateway) Actions() <-chan fleetapi.Actions {
+func (f *fleetGateway) Actions() <-chan []fleetapi.Action {
 	return f.actionCh
 }
 

@@ -7,6 +7,7 @@ package gateway
 import (
 	"context"
 
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
 
@@ -20,6 +21,9 @@ type FleetGateway interface {
 
 	// Errors returns the channel to watch for reported errors.
 	Errors() <-chan error
+
+	// Actions returns the channel to watch for new actions from the fleet-server.
+	Actions() <-chan []fleetapi.Action
 
 	// SetClient sets the client for the gateway.
 	SetClient(client.Sender)

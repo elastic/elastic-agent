@@ -70,7 +70,7 @@ func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionD
 }
 
 func (ad *ActionDispatcher) Errors() <-chan error {
-	return m.errCh
+	return ad.errCh
 }
 
 // Register registers a new handler for action.
@@ -99,6 +99,7 @@ func (ad *ActionDispatcher) key(a fleetapi.Action) string {
 
 // Dispatch dispatches an action using pre-registered set of handlers.
 func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, actions ...fleetapi.Action) {
+	var err error
 	span, ctx := apm.StartSpan(ctx, "dispatch", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -129,7 +130,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 
 	var mErr error
 	for _, action := range actions {
-		if err := ctx.Err(); err != nil {
+		if err = ctx.Err(); err != nil {
 			ad.errCh <- err
 			return
 		}
@@ -159,7 +160,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 		return
 	}
 
-	if err := acker.Commit(ctx); err != nil {
+	if err = acker.Commit(ctx); err != nil {
 		ad.errCh <- err
 	}
 }
