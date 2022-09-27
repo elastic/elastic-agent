@@ -14,15 +14,12 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-type dispatcher interface {
-	Dispatch(context.Context, acker.Acker, ...action) error
-}
 
 type store interface {
 	Save(io.Reader) error
@@ -344,7 +341,7 @@ func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 func ReplayActions(
 	ctx context.Context,
 	log *logger.Logger,
-	dispatcher dispatcher,
+	dispatcher dispatcher.Dispatcher,
 	acker acker.Acker,
 	actions ...action,
 ) error {
