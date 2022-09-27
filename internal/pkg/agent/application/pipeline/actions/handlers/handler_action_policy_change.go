@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"sort"
 	"time"
 
@@ -142,14 +143,32 @@ func (h *PolicyChange) handleFleetServerHosts(ctx context.Context, c *config.Con
 			err, "fail to create API client with updated hosts",
 			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
 	}
+
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
 	defer cancel()
-	resp, err := client.Send(ctx, "GET", "/api/status", nil, nil, nil)
+
+	// The new client might have several fleet hosts, we need to try all of them before failing.
+	// As it's a new client, just trying
+	hostsCount := len(h.config.Fleet.Client.Hosts)
+	var resp *http.Response
+	for i := 0; i < hostsCount; i++ {
+		resp, err = client.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
+		if err == nil {
+			break // at least one fleet host is reachable, that is enough.
+		}
+
+		h.log.Warnf(
+			"fail to communicate with new Fleet Server API client host %d of %d host. Will try next one",
+			i, hostsCount)
+	}
 	if err != nil {
 		return errors.New(
-			err, "fail to communicate with updated API client hosts",
+			err,
+			fmt.Sprintf("fail to communicate with all %d new Fleet Server API client hosts",
+				hostsCount),
 			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
 	}
+
 	// discard body for proper cancellation and connection reuse
 	_, _ = io.Copy(ioutil.Discard, resp.Body)
 	resp.Body.Close()
@@ -157,15 +176,17 @@ func (h *PolicyChange) handleFleetServerHosts(ctx context.Context, c *config.Con
 	reader, err := fleetToReader(h.agentInfo, h.config)
 	if err != nil {
 		return errors.New(
-			err, "fail to persist updated API client hosts",
+			err, "fail to persist new Fleet Server API client hosts",
 			errors.TypeUnexpected, errors.M("hosts", h.config.Fleet.Client.Hosts))
 	}
+
 	err = h.store.Save(reader)
 	if err != nil {
 		return errors.New(
-			err, "fail to persist updated API client hosts",
+			err, "fail to persist new Fleet Server API client hosts",
 			errors.TypeFilesystem, errors.M("hosts", h.config.Fleet.Client.Hosts))
 	}
+
 	for _, setter := range h.setters {
 		setter.SetClient(client)
 	}

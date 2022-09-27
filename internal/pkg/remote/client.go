@@ -17,6 +17,7 @@ import (
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/id"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -30,6 +31,7 @@ type requestFunc func(string, string, url.Values, io.Reader) (*http.Request, err
 type wrapperFunc func(rt http.RoundTripper) (http.RoundTripper, error)
 
 type requestClient struct {
+	host       string
 	request    requestFunc
 	client     http.Client
 	lastUsed   time.Time
@@ -97,8 +99,11 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 	}
 
 	hosts := cfg.GetHosts()
-	clients := make([]*requestClient, len(hosts))
-	for i, host := range cfg.GetHosts() {
+	hostCount := len(hosts)
+	log.With("hosts", hosts).Debugf("creating remote client with %d hosts",
+		hostCount, hosts)
+	clients := make([]*requestClient, hostCount)
+	for i, host := range hosts {
 		connStr, err := urlutil.MakeURL(string(cfg.Protocol), p, host, 0)
 		if err != nil {
 			return nil, errors.Wrap(err, "invalid fleet-server endpoint")
@@ -124,8 +129,10 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 			Timeout:   cfg.Transport.Timeout,
 		}
 
+		basePath := prefixRequestFactory(connStr)
 		clients[i] = &requestClient{
-			request: prefixRequestFactory(connStr),
+			host:    connStr,
+			request: basePath,
 			client:  httpClient,
 		}
 	}
@@ -133,9 +140,9 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 	return new(log, cfg, clients...)
 }
 
-// Send executes a direct calls against the API, the method will takes cares of cloning
-// also add necessary headers for likes: "Content-Type", "Accept", and "kbn-xsrf".
-// No assumptions is done on the response concerning the received format, this will be the responsibility
+// Send executes a direct calls against the API, the method will take care of cloning and
+// also adding the necessary headers likes: "Content-Type", "Accept", and "kbn-xsrf".
+// No assumptions are done on the response concerning the received format, this will be the responsibility
 // of the implementation to correctly unpack any received data.
 //
 // NOTE:
@@ -165,7 +172,7 @@ func (c *Client) Send(
 	}
 
 	// Add generals headers to the request, we are dealing exclusively with JSON.
-	// Content-Type / Accepted type can be override from the called.
+	// Content-Type / Accepted type can be overridden by the caller.
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
 	// This header should be specific to fleet-server or remove it
@@ -189,11 +196,16 @@ func (c *Client) Send(
 	if err != nil {
 		requester.lastErr = err
 		requester.lastErrOcc = time.Now().UTC()
-	} else {
-		requester.lastErr = nil
-		requester.lastErrOcc = time.Time{}
+
+		// Using debug level as the caller is responsible to choose how to
+		// handle failed attempts.
+		c.log.Debugf("requester to host %s errored", requester.host)
+		return resp, err
 	}
-	return resp, err
+
+	requester.lastErr = nil
+	requester.lastErrOcc = time.Time{}
+	return resp, nil
 }
 
 // URI returns the remote URI.
@@ -244,6 +256,7 @@ func (c *Client) nextRequester() *requestClient {
 			selected = requester
 		}
 	}
+
 	if selected == nil {
 		// all are erroring; select the oldest one that errored
 		for _, requester := range c.clients {
@@ -256,6 +269,7 @@ func (c *Client) nextRequester() *requestClient {
 			}
 		}
 	}
+
 	return selected
 }
 
