@@ -44,18 +44,19 @@ func (r *Runner) Done() <-chan struct{} {
 func (r *Runner) DoneWithTimeout(to time.Duration) <-chan struct{} {
 	done := make(chan struct{})
 
+	t := time.NewTimer(to)
+
 	go func() {
-		t := time.NewTimer(to)
 		defer t.Stop()
 
 		select {
 		case <-r.Done():
-			close(done)
 		case <-t.C:
 			r.setError(context.DeadlineExceeded)
-			close(done)
 		}
+		close(done)
 	}()
+
 	return done
 }
 
