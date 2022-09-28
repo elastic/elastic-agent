@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -211,6 +212,7 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	changed := false
 	touched := make(map[ComponentUnitKey]bool)
+	fmt.Printf("CHECKIN: %v\n", checkin)
 	for _, unit := range checkin.Units {
 		key := ComponentUnitKey{
 			UnitType: client.UnitType(unit.Type),
@@ -221,6 +223,8 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		if unit.Payload != nil {
 			payload = unit.Payload.AsMap()
 		}
+
+		fmt.Printf("CHECKIN UNIT [%v] %v\n", key, unit)
 
 		touched[key] = true
 		_, inExpected := s.expectedUnits[key]
@@ -255,6 +259,7 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		s.Units[key] = existing
 	}
 	for key, unit := range s.Units {
+		fmt.Printf("CURRENT UNIT [%v] %v\n", key, unit)
 		_, ok := touched[key]
 		if !ok {
 			unit.unitState = client.UnitStateStarting
