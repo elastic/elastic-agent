@@ -29,6 +29,23 @@ inputs:
       type: sql/metrics
       use_output: default
       streams:
+        - condition: ${kubernetes.hints.oracle.memory.enabled} == true and ${kubernetes.hints.oracle.enabled} == true
+          data_stream:
+            dataset: oracle.memory
+            type: metrics
+          driver: oracle
+          hosts:
+            - ${kubernetes.hints.oracle.memory.host|'oracle://sys:Oradoc_db1@0.0.0.0:1521/ORCLCDB.localdomain?sysdba=1'}
+          merge_results: true
+          metricsets:
+            - query
+          period: ${kubernetes.hints.oracle.memory.period|'60s'}
+          raw_data.enabled: true
+          sql_queries:
+            - query: select name, value from V$PGASTAT where name in ('aggregate PGA auto target','global memory bound', 'total PGA allocated', 'total PGA used for auto workareas', 'total PGA inuse', 'maximum PGA allocated', 'total freeable PGA memory', 'cache hit percentage', 'aggregate PGA target parameter')
+              response_format: variables
+            - query: select 'sga free memory' as NAME, sum(decode(name,'free memory',bytes)) as VALUE from v$sgastat where pool = 'shared pool' union select 'sga total memory' as NAME, sum(bytes) as VALUE from v$sgastat where pool = 'shared pool'
+              response_format: variables
         - condition: ${kubernetes.hints.oracle.performance.enabled} == true and ${kubernetes.hints.oracle.enabled} == true
           data_stream:
             dataset: oracle.performance
@@ -49,6 +66,12 @@ inputs:
               response_format: table
             - query: SELECT 'lock_requests' "Ratio" , AVG(gethitratio) FROM V$LIBRARYCACHE UNION SELECT 'pin_requests' "Ratio", AVG(pinhitratio) FROM V$LIBRARYCACHE UNION SELECT 'io_reloads' "Ratio", (SUM(reloads) / SUM(pins)) FROM V$LIBRARYCACHE
               response_format: variables
+            - query: SELECT COUNT(*) as "failed_db_jobs" FROM dba_jobs WHERE NVL(failures, 0) < > 0
+              response_format: table
+            - query: select 'active_session_count' as name, count(s.status) as value from gv$session s, v$process p where p.addr=s.paddr and s.status='ACTIVE' union  select 'inactive_session_count' as name, count(s.status) as value from gv$session s, v$process p where p.addr=s.paddr and s.status='INACTIVE' union select 'inactive_morethan_onehr' as name, count(s.status) as value from gv$session s, v$process p where p.addr=s.paddr and s.last_call_et > 3600 and s.status='INACTIVE'
+              response_format: variables
+            - query: select WAIT_CLASS, TOTAL_WAITS, round(100 * (TOTAL_WAITS / SUM_WAITS),2) PCT_WAITS, ROUND((TIME_WAITED / 100),2) TIME_WAITED_SECS, round(100 * (TIME_WAITED / SUM_TIME),2) PCT_TIME from (select WAIT_CLASS, TOTAL_WAITS, TIME_WAITED from V$SYSTEM_WAIT_CLASS where WAIT_CLASS != 'Idle'), (select sum(TOTAL_WAITS) SUM_WAITS, sum(TIME_WAITED) SUM_TIME from V$SYSTEM_WAIT_CLASS where WAIT_CLASS != 'Idle') order by 5 desc
+              response_format: table
         - condition: ${kubernetes.hints.oracle.sysmetric.enabled} == true and ${kubernetes.hints.oracle.enabled} == true
           data_stream:
             dataset: oracle.sysmetric
@@ -63,6 +86,20 @@ inputs:
           raw_data.enabled: true
           sql_queries:
             - query: SELECT METRIC_NAME, VALUE FROM V$SYSMETRIC WHERE GROUP_ID = 2 and METRIC_NAME LIKE '%'
+              response_format: variables
+        - condition: ${kubernetes.hints.oracle.system_statistics.enabled} == true and ${kubernetes.hints.oracle.enabled} == true
+          data_stream:
+            dataset: oracle.system_statistics
+            type: metrics
+          driver: oracle
+          hosts:
+            - ${kubernetes.hints.oracle.system_statistics.host|'oracle://sys:Oradoc_db1@0.0.0.0:1521/ORCLCDB.localdomain?sysdba=1'}
+          metricsets:
+            - query
+          period: ${kubernetes.hints.oracle.system_statistics.period|'60s'}
+          raw_data.enabled: true
+          sql_queries:
+            - query: SELECT NAME, VALUE FROM V$SYSSTAT WHERE NAME IN ( 'bytes received via SQL*Net from client', 'bytes received via SQL*Net from dblink', 'bytes sent via SQL*Net to client', 'bytes sent via SQL*Net to dblink', 'CPU used by this session', 'db block changes', 'db block gets from cache', 'DBWR checkpoint buffers written', 'DBWR checkpoints', 'DML statements parallelized', 'enqueue conversions', 'enqueue deadlocks', 'enqueue releases', 'enqueue requests', 'enqueue timeouts', 'enqueue waits', 'exchange deadlocks', 'execute count', 'gc current block receive time', 'index fast full scans (direct read)', 'index fast full scans (full)', 'index fast full scans (rowid ranges)', 'lob reads', 'lob writes', 'logons current', 'opened cursors current', 'Parallel operations not downgraded', 'parse count (hard)', 'parse count (total)', 'parse time cpu', 'parse time elapsed', 'physical read bytes', 'physical read IO requests', 'physical read total bytes', 'physical read total IO requests', 'physical reads', 'physical write bytes', 'physical write IO requests', 'physical write total bytes', 'physical write total IO requests', 'physical writes', 'physical writes direct', 'physical writes from cache', 'process last non-idle time', 'queries parallelized', 'recovery blocks read', 'recursive calls', 'recursive cpu usage', 'redo blocks written', 'redo buffer allocation retries', 'redo log space requests', 'redo log space wait time', 'redo size', 'redo synch time', 'redo write time', 'redo writes', 'session cursor cache count', 'session cursor cache hits', 'session logical reads', 'session stored procedure space', 'sorts (disk)', 'sorts (memory)', 'sorts (rows)', 'table scan rows gotten', 'table scans (direct read)', 'table scans (long tables)', 'table scans (rowid ranges)', 'transaction rollbacks', 'user calls', 'user commits', 'user rollbacks', 'DB time', 'OS System time used', 'OS User time used', 'SMON posted for instance recovery', 'SMON posted for txn recovery for other instances', 'java call heap live size', 'java call heap total size', 'java call heap used size')
               response_format: variables
         - condition: ${kubernetes.hints.oracle.tablespace.enabled} == true and ${kubernetes.hints.oracle.enabled} == true
           data_stream:

@@ -1,4 +1,14 @@
 inputs:
+    - name: tcp-tcp
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.tcp.generic.enabled} == true or ${kubernetes.hints.tcp.enabled} == true
+          data_stream:
+            dataset: tcp.generic
+            type: logs
+          host: localhost:8080
+      data_stream.namespace: default
     - name: filestream-tcp
       type: filestream
       use_output: default
@@ -19,14 +29,4 @@ inputs:
             scanner:
                 symlinks: true
           tags: []
-      data_stream.namespace: default
-    - name: tcp-tcp
-      type: tcp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.tcp.generic.enabled} == true or ${kubernetes.hints.tcp.enabled} == true
-          data_stream:
-            dataset: tcp.generic
-            type: logs
-          host: localhost:8080
       data_stream.namespace: default

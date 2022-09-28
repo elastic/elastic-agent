@@ -1,25 +1,4 @@
 inputs:
-    - name: filestream-snyk
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.snyk.container_logs.enabled} == true
-          data_stream:
-            dataset: kubernetes.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
-      data_stream.namespace: default
     - name: httpjson-snyk
       type: httpjson
       use_output: default
@@ -136,4 +115,25 @@ inputs:
           tags:
             - forwarded
             - snyk-vulnerabilities
+      data_stream.namespace: default
+    - name: filestream-snyk
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.snyk.container_logs.enabled} == true
+          data_stream:
+            dataset: kubernetes.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
       data_stream.namespace: default

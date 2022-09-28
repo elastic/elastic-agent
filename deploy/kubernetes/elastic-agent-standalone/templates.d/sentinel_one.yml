@@ -1,4 +1,25 @@
 inputs:
+    - name: filestream-sentinel_one
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.sentinel_one.container_logs.enabled} == true
+          data_stream:
+            dataset: kubernetes.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
     - name: httpjson-sentinel_one
       type: httpjson
       use_output: default
@@ -193,25 +214,4 @@ inputs:
           tags:
             - forwarded
             - sentinel_one-threat
-      data_stream.namespace: default
-    - name: filestream-sentinel_one
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.sentinel_one.container_logs.enabled} == true
-          data_stream:
-            dataset: kubernetes.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
       data_stream.namespace: default
