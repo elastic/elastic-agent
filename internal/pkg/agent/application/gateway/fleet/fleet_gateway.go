@@ -210,7 +210,7 @@ func (f *fleetGateway) worker() {
 				f.statusReporter.Update(state.Failed, errMsg, nil)
 			} else {
 				f.statusReporter.Update(state.Healthy, "", nil)
-				f.localReporter.Update(state.Healthy, "", nil) // we don't need to specifically set the local reporter to failed above, but it needs to be reset to healthy if a checking succeeds
+				f.localReporter.Update(state.Healthy, "", nil) // we don't need to specifically set the local reporter to failed above, but it needs to be reset to healthy if a checkin succeeds
 			}
 
 		case <-f.bgContext.Done():
@@ -280,11 +280,11 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 	// Guard if the context is stopped by a out of bound call,
 	// this mean we are rebooting to change the log level or the system is shutting us down.
 	for f.bgContext.Err() == nil {
-		f.log.Debugf("Checking started")
+		f.log.Debugf("Checkin started")
 		resp, err := f.execute(f.bgContext)
 		if err != nil {
 			f.checkinFailCounter++
-			f.log.Errorf("Could not communicate with fleet-server Checking API will retry, error: %s", err)
+			f.log.Errorf("Could not communicate with fleet-server checkin API will retry, error: %s", err)
 			if !f.backoff.Wait() {
 				// Something bad has happened and we log it and we should update our current state.
 				err := errors.New(
@@ -299,10 +299,16 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 			}
 			if f.checkinFailCounter > 1 {
 				f.localReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
-				f.log.Errorf("checking number %d failed: %s", f.checkinFailCounter, err.Error())
+				f.log.Errorf("checkin number %d failed: %s", f.checkinFailCounter, err.Error())
 			}
 			continue
 		}
+
+		if f.checkinFailCounter > 0 {
+			// Log at same level as error logs above so subsequent successes are visible when log level is set to 'error'.
+			f.log.Errorf("Checkin request to fleet-server succeeded after %d failures", f.checkinFailCounter)
+		}
+
 		f.checkinFailCounter = 0
 		// Request was successful, return the collected actions.
 		return resp, nil
@@ -338,7 +344,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		f.unauthCounter++
 
 		if f.shouldUnenroll() {
-			f.log.Warnf("retrieved an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
+			f.log.Warnf("received an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
 			return &fleetapi.CheckinResponse{
 				Actions: []fleetapi.Action{&fleetapi.ActionUnenroll{ActionID: "", ActionType: "UNENROLL", IsDetected: true}},
 			}, nil
