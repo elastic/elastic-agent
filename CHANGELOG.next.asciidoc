@@ -117,6 +117,7 @@
 - Remove fleet event reporter and events from checkin body. {issue}993[993]
 - Fix unintended reset of source URI when downloading components {pull}1252[1252]
 - Create separate status reporter for local only events so that degraded fleet-checkins no longer affect health on successful fleet-checkins. {issue}1157[1157] {pull}1285[1285]
+- Add success log message after previous checkin failures {pull}1327[1327]
 
 ==== New features
 
