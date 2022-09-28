@@ -88,10 +88,11 @@ type controller struct {
 // NewController creates a new reporter.
 func NewController(log *logger.Logger) Controller {
 	return &controller{
-		status:       Healthy,
-		reporters:    map[string]*reporter{},
-		appReporters: map[string]*reporter{},
-		log:          log,
+		status:         Healthy,
+		reporters:      make(map[string]*reporter),
+		localReporters: make(map[string]*reporter),
+		appReporters:   make(map[string]*reporter),
+		log:            log,
 	}
 }
 

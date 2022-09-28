@@ -24,6 +24,7 @@ func TestNewController_ensure_all_is_initialzed(t *testing.T) {
 		t.Fatalf("expected c %T, not c %T", controller{}, newController)
 	}
 
+	c.reporters["ignore"] = &reporter{}
 	c.localReporters["ignore"] = &reporter{}
 	c.appReporters["ignore"] = &reporter{}
 	if c.log == nil {
