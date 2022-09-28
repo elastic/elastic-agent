@@ -14,6 +14,24 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+func TestNewController_ensure_all_is_initialzed(t *testing.T) {
+	l, _ := logger.New("", false)
+
+	newController := NewController(l)
+
+	c, ok := newController.(*controller)
+	if !ok {
+		t.Fatalf("expected c %T, not c %T", controller{}, newController)
+	}
+
+	c.reporters["ignore"] = &reporter{}
+	c.localReporters["ignore"] = &reporter{}
+	c.appReporters["ignore"] = &reporter{}
+	if c.log == nil {
+		t.Error("logger shouldn't be nil, it was not correctly assigned")
+	}
+}
+
 func TestReporter(t *testing.T) {
 	l, _ := logger.New("", false)
 	t.Run("healthy by default", func(t *testing.T) {
