@@ -80,10 +80,12 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 		err = &exec.ExitError{ProcessState: procState}
 	}
 
-	errmsg := <-errch
-	errmsg = strings.TrimSpace(errmsg)
-	if errmsg != "" {
-		err = fmt.Errorf("%s: %w", errmsg, err)
+	if err != nil {
+		errmsg := <-errch
+		errmsg = strings.TrimSpace(errmsg)
+		if errmsg != "" {
+			err = fmt.Errorf("%s: %w", errmsg, err)
+		}
 	}
 
 	return err
