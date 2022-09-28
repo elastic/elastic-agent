@@ -89,8 +89,8 @@ type controller struct {
 func NewController(log *logger.Logger) Controller {
 	return &controller{
 		status:       Healthy,
-		reporters:    make(map[string]*reporter),
-		appReporters: make(map[string]*reporter),
+		reporters:    map[string]*reporter{},
+		appReporters: map[string]*reporter{},
 		log:          log,
 	}
 }
@@ -154,12 +154,12 @@ func (r *controller) RegisterLocalComponent(componentIdentifier string) Reporter
 	return rep
 }
 
-// Register registers new component for status updates.
+// RegisterComponent registers new component for status updates.
 func (r *controller) RegisterComponent(componentIdentifier string) Reporter {
 	return r.RegisterComponentWithPersistance(componentIdentifier, false)
 }
 
-// Register registers new component for status updates.
+// RegisterComponentWithPersistance registers new component for status updates.
 func (r *controller) RegisterComponentWithPersistance(componentIdentifier string, persistent bool) Reporter {
 	id := componentIdentifier + "-" + uuid.New().String()[:8]
 	rep := &reporter{
