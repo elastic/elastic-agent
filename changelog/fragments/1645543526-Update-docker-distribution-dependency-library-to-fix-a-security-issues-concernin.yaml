@@ -1,3 +1,0 @@
-kind: feature
-summary: Update docker/distribution dependency library to fix a security issues concerning OCI Manifest Type Confusion Issue.
-pr: https://github.com/elastic/beats/pull/30462

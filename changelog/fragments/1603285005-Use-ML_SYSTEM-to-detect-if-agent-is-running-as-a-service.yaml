@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Use ML_SYSTEM to detect if agent is running as a service
-pr: https://github.com/elastic/beats/pull/21884

@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Do not take ownership of Endpoint log path
-pr: https://github.com/elastic/beats/pull/23444

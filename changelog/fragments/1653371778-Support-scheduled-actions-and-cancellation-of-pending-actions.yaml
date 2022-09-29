@@ -1,4 +1,0 @@
-kind: feature
-summary: Support scheduled actions and cancellation of pending actions.
-issue: https://github.com/elastic/elastic-agent/issues/393
-pr: https://github.com/elastic/elastic-agent/pull/419

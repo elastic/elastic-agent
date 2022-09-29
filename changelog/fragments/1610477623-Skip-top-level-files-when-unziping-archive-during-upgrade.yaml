@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Skip top level files when unziping archive during upgrade
-pr: https://github.com/elastic/beats/pull/23456

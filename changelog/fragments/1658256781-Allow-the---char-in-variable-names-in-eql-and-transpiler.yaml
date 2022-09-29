@@ -1,4 +1,0 @@
-kind: bug-fix
-summary: Allow the / char in variable names in eql and transpiler.
-issue: https://github.com/elastic/elastic-agent/issues/715
-pr: https://github.com/elastic/elastic-agent/pull/718

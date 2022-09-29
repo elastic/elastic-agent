@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Set permissions during installation
-pr: https://github.com/elastic/beats/pull/26665

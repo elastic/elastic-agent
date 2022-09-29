@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Respect host configuration for exposed processes endpoint
-pr: https://github.com/elastic/beats/pull/25114

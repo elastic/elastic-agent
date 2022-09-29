@@ -1,4 +1,0 @@
-kind: bug-fix
-summary: Allow the - char to appear as part of variable names in eql expressions.
-issue: https://github.com/elastic/elastic-agent/issues/709
-pr: https://github.com/elastic/elastic-agent/pull/710

@@ -1,3 +1,0 @@
-kind: feature
-summary: Enroll CLI now restarts running daemon
-pr: https://github.com/elastic/beats/pull/20359

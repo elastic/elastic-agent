@@ -1,3 +1,0 @@
-kind: feature
-summary: Log output of container to $LOGS_PATH/elastic-agent-start.log when LOGS_PATH set
-pr: https://github.com/elastic/beats/pull/25150

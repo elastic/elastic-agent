@@ -1,4 +1,0 @@
-kind: feature
-summary: Agent now adapts the beats queue size based on output settings.
-issue: https://github.com/elastic/beats/issues/26638
-pr: https://github.com/elastic/beats/pull/27429

@@ -1,4 +1,0 @@
-kind: feature
-summary: Discover changes in Kubernetes nodes metadata as soon as they happen.
-issue: https://github.com/elastic/beats/issues/23139
-pr: https://github.com/elastic/beats/pull/29289

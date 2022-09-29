@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Add fleet-server to output of elastic-agent inspect output command (and diagnostic bundle).
-pr: https://github.com/elastic/elastic-agent/pull/243

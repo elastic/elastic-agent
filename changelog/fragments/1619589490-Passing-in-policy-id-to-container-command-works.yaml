@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Passing in policy id to container command works
-pr: https://github.com/elastic/beats/pull/25352

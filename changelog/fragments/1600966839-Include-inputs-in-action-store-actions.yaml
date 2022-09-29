@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Include inputs in action store actions
-pr: https://github.com/elastic/beats/pull/21298

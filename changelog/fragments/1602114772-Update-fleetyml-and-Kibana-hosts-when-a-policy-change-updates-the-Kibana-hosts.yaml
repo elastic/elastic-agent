@@ -1,3 +1,0 @@
-kind: feature
-summary: Update `fleet.yml` and Kibana hosts when a policy change updates the Kibana hosts
-pr: https://github.com/elastic/beats/pull/21599

@@ -1,3 +1,0 @@
-kind: breaking-change
-summary: Remove deprecated/undocumented IncludeCreatorMetadata setting from kubernetes metadata config options
-pr: https://github.com/elastic/beats/pull/28006

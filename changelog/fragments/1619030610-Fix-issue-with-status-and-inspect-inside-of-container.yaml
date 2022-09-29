@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Fix issue with status and inspect inside of container
-pr: https://github.com/elastic/beats/pull/25204

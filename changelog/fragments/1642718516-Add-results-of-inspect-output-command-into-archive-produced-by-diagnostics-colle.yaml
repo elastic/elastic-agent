@@ -1,3 +1,0 @@
-kind: feature
-summary: Add results of inspect output command into archive produced by diagnostics collect.
-pr: https://github.com/elastic/beats/pull/29902

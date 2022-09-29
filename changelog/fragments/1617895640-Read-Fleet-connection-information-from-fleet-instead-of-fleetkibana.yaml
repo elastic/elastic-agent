@@ -1,3 +1,0 @@
-kind: breaking-change
-summary: Read Fleet connection information from `fleet.*` instead of `fleet.kibana.*`.
-pr: https://github.com/elastic/beats/pull/24713

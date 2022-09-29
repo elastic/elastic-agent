@@ -1,3 +1,0 @@
-kind: feature
-summary: Add support for enabling the metrics buffer endpoint in the elastic-agent and beats it runs. diagnostics collect command will gather metrics-buffer data if enabled.
-pr: https://github.com/elastic/beats/pull/30471

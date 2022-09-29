@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Fixed Elastic Agent expecting Dict and received *transpiler.Key for '0'
-issue: https://github.com/elastic/beats/issues/24453

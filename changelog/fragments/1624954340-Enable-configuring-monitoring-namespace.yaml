@@ -1,3 +1,0 @@
-kind: feature
-summary: Enable configuring monitoring namespace
-issue: https://github.com/elastic/beats/issues/26439

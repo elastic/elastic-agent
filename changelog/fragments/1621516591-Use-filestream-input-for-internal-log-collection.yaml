@@ -1,3 +1,0 @@
-kind: feature
-summary: Use `filestream` input for internal log collection.
-pr: https://github.com/elastic/beats/pull/25660

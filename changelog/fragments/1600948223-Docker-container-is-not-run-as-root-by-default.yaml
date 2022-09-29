@@ -1,3 +1,0 @@
-kind: breaking-change
-summary: Docker container is not run as root by default.
-pr: https://github.com/elastic/beats/pull/21213

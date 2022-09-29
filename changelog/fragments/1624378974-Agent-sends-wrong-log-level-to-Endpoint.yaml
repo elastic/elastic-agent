@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Agent sends wrong log level to Endpoint
-issue: https://github.com/elastic/beats/issues/25583

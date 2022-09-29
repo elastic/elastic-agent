@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Disable monitoring during fleet-server bootstrapping.
-pr: https://github.com/elastic/beats/pull/27222

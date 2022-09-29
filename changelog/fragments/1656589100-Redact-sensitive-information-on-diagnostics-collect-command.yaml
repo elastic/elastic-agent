@@ -1,4 +1,0 @@
-kind: feature
-summary: Redact sensitive information on diagnostics collect command.
-issue: https://github.com/elastic/elastic-agent/issues/241
-pr: https://github.com/elastic/elastic-agent/pull/566

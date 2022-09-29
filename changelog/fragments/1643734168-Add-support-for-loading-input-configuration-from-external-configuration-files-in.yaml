@@ -1,3 +1,0 @@
-kind: feature
-summary: Add support for loading input configuration from external configuration files in standalone mode. You can load inputs from YAML configuration files under the folder `{path.config}/inputs.d`.
-pr: https://github.com/elastic/beats/pull/30087

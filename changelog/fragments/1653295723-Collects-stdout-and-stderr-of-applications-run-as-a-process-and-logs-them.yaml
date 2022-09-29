@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Collects stdout and stderr of applications run as a process and logs them.
-issue: https://github.com/elastic/elastic-agent/issues/88

@@ -1,3 +1,0 @@
-kind: breaking-change
-summary: Default to port 80 and 443 for Kibana and Fleet Server connections.
-pr: https://github.com/elastic/beats/pull/25723

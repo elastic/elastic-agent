@@ -1,3 +1,0 @@
-kind: feature
-summary: Add --fleet-server-service-token and FLEET_SERVER_SERVICE_TOKEN options
-pr: https://github.com/elastic/beats/pull/25083

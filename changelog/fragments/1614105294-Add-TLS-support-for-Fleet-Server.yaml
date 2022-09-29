@@ -1,3 +1,0 @@
-kind: feature
-summary: Add TLS support for Fleet Server
-pr: https://github.com/elastic/beats/pull/24142

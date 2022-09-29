@@ -1,3 +1,0 @@
-kind: feature
-summary: Update `fleet.kibana.path` from a POLICY_CHANGE
-pr: https://github.com/elastic/beats/pull/21804

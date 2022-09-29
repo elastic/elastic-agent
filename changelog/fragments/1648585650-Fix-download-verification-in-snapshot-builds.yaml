@@ -1,3 +1,0 @@
-kind: feature
-summary: Fix download verification in snapshot builds.
-issue: https://github.com/elastic/elastic-agent/issues/252

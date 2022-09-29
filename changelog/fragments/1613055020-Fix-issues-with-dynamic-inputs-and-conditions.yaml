@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Fix issues with dynamic inputs and conditions
-pr: https://github.com/elastic/beats/pull/23886

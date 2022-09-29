@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Fix install command for Fleet Server bootstrap, remove need for --enrollment-token when using --fleet-server
-pr: https://github.com/elastic/beats/pull/24981

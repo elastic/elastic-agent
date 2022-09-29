@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Use at least warning level for all status logs
-pr: https://github.com/elastic/elastic-agent/pull/1218

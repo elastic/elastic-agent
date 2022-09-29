@@ -1,3 +1,0 @@
-kind: feature
-summary: Allow pprof endpoints for elastic-agent or beats if enabled.
-pr: https://github.com/elastic/beats/pull/29155

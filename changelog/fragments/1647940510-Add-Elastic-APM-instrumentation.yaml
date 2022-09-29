@@ -1,3 +1,0 @@
-kind: feature
-summary: Add Elastic APM instrumentation
-pr: https://github.com/elastic/elastic-agent/pull/180

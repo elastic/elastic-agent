@@ -1,3 +1,0 @@
-kind: feature
-summary: Send `fleet.host.id` to Endpoint Security
-pr: https://github.com/elastic/beats/pull/21042

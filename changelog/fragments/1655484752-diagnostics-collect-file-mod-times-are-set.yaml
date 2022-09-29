@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: diagnostics collect file mod times are set.
-pr: https://github.com/elastic/elastic-agent/pull/570

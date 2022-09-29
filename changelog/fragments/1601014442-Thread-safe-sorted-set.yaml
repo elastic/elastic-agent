@@ -1,3 +1,0 @@
-kind: bug-fix
-summary: Thread safe sorted set
-pr: https://github.com/elastic/beats/pull/21290

@@ -1,4 +1,0 @@
-kind: feature
-summary: Save the agent configuration and the state encrypted on the disk.
-issue: https://github.com/elastic/elastic-agent/issues/535
-pr: https://github.com/elastic/elastic-agent/pull/398
