@@ -6,7 +6,6 @@ package fleet
 
 import (
 	"context"
-	stderr "errors"
 	"fmt"
 	"time"
 
@@ -62,14 +61,6 @@ type stateStore interface {
 	AckToken() string
 	SetAckToken(ackToken string)
 	Save() error
-	SetQueue([]fleetapi.Action)
-	Actions() []fleetapi.Action
-}
-
-type actionQueue interface {
-	Add(fleetapi.Action, int64)
-	DequeueActions() []fleetapi.Action
-	Cancel(string) int
 	Actions() []fleetapi.Action
 }
 
@@ -84,7 +75,6 @@ type fleetGateway struct {
 	unauthCounter int
 	stateFetcher  coordinator.StateFetcher
 	stateStore    stateStore
-	queue         actionQueue
 	errCh         chan error
 }
 
@@ -97,7 +87,6 @@ func New(
 	acker acker.Acker,
 	stateFetcher coordinator.StateFetcher,
 	stateStore stateStore,
-	queue actionQueue,
 ) (gateway.FleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
@@ -111,7 +100,6 @@ func New(
 		acker,
 		stateFetcher,
 		stateStore,
-		queue,
 	)
 }
 
@@ -125,7 +113,6 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateFetcher coordinator.StateFetcher,
 	stateStore stateStore,
-	queue actionQueue,
 ) (gateway.FleetGateway, error) {
 	return &fleetGateway{
 		log:          log,
@@ -137,7 +124,6 @@ func newFleetGatewayWithScheduler(
 		acker:        acker,
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
-		queue:        queue,
 		errCh:        make(chan error),
 	}, nil
 }
@@ -163,7 +149,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 			f.scheduler.Stop()
 			f.log.Info("Fleet gateway stopped")
 			return ctx.Err()
-		case ts := <-f.scheduler.WaitTick():
+		case <-f.scheduler.WaitTick():
 			f.log.Debug("FleetGateway calling Checkin API")
 
 			// Execute the checkin call and for any errors returned by the fleet-server API
@@ -174,28 +160,11 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 				continue
 			}
 
-			actions := f.queueScheduledActions(resp.Actions)
-			actions, err = f.dispatchCancelActions(actions)
-			if err != nil {
-				f.log.Error(err.Error())
-			}
-
-			queued, expired := f.gatherQueuedActions(ts.UTC())
-			f.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
-			f.log.Debugf("Expired actions: %v", expired)
-
-			actions = append(actions, queued...)
+			actions := make([]fleetapi.Action, len(resp.Actions))
+			copy(actions, resp.Actions)
 
 			// Persist state
 			hadErr := false
-			f.stateStore.SetQueue(f.queue.Actions())
-			if err := f.stateStore.Save(); err != nil {
-				err = fmt.Errorf("failed to persist action_queue, error: %w", err)
-				f.log.Error(err)
-				f.errCh <- err
-				hadErr = true
-			}
-
 			if err := f.dispatcher.Dispatch(context.Background(), f.acker, actions...); err != nil {
 				err = fmt.Errorf("failed to dispatch actions, error: %w", err)
 				f.log.Error(err)
@@ -214,60 +183,6 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 // Errors returns the channel to watch for reported errors.
 func (f *fleetGateway) Errors() <-chan error {
 	return f.errCh
-}
-
-// queueScheduledActions will add any action in actions with a valid start time to the queue and return the rest.
-// start time to current time comparisons are purposefully not made in case of cancel actions.
-func (f *fleetGateway) queueScheduledActions(input fleetapi.Actions) []fleetapi.Action {
-	actions := make([]fleetapi.Action, 0, len(input))
-	for _, action := range input {
-		start, err := action.StartTime()
-		if err == nil {
-			f.log.Debugf("Adding action id: %s to queue.", action.ID())
-			f.queue.Add(action, start.Unix())
-			continue
-		}
-		if !stderr.Is(err, fleetapi.ErrNoStartTime) {
-			f.log.Warnf("Issue gathering start time from action id %s: %v", action.ID(), err)
-		}
-		actions = append(actions, action)
-	}
-	return actions
-}
-
-// dispatchCancelActions will separate and dispatch any cancel actions from the actions list and return the rest of the list.
-// cancel actions are dispatched seperatly as they may remove items from the queue.
-func (f *fleetGateway) dispatchCancelActions(actions []fleetapi.Action) ([]fleetapi.Action, error) {
-	// separate cancel actions from the actions list
-	cancelActions := make([]fleetapi.Action, 0, len(actions))
-	for i := len(actions) - 1; i >= 0; i-- {
-		action := actions[i]
-		if action.Type() == fleetapi.ActionTypeCancel {
-			cancelActions = append(cancelActions, action)
-			actions = append(actions[:i], actions[i+1:]...)
-		}
-	}
-	// Dispatch cancel actions
-	if len(cancelActions) > 0 {
-		if err := f.dispatcher.Dispatch(context.Background(), f.acker, cancelActions...); err != nil {
-			return actions, fmt.Errorf("failed to dispatch cancel actions: %w", err)
-		}
-	}
-	return actions, nil
-}
-
-// gatherQueuedActions will dequeue actions from the action queue and separate those that have already expired.
-func (f *fleetGateway) gatherQueuedActions(ts time.Time) (queued, expired []fleetapi.Action) {
-	actions := f.queue.DequeueActions()
-	for _, action := range actions {
-		exp, _ := action.Expiration()
-		if ts.After(exp) {
-			expired = append(expired, action)
-			continue
-		}
-		queued = append(queued, action)
-	}
-	return queued, expired
 }
 
 func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
