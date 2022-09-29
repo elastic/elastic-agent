@@ -804,7 +804,7 @@ func (m *Manager) performDiagAction(ctx context.Context, unit component.Unit) ([
 				}
 			}
 		}
-		return nil, errors.New("generic action failure")
+		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
 	return res.Diagnostic, nil
 }
