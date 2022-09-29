@@ -337,6 +337,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		AckToken: ackToken,
 		Metadata: ecsMeta,
 		Status:   f.statusController.StatusString(),
+		Message:  f.statusController.Status().Message,
 	}
 
 	resp, err := cmd.Execute(ctx, req)
