@@ -16,10 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-
 	"github.com/gofrs/uuid"
-
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
@@ -31,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/atomic"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -43,6 +41,8 @@ const (
 	// maxCheckinMisses is the maximum number of check-in misses a component can miss before it is killed
 	// and restarted.
 	maxCheckinMisses = 3
+	// diagnosticTimeout is the maximum amount of time to wait for a diagnostic response from a unit.
+	diagnosticTimeout = 20 * time.Second
 )
 
 var (
@@ -52,8 +52,16 @@ var (
 
 // ComponentComponentState provides a structure to map a component to current component state.
 type ComponentComponentState struct {
+	Component component.Component `yaml:"component"`
+	State     ComponentState      `yaml:"state"`
+}
+
+// ComponentUnitDiagnostic provides a structure to map a component/unit to diagnostic results.
+type ComponentUnitDiagnostic struct {
 	Component component.Component
-	State     ComponentState
+	Unit      component.Unit
+	Results   []*proto.ActionDiagnosticUnitResult
+	Err       error
 }
 
 // Manager for the entire runtime of operating components.
@@ -331,6 +339,69 @@ func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name s
 		}
 	}
 	return respBody, nil
+}
+
+// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
+// it performs diagnostics for all current units.
+func (m *Manager) PerformDiagnostics(ctx context.Context, units ...component.Unit) []ComponentUnitDiagnostic {
+	// build results from units
+	var results []ComponentUnitDiagnostic
+	if len(units) > 0 {
+		for _, u := range units {
+			r := m.getRuntimeFromUnit(u)
+			if r == nil {
+				results = append(results, ComponentUnitDiagnostic{
+					Unit: u,
+					Err:  ErrNoUnit,
+				})
+			} else {
+				results = append(results, ComponentUnitDiagnostic{
+					Component: r.currComp,
+					Unit:      u,
+				})
+			}
+		}
+	} else {
+		m.mx.RLock()
+		for _, r := range m.current {
+			for _, u := range r.currComp.Units {
+				var err error
+				if r.currComp.Err != nil {
+					err = r.currComp.Err
+				} else if u.Err != nil {
+					err = u.Err
+				}
+				if err != nil {
+					results = append(results, ComponentUnitDiagnostic{
+						Component: r.currComp,
+						Unit:      u,
+						Err:       err,
+					})
+				} else {
+					results = append(results, ComponentUnitDiagnostic{
+						Component: r.currComp,
+						Unit:      u,
+					})
+				}
+			}
+		}
+		m.mx.RUnlock()
+	}
+
+	for i, r := range results {
+		if r.Err != nil {
+			// already in error don't perform diagnostics
+			continue
+		}
+		diag, err := m.performDiagAction(ctx, r.Unit)
+		if err != nil {
+			r.Err = err
+		} else {
+			r.Results = diag
+		}
+		results[i] = r
+	}
+	return results
 }
 
 // Subscribe to changes in a component.
@@ -694,6 +765,50 @@ func (m *Manager) getListenAddr() string {
 		}
 	}
 	return m.listenAddr
+}
+
+func (m *Manager) performDiagAction(ctx context.Context, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
+	defer cancel()
+
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+
+	runtime := m.getRuntimeFromUnit(unit)
+	if runtime == nil {
+		return nil, ErrNoUnit
+	}
+
+	req := &proto.ActionRequest{
+		Id:       id.String(),
+		UnitId:   unit.ID,
+		UnitType: proto.UnitType(unit.Type),
+		Type:     proto.ActionRequest_DIAGNOSTICS,
+	}
+	res, err := runtime.performAction(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if res.Status == proto.ActionResponse_FAILED {
+		var respBody map[string]interface{}
+		if res.Result != nil {
+			err = json.Unmarshal(res.Result, &respBody)
+			if err != nil {
+				return nil, err
+			}
+			errMsgT, ok := respBody["error"]
+			if ok {
+				errMsg, ok := errMsgT.(string)
+				if ok {
+					return nil, errors.New(errMsg)
+				}
+			}
+		}
+		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
+	}
+	return res.Diagnostic, nil
 }
 
 type waitForReady struct {

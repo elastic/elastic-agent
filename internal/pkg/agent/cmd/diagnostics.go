@@ -7,7 +7,6 @@ package cmd
 import (
 	"archive/zip"
 	"context"
-	"encoding/json"
 	stderrors "errors"
 	"fmt"
 	"io"
@@ -15,240 +14,67 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
-const (
-	outputTypeHuman = "human"
-	outputTypeJSON  = "json"
-	outputTypeYAML  = "yaml"
-)
-
-var diagOutputs = map[string]outputter{
-	outputTypeHuman: humanDiagnosticsOutput,
-	outputTypeJSON:  jsonOutput,
-	outputTypeYAML:  yamlOutput,
-}
-
-// DiagnosticsInfo a struct to track all information related to diagnostics for the agent.
-type DiagnosticsInfo struct {
-	ProcMeta  []client.ProcMeta
-	AgentInfo AgentInfo
-}
-
-// AgentInfo contains all information about the running Agent.
-type AgentInfo struct {
-	ID        string
-	Version   string
-	Commit    string
-	BuildTime time.Time
-	Snapshot  bool
-}
-
-// AgentConfig tracks all configuration that the agent uses, local files, rendered policies, beat inputs etc.
-type AgentConfig struct {
-	ConfigLocal    *configuration.Configuration
-	ConfigRendered map[string]interface{}
-	AppConfig      map[string]interface{} // map of processName_rk:config
-}
-
-func newDiagnosticsCommand(s []string, streams *cli.IOStreams) *cobra.Command {
+func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diagnostics",
-		Short: "Gather diagnostics information from the elastic-agent and running processes.",
-		Long:  "Gather diagnostics information from the elastic-agent and running processes.",
+		Short: "Gather diagnostics information from the elastic-agent and write it to a zip archive.",
+		Long:  "Gather diagnostics information from the elastic-agent and write it to a zip archive.",
 		Run: func(c *cobra.Command, args []string) {
-			if err := diagnosticCmd(streams, c, args); err != nil {
+			if err := diagnosticCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
 		},
 	}
 
-	cmd.Flags().String("output", "human", "Output the diagnostics information in either human, json, or yaml (default: human)")
-	cmd.AddCommand(newDiagnosticsCollectCommandWithArgs(s, streams))
-	cmd.AddCommand(newDiagnosticsPprofCommandWithArgs(s, streams))
-
-	return cmd
-}
-
-func newDiagnosticsCollectCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "collect",
-		Short: "Collect diagnostics information from the elastic-agent and write it to a zip archive.",
-		Long:  "Collect diagnostics information from the elastic-agent and write it to a zip archive.\nNote that any credentials will appear in plain text.",
-		Args:  cobra.MaximumNArgs(3),
-		RunE: func(c *cobra.Command, args []string) error {
-			file, _ := c.Flags().GetString("file")
-
-			if file == "" {
-				ts := time.Now().UTC()
-				file = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
-			}
-
-			output, _ := c.Flags().GetString("output")
-			switch output {
-			case outputTypeYAML:
-			case outputTypeJSON:
-			default:
-				return fmt.Errorf("unsupported output: %s", output)
-			}
-
-			pprof, _ := c.Flags().GetBool("pprof")
-			d, _ := c.Flags().GetDuration("pprof-duration")
-			// get the command timeout value only if one is set explicitly.
-			// otherwise a value of 30s + pprof-duration will be used.
-			var timeout time.Duration
-			if c.Flags().Changed("timeout") {
-				timeout, _ = c.Flags().GetDuration("timeout")
-			}
-
-			return diagnosticsCollectCmd(streams, file, output, pprof, d, timeout)
-		},
-	}
-
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
-	cmd.Flags().String("output", "yaml", "Output the collected information in either json, or yaml (default: yaml)") // replace output flag with different options
-	cmd.Flags().Bool("pprof", false, "Collect all pprof data from all running applications.")
-	cmd.Flags().Duration("pprof-duration", time.Second*30, "The duration to collect trace and profiling data from the debug/pprof endpoints. (default: 30s)")
-	cmd.Flags().Duration("timeout", time.Second*30, "The timeout for the diagnostics collect command, will be either 30s or 30s+pprof-duration by default. Should be longer then pprof-duration when pprof is enabled as the command needs time to process/archive the response.")
 
 	return cmd
 }
 
-func newDiagnosticsPprofCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "pprof",
-		Short: "Collect pprof information from a running process.",
-		Long:  "Collect pprof information from the elastic-agent or one of its processes and write to stdout or a file.\nBy default it will gather a 30s profile of the elastic-agent and output on stdout.",
-		Args:  cobra.MaximumNArgs(5),
-		RunE: func(c *cobra.Command, args []string) error {
-			file, _ := c.Flags().GetString("file")
-			pprofType, _ := c.Flags().GetString("pprof-type")
-			d, _ := c.Flags().GetDuration("pprof-duration")
-			// get the command timeout value only if one is set explicitly.
-			// otherwise a value of 30s + pprof-duration will be used.
-			var timeout time.Duration
-			if c.Flags().Changed("timeout") {
-				timeout, _ = c.Flags().GetDuration("timeout")
-			}
-
-			pprofApp, _ := c.Flags().GetString("pprof-application")
-			pprofRK, _ := c.Flags().GetString("pprof-route-key")
-
-			return diagnosticsPprofCmd(streams, d, timeout, file, pprofType, pprofApp, pprofRK)
-		},
+func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
+	fileName, _ := cmd.Flags().GetString("file")
+	if fileName == "" {
+		ts := time.Now().UTC()
+		fileName = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
 	}
 
-	cmd.Flags().StringP("file", "f", "", "name of the output file, stdout if unspecified.")
-	cmd.Flags().String("pprof-type", "profile", "Collect all pprof data from all running applications. Select one of [allocs, block, cmdline, goroutine, heap, mutex, profile, threadcreate, trace]")
-	cmd.Flags().Duration("pprof-duration", time.Second*30, "The duration to collect trace and profiling data from the debug/pprof endpoints. (default: 30s)")
-	cmd.Flags().Duration("timeout", time.Second*60, "The timeout for the pprof collect command, defaults to 30s+pprof-duration by default. Should be longer then pprof-duration as the command needs time to process the response.")
-	cmd.Flags().String("pprof-application", "elastic-agent", "Application name to collect pprof data from.")
-	cmd.Flags().String("pprof-route-key", "default", "Route key to collect pprof data from.")
-
-	return cmd
-}
-
-func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command, _ []string) error {
-	err := tryContainerLoadPaths()
-	if err != nil {
-		return err
-	}
-
-	output, _ := cmd.Flags().GetString("output")
-	outputFunc, ok := diagOutputs[output]
-	if !ok {
-		return fmt.Errorf("unsupported output: %s", output)
-	}
-
-	ctx := handleSignal(context.Background())
-	innerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	diag, err := getDiagnostics(innerCtx)
-	if errors.Is(err, context.DeadlineExceeded) {
-		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if errors.Is(err, context.Canceled) {
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
-	}
-
-	return outputFunc(streams.Out, diag)
-}
-
-func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string, pprof bool, pprofDur, cmdTimeout time.Duration) error {
 	err := tryContainerLoadPaths()
 	if err != nil {
 		return err
 	}
 
 	ctx := handleSignal(context.Background())
-	// set command timeout to 30s or 30s+pprofDur if no timeout is specified
-	if cmdTimeout == time.Duration(0) {
-		cmdTimeout = time.Second * 30
-		if pprof {
-			cmdTimeout += pprofDur
-		}
 
-	}
-	innerCtx, cancel := context.WithTimeout(ctx, cmdTimeout)
-	defer cancel()
-
-	errs := make([]error, 0)
-	diag, err := getDiagnostics(innerCtx)
-	if errors.Is(err, context.DeadlineExceeded) {
-		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
-	} else if errors.Is(err, context.Canceled) {
-		return nil
-	} else if err != nil {
-		errs = append(errs, fmt.Errorf("unable to gather diagnostics data: %w", err))
-		fmt.Fprintf(streams.Err, "Failed to gather diagnostics data from elastic-agent: %v\n", err)
-	}
-
-	metrics, err := gatherMetrics(innerCtx)
+	daemon := client.New()
+	err = daemon.Connect(ctx)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("timed out after %s trying to connect to Elastic Agent daemon", cmdTimeout)
-		}
-		if errors.Is(err, context.Canceled) {
-			return nil
-		}
-		errs = append(errs, fmt.Errorf("unable to gather metrics data: %w", err))
-		fmt.Fprintf(streams.Err, "Failed to gather metrics data from elastic-agent: %v\n", err)
+		return fmt.Errorf("failed to connect to daemon: %w", err)
 	}
+	defer daemon.Disconnect()
 
-	cfg, err := gatherConfig()
+	agentDiag, err := daemon.DiagnosticAgent(ctx)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("unable to gather config data: %w", err))
-		fmt.Fprintf(streams.Err, "Failed to gather config data from elastic-agent: %v\n", err)
+		return fmt.Errorf("failed to fetch agent diagnostics: %w", err)
 	}
 
-	var pprofData map[string][]client.ProcPProf
-	if pprof {
-		pprofData, err = getAllPprof(innerCtx, pprofDur)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("unable to gather pprof data: %w", err))
-			fmt.Fprintf(streams.Err, "Failed to gather pprof data from elastic-agent: %v\n", err)
-		}
+	unitDiags, err := daemon.DiagnosticUnits(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch component/unit diagnostics: %w", err)
 	}
 
-	err = createZip(fileName, outputFormat, diag, cfg, pprofData, metrics, errs)
+	err = createZip(fileName, agentDiag, unitDiags)
 	if err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
 	}
@@ -257,297 +83,79 @@ func diagnosticsCollectCmd(streams *cli.IOStreams, fileName, outputFormat string
 	return nil
 }
 
-func diagnosticsPprofCmd(streams *cli.IOStreams, dur, cmdTimeout time.Duration, outFile, pType, appName, rk string) error {
-	pt, ok := cproto.PprofOption_value[strings.ToUpper(pType)]
-	if !ok {
-		return fmt.Errorf("unknown pprof-type %q, select one of [allocs, block, cmdline, goroutine, heap, mutex, profile, threadcreate, trace]", pType)
-	}
-
-	// the elastic-agent application does not have a route key
-	if appName == "elastic-agent" {
-		rk = ""
-	}
-
-	ctx := handleSignal(context.Background())
-	// set cmdTimeout to 30s+dur if not set.
-	if cmdTimeout == time.Duration(0) {
-		cmdTimeout = time.Second*30 + dur
-	}
-	innerCtx, cancel := context.WithTimeout(ctx, cmdTimeout)
-	defer cancel()
-
-	daemon := client.New()
-	err := daemon.Connect(ctx)
-	if err != nil {
-		return err
-	}
-
-	pprofData, err := daemon.Pprof(innerCtx, dur, []cproto.PprofOption{cproto.PprofOption(pt)}, appName, rk)
-	if err != nil {
-		return err
-	}
-
-	// validate response
-	pArr, ok := pprofData[cproto.PprofOption_name[pt]]
-	if !ok {
-		return fmt.Errorf("route key %q not found in response data (map length: %d)", rk, len(pprofData))
-	}
-	if len(pArr) != 1 {
-		return fmt.Errorf("pprof type length 1 expected, received %d", len(pArr))
-	}
-	res := pArr[0]
-
-	if res.Error != "" {
-		return fmt.Errorf(res.Error)
-	}
-
-	// handle result
-	if outFile != "" {
-		f, err := os.Create(outFile)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = f.Write(res.Result)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(streams.Out, "pprof data written to %s\n", outFile)
-		return nil
-	}
-	_, err = streams.Out.Write(res.Result)
-	return err
-}
-
-func getDiagnostics(ctx context.Context) (DiagnosticsInfo, error) {
-	daemon := client.New()
-	diag := DiagnosticsInfo{}
-	err := daemon.Connect(ctx)
-	if err != nil {
-		return DiagnosticsInfo{}, err
-	}
-	defer daemon.Disconnect()
-
-	bv, err := daemon.ProcMeta(ctx)
-	if err != nil {
-		return DiagnosticsInfo{}, err
-	}
-	diag.ProcMeta = bv
-
-	version, err := daemon.Version(ctx)
-	if err != nil {
-		return diag, err
-	}
-	diag.AgentInfo = AgentInfo{
-		Version:   version.Version,
-		Commit:    version.Commit,
-		BuildTime: version.BuildTime,
-		Snapshot:  version.Snapshot,
-	}
-
-	agentInfo, err := info.NewAgentInfo(false)
-	if err != nil {
-		return diag, err
-	}
-	diag.AgentInfo.ID = agentInfo.AgentID()
-
-	return diag, nil
-}
-
-func gatherMetrics(ctx context.Context) (*cproto.ProcMetricsResponse, error) {
-	daemon := client.New()
-	err := daemon.Connect(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer daemon.Disconnect()
-
-	return daemon.ProcMetrics(ctx)
-}
-
-func humanDiagnosticsOutput(w io.Writer, obj interface{}) error {
-	diag, ok := obj.(DiagnosticsInfo)
-	if !ok {
-		return fmt.Errorf("unable to cast %T as DiagnosticsInfo", obj)
-	}
-	return outputDiagnostics(w, diag)
-}
-
-func outputDiagnostics(w io.Writer, d DiagnosticsInfo) error {
-	tw := tabwriter.NewWriter(w, 4, 1, 2, ' ', 0)
-	fmt.Fprintf(tw, "elastic-agent\tid: %s\tversion: %s\n", d.AgentInfo.ID, d.AgentInfo.Version)
-	fmt.Fprintf(tw, "\tbuild_commit: %s\tbuild_time: %s\tsnapshot_build: %v\n", d.AgentInfo.Commit, d.AgentInfo.BuildTime, d.AgentInfo.Snapshot)
-	if len(d.ProcMeta) == 0 {
-		fmt.Fprintf(tw, "Applications: (none)\n")
-	} else {
-		fmt.Fprintf(tw, "Applications:\n")
-		for _, app := range d.ProcMeta {
-			fmt.Fprintf(tw, "  *\tname: %s\troute_key: %s\n", app.Name, app.RouteKey)
-			if app.Error != "" {
-				fmt.Fprintf(tw, "\terror: %s\n", app.Error)
-			} else {
-				fmt.Fprintf(tw, "\tprocess: %s\tid: %s\tephemeral_id: %s\telastic_license: %v\n", app.Process, app.ID, app.EphemeralID, app.ElasticLicensed)
-				fmt.Fprintf(tw, "\tversion: %s\tcommit: %s\tbuild_time: %s\tbinary_arch: %v\n", app.Version, app.BuildCommit, app.BuildTime, app.BinaryArchitecture)
-				fmt.Fprintf(tw, "\thostname: %s\tusername: %s\tuser_id: %s\tuser_gid: %s\n", app.Hostname, app.Username, app.UserID, app.UserGID)
-			}
-
-		}
-	}
-	tw.Flush()
-	return nil
-}
-
-func gatherConfig() (AgentConfig, error) {
-	log, err := newErrorLogger()
-	if err != nil {
-		return AgentConfig{}, err
-	}
-
-	cfg := AgentConfig{}
-	localCFG, err := loadConfig(nil)
-	if err != nil {
-		return cfg, err
-	}
-	cfg.ConfigLocal = localCFG
-
-	renderedCFG, err := operations.LoadFullAgentConfig(log, paths.ConfigFile(), true)
-	if err != nil {
-		return cfg, err
-	}
-
-	agentInfo, err := info.NewAgentInfo(false)
-	if err != nil {
-		return cfg, err
-	}
-
-	if cfg.ConfigLocal.Fleet.Info.ID == "" {
-		cfg.ConfigLocal.Fleet.Info.ID = agentInfo.AgentID()
-	}
-
-	// Must force *config.Config to map[string]interface{} in order to write to a file.
-	mapCFG, err := renderedCFG.ToMapStr()
-	if err != nil {
-		return cfg, err
-	}
-	cfg.ConfigRendered = mapCFG
-
-	// TODO(blakerouse): Fix diagnostic command for Elastic Agent v2
-	/*
-		// Gather vars to render process config
-		isStandalone, err := isStandalone(renderedCFG)
-		if err != nil {
-			return AgentConfig{}, err
-		}
-
-		// Get process config - uses same approach as inspect output command.
-		// Does not contact server process to request configs.
-		pMap, err := getProgramsFromConfig(log, agentInfo, renderedCFG, isStandalone)
-		if err != nil {
-			return AgentConfig{}, err
-		}
-		cfg.AppConfig = make(map[string]interface{}, 0)
-		for rk, programs := range pMap {
-			for _, p := range programs {
-				cfg.AppConfig[p.Identifier()+"_"+rk] = p.Configuration()
-			}
-		}
-	*/
-
-	return cfg, nil
-}
-
 // createZip creates a zip archive with the passed fileName.
 //
 // The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName, outputFormat string, diag DiagnosticsInfo, cfg AgentConfig, pprof map[string][]client.ProcPProf, metrics *cproto.ProcMetricsResponse, errs []error) error {
+func createZip(fileName string, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
 	zw := zip.NewWriter(f)
 
-	if len(errs) > 0 {
-		zf, err := zw.Create("errors.txt")
+	// write all Elastic Agent diagnostics at the top level
+	for _, ad := range agentDiag {
+		zf, err := zw.Create(ad.Filename)
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
-		for i, e := range errs {
-			fmt.Fprintf(zf, "Error %d: %v\n", i+1, e)
-		}
-	}
-
-	_, err = zw.Create("meta/")
-	if err != nil {
-		return closeHandlers(err, zw, f)
-	}
-
-	zf, err := zw.Create("meta/elastic-agent-version." + outputFormat)
-	if err != nil {
-		return closeHandlers(err, zw, f)
-	}
-
-	if err := writeFile(zf, outputFormat, diag.AgentInfo); err != nil {
-		return closeHandlers(err, zw, f)
-	}
-
-	for _, m := range diag.ProcMeta {
-		zf, err = zw.Create("meta/" + m.Name + "-" + m.RouteKey + "." + outputFormat)
+		_, err = zf.Write(ad.Content)
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
-
-		if err := writeFile(zf, outputFormat, m); err != nil {
-			return closeHandlers(err, zw, f)
-		}
 	}
 
-	_, err = zw.Create("config/")
+	// structure each unit into its own component directory
+	compDirs := make(map[string][]client.DiagnosticUnitResult)
+	for _, ud := range unitDiags {
+		compDir := strings.ReplaceAll(ud.ComponentID, "/", "-")
+		compDirs[compDir] = append(compDirs[compDir], ud)
+	}
+
+	// write each units diagnostics into its own directory
+	// layout becomes components/<component-id>/<unit-id>/<filename>
+	_, err = zw.Create("components/")
 	if err != nil {
 		return closeHandlers(err, zw, f)
 	}
-
-	zf, err = zw.Create("config/elastic-agent-local." + outputFormat)
-	if err != nil {
-		return closeHandlers(err, zw, f)
-	}
-	if err := writeFile(zf, outputFormat, cfg.ConfigLocal); err != nil {
-		return closeHandlers(err, zw, f)
-	}
-
-	zf, err = zw.Create("config/elastic-agent-policy." + outputFormat)
-	if err != nil {
-		return closeHandlers(err, zw, f)
-	}
-	if err := writeFile(zf, outputFormat, cfg.ConfigRendered); err != nil {
-		return closeHandlers(err, zw, f)
-	}
-	for name, appCfg := range cfg.AppConfig {
-		zf, err := zw.Create("config/" + name + "." + outputFormat)
+	for dirName, units := range compDirs {
+		_, err = zw.Create(fmt.Sprintf("components/%s/", dirName))
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
-		if err := writeFile(zf, outputFormat, appCfg); err != nil {
-			return closeHandlers(err, zw, f)
+		for _, ud := range units {
+			unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
+			_, err = zw.Create(fmt.Sprintf("components/%s/%s/", dirName, unitDir))
+			if err != nil {
+				return closeHandlers(err, zw, f)
+			}
+			if ud.Err != nil {
+				w, err := zw.Create(fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir))
+				if err != nil {
+					return closeHandlers(err, zw, f)
+				}
+				_, err = w.Write([]byte(fmt.Sprintf("%s\n", ud.Err)))
+				if err != nil {
+					return closeHandlers(err, zw, f)
+				}
+				continue
+			}
+			for _, fr := range ud.Results {
+				w, err := zw.Create(fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name))
+				if err != nil {
+					return closeHandlers(err, zw, f)
+				}
+				_, err = w.Write(fr.Content)
+				if err != nil {
+					return closeHandlers(err, zw, f)
+				}
+			}
 		}
 	}
 
 	if err := zipLogs(zw); err != nil {
 		return closeHandlers(err, zw, f)
-	}
-
-	if pprof != nil {
-		err := zipProfs(zw, pprof)
-		if err != nil {
-			return closeHandlers(err, zw, f)
-		}
-	}
-
-	if metrics != nil && len(metrics.Result) > 0 {
-		err := zipMetrics(zw, metrics)
-		if err != nil {
-			return closeHandlers(err, zw, f)
-		}
 	}
 
 	return closeHandlers(nil, zw, f)
@@ -560,10 +168,9 @@ func zipLogs(zw *zip.Writer) error {
 		return err
 	}
 
-	// TODO(blakerouse): Fix diagnostics for v2
-	//if err := collectEndpointSecurityLogs(zw, program.SupportedMap); err != nil {
-	//	return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
-	//}
+	if err := collectServiceComponentsLogs(zw); err != nil {
+		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
+	}
 
 	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
 	logPath := filepath.Join(paths.Home(), "logs") + string(filepath.Separator)
@@ -594,41 +201,48 @@ func zipLogs(zw *zip.Writer) error {
 	})
 }
 
-/*
-func collectEndpointSecurityLogs(zw *zip.Writer, specs map[string]program.Spec) error {
-	spec, ok := specs["endpoint-security"]
-	if !ok {
-		return nil
+func collectServiceComponentsLogs(zw *zip.Writer) error {
+	platform, err := component.LoadPlatformDetail()
+	if err != nil {
+		return fmt.Errorf("failed to gather system information: %w", err)
 	}
-
-	logs, ok := spec.LogPaths[runtime.GOOS]
-	if !ok {
-		return nil
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
+	for _, spec := range specs.ServiceSpecs() {
+		if spec.Spec.Service.Log == nil || spec.Spec.Service.Log.Path == "" {
+			// no log path set in specification
+			continue
+		}
 
-	logPath := filepath.Dir(logs) + string(filepath.Separator)
-	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
-		if fErr != nil {
-			if stderrors.Is(fErr, fs.ErrNotExist) {
+		logPath := filepath.Dir(spec.Spec.Service.Log.Path) + string(filepath.Separator)
+		err = filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+			if fErr != nil {
+				if stderrors.Is(fErr, fs.ErrNotExist) {
+					return nil
+				}
+
+				return fmt.Errorf("unable to walk log directory %q for service input %s: %w", logPath, spec.InputType, fErr)
+			}
+
+			name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
+			if name == "" {
 				return nil
 			}
 
-			return fmt.Errorf("unable to walk log dir: %w", fErr)
-		}
+			if d.IsDir() {
+				return nil
+			}
 
-		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
-		if name == "" {
-			return nil
+			return saveLogs("services/"+name, path, zw)
+		})
+		if err != nil {
+			return err
 		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		return saveLogs(name, path, zw)
-	})
+	}
+	return nil
 }
-*/
 
 func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	lf, err := os.Open(logPath)
@@ -647,18 +261,6 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	return lf.Close()
 }
 
-// writeFile writes json or yaml data from the interface to the writer.
-func writeFile(w io.Writer, outputFormat string, v interface{}) error {
-	if outputFormat == "json" {
-		je := json.NewEncoder(w)
-		je.SetIndent("", "  ")
-		return je.Encode(v)
-	}
-	ye := yaml.NewEncoder(w)
-	err := ye.Encode(v)
-	return closeHandlers(err, ye)
-}
-
 // closeHandlers will close all passed closers attaching any errors to the passed err and returning the result
 func closeHandlers(err error, closers ...io.Closer) error {
 	var mErr *multierror.Error
@@ -669,91 +271,4 @@ func closeHandlers(err error, closers ...io.Closer) error {
 		}
 	}
 	return mErr.ErrorOrNil()
-}
-
-func getAllPprof(ctx context.Context, d time.Duration) (map[string][]client.ProcPProf, error) {
-	daemon := client.New()
-	err := daemon.Connect(ctx)
-	if err != nil {
-		return nil, err
-	}
-	pprofTypes := []cproto.PprofOption{
-		cproto.PprofOption_ALLOCS,
-		cproto.PprofOption_BLOCK,
-		cproto.PprofOption_CMDLINE,
-		cproto.PprofOption_GOROUTINE,
-		cproto.PprofOption_HEAP,
-		cproto.PprofOption_MUTEX,
-		cproto.PprofOption_PROFILE,
-		cproto.PprofOption_THREADCREATE,
-		cproto.PprofOption_TRACE,
-	}
-	return daemon.Pprof(ctx, d, pprofTypes, "", "")
-}
-
-func zipProfs(zw *zip.Writer, pprof map[string][]client.ProcPProf) error {
-	_, err := zw.Create("pprof/")
-	if err != nil {
-		return err
-	}
-
-	for pType, profs := range pprof {
-		_, err := zw.Create("pprof/" + pType + "/")
-		if err != nil {
-			return err
-		}
-		for _, p := range profs {
-			if p.Error != "" {
-				zf, err := zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + "_error.txt")
-				if err != nil {
-					return err
-				}
-				_, err = zf.Write([]byte(p.Error))
-				if err != nil {
-					return err
-				}
-				continue
-			}
-			zf, err := zw.Create("pprof/" + pType + "/" + p.Name + "_" + p.RouteKey + ".pprof")
-			if err != nil {
-				return err
-			}
-			_, err = zf.Write(p.Result)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func zipMetrics(zw *zip.Writer, metrics *cproto.ProcMetricsResponse) error {
-	//nolint:staticcheck,wastedassign // false positive
-	zf, err := zw.Create("metrics/")
-	if err != nil {
-		return err
-	}
-
-	for _, m := range metrics.Result {
-		if m.Error != "" {
-			zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + "_error.txt")
-			if err != nil {
-				return err
-			}
-			_, err = zf.Write([]byte(m.Error))
-			if err != nil {
-				return err
-			}
-			continue
-		}
-		zf, err = zw.Create("metrics/" + m.AppName + "_" + m.RouteKey + ".json")
-		if err != nil {
-			return err
-		}
-		_, err = zf.Write(m.Result)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
