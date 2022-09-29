@@ -202,7 +202,7 @@ func TestFleetGateway(t *testing.T) {
 		case actions := <-gateway.Actions():
 			require.Len(t, actions, 2)
 		default:
-			t.Errorf("Expected to recieve actions")
+			t.Errorf("Expected to receive actions")
 		}
 	}))
 
