@@ -88,6 +88,10 @@ func (b *SidecarMonitor) EnrichArgs(spec program.Spec, pipelineID string, args [
 func (b *SidecarMonitor) Cleanup(spec program.Spec, pipelineID string) error {
 	endpoint := MonitoringEndpoint(spec, b.operatingSystem, pipelineID, true)
 	drop := monitoringDrop(endpoint)
+	if drop == "" {
+		// not exposed using sockets
+		return nil
+	}
 
 	return os.RemoveAll(drop)
 }
@@ -103,6 +107,11 @@ func (b *SidecarMonitor) Close() {
 func (b *SidecarMonitor) Prepare(spec program.Spec, pipelineID string, uid, gid int) error {
 	endpoint := MonitoringEndpoint(spec, b.operatingSystem, pipelineID, true)
 	drop := monitoringDrop(endpoint)
+
+	if drop == "" {
+		// not exposed using sockets
+		return nil
+	}
 
 	if err := os.MkdirAll(drop, 0775); err != nil {
 		return errors.New(err, fmt.Sprintf("failed to create a directory %q", drop))
