@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
@@ -717,6 +718,7 @@ func TestRetriesOnFailures(t *testing.T) {
 		statusController.On("RegisterComponent", "gateway").Return(fleetReporter).Once()
 		statusController.On("RegisterLocalComponent", "gateway-checkin").Return(localReporter).Once()
 		statusController.On("StatusString").Return("string")
+		statusController.On("Status").Return(status.AgentStatus{Message: "message"})
 
 		gateway, err := newFleetGatewayWithScheduler(
 			ctx,
