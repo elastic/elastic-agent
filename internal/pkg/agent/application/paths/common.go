@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -22,8 +21,6 @@ const (
 	// AgentLockFileName is the name of the overall Elastic Agent file lock.
 	AgentLockFileName = "agent.lock"
 	tempSubdir        = "tmp"
-
-	darwin = "darwin"
 )
 
 var (
@@ -71,9 +68,7 @@ func SetTop(path string) {
 func TempDir() string {
 	tmpDir := filepath.Join(Data(), tempSubdir)
 	tmpCreator.Do(func() {
-		// Create tempdir as it probably don't exists.
-		// The error was not checked here before and the linter is not happy about it.
-		// Changing this now would lead to the wide change scope that intended at the moment, so just making the linter happy for now.
+		// create tempdir as it probably don't exists
 		_ = os.MkdirAll(tmpDir, 0750)
 	})
 	return tmpDir
@@ -177,15 +172,10 @@ func SetInstall(path string) {
 // initialTop returns the initial top-level path for the binary
 //
 // When nested in top-level/data/elastic-agent-${hash}/ the result is top-level/.
-// The agent fexecutable for MacOS is wrappend in the bundle, so the path to the binary is
-// top-level/data/elastic-agent-${hash}/elastic-agent.app/Contents/MacOS
 func initialTop() string {
 	exePath := retrieveExecutablePath()
 	if insideData(exePath) {
-		exePath = filepath.Dir(filepath.Dir(exePath))
-		if runtime.GOOS == darwin {
-			exePath = filepath.Dir(filepath.Dir(filepath.Dir(exePath)))
-		}
+		return filepath.Dir(filepath.Dir(exePath))
 	}
 	return exePath
 }
@@ -206,8 +196,5 @@ func retrieveExecutablePath() string {
 // insideData returns true when the exePath is inside of the current Agents data path.
 func insideData(exePath string) bool {
 	expectedPath := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-	if runtime.GOOS == darwin {
-		expectedPath = filepath.Join(expectedPath, "elastic-agent.app", "Contents", "MacOS")
-	}
 	return strings.HasSuffix(exePath, expectedPath)
 }
