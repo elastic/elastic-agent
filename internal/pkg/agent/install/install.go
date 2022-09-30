@@ -55,7 +55,7 @@ func Install(cfgFile string) error {
 	if paths.ShellWrapperPath != "" {
 		err = os.MkdirAll(filepath.Dir(paths.ShellWrapperPath), 0755)
 		if err == nil {
-			err = ioutil.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
+			err = ioutil.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755) // nolint:gosec,G306 // this is fine.
 		}
 		if err != nil {
 			return errors.New(
