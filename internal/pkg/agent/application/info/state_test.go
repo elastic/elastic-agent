@@ -7,20 +7,15 @@ package info
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestIsInsideData(t *testing.T) {
-
-	validExePath := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-
-	if runtime.GOOS == darwin {
-		validExePath = filepath.Join(validExePath, "elastic-agent.app", "Contents", "MacOS")
-	}
+	validExePath := paths.BinaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
 
 	tests := []struct {
 		name    string

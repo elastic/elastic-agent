@@ -1,0 +1,11 @@
+#!/bin/sh
+# Fix up the symlink and exit
+
+set -e
+
+symlink="/Library/Elastic/Agent/elastic-agent"
+
+if test -L "$symlink"; then
+    ln -sfn "data/elastic-agent-{{ commit_short }}/elastic-agent.app/Contents/MacOS/elastic-agent" "$symlink"
+fi
+
