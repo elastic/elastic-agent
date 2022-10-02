@@ -205,9 +205,21 @@ func retrieveExecutablePath() string {
 
 // insideData returns true when the exePath is inside of the current Agents data path.
 func insideData(exePath string) bool {
-	expectedPath := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-	if runtime.GOOS == darwin {
-		expectedPath = filepath.Join(expectedPath, "elastic-agent.app", "Contents", "MacOS")
-	}
+	expectedPath := BinaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
 	return strings.HasSuffix(exePath, expectedPath)
+}
+
+// BinaryDir returns the application binary directory
+// For macOS it appends the path inside of the app bundle
+// For other platforms it returns the same dir
+func BinaryDir(baseDir string) string {
+	if runtime.GOOS == darwin {
+		baseDir = filepath.Join(baseDir, "elastic-agent.app", "Contents", "MacOS")
+	}
+	return baseDir
+}
+
+// BinaryPath returns the application binary path that is concatenation of the directory and the agentName
+func BinaryPath(baseDir, agentName string) string {
+	return filepath.Join(BinaryDir(baseDir), agentName)
 }

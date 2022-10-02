@@ -1089,6 +1089,9 @@ specs:
         <<: *agent_darwin_binary_spec
         <<: *elastic_license_for_binaries
         files:
+          'data/{{.BeatName}}-{{ commit_short }}/elastic-agent':
+            template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
+            mode: 0755
           '{{.BeatName}}{{.BinaryExt}}':
             source: data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
             symlink: true
