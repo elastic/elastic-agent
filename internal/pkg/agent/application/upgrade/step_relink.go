@@ -17,6 +17,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+const (
+	windows = "windows"
+	exe     = ".exe"
+)
+
 // ChangeSymlink updates symlink paths to match current version.
 func ChangeSymlink(ctx context.Context, log *logger.Logger, targetHash string) error {
 	// create symlink to elastic-agent-{hash}
@@ -28,9 +33,9 @@ func ChangeSymlink(ctx context.Context, log *logger.Logger, targetHash string) e
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), "data", hashedDir), agentName)
 
 	// handle windows suffixes
-	if runtime.GOOS == "windows" {
-		symlinkPath += ".exe"
-		newPath += ".exe"
+	if runtime.GOOS == windows {
+		symlinkPath += exe
+		newPath += exe
 	}
 
 	prevNewPath := prevSymlinkPath()
@@ -53,7 +58,7 @@ func prevSymlinkPath() string {
 	agentPrevName := agentName + ".prev"
 
 	// handle windows suffixes
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windows {
 		agentPrevName = agentName + ".exe.prev"
 	}
 

@@ -6,7 +6,6 @@ package install
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -82,7 +81,7 @@ func Install(cfgFile string) error {
 			err = os.MkdirAll(filepath.Dir(paths.ShellWrapperPath), 0755)
 			if err == nil {
 				//nolint: gosec // this is intended to be an executable shell script, not chaning the permissions for the linter
-				err = ioutil.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
+				err = os.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
 			}
 			if err != nil {
 				return errors.New(

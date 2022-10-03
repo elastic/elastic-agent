@@ -7,7 +7,6 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,7 +150,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		return nil, err
 	}
 
-	newHash, err := u.unpack(ctx, a.Version(), archivePath)
+	newHash, err := u.unpack(a.Version(), archivePath)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +305,7 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 	for _, currentActionStorePath := range storePaths {
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
 		log.Debugw("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
-		currentActionStore, err := ioutil.ReadFile(currentActionStorePath)
+		currentActionStore, err := os.ReadFile(currentActionStorePath)
 		if os.IsNotExist(err) {
 			// nothing to copy
 			continue
@@ -315,7 +314,7 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 			return err
 		}
 
-		if err := ioutil.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
+		if err := os.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
 			return err
 		}
 	}
