@@ -23,7 +23,8 @@ func ChangeSymlink(ctx context.Context, log *logger.Logger, targetHash string) e
 	hashedDir := fmt.Sprintf("%s-%s", agentName, targetHash)
 
 	symlinkPath := filepath.Join(paths.Top(), agentName)
-	newPath := filepath.Join(paths.Top(), "data", hashedDir, agentName)
+
+	newPath := paths.BinaryPath(filepath.Join(paths.Top(), "data", hashedDir), agentName)
 
 	// handle windows suffixes
 	if runtime.GOOS == "windows" {
