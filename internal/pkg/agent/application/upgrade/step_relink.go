@@ -24,6 +24,7 @@ func ChangeSymlink(ctx context.Context, log *logger.Logger, targetHash string) e
 
 	symlinkPath := filepath.Join(paths.Top(), agentName)
 
+	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), "data", hashedDir), agentName)
 
 	// handle windows suffixes
