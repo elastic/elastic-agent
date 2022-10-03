@@ -54,7 +54,7 @@ func TestIsInsideData(t *testing.T) {
 }
 
 func TestExecDir(t *testing.T) {
-	const base = "/Library/Elastic/Agent"
+	base := filepath.Join(string(filepath.Separator), "Library", "Elastic", "Agent")
 	tests := []struct {
 		name    string
 		execDir string
