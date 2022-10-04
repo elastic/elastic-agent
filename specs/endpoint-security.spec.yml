@@ -15,8 +15,11 @@ inputs:
           message: "No support for RHEL7 on arm64"
     service:
       name: "ElasticEndpoint"
+      label: "co.elastic.endpoint"
       cport: 6788
-      operations:
+      log:
+        path: "/opt/Elastic/Endpoint/state/log/endpoint-*.log"
+      operations: &operations
         check:
           args:
             - "verify"
@@ -46,30 +49,9 @@ inputs:
     outputs:
       - elasticsearch
     service:
-      name: "co.elastic.endpoint"
-      cport: 6788
-      operations:
-        check:
-          args:
-            - "verify"
-            - "--log"
-            - "stderr"
-          timeout: 30
-        install:
-          args:
-            - "install"
-            - "--log"
-            - "stderr"
-            - "--upgrade"
-            - "--resources"
-            - "endpoint-security-resources.zip"
-          timeout: 600
-        uninstall:
-          args:
-            - "uninstall"
-            - "--log"
-            - "stderr"
-          timeout: 600
+      log:
+        path: "/Library/Elastic/Endpoint/state/log/endpoint-*.log"
+      operations: *operations
   - name: endpoint
     description: "Endpoint Security"
     platforms:
@@ -81,27 +63,6 @@ inputs:
         - condition: ${runtime.user.root} == false
           message: "Elastic Agent must be running as Administrator or SYSTEM"
     service:
-      name: "ElasticEndpoint"
-      cport: 6788
-      operations:
-        check:
-          args:
-            - "verify"
-            - "--log"
-            - "stderr"
-          timeout: 30
-        install:
-          args:
-            - "install"
-            - "--log"
-            - "stderr"
-            - "--upgrade"
-            - "--resources"
-            - "endpoint-security-resources.zip"
-          timeout: 600
-        uninstall:
-          args:
-            - "uninstall"
-            - "--log"
-            - "stderr"
-          timeout: 600
+      log:
+        path: "C:\\Program Files\\Elastic\\Endpoint\\state\\log\\endpoint-*.log"
+      operations: *operations

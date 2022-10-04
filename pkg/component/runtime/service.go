@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/kardianos/service"
@@ -422,11 +423,15 @@ func (s *ServiceRuntime) compState(state client.UnitState, cli service.Service) 
 
 // platformService returns the service.Service client that allows to manage the lifecycle of the service
 func (s *ServiceRuntime) platformService() (service.Service, error) {
-	if s.current.Spec.Spec.Service.Name == "" {
+	name := s.current.Spec.Spec.Service.Name
+	if runtime.GOOS == "darwin" {
+		name = s.current.Spec.Spec.Service.Label
+	}
+	if name == "" {
 		return nil, fmt.Errorf("missing service name: %w", ErrInvalidServiceSpec)
 	}
 
-	return s.platformServiceImpl(s.current.Spec.Spec.Service.Name)
+	return s.platformServiceImpl(name)
 }
 
 func platformService(name string) (service.Service, error) {

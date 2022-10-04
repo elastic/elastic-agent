@@ -169,6 +169,17 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 	return InputRuntimeSpec{}, ErrInputNotSupported
 }
 
+// ServiceSpecs returns only the input specification that are based on the service runtime.
+func (r *RuntimeSpecs) ServiceSpecs() []InputRuntimeSpec {
+	var services []InputRuntimeSpec
+	for _, s := range r.inputSpecs {
+		if s.Spec.Service != nil {
+			services = append(services, s)
+		}
+	}
+	return services
+}
+
 // LoadSpec loads the component specification.
 //
 // Will error in the case that the specification is not valid. Only valid specifications are allowed.
