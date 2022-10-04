@@ -94,7 +94,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	// persisted and we return an empty store.
 	reader, err := store.Load()
 	if err != nil {
-		return &StateStore{log: log, store: store}, nil //nolint:nilerr // expected results
+		return &StateStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
 
