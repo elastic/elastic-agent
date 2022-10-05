@@ -36,6 +36,7 @@ import (
 
 const (
 	darwin  = "darwin"
+	windows = "windows"
 	unknown = "Unknown"
 	running = "Running"
 )
@@ -278,7 +279,7 @@ func (a *Application) Stop() {
 	if err := srvState.Stop(to); err != nil {
 		a.setState(
 			state.Failed,
-			fmt.Errorf("failed to stop after %s: %w", to, err).Error(),
+			fmt.Sprintf("failed to stop after %s: %v", to, err),
 			nil)
 
 		// Start service status watcher if service haven't responded over RPC within the allowed duration.
@@ -301,7 +302,9 @@ func (a *Application) stopAndWatch() {
 	name := a.desc.Spec().ServiceInfo.Name
 	if runtime.GOOS == darwin {
 		name = a.desc.Spec().ServiceInfo.Label
-	} else {
+	}
+
+	if runtime.GOOS != windows {
 		// Attempt to stop the service on non-windows platforms
 		svc, err := getService(name)
 		if err != nil {
