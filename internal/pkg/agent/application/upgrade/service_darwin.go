@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -50,13 +49,13 @@ func (p *darwinPidProvider) Close() {}
 
 func (p *darwinPidProvider) PID(ctx context.Context) (int, error) {
 	piders := []func(context.Context) (int, error){
-		p.piderFromCmd(ctx, "launchctl", "list", paths.ServiceName),
+		p.piderFromCmd("launchctl", "list", paths.ServiceName),
 	}
 
 	// if release is specifically built to be upgradeable (using DEV flag)
 	// we dont require to run as a service and will need sudo fallback
 	if release.Upgradeable() {
-		piders = append(piders, p.piderFromCmd(ctx, "sudo", "launchctl", "list", paths.ServiceName))
+		piders = append(piders, p.piderFromCmd("sudo", "launchctl", "list", paths.ServiceName))
 	}
 
 	var pidErrors error
@@ -72,7 +71,7 @@ func (p *darwinPidProvider) PID(ctx context.Context) (int, error) {
 	return 0, pidErrors
 }
 
-func (p *darwinPidProvider) piderFromCmd(ctx context.Context, name string, args ...string) func(context.Context) (int, error) {
+func (p *darwinPidProvider) piderFromCmd(name string, args ...string) func(context.Context) (int, error) {
 	return func(context.Context) (int, error) {
 		listCmd := exec.Command(name, args...)
 		listCmd.SysProcAttr = &syscall.SysProcAttr{
@@ -115,8 +114,8 @@ func (p *darwinPidProvider) piderFromCmd(ctx context.Context, name string, args 
 }
 
 func invokeCmd(topPath string) *exec.Cmd {
-	homeExePath := filepath.Join(topPath, agentName)
-
+	// paths.BinaryPath properly derives the newPath depending on the platform. The path to the binary for macOS is inside of the app bundle.
+	homeExePath := paths.BinaryPath(topPath, agentName)
 	cmd := exec.Command(homeExePath, watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),

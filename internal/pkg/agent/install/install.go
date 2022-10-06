@@ -6,14 +6,12 @@ package install
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/otiai10/copy"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
@@ -58,7 +56,10 @@ func Install(cfgFile string) error {
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
-		// Install symlink for darwin instead
+		// Install symlink for darwin instead of the wrapper script.
+		// Elastic-agent should be first process that launchd starts in order to be able to grant
+		// the Full-Disk Access (FDA) to the agent and it's child processes.
+		// This is specifically important for osquery FDA permissions at the moment.
 		if runtime.GOOS == darwin {
 			// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
 			if _, err := os.Lstat(paths.ShellWrapperPath); err == nil {
@@ -80,7 +81,7 @@ func Install(cfgFile string) error {
 			err = os.MkdirAll(filepath.Dir(paths.ShellWrapperPath), 0755)
 			if err == nil {
 				//nolint: gosec // this is intended to be an executable shell script, not chaning the permissions for the linter
-				err = ioutil.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
+				err = os.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
 			}
 			if err != nil {
 				return errors.New(
@@ -172,15 +173,7 @@ func findDirectory() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sourceDir := filepath.Dir(execPath)
-	if info.IsInsideData(sourceDir) {
-		// executable path is being reported as being down inside of data path
-		// move up to directories to perform the copy
-		sourceDir = filepath.Dir(filepath.Dir(sourceDir))
-		if runtime.GOOS == darwin {
-			sourceDir = filepath.Dir(filepath.Dir(filepath.Dir(sourceDir)))
-		}
-	}
+	sourceDir := paths.ExecDir(filepath.Dir(execPath))
 	err = verifyDirectory(sourceDir)
 	if err != nil {
 		return "", err

@@ -8,10 +8,8 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
-	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,13 +23,13 @@ import (
 )
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(ctx context.Context, version, archivePath string) (string, error) {
+func (u *Upgrader) unpack(version, archivePath string) (string, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var hash string
 	var err error
-	if runtime.GOOS == "windows" {
-		hash, err = unzip(u.log, version, archivePath)
+	if runtime.GOOS == windows {
+		hash, err = unzip(u.log, archivePath)
 	} else {
 		hash, err = untar(u.log, version, archivePath)
 	}
@@ -45,7 +43,7 @@ func (u *Upgrader) unpack(ctx context.Context, version, archivePath string) (str
 	return hash, nil
 }
 
-func unzip(log *logger.Logger, version string, archivePath string) (string, error) {
+func unzip(log *logger.Logger, archivePath string) (string, error) {
 	var hash, rootDir string
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -69,7 +67,7 @@ func unzip(log *logger.Logger, version string, archivePath string) (string, erro
 		//get hash
 		fileName := strings.TrimPrefix(f.Name, fileNamePrefix)
 		if fileName == agentCommitFile {
-			hashBytes, err := ioutil.ReadAll(rc)
+			hashBytes, err := io.ReadAll(rc)
 			if err != nil || len(hashBytes) < hashLen {
 				return err
 			}
@@ -87,10 +85,10 @@ func unzip(log *logger.Logger, version string, archivePath string) (string, erro
 
 		if f.FileInfo().IsDir() {
 			log.Debugw("Unpacking directory", "archive", "zip", "file.path", path)
-			os.MkdirAll(path, f.Mode())
+			_ = os.MkdirAll(path, f.Mode())
 		} else {
 			log.Debugw("Unpacking file", "archive", "zip", "file.path", path)
-			os.MkdirAll(filepath.Dir(path), f.Mode())
+			_ = os.MkdirAll(filepath.Dir(path), f.Mode())
 			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
 				return err
@@ -101,6 +99,7 @@ func unzip(log *logger.Logger, version string, archivePath string) (string, erro
 				}
 			}()
 
+			//nolint:gosec // legacy
 			if _, err = io.Copy(f, rc); err != nil {
 				return err
 			}
@@ -163,7 +162,7 @@ func untar(log *logger.Logger, version string, archivePath string) (string, erro
 		fileName := strings.TrimPrefix(f.Name, fileNamePrefix)
 
 		if fileName == agentCommitFile {
-			hashBytes, err := ioutil.ReadAll(tr)
+			hashBytes, err := io.ReadAll(tr)
 			if err != nil || len(hashBytes) < hashLen {
 				return "", err
 			}
@@ -200,6 +199,7 @@ func untar(log *logger.Logger, version string, archivePath string) (string, erro
 				return "", errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
+			//nolint:gosec // legacy
 			_, err = io.Copy(wf, tr)
 			if closeErr := wf.Close(); closeErr != nil && err == nil {
 				err = closeErr
