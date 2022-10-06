@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -154,6 +155,12 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	req, err := http.NewRequest("GET", sourceURI, nil)
 	if err != nil {
 		return "", errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+	}
+
+	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
+		if err := os.MkdirAll(destinationDir, 0755); err != nil {
+			return "", err
+		}
 	}
 
 	destinationFile, err := os.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)

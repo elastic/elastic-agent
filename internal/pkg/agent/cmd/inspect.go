@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -21,9 +20,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -302,7 +301,7 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	}
 
 	// Wait for the variables based on the timeout.
-	vars, err := waitForVariables(ctx, l, cfg, timeout)
+	vars, err := vars.WaitForVariables(ctx, l, cfg, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather variables: %w", err)
 	}
@@ -324,66 +323,6 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 		return nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
 	return m, nil
-}
-
-func waitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config, wait time.Duration) ([]*transpiler.Vars, error) {
-	var cancel context.CancelFunc
-	var vars []*transpiler.Vars
-
-	composable, err := composable.New(l, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create composable controller: %w", err)
-	}
-
-	hasTimeout := false
-	if wait > time.Duration(0) {
-		hasTimeout = true
-		ctx, cancel = context.WithTimeout(ctx, wait)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-	defer cancel()
-
-	g, ctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		var err error
-		for {
-			select {
-			case <-ctx.Done():
-				if err == nil {
-					err = ctx.Err()
-				}
-				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-					err = nil
-				}
-				return err
-			case cErr := <-composable.Errors():
-				err = cErr
-				if err != nil {
-					cancel()
-				}
-			case cVars := <-composable.Watch():
-				vars = cVars
-				if !hasTimeout {
-					cancel()
-				}
-			}
-		}
-	})
-
-	g.Go(func() error {
-		err := composable.Run(ctx)
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			err = nil
-		}
-		return err
-	})
-
-	err = g.Wait()
-	if err != nil {
-		return nil, err
-	}
-	return vars, nil
 }
 
 func printComponents(components []component.Component, streams *cli.IOStreams) error {

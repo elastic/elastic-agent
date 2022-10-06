@@ -98,7 +98,7 @@ func (r *Retrier) Run(ctx context.Context) {
 		case <-r.kickCh:
 			r.runRetries(ctx)
 		case <-ctx.Done():
-			r.log.Debug("ack retrier: exit on %v", ctx.Err())
+			r.log.Debugf("ack retrier: exit on %v", ctx.Err())
 			return
 		}
 	}

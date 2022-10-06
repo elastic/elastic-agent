@@ -97,6 +97,12 @@ func (v *Vars) Lookup(name string) (interface{}, bool) {
 	return v.tree.Lookup(name)
 }
 
+// Map transforms the variables into a map[string]interface{} and will abort and return any errors related
+// to type conversion.
+func (v *Vars) Map() (map[string]interface{}, error) {
+	return v.tree.Map()
+}
+
 // lookupNode performs a lookup on the AST, but keeps the result as a `Node`.
 //
 // This is different from `Lookup` which returns the actual type, not the AST type.

@@ -27,6 +27,7 @@ import (
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -67,7 +68,7 @@ func newManagedConfigManager(
 		return nil, errors.New(err, fmt.Sprintf("fail to read action store '%s'", paths.AgentActionStoreFile()))
 	}
 
-	actionQueue, err := queue.NewActionQueue(stateStore.Queue())
+	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
@@ -170,7 +171,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		actionAcker,
 		m.coord,
 		m.stateStore,
-		m.actionQueue,
 	)
 	if err != nil {
 		return err
@@ -183,32 +183,25 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	}
 
 	// Proxy errors from the gateway to our own channel.
-	go func() {
+	gatewayErrorsRunner := runner.Start(context.Background(), func(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return nil
 			case err := <-gateway.Errors():
 				m.errCh <- err
 			}
 		}
-	}()
+	})
 
 	// Run the gateway.
-	gatewayRun := make(chan bool)
-	gatewayErrCh := make(chan error)
-	defer func() {
-		gatewayCancel()
-		<-gatewayRun
-	}()
-	go func() {
-		err := gateway.Run(gatewayCtx)
-		close(gatewayRun)
-		gatewayErrCh <- err
-	}()
+	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
+		defer gatewayErrorsRunner.Stop()
+		return gateway.Run(ctx)
+	})
 
 	<-ctx.Done()
-	return <-gatewayErrCh
+	return gatewayRunner.Err()
 }
 
 func (m *managedConfigManager) Errors() <-chan error {
@@ -281,7 +274,7 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 }
 
 func newManagedActionDispatcher(m *managedConfigManager, canceller context.CancelFunc) (*dispatcher.ActionDispatcher, *handlers.PolicyChange, error) {
-	actionDispatcher, err := dispatcher.New(m.log, handlers.NewDefault(m.log))
+	actionDispatcher, err := dispatcher.New(m.log, handlers.NewDefault(m.log), m.actionQueue)
 	if err != nil {
 		return nil, nil, err
 	}
