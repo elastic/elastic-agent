@@ -78,7 +78,6 @@ func TestGenerateHintsMapping(t *testing.T) {
 
 	expected := mapstr.M{
 		"redis": mapstr.M{
-			"enabled":      true,
 			"host":         "127.0.0.5:6379",
 			"metrics_path": "/metrics",
 			"username":     "username",
@@ -110,6 +109,76 @@ func TestGenerateHintsMapping(t *testing.T) {
 				"password":     "password",
 				"timeout":      "42s",
 			},
+		},
+	}
+
+	hintsMapping := GenerateHintsMapping(hints, mapping, logger, "")
+
+	assert.Equal(t, expected, hintsMapping)
+}
+
+func TestGenerateHintsMappingWithDefaults(t *testing.T) {
+	logger := getLogger()
+	pod := &kubernetes.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testpod",
+			UID:       types.UID(uid),
+			Namespace: "testns",
+			Labels: map[string]string{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
+			},
+			Annotations: map[string]string{
+				"app": "production",
+			},
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		Spec: kubernetes.PodSpec{
+			NodeName: "testnode",
+		},
+		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
+	}
+
+	mapping := map[string]interface{}{
+		"namespace": pod.GetNamespace(),
+		"pod": mapstr.M{
+			"uid":  string(pod.GetUID()),
+			"name": pod.GetName(),
+			"ip":   pod.Status.PodIP,
+		},
+		"namespace_annotations": mapstr.M{
+			"nsa": "nsb",
+		},
+		"labels": mapstr.M{
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
+		},
+		"annotations": mapstr.M{
+			"app": "production",
+		},
+	}
+	hints := mapstr.M{
+		"hints": mapstr.M{
+			"host":         "${kubernetes.pod.ip}:6379",
+			"package":      "redis",
+			"metrics_path": "/metrics",
+			"timeout":      "42s",
+			"period":       "42s",
+		},
+	}
+
+	expected := mapstr.M{
+		"redis": mapstr.M{
+			"enabled":      true,
+			"host":         "127.0.0.5:6379",
+			"metrics_path": "/metrics",
+			"timeout":      "42s",
+			"period":       "42s",
 		},
 	}
 
@@ -184,7 +253,6 @@ func TestGenerateHintsMappingWithContainerID(t *testing.T) {
 			"container_logs": mapstr.M{
 				"enabled": true,
 			},
-			"enabled":      true,
 			"host":         "127.0.0.5:6379",
 			"metrics_path": "/metrics",
 			"username":     "username",
@@ -281,7 +349,6 @@ func TestGenerateHintsMappingWithLogStream(t *testing.T) {
 	expected := mapstr.M{
 		"container_id": "asdfghjkl",
 		"apache": mapstr.M{
-			"enabled": true,
 			"container_logs": mapstr.M{
 				"enabled": true,
 			},
