@@ -193,7 +193,7 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 
 	dataStreams := builder.getDataStreams(hints)
 	if len(dataStreams) == 0 {
-		integrationHints.Put("enabled", true)
+		_, _ = integrationHints.Put("enabled", true)
 	}
 	for _, dataStream := range dataStreams {
 		streamHints := mapstr.M{
