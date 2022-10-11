@@ -258,7 +258,7 @@ func TestHTTPClient(t *testing.T) {
 			assert.Equal(t, successResp, string(body))
 
 			for _, m := range debugger.messages {
-				fmt.Println(m)
+				fmt.Println(m) //nolint:forbidigo // printing debug messages on a test.
 			}
 
 			assert.Equal(t, 1, len(debugger.messages))
