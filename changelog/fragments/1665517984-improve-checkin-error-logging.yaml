@@ -1,0 +1,4 @@
+kind: enhancement
+summary: improve-checkin-error-logging
+pr: 1477
+issue: 1154
