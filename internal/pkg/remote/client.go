@@ -43,7 +43,7 @@ type requestClient struct {
 // Client wraps a http.Client and takes care of making the raw calls, the client should
 // stay simple and specifics should be implemented in external action instead of adding new methods
 // to the client. For authenticated calls or sending fields on every request, create a custom RoundTripper
-// implementation that will take care of the boiler plate.
+// implementation that will take care of the boilerplate.
 type Client struct {
 	log      *logger.Logger
 	clientMu sync.Mutex
