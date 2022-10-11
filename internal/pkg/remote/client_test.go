@@ -171,13 +171,13 @@ func TestHTTPClient(t *testing.T) {
 			})
 			return mux
 		}, func(t *testing.T, host string) {
-			cfg := config.MustNewConfigFrom(map[string]interface{}{
-				"hosts": []string{"http://must.fail", "http://must.fail", host},
-			})
+			one := &requestClient{host: "http://must.fail-1.co/"}
+			two := &requestClient{host: "http://must.fail-2.co/"}
+			three := &requestClient{host: fmt.Sprintf("http://%s/", host)}
 
-			client, err := NewWithRawConfig(nil, cfg, nil)
+			c := &Client{clients: []*requestClient{one, two, three}, log: l}
 			require.NoError(t, err)
-			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
+			resp, err := c.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
