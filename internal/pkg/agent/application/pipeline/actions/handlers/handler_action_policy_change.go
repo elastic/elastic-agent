@@ -147,25 +147,10 @@ func (h *PolicyChange) handleFleetServerHosts(ctx context.Context, c *config.Con
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
 	defer cancel()
 
-	// The new client might have several fleet hosts, we need to try all of them before failing.
-	// As it's a new client, just trying
-	hostsCount := len(h.config.Fleet.Client.Hosts)
-	var resp *http.Response
-	for i := 0; i < hostsCount; i++ {
-		resp, err = client.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
-		if err == nil {
-			break // at least one fleet host is reachable, that is enough.
-		}
-
-		h.log.Warnf(
-			"fail to communicate with new Fleet Server API client host %d of %d host. Will try next one",
-			i, hostsCount)
-	}
+	resp, err := client.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
 	if err != nil {
 		return errors.New(
-			err,
-			fmt.Sprintf("fail to communicate with all %d new Fleet Server API client hosts",
-				hostsCount),
+			err, "fail to communicate with Fleet Server API client hosts",
 			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
 	}
 
