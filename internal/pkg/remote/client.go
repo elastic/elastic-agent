@@ -136,7 +136,7 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 		}
 	}
 
-	return new(log, cfg, clients...)
+	return newClient(log, cfg, clients...)
 }
 
 // Send executes a direct calls against the API, the method will take care of cloning and
@@ -221,8 +221,8 @@ func (c *Client) URI() string {
 	return string(c.config.Protocol) + "://" + host + "/" + c.config.Path
 }
 
-// new creates new API client.
-func new(
+// newClient creates a new API client.
+func newClient(
 	log *logger.Logger,
 	cfg Config,
 	clients ...*requestClient,
@@ -240,14 +240,13 @@ func new(
 	return c, nil
 }
 
-// sortClients returns the requester to use.
-//
-// It excludes clients that have errored in the last 5 minutes.
+// sortClients sort the clients according to the following priority:
+//  - never used
+//  - without errors, last used first when more than one does not have errors
+//  - last errored.
+// It also removes the last error after retryOnBadConnTimeout has elapsed.
 func (c *Client) sortClients() {
 	now := time.Now().UTC()
-
-	// Less reports whether the element with index i
-	// must sort before the element with index j.
 
 	sort.Slice(c.clients, func(i, j int) bool {
 		// First, set them good if the timout has elapsed
@@ -286,7 +285,7 @@ func (c *Client) sortClients() {
 			return true
 		}
 
-		// Lastly, the one that errored first
+		// Lastly, the one that errored last
 		return c.clients[i].lastUsed.Before(c.clients[j].lastUsed)
 	})
 }

@@ -78,13 +78,13 @@ func TestHTTPClient(t *testing.T) {
 	l, err := logger.New("", false)
 	require.NoError(t, err)
 
+	const successResp = `{"message":"hello"}`
 	t.Run("Guard against double slashes on path", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/nested/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return addCatchAll(mux, t)
 		}, func(t *testing.T, host string) {
@@ -104,17 +104,16 @@ func TestHTTPClient(t *testing.T) {
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
 	t.Run("Simple call", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -130,17 +129,16 @@ func TestHTTPClient(t *testing.T) {
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
 	t.Run("Simple call with a prefix path", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/mycustompath/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -157,17 +155,16 @@ func TestHTTPClient(t *testing.T) {
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
 	t.Run("Tries all the hosts", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -184,7 +181,7 @@ func TestHTTPClient(t *testing.T) {
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
@@ -204,11 +201,10 @@ func TestHTTPClient(t *testing.T) {
 
 	t.Run("Custom user agent", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 				require.Equal(t, r.Header.Get("User-Agent"), "custom-agent")
 			})
 			return mux
@@ -228,17 +224,16 @@ func TestHTTPClient(t *testing.T) {
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
 	t.Run("Allows to debug HTTP request between a client and a server", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ "message": "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -260,7 +255,7 @@ func TestHTTPClient(t *testing.T) {
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ "message": "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 
 			for _, m := range debugger.messages {
 				fmt.Println(m)
@@ -272,11 +267,10 @@ func TestHTTPClient(t *testing.T) {
 
 	t.Run("RequestId", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 				require.NotEmpty(t, r.Header.Get("X-Request-ID"))
 			})
 			return mux
@@ -293,7 +287,7 @@ func TestHTTPClient(t *testing.T) {
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 }
@@ -302,7 +296,7 @@ func TestSortClients(t *testing.T) {
 	t.Run("Picks first requester on initial call", func(t *testing.T) {
 		one := &requestClient{}
 		two := &requestClient{}
-		client, err := new(nil, Config{}, one, two)
+		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
 		client.sortClients()
@@ -312,11 +306,12 @@ func TestSortClients(t *testing.T) {
 
 	t.Run("Picks second requester when first has error", func(t *testing.T) {
 		one := &requestClient{
+			lastUsed:   time.Now().UTC(),
 			lastErr:    fmt.Errorf("fake error"),
 			lastErrOcc: time.Now().UTC(),
 		}
 		two := &requestClient{}
-		client, err := new(nil, Config{}, one, two)
+		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
 		client.sortClients()
@@ -329,7 +324,7 @@ func TestSortClients(t *testing.T) {
 			lastUsed: time.Now().UTC(),
 		}
 		two := &requestClient{}
-		client, err := new(nil, Config{}, one, two)
+		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
 		client.sortClients()
@@ -347,7 +342,7 @@ func TestSortClients(t *testing.T) {
 		three := &requestClient{
 			lastUsed: time.Now().UTC().Add(-2 * time.Minute),
 		}
-		client, err := new(nil, Config{}, one, two, three)
+		client, err := newClient(nil, Config{}, one, two, three)
 		require.NoError(t, err)
 
 		client.sortClients()
@@ -390,7 +385,7 @@ func TestSortClients(t *testing.T) {
 			lastErr:    fmt.Errorf("fake error"),
 			lastErrOcc: time.Now().Add(-2 * time.Minute),
 		}
-		client, err := new(nil, Config{}, one, two, three)
+		client, err := newClient(nil, Config{}, one, two, three)
 		require.NoError(t, err)
 
 		client.sortClients()
