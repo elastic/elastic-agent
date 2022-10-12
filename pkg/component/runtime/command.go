@@ -324,7 +324,7 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 	}
 
 	// cleanup reserved resources related to monitoring
-	defer c.monitor.Cleanup(c.current.ID)
+	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
 
 	cmdSpec := c.current.Spec.Spec.Command
 	go func(info *process.Info, timeout time.Duration) {

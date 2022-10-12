@@ -340,7 +340,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		// no enrollment file exists or failed to stat it; nothing to do
-		return cfg, nil //nolint:nilerr // there is nothing to do
+		return cfg, nil
 	}
 	contents, err := ioutil.ReadFile(enrollPath)
 	if err != nil {
