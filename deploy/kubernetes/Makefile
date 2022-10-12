@@ -52,7 +52,6 @@ ci-clone-kibana-repository:
 $(eval HASDIFF =$(shell sh -c "git status | grep $(FILE_REPO) | wc -l"))
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
-	echo $(HASDIFF)
 ifeq ($(HASDIFF),1)
 	echo "INFO: Create branch to update k8s templates"
 	git config user.name obscloudnativemonitoring
