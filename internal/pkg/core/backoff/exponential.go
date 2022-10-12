@@ -36,18 +36,23 @@ func (b *ExpBackoff) Reset() {
 	b.duration = b.init
 }
 
+func (b *ExpBackoff) NextWait() time.Duration {
+	nextWait := b.duration
+	nextWait *= 2
+	if nextWait > b.max {
+		nextWait = b.max
+	}
+	return nextWait
+}
+
 // Wait block until either the timer is completed or channel is done.
 func (b *ExpBackoff) Wait() bool {
-	backoff := b.duration
-	b.duration *= 2
-	if b.duration > b.max {
-		b.duration = b.max
-	}
+	b.duration = b.NextWait()
 
 	select {
 	case <-b.done:
 		return false
-	case <-time.After(backoff):
+	case <-time.After(b.duration):
 		b.last = time.Now()
 		return true
 	}
