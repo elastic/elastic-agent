@@ -142,7 +142,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	if strings.HasPrefix(release.Commit(), newHash) {
-		u.Log.Error("Upgrade failed: upgrade did not occur because its the same version")
+		u.log.Error("Upgrade failed: upgrade did not occur because its the same version")
 		return nil, nil
 	}
 
