@@ -290,12 +290,12 @@ func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, e
 			// Report the first two failures at warn level as they may be recoverable with retries.
 			if f.checkinFailCounter <= 2 {
 				f.log.Warnw("Possible transient error during checkin with fleet-server, retrying",
-					"error.message", err, "request_duration", took, "failed_checkins", f.checkinFailCounter,
-					"retry_after", f.backoff.NextWait())
+					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
+					"retry_after_ns", f.backoff.NextWait())
 			} else {
 				f.log.Errorw("Cannot checkin in with fleet-server, retrying",
-					"error.message", err, "request_duration", took, "failed_checkins", f.checkinFailCounter,
-					"retry_after", f.backoff.NextWait())
+					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
+					"retry_after_ns", f.backoff.NextWait())
 			}
 
 			if !f.backoff.Wait() {

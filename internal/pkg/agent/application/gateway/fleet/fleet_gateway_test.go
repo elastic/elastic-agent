@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -693,7 +694,7 @@ func TestRetriesOnFailures(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
 		dispatcher := newTestingDispatcher()
-		log, _ := logger.New("fleet_gateway", false)
+		log := newInfoLogger(t, "fleet_gateway")
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -814,3 +815,16 @@ type testAgentInfo struct{}
 func (testAgentInfo) AgentID() string { return "agent-secret" }
 
 type request struct{}
+
+func newInfoLogger(t *testing.T, name string) *logger.Logger {
+	t.Helper()
+
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.InfoLevel
+	loggerCfg.ToFiles = false
+	loggerCfg.ToStderr = true
+
+	log, err := logger.NewFromConfig("", loggerCfg, false)
+	require.NoError(t, err)
+	return log
+}
