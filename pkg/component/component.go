@@ -80,6 +80,8 @@ type Component struct {
 
 // ToComponents returns the components that should be running based on the policy and the current runtime specification.
 func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component, error) {
+	const revisionKey = "revision"
+
 	outputsMap, err := toIntermediate(policy)
 	if err != nil {
 		return nil, err
@@ -150,6 +152,9 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 				if !input.enabled {
 					// skip; not enabled
 					continue
+				}
+				input.input["policy"] = map[string]interface{}{
+					revisionKey: policy[revisionKey],
 				}
 				cfg, cfgErr := ExpectedConfig(input.input)
 				if cfg != nil {

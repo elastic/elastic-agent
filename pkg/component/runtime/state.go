@@ -223,7 +223,7 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		}
 		touched[key] = true
 		_, inExpected := s.expectedUnits[key]
-		existing, _ := s.Units[key]
+		existing := s.Units[key]
 		existing.unitState = client.UnitState(unit.State)
 		existing.unitMessage = unit.Message
 		existing.unitPayload = payload
@@ -395,6 +395,21 @@ func (s *ComponentState) forceState(state client.UnitState, msg string) bool {
 
 		// unit is a copy and must be set back into the map
 		s.Units[k] = unit
+	}
+	return changed
+}
+
+// forceExpectedState force updates the expected state for the entire component, forcing that state on all expected units.
+func (s *ComponentState) forceExpectedState(state client.UnitState) bool {
+	changed := false
+	for k, unit := range s.expectedUnits {
+		if unit.state != state {
+			unit.state = state
+			changed = true
+		}
+
+		// unit is a copy and must be set back into the map
+		s.expectedUnits[k] = unit
 	}
 	return changed
 }

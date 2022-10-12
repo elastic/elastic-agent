@@ -14,6 +14,12 @@ import (
 	"github.com/kardianos/service"
 )
 
+const (
+	darwin  = "darwin"
+	unknown = "unknown"
+	running = "running"
+)
+
 // Useful test to keep the code around.
 // Marked as skipped, because can't really use as unit test with CI since it relies on actual endpoint service to be present
 func TestStatusWatcher(t *testing.T) {

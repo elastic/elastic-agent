@@ -21,6 +21,7 @@ import (
 const (
 	elasticsearch = "elasticsearch"
 	fleetServer   = "fleet-server"
+	endpoint      = "endpoint"
 )
 
 // injectFleetServerInput is the base configuration that is used plus the FleetServerComponentModifier that adjusts
@@ -43,7 +44,7 @@ var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
 // FleetServerComponentModifier modifies the comps to inject extra information from the policy into
 // the Fleet Server component and units needed to run Fleet Server correctly.
 func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) coordinator.ComponentsModifier {
-	return func(comps []component.Component) ([]component.Component, error) {
+	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
 			if comp.Spec.InputType == fleetServer {
 				for j, unit := range comp.Units {
@@ -67,6 +68,37 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 							return nil, err
 						}
 						fixInputMap(unitCfgMap)
+						unitCfg, err := component.ExpectedConfig(unitCfgMap)
+						if err != nil {
+							return nil, err
+						}
+						unit.Config = unitCfg
+					}
+					comp.Units[j] = unit
+				}
+			}
+			comps[i] = comp
+		}
+		return comps, nil
+	}
+}
+
+func EndpointComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordinator.ComponentsModifier {
+	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+		for i, comp := range comps {
+			if comp.Spec.InputType == endpoint {
+				for j, unit := range comp.Units {
+					if unit.Type == client.UnitTypeInput && unit.Config.Type == endpoint {
+						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), map[string]interface{}{"fleet": fleetCfg})
+						if err != nil {
+							return nil, err
+						}
+						// Set host.id for the host, assign the host from the top level config
+						// Endpoint expects this
+						// "host": {
+						// 	   "id": "b62e91be682a4108bbb080152cc5eeac"
+						// },
+						unitCfgMap["fleet"].(map[string]interface{})["host"] = cfg["host"]
 						unitCfg, err := component.ExpectedConfig(unitCfgMap)
 						if err != nil {
 							return nil, err

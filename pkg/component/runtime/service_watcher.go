@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	defaultCheckInterval = 10 * time.Second
-	defaultCheckDuration = 3 * time.Minute
+	defaultCheckMinInterval = 500 * time.Millisecond
+	defaultCheckInterval    = 10 * time.Second
+	defaultCheckDuration    = 3 * time.Minute
 )
 
 type statusCheckResult struct {
@@ -62,9 +63,15 @@ func newServiceWatcher(name string) (*serviceWatcher, error) {
 
 func (s *serviceWatcher) run(ctx context.Context) {
 	start := time.Now()
-	t := time.NewTicker(s.checkInterval)
+	interval := s.nextInterval(0)
+	t := time.NewTimer(interval)
 	defer t.Stop()
 	defer close(s.statusCh)
+
+	resetTimer := func() {
+		interval = s.nextInterval(interval)
+		t.Reset(s.nextInterval(interval))
+	}
 
 	for {
 		select {
@@ -78,8 +85,11 @@ func (s *serviceWatcher) run(ctx context.Context) {
 			status, err := s.svc.Status()
 
 			if err != nil {
+				// In real testing sometimes the library returns the error during service stop
+				// Skipping the error once and expecting a second check
 				if s.lastStatusCheckError == nil && errors.Is(err, service.ErrNotInstalled) {
 					s.lastStatusCheckError = err
+					resetTimer()
 					break
 				}
 			}
@@ -101,8 +111,22 @@ func (s *serviceWatcher) run(ctx context.Context) {
 			if err != nil && s.stopOnError {
 				return
 			}
+			resetTimer()
 		}
 	}
+}
+
+func (s *serviceWatcher) nextInterval(cur time.Duration) time.Duration {
+	var newInterval time.Duration
+	if cur == 0 {
+		newInterval = defaultCheckMinInterval
+	} else {
+		newInterval = cur * 2
+	}
+	if newInterval > s.checkInterval {
+		return s.checkInterval
+	}
+	return newInterval
 }
 
 func (s *serviceWatcher) status() <-chan statusCheckResult {

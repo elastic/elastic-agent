@@ -199,7 +199,6 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 				return
 			case expected = <-c.checkinExpected:
 			}
-
 			err := server.Send(expected)
 			if err != nil {
 				if reportableErr(err) {

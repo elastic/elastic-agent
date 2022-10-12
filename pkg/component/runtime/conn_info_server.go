@@ -42,6 +42,7 @@ func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connIn
 				log.Errorf("failed accept conn info connection: %v", err)
 				break
 			}
+			log.Debugf("client connected, sending connection info")
 			err = comm.WriteConnInfo(conn)
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
