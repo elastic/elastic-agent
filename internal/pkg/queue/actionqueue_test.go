@@ -517,3 +517,65 @@ func Test_ActionQueue_Actions(t *testing.T) {
 		assert.Equal(t, "test-1", actions[0].ID())
 	})
 }
+
+func Test_ActionQueue_CancelType(t *testing.T) {
+	a1 := &mockAction{}
+	a1.On("ID").Return("test-1")
+	a1.On("Type").Return("upgrade")
+	a2 := &mockAction{}
+	a2.On("ID").Return("test-2")
+	a2.On("Type").Return("upgrade")
+	a3 := &mockAction{}
+	a3.On("ID").Return("test-3")
+	a3.On("Type").Return("unknown")
+
+	t.Run("empty queue", func(t *testing.T) {
+		aq := &ActionQueue{&queue{}, &mockSaver{}}
+
+		n := aq.CancelType("upgrade")
+		assert.Equal(t, 0, n)
+	})
+
+	t.Run("single item in queue", func(t *testing.T) {
+		q := &queue{&item{
+			action:   a1,
+			priority: 1,
+			index:    0,
+		}}
+		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
+
+		n := aq.CancelType("upgrade")
+		assert.Equal(t, 1, n)
+	})
+
+	t.Run("no matches in queue", func(t *testing.T) {
+		q := &queue{&item{
+			action:   a3,
+			priority: 1,
+			index:    0,
+		}}
+		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
+
+		n := aq.CancelType("upgrade")
+		assert.Equal(t, 0, n)
+	})
+
+	t.Run("all items cancelled", func(t *testing.T) {
+		q := &queue{&item{
+			action:   a1,
+			priority: 1,
+			index:    0,
+		}, &item{
+			action:   a2,
+			priority: 2,
+			index:    1,
+		}}
+		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
+
+		n := aq.CancelType("upgrade")
+		assert.Equal(t, 2, n)
+	})
+}

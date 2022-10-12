@@ -135,10 +135,10 @@ func constructEvent(action fleetapi.Action, agentID string) fleetapi.AckEvent {
 				Retry   bool `json:"retry"`
 				Attempt int  `json:"retry_attempt,omitempty"`
 			}
-			var e errors.Error
-			if errors.As(err, &e) && e.Type() == errors.TypeRetryableAction {
-				payload.Retry = true
-				payload.Attempt = a.RetryAttempt()
+			payload.Retry = true
+			payload.Attempt = a.RetryAttempt()
+			if a.RetryAttempt() < 1 {
+				payload.Retry = false
 			}
 			p, _ := json.Marshal(payload)
 			ackev.Payload = p

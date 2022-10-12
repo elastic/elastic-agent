@@ -135,6 +135,18 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		close(retrierRun)
 	}()
 
+	// Gather errors from the dispatcher and pass to the error channel.
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case err := <-actionDispatcher.Errors():
+				m.errCh <- err // err is one or more failures from dispatching an action
+			}
+		}
+	}()
+
 	actions := m.stateStore.Actions()
 	stateRestored := false
 	if len(actions) > 0 && !m.wasUnenrolled() {
@@ -196,17 +208,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 			}
 		}
 	})
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case err := <-actionDispatcher.Errors():
-				m.errCh <- err // err is one or more failures from dispatching an action
-			}
-		}
-	}()
 
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {

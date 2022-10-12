@@ -157,6 +157,20 @@ func (q *ActionQueue) Actions() []fleetapi.Action {
 	return actions
 }
 
+// CancelType cancels all actions in the queue with a matching action type and returns the number of entries cancelled.
+func (q *ActionQueue) CancelType(actionType string) int {
+	items := make([]*item, 0)
+	for _, item := range *q.q {
+		if item.action.Type() == actionType {
+			items = append(items, item)
+		}
+	}
+	for _, item := range items {
+		heap.Remove(q.q, item.index)
+	}
+	return len(items)
+}
+
 // Save persists the queue to disk.
 func (q *ActionQueue) Save() error {
 	q.s.SetQueue(q.Actions())

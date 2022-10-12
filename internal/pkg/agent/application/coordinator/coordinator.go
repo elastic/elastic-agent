@@ -251,7 +251,9 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		c.state.overrideState = nil
 		return err
 	}
-	c.ReExec(cb)
+	if cb != nil {
+		c.ReExec(cb)
+	}
 	return nil
 }
 

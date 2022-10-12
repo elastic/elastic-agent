@@ -63,6 +63,8 @@ type RetryableAction interface {
 	ScheduledAction
 	// RetryAttempt returns the retry-attempt number of the action
 	// the retry_attempt number is meant to be an interal counter for the elastic-agent and not communicated to fleet-server or ES.
+	// If RetryAttempt returns > 1, and GetError is not nil the acker should signal that the action is being retried.
+	// If RetryAttempt returns < 1, and GetError is not nil the acker should signal that the action has failed.
 	RetryAttempt() int
 	// SetRetryAttempt sets the retry-attempt number of the action
 	// the retry_attempt number is meant to be an interal counter for the elastic-agent and not communicated to fleet-server or ES.

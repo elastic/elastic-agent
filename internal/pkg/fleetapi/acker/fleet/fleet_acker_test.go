@@ -127,11 +127,12 @@ func TestAcker_Ack(t *testing.T) {
 					ActionID:   "upgrade-retry",
 					ActionType: fleetapi.ActionTypeUpgrade,
 					Retry:      1,
-					Err:        errors.New("upgrade failed", errors.TypeRetryableAction),
+					Err:        errors.New("upgrade failed"),
 				},
 				&fleetapi.ActionUpgrade{
 					ActionID:   "upgrade-failed",
 					ActionType: fleetapi.ActionTypeUpgrade,
+					Retry:      -1,
 					Err:        errors.New("upgrade failed"),
 				},
 			},
@@ -167,8 +168,7 @@ func TestAcker_Ack(t *testing.T) {
 					require.NoError(t, err)
 					assert.Equal(t, a.Retry, pl.Attempt, "action ID %s failed", a.ActionID)
 					// Check retry flag
-					var e errors.Error
-					if errors.As(a.Err, &e) && e.Type() == errors.TypeRetryableAction {
+					if pl.Attempt > 0 {
 						assert.True(t, pl.Retry)
 					} else {
 						assert.False(t, pl.Retry)

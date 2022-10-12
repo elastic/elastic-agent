@@ -129,39 +129,40 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		if dErr := preUpgradeCleanup(u.agentInfo.Version()); dErr != nil {
 			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
 		}
-		return nil, errors.New(err, errors.TypeRetryableAction)
+		return nil, err
 	}
 
 	newHash, err := u.unpack(ctx, version, archivePath)
 	if err != nil {
-		return nil, errors.New(err, errors.TypeRetryableAction)
+		return nil, err
 	}
 
 	if newHash == "" {
-		return nil, errors.New("unknown hash", errors.TypeRetryableAction)
+		return nil, errors.New("unknown hash")
 	}
 
 	if strings.HasPrefix(release.Commit(), newHash) {
-		return nil, ErrSameVersion
+		u.Log.Error("Upgrade failed: upgrade did not occur because its the same version")
+		return nil, nil
 	}
 
 	if err := copyActionStore(newHash); err != nil {
-		return nil, errors.New(err, "failed to copy action store", errors.TypeRetryableAction)
+		return nil, errors.New(err, "failed to copy action store")
 	}
 
 	if err := ChangeSymlink(ctx, newHash); err != nil {
 		rollbackInstall(ctx, newHash)
-		return nil, errors.New(err, errors.TypeRetryableAction)
+		return nil, err
 	}
 
 	if err := u.markUpgrade(ctx, newHash, action); err != nil {
 		rollbackInstall(ctx, newHash)
-		return nil, errors.New(err, errors.TypeRetryableAction)
+		return nil, err
 	}
 
 	if err := InvokeWatcher(u.log); err != nil {
 		rollbackInstall(ctx, newHash)
-		return nil, errors.New("failed to invoke rollback watcher", err, errors.TypeRetryableAction)
+		return nil, err
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))

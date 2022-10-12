@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
@@ -26,6 +25,7 @@ type actionHandlers map[string]actions.Handler
 type priorityQueue interface {
 	Add(fleetapi.ScheduledAction, int64)
 	DequeueActions() []fleetapi.ScheduledAction
+	CancelType(string) int
 	Save() error
 }
 
@@ -98,6 +98,9 @@ func (ad *ActionDispatcher) key(a fleetapi.Action) string {
 }
 
 // Dispatch dispatches an action using pre-registered set of handlers.
+// Dispatch will handle action queue operations, and retries.
+// Any action that implements the ScheduledAction interface may be added/removed from the queue based on StartTime.
+// Any action that implements the RetryableAction interface will be rescheduled if the handler returns an error.
 func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, actions ...fleetapi.Action) {
 	var err error
 	span, ctx := apm.StartSpan(ctx, "dispatch", "app.internal")
@@ -106,6 +109,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 		span.End()
 	}()
 
+	ad.removeQueuedUpgrades(actions)
 	actions = ad.queueScheduledActions(actions)
 	actions = ad.dispatchCancelActions(ctx, actions, acker)
 	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
@@ -128,7 +132,6 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 		strings.Join(detectTypes(actions), ", "),
 	)
 
-	var mErr error
 	for _, action := range actions {
 		if err = ctx.Err(); err != nil {
 			ad.errCh <- err
@@ -136,28 +139,17 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 		}
 
 		if err := ad.dispatchAction(ctx, action, acker); err != nil {
-			var e errors.Error
-			if errors.As(err, &e) && e.Type() == errors.TypeRetryableAction {
-				rAction, ok := action.(fleetapi.RetryableAction)
-				if !ok {
-					// This line should only occur if an action hander returns a retryable error
-					// but the action defined in fleetapi/action.go does not implement the required methods.
-					ad.log.Warnf("action ID %s is not a retryable action, handler retuned error: %v", action.ID(), err)
-					mErr = multierror.Append(mErr, err)
-					continue
-				}
-				rAction.SetError(e) // set the retryable action error to what the dispatcher returned
+			rAction, ok := action.(fleetapi.RetryableAction)
+			if ok {
+				rAction.SetError(err) // set the retryable action error to what the dispatcher returned
 				ad.scheduleRetry(ctx, rAction, acker)
 				continue
 			}
 			ad.log.Debugf("Failed to dispatch action '%+v', error: %+v", action, err)
-			mErr = multierror.Append(mErr, err)
+			ad.errCh <- err
+			continue
 		}
 		ad.log.Debugf("Successfully dispatched action: '%+v'", action)
-	}
-	if mErr != nil {
-		ad.errCh <- mErr
-		return
 	}
 
 	if err = acker.Commit(ctx); err != nil {
@@ -234,14 +226,25 @@ func (ad *ActionDispatcher) gatherQueuedActions(ts time.Time) (queued, expired [
 	return queued, expired
 }
 
+// removeQueuedUpgrades will scan the passed actions and if there is an upgrade action it will remove all upgrade actions in the queue but not alter the passed list.
+// this is done to try to only have the most recent upgrade action executed. However it does not eliminate duplicates in retrieved directly from the gateway
+func (ad *ActionDispatcher) removeQueuedUpgrades(actions []fleetapi.Action) {
+	for _, action := range actions {
+		if action.Type() == fleetapi.ActionTypeUpgrade {
+			if n := ad.queue.CancelType(fleetapi.ActionTypeUpgrade); n > 0 {
+				ad.log.Debugw("New upgrade action retrieved from gateway, removing queued upgrade actions", "actions_found", n)
+			}
+			return
+		}
+	}
+}
+
 func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.RetryableAction, acker acker.Acker) {
 	attempt := action.RetryAttempt()
 	d, err := ad.rt.GetWait(attempt)
 	if err != nil {
 		ad.log.Errorf("No more reties for action id %s: %v", action.ID(), err)
-		// Construct a "new" error with the existing action error
-		// the errors.New will clear the error type indicator so the ack will not flag it as retryable.
-		action.SetError(errors.New(action.GetError()))
+		action.SetRetryAttempt(-1)
 		if err := acker.Ack(ctx, action); err != nil {
 			ad.log.Errorf("Unable to ack action failure (id %s) to fleet-server: %v", action.ID(), err)
 			return
