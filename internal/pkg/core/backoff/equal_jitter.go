@@ -30,7 +30,7 @@ func NewEqualJitterBackoff(done <-chan struct{}, init, max time.Duration) Backof
 		done:     done,
 		init:     init,
 		max:      max,
-		nextRand: time.Duration(rand.Int63n(int64(init))),
+		nextRand: time.Duration(rand.Int63n(int64(init))), //nolint:gosec
 	}
 }
 
