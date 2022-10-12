@@ -1,4 +1,4 @@
 kind: enhancement
-summary: improve-checkin-error-logging
+summary: Improve logging of Fleet check-in errors.
 pr: 1477
 issue: 1154
