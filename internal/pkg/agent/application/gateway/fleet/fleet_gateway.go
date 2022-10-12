@@ -283,8 +283,6 @@ func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, e
 		f.log.Debugf("Checkin started")
 		resp, took, err := f.executeCheckin(f.bgContext)
 		if err != nil {
-			// Only update the local status on failure: https://github.com/elastic/elastic-agent/issues/1148
-			f.localReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
 			f.checkinFailCounter++
 
 			// Report the first two failures at warn level as they may be recoverable with retries.
@@ -293,6 +291,8 @@ func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, e
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
 					"retry_after_ns", f.backoff.NextWait())
 			} else {
+				// Only update the local status after repeated failures: https://github.com/elastic/elastic-agent/issues/1148
+				f.localReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
 				f.log.Errorw("Cannot checkin in with fleet-server, retrying",
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
 					"retry_after_ns", f.backoff.NextWait())
