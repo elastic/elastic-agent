@@ -740,15 +740,15 @@ func monitoringFile(id, operatingSystem string) string {
 	}
 
 	u, _ := url.Parse(endpoint)
-	if u == nil || (u.Scheme != "" && u.Scheme != "file" && u.Scheme != "unix") {
+	if u == nil || (u.Scheme != "" && u.Scheme != fileSchemePrefix && u.Scheme != unixSchemePrefix) {
 		return ""
 	}
 
-	if u.Scheme == "file" {
+	if u.Scheme == fileSchemePrefix {
 		return strings.TrimPrefix(endpoint, "file://")
 	}
 
-	if u.Scheme == "unix" {
+	if u.Scheme == unixSchemePrefix {
 		return strings.TrimPrefix(endpoint, "unix://")
 	}
 	return endpoint

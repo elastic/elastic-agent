@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	exeExt = ".exe"
+	exeExt             = ".exe"
+	errActionUndefined = "action undefined"
 )
 
 var (
@@ -1339,7 +1340,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 							actionCancel()
 							if err == nil {
 								subErrCh <- fmt.Errorf("should have returned an error")
-							} else if err.Error() != "action undefined" {
+							} else if err.Error() != errActionUndefined {
 								subErrCh <- fmt.Errorf("should have returned error: action undefined")
 							} else {
 								subErrCh <- nil
@@ -1690,7 +1691,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 							actionCancel()
 							if err == nil {
 								subErrCh <- fmt.Errorf("should have returned an error")
-							} else if err.Error() != "action undefined" {
+							} else if err.Error() != errActionUndefined {
 								subErrCh <- fmt.Errorf("should have returned error: action undefined")
 							} else {
 								subErrCh <- nil
