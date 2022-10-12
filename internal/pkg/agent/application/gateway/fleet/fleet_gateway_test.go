@@ -707,8 +707,8 @@ func TestRetriesOnFailures(t *testing.T) {
 		queue.On("Actions").Return([]fleetapi.Action{})
 
 		localReporter := &testutils.MockReporter{}
-		localReporter.On("Update", state.Degraded, mock.Anything, mock.Anything).Times(2)
-		localReporter.On("Update", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		// The local state should only be reported as degraded after two consecutive failures.
+		localReporter.On("Update", state.Degraded, mock.Anything, mock.Anything).Once()
 		localReporter.On("Unregister").Maybe()
 
 		fleetReporter := &testutils.MockReporter{}
