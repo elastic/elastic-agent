@@ -185,8 +185,8 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 	return components, nil
 }
 
-// ToComponentIDs returns the component IDs that should be running based on the policy and the current runtime specification.
-func (r *RuntimeSpecs) ToComponentIDs(policy map[string]interface{}) ([]string, error) {
+// ToComponentIdsInputMap returns the component IDs that should be running based on the policy and the current runtime specification and their mapping to a binary.
+func (r *RuntimeSpecs) ToComponentIdsInputMap(policy map[string]interface{}) (map[string]string, error) {
 	outputsMap, err := toIntermediate(policy)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (r *RuntimeSpecs) ToComponentIDs(policy map[string]interface{}) ([]string, 
 		return nil, nil
 	}
 
-	var componentIDs []string
+	componentIdsInputMap := make(map[string]string)
 	for outputName, output := range outputsMap {
 		if !output.enabled {
 			// skip; not enabled
@@ -229,12 +229,12 @@ func (r *RuntimeSpecs) ToComponentIDs(policy map[string]interface{}) ([]string, 
 			}
 			if len(units) > 0 {
 				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
-				componentIDs = append(componentIDs, componentID)
+				componentIdsInputMap[componentID] = inputSpec.BinaryName
 			}
 		}
 	}
 
-	return componentIDs, nil
+	return componentIdsInputMap, nil
 }
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set

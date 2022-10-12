@@ -36,7 +36,7 @@ const (
 )
 
 type MonitoringManager interface {
-	EnrichArgs(string, []string) []string
+	EnrichArgs(string, string, []string) []string
 	Prepare() error
 	Cleanup(string) error
 }
@@ -291,7 +291,13 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	if err := c.monitor.Prepare(); err != nil {
 		return err
 	}
-	args := c.monitor.EnrichArgs(c.current.ID, cmdSpec.Args)
+	args := c.monitor.EnrichArgs(c.current.ID, c.current.Spec.BinaryName, cmdSpec.Args)
+
+	// differentiate data paths
+	dataPath := filepath.Join(paths.Home(), "run", c.current.ID)
+	_ = os.MkdirAll(dataPath, 0755)
+	args = append(args, "-E", "path.data="+dataPath)
+
 	proc, err := process.Start(path, uid, gid, args, env, attachOutErr, dirPath(workDir))
 	if err != nil {
 		return err

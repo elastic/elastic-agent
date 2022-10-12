@@ -1835,6 +1835,6 @@ type testMonitoringManager struct{}
 
 func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManager{} }
 
-func (*testMonitoringManager) EnrichArgs(_ string, args []string) []string { return args }
-func (*testMonitoringManager) Prepare() error                              { return nil }
-func (*testMonitoringManager) Cleanup(string) error                        { return nil }
+func (*testMonitoringManager) EnrichArgs(_ string, _ string, args []string) []string { return args }
+func (*testMonitoringManager) Prepare() error                                        { return nil }
+func (*testMonitoringManager) Cleanup(string) error                                  { return nil }

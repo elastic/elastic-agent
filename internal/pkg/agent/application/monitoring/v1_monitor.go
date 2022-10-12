@@ -35,6 +35,9 @@ const (
 	// agentMbEndpointHTTP is used with cloud and exposes metrics on http endpoint
 	agentMbEndpointHTTP = "http://%s:%d"
 	httpPlusPrefix      = "http+"
+	httpPrefix          = "http"
+	fileSchemePrefix    = "file"
+	unixSchemePrefix    = "unix"
 
 	defaultOutputName          = "default"
 	outputsKey                 = "outputs"
@@ -51,7 +54,8 @@ const (
 )
 
 var (
-	supportedComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "endpoint-security", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedComponents      = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "endpoint-security", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedBeatsComponents = []string{"filebeat", "metricbeat", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
 type BeatsMonitor struct {
@@ -92,7 +96,7 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
-func (b *BeatsMonitor) InjectMonitoring(cfg map[string]interface{}, components []string) error {
+func (b *BeatsMonitor) InjectMonitoring(cfg map[string]interface{}, componentIDToBinary map[string]string) error {
 	if !b.Enabled() {
 		return nil
 	}
@@ -119,13 +123,13 @@ func (b *BeatsMonitor) InjectMonitoring(cfg map[string]interface{}, components [
 	}
 
 	if b.config.C.MonitorLogs {
-		if err := b.injectLogsInput(cfg, components, monitoringOutputName); err != nil {
+		if err := b.injectLogsInput(cfg, componentIDToBinary, monitoringOutputName); err != nil {
 			return errors.New(err, "failed to inject monitoring output")
 		}
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, components, monitoringOutputName); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutputName); err != nil {
 			return errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -134,7 +138,7 @@ func (b *BeatsMonitor) InjectMonitoring(cfg map[string]interface{}, components [
 
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
-func (b *BeatsMonitor) EnrichArgs(unit string, args []string) []string {
+func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
 	if !b.enabled {
 		// even if monitoring is disabled enrich args.
 		// the only way to skip it is by disabling monitoring by feature flag
@@ -142,7 +146,7 @@ func (b *BeatsMonitor) EnrichArgs(unit string, args []string) []string {
 	}
 
 	// only beats understands these flags
-	if !strings.Contains(unit, "beat-") {
+	if !isSupportedBeatsBinary(binary) {
 		return args
 	}
 
@@ -197,8 +201,8 @@ func (b *BeatsMonitor) Prepare() error {
 	}
 
 	if b.config.C.MonitorMetrics {
-		metricsDrop := endpointPath("unit", b.operatingSystem)
-		drops = append(drops, filepath.Dir(metricsDrop))
+		metricsDrop := monitoringDrop(endpointPath("unit", b.operatingSystem))
+		drops = append(drops, metricsDrop)
 	}
 
 	for _, drop := range drops {
@@ -266,156 +270,179 @@ func (b *BeatsMonitor) injectMonitoringOutput(cfg map[string]interface{}, monito
 	return nil
 }
 
-func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, units []string, monitoringOutput string) error {
+func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
+	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
-
-	agentID := b.agentInfo.AgentID()
-	version := b.agentInfo.Version()
-	isSnapshot := b.agentInfo.Snapshot()
 
 	inputs := []interface{}{
 		map[string]interface{}{
-			"type":       "filestream",
 			idKey:        "logs-monitoring-agent",
+			"name":       "logs-monitoring-agent",
+			"type":       "filestream",
 			useOutputKey: monitoringOutput,
-			"close": map[string]interface{}{
-				"on_state_change": map[string]interface{}{
-					"inactive": "5m",
-				},
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
 			},
-			"parsers": []map[string]interface{}{
-				{
-					"ndjson": map[string]interface{}{
-						"overwrite_keys": true,
-						"message_key":    "message",
+			"streams": []interface{}{
+				map[string]interface{}{
+					idKey: "logs-monitoring-agent",
+					"data_stream": map[string]interface{}{
+						"type":      "logs",
+						"dataset":   "elastic_agent",
+						"namespace": monitoringNamespace,
 					},
-				},
-			},
-			"paths": []string{
-				filepath.Join(logsDrop, agentName+"-*.ndjson"),
-				filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
-			},
-			"index": fmt.Sprintf("logs-elastic_agent-%s", monitoringNamespace),
-			"processors": []map[string]interface{}{
-				{
-					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
-							"type":      "logs",
-							"dataset":   "elastic_agent",
-							"namespace": monitoringNamespace,
+					"paths": []interface{}{
+						filepath.Join(logsDrop, agentName+"-*.ndjson"),
+						filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
+					},
+					"index": fmt.Sprintf("logs-elastic_agent-%s", monitoringNamespace),
+					"close": map[string]interface{}{
+						"on_state_change": map[string]interface{}{
+							"inactive": "5m",
 						},
 					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": "elastic_agent",
+					"parsers": []interface{}{
+						map[string]interface{}{
+							"ndjson": map[string]interface{}{
+								"overwrite_keys": true,
+								"message_key":    "message",
+							},
 						},
 					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       agentID,
-							"version":  version,
-							"snapshot": isSnapshot,
+					"processors": []interface{}{
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "data_stream",
+								"fields": map[string]interface{}{
+									"type":      "logs",
+									"dataset":   "elastic_agent",
+									"namespace": monitoringNamespace,
+								},
+							},
 						},
-					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": agentID,
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "event",
+								"fields": map[string]interface{}{
+									"dataset": "elastic_agent",
+								},
+							},
 						},
-					},
-				},
-				{
-					"drop_fields": map[string]interface{}{
-						"fields": []string{
-							"ecs.version", //coming from logger, already added by libbeat
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "elastic_agent",
+								"fields": map[string]interface{}{
+									"id":       b.agentInfo.AgentID(),
+									"version":  b.agentInfo.Version(),
+									"snapshot": b.agentInfo.Snapshot(),
+								},
+							},
 						},
-						"ignore_missing": true,
-					},
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "agent",
+								"fields": map[string]interface{}{
+									"id": b.agentInfo.AgentID(),
+								},
+							},
+						},
+						map[string]interface{}{
+							"drop_fields": map[string]interface{}{
+								"fields": []interface{}{
+									"ecs.version", //coming from logger, already added by libbeat
+								},
+								"ignore_missing": true,
+							},
+						}},
 				},
 			},
 		},
 	}
 
-	for _, unit := range units {
-		name, isSupported := componentName(unit)
-		if !isSupported {
+	for unit, binaryName := range componentIDToBinary {
+		if !isSupportedBinary(binaryName) {
 			continue
 		}
 
-		name = strings.ReplaceAll(name, "-", "_") // conform with index naming policy
+		name := strings.ReplaceAll(unit, "-", "_") // conform with index naming policy
 		logFile := loggingPath(unit, b.operatingSystem)
 		inputs = append(inputs, map[string]interface{}{
-			"type":       "filestream",
 			idKey:        "logs-monitoring-" + name,
+			"name":       "logs-monitoring-" + name,
+			"type":       "filestream",
 			useOutputKey: monitoringOutput,
-			"close": map[string]interface{}{
-				"on_state_change": map[string]interface{}{
-					"inactive": "5m",
-				},
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
 			},
-			"parsers": []map[string]interface{}{
-				{
-					"ndjson": map[string]interface{}{
-						"overwrite_keys": true,
-						"message_key":    "message",
+			"streams": []interface{}{
+				map[string]interface{}{
+					idKey: "logs-monitoring-" + name,
+					"data_stream": map[string]interface{}{
+						"type":      "logs",
+						"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+						"namespace": monitoringNamespace,
 					},
-				},
-			},
-			"paths": []string{logFile, logFile + "*"},
-			"index": fmt.Sprintf("logs-elastic_agent.%s-%s", name, monitoringNamespace),
-			"processors": []map[string]interface{}{
-				{
-					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
-							"type":      "logs",
-							"dataset":   fmt.Sprintf("elastic_agent.%s", name),
-							"namespace": monitoringNamespace,
+					"index": fmt.Sprintf("logs-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+					"paths": []interface{}{logFile, logFile + "*"},
+					"close": map[string]interface{}{
+						"on_state_change": map[string]interface{}{
+							"inactive": "5m",
 						},
 					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": fmt.Sprintf("elastic_agent.%s", name),
+					"parsers": []interface{}{
+						map[string]interface{}{
+							"ndjson": map[string]interface{}{
+								"overwrite_keys": true,
+								"message_key":    "message",
+							},
 						},
 					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       agentID,
-							"version":  version,
-							"snapshot": isSnapshot,
+					"processors": []interface{}{
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "data_stream",
+								"fields": map[string]interface{}{
+									"type":      "logs",
+									"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+									"namespace": monitoringNamespace,
+								},
+							},
 						},
-					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": agentID,
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "event",
+								"fields": map[string]interface{}{
+									"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+								},
+							},
 						},
-					},
-				},
-				{
-					"drop_fields": map[string]interface{}{
-						"fields": []string{
-							"ecs.version", //coming from logger, already added by libbeat
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "elastic_agent",
+								"fields": map[string]interface{}{
+									"id":       b.agentInfo.AgentID(),
+									"version":  b.agentInfo.Version(),
+									"snapshot": b.agentInfo.Snapshot(),
+								},
+							},
 						},
-						"ignore_missing": true,
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "agent",
+								"fields": map[string]interface{}{
+									"id": b.agentInfo.AgentID(),
+								},
+							},
+						},
+						map[string]interface{}{
+							"drop_fields": map[string]interface{}{
+								"fields": []interface{}{
+									"ecs.version", //coming from logger, already added by libbeat
+								},
+								"ignore_missing": true,
+							},
+						},
 					},
 				},
 			},
@@ -443,193 +470,230 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	}
 	return defaultMonitoringNamespace
 }
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, units []string, monitoringOutputName string) error {
+func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string) error {
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 
-	agentID := b.agentInfo.AgentID()
-	version := b.agentInfo.Version()
-	isSnapshot := b.agentInfo.Snapshot()
-
 	inputs := []interface{}{
 		map[string]interface{}{
-			"type":       "http/metrics",
 			idKey:        "metrics-monitoring-agent",
+			"name":       "metrics-monitoring-agent",
+			"type":       "http/metrics",
 			useOutputKey: monitoringOutput,
-			"metricsets": []string{"json"},
-			"namespace":  "agent",
-			"period":     "10s",
-			"path":       "/stats",
-			"hosts":      []string{b.agentMonitoringEndpoint()},
-			"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
-			"processors": []map[string]interface{}{
-				{
-					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
-							"type":      "metrics",
-							"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
-							"namespace": monitoringNamespace,
-						},
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
+			},
+			"streams": []interface{}{
+				map[string]interface{}{
+					idKey: "metrics-monitoring-agent",
+					"data_stream": map[string]interface{}{
+						"type":      "metrics",
+						"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+						"namespace": monitoringNamespace,
 					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+					"metricsets": []interface{}{"json"},
+					"path":       "/stats",
+					"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.operatingSystem, b.config.C)},
+					"namespace":  "agent",
+					"period":     "10s",
+					"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+					"processors": []interface{}{
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "data_stream",
+								"fields": map[string]interface{}{
+									"type":      "metrics",
+									"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+									"namespace": monitoringNamespace,
+								},
+							},
 						},
-					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       agentID,
-							"version":  version,
-							"snapshot": isSnapshot,
-							"process":  "elastic-agent",
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "event",
+								"fields": map[string]interface{}{
+									"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+								},
+							},
 						},
-					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": agentID,
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "elastic_agent",
+								"fields": map[string]interface{}{
+									"id":       b.agentInfo.AgentID(),
+									"version":  b.agentInfo.Version(),
+									"snapshot": b.agentInfo.Snapshot(),
+									"process":  "elastic-agent",
+								},
+							},
 						},
-					},
-				},
-				{
-					"copy_fields": map[string]interface{}{
-						"fields":         httpCopyRules(),
-						"ignore_missing": true,
-					},
-				},
-				{
-					"drop_fields": map[string]interface{}{
-						"fields": []string{
-							"http",
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "agent",
+								"fields": map[string]interface{}{
+									"id": b.agentInfo.AgentID(),
+								},
+							},
 						},
-						"ignore_missing": true,
+						map[string]interface{}{
+							"copy_fields": map[string]interface{}{
+								"fields":         httpCopyRules(),
+								"ignore_missing": true,
+								"fail_on_error":  false,
+							},
+						},
+						map[string]interface{}{
+							"drop_fields": map[string]interface{}{
+								"fields": []interface{}{
+									"http",
+								},
+								"ignore_missing": true,
+							},
+						},
 					},
 				},
 			},
 		},
 	}
 
-	for _, unit := range units {
-		name, isSupported := componentName(unit)
-		if !isSupported {
+	for unit, binaryName := range componentIDToBinary {
+		if !isSupportedBinary(binaryName) {
 			continue
 		}
-		endpoints := []string{endpointPath(unit, b.operatingSystem)}
-		name = strings.ReplaceAll(name, "-", "_") // conform with index naming policy
-		inputs = append(inputs, map[string]interface{}{
-			"type":       "beat/metrics",
-			idKey:        "metrics-monitoring-" + name,
-			useOutputKey: monitoringOutput,
-			"metricsets": []string{"stats", "state"},
-			"period":     "10s",
-			"hosts":      endpoints,
-			"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
-			"processors": []map[string]interface{}{
-				{
-					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
-							"type":      "metrics",
-							"dataset":   fmt.Sprintf("elastic_agent.%s", name),
-							"namespace": monitoringNamespace,
-						},
-					},
+
+		endpoints := []interface{}{prefixedEndpoint(endpointPath(unit, b.operatingSystem))}
+		name := strings.ReplaceAll(unit, "-", "_") // conform with index naming policy
+
+		if isSupportedBeatsBinary(binaryName) {
+			inputs = append(inputs, map[string]interface{}{
+				idKey:        "metrics-monitoring-" + name,
+				"name":       "metrics-monitoring-" + name,
+				"type":       "beat/metrics",
+				useOutputKey: monitoringOutput,
+				"data_stream": map[string]interface{}{
+					"namespace": monitoringNamespace,
 				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": fmt.Sprintf("elastic_agent.%s", name),
-						},
-					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       agentID,
-							"version":  version,
-							"snapshot": isSnapshot,
-						},
-					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": agentID,
-						},
-					},
-				},
-			},
-		}, map[string]interface{}{
-			"type":       "http/metrics",
-			useOutputKey: monitoringOutput,
-			"metricsets": []string{"json"},
-			"namespace":  "agent",
-			"period":     "10s",
-			"path":       "/stats",
-			"hosts":      endpoints,
-			"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
-			"processors": []map[string]interface{}{
-				{
-					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
+				"streams": []interface{}{
+					map[string]interface{}{
+						idKey: "metrics-monitoring-" + name,
+						"data_stream": map[string]interface{}{
 							"type":      "metrics",
 							"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
 							"namespace": monitoringNamespace,
 						},
-					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+						"metricsets": []interface{}{"stats", "state"},
+						"hosts":      endpoints,
+						"period":     "10s",
+						"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+						"processors": []interface{}{
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "data_stream",
+									"fields": map[string]interface{}{
+										"type":      "metrics",
+										"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+										"namespace": monitoringNamespace,
+									},
+								},
+							},
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "event",
+									"fields": map[string]interface{}{
+										"dataset": fmt.Sprintf("elastic_agent.%s", name),
+									},
+								},
+							},
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "elastic_agent",
+									"fields": map[string]interface{}{
+										"id":       b.agentInfo.AgentID(),
+										"version":  b.agentInfo.Version(),
+										"snapshot": b.agentInfo.Snapshot(),
+										"process":  binaryName,
+									},
+								},
+							},
+							map[string]interface{}{
+								"add_fields": map[string]interface{}{
+									"target": "agent",
+									"fields": map[string]interface{}{
+										"id": b.agentInfo.AgentID(),
+									},
+								},
+							},
 						},
 					},
 				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       agentID,
-							"version":  version,
-							"snapshot": isSnapshot,
-							"process":  name,
-						},
+			})
+		}
+
+		inputs = append(inputs, map[string]interface{}{
+			idKey:        "metrics-monitoring-" + name + "-1",
+			"name":       "metrics-monitoring-" + name + "-1",
+			"type":       "http/metrics",
+			useOutputKey: monitoringOutput,
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
+			},
+			"streams": []interface{}{
+				map[string]interface{}{
+					idKey: "metrics-monitoring-" + name + "-1",
+					"data_stream": map[string]interface{}{
+						"type":      "metrics",
+						"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+						"namespace": monitoringNamespace,
 					},
-				},
-				{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": agentID,
+					"metricsets": []interface{}{"json"},
+					"hosts":      endpoints,
+					"path":       "/stats",
+					"namespace":  "agent",
+					"period":     "10s",
+					"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+					"processors": []interface{}{
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "event",
+								"fields": map[string]interface{}{
+									"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+								},
+							},
 						},
-					},
-				},
-				{
-					"copy_fields": map[string]interface{}{
-						"fields":         httpCopyRules(),
-						"ignore_missing": true,
-					},
-				},
-				{
-					"drop_fields": map[string]interface{}{
-						"fields": []string{
-							"http",
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "elastic_agent",
+								"fields": map[string]interface{}{
+									"id":       b.agentInfo.AgentID(),
+									"version":  b.agentInfo.Version(),
+									"snapshot": b.agentInfo.Snapshot(),
+									"process":  name,
+								},
+							},
 						},
-						"ignore_missing": true,
+						map[string]interface{}{
+							"add_fields": map[string]interface{}{
+								"target": "agent",
+								"fields": map[string]interface{}{
+									"id": b.agentInfo.AgentID(),
+								},
+							},
+						},
+						map[string]interface{}{
+							"copy_fields": map[string]interface{}{
+								"fields":         httpCopyRules(),
+								"ignore_missing": true,
+								"fail_on_error":  false,
+							},
+						},
+						map[string]interface{}{
+							"drop_fields": map[string]interface{}{
+								"fields": []interface{}{
+									"http",
+								},
+								"ignore_missing": true,
+							},
+						},
 					},
 				},
 			},
@@ -652,6 +716,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, units []st
 }
 
 func loggingPath(id, operatingSystem string) string {
+	id = strings.ReplaceAll(id, string(filepath.Separator), "-")
 	if operatingSystem == windowsOS {
 		return fmt.Sprintf(logFileFormatWin, paths.Home(), id)
 	}
@@ -660,6 +725,7 @@ func loggingPath(id, operatingSystem string) string {
 }
 
 func endpointPath(id, operatingSystem string) (endpointPath string) {
+	id = strings.ReplaceAll(id, string(filepath.Separator), "-")
 	if operatingSystem == windowsOS {
 		return fmt.Sprintf(mbEndpointFileFormatWin, id)
 	}
@@ -671,6 +737,14 @@ func endpointPath(id, operatingSystem string) (endpointPath string) {
 	// place in global /tmp (or /var/tmp on Darwin) to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
+}
+
+func prefixedEndpoint(endpoint string) string {
+	if endpoint == "" || strings.HasPrefix(endpoint, httpPlusPrefix) || strings.HasPrefix(endpoint, httpPrefix) {
+		return endpoint
+	}
+
+	return httpPlusPrefix + endpoint
 }
 
 func monitoringFile(id, operatingSystem string) string {
@@ -721,69 +795,119 @@ func changeOwner(path string, uid, gid int) error {
 	return os.Chown(path, uid, gid)
 }
 
-func componentName(unit string) (string, bool) {
-	for _, comp := range supportedComponents {
-		if strings.HasPrefix(unit, comp) {
-			return comp, true
-		}
-	}
-
-	return "", false
+func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
+	return prefixedEndpoint(AgentMonitoringEndpoint(operatingSystem, cfg))
 }
 
-func (b *BeatsMonitor) agentMonitoringEndpoint() string {
-	if b.config.C != nil && b.config.C.Enabled {
-		return httpPlusPrefix + fmt.Sprintf(agentMbEndpointHTTP, b.config.C.HTTP.Host, b.config.C.HTTP.Port)
+func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
+	if cfg != nil && cfg.Enabled {
+		return fmt.Sprintf(agentMbEndpointHTTP, cfg.HTTP.Host, cfg.HTTP.Port)
 	}
 
-	if b.operatingSystem == windowsOS {
-		return httpPlusPrefix + agentMbEndpointFileFormatWin
+	if operatingSystem == windowsOS {
+		return agentMbEndpointFileFormatWin
 	}
 	// unix socket path must be less than 104 characters
 	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), agentName))
 	if len(path) < 104 {
-		return httpPlusPrefix + path
+		return path
 	}
 	// place in global /tmp to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
-	return httpPlusPrefix + fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
+	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
 }
 
-func httpCopyRules() []map[string]interface{} {
-	fromToMap := []map[string]interface{}{
+func httpCopyRules() []interface{} {
+	fromToMap := []interface{}{
 		// I should be able to see the CPU Usage on the running machine. Am using too much CPU?
-		{
+		map[string]interface{}{
 			"from": "http.agent.beat.cpu",
 			"to":   "system.process.cpu",
 		},
+
 		// I should be able to see the Memory usage of Elastic Agent. Is the Elastic Agent using too much memory?
-		{
+		map[string]interface{}{
 			"from": "http.agent.beat.memstats.memory_sys",
 			"to":   "system.process.memory.size",
 		},
-		// I should be able to see the system memory. Am I running out of memory?
-		// TODO: with APM agent: total and free
-
-		// I should be able to see Disk usage on the running machine. Am I running out of disk space?
-		// TODO: with APM agent
 
 		// I should be able to see fd usage. Am I keep too many files open?
-		{
+		map[string]interface{}{
 			"from": "http.agent.beat.handles",
 			"to":   "system.process.fd",
 		},
+
 		// Cgroup reporting
-		{
+		map[string]interface{}{
 			"from": "http.agent.beat.cgroup",
 			"to":   "system.process.cgroup",
 		},
 
 		// apm-server specific
-		{
+		map[string]interface{}{
 			"from": "http.agent.apm-server",
 			"to":   "apm-server",
 		},
 	}
 
 	return fromToMap
+}
+
+func isSupportedBinary(binaryName string) bool {
+	for _, supportedBinary := range supportedComponents {
+		if strings.EqualFold(supportedBinary, binaryName) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSupportedBeatsBinary(binaryName string) bool {
+	for _, supportedBinary := range supportedBeatsComponents {
+		if strings.EqualFold(supportedBinary, binaryName) {
+			return true
+		}
+	}
+	return false
+}
+
+func monitoringDrop(path string) (drop string) {
+	defer func() {
+		if drop != "" {
+			// Dir call changes separator to the one used in OS
+			// '/var/lib' -> '\var\lib\' on windows
+			baseLen := len(filepath.Dir(drop))
+			drop = drop[:baseLen]
+		}
+	}()
+
+	if strings.Contains(path, "localhost") {
+		return ""
+	}
+
+	path = strings.TrimPrefix(path, httpPlusPrefix)
+
+	// npipe is virtual without a drop
+	if isNpipe(path) {
+		return ""
+	}
+
+	if isWindowsPath(path) {
+		return path
+	}
+
+	u, _ := url.Parse(path)
+	if u == nil || (u.Scheme != "" && u.Scheme != fileSchemePrefix && u.Scheme != unixSchemePrefix) {
+		return ""
+	}
+
+	if u.Scheme == fileSchemePrefix {
+		return strings.TrimPrefix(path, "file://")
+	}
+
+	if u.Scheme == unixSchemePrefix {
+		return strings.TrimPrefix(path, "unix://")
+	}
+
+	return path
 }
