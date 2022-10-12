@@ -280,7 +280,7 @@ func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, e
 	// Guard if the context is stopped by a out of bound call,
 	// this mean we are rebooting to change the log level or the system is shutting us down.
 	for f.bgContext.Err() == nil {
-		f.log.Debugf("Checking started")
+		f.log.Debugf("Checkin started")
 		resp, took, err := f.executeCheckin(f.bgContext)
 		if err != nil {
 			// Only update the local status on failure: https://github.com/elastic/elastic-agent/issues/1148
