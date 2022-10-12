@@ -58,6 +58,7 @@ var (
 	supportedBeatsComponents = []string{"filebeat", "metricbeat", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
+// Beats monitor is providing V1 monitoring support.
 type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
@@ -69,6 +70,7 @@ type monitoringConfig struct {
 	C *monitoringCfg.MonitoringConfig `config:"agent.monitoring"`
 }
 
+// New creates a new BeatsMonitor instance.
 func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo *info.AgentInfo) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
@@ -85,6 +87,7 @@ func (b *BeatsMonitor) Enabled() bool {
 	return b.enabled && b.config.C.Enabled && (b.config.C.MonitorLogs || b.config.C.MonitorMetrics)
 }
 
+// Reload refreshes monitoring configuration.
 func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 	if !b.Enabled() {
 		return nil
@@ -96,6 +99,7 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
+// InjectMonitoring adds monitoring inputs to a configuration based on retrieved list of components to run.
 func (b *BeatsMonitor) InjectMonitoring(cfg map[string]interface{}, componentIDToBinary map[string]string) error {
 	if !b.Enabled() {
 		return nil
@@ -774,10 +778,12 @@ func changeOwner(path string, uid, gid int) error {
 	return os.Chown(path, uid, gid)
 }
 
+// HttpPlusAgentMonitoringEndpoint provides an agent monitoring endpoint path with a `http+` prefix.
 func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
 	return prefixedEndpoint(AgentMonitoringEndpoint(operatingSystem, cfg))
 }
 
+// AgentMonitoringEndpoint provides an agent monitoring endpoint path.
 func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
 	if cfg != nil && cfg.Enabled {
 		return fmt.Sprintf(agentMbEndpointHTTP, cfg.HTTP.Host, cfg.HTTP.Port)

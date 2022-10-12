@@ -14,11 +14,12 @@ import (
 	"path/filepath"
 	"syscall"
 
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/spf13/cobra"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
+
+	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/service"

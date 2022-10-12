@@ -14,6 +14,7 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.0.0-20220404145827-89887023c1ab
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484
 	github.com/elastic/elastic-agent-libs v0.2.6
+	github.com/elastic/elastic-agent-system-metrics v0.4.4
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
 	github.com/elastic/go-ucfg v0.8.5
@@ -71,7 +72,6 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/docker v20.10.12+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/elastic/elastic-agent-system-metrics v0.4.4 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect

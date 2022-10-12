@@ -11,13 +11,14 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/gorilla/mux"
+	"go.elastic.co/apm"
+	"go.elastic.co/apm/module/apmgorilla"
+
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/gorilla/mux"
-	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmgorilla"
 )
 
 // New creates a new server exposing metrics and process information.
