@@ -23,6 +23,8 @@ const (
 	defaultCheckServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
 	defaultServiceStopTimeout         = 3 * time.Minute  // 3 minutes default wait for the service stop
 	defaultServiceStartTimeout        = time.Minute      // 1 minute default wait for the service start
+
+	windows = "windows"
 )
 
 var (
@@ -302,7 +304,10 @@ func (s *ServiceRuntime) start(ctx context.Context, comm Communicator, cli servi
 	return nil
 }
 
-func (s *ServiceRuntime) awaitCheckinState(ctx context.Context, comm Communicator, cli service.Service, state client.UnitState, timeout time.Duration) {
+// awaitCheckin awaits checkin with timeout.
+// If the state == nil then it returns on the first check-in.
+// If the state != nil then it returns when any unit has the matching state
+func (s *ServiceRuntime) awaitCheckin(ctx context.Context, comm Communicator, cli service.Service, state *client.UnitState, timeout time.Duration) bool {
 	t := time.NewTimer(s.stopTimeout())
 	defer t.Stop()
 
@@ -311,18 +316,23 @@ func (s *ServiceRuntime) awaitCheckinState(ctx context.Context, comm Communicato
 		case <-ctx.Done():
 			// stop cancelled
 			s.log.Debugf("stopping %s service, cancelled", cli)
-			return
+			return false
 		case <-t.C:
 			// stop timed out
 			s.log.Debugf("stopping %s service, timed out", cli)
-			return
+			return false
 		case checkin := <-comm.CheckinObserved():
 			s.processCheckin(checkin, comm)
+
+			//
+			if state == nil {
+				return true
+			}
 			// Return on the first matching unit state
 			// This is used for the start/stop logic
 			for _, unit := range s.state.Units {
-				if unit.State == state {
-					return
+				if unit.State == *state {
+					return true
 				}
 			}
 		}
@@ -381,59 +391,69 @@ func (s *ServiceRuntime) setStopped(name string) {
 }
 
 func (s *ServiceRuntime) stop(ctx context.Context, comm Communicator, cli service.Service, checkedIn bool) (err error) {
-	s.log.Debugf("stopping %s service", cli)
-
 	name := s.serviceName()
+
+	s.log.Debugf("stopping %s service", name)
+
 	if s.state.State == client.UnitStateStopping || s.state.State == client.UnitStateStopped {
 		s.log.Debugf("%s service can't be stopped, already %s", name, s.state.State)
 		return nil
 	}
 
-	// Send stopping state to the service
+	// If the service on windows(!) haven't checked in, wait until it is checked in.
+	// There is no other way to stop the windows service,
+	// the endpoint service is protecting itself from stopping with the regular service manager APIs
+	checkinWait := s.checkinPeriod() * 2 // wait for checking twice as long as the expected check-in intervals
+	if !checkedIn && runtime.GOOS == windows {
+		checkedIn = s.awaitCheckin(ctx, comm, cli, nil, checkinWait)
+	}
+
+	// If service checked in send STOPPING
 	if checkedIn {
+		// Send stopping state to the service
 		s.log.Debugf("send stopping state to %s service", name)
 		s.state.forceExpectedState(client.UnitStateStopping)
 		comm.CheckinExpected(s.state.toCheckinExpected())
 		// Awating the service to check-in with stopping state
 		s.log.Debugf("await check-in upon stopping for %s service", name)
-		s.awaitCheckinState(ctx, comm, cli, client.UnitStateStopping, s.stopTimeout())
+		awaitState := client.UnitStateStopping
+		s.awaitCheckin(ctx, comm, cli, &awaitState, checkinWait)
 		s.log.Debugf("got check-in upon stopping for %s service", name)
-		// Set state to stopped if service received STOPPING state
-		// Presently the final state is STOPPING
-		// The Endpoint will make changes to send STOPPED when the service is actually stopped
-		if s.state.State == client.UnitStateStopping {
-			s.setStopped(s.serviceName())
-			return nil
-		}
+	}
+
+	// Set state to stopped if service received STOPPING state
+	// Presently the final state is STOPPING
+	// The Endpoint will make changes to send STOPPED when the service is actually stopped
+	if s.state.State == client.UnitStateStopping {
+		s.setStopped(name)
+		return nil
 	}
 
 	// Attempt to stop the service on non-windows platform
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != windows {
 		s.log.Debugf("attempt to stop %s service", name)
 		err = cli.Stop()
 		if err != nil {
 			return err
 		}
+	}
 
-		// Await the service status stopped with the platform services management
-		var status service.Status
-		s.log.Debugf("wait for %s service to stop", name)
-		status, err = s.awaitServiceStatus(ctx, service.StatusStopped)
-		s.log.Debugf("got %s service [%s] status upon stop, err: %v", name, status, err)
+	// Await the service status gets stopped with the platform services management
+	var status service.Status
+	s.log.Debugf("wait for %s service to stop", name)
+	status, err = s.awaitServiceStatus(ctx, service.StatusStopped)
+	s.log.Debugf("got %s service [%s] status upon stop, err: %v", name, status, err)
 
-		// If service is stopped or uninstalled, set the runtime state into stopped
-		if err != nil {
-			if !errors.Is(err, service.ErrNotInstalled) {
-				return err
-			}
+	// If service is stopped or uninstalled, set the runtime state into stopped
+	if err != nil {
+		if !errors.Is(err, service.ErrNotInstalled) {
+			return err
 		}
-		if status == service.StatusStopped {
-			s.setStopped(s.serviceName())
-		} else {
-			s.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: while stopping %s service, status: %v", cli, status))
-		}
+	}
+	if status == service.StatusStopped {
+		s.setStopped(name)
 	} else {
-		s.setStopped(s.serviceName())
+		s.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: while stopping %s service, status: %v", cli, status))
 	}
 
 	return nil
