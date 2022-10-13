@@ -49,11 +49,10 @@ ci-clone-kibana-repository:
 	cp $(FILE_REPO)  $(ELASTIC_AGENT_REPO)/$(ELASTIC_AGENT_REPO_PATH)
 	
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
+$(eval HASDIFF =$(shell sh -c "git status | grep $(FILE_REPO) | wc -l"))
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
-	HASDIFF=`git status | grep $(FILE_REPO) | wc -l`; \
-	echo $${HASDIFF}
-ifeq ($${HASDIFF},1)
+ifeq ($(HASDIFF),1)
 	echo "INFO: Create branch to update k8s templates"
 	git config user.name obscloudnativemonitoring
 	git config user.email obs-cloudnative-monitoring@elastic.co
@@ -79,8 +78,7 @@ else
 		--base main \
 		--head $(ELASTIC_AGENT_BRANCH) \
 		--reviewer elastic/obs-cloudnative-monitoring
-endif 
-
+endif
 else
 	echo "No differences found with kibana git repository"
 endif
