@@ -80,11 +80,7 @@ else
 		--base main \
 		--head $(ELASTIC_AGENT_BRANCH) \
 		--reviewer elastic/obs-cloudnative-monitoring
-<<<<<<< HEAD
 endif 
-=======
-endif
->>>>>>> 890483300 (Fix k8s template link versioning (#1504))
 
 else
 	echo "No differences found with kibana git repository"
