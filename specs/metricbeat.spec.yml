@@ -15,6 +15,7 @@ inputs:
       - kafka
       - logstash
       - redis
+    shippers: &shippers
       - shipper
     command:
       args: &args
@@ -34,125 +35,146 @@ inputs:
     description: "Docker metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: elasticsearch/metrics
     description: "Elasticsearch metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: kibana/metrics
     description: "Kibana metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: kubernetes/metrics
     description: "Kubernetes metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: linux/metrics
     description: "Linux metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: logstash/metrics
     description: "Logstash metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: mongodb/metrics
     description: "Mongodb metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: mysql/metrics
     description: "MySQL metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: postgresql/metrics
     description: "PostgreSQL metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: redis/metrics
     description: "Redis metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: system/metrics
     description: "System metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: uwsgi/metrics
     description: "UWSGI metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: windows/metrics
     description: "Windows metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: aws/metrics
     description: "AWS metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: awsfargate/metrics
     description: "AWS Fargate metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: azure/metrics
     description: "Azure metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: cloudfoundry/metrics
     description: "PCF Cloudfoundry metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: containerd/metrics
     description: "Containerd metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: mssql/metrics
     description: "Microsoft SQL Server metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: oracle/metrics
     description: "Oracle Database metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args
   - name: syncgateway/metrics
     description: "Couchbase Sync Gateway metrics"
     platforms: *platforms
     outputs: *outputs
+    shippers: *shippers
     command:
       args: *args

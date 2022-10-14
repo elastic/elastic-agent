@@ -305,7 +305,7 @@ func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntime
 	}
 	supportedShippers := make([]ShipperRuntimeSpec, 0, len(shippers))
 	for _, shipper := range shippers {
-		if containsStr(inputSpec.Spec.Outputs, shipper.ShipperType) {
+		if containsStr(inputSpec.Spec.Shippers, shipper.ShipperType) {
 			// validate the runtime specification to determine if it can even run
 			err = validateRuntimeChecks(&shipper.Spec.Runtime, vars)
 			if err != nil {
