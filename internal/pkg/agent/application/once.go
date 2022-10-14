@@ -50,6 +50,12 @@ func (o *once) Errors() <-chan error {
 	return o.errCh
 }
 
+// ActionErrors returns the error channel for actions.
+// Returns nil channel.
+func (o *once) ActionErrors() <-chan error {
+	return nil
+}
+
 func (o *once) Watch() <-chan coordinator.ConfigChange {
 	return o.ch
 }

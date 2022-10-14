@@ -115,6 +115,10 @@ func (m *fleetServerBootstrapManager) Errors() <-chan error {
 	return m.errCh
 }
 
+func (m *fleetServerBootstrapManager) ActionErrors() <-chan error {
+	return nil
+}
+
 func (m *fleetServerBootstrapManager) Watch() <-chan coordinator.ConfigChange {
 	return m.ch
 }

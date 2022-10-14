@@ -111,6 +111,11 @@ type ErrorReporter interface {
 type ConfigManager interface {
 	Runner
 
+	// ActionErrors returns the error channel for actions.
+	// May return errors for fleet managed agents.
+	// Will always be empty for stand alone agents.
+	ActionErrors() <-chan error
+
 	// Watch returns the chanel to watch for configuration changes.
 	Watch() <-chan ConfigChange
 }
@@ -156,6 +161,7 @@ type Coordinator struct {
 	runtimeMgrErr error
 	configMgr     ConfigManager
 	configMgrErr  error
+	actionsErr    error
 	varsMgr       VarsManager
 	varsMgrErr    error
 
@@ -205,6 +211,9 @@ func (c *Coordinator) State(local bool) (s State) {
 		} else if local && c.configMgrErr != nil {
 			s.State = agentclient.Failed
 			s.Message = c.configMgrErr.Error()
+		} else if c.actionsErr != nil {
+			s.State = agentclient.Failed
+			s.Message = c.actionsErr.Error()
 		} else if c.varsMgrErr != nil {
 			s.State = agentclient.Failed
 			s.Message = c.varsMgrErr.Error()
@@ -428,7 +437,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current state of running components by the Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				s := c.State()
+				s := c.State(true)
 				o, err := yaml.Marshal(s)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -508,6 +517,8 @@ func (c *Coordinator) runner(ctx context.Context) error {
 			c.runtimeMgrErr = runtimeErr
 		case configErr := <-c.configMgr.Errors():
 			c.configMgrErr = configErr
+		case actionsErr := <-c.configMgr.ActionErrors():
+			c.actionsErr = actionsErr
 		case varsErr := <-c.varsMgr.Errors():
 			c.varsMgrErr = varsErr
 		case change := <-configWatcher.Watch():
