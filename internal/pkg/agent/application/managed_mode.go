@@ -123,6 +123,10 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	batchedAcker := lazy.NewAcker(ack, m.log, lazy.WithRetrier(retrier))
 	actionAcker := store.NewStateStoreActionAcker(batchedAcker, m.stateStore)
 
+	if err := m.coord.AckUpgrade(ctx, actionAcker); err != nil {
+		m.log.Warnf("Failed to ack upgrade: %v", err)
+	}
+
 	// Run the retrier.
 	retrierRun := make(chan bool)
 	retrierCtx, retrierCancel := context.WithCancel(ctx)

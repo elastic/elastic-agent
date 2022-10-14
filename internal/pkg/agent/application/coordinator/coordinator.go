@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 
@@ -51,6 +52,9 @@ type UpgradeManager interface {
 
 	// Upgrade upgrades running agent.
 	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error)
+
+	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
+	Ack(ctx context.Context, acker acker.Acker) error
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -255,6 +259,10 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		c.ReExec(cb)
 	}
 	return nil
+}
+
+func (c *Coordinator) AckUpgrade(ctx context.Context, acker acker.Acker) error {
+	return c.upgradeMgr.Ack(ctx, acker)
 }
 
 // PerformAction executes an action on a unit.
