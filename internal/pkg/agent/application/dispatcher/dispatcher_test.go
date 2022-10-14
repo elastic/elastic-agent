@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
@@ -33,8 +34,11 @@ type mockAction struct {
 type mockOtherAction struct {
 	mockAction
 }
-type mockUnknownAction struct {
+type mockScheduledAction struct {
 	mockAction
+}
+type mockRetryableAction struct {
+	mockScheduledAction
 }
 
 func (m *mockAction) ID() string {
@@ -49,26 +53,48 @@ func (m *mockAction) String() string {
 	args := m.Called()
 	return args.String(0)
 }
-func (m *mockAction) StartTime() (time.Time, error) {
+func (m *mockScheduledAction) StartTime() (time.Time, error) {
 	args := m.Called()
 	return args.Get(0).(time.Time), args.Error(1)
 }
-func (m *mockAction) Expiration() (time.Time, error) {
+func (m *mockScheduledAction) Expiration() (time.Time, error) {
 	args := m.Called()
 	return args.Get(0).(time.Time), args.Error(1)
+}
+func (m *mockRetryableAction) RetryAttempt() int {
+	args := m.Called()
+	return args.Int(0)
+}
+func (m *mockRetryableAction) SetRetryAttempt(n int) {
+	m.Called(n)
+}
+func (m *mockRetryableAction) SetStartTime(ts time.Time) {
+	m.Called(ts)
+}
+func (m *mockRetryableAction) GetError() error {
+	args := m.Called()
+	return args.Error(0)
+}
+func (m *mockRetryableAction) SetError(err error) {
+	m.Called(err)
 }
 
 type mockQueue struct {
 	mock.Mock
 }
 
-func (m *mockQueue) Add(action fleetapi.Action, n int64) {
+func (m *mockQueue) Add(action fleetapi.ScheduledAction, n int64) {
 	m.Called(action, n)
 }
 
-func (m *mockQueue) DequeueActions() []fleetapi.Action {
+func (m *mockQueue) DequeueActions() []fleetapi.ScheduledAction {
 	args := m.Called()
-	return args.Get(0).([]fleetapi.Action)
+	return args.Get(0).([]fleetapi.ScheduledAction)
+}
+
+func (m *mockQueue) CancelType(t string) int {
+	args := m.Called(t)
+	return args.Int(0)
 }
 
 func (m *mockQueue) Save() error {
@@ -84,7 +110,7 @@ func TestActionDispatcher(t *testing.T) {
 		def := &mockHandler{}
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.Action{}).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 		d, err := New(nil, def, queue)
 		require.NoError(t, err)
 
@@ -97,11 +123,9 @@ func TestActionDispatcher(t *testing.T) {
 		require.NoError(t, err)
 
 		action1 := &mockAction{}
-		action1.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
 		action1.On("Type").Return("action")
 		action1.On("ID").Return("id")
 		action2 := &mockOtherAction{}
-		action2.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
 		action2.On("Type").Return("action")
 		action2.On("ID").Return("id")
 
@@ -109,8 +133,12 @@ func TestActionDispatcher(t *testing.T) {
 		success1.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		success2.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		err = d.Dispatch(ctx, ack, action1, action2)
-		require.NoError(t, err)
+		d.Dispatch(ctx, ack, action1, action2)
+		select {
+		case err := <-d.Errors():
+			t.Fatalf("Unexpected error: %v", err)
+		default:
+		}
 
 		success1.AssertExpectations(t)
 		success2.AssertExpectations(t)
@@ -124,17 +152,20 @@ func TestActionDispatcher(t *testing.T) {
 		ctx := context.Background()
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.Action{}).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 		d, err := New(nil, def, queue)
 		require.NoError(t, err)
 
-		action := &mockUnknownAction{}
-		action.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
+		action := &mockOtherAction{}
 		action.On("Type").Return("action")
 		action.On("ID").Return("id")
-		err = d.Dispatch(ctx, ack, action)
+		d.Dispatch(ctx, ack, action)
+		select {
+		case err := <-d.Errors():
+			t.Fatalf("Unexpected error: %v", err)
+		default:
+		}
 
-		require.NoError(t, err)
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
 	})
@@ -162,7 +193,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.Action{}).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 		queue.On("Add", mock.Anything, mock.Anything).Once()
 
 		d, err := New(nil, def, queue)
@@ -171,16 +202,19 @@ func TestActionDispatcher(t *testing.T) {
 		require.NoError(t, err)
 
 		action1 := &mockAction{}
-		action1.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
 		action1.On("Type").Return("action")
 		action1.On("ID").Return("id")
-		action2 := &mockAction{}
+		action2 := &mockScheduledAction{}
 		action2.On("StartTime").Return(time.Now().Add(time.Hour), nil)
 		action2.On("Type").Return("action")
 		action2.On("ID").Return("id")
 
-		err = d.Dispatch(context.Background(), ack, action1, action2)
-		require.NoError(t, err)
+		d.Dispatch(context.Background(), ack, action1, action2)
+		select {
+		case err := <-d.Errors():
+			t.Fatalf("Unexpected error: %v", err)
+		default:
+		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
 	})
@@ -191,7 +225,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.Action{}).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
 		d, err := New(nil, def, queue)
 		require.NoError(t, err)
@@ -199,12 +233,15 @@ func TestActionDispatcher(t *testing.T) {
 		require.NoError(t, err)
 
 		action := &mockAction{}
-		action.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
 		action.On("Type").Return(fleetapi.ActionTypeCancel)
 		action.On("ID").Return("id")
 
-		err = d.Dispatch(context.Background(), ack, action)
-		require.NoError(t, err)
+		d.Dispatch(context.Background(), ack, action)
+		select {
+		case err := <-d.Errors():
+			t.Fatalf("Unexpected error: %v", err)
+		default:
+		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
 	})
@@ -213,7 +250,7 @@ func TestActionDispatcher(t *testing.T) {
 		def := &mockHandler{}
 		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
 
-		action1 := &mockAction{}
+		action1 := &mockScheduledAction{}
 		action1.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
 		action1.On("Expiration").Return(time.Now().Add(time.Hour), fleetapi.ErrNoStartTime)
 		action1.On("Type").Return(fleetapi.ActionTypeCancel)
@@ -221,7 +258,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.Action{action1}).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{action1}).Once()
 
 		d, err := New(nil, def, queue)
 		require.NoError(t, err)
@@ -229,12 +266,15 @@ func TestActionDispatcher(t *testing.T) {
 		require.NoError(t, err)
 
 		action2 := &mockAction{}
-		action2.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
 		action2.On("Type").Return(fleetapi.ActionTypeCancel)
 		action2.On("ID").Return("id")
 
-		err = d.Dispatch(context.Background(), ack, action2)
-		require.NoError(t, err)
+		d.Dispatch(context.Background(), ack, action2)
+		select {
+		case err := <-d.Errors():
+			t.Fatalf("Unexpected error: %v", err)
+		default:
+		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
 	})
@@ -245,15 +285,132 @@ func TestActionDispatcher(t *testing.T) {
 
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.Action{}).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
 
 		d, err := New(nil, def, queue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
 
-		err = d.Dispatch(context.Background(), ack)
-		require.NoError(t, err)
+		d.Dispatch(context.Background(), ack)
+		select {
+		case err := <-d.Errors():
+			t.Fatalf("Unexpected error: %v", err)
+		default:
+		}
 		def.AssertNotCalled(t, "Handle", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Dispatch of a retryable action returns an error", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Twice()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+		queue.On("Add", mock.Anything, mock.Anything).Once()
+
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+		err = d.Register(&mockRetryableAction{}, def)
+		require.NoError(t, err)
+
+		action := &mockRetryableAction{}
+		action.On("Type").Return("action")
+		action.On("ID").Return("id")
+		action.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime).Once()
+		action.On("SetError", mock.Anything).Once()
+		action.On("RetryAttempt").Return(0).Once()
+		action.On("SetRetryAttempt", 1).Once()
+		action.On("SetStartTime", mock.Anything).Once()
+
+		d.Dispatch(context.Background(), ack, action)
+		select {
+		case err := <-d.Errors():
+			t.Fatalf("Unexpected error: %v", err)
+		default:
+		}
+		def.AssertExpectations(t)
+		queue.AssertExpectations(t)
+		action.AssertExpectations(t)
+	})
+
+	t.Run("Dispatch multiples events returns one error", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+		err = d.Register(&mockAction{}, def)
+		require.NoError(t, err)
+
+		action1 := &mockAction{}
+		action1.On("Type").Return("action")
+		action1.On("ID").Return("id")
+		action2 := &mockAction{}
+		action2.On("Type").Return("action")
+		action2.On("ID").Return("id")
+
+		// Kind of a dirty work around to test an error return.
+		// launch in another routing and sleep to check if an error is generated
+		go d.Dispatch(context.Background(), ack, action1, action2)
+		time.Sleep(time.Millisecond * 200)
+		select {
+		case <-d.Errors():
+		default:
+			t.Fatal("Expected error")
+		}
+		time.Sleep(time.Millisecond * 200)
+		select {
+		case <-d.Errors():
+			t.Fatal(err)
+		default:
+		}
+
+		def.AssertExpectations(t)
+		queue.AssertExpectations(t)
+	})
+}
+
+func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
+	ack := noop.New()
+	def := &mockHandler{}
+
+	t.Run("no more attmpts", func(t *testing.T) {
+		queue := &mockQueue{}
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+
+		action := &mockRetryableAction{}
+		action.On("ID").Return("id")
+		action.On("RetryAttempt").Return(len(d.rt.steps)).Once()
+		action.On("SetRetryAttempt", mock.Anything).Once()
+
+		d.scheduleRetry(context.Background(), action, ack)
+		queue.AssertExpectations(t)
+		action.AssertExpectations(t)
+	})
+
+	t.Run("schedule an attempt", func(t *testing.T) {
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Once()
+		queue.On("Add", mock.Anything, mock.Anything).Once()
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+
+		action := &mockRetryableAction{}
+		action.On("ID").Return("id")
+		action.On("RetryAttempt").Return(0).Once()
+		action.On("SetRetryAttempt", 1).Once()
+		action.On("SetStartTime", mock.Anything).Once()
+
+		d.scheduleRetry(context.Background(), action, ack)
+		queue.AssertExpectations(t)
+		action.AssertExpectations(t)
 	})
 }
