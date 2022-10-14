@@ -45,7 +45,7 @@ var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
 func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) coordinator.ComponentsModifier {
 	return func(comps []component.Component) ([]component.Component, error) {
 		for i, comp := range comps {
-			if comp.Spec.InputType == fleetServer {
+			if comp.InputSpec != nil && comp.InputSpec.InputType == fleetServer {
 				for j, unit := range comp.Units {
 					if unit.Type == client.UnitTypeOutput && unit.Config.Type == elasticsearch {
 						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &serverCfg.Output.Elasticsearch)

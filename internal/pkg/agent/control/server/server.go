@@ -129,7 +129,7 @@ func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateRespons
 		}
 		components = append(components, &cproto.ComponentState{
 			Id:      comp.Component.ID,
-			Name:    comp.Component.Spec.BinaryName,
+			Name:    comp.Component.Type(),
 			State:   cproto.State(comp.State.State),
 			Message: comp.State.Message,
 			Units:   units,

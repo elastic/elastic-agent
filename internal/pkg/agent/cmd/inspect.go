@@ -236,7 +236,8 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 				return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
 			}
 			if !opts.showSpec {
-				comp.Spec = component.InputRuntimeSpec{}
+				comp.InputSpec = nil
+				comp.ShipperSpec = nil
 			}
 			if !opts.showConfig {
 				for key, unit := range comp.Units {
@@ -263,7 +264,8 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	// Hide runtime specification unless toggled on.
 	if !opts.showSpec {
 		for i, comp := range comps {
-			comp.Spec = component.InputRuntimeSpec{}
+			comp.InputSpec = nil
+			comp.ShipperSpec = nil
 			comps[i] = comp
 		}
 	}

@@ -88,6 +88,16 @@ type Component struct {
 	Shipper *ShipperReference `yaml:"shipper,omitempty"`
 }
 
+// Type returns the type of the component.
+func (c *Component) Type() string {
+	if c.InputSpec != nil {
+		return c.InputSpec.InputType
+	} else if c.ShipperSpec != nil {
+		return c.ShipperSpec.ShipperType
+	}
+	return ""
+}
+
 // ToComponents returns the components that should be running based on the policy and the current runtime specification.
 func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component, error) {
 	outputsMap, err := toIntermediate(policy)
@@ -306,18 +316,18 @@ func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntime
 			// is enabled in the output configuration
 			shipperConfigRaw, ok := output.output[shipper.ShipperType]
 			if ok {
+				// key exists enabled by default unless explicitly disabled
+				enabled := true
 				if shipperConfig, ok := shipperConfigRaw.(map[string]interface{}); ok {
-					// key exists enabled by default unless explicitly disabled
-					enabled := true
 					if enabledRaw, ok := shipperConfig[enabledKey]; ok {
 						if enabledVal, ok := enabledRaw.(bool); ok {
 							enabled = enabledVal
 						}
 					}
-					if enabled {
-						// inputs supports this shipper (and it's enabled)
-						supportedShippers = append(supportedShippers, shipper)
-					}
+				}
+				if enabled {
+					// inputs supports this shipper (and it's enabled)
+					supportedShippers = append(supportedShippers, shipper)
 				}
 			}
 		}
