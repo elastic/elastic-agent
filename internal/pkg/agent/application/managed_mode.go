@@ -155,11 +155,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
 		actionDispatcher.Dispatch(ctx, actionAcker, actions...)
-		select {
-		case err := <-actionDispatcher.Errors():
-			m.log.Errorf("could not recover state, error %+v, skipping...", err)
-		default:
-		}
 		stateRestored = true
 	}
 
