@@ -582,10 +582,19 @@ func (s *ServiceRuntime) install(ctx context.Context) error {
 
 // uninstall executes the service uninstall command
 func (s *ServiceRuntime) uninstall(ctx context.Context) error {
-	if s.comp.Spec.Spec.Service.Operations.Uninstall == nil {
-		s.log.Errorf("missing uninstall spec for %s service", s.comp.Spec.BinaryName)
+	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl)
+}
+
+// UninstallService uninstalls the service
+func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component) error {
+	return uninstallService(ctx, log, comp, executeServiceCommand)
+}
+
+func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc) error {
+	if comp.Spec.Spec.Service.Operations.Uninstall == nil {
+		log.Errorf("missing uninstall spec for %s service", comp.Spec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
-	s.log.Debugf("uninstall %s service", s.comp.Spec.BinaryName)
-	return s.executeServiceCommandImpl(ctx, s.log, s.comp.Spec.BinaryPath, s.comp.Spec.Spec.Service.Operations.Uninstall)
+	log.Debugf("uninstall %s service", comp.Spec.BinaryName)
+	return executeServiceCommandImpl(ctx, log, comp.Spec.BinaryPath, comp.Spec.Spec.Service.Operations.Uninstall)
 }
