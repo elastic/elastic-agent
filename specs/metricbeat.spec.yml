@@ -15,6 +15,7 @@ inputs:
       - kafka
       - logstash
       - redis
+      - shipper
     command:
       args: &args
         - "-E"

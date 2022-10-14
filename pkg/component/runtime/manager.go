@@ -81,8 +81,9 @@ type Manager struct {
 	waitMx    sync.RWMutex
 	waitReady map[string]waitForReady
 
-	mx      sync.RWMutex
-	current map[string]*componentRuntimeState
+	mx           sync.RWMutex
+	current      map[string]*componentRuntimeState
+	shipperConns map[string]*shipperConn
 
 	subMx         sync.RWMutex
 	subscriptions map[string][]*Subscription
@@ -108,6 +109,7 @@ func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentI
 		tracer:        tracer,
 		waitReady:     make(map[string]waitForReady),
 		current:       make(map[string]*componentRuntimeState),
+		shipperConns:  make(map[string]*shipperConn),
 		subscriptions: make(map[string][]*Subscription),
 		errCh:         make(chan error),
 	}
@@ -606,6 +608,13 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
+	// prepare the components to add consistent shipper connection information between
+	// the connected components in the model
+	err := m.connectShippers(components)
+	if err != nil {
+		return err
+	}
+
 	touched := make(map[string]bool)
 	for _, comp := range components {
 		touched[comp.ID] = true
@@ -809,6 +818,119 @@ func (m *Manager) performDiagAction(ctx context.Context, unit component.Unit) ([
 		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
 	return res.Diagnostic, nil
+}
+
+func (m *Manager) connectShippers(components []component.Component) error {
+	// ensure that all shipper components have created connection information (must happen before we connect the units)
+	shippersTouched := make(map[string]bool)
+	for i, comp := range components {
+		if comp.ShipperSpec != nil {
+			// running shipper (ensure connection information is created)
+			shippersTouched[comp.ID] = true
+			conn, ok := m.shipperConns[comp.ID]
+			if !ok {
+				ca, err := authority.NewCA()
+				if err != nil {
+					return fmt.Errorf("failed to create connection CA for shipper %q: %w", comp.ID, err)
+				}
+				conn = &shipperConn{
+					addr:  "", // TODO: Add address
+					ca:    ca,
+					pairs: make(map[string]*authority.Pair),
+				}
+				m.shipperConns[comp.ID] = conn
+			}
+
+			// each input unit needs its corresponding
+			pairsTouched := make(map[string]bool)
+			for j, unit := range comp.Units {
+				if unit.Type == client.UnitTypeInput {
+					pairsTouched[unit.ID] = true
+					pair, err := pairGetOrCreate(conn, unit.ID)
+					if err != nil {
+						return fmt.Errorf("failed to get/create certificate pait for shipper %q/%q: %w", comp.ID, unit.ID, err)
+					}
+					cfg, cfgErr := injectShipperConn(unit.Config, conn.addr, conn.ca, pair)
+					unit.Config = cfg
+					unit.Err = cfgErr
+					comp.Units[j] = unit
+				}
+			}
+
+			// cleanup any pairs that are no-longer used
+			for pairID := range conn.pairs {
+				touch, _ := pairsTouched[pairID]
+				if !touch {
+					delete(conn.pairs, pairID)
+				}
+			}
+			components[i] = comp
+		}
+	}
+
+	// cleanup any shippers that are no-longer used
+	for shipperID := range m.shipperConns {
+		touch, _ := shippersTouched[shipperID]
+		if !touch {
+			delete(m.shipperConns, shipperID)
+		}
+	}
+
+	// connect the output units with the same connection information
+	for i, comp := range components {
+		if comp.Shipper != nil {
+			conn, ok := m.shipperConns[comp.Shipper.ComponentID]
+			if !ok {
+				return fmt.Errorf("component %q references a non-existing shipper %q", comp.ID, comp.Shipper.ComponentID)
+			}
+			pair, ok := conn.pairs[comp.ID]
+			if !ok {
+				return fmt.Errorf("component %q references shipper %q that doesn't know about the component", comp.ID, comp.Shipper.ComponentID)
+			}
+			for j, unit := range comp.Units {
+				if unit.Type == client.UnitTypeOutput {
+					cfg, cfgErr := injectShipperConn(unit.Config, conn.addr, conn.ca, pair)
+					unit.Config = cfg
+					unit.Err = cfgErr
+					comp.Units[j] = unit
+				}
+			}
+			components[i] = comp
+		}
+	}
+
+	return nil
+}
+
+func pairGetOrCreate(conn *shipperConn, pairID string) (*authority.Pair, error) {
+	var err error
+	pair, ok := conn.pairs[pairID]
+	if ok {
+		return pair, nil
+	}
+	pair, err = conn.ca.GeneratePair()
+	if err != nil {
+		return nil, err
+	}
+	conn.pairs[pairID] = pair
+	return pair, nil
+}
+
+func injectShipperConn(cfg *proto.UnitExpectedConfig, addr string, ca *authority.CertificateAuthority, pair *authority.Pair) (*proto.UnitExpectedConfig, error) {
+	if cfg == nil {
+		// unit configuration had an error generating (do nothing)
+		return cfg, nil
+	}
+	source := cfg.Source.AsMap()
+	source["host"] = addr
+	source["ssl"] = map[string]interface{}{
+		"certificate_authorities": []interface{}{
+			string(ca.Crt()),
+		},
+		"certificate": string(pair.Crt),
+		"key":         string(pair.Key),
+	}
+	return component.ExpectedConfig(source)
 }
 
 type waitForReady struct {

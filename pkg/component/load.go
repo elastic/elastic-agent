@@ -24,6 +24,10 @@ var (
 	ErrInputNotSupported = newError("input not supported")
 	// ErrInputNotSupportedOnPlatform is returned when the input is supported but not on this platform
 	ErrInputNotSupportedOnPlatform = newError("input not supported on this platform")
+	// ErrOutputNotSupported is returned when the output is not supported on any platform
+	ErrOutputNotSupported = newError("output not supported")
+	// ErrOutputNotSupportedOnPlatform is returned when the input is supported but not on this platform
+	ErrOutputNotSupportedOnPlatform = newError("output not supported on this platform")
 )
 
 // InputRuntimeSpec returns the specification for running this input on the current platform.
@@ -32,6 +36,14 @@ type InputRuntimeSpec struct {
 	BinaryName string    `yaml:"binary_name"`
 	BinaryPath string    `yaml:"binary_path"`
 	Spec       InputSpec `yaml:"spec"`
+}
+
+// ShipperRuntimeSpec returns the specification for running this shipper on the current platform.
+type ShipperRuntimeSpec struct {
+	ShipperType string      `yaml:"shipper_type"`
+	BinaryName  string      `yaml:"binary_name"`
+	BinaryPath  string      `yaml:"binary_path"`
+	Spec        ShipperSpec `yaml:"spec"`
 }
 
 // RuntimeSpecs return all the specifications for inputs that are supported on the current platform.
@@ -47,6 +59,12 @@ type RuntimeSpecs struct {
 
 	// aliasMapping maps aliases to real input name
 	aliasMapping map[string]string
+
+	// shipperSpecs only the shipper specs for the current platform
+	shipperSpecs map[string]ShipperRuntimeSpec
+
+	// shipperOutputs maps the supported outputs of a shipper to a shippers name
+	shipperOutputs map[string][]string
 }
 
 type loadRuntimeOpts struct {
@@ -78,9 +96,11 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 	if err != nil {
 		return RuntimeSpecs{}, err
 	}
-	var types []string
-	mapping := make(map[string]InputRuntimeSpec)
-	aliases := make(map[string]string)
+	var inputTypes []string
+	inputSpecs := make(map[string]InputRuntimeSpec)
+	inputAliases := make(map[string]string)
+	shipperSpecs := make(map[string]ShipperRuntimeSpec)
+	shipperOutputs := make(map[string][]string)
 	for _, match := range matches {
 		binaryName := filepath.Base(match[:len(match)-len(specGlobPattern)+1])
 		binaryPath := match[:len(match)-len(specGlobPattern)+1]
@@ -106,43 +126,66 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 			return RuntimeSpecs{}, fmt.Errorf("failed reading spec %s: %w", match, err)
 		}
 		for _, input := range spec.Inputs {
-			if !containsStr(types, input.Name) {
-				types = append(types, input.Name)
+			if !containsStr(inputTypes, input.Name) {
+				inputTypes = append(inputTypes, input.Name)
 			}
 			if !containsStr(input.Platforms, platform.String()) {
 				// input spec doesn't support this platform
 				continue
 			}
-			if existing, exists := mapping[input.Name]; exists {
+			if existing, exists := inputSpecs[input.Name]; exists {
 				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input '%s' already exists in spec '%s'", match, input.Name, existing.BinaryName)
 			}
-			if existing, exists := aliases[input.Name]; exists {
+			if existing, exists := inputAliases[input.Name]; exists {
 				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input '%s' collides with an alias from another input '%s'", match, input.Name, existing)
 			}
 			for _, alias := range input.Aliases {
-				if existing, exists := mapping[alias]; exists {
+				if existing, exists := inputSpecs[alias]; exists {
 					return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input alias '%s' collides with an already defined input in spec '%s'", match, alias, existing.BinaryName)
 				}
-				if existing, exists := aliases[alias]; exists {
+				if existing, exists := inputAliases[alias]; exists {
 					return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input alias '%s' collides with an already defined input alias for input '%s'", match, alias, existing)
 				}
 			}
-			mapping[input.Name] = InputRuntimeSpec{
+			inputSpecs[input.Name] = InputRuntimeSpec{
 				InputType:  input.Name,
 				BinaryName: binaryName,
 				BinaryPath: binaryPath,
 				Spec:       input,
 			}
 			for _, alias := range input.Aliases {
-				aliases[alias] = input.Name
+				inputAliases[alias] = input.Name
+			}
+		}
+		for _, shipper := range spec.Shippers {
+			// map the native outputs that the shipper supports
+			for _, output := range shipper.Outputs {
+				shippers, _ := shipperOutputs[output]
+				shippers = append(shippers, shipper.Name)
+				shipperOutputs[output] = shippers
+			}
+			if !containsStr(shipper.Platforms, platform.String()) {
+				// input spec doesn't support this platform (but shipper is still mapped into shipperOutputs)
+				continue
+			}
+			if existing, exists := shipperSpecs[shipper.Name]; exists {
+				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': shipper '%s' already exists in spec '%s'", match, shipper.Name, existing.BinaryName)
+			}
+			shipperSpecs[shipper.Name] = ShipperRuntimeSpec{
+				ShipperType: shipper.Name,
+				BinaryName:  binaryName,
+				BinaryPath:  binaryPath,
+				Spec:        shipper,
 			}
 		}
 	}
 	return RuntimeSpecs{
-		platform:     platform,
-		inputTypes:   types,
-		inputSpecs:   mapping,
-		aliasMapping: aliases,
+		platform:       platform,
+		inputTypes:     inputTypes,
+		inputSpecs:     inputSpecs,
+		aliasMapping:   inputAliases,
+		shipperSpecs:   shipperSpecs,
+		shipperOutputs: shipperOutputs,
 	}, nil
 }
 
@@ -167,6 +210,41 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 	}
 	// not supported at all
 	return InputRuntimeSpec{}, ErrInputNotSupported
+}
+
+// GetShipper returns the shipper runtime specification for this shipper on this platform.
+func (r *RuntimeSpecs) GetShipper(shipperType string) (ShipperRuntimeSpec, bool) {
+	runtime, ok := r.shipperSpecs[shipperType]
+	return runtime, ok
+}
+
+// GetShippers returns the shippers that support the outputType.
+func (r *RuntimeSpecs) GetShippers(outputType string) ([]ShipperRuntimeSpec, error) {
+	shipperNames, ok := r.shipperOutputs[outputType]
+	if !ok {
+		// no shippers support that outputType
+		return nil, nil
+	}
+	platformErr := false
+	shippers := make([]ShipperRuntimeSpec, 0, len(shipperNames))
+	for _, name := range shipperNames {
+		shipper, ok := r.shipperSpecs[name]
+		if !ok {
+			// not supported on this platform
+			platformErr = true
+			continue
+		}
+		shippers = append(shippers, shipper)
+	}
+	if len(shippers) > 0 {
+		return shippers, nil
+	}
+	if platformErr {
+		// supported by at least one shipper, but not on this platform
+		return nil, ErrOutputNotSupportedOnPlatform
+	}
+	// not supported by any shippers
+	return nil, ErrOutputNotSupported
 }
 
 // ServiceSpecs returns only the input specification that are based on the service runtime.
