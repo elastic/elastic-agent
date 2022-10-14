@@ -19,7 +19,7 @@ type saver interface {
 
 // item tracks an action in the action queue
 type item struct {
-	action   fleetapi.Action
+	action   fleetapi.ScheduledAction
 	priority int64
 	index    int
 }
@@ -76,7 +76,11 @@ func (q *queue) Pop() interface{} {
 // Will return an error if StartTime fails for any action.
 func newQueue(actions []fleetapi.Action) (*queue, error) {
 	q := make(queue, len(actions))
-	for i, action := range actions {
+	for i, a := range actions {
+		action, ok := a.(fleetapi.ScheduledAction)
+		if !ok {
+			continue
+		}
 		ts, err := action.StartTime()
 		if err != nil {
 			return nil, err
@@ -106,7 +110,7 @@ func NewActionQueue(actions []fleetapi.Action, s saver) (*ActionQueue, error) {
 // Add will add an action to the queue with the associated priority.
 // The priority is meant to be the start-time of the action as a unix epoch time.
 // Complexity: O(log n)
-func (q *ActionQueue) Add(action fleetapi.Action, priority int64) {
+func (q *ActionQueue) Add(action fleetapi.ScheduledAction, priority int64) {
 	e := &item{
 		action:   action,
 		priority: priority,
@@ -116,9 +120,9 @@ func (q *ActionQueue) Add(action fleetapi.Action, priority int64) {
 
 // DequeueActions will dequeue all actions that have a priority less then time.Now().
 // Complexity: O(n*log n)
-func (q *ActionQueue) DequeueActions() []fleetapi.Action {
+func (q *ActionQueue) DequeueActions() []fleetapi.ScheduledAction {
 	ts := time.Now().Unix()
-	actions := make([]fleetapi.Action, 0)
+	actions := make([]fleetapi.ScheduledAction, 0)
 	for q.q.Len() != 0 {
 		if (*q.q)[0].priority > ts {
 			break
@@ -151,6 +155,20 @@ func (q *ActionQueue) Actions() []fleetapi.Action {
 		actions[i] = item.action
 	}
 	return actions
+}
+
+// CancelType cancels all actions in the queue with a matching action type and returns the number of entries cancelled.
+func (q *ActionQueue) CancelType(actionType string) int {
+	items := make([]*item, 0)
+	for _, item := range *q.q {
+		if item.action.Type() == actionType {
+			items = append(items, item)
+		}
+	}
+	for _, item := range items {
+		heap.Remove(q.q, item.index)
+	}
+	return len(items)
 }
 
 // Save persists the queue to disk.

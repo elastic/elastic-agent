@@ -197,3 +197,4 @@
 - Add liveness endpoint, allow fleet-gateway component to report degraded state, add update time and messages to status output. {issue}390[390] {pull}569[569]
 - Redact sensitive information on diagnostics collect command. {issue}[241] {pull}[566]
 - Fix incorrectly creating a filebeat redis input when a policy contains a packetbeat redis input. {issue}[427] {pull}[700]
+- Allow upgrade actions to be retried on failure with action queue scheduling. {issue}778[778] {pull}1219[1219]

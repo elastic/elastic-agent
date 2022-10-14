@@ -8,6 +8,7 @@ package cproto;
 
 option cc_enable_arenas = true;
 option go_package = "internal/pkg/agent/control/cproto";
+import "google/protobuf/timestamp.proto";
 
 // State codes for the current state.
 enum State {
@@ -139,77 +140,89 @@ message ComponentState {
   ComponentVersionInfo version_info = 6;
 }
 
-// Current metadata for a running process.
-message ProcMeta {
-  string process = 1;
-  string name = 2;
-  string hostname = 3;
-  string id = 4;
-  string ephemeral_id = 5;
-  string version = 6;
-  string build_commit = 7;
-  string build_time = 8;
-  string username = 9;
-  string user_id = 10;
-  string user_gid = 11;
-  string architecture = 12;
-  string route_key = 13;
-  bool elastic_licensed = 14;
-  string error = 15;
+message StateAgentInfo {
+  // Current ID of the Agent.
+  string id = 1;
+  // Current running version.
+  string version = 2;
+  // Current running commit.
+  string commit = 3;
+  // Current running build time.
+  string buildTime = 4;
+  // Current running version is a snapshot.
+  bool snapshot = 5;
 }
 
 // StateResponse is the current state of Elastic Agent.
 message StateResponse {
+  // Overall information of Elastic Agent.
+  StateAgentInfo info = 1;
   // Overall state of Elastic Agent.
-  State state = 1;
+  State state = 2;
   // Overall status message of Elastic Agent.
-  string message = 2;
+  string message = 3;
   // Status of each component in Elastic Agent.
-  repeated ComponentState components = 3;
+  repeated ComponentState components = 4;
 }
 
-// ProcMetaResponse is the current running version infomation for all processes.
-message ProcMetaResponse {
-  repeated ProcMeta procs = 1;
+// DiagnosticFileResult is a file result from a diagnostic result.
+message DiagnosticFileResult {
+  // Human readable name of the diagnostic result content.
+  string name = 1;
+  // Filename to use to store the diagnostic to the disk.
+  string filename = 2;
+  // Human readable description of the information this diagnostic provides.
+  string description = 3;
+  // Content-Type of the resulting content.
+  string content_type = 4;
+  // Actual file content.
+  bytes content = 5;
+  // Timestamp the content was generated at.
+  google.protobuf.Timestamp generated = 6;
 }
 
-// PprofRequest is a request for pprof data from and http/pprof endpoint.
-message PprofRequest {
-	// The profiles that are requested
-	repeated PprofOption pprofType = 1;
-	// A string representing a time.Duration to apply to trace, and profile options.
-	string traceDuration = 2;
-	// The application that will be profiled, if empty all applications are profiled.
-	string appName = 3;
-	// The route key to match for profiling, if empty all are profiled.
-	string routeKey = 4;
+// DiagnosticAgentRequest is request to gather diagnostic information about the Elastic Agent.
+message DiagnosticAgentRequest {
 }
 
-// PprofResult is the result of a pprof request for a given application/route key.
-message PprofResult {
-	string appName = 1;
-	string routeKey = 2;
-	PprofOption pprofType = 3;
-	bytes result = 4;
-	string error = 5;
+// DiagnosticAgentResponse is response to gathered diagnostic information about the Elastic Agent.
+message DiagnosticAgentResponse {
+  // Diagnostic results for the agent.
+  repeated DiagnosticFileResult results = 1;
 }
 
-// PprofResponse is a wrapper to return all pprof responses.
-message PprofResponse {
-	repeated PprofResult results = 1;
+// DiagnosticUnitRequest specifies a specific unit to gather diagnostics from.
+message DiagnosticUnitRequest {
+  // Type of unit.
+  UnitType unit_type = 2;
+  // ID of the unit.
+  string unit_id = 3;
 }
 
-// MetricsResponse is the result of a request for the metrics buffer endpoint for a application/route key
-message MetricsResponse {
-	string appName = 1;
-	string routeKey = 2;
-	bytes result = 3;
-	string error = 4;
+// DiagnosticUnitsRequest allows a diagnostic request to specify the units to target.
+message DiagnosticUnitsRequest {
+  // Specific units to target. (If no units are given then a result for all units is provided).
+  repeated DiagnosticUnitRequest units = 1;
 }
 
-// ProcMetricsResponse is a wrapper to return all metrics buffer responses
-message ProcMetricsResponse {
-	repeated MetricsResponse result = 1;
+// DiagnosticUnitResponse is diagnostic information about a specific unit.
+message DiagnosticUnitResponse {
+  // ID of the component.
+  string component_id = 1;
+  // Type of unit.
+  UnitType unit_type = 2;
+  // ID of the unit.
+  string unit_id = 3;
+  // Error message for the failure fetching diagnostic information for this unit.
+  string error = 4;
+  // Diagnostic results for the unit.
+  repeated DiagnosticFileResult results = 5;
+}
+
+// DiagnosticUnitsResponse is response to gathered units diagnostic information.
+message DiagnosticUnitsResponse {
+  // Diagnostics results per unit.
+  repeated DiagnosticUnitResponse units = 2;
 }
 
 service ElasticAgentControl {
@@ -225,12 +238,9 @@ service ElasticAgentControl {
   // Upgrade starts the upgrade process of Elastic Agent.
   rpc Upgrade(UpgradeRequest) returns (UpgradeResponse);
 
-  // Gather all running process metadata.
-  rpc ProcMeta(Empty) returns (ProcMetaResponse);
+  // Gather diagnostic information for the running Elastic Agent.
+  rpc DiagnosticAgent(DiagnosticAgentRequest) returns (DiagnosticAgentResponse);
 
-  // Gather requested pprof data from specified applications.
-  rpc Pprof(PprofRequest) returns (PprofResponse);
-
-  // Gather all running process metrics.
-  rpc ProcMetrics(Empty) returns (ProcMetricsResponse);
+  // Gather diagnostic information for the running units.
+  rpc DiagnosticUnits(DiagnosticUnitsRequest) returns (DiagnosticUnitsResponse);
 }

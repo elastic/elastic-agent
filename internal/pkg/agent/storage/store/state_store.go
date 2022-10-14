@@ -20,10 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type dispatcher interface {
-	Dispatch(context.Context, acker.Acker, ...action) error
-}
-
 type store interface {
 	Save(io.Reader) error
 }
@@ -98,7 +94,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	// persisted and we return an empty store.
 	reader, err := store.Load()
 	if err != nil {
-		return &StateStore{log: log, store: store}, nil //nolint:nilerr // expected results
+		return &StateStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
 
@@ -338,23 +334,6 @@ func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action)
 // Commit commits acks.
 func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 	return a.acker.Commit(ctx)
-}
-
-// ReplayActions replays list of actions.
-func ReplayActions(
-	ctx context.Context,
-	log *logger.Logger,
-	dispatcher dispatcher,
-	acker acker.Acker,
-	actions ...action,
-) error {
-	log.Info("restoring current policy from disk")
-
-	if err := dispatcher.Dispatch(ctx, acker, actions...); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func yamlToReader(in interface{}) (io.Reader, error) {

@@ -860,6 +860,10 @@ func tryContainerLoadPaths() error {
 func syncDir(src string, dest string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if os.IsNotExist(err) {
+				// source dir exists only if there's agent artifact
+				return nil
+			}
 			return err
 		}
 		relativePath := strings.TrimPrefix(path, src)

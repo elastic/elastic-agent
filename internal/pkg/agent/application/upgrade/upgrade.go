@@ -142,7 +142,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	if strings.HasPrefix(release.Commit(), newHash) {
-		return nil, ErrSameVersion
+		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
+		return nil, nil
 	}
 
 	if err := copyActionStore(newHash); err != nil {
@@ -161,7 +162,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	if err := InvokeWatcher(u.log); err != nil {
 		rollbackInstall(ctx, newHash)
-		return nil, errors.New("failed to invoke rollback watcher", err)
+		return nil, err
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))

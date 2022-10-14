@@ -102,6 +102,12 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 	}
 	defer sourceFile.Close()
 
+	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
+		if err := os.MkdirAll(destinationDir, 0755); err != nil {
+			return "", err
+		}
+	}
+
 	destinationFile, err := os.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
 		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))

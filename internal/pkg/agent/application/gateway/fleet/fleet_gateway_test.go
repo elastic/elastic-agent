@@ -25,8 +25,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -69,53 +67,12 @@ func newTestingClient() *testingClient {
 	return &testingClient{received: make(chan struct{}, 1)}
 }
 
-type testingDispatcherFunc func(...fleetapi.Action) error
-
-type testingDispatcher struct {
-	sync.Mutex
-	callback testingDispatcherFunc
-	received chan struct{}
-}
-
-func (t *testingDispatcher) Dispatch(_ context.Context, acker acker.Acker, actions ...fleetapi.Action) error {
-	t.Lock()
-	defer t.Unlock()
-	defer func() { t.received <- struct{}{} }()
-	// Get a dummy context.
-	ctx := context.Background()
-
-	// In context of testing we need to abort on error.
-	if err := t.callback(actions...); err != nil {
-		return err
-	}
-
-	// Ack everything and commit at the end.
-	for _, action := range actions {
-		_ = acker.Ack(ctx, action)
-	}
-	_ = acker.Commit(ctx)
-
-	return nil
-}
-
-func (t *testingDispatcher) Answer(fn testingDispatcherFunc) <-chan struct{} {
-	t.Lock()
-	defer t.Unlock()
-	t.callback = fn
-	return t.received
-}
-
-func newTestingDispatcher() *testingDispatcher {
-	return &testingDispatcher{received: make(chan struct{}, 1)}
-}
-
-type withGatewayFunc func(*testing.T, gateway.FleetGateway, *testingClient, *testingDispatcher, *scheduler.Stepper)
+type withGatewayFunc func(*testing.T, gateway.FleetGateway, *testingClient, *scheduler.Stepper)
 
 func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
-		dispatcher := newTestingDispatcher()
 
 		log, _ := logger.New("fleet_gateway", false)
 
@@ -126,7 +83,6 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 			settings,
 			agentInfo,
 			client,
-			dispatcher,
 			scheduler,
 			noop.New(),
 			&emptyStateFetcher{},
@@ -135,7 +91,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 
 		require.NoError(t, err)
 
-		fn(t, gateway, client, dispatcher, scheduler)
+		fn(t, gateway, client, scheduler)
 	}
 }
 
@@ -171,7 +127,6 @@ func TestFleetGateway(t *testing.T) {
 		t *testing.T,
 		gateway gateway.FleetGateway,
 		client *testingClient,
-		dispatcher *testingDispatcher,
 		scheduler *scheduler.Stepper,
 	) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -181,10 +136,6 @@ func TestFleetGateway(t *testing.T) {
 			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
-			}),
-			dispatcher.Answer(func(actions ...fleetapi.Action) error {
-				require.Equal(t, 0, len(actions))
-				return nil
 			}),
 		)
 
@@ -197,13 +148,17 @@ func TestFleetGateway(t *testing.T) {
 		cancel()
 		err := <-errCh
 		require.NoError(t, err)
+		select {
+		case actions := <-gateway.Actions():
+			t.Errorf("Expected no actions, got %v", actions)
+		default:
+		}
 	}))
 
 	t.Run("Successfully connects and receives a series of actions", withGateway(agentInfo, settings, func(
 		t *testing.T,
 		gateway gateway.FleetGateway,
 		client *testingClient,
-		dispatcher *testingDispatcher,
 		scheduler *scheduler.Stepper,
 	) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -233,10 +188,6 @@ func TestFleetGateway(t *testing.T) {
 	`)
 				return resp, nil
 			}),
-			dispatcher.Answer(func(actions ...fleetapi.Action) error {
-				require.Len(t, actions, 2)
-				return nil
-			}),
 		)
 
 		errCh := runFleetGateway(ctx, gateway)
@@ -247,13 +198,18 @@ func TestFleetGateway(t *testing.T) {
 		cancel()
 		err := <-errCh
 		require.NoError(t, err)
+		select {
+		case actions := <-gateway.Actions():
+			require.Len(t, actions, 2)
+		default:
+			t.Errorf("Expected to receive actions")
+		}
 	}))
 
 	// Test the normal time based execution.
 	t.Run("Periodically communicates with Fleet", func(t *testing.T) {
 		scheduler := scheduler.NewPeriodic(150 * time.Millisecond)
 		client := newTestingClient()
-		dispatcher := newTestingDispatcher()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -266,7 +222,6 @@ func TestFleetGateway(t *testing.T) {
 			settings,
 			agentInfo,
 			client,
-			dispatcher,
 			scheduler,
 			noop.New(),
 			&emptyStateFetcher{},
@@ -278,10 +233,6 @@ func TestFleetGateway(t *testing.T) {
 			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
-			}),
-			dispatcher.Answer(func(actions ...fleetapi.Action) error {
-				require.Equal(t, 0, len(actions))
-				return nil
 			}),
 		)
 
@@ -309,7 +260,6 @@ func TestFleetGateway(t *testing.T) {
 		d := 20 * time.Minute
 		scheduler := scheduler.NewPeriodic(d)
 		client := newTestingClient()
-		dispatcher := newTestingDispatcher()
 
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -324,7 +274,6 @@ func TestFleetGateway(t *testing.T) {
 			},
 			agentInfo,
 			client,
-			dispatcher,
 			scheduler,
 			noop.New(),
 			&emptyStateFetcher{},
@@ -332,7 +281,6 @@ func TestFleetGateway(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		ch1 := dispatcher.Answer(func(actions ...fleetapi.Action) error { return nil })
 		ch2 := client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
 			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 			return resp, nil
@@ -340,14 +288,7 @@ func TestFleetGateway(t *testing.T) {
 
 		errCh := runFleetGateway(ctx, gateway)
 
-		// Silently dispatch action.
-		go func() {
-			for range ch1 {
-			}
-		}()
-
 		// Make sure that all API calls to the checkin API are successful, the following will happen:
-
 		// block on the first call.
 		<-ch2
 
@@ -379,7 +320,6 @@ func TestRetriesOnFailures(t *testing.T) {
 			t *testing.T,
 			gateway gateway.FleetGateway,
 			client *testingClient,
-			dispatcher *testingDispatcher,
 			scheduler *scheduler.Stepper,
 		) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -406,11 +346,6 @@ func TestRetriesOnFailures(t *testing.T) {
 					resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 					return resp, nil
 				}),
-
-				dispatcher.Answer(func(actions ...fleetapi.Action) error {
-					require.Equal(t, 0, len(actions))
-					return nil
-				}),
 			)
 
 			waitFn()
@@ -418,6 +353,11 @@ func TestRetriesOnFailures(t *testing.T) {
 			cancel()
 			err := <-errCh
 			require.NoError(t, err)
+			select {
+			case actions := <-gateway.Actions():
+				t.Errorf("Expected no actions, got %v", actions)
+			default:
+			}
 		}))
 
 	t.Run("The retry loop is interruptible",
@@ -428,7 +368,6 @@ func TestRetriesOnFailures(t *testing.T) {
 			t *testing.T,
 			gateway gateway.FleetGateway,
 			client *testingClient,
-			dispatcher *testingDispatcher,
 			scheduler *scheduler.Stepper,
 		) {
 			ctx, cancel := context.WithCancel(context.Background())

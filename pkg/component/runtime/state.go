@@ -21,9 +21,9 @@ const (
 
 // ComponentUnitState is the state for a unit running in a component.
 type ComponentUnitState struct {
-	State   client.UnitState
-	Message string
-	Payload map[string]interface{}
+	State   client.UnitState       `yaml:"state"`
+	Message string                 `yaml:"message"`
+	Payload map[string]interface{} `yaml:"payload,omitempty"`
 
 	// internal
 	unitState      client.UnitState
@@ -42,21 +42,21 @@ type ComponentUnitKey struct {
 // ComponentVersionInfo provides version information reported by the component.
 type ComponentVersionInfo struct {
 	// Name of the binary.
-	Name string
+	Name string `yaml:"name"`
 	// Version of the binary.
-	Version string
+	Version string `yaml:"version"`
 	// Additional metadata about the binary.
-	Meta map[string]string
+	Meta map[string]string `yaml:"meta,omitempty"`
 }
 
 // ComponentState is the overall state of the component.
 type ComponentState struct {
-	State   client.UnitState
-	Message string
+	State   client.UnitState `yaml:"state"`
+	Message string           `yaml:"message"`
 
-	Units map[ComponentUnitKey]ComponentUnitState
+	Units map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
 
-	VersionInfo ComponentVersionInfo
+	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
 	// internal
 	expectedUnits map[ComponentUnitKey]expectedUnitState

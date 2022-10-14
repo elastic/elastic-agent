@@ -19,8 +19,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -195,13 +195,10 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	// apply dynamic inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		varsArray := make([]*transpiler.Vars, 0)
-
-		ctrl, err := composable.New(log, cfg)
+		varsArray, err := vars.WaitForVariables(ctx, log, cfg, 0)
 		if err != nil {
 			return nil, err
 		}
-		_ = ctrl.Run(ctx)
 
 		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {

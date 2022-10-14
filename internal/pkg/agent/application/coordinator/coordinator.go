@@ -9,6 +9,11 @@ import (
 	"errors"
 	"fmt"
 
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 
 	"go.elastic.co/apm"
@@ -47,6 +52,9 @@ type UpgradeManager interface {
 
 	// Upgrade upgrades running agent.
 	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error)
+
+	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
+	Ack(ctx context.Context, acker acker.Acker) error
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -75,6 +83,10 @@ type RuntimeManager interface {
 
 	// SubscribeAll provides an interface to watch for changes in all components.
 	SubscribeAll(context.Context) *runtime.SubscriptionAll
+
+	// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
+	// it performs diagnostics for all current units.
+	PerformDiagnostics(context.Context, ...component.Unit) []runtime.ComponentUnitDiagnostic
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -117,9 +129,9 @@ type ComponentsModifier func(comps []component.Component) ([]component.Component
 
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
-	State      agentclient.State
-	Message    string
-	Components []runtime.ComponentComponentState
+	State      agentclient.State                 `yaml:"state"`
+	Message    string                            `yaml:"message"`
+	Components []runtime.ComponentComponentState `yaml:"components"`
 }
 
 // StateFetcher provides an interface to fetch the current state of the coordinator.
@@ -244,13 +256,25 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		c.state.overrideState = nil
 		return err
 	}
-	c.ReExec(cb)
+	if cb != nil {
+		c.ReExec(cb)
+	}
 	return nil
+}
+
+func (c *Coordinator) AckUpgrade(ctx context.Context, acker acker.Acker) error {
+	return c.upgradeMgr.Ack(ctx, acker)
 }
 
 // PerformAction executes an action on a unit.
 func (c *Coordinator) PerformAction(ctx context.Context, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
 	return c.runtimeMgr.PerformAction(ctx, unit, name, params)
+}
+
+// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
+// it performs diagnostics for all current units.
+func (c *Coordinator) PerformDiagnostics(ctx context.Context, units ...component.Unit) []runtime.ComponentUnitDiagnostic {
+	return c.runtimeMgr.PerformDiagnostics(ctx, units...)
 }
 
 // Run runs the coordinator.
@@ -299,6 +323,119 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		c.state.state = agentclient.Failed
 		c.state.message = fmt.Sprintf("Coordinator failed and will be restarted: %s", err)
 		c.logger.Errorf("coordinator failed and will be restarted: %s", err)
+	}
+}
+
+// DiagnosticHooks returns diagnostic hooks that can be connected to the control server to provide diagnostic
+// information about the state of the Elastic Agent.
+func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
+	return diagnostics.Hooks{
+		{
+			Name:        "pre-config",
+			Filename:    "pre-config.yaml",
+			Description: "current pre-configuration of the running Elastic Agent before variable substitution",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.state.ast == nil {
+					return []byte("error: failed no configuration by the coordinator")
+				}
+				cfg, err := c.state.ast.Map()
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				o, err := yaml.Marshal(cfg)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
+		{
+			Name:        "variables",
+			Filename:    "variables.yaml",
+			Description: "current variable contexts of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.state.vars == nil {
+					return []byte("error: failed no variables by the coordinator")
+				}
+				vars := make([]map[string]interface{}, 0, len(c.state.vars))
+				for _, v := range c.state.vars {
+					m, err := v.Map()
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err))
+					}
+					vars = append(vars, m)
+				}
+				o, err := yaml.Marshal(struct {
+					Variables []map[string]interface{} `yaml:"variables"`
+				}{
+					Variables: vars,
+				})
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
+		{
+			Name:        "computed-config",
+			Filename:    "computed-config.yaml",
+			Description: "current computed configuration of the running Elastic Agent after variable substitution",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.state.ast == nil || c.state.vars == nil {
+					return []byte("error: failed no configuration or variables received by the coordinator")
+				}
+				cfg, _, err := c.compute()
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				o, err := yaml.Marshal(cfg)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
+		{
+			Name:        "components",
+			Filename:    "components.yaml",
+			Description: "current expected components model of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.state.ast == nil || c.state.vars == nil {
+					return []byte("error: failed no configuration or variables received by the coordinator")
+				}
+				_, comps, err := c.compute()
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				o, err := yaml.Marshal(struct {
+					Components []component.Component `yaml:"components"`
+				}{
+					Components: comps,
+				})
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
+		{
+			Name:        "state",
+			Filename:    "state.yaml",
+			Description: "current state of running components by the Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				s := c.State()
+				o, err := yaml.Marshal(s)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
 	}
 }
 
@@ -470,33 +607,9 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 		span.End()
 	}()
 
-	ast := c.state.ast.Clone()
-	inputs, ok := transpiler.Lookup(ast, "inputs")
-	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, c.state.vars)
-		if err != nil {
-			return fmt.Errorf("rendering inputs failed: %w", err)
-		}
-		err = transpiler.Insert(ast, renderedInputs, "inputs")
-		if err != nil {
-			return fmt.Errorf("inserting rendered inputs failed: %w", err)
-		}
-	}
-
-	cfg, err := ast.Map()
+	_, comps, err := c.compute()
 	if err != nil {
-		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
-	}
-	comps, err := c.specs.ToComponents(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to render components: %w", err)
-	}
-
-	for _, modifier := range c.modifiers {
-		comps, err = modifier(comps)
-		if err != nil {
-			return fmt.Errorf("failed to modify components: %w", err)
-		}
+		return err
 	}
 
 	c.logger.Info("Updating running component model")
@@ -508,6 +621,39 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	c.state.state = agentclient.Healthy
 	c.state.message = "Running"
 	return nil
+}
+
+func (c *Coordinator) compute() (map[string]interface{}, []component.Component, error) {
+	ast := c.state.ast.Clone()
+	inputs, ok := transpiler.Lookup(ast, "inputs")
+	if ok {
+		renderedInputs, err := transpiler.RenderInputs(inputs, c.state.vars)
+		if err != nil {
+			return nil, nil, fmt.Errorf("rendering inputs failed: %w", err)
+		}
+		err = transpiler.Insert(ast, renderedInputs, "inputs")
+		if err != nil {
+			return nil, nil, fmt.Errorf("inserting rendered inputs failed: %w", err)
+		}
+	}
+
+	cfg, err := ast.Map()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+	}
+	comps, err := c.specs.ToComponents(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to render components: %w", err)
+	}
+
+	for _, modifier := range c.modifiers {
+		comps, err = modifier(comps)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to modify components: %w", err)
+		}
+	}
+
+	return cfg, comps, nil
 }
 
 type coordinatorState struct {
