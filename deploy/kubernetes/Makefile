@@ -1,5 +1,6 @@
 ALL=elastic-agent-standalone elastic-agent-managed
 BEAT_VERSION=$(shell head -n 1 ../../version/docs/version.asciidoc | cut -c 17- )
+BRANCH_VERSION=$(shell sed -n '2p' ../../version/docs/version.asciidoc | cut -c 14- )
 
 #variables needed for ci-create-kubernetes-templates-pull-request
 ELASTIC_AGENT_REPO=kibana
@@ -9,7 +10,7 @@ ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 
 .PHONY: generate-k8s $(ALL)
 generate-k8s: $(ALL)
-	
+
 test: generate-k8s
 	for FILE in $(shell ls *-kubernetes.yaml); do \
 		BEAT=$$(echo $$FILE | cut -d \- -f 1); \
@@ -19,21 +20,21 @@ test: generate-k8s
 clean:
 	@for f in $(ALL); do rm -f "$$f-kubernetes.yaml"; done
 
-$(ALL): 
+$(ALL):
 ifdef WITHOUTCONFIG
 	@echo "Generating $@-kubernetes-without-configmap.yaml"
 	@rm -f $@-kubernetes-without-configmap.yaml
 	@for f in $(shell ls $@/*.yaml | grep -v daemonset-configmap); do \
-		sed "s/%VERSION%/VERSION/g" $$f >> $@-kubernetes-without-configmap.yaml; \
+		sed -e "s/%VERSION%/VERSION/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $$f >> $@-kubernetes-without-configmap.yaml; \
 		echo --- >> $@-kubernetes-without-configmap.yaml; \
 	done
 else
-	@echo "Generating $@-kubernetes.yaml" 
-	@rm -f $@-kubernetes.yaml 
+	@echo "Generating $@-kubernetes.yaml"
+	@rm -f $@-kubernetes.yaml
 	@for f in $(shell ls $@/*.yaml); do \
-		sed "s/%VERSION%/${BEAT_VERSION}/g" $$f >> $@-kubernetes.yaml; \
+		sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $$f >> $@-kubernetes.yaml; \
 		echo --- >> $@-kubernetes.yaml; \
-	done 
+	done
 endif
 
 CHDIR_SHELL := $(SHELL)
@@ -47,13 +48,12 @@ endef
 ci-clone-kibana-repository:
 	git clone git@github.com:elastic/kibana.git
 	cp $(FILE_REPO)  $(ELASTIC_AGENT_REPO)/$(ELASTIC_AGENT_REPO_PATH)
-	
+
 ## ci-create-kubernetes-templates-pull-request : Create the pull request for the kubernetes templates
+$(eval HASDIFF =$(shell sh -c "git status | grep $(FILE_REPO) | wc -l"))
 .PHONY: ci-create-kubernetes-templates-pull-request
 ci-create-kubernetes-templates-pull-request:
-	HASDIFF=`git status | grep $(FILE_REPO) | wc -l`; \
-	echo $${HASDIFF}
-ifeq ($${HASDIFF},1)
+ifeq ($(HASDIFF),1)
 	echo "INFO: Create branch to update k8s templates"
 	git config user.name obscloudnativemonitoring
 	git config user.email obs-cloudnative-monitoring@elastic.co
@@ -75,11 +75,10 @@ else
 		--title "Update kubernetes templates for elastic-agent" \
 		--body "Automated by ${BUILD_URL}" \
 		--label automation \
-		--label release_note:automation \
 		--base main \
 		--head $(ELASTIC_AGENT_BRANCH) \
 		--reviewer elastic/obs-cloudnative-monitoring
-endif 
+endif
 
 else
 	echo "No differences found with kibana git repository"
