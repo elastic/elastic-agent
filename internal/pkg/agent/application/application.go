@@ -100,7 +100,8 @@ func New(
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
-			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
+			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
+				EndpointComponentModifier(cfg.Fleet))
 			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
 			if err != nil {
 				return nil, err
@@ -126,6 +127,7 @@ func New(
 func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
 	store := storage.NewEncryptedDiskStore(path)
+
 	reader, err := store.Load()
 	if err != nil {
 		return store, nil, errors.New(err, "could not initialize config store",
@@ -155,6 +157,11 @@ func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.C
 			fmt.Sprintf("fail to unpack configuration from %s", path),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, path))
+	}
+
+	// Fix up fleet.agent.id otherwise the fleet.agent.id is empty string
+	if cfg.Settings != nil && cfg.Fleet != nil && cfg.Fleet.Info != nil && cfg.Fleet.Info.ID == "" {
+		cfg.Fleet.Info.ID = cfg.Settings.ID
 	}
 
 	if err := cfg.Fleet.Valid(); err != nil {

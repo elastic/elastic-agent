@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/pkg/component"
+	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -149,7 +150,7 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 
 	// remove each service component
 	for _, comp := range comps {
-		if err := uninstallComponent(ctx, comp); err != nil {
+		if err := uninstallComponent(ctx, comp, log); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
 	}
@@ -157,9 +158,8 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 	return nil
 }
 
-func uninstallComponent(_ context.Context, _ component.Component) error {
-	// TODO(blakerouse): Perform uninstall of service component; once the service runtime is written.
-	return errors.New("failed to uninstall component; not implemented")
+func uninstallComponent(ctx context.Context, comp component.Component, log *logp.Logger) error {
+	return comprt.UninstallService(ctx, log, comp)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {

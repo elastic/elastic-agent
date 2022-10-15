@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -231,12 +230,12 @@ func containerCmd(streams *cli.IOStreams) error {
 				wg.Done()
 				// sending kill signal to current process (elastic-agent)
 				logInfo(streams, "Initiate shutdown elastic-agent.")
-				mainProc.Signal(syscall.SIGTERM) // nolint:errcheck //not required
+				mainProc.Signal(syscall.SIGTERM) //nolint:errcheck //not required
 			}()
 
 			defer func() {
 				if apmProc != nil {
-					apmProc.Stop() // nolint:errcheck //not required
+					apmProc.Stop() //nolint:errcheck //not required
 					logInfo(streams, "Initiate shutdown legacy apm-server.")
 				}
 			}()
@@ -712,7 +711,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	}
 
 	// Get the apm-server directory
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("reading directory %s", path))
 	}
@@ -740,7 +739,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	addEnv("--httpprof", "HTTPPROF")
 	addSettingEnv("gc_percent", "APMSERVER_GOGC")
 	logInfo(streams, "Starting legacy apm-server daemon as a subprocess.")
-	return process.Start(spec.BinaryPath, os.Geteuid(), os.Getegid(), args, nil)
+	return process.Start(spec.BinaryPath, process.WithArgs(args))
 }
 
 func logToStderr(cfg *configuration.Configuration) {

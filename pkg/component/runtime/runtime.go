@@ -21,8 +21,8 @@ import (
 type ComponentRuntime interface {
 	// Run starts the runtime for the component.
 	//
-	// Called by Manager inside a go-routine. Run should not return until the passed in context is done. Run is always
-	// called before any of the other methods in the interface and once the context is done none of those methods will
+	// Called by Manager inside a goroutine. Run should not return until the passed in context is done. Run should always
+	// be called before any of the other methods in the interface and once the context is done none of those methods should
 	// ever be called again.
 	Run(ctx context.Context, comm Communicator) error
 	// Watch returns the channel that sends component state.
@@ -54,13 +54,13 @@ type ComponentRuntime interface {
 }
 
 // NewComponentRuntime creates the proper runtime based on the input specification for the component.
-func NewComponentRuntime(comp component.Component) (ComponentRuntime, error) {
+func NewComponentRuntime(comp component.Component, logger *logger.Logger) (ComponentRuntime, error) {
 	if comp.Err != nil {
 		return NewFailedRuntime(comp)
 	} else if comp.Spec.Spec.Command != nil {
 		return NewCommandRuntime(comp)
 	} else if comp.Spec.Spec.Service != nil {
-		return nil, errors.New("service component runtime not implemented")
+		return NewServiceRuntime(comp, logger)
 	}
 	return nil, errors.New("unknown component runtime")
 }
@@ -87,7 +87,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := NewComponentRuntime(comp)
+	runtime, err := NewComponentRuntime(comp, logger)
 	if err != nil {
 		return nil, err
 	}

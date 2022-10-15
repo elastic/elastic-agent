@@ -33,6 +33,8 @@ const (
 
 	envAgentComponentID        = "AGENT_COMPONENT_ID"
 	envAgentComponentInputType = "AGENT_COMPONENT_INPUT_TYPE"
+
+	stateUnknownMessage = "Unknown"
 )
 
 type procState struct {
@@ -75,8 +77,8 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 
 // Run starts the runtime for the component.
 //
-// Called by Manager inside a go-routine. Run should not return until the passed in context is done. Run is always
-// called before any of the other methods in the interface and once the context is done none of those methods will
+// Called by Manager inside a goroutine. Run should not return until the passed in context is done. Run should always
+// be called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
 func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 	checkinPeriod := c.current.Spec.Spec.Command.Timeouts.Checkin
@@ -235,7 +237,7 @@ func (c *CommandRuntime) forceCompState(state client.UnitState, msg string) {
 
 // compState updates just the component state not all the units.
 func (c *CommandRuntime) compState(state client.UnitState) {
-	msg := "Unknown"
+	msg := stateUnknownMessage
 	if state == client.UnitStateHealthy {
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
 	} else if state == client.UnitStateDegraded {
@@ -279,7 +281,10 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	if err != nil {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}
-	proc, err := process.Start(path, uid, gid, cmdSpec.Args, env, attachOutErr, dirPath(workDir))
+	proc, err := process.Start(path,
+		process.WithArgs(cmdSpec.Args),
+		process.WithEnv(env),
+		process.WithCmdOptions(attachOutErr, dirPath(workDir)))
 	if err != nil {
 		return err
 	}
@@ -387,7 +392,7 @@ func attachOutErr(cmd *exec.Cmd) error {
 	return nil
 }
 
-func dirPath(path string) process.Option {
+func dirPath(path string) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
 		cmd.Dir = path
 		return nil
