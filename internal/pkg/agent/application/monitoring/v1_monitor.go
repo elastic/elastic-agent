@@ -679,7 +679,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			"data_stream": map[string]interface{}{
 				"namespace": monitoringNamespace,
 			},
-			"streams": beatsStreams,
+			"streams": streams,
 		},
 	}
 

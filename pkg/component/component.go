@@ -17,6 +17,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+type ConfigInjectFn func(map[string]interface{}, map[string]string) error
+
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
 	defaultUnitLogLevel = client.UnitLogLevelInfo
@@ -79,13 +81,35 @@ type Component struct {
 }
 
 // ToComponents returns the components that should be running based on the policy and the current runtime specification.
-func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component, error) {
+func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, configInjector ...ConfigInjectFn) ([]Component, error) {
 	outputsMap, err := toIntermediate(policy)
 	if err != nil {
 		return nil, err
 	}
 	if outputsMap == nil {
 		return nil, nil
+	}
+
+	if len(configInjector) > 0 {
+		componentIDToBinary, err := r.toComponentIdsInputMap(outputsMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate component IDs: %w", err)
+		}
+
+		for i, injector := range configInjector {
+			if err := injector(policy, componentIDToBinary); err != nil {
+				return nil, fmt.Errorf("injecting monitoring failed on step %d: %w", i, err)
+			}
+		}
+
+		// regenerate outputs map to cover new inputs
+		outputsMap, err = toIntermediate(policy)
+		if err != nil {
+			return nil, err
+		}
+		if outputsMap == nil {
+			return nil, nil
+		}
 	}
 
 	// set the runtime variables that are available in the input specification runtime checks
@@ -186,11 +210,7 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 }
 
 // ToComponentIdsInputMap returns the component IDs that should be running based on the policy and the current runtime specification and their mapping to a binary.
-func (r *RuntimeSpecs) ToComponentIdsInputMap(policy map[string]interface{}) (map[string]string, error) {
-	outputsMap, err := toIntermediate(policy)
-	if err != nil {
-		return nil, err
-	}
+func (r *RuntimeSpecs) toComponentIdsInputMap(outputsMap map[string]outputI) (map[string]string, error) {
 	if outputsMap == nil {
 		return nil, nil
 	}

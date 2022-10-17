@@ -649,17 +649,12 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 		return nil, nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
 
+	var configInjector component.ConfigInjectFn
 	if c.monitorMgr.Enabled() {
-		componentIDToBinary, err := c.specs.ToComponentIdsInputMap(cfg)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to generate component IDs: %w", err)
-		}
-		if err := c.monitorMgr.InjectMonitoring(cfg, componentIDToBinary); err != nil {
-			return nil, nil, fmt.Errorf("injecting monitoring failed: %w", err)
-		}
+		configInjector = c.monitorMgr.InjectMonitoring
 	}
 
-	comps, err := c.specs.ToComponents(cfg)
+	comps, err := c.specs.ToComponents(cfg, configInjector)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to render components: %w", err)
 	}
