@@ -10,12 +10,18 @@ package server
 import (
 	"net"
 	"os/user"
+	"strings"
 
 	"github.com/pkg/errors"
 
 	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+)
+
+const (
+	NTAUTHORITY_SYSTEM   = "S-1-5-18"
+	ADMINISTRATORS_GROUP = "S-1-5-32-544"
 )
 
 // createListener creates a named pipe listener on Windows
@@ -42,11 +48,34 @@ func securityDescriptor() (string, error) {
 	// String definition: https://docs.microsoft.com/en-us/windows/win32/secauthz/ace-strings
 	// Give generic read/write access to the specified user.
 	descriptor := "D:P(A;;GA;;;" + u.Uid + ")"
-	if u.Username == "NT AUTHORITY\\SYSTEM" {
+
+	if isAdmin, err := isWindowsAdmin(u); err != nil {
+		return "", err
+	} else if isAdmin {
 		// running as SYSTEM, include Administrators group so Administrators can talk over
 		// the named pipe to the running Elastic Agent system process
 		// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
-		descriptor += "(A;;GA;;;S-1-5-32-544)" // Administrators group
+		descriptor += "(A;;GA;;;" + ADMINISTRATORS_GROUP + ")"
 	}
 	return descriptor, nil
+}
+
+func isWindowsAdmin(u *user.User) (bool, error) {
+	if u.Username == "NT AUTHORITY\\SYSTEM" {
+		return true, nil
+	}
+
+	groups, err := u.GroupIds()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get current user groups")
+	}
+
+	for _, groupSid := range groups {
+		if strings.EqualFold(groupSid, NTAUTHORITY_SYSTEM) ||
+			strings.EqualFold(groupSid, ADMINISTRATORS_GROUP) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
