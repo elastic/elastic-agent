@@ -15,7 +15,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const defaultStopTimeout = 15 * time.Second
+const (
+	defaultStopTimeout = 15 * time.Second
+	windows            = "windows"
+)
 
 type connInfoServer struct {
 	log         *logger.Logger
