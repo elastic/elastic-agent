@@ -46,7 +46,7 @@ type controller struct {
 }
 
 // New creates a new controller.
-func New(log *logger.Logger, c *config.Config) (Controller, error) {
+func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error) {
 	l := log.Named("composable")
 
 	var providersCfg Config
@@ -65,7 +65,7 @@ func New(log *logger.Logger, c *config.Config) (Controller, error) {
 			// explicitly disabled; skipping
 			continue
 		}
-		provider, err := builder(l, pCfg)
+		provider, err := builder(l, pCfg, managed)
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}
@@ -82,7 +82,7 @@ func New(log *logger.Logger, c *config.Config) (Controller, error) {
 			// explicitly disabled; skipping
 			continue
 		}
-		provider, err := builder(l.Named(strings.Join([]string{"providers", name}, ".")), pCfg)
+		provider, err := builder(l.Named(strings.Join([]string{"providers", name}, ".")), pCfg, managed)
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}

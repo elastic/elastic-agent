@@ -14,7 +14,7 @@ import (
 )
 
 // ContextProviderBuilder creates a new context provider based on the given config and returns it.
-type ContextProviderBuilder func(log *logger.Logger, config *config.Config) (corecomp.ContextProvider, error)
+type ContextProviderBuilder func(log *logger.Logger, config *config.Config, managed bool) (corecomp.ContextProvider, error)
 
 // MustAddContextProvider adds a new ContextProviderBuilder and panics if it AddContextProvider returns an error.
 func (r *providerRegistry) MustAddContextProvider(name string, builder ContextProviderBuilder) {
@@ -24,6 +24,7 @@ func (r *providerRegistry) MustAddContextProvider(name string, builder ContextPr
 	}
 }
 
+//nolint:dupl,goimports,nolintlint // false positive
 // AddContextProvider adds a new ContextProviderBuilder
 func (r *providerRegistry) AddContextProvider(name string, builder ContextProviderBuilder) error {
 	r.lock.Lock()
@@ -32,11 +33,14 @@ func (r *providerRegistry) AddContextProvider(name string, builder ContextProvid
 	if name == "" {
 		return fmt.Errorf("provider name is required")
 	}
+
 	if strings.ToLower(name) != name {
 		return fmt.Errorf("provider name must be lowercase")
 	}
+
 	_, contextExists := r.contextProviders[name]
 	_, dynamicExists := r.dynamicProviders[name]
+
 	if contextExists || dynamicExists {
 		return fmt.Errorf("provider '%s' is already registered", name)
 	}
