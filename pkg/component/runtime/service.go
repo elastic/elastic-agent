@@ -254,7 +254,7 @@ func (s *ServiceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Com
 // isRunning returns true is the service is running
 func (s *ServiceRuntime) isRunning() bool {
 	return s.state.State != client.UnitStateStopping &&
-		s.state.State == client.UnitStateStopped
+		s.state.State != client.UnitStateStopped
 }
 
 // checkStatus checks check-ins state, called on timer
