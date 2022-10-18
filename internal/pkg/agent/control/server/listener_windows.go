@@ -65,17 +65,24 @@ func isWindowsAdmin(u *user.User) (bool, error) {
 		return true, nil
 	}
 
+	if equalsSystemGroup(u.Uid) || equalsSystemGroup(u.Gid) {
+		return true, nil
+	}
+
 	groups, err := u.GroupIds()
 	if err != nil {
 		return false, errors.Wrap(err, "failed to get current user groups")
 	}
 
 	for _, groupSid := range groups {
-		if strings.EqualFold(groupSid, NTAUTHORITY_SYSTEM) ||
-			strings.EqualFold(groupSid, ADMINISTRATORS_GROUP) {
+		if equalsSystemGroup(groupSid) {
 			return true, nil
 		}
 	}
 
 	return false, nil
+}
+
+func equalsSystemGroup(s string) bool {
+	return strings.EqualFold(s, NTAUTHORITY_SYSTEM) || strings.EqualFold(s, ADMINISTRATORS_GROUP)
 }
