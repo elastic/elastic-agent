@@ -10,15 +10,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
-
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/download"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )

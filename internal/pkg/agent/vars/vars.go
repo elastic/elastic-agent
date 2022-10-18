@@ -10,18 +10,19 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"golang.org/x/sync/errgroup"
 )
 
 func WaitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config, wait time.Duration) ([]*transpiler.Vars, error) {
 	var cancel context.CancelFunc
 	var vars []*transpiler.Vars
 
-	composable, err := composable.New(l, cfg)
+	composable, err := composable.New(l, cfg, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create composable controller: %w", err)
 	}

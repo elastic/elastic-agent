@@ -10,8 +10,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 func validTestPath() string {

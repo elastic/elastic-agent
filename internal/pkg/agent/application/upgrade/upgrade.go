@@ -7,10 +7,11 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
@@ -111,7 +112,7 @@ func (u *Upgrader) Upgradeable() bool {
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error) {
-	u.log.Infow("Upgrading agent", "version", a.Version(), "source_uri", a.SourceURI())
+	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
 
@@ -131,7 +132,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	newHash, err := u.unpack(ctx, version, archivePath)
+	newHash, err := u.unpack(version, archivePath)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +156,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, newHash, action); err != nil {
+	if err := u.markUpgrade(ctx, u.log, newHash, action); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
