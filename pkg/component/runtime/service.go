@@ -181,14 +181,14 @@ func (s *ServiceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 
 	s.log.Debugf("stopping %s service runtime", name)
 
-	// If checked in before, send STOPPING
-	if s.isRunning() || !lastCheckin.IsZero() {
-		s.log.Debugf("send stopping state to %s service", name)
-		s.state.forceExpectedState(client.UnitStateStopping)
-		comm.CheckinExpected(s.state.toCheckinExpected())
-	}
-
 	if teardown {
+		// If checked in before, send STOPPING
+		if s.isRunning() || !lastCheckin.IsZero() {
+			s.log.Debugf("send stopping state to %s service", name)
+			s.state.forceExpectedState(client.UnitStateStopping)
+			comm.CheckinExpected(s.state.toCheckinExpected())
+		}
+
 		s.log.Debug("uninstall %s service", s.name())
 		err = s.uninstall(ctx)
 		if err != nil {
