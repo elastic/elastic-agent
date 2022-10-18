@@ -10,12 +10,8 @@ in the [observability-docs](https://github.com/elastic/observability-docs) repo.
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
 - [Docker](https://docs.docker.com/get-docker/)
-<<<<<<< HEAD
-- [X-pack](https://github.com/elastic/beats/tree/8.5/x-pack) to pre-exist in the parent folder of the local Git repository checkout
-=======
 - [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
 - [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) to add changelog fragments for changelog generation
->>>>>>> 6eadeeff9 (Convert CHANGELOG.next to fragments (#1244))
 
 If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
 ```
