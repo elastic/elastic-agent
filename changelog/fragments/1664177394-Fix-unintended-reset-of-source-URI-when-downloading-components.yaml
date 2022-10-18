@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix unintended reset of source URI when downloading components
+pr: https://github.com/elastic/elastic-agent/pull/1252
