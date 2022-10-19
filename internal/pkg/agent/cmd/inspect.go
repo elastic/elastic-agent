@@ -176,7 +176,9 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 
 		if monitorCfg != nil {
 			// print separate rather than merge.
-			printMapStringConfig(monitorCfg, streams)
+			if err := printMapStringConfig(monitorCfg, streams); err != nil {
+				streams.Out.Write([]byte(fmt.Sprintf("failed to generate monitoring config: %v\n", err)))
+			}
 		}
 	}
 
