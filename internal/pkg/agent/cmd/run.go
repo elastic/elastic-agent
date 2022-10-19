@@ -469,10 +469,6 @@ func setupMetrics(
 	}
 	s.Start()
 
-	if cfg.Pprof != nil && cfg.Pprof.Enabled {
-		s.AttachPprof()
-	}
-
 	// return server stopper
 	return s.Stop, nil
 }
