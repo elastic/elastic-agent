@@ -137,7 +137,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				cisStop()
 
 				// Stop service
-				err = s.stop(ctx, comm, lastCheckin, as == actionTeardown)
+				s.stop(ctx, comm, lastCheckin, as == actionTeardown)
 			}
 			if err != nil {
 				s.forceCompState(client.UnitStateFailed, err.Error())
@@ -176,30 +176,65 @@ func (s *ServiceRuntime) start(ctx context.Context) (err error) {
 	return nil
 }
 
-func (s *ServiceRuntime) stop(ctx context.Context, comm Communicator, lastCheckin time.Time, teardown bool) (err error) {
+func (s *ServiceRuntime) stop(ctx context.Context, comm Communicator, lastCheckin time.Time, teardown bool) {
 	name := s.name()
 
 	s.log.Debugf("stopping %s service runtime", name)
 
+	checkedIn := !lastCheckin.IsZero()
+
 	if teardown {
 		// If checked in before, send STOPPING
-		if s.isRunning() || !lastCheckin.IsZero() {
-			s.log.Debugf("send stopping state to %s service", name)
-			s.state.forceExpectedState(client.UnitStateStopping)
-			comm.CheckinExpected(s.state.toCheckinExpected())
+		if s.isRunning() {
+			// If never checked in await for the checkin with the timeout
+			if !checkedIn {
+				timeout := s.checkinPeriod()
+				s.log.Debugf("%s service had never checked in, await for check-in for %v", name, timeout)
+				checkedIn = s.awaitCheckin(ctx, comm, timeout)
+			}
+
+			// Received check in send STOPPING
+			if checkedIn {
+				s.log.Debugf("send stopping state to %s service", name)
+				s.state.forceExpectedState(client.UnitStateStopping)
+				comm.CheckinExpected(s.state.toCheckinExpected())
+			} else {
+				s.log.Debugf("%s service had never checked in, proceed to uninstall", name)
+			}
 		}
 
-		s.log.Debug("uninstall %s service", s.name())
-		err = s.uninstall(ctx)
+		s.log.Debug("uninstall %s service", name)
+		err := s.uninstall(ctx)
 		if err != nil {
 			s.log.Errorf("failed %s service uninstall, err: %v", name, err)
 		}
 	}
 
 	// Force component stopped state
+	s.log.Debug("set %s service runtime to stopped state", name)
 	s.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: %s service runtime", name))
+}
 
-	return nil
+// awaitCheckin awaits checkin with timeout.
+func (s *ServiceRuntime) awaitCheckin(ctx context.Context, comm Communicator, timeout time.Duration) bool {
+	name := s.name()
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// stop cancelled
+			s.log.Debugf("stopping %s service, cancelled", name)
+			return false
+		case <-t.C:
+			// stop timed out
+			s.log.Debugf("stopping %s service, timed out", name)
+			return false
+		case <-comm.CheckinObserved():
+			return true
+		}
+	}
 }
 
 func (s *ServiceRuntime) processNewComp(newComp component.Component, comm Communicator) {
