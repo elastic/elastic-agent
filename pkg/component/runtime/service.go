@@ -263,8 +263,11 @@ func (s *ServiceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Com
 		changed = true
 	}
 
-	isRunning := s.isRunning()
-	if lastCheckin.IsZero() && isRunning {
+	if !s.isRunning() {
+		return
+	}
+
+	if lastCheckin.IsZero() {
 		// first check-in
 		sendExpected = true
 	}
@@ -272,7 +275,7 @@ func (s *ServiceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Com
 	if s.state.syncCheckin(checkin) {
 		changed = true
 	}
-	if s.state.unsettled() && isRunning {
+	if s.state.unsettled() {
 		sendExpected = true
 	}
 	if sendExpected {
