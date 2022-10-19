@@ -57,6 +57,18 @@ type UpgradeManager interface {
 	Ack(ctx context.Context, acker acker.Acker) error
 }
 
+// MonitorManager provides an interface to perform the monitoring action for the agent.
+type MonitorManager interface {
+	// Enabled when configured to collect metrics/logs.
+	Enabled() bool
+
+	// Reload reloads the configuration for the upgrade manager.
+	Reload(rawConfig *config.Config) error
+
+	// InjectMonitoring injects monitoring configuration into resolved ast tree.
+	MonitoringConfig(map[string]interface{}, map[string]string) (map[string]interface{}, error)
+}
+
 // Runner provides interface to run a manager and receive running errors.
 type Runner interface {
 	// Run runs the manager.
@@ -151,6 +163,7 @@ type Coordinator struct {
 
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
+	monitorMgr MonitorManager
 
 	runtimeMgr    RuntimeManager
 	runtimeMgrErr error
@@ -166,7 +179,7 @@ type Coordinator struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, modifiers ...ComponentsModifier) *Coordinator {
 	return &Coordinator{
 		logger:     logger,
 		agentInfo:  agentInfo,
@@ -181,6 +194,7 @@ func New(logger *logger.Logger, agentInfo *info.AgentInfo, specs component.Runti
 		state: coordinatorState{
 			state: agentclient.Starting,
 		},
+		monitorMgr: monitorMgr,
 	}
 }
 
@@ -575,6 +589,10 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		return fmt.Errorf("failed to reload upgrade manager configuration: %w", err)
 	}
 
+	if err := c.monitorMgr.Reload(cfg); err != nil {
+		return fmt.Errorf("failed to reload upgrade manager configuration: %w", err)
+	}
+
 	c.state.config = cfg
 	c.state.ast = rawAst
 
@@ -640,7 +658,13 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
-	comps, err := c.specs.ToComponents(cfg)
+
+	var configInjector component.GenerateMonitoringCfgFn
+	if c.monitorMgr.Enabled() {
+		configInjector = c.monitorMgr.MonitoringConfig
+	}
+
+	comps, err := c.specs.ToComponents(cfg, configInjector)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to render components: %w", err)
 	}
