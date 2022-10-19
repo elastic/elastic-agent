@@ -19,10 +19,15 @@ import (
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
 
+	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
+
+	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/service"
+	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
@@ -38,6 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -163,6 +169,14 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	if err != nil {
 		return err
 	}
+
+	serverStopFn, err := setupMetrics(logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = serverStopFn()
+	}()
 
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
@@ -327,7 +341,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		// no enrollment file exists or failed to stat it; nothing to do
-		return cfg, nil //nolint:nilerr // there is nothing to do
+		return cfg, nil
 	}
 	contents, err := ioutil.ReadFile(enrollPath)
 	if err != nil {
@@ -431,4 +445,30 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 		ServiceEnvironment: cfg.Environment,
 		Transport:          ts,
 	})
+}
+
+func setupMetrics(
+	logger *logger.Logger,
+	operatingSystem string,
+	cfg *monitoringCfg.MonitoringConfig,
+	tracer *apm.Tracer,
+) (func() error, error) {
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+		return nil, err
+	}
+
+	// start server for stats
+	endpointConfig := api.Config{
+		Enabled: true,
+		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
+	}
+
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer)
+	if err != nil {
+		return nil, errors.New(err, "could not start the HTTP server for the API")
+	}
+	s.Start()
+
+	// return server stopper
+	return s.Stop, nil
 }

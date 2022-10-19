@@ -54,11 +54,11 @@ type ComponentRuntime interface {
 }
 
 // NewComponentRuntime creates the proper runtime based on the input specification for the component.
-func NewComponentRuntime(comp component.Component, logger *logger.Logger) (ComponentRuntime, error) {
+func NewComponentRuntime(comp component.Component, monitor MonitoringManager, logger *logger.Logger) (ComponentRuntime, error) {
 	if comp.Err != nil {
 		return NewFailedRuntime(comp)
 	} else if comp.Spec.Spec.Command != nil {
-		return NewCommandRuntime(comp)
+		return NewCommandRuntime(comp, monitor)
 	} else if comp.Spec.Spec.Service != nil {
 		return NewServiceRuntime(comp, logger)
 	}
@@ -82,12 +82,12 @@ type componentRuntimeState struct {
 	actions   map[string]func(*proto.ActionResponse)
 }
 
-func newComponentRuntimeState(m *Manager, logger *logger.Logger, comp component.Component) (*componentRuntimeState, error) {
+func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component) (*componentRuntimeState, error) {
 	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca, m.agentInfo)
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := NewComponentRuntime(comp, logger)
+	runtime, err := NewComponentRuntime(comp, monitor, logger)
 	if err != nil {
 		return nil, err
 	}

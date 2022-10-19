@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -64,8 +65,9 @@ func New(
 	}
 
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
+	monitor := monitoring.New(cfg.Settings.V1MonitoringEnabled, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
-	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), agentInfo, tracer)
+	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), agentInfo, tracer, monitor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
@@ -115,7 +117,7 @@ func New(
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, compModifiers...)
+	coord := coordinator.New(log, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

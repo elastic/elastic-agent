@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //nolint:dupl // duplicate code is in test cases
-
 package component
 
 import (
@@ -915,7 +914,7 @@ func TestToComponents(t *testing.T) {
 			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
 			require.NoError(t, err)
 
-			result, err := runtime.ToComponents(scenario.Policy)
+			result, err := runtime.ToComponents(scenario.Policy, nil)
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {

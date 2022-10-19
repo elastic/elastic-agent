@@ -17,7 +17,10 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
@@ -45,6 +48,7 @@ wait that amount of time before using the variables for the configuration.
 		Run: func(c *cobra.Command, args []string) {
 			var opts inspectConfigOpts
 			opts.variables, _ = c.Flags().GetBool("variables")
+			opts.includeMonitoring, _ = c.Flags().GetBool("monitoring")
 			opts.variablesWait, _ = c.Flags().GetDuration("variables-wait")
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -57,6 +61,7 @@ wait that amount of time before using the variables for the configuration.
 	}
 
 	cmd.Flags().Bool("variables", false, "render configuration with variables substituted")
+	cmd.Flags().Bool("monitoring", false, "includes monitoring configuration")
 	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution")
 
 	cmd.AddCommand(newInspectComponentsCommandWithArgs(s, streams))
@@ -115,8 +120,9 @@ variables for the configuration.
 }
 
 type inspectConfigOpts struct {
-	variables     bool
-	variablesWait time.Duration
+	variables         bool
+	includeMonitoring bool
+	variablesWait     time.Duration
 }
 
 func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, streams *cli.IOStreams) error {
@@ -135,13 +141,53 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return err
 	}
 
-	if !opts.variables {
+	if !opts.variables && !opts.includeMonitoring {
 		return printConfig(fullCfg, l, streams)
 	}
 	cfg, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
 		return err
 	}
+
+	if opts.includeMonitoring {
+		// Load the requirements before trying to load the configuration. These should always load
+		// even if the configuration is wrong.
+		platform, err := component.LoadPlatformDetail()
+		if err != nil {
+			return fmt.Errorf("failed to gather system information: %w", err)
+		}
+		specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+		if err != nil {
+			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
+		}
+
+		monitorFn, err := getMonitoringFn(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to get monitoring: %w", err)
+		}
+		_, binaryMapping, err := specs.PolicyToComponents(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to get binary mappings: %w", err)
+		}
+		monitorCfg, err := monitorFn(cfg, binaryMapping)
+		if err != nil {
+			return fmt.Errorf("failed to get monitoring config: %w", err)
+		}
+
+		if monitorCfg != nil {
+			rawCfg := config.MustNewConfigFrom(cfg)
+
+			if err := rawCfg.Merge(monitorCfg); err != nil {
+				return fmt.Errorf("failed to merge monitoring config: %w", err)
+			}
+
+			cfg, err = rawCfg.ToMapStr()
+			if err != nil {
+				return fmt.Errorf("failed to convert monitoring config: %w", err)
+			}
+		}
+	}
+
 	return printMapStringConfig(cfg, streams)
 }
 
@@ -212,8 +258,13 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return err
 	}
 
+	monitorFn, err := getMonitoringFn(m)
+	if err != nil {
+		return fmt.Errorf("failed to get monitoring: %w", err)
+	}
+
 	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m)
+	comps, err := specs.ToComponents(m, monitorFn)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
 	}
@@ -269,6 +320,26 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	}
 
 	return printComponents(comps, streams)
+}
+
+func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
+	config, err := config.NewConfigFrom(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	agentCfg := configuration.DefaultConfiguration()
+	if err := config.Unpack(agentCfg); err != nil {
+		return nil, err
+	}
+
+	agentInfo, err := info.NewAgentInfoWithLog("error", false)
+	if err != nil {
+		return nil, fmt.Errorf("could not load agent info: %w", err)
+	}
+
+	monitor := monitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo)
+	return monitor.MonitoringConfig, nil
 }
 
 func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration) (map[string]interface{}, error) {

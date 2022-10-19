@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //nolint:dupl // duplicate code is in test cases
-
 package runtime
 
 import (
@@ -29,7 +28,8 @@ import (
 )
 
 const (
-	exeExt = ".exe"
+	exeExt             = ".exe"
+	errActionUndefined = "action undefined"
 )
 
 var (
@@ -50,7 +50,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -152,7 +152,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -277,7 +277,7 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -448,7 +448,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -603,7 +603,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -729,7 +729,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -887,7 +887,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1017,7 +1017,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1156,7 +1156,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1277,7 +1277,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1340,7 +1340,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 							actionCancel()
 							if err == nil {
 								subErrCh <- fmt.Errorf("should have returned an error")
-							} else if err.Error() != "action undefined" {
+							} else if err.Error() != errActionUndefined {
 								subErrCh <- fmt.Errorf("should have returned error: action undefined")
 							} else {
 								subErrCh <- nil
@@ -1401,7 +1401,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1613,7 +1613,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1691,7 +1691,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 							actionCancel()
 							if err == nil {
 								subErrCh <- fmt.Errorf("should have returned an error")
-							} else if err.Error() != "action undefined" {
+							} else if err.Error() != errActionUndefined {
 								subErrCh <- fmt.Errorf("should have returned error: action undefined")
 							} else {
 								subErrCh <- nil
@@ -1830,3 +1830,11 @@ func testBinary(t *testing.T) string {
 	}
 	return binaryPath
 }
+
+type testMonitoringManager struct{}
+
+func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManager{} }
+
+func (*testMonitoringManager) EnrichArgs(_ string, _ string, args []string) []string { return args }
+func (*testMonitoringManager) Prepare() error                                        { return nil }
+func (*testMonitoringManager) Cleanup(string) error                                  { return nil }

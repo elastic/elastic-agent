@@ -37,6 +37,12 @@ const (
 	stateUnknownMessage = "Unknown"
 )
 
+type MonitoringManager interface {
+	EnrichArgs(string, string, []string) []string
+	Prepare() error
+	Cleanup(string) error
+}
+
 type procState struct {
 	proc  *process.Info
 	state *os.ProcessState
@@ -45,6 +51,7 @@ type procState struct {
 // CommandRuntime provides the command runtime for running a component as a subprocess.
 type CommandRuntime struct {
 	current component.Component
+	monitor MonitoringManager
 
 	ch       chan ComponentState
 	actionCh chan actionMode
@@ -60,7 +67,7 @@ type CommandRuntime struct {
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
-func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
+func NewCommandRuntime(comp component.Component, monitor MonitoringManager) (ComponentRuntime, error) {
 	if comp.Spec.Spec.Command == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
@@ -72,6 +79,7 @@ func NewCommandRuntime(comp component.Component) (ComponentRuntime, error) {
 		compCh:      make(chan component.Component),
 		actionState: actionStop,
 		state:       newComponentState(&comp),
+		monitor:     monitor,
 	}, nil
 }
 
@@ -281,8 +289,19 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	if err != nil {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}
+
+	if err := c.monitor.Prepare(); err != nil {
+		return err
+	}
+	args := c.monitor.EnrichArgs(c.current.ID, c.current.Spec.BinaryName, cmdSpec.Args)
+
+	// differentiate data paths
+	dataPath := filepath.Join(paths.Home(), "run", c.current.ID)
+	_ = os.MkdirAll(dataPath, 0755)
+	args = append(args, "-E", "path.data="+dataPath)
+
 	proc, err := process.Start(path,
-		process.WithArgs(cmdSpec.Args),
+		process.WithArgs(args),
 		process.WithEnv(env),
 		process.WithCmdOptions(attachOutErr, dirPath(workDir)))
 	if err != nil {
@@ -308,6 +327,10 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 		}
 		return nil
 	}
+
+	// cleanup reserved resources related to monitoring
+	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
+
 	cmdSpec := c.current.Spec.Spec.Command
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
