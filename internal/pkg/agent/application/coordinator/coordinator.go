@@ -62,7 +62,7 @@ type MonitorManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// InjectMonitoring injects monitoring configuration into resolved ast tree.
-	InjectMonitoring(map[string]interface{}, map[string]string) error
+	MonitoringConfig(map[string]interface{}, map[string]string) (map[string]interface{}, error)
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -649,9 +649,9 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 		return nil, nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
 
-	var configInjector component.ConfigInjectFn
+	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr.Enabled() {
-		configInjector = c.monitorMgr.InjectMonitoring
+		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
 	comps, err := c.specs.ToComponents(cfg, configInjector)

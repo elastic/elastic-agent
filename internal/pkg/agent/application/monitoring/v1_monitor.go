@@ -99,14 +99,14 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
-// InjectMonitoring adds monitoring inputs to a configuration based on retrieved list of components to run.
-func (b *BeatsMonitor) InjectMonitoring(cfg map[string]interface{}, componentIDToBinary map[string]string) error {
+// MonitoringConfig adds monitoring inputs to a configuration based on retrieved list of components to run.
+func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, componentIDToBinary map[string]string) (map[string]interface{}, error) {
 	if !b.Enabled() {
-		return nil
+		return nil, nil
 	}
 
 	monitoringOutputName := defaultOutputName
-	if agentCfg, found := cfg[agentKey]; found {
+	if agentCfg, found := policy[agentKey]; found {
 		agentCfgMap, ok := agentCfg.(map[string]interface{})
 		if ok {
 			if monitoringCfg, found := agentCfgMap[monitoringKey]; found {
@@ -122,22 +122,27 @@ func (b *BeatsMonitor) InjectMonitoring(cfg map[string]interface{}, componentIDT
 		}
 	}
 
-	if err := b.injectMonitoringOutput(cfg, monitoringOutputName); err != nil {
-		return errors.New(err, "failed to inject monitoring output")
+	cfg := make(map[string]interface{})
+
+	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil {
+		return nil, errors.New(err, "failed to inject monitoring output")
 	}
+
+	// initializes inputs collection so injectors don't have to deal with it
+	b.initInputs(cfg)
 
 	if b.config.C.MonitorLogs {
 		if err := b.injectLogsInput(cfg, componentIDToBinary, monitoringOutput); err != nil {
-			return errors.New(err, "failed to inject monitoring output")
+			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
 
 	if b.config.C.MonitorMetrics {
 		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput); err != nil {
-			return errors.New(err, "failed to inject monitoring output")
+			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
-	return nil
+	return cfg, nil
 }
 
 // EnrichArgs enriches arguments provided to application, in order to enable
@@ -249,13 +254,18 @@ func (b *BeatsMonitor) Cleanup(unit string) error {
 	return os.RemoveAll(endpoint)
 }
 
-func (b *BeatsMonitor) injectMonitoringOutput(cfg map[string]interface{}, monitoringOutputName string) error {
-	if monitoringOutputName == monitoringOutput {
-		// no work needed
-		return nil
+func (b *BeatsMonitor) initInputs(cfg map[string]interface{}) {
+	_, found := cfg[inputsKey]
+	if found {
+		return
 	}
 
-	outputsNode, found := cfg[outputsKey]
+	inputsCollection := make([]interface{}, 0)
+	cfg[inputsKey] = inputsCollection
+}
+
+func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{}, monitoringOutputName string) error {
+	outputsNode, found := source[outputsKey]
 	if !found {
 		return fmt.Errorf("outputs not part of the config")
 	}
@@ -270,7 +280,12 @@ func (b *BeatsMonitor) injectMonitoringOutput(cfg map[string]interface{}, monito
 		return fmt.Errorf("output %q used for monitoring not found", monitoringOutputName)
 	}
 
-	outputs[monitoringOutput] = outputNode
+	monitoringOutputs := map[string]interface{}{
+		monitoringOutput: outputNode,
+	}
+
+	dest[outputsKey] = monitoringOutputs
+
 	return nil
 }
 

@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-type ConfigInjectFn func(map[string]interface{}, map[string]string) error
+type GenerateMonitoringCfgFn func(map[string]interface{}, map[string]string) (map[string]interface{}, error)
 
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
@@ -81,41 +81,45 @@ type Component struct {
 }
 
 // ToComponents returns the components that should be running based on the policy and the current runtime specification.
-func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, configInjector ...ConfigInjectFn) ([]Component, error) {
-	outputsMap, err := toIntermediate(policy)
+func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInjector GenerateMonitoringCfgFn) ([]Component, error) {
+	components, binaryMapping, err := r.PolicyToComponents(policy)
 	if err != nil {
 		return nil, err
 	}
-	if outputsMap == nil {
-		return nil, nil
+
+	if monitoringInjector != nil {
+		monitoringCfg, err := monitoringInjector(policy, binaryMapping)
+		if err != nil {
+			return nil, fmt.Errorf("failed to inject monitoring: %w", err)
+		}
+
+		if monitoringCfg != nil {
+			// monitoring is enabled
+			monitoringComps, _, err := r.PolicyToComponents(monitoringCfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
+			}
+
+			components = append(components, monitoringComps...)
+		}
 	}
 
-	if len(configInjector) > 0 {
-		componentIDToBinary, err := r.toComponentIdsInputMap(outputsMap)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate component IDs: %w", err)
-		}
+	return components, nil
+}
 
-		for i, injector := range configInjector {
-			if err := injector(policy, componentIDToBinary); err != nil {
-				return nil, fmt.Errorf("injecting monitoring failed on step %d: %w", i, err)
-			}
-		}
-
-		// regenerate outputs map to cover new inputs
-		outputsMap, err = toIntermediate(policy)
-		if err != nil {
-			return nil, err
-		}
-		if outputsMap == nil {
-			return nil, nil
-		}
+func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Component, map[string]string, error) {
+	outputsMap, err := toIntermediate(policy)
+	if err != nil {
+		return nil, nil, err
+	}
+	if outputsMap == nil {
+		return nil, nil, nil
 	}
 
 	// set the runtime variables that are available in the input specification runtime checks
 	hasRoot, err := utils.HasRoot()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	vars, err := transpiler.NewVars(map[string]interface{}{
 		"runtime": map[string]interface{}{
@@ -133,10 +137,11 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, configInjecto
 		},
 	}, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var components []Component
+	componentIdsInputMap := make(map[string]string)
 	for outputName, output := range outputsMap {
 		if !output.enabled {
 			// skip; not enabled
@@ -203,58 +208,12 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, configInjecto
 					Spec:  inputSpec,
 					Units: units,
 				})
-			}
-		}
-	}
-	return components, nil
-}
-
-// ToComponentIdsInputMap returns the component IDs that should be running based on the policy and the current runtime specification and their mapping to a binary.
-func (r *RuntimeSpecs) toComponentIdsInputMap(outputsMap map[string]outputI) (map[string]string, error) {
-	if outputsMap == nil {
-		return nil, nil
-	}
-
-	componentIdsInputMap := make(map[string]string)
-	for outputName, output := range outputsMap {
-		if !output.enabled {
-			// skip; not enabled
-			continue
-		}
-
-		// merge aliases into same input type
-		inputsMap := make(map[string][]inputI)
-		for inputType, inputs := range output.inputs {
-			realInputType, ok := r.aliasMapping[inputType]
-			if ok {
-				inputsMap[realInputType] = append(inputsMap[realInputType], inputs...)
-			} else {
-				inputsMap[inputType] = append(inputsMap[inputType], inputs...)
-			}
-		}
-
-		for inputType, inputs := range inputsMap {
-			inputSpec, err := r.GetInput(inputType)
-			if err == nil {
-				// update the inputType to match the spec; as it could have been alias
-				inputType = inputSpec.InputType
-			}
-			units := make([]string, 0, len(inputs)+1)
-			for _, input := range inputs {
-				if !input.enabled {
-					// skip; not enabled
-					continue
-				}
-				units = append(units, fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id))
-			}
-			if len(units) > 0 {
-				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
 				componentIdsInputMap[componentID] = inputSpec.BinaryName
 			}
 		}
 	}
 
-	return componentIdsInputMap, nil
+	return components, componentIdsInputMap, nil
 }
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
