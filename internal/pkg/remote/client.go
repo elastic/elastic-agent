@@ -6,6 +6,7 @@ package remote
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -15,8 +16,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -204,7 +203,7 @@ func (c *Client) Send(
 
 			msg := fmt.Sprintf("requester %d/%d to host %s errored",
 				i, len(c.clients), requester.host)
-			multiErr = fmt.Errorf("%s: %s: %s", msg, err, multiErr)
+			multiErr = fmt.Errorf("%s: %s: %w", msg, err, multiErr)
 
 			// Using debug level as the error is only relevant if all clients fail.
 			c.log.With("error", err).Debugf(msg)
