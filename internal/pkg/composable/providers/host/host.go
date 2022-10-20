@@ -77,7 +77,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(log *logger.Logger, c *config.Config) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{
 		logger:  log,
 		fetcher: getHostInfo,

@@ -7,6 +7,8 @@ package kubernetes
 import (
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/config"
+
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -34,6 +36,9 @@ type Config struct {
 
 	LabelsDedot      bool `config:"labels.dedot"`
 	AnnotationsDedot bool `config:"annotations.dedot"`
+
+	Hints  *config.C `config:"hints"`
+	Prefix string    `config:"prefix"`
 }
 
 // Resources config section for resources' config blocks
@@ -56,6 +61,7 @@ func (c *Config) InitDefaults() {
 	c.LabelsDedot = true
 	c.AnnotationsDedot = true
 	c.AddResourceMetadata = metadata.GetDefaultResourceMetadataConfig()
+	c.Prefix = "co.elastic"
 }
 
 // Validate ensures correctness of config

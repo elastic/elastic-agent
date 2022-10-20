@@ -7,7 +7,6 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,26 +112,27 @@ func (u *Upgrader) Upgradeable() bool {
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error) {
+	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
 
-	err = preUpgradeCleanup(u.agentInfo.Version())
+	err = cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version())
 	if err != nil {
-		u.log.Errorf("Unable to clean downloads dir %q before update: %v", paths.Downloads(), err)
+		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
 
 	sourceURI = u.sourceURI(sourceURI)
 	archivePath, err := u.downloadArtifact(ctx, version, sourceURI)
 	if err != nil {
-		// Run the same preUpgradeCleanup task to get rid of any newly downloaded files
+		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
-		if dErr := preUpgradeCleanup(u.agentInfo.Version()); dErr != nil {
-			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
+		if dErr := cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
+			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
 		}
 		return nil, err
 	}
 
-	newHash, err := u.unpack(ctx, version, archivePath)
+	newHash, err := u.unpack(version, archivePath)
 	if err != nil {
 		return nil, err
 	}
@@ -146,31 +146,35 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, nil
 	}
 
-	if err := copyActionStore(newHash); err != nil {
+	if err := copyActionStore(u.log, newHash); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
-	if err := ChangeSymlink(ctx, newHash); err != nil {
-		rollbackInstall(ctx, newHash)
+	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
+		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, newHash, action); err != nil {
-		rollbackInstall(ctx, newHash)
+	if err := u.markUpgrade(ctx, u.log, newHash, action); err != nil {
+		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
 	if err := InvokeWatcher(u.log); err != nil {
-		rollbackInstall(ctx, newHash)
+		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))
 
 	// Clean everything from the downloads dir
+	u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads())
 	err = os.RemoveAll(paths.Downloads())
 	if err != nil {
-		u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
+		u.log.Errorw("Unable to clean downloads after update", "error.message", err, "file.path", paths.Downloads())
 	}
 
 	return cb, nil
@@ -212,20 +216,21 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func rollbackInstall(ctx context.Context, hash string) {
+func rollbackInstall(ctx context.Context, log *logger.Logger, hash string) {
 	os.RemoveAll(filepath.Join(paths.Data(), fmt.Sprintf("%s-%s", agentName, hash)))
-	_ = ChangeSymlink(ctx, release.ShortCommit())
+	_ = ChangeSymlink(ctx, log, release.ShortCommit())
 }
 
-func copyActionStore(newHash string) error {
+func copyActionStore(log *logger.Logger, newHash string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
+	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
+	log.Debugw("Copying action store", "new_home_path", newHome)
 
 	for _, currentActionStorePath := range storePaths {
-		newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
-
-		currentActionStore, err := ioutil.ReadFile(currentActionStorePath)
+		log.Debugw("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
+		currentActionStore, err := os.ReadFile(currentActionStorePath)
 		if os.IsNotExist(err) {
 			// nothing to copy
 			continue
@@ -234,7 +239,7 @@ func copyActionStore(newHash string) error {
 			return err
 		}
 
-		if err := ioutil.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
+		if err := os.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
 			return err
 		}
 	}

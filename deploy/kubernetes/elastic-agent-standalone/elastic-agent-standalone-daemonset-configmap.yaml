@@ -1,4 +1,4 @@
-# For more information refer to https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
+# For more information https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -25,6 +25,8 @@ data:
     providers.kubernetes:
       node: ${NODE_NAME}
       scope: node
+      #Uncomment to enable hints' support
+      #hints.enabled: true
     inputs:
       - name: kubernetes-cluster-metrics
         condition: ${kubernetes_leaderelection.leader} == true
