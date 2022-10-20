@@ -42,7 +42,6 @@ type Spec struct {
 	RestartOnOutputChange bool                 `yaml:"restart_on_output_change,omitempty"`
 	ExportedMetrics       []string             `yaml:"exported_metrics,omitempty"`
 	Process               *ProcessSettings     `yaml:"process,omitempty"`
-	ServiceInfo           *ServiceInfo         `yaml:"service_info,omitempty"`
 }
 
 // ProcessSettings process specific settings

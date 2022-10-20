@@ -4,9 +4,6 @@ artifact: endpoint-dev
 service: 6788
 process:
     stop_timeout: 180
-service_info:
-    name: ElasticEndpoint
-    label: co.elastic.endpoint
 action_input_types:
 - endpoint
 log_paths:

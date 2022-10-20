@@ -10,12 +10,10 @@ import (
 	"io"
 	"net"
 	"reflect"
-	"runtime"
 	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/kardianos/service"
 
 	"gopkg.in/yaml.v2"
 
@@ -273,105 +271,27 @@ func (a *Application) Stop() {
 	if srvState == nil {
 		return
 	}
+
+	name := a.desc.Spec().Name
 	to := a.getStopTimeout()
-	a.logger.Infof("Stop %v service, with %v timeout", a.desc.Spec().Name, to)
-	a.appLock.Lock()
+
+	a.logger.Infof("Stop %v service, with %v timeout", name, to)
+
+	// Try to stop the service with 3 minutes (default) timeout
 	if err := srvState.Stop(to); err != nil {
-		a.setState(
-			state.Failed,
-			fmt.Sprintf("failed to stop after %s: %v", to, err),
-			nil)
-
-		// Start service status watcher if service haven't responded over RPC within the allowed duration.
-		// This monitors the service status over the platform specific service interfaces
-		// and sets the state into stopped if the service has stopped or the grace period ended.
-		a.stopAndWatch()
-	} else {
-		a.setState(state.Stopped, "Stopped", nil)
+		// Log the error
+		a.logger.Errorf("Failed to stop %v service after %v timeout", name, to)
 	}
-	a.srvState = nil
 
+	// Cleanup
+	a.appLock.Lock()
+	defer a.appLock.Unlock()
+
+	a.srvState = nil
 	a.cleanUp()
 	a.stopCredsListener()
-	a.appLock.Unlock()
-}
 
-func (a *Application) stopAndWatch() {
-	var err error
-
-	name := a.desc.Spec().ServiceInfo.Name
-	if runtime.GOOS == darwin {
-		name = a.desc.Spec().ServiceInfo.Label
-	}
-
-	if runtime.GOOS != windows {
-		// Attempt to stop the service on non-windows platforms
-		svc, err := getService(name)
-		if err != nil {
-			a.logger.Errorf("failed to get %s service: %v", name, err)
-			a.setState(state.Stopped, "Stopped", nil)
-		}
-
-		// Attempt to stop the service, log any errors and continue to watch the service status anyways.
-		// The Endpoint service implements a protection from being stopped on windows
-		// and this call can result in "Access denied" error at the moment.
-		err = svc.Stop()
-		if err != nil {
-			a.logger.Debugf("failed to stop %s service, err: %v, ", name, err)
-		}
-	}
-
-	// Watch the service status, log errors and set the state to stopped in order to allow the agent health to recover.
-	sw, err := newServiceWatcher(name)
-	if err != nil {
-		a.logger.Errorf("failed to create the %s service watcher, setting service status to stopped", name)
-		a.setState(state.Stopped, "Stopped", nil)
-		return
-	}
-
-	// Run service watcher.
-	ctx, cn := context.WithCancel(a.bgContext)
-	defer cn()
-	go func() {
-		sw.run(ctx)
-	}()
-
-	var lastStatus service.Status
-LOOP:
-	// The status update channel is closed when the service watcher stops
-	for r := range sw.status() {
-		if r.Err != nil {
-			err = r.Err
-			// If service watcher returned the error, log the error and exit the loop
-			a.logger.Errorf("%s service watcher returned err: %v", name, r.Err)
-			break LOOP
-		} else {
-			lastStatus = r.Status
-			switch lastStatus {
-			case service.StatusUnknown:
-				a.logger.Debugf("%s service watcher status: Unknown", name)
-			case service.StatusRunning:
-				a.logger.Debugf("%s service watcher status: Running", name)
-			case service.StatusStopped:
-				a.logger.Debugf("%s service watcher status: Stopped", name)
-				break LOOP
-			}
-		}
-	}
-
-	// The service watcher exited at this point. Log the error if the status of the service is still not stopped.
-	if lastStatus != service.StatusStopped && err == nil {
-		var s string
-		switch lastStatus {
-		case service.StatusUnknown:
-			s = unknown
-		case service.StatusRunning:
-			s = running
-		}
-		a.logger.Errorf("%s service failed to stop within %v, last reported service status: %s", name, sw.checkDuration, s)
-	}
-
-	// Set the service state to "stopped"
+	// Set the service state to "stopped", otherwise the agent is stuck in the failed stop state until restarted
 	a.logger.Infof("setting %s service status to Stopped", name)
 	a.setState(state.Stopped, "Stopped", nil)
 }
