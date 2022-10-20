@@ -204,10 +204,9 @@ func (c *Client) Send(
 			requester.lastErr = err
 			requester.lastErrOcc = time.Now().UTC()
 
-			multiErr = multierror.Append(multiErr, err)
 			msg := fmt.Sprintf("requester %d/%d to host %s errored",
 				i, len(c.clients), requester.host)
-			multiErr = fmt.Errorf("%s: %s: %w", msg, err, multiErr)
+			multiErr = multierror.Append(multiErr, fmt.Errorf("%s: %w", msg, err))
 
 			// Using debug level as the error is only relevant if all clients fail.
 			c.log.With("error", err).Debugf(msg)
