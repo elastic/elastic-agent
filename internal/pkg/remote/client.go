@@ -30,6 +30,8 @@ const (
 	retryOnBadConnTimeout = 5 * time.Minute
 )
 
+var errRequestFailed = errors.New("request failed")
+
 type wrapperFunc func(rt http.RoundTripper) (http.RoundTripper, error)
 
 type requestClient struct {
@@ -45,10 +47,10 @@ type requestClient struct {
 // to the client. For authenticated calls or sending fields on every request, create a custom RoundTripper
 // implementation that will take care of the boilerplate.
 type Client struct {
-	log      *logger.Logger
-	clientMu sync.Mutex
-	clients  []*requestClient
-	config   Config
+	log        *logger.Logger
+	clientLock sync.Mutex
+	clients    []*requestClient
+	config     Config
 }
 
 // NewConfigFromURL returns a Config based on a received host.
@@ -102,7 +104,7 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 	hosts := cfg.GetHosts()
 	hostCount := len(hosts)
 	log.With("hosts", hosts).Debugf(
-		"creating remote client with %d hosts", hostCount, hosts)
+		"creating remote client with %d hosts", hostCount)
 	clients := make([]*requestClient, hostCount)
 	for i, host := range hosts {
 		baseURL, err := urlutil.MakeURL(string(cfg.Protocol), p, host, 0)
@@ -161,16 +163,15 @@ func (c *Client) Send(
 	}
 
 	c.log.Debugf("Request method: %s, path: %s, reqID: %s", method, path, reqID)
-	c.clientMu.Lock()
-	defer c.clientMu.Unlock()
+	c.clientLock.Lock()
+	defer c.clientLock.Unlock()
 
-	var err error
-	var req *http.Request
 	var resp *http.Response
+	multiErr := errRequestFailed
 
 	c.sortClients()
 	for i, requester := range c.clients {
-		req, err = requester.newRequest(method, path, params, body)
+		req, err := requester.newRequest(method, path, params, body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "fail to create HTTP request using method %s to %s", method, path)
 		}
@@ -201,9 +202,12 @@ func (c *Client) Send(
 			requester.lastErr = err
 			requester.lastErrOcc = time.Now().UTC()
 
-			// Using debug level as the error is only relevant if all clients fail.
-			c.log.With("error", err).Debugf("requester %d/%d to host %s errored",
+			msg := fmt.Sprintf("requester %d/%d to host %s errored",
 				i, len(c.clients), requester.host)
+			multiErr = fmt.Errorf("%s: %s: %s", msg, err, multiErr)
+
+			// Using debug level as the error is only relevant if all clients fail.
+			c.log.With("error", err).Debugf(msg)
 			continue
 		}
 
@@ -212,7 +216,7 @@ func (c *Client) Send(
 		return resp, nil
 	}
 
-	return nil, fmt.Errorf("all hosts failed, last error: %w", err)
+	return nil, fmt.Errorf("all hosts failed: %w", multiErr)
 }
 
 // URI returns the remote URI.
