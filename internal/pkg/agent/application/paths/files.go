@@ -32,6 +32,9 @@ const defaultAgentStateStoreYmlFile = "state.yml"
 // defaultAgentStateStoreFile is the file that will contain the action that can be replayed after restart encrypted.
 const defaultAgentStateStoreFile = "state.enc"
 
+// defaultInputDPath return the location of the inputs.d.
+const defaultInputsDPath = "inputs.d"
+
 // AgentConfigYmlFile is a name of file used to store agent information
 func AgentConfigYmlFile() string {
 	return filepath.Join(Config(), defaultAgentFleetYmlFile)
@@ -81,4 +84,9 @@ func AgentStateStoreYmlFile() string {
 // AgentStateStoreFile is the file that contains the persisted state of the agent including the action that can be replayed after restart encrypted.
 func AgentStateStoreFile() string {
 	return filepath.Join(Home(), defaultAgentStateStoreFile)
+}
+
+// AgentInputsDPath is directory that contains the fragment of inputs yaml for K8s deployment.
+func AgentInputsDPath() string {
+	return filepath.Join(Config(), defaultInputsDPath)
 }

@@ -17,6 +17,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+type GenerateMonitoringCfgFn func(map[string]interface{}, map[string]string) (map[string]interface{}, error)
+
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
 	defaultUnitLogLevel = client.UnitLogLevelInfo
@@ -99,19 +101,45 @@ func (c *Component) Type() string {
 }
 
 // ToComponents returns the components that should be running based on the policy and the current runtime specification.
-func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component, error) {
-	outputsMap, err := toIntermediate(policy)
+func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInjector GenerateMonitoringCfgFn) ([]Component, error) {
+	components, binaryMapping, err := r.PolicyToComponents(policy)
 	if err != nil {
 		return nil, err
 	}
+
+	if monitoringInjector != nil {
+		monitoringCfg, err := monitoringInjector(policy, binaryMapping)
+		if err != nil {
+			return nil, fmt.Errorf("failed to inject monitoring: %w", err)
+		}
+
+		if monitoringCfg != nil {
+			// monitoring is enabled
+			monitoringComps, _, err := r.PolicyToComponents(monitoringCfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
+			}
+
+			components = append(components, monitoringComps...)
+		}
+	}
+
+	return components, nil
+}
+
+func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Component, map[string]string, error) {
+	outputsMap, err := toIntermediate(policy)
+	if err != nil {
+		return nil, nil, err
+	}
 	if outputsMap == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// set the runtime variables that are available in the input specification runtime checks
 	hasRoot, err := utils.HasRoot()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	vars, err := transpiler.NewVars(map[string]interface{}{
 		"runtime": map[string]interface{}{
@@ -129,10 +157,11 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 		},
 	}, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var components []Component
+	componentIdsInputMap := make(map[string]string)
 	for outputName, output := range outputsMap {
 		if !output.enabled {
 			// skip; not enabled
@@ -271,10 +300,12 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}) ([]Component,
 					ShipperSpec: &shipperSpec,
 					Units:       shipperUnits,
 				})
+				componentIdsInputMap[componentID] = inputSpec.BinaryName
 			}
 		}
 	}
-	return components, nil
+
+	return components, componentIdsInputMap, nil
 }
 
 func componentToShipperConfig(comp Component) (*proto.UnitExpectedConfig, error) {

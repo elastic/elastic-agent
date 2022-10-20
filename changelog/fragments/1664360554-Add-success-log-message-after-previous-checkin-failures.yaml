@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Add success log message after previous checkin failures
+pr: https://github.com/elastic/elastic-agent/pull/1327

@@ -123,6 +123,10 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	batchedAcker := lazy.NewAcker(ack, m.log, lazy.WithRetrier(retrier))
 	actionAcker := store.NewStateStoreActionAcker(batchedAcker, m.stateStore)
 
+	if err := m.coord.AckUpgrade(ctx, actionAcker); err != nil {
+		m.log.Warnf("Failed to ack upgrade: %v", err)
+	}
+
 	// Run the retrier.
 	retrierRun := make(chan bool)
 	retrierCtx, retrierCancel := context.WithCancel(ctx)
@@ -135,15 +139,26 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		close(retrierRun)
 	}()
 
+	// Gather errors from the dispatcher and pass to the error channel.
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case err := <-actionDispatcher.Errors():
+				m.errCh <- err // err is one or more failures from dispatching an action
+			}
+		}
+	}()
+
 	actions := m.stateStore.Actions()
 	stateRestored := false
 	if len(actions) > 0 && !m.wasUnenrolled() {
 		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
-		if err := store.ReplayActions(ctx, m.log, actionDispatcher, actionAcker, actions...); err != nil {
-			m.log.Errorf("could not recover state, error %+v, skipping...", err)
-		}
+		m.log.Info("restoring current policy from disk")
+		actionDispatcher.Dispatch(ctx, actionAcker, actions...)
 		stateRestored = true
 	}
 
@@ -167,7 +182,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.log,
 		m.agentInfo,
 		m.client,
-		actionDispatcher,
 		actionAcker,
 		m.coord,
 		m.stateStore,
@@ -199,6 +213,18 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		defer gatewayErrorsRunner.Stop()
 		return gateway.Run(ctx)
 	})
+
+	// pass actions collected from gateway to dispatcher
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case actions := <-gateway.Actions():
+				actionDispatcher.Dispatch(ctx, actionAcker, actions...)
+			}
+		}
+	}()
 
 	<-ctx.Done()
 	return gatewayRunner.Err()

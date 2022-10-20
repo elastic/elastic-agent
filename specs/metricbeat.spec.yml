@@ -178,3 +178,10 @@ inputs:
     shippers: *shippers
     command:
       args: *args
+  - name: http/metrics
+    description: "HTTP metrics"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command:
+      args: *args

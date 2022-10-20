@@ -52,6 +52,7 @@ func DefaultConfig() *MonitoringConfig {
 		MonitorTraces:  false,
 		HTTP: &MonitoringHTTPConfig{
 			Enabled: false,
+			Host:    "localhost",
 			Port:    defaultPort,
 		},
 		Namespace: defaultNamespace,

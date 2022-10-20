@@ -12,9 +12,6 @@ inputs:
       - container/arm64
     outputs: &outputs
       - elasticsearch
-      - kafka
-      - logstash
-      - redis
     command:
       args: &args
         - "-E"

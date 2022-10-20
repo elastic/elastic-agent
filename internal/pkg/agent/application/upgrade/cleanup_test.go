@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +33,8 @@ func setupDir(t *testing.T) {
 
 func TestPreUpgradeCleanup(t *testing.T) {
 	setupDir(t)
-	err := preUpgradeCleanup("8.4.0")
+	log := newErrorLogger(t)
+	err := cleanNonMatchingVersionsFromDownloads(log, "8.4.0")
 	require.NoError(t, err)
 
 	files, err := os.ReadDir(paths.Downloads())
@@ -41,4 +44,15 @@ func TestPreUpgradeCleanup(t *testing.T) {
 	p, err := os.ReadFile(filepath.Join(paths.Downloads(), files[0].Name()))
 	require.NoError(t, err)
 	require.Equal(t, []byte("hello, world!"), p)
+}
+
+func newErrorLogger(t *testing.T) *logger.Logger {
+	t.Helper()
+
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.ErrorLevel
+
+	log, err := logger.NewFromConfig("", loggerCfg, false)
+	require.NoError(t, err)
+	return log
 }

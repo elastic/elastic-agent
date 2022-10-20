@@ -47,12 +47,11 @@ type CheckinComponent struct {
 
 // CheckinRequest consists of multiple events reported to fleet ui.
 type CheckinRequest struct {
-	Status     string              `json:"status"`
-	AckToken   string              `json:"ack_token,omitempty"`
-	Events     []SerializableEvent `json:"events"`
-	Metadata   *info.ECSMeta       `json:"local_metadata,omitempty"`
-	Message    string              `json:"message"`    // V2 Agent message
-	Components []CheckinComponent  `json:"components"` // V2 Agent components
+	Status     string             `json:"status"`
+	AckToken   string             `json:"ack_token,omitempty"`
+	Metadata   *info.ECSMeta      `json:"local_metadata,omitempty"`
+	Message    string             `json:"message"`    // V2 Agent message
+	Components []CheckinComponent `json:"components"` // V2 Agent components
 }
 
 // SerializableEvent is a representation of the event to be send to the Fleet Server API via the checkin
@@ -105,23 +104,26 @@ func NewCheckinCmd(info agentInfo, client client.Sender) *CheckinCmd {
 	}
 }
 
-// Execute enroll the Agent in the Fleet Server.
-func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinResponse, error) {
+// Execute enroll the Agent in the Fleet Server. Returns the decoded check in response, a duration indicating
+// how long the request took, and an error.
+func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinResponse, time.Duration, error) {
 	if err := r.Validate(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	b, err := json.Marshal(r)
 	if err != nil {
-		return nil, errors.New(err,
+		return nil, 0, errors.New(err,
 			"fail to encode the checkin request",
 			errors.TypeUnexpected)
 	}
 
 	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
+	sendStart := time.Now()
 	resp, err := e.client.Send(ctx, "POST", cp, nil, nil, bytes.NewBuffer(b))
+	sendDuration := time.Now().Sub(sendStart)
 	if err != nil {
-		return nil, errors.New(err,
+		return nil, sendDuration, errors.New(err,
 			"fail to checkin to fleet-server",
 			errors.TypeNetwork,
 			errors.M(errors.MetaKeyURI, cp))
@@ -129,26 +131,26 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, client.ExtractError(resp.Body)
+		return nil, sendDuration, client.ExtractError(resp.Body)
 	}
 
 	rs, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.New(err, "failed to read checkin response")
+		return nil, sendDuration, errors.New(err, "failed to read checkin response")
 	}
 
 	checkinResponse := &CheckinResponse{}
 	decoder := json.NewDecoder(bytes.NewReader(rs))
 	if err := decoder.Decode(checkinResponse); err != nil {
-		return nil, errors.New(err,
+		return nil, sendDuration, errors.New(err,
 			"fail to decode checkin response",
 			errors.TypeNetwork,
 			errors.M(errors.MetaKeyURI, cp))
 	}
 
 	if err := checkinResponse.Validate(); err != nil {
-		return nil, err
+		return nil, sendDuration, err
 	}
 
-	return checkinResponse, nil
+	return checkinResponse, sendDuration, nil
 }

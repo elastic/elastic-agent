@@ -6,12 +6,10 @@ package fleet
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
@@ -65,17 +63,18 @@ type stateStore interface {
 }
 
 type fleetGateway struct {
-	log           *logger.Logger
-	dispatcher    dispatcher.Dispatcher
-	client        client.Sender
-	scheduler     scheduler.Scheduler
-	settings      *fleetGatewaySettings
-	agentInfo     agentInfo
-	acker         acker.Acker
-	unauthCounter int
-	stateFetcher  coordinator.StateFetcher
-	stateStore    stateStore
-	errCh         chan error
+	log                *logger.Logger
+	client             client.Sender
+	scheduler          scheduler.Scheduler
+	settings           *fleetGatewaySettings
+	agentInfo          agentInfo
+	acker              acker.Acker
+	unauthCounter      int
+	checkinFailCounter int
+	stateFetcher       coordinator.StateFetcher
+	stateStore         stateStore
+	errCh              chan error
+	actionCh           chan []fleetapi.Action
 }
 
 // New creates a new fleet gateway
@@ -83,7 +82,6 @@ func New(
 	log *logger.Logger,
 	agentInfo agentInfo,
 	client client.Sender,
-	d dispatcher.Dispatcher,
 	acker acker.Acker,
 	stateFetcher coordinator.StateFetcher,
 	stateStore stateStore,
@@ -95,7 +93,6 @@ func New(
 		defaultGatewaySettings,
 		agentInfo,
 		client,
-		d,
 		scheduler,
 		acker,
 		stateFetcher,
@@ -108,7 +105,6 @@ func newFleetGatewayWithScheduler(
 	settings *fleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
-	d dispatcher.Dispatcher,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
 	stateFetcher coordinator.StateFetcher,
@@ -116,7 +112,6 @@ func newFleetGatewayWithScheduler(
 ) (gateway.FleetGateway, error) {
 	return &fleetGateway{
 		log:          log,
-		dispatcher:   d,
 		client:       client,
 		settings:     settings,
 		agentInfo:    agentInfo,
@@ -125,7 +120,12 @@ func newFleetGatewayWithScheduler(
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
 		errCh:        make(chan error),
+		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
+}
+
+func (f *fleetGateway) Actions() <-chan []fleetapi.Action {
+	return f.actionCh
 }
 
 func (f *fleetGateway) Run(ctx context.Context) error {
@@ -162,19 +162,8 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 
 			actions := make([]fleetapi.Action, len(resp.Actions))
 			copy(actions, resp.Actions)
-
-			// Persist state
-			hadErr := false
-			if err := f.dispatcher.Dispatch(context.Background(), f.acker, actions...); err != nil {
-				err = fmt.Errorf("failed to dispatch actions, error: %w", err)
-				f.log.Error(err)
-				f.errCh <- err
-				hadErr = true
-			}
-
-			f.log.Debugf("FleetGateway is sleeping, next update in %s", f.settings.Duration)
-			if !hadErr {
-				f.errCh <- nil
+			if len(actions) > 0 {
+				f.actionCh <- actions
 			}
 		}
 	}
@@ -192,13 +181,25 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	// this mean we are rebooting to change the log level or the system is shutting us down.
 	for ctx.Err() == nil {
 		f.log.Debugf("Checking started")
-		resp, err := f.execute(ctx)
+		resp, took, err := f.execute(ctx)
 		if err != nil {
-			f.log.Errorf("Could not communicate with fleet-server Checking API will retry, error: %s", err)
+			f.checkinFailCounter++
+
+			// Report the first two failures at warn level as they may be recoverable with retries.
+			if f.checkinFailCounter <= 2 {
+				f.log.Warnw("Possible transient error during checkin with fleet-server, retrying",
+					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
+					"retry_after_ns", bo.NextWait())
+			} else {
+				f.log.Errorw("Cannot checkin in with fleet-server, retrying",
+					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
+					"retry_after_ns", bo.NextWait())
+			}
+
 			if !bo.Wait() {
 				// Something bad has happened and we log it and we should update our current state.
 				err := errors.New(
-					"execute retry loop was stopped",
+					"checkin retry loop was stopped",
 					errors.TypeNetwork,
 					errors.M(errors.MetaKeyURI, f.client.URI()),
 				)
@@ -209,6 +210,13 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 			}
 			continue
 		}
+
+		if f.checkinFailCounter > 0 {
+			// Log at same level as error logs above so subsequent successes are visible when log level is set to 'error'.
+			f.log.Errorf("Checkin request to fleet-server succeeded after %d failures", f.checkinFailCounter)
+		}
+
+		f.checkinFailCounter = 0
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}
@@ -293,7 +301,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 	return checkinComponents
 }
 
-func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, error) {
+func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
 	ecsMeta, err := info.Metadata()
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -321,7 +329,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		Components: components,
 	}
 
-	resp, err := cmd.Execute(ctx, req)
+	resp, took, err := cmd.Execute(ctx, req)
 	if isUnauth(err) {
 		f.unauthCounter++
 
@@ -329,15 +337,15 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 			f.log.Warnf("retrieved an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
 			return &fleetapi.CheckinResponse{
 				Actions: []fleetapi.Action{&fleetapi.ActionUnenroll{ActionID: "", ActionType: "UNENROLL", IsDetected: true}},
-			}, nil
+			}, took, nil
 		}
 
-		return nil, err
+		return nil, took, err
 	}
 
 	f.unauthCounter = 0
 	if err != nil {
-		return nil, err
+		return nil, took, err
 	}
 
 	// Save the latest ackToken
@@ -349,7 +357,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		}
 	}
 
-	return resp, nil
+	return resp, took, nil
 }
 
 // shouldUnenroll checks if the max number of trying an invalid key is reached

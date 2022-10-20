@@ -33,7 +33,7 @@ type contextProvider struct {
 }
 
 // ContextProviderBuilder builds the provider.
-func ContextProviderBuilder(logger *logger.Logger, c *config.Config) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (corecomp.ContextProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()

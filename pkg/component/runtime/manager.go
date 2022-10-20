@@ -73,6 +73,7 @@ type Manager struct {
 	listenAddr string
 	agentInfo  *info.AgentInfo
 	tracer     *apm.Tracer
+	monitor    MonitoringManager
 
 	netMx    sync.RWMutex
 	listener net.Listener
@@ -96,7 +97,7 @@ type Manager struct {
 }
 
 // NewManager creates a new manager.
-func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentInfo, tracer *apm.Tracer) (*Manager, error) {
+func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentInfo, tracer *apm.Tracer, monitor MonitoringManager) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
 		return nil, err
@@ -112,6 +113,7 @@ func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentI
 		shipperConns:  make(map[string]*shipperConn),
 		subscriptions: make(map[string][]*Subscription),
 		errCh:         make(chan error),
+		monitor:       monitor,
 	}
 	return m, nil
 }
@@ -628,7 +630,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		} else {
 			// new component; create its runtime
 			logger := m.logger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-			state, err := newComponentRuntimeState(m, logger, comp)
+			state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
 			if err != nil {
 				return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 			}
