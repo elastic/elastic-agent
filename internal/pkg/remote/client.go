@@ -19,6 +19,7 @@ import (
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/id"
@@ -56,7 +57,7 @@ type Client struct {
 func NewConfigFromURL(URL string) (Config, error) {
 	u, err := url.Parse(URL)
 	if err != nil {
-		return Config{}, errors.Wrap(err, "could not parse url")
+		return Config{}, fmt.Errorf("could not parse url: %w", err)
 	}
 
 	c := DefaultClientConfig()
@@ -80,7 +81,7 @@ func NewWithRawConfig(log *logger.Logger, config *config.Config, wrapper wrapper
 
 	cfg := Config{}
 	if err := config.Unpack(&cfg); err != nil {
-		return nil, errors.Wrap(err, "invalidate configuration")
+		return nil, fmt.Errorf("invalidate configuration: %w", err)
 	}
 
 	return NewWithConfig(l, cfg, wrapper)
@@ -108,7 +109,7 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 	for i, host := range hosts {
 		baseURL, err := urlutil.MakeURL(string(cfg.Protocol), p, host, 0)
 		if err != nil {
-			return nil, errors.Wrap(err, "invalid fleet-server endpoint")
+			return nil, fmt.Errorf("invalid fleet-server endpoint: %w", err)
 		}
 
 		transport, err := cfg.Transport.RoundTripper(
@@ -122,7 +123,7 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 		if wrapper != nil {
 			transport, err = wrapper(transport)
 			if err != nil {
-				return nil, errors.Wrap(err, "fail to create transport client")
+				return nil, fmt.Errorf("fail to create transport client: %w", err)
 			}
 		}
 
@@ -166,13 +167,15 @@ func (c *Client) Send(
 	defer c.clientLock.Unlock()
 
 	var resp *http.Response
-	multiErr := errRequestFailed
+	var multiErr error
 
 	c.sortClients()
 	for i, requester := range c.clients {
 		req, err := requester.newRequest(method, path, params, body)
 		if err != nil {
-			return nil, errors.Wrapf(err, "fail to create HTTP request using method %s to %s", method, path)
+			return nil, fmt.Errorf(
+				"fail to create HTTP request using method %s to %s: %w",
+				method, path, err)
 		}
 
 		// Add generals headers to the request, we are dealing exclusively with JSON.
@@ -201,6 +204,7 @@ func (c *Client) Send(
 			requester.lastErr = err
 			requester.lastErrOcc = time.Now().UTC()
 
+			multiErr = multierror.Append(multiErr, err)
 			msg := fmt.Sprintf("requester %d/%d to host %s errored",
 				i, len(c.clients), requester.host)
 			multiErr = fmt.Errorf("%s: %s: %w", msg, err, multiErr)
