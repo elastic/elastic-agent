@@ -6,7 +6,6 @@ package remote
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -29,8 +28,6 @@ import (
 const (
 	retryOnBadConnTimeout = 5 * time.Minute
 )
-
-var errRequestFailed = errors.New("request failed")
 
 type wrapperFunc func(rt http.RoundTripper) (http.RoundTripper, error)
 
