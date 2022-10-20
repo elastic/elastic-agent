@@ -31,23 +31,23 @@ import (
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
 
-	logger    *logger.Logger
-	agentInfo *info.AgentInfo
-	coord     *coordinator.Coordinator
-	listener  net.Listener
-	server    *grpc.Server
-	tracer    *apm.Tracer
-	diagHooks diagnostics.Hooks
+	logger      *logger.Logger
+	agentInfo   *info.AgentInfo
+	coord       *coordinator.Coordinator
+	listener    net.Listener
+	server      *grpc.Server
+	tracer      *apm.Tracer
+	diagHooksFn []func() diagnostics.Hooks
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks) *Server {
+func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooksFn ...func() diagnostics.Hooks) *Server {
 	return &Server{
-		logger:    log,
-		agentInfo: agentInfo,
-		coord:     coord,
-		tracer:    tracer,
-		diagHooks: diagHooks,
+		logger:      log,
+		agentInfo:   agentInfo,
+		coord:       coord,
+		tracer:      tracer,
+		diagHooksFn: diagHooksFn,
 	}
 }
 
@@ -179,8 +179,13 @@ func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*
 
 // DiagnosticAgent returns diagnostic information for this running Elastic Agent.
 func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentRequest) (*cproto.DiagnosticAgentResponse, error) {
-	res := make([]*cproto.DiagnosticFileResult, 0, len(s.diagHooks))
-	for _, h := range s.diagHooks {
+	diagHooks := make([]diagnostics.Hook, 0)
+	for _, fn := range s.diagHooksFn {
+		hooks := fn()
+		diagHooks = append(diagHooks, hooks...)
+	}
+	res := make([]*cproto.DiagnosticFileResult, 0, len(diagHooks))
+	for _, h := range diagHooks {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}

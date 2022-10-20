@@ -33,6 +33,8 @@ const (
 	ActionTypeInputAction = "INPUT_ACTION"
 	// ActionTypeCancel specifies a cancel action.
 	ActionTypeCancel = "CANCEL"
+	// ActioNTypeDiagnostics specifies a diagnostics action.
+	ActionTypeDiagnostics = "DIAGNOSTICS"
 )
 
 // Error values that the Action interface can return
@@ -348,6 +350,36 @@ func (a *ActionCancel) String() string {
 	return s.String()
 }
 
+type ActionDiagnostics struct {
+	ActionID   string `json:"action_id"`
+	ActionType string `json:"type"`
+	Units      []struct {
+		ID       string `json:"id"`
+		UnitType string `json:"type"`
+	} `json:"units"`
+}
+
+func (a *ActionDiagnostics) ID() string {
+	return a.ActionID
+}
+
+func (a *ActionDiagnostics) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionDiagnostics) String() string {
+	var s strings.Builder
+	s.WriteString("action_id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	s.WriteString(", units: ")
+	s.WriteString(a.Units)
+	return s.String()
+	s.WriteString()
+	return s.String()
+}
+
 // ActionApp is the application action request.
 type ActionApp struct {
 	ActionID    string                 `json:"id" mapstructure:"id"`
@@ -465,6 +497,16 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 			if err := json.Unmarshal(response.Data, action); err != nil {
 				return errors.New(err,
 					"fail to decode CANCEL_ACTION action",
+					errors.TypeConfig)
+			}
+		case ActionTypeDiagnostics:
+			action = &ActionDiagnostics{
+				ActionID:   response.ActionID,
+				ActionType: response.ActionType,
+			}
+			if err := json.Unmarshal(response.Data, action); err != nil {
+				return errors.New(err,
+					"fail to decode DIAGNOSTICS_ACTION action",
 					errors.TypeConfig)
 			}
 		default:

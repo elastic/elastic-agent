@@ -5,15 +5,22 @@
 package diagnostics
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"runtime/pprof"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
+
+// ContentTypeDirectory should be used to indicate that a directory should be made in the resulting bundle
+const ContentTypeDirectory = "directory"
 
 // Hook is a hook that gets used when diagnostic information is requested from the Elastic Agent.
 type Hook struct {
@@ -99,4 +106,83 @@ func pprofDiag(name string) func(context.Context) []byte {
 		}
 		return w.Bytes()
 	}
+}
+
+// ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics.
+// If any error is encounted when writing the contents of the archive it is returned.
+func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+	// Create directories in the zip archive before writing any files
+	for _, ad := range agentDiag {
+		if ad.ContentType == ContentTypeDirectory {
+			_, err := zw.Create(ad.Filename)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Write agent diagnostics content
+	// TODO timestamps for log files
+	for _, ad := range agentDiag {
+		if ad.ContentType != ContentTypeDirectory {
+			zf, err := zw.Create(ad.Filename)
+			if err != nil {
+				return err
+			}
+			_, err = zf.Write(ad.Content)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Handle unit diagnostics
+	// structure each unit into its own component directory
+	compDirs := make(map[string][]client.DiagnosticUnitResult)
+	for _, ud := range unitDiags {
+		compDir := strings.ReplaceAll(ud.ComponentID, "/", "-")
+		compDirs[compDir] = append(compDirs[compDir], ud)
+	}
+	// write each units diagnostics into its own directory
+	// layout becomes components/<component-id>/<unit-id>/<filename>
+	_, err := zw.Create("components/")
+	if err != nil {
+		return err
+	}
+	for dirName, units := range compDirs {
+		_, err = zw.Create(fmt.Sprintf("components/%s/", dirName))
+		if err != nil {
+			return err
+		}
+		for _, ud := range units {
+			unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
+			_, err = zw.Create(fmt.Sprintf("components/%s/%s/", dirName, unitDir))
+			if err != nil {
+				return err
+			}
+			if ud.Err != nil {
+				w, err := zw.Create(fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir))
+				if err != nil {
+					return err
+				}
+				_, err = w.Write([]byte(fmt.Sprintf("%s\n", ud.Err)))
+				if err != nil {
+					return err
+				}
+				continue
+			}
+			for _, fr := range ud.Results {
+				w, err := zw.Create(fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name))
+				if err != nil {
+					return err
+				}
+				_, err = w.Write(fr.Content)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }

@@ -177,10 +177,8 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	defer func() {
 		_ = serverStopFn()
 	}()
+	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagnostics.GlobalHooks, coord.DiagnosticHooks())
 
-	diagHooks := diagnostics.GlobalHooks()
-	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
-	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagHooks)
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err
