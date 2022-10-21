@@ -177,21 +177,14 @@ func SetInstall(path string) {
 // initialTop returns the initial top-level path for the binary
 //
 // When nested in top-level/data/elastic-agent-${hash}/ the result is top-level/.
-// The agent fexecutable for MacOS is wrappend in the bundle, so the path to the binary is
+// The agent executable for MacOS is wrapped in the app bundle, so the path to the binary is
 // top-level/data/elastic-agent-${hash}/elastic-agent.app/Contents/MacOS
 func initialTop() string {
-	exePath := retrieveExecutablePath()
-	if insideData(exePath) {
-		exePath = filepath.Dir(filepath.Dir(exePath))
-		if runtime.GOOS == darwin {
-			exePath = filepath.Dir(filepath.Dir(filepath.Dir(exePath)))
-		}
-	}
-	return exePath
+	return ExecDir(retrieveExecutableDir())
 }
 
 // retrieveExecutablePath returns the executing binary, even if the started binary was a symlink
-func retrieveExecutablePath() string {
+func retrieveExecutableDir() string {
 	execPath, err := os.Executable()
 	if err != nil {
 		panic(err)
@@ -203,11 +196,37 @@ func retrieveExecutablePath() string {
 	return filepath.Dir(evalPath)
 }
 
-// insideData returns true when the exePath is inside of the current Agents data path.
-func insideData(exePath string) bool {
-	expectedPath := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-	if runtime.GOOS == darwin {
-		expectedPath = filepath.Join(expectedPath, "elastic-agent.app", "Contents", "MacOS")
+// isInsideData returns true when the exePath is inside of the current Agents data path.
+func isInsideData(exeDir string) bool {
+	expectedDir := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
+	return strings.HasSuffix(exeDir, expectedDir)
+}
+
+// ExecDir returns the "executable" directory which is:
+// 1. The same if the execDir is not inside of the data path
+// 2. Two levels up if the execDir inside of the data path on non-macOS platforms
+// 3. Five levels up if the execDir inside of the dataPath on macOS platform
+func ExecDir(execDir string) string {
+	if isInsideData(execDir) {
+		execDir = filepath.Dir(filepath.Dir(execDir))
+		if runtime.GOOS == darwin {
+			execDir = filepath.Dir(filepath.Dir(filepath.Dir(execDir)))
+		}
 	}
-	return strings.HasSuffix(exePath, expectedPath)
+	return execDir
+}
+
+// binaryDir returns the application binary directory
+// For macOS it appends the path inside of the app bundle
+// For other platforms it returns the same dir
+func binaryDir(baseDir string) string {
+	if runtime.GOOS == darwin {
+		baseDir = filepath.Join(baseDir, "elastic-agent.app", "Contents", "MacOS")
+	}
+	return baseDir
+}
+
+// BinaryPath returns the application binary path that is concatenation of the directory and the agentName
+func BinaryPath(baseDir, agentName string) string {
+	return filepath.Join(binaryDir(baseDir), agentName)
 }

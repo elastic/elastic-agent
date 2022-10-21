@@ -20,7 +20,7 @@ pipeline {
   stages {
     stage('Nighly beats builds') {
       steps {
-        runBuilds(quietPeriodFactor: 2000, branches: ['main', '8.<minor>', '8.<next-patch>', '7.<minor>'])
+        runBuilds(quietPeriodFactor: 2000, branches: ['main', '8.<minor>', '8.<next-patch>'])
       }
     }
   }

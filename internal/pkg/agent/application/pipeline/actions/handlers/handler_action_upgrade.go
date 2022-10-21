@@ -39,6 +39,14 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, acker store.Fle
 	}
 
 	_, err := h.upgrader.Upgrade(ctx, &upgradeAction{action}, true)
+	if err != nil {
+		// Always log upgrade failures at the error level. Action errors are logged at debug level
+		// by default higher up the stack in ActionDispatcher.Dispatch()
+		h.log.Errorw("Upgrade action failed", "error.message", err,
+			"action.version", action.Version, "action.source_uri", action.SourceURI, "action.id", action.ActionID,
+			"action.start_time", action.StartTime, "action.expiration", action.ActionExpiration)
+	}
+
 	return err
 }
 
