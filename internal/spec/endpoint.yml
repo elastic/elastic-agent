@@ -3,7 +3,10 @@ cmd: endpoint-security
 artifact: endpoint-dev
 service: 6788
 process:
-    stop_timeout: 180
+    # After discussion with Endpoint team the stop timeout is set to 3m,
+    # in order to give enough time for the Endpoint to stop gracefully.
+    # https://github.com/elastic/elastic-agent/issues/1262
+    stop_timeout: 3m
 action_input_types:
 - endpoint
 log_paths:

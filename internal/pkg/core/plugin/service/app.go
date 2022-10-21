@@ -255,9 +255,8 @@ func (a *Application) Configure(ctx context.Context, config map[string]interface
 }
 
 func (a *Application) getStopTimeout() time.Duration {
-	if a.desc.Spec().Process != nil && a.desc.Spec().Process.StopTimeoutSecs > 0 {
-		to := time.Duration(a.desc.Spec().Process.StopTimeoutSecs) * time.Second
-		return to
+	if a.desc.Spec().Process != nil && a.desc.Spec().Process.StopTimeout > 0 {
+		return a.desc.Spec().Process.StopTimeout
 	}
 	return a.processConfig.StopTimeout
 }
@@ -276,8 +275,16 @@ func (a *Application) Stop() {
 	to := a.getStopTimeout()
 
 	a.logger.Infof("Stop %v service, with %v timeout", name, to)
+	start := time.Now()
 
-	// Try to stop the service with 3 minutes (default) timeout
+	// Try to stop the service with timeout
+	// If timed out and the service is still not stopped the runtime is set to STOPPED state anyways.
+	// This avoids leaving the runtime indefinitely in the failed state.
+	//
+	// The Agent is not managing the Endpoint service state by design.
+	// The service runtime should send STOPPING state to the Endpoint service only before the Endpoint is expected to be uninstalled.
+	// So if the Agent never receives the STOPPING check-in from the Endpoint after this, it's ok to set the state
+	// to STOPPED following with the Endpoint service uninstall.
 	if err := srvState.Stop(to); err != nil {
 		// Log the error
 		a.logger.Errorf("Failed to stop %v service after %v timeout", name, to)
@@ -292,7 +299,7 @@ func (a *Application) Stop() {
 	a.stopCredsListener()
 
 	// Set the service state to "stopped", otherwise the agent is stuck in the failed stop state until restarted
-	a.logger.Infof("setting %s service status to Stopped", name)
+	a.logger.Infof("setting %s service status to Stopped, took: %v", name, time.Since(start))
 	a.setState(state.Stopped, "Stopped", nil)
 }
 
