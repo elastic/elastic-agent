@@ -31,3 +31,9 @@ inputs:
     outputs: *outputs
     command:
       args: *args
+  - name: cloudbeat/cis_eks
+    description: "CIS elastic Kubernetes monitoring"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
