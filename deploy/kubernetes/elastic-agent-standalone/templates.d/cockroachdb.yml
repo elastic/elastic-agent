@@ -9,14 +9,14 @@ inputs:
             dataset: cockroachdb.status
             type: metrics
           hosts:
-            - ${kubernetes.hints.cockroachdb.status.host|'localhost:8080'}
+            - ${kubernetes.hints.cockroachdb.status.host|kubernetes.hints.cockroachdb.host|'localhost:8080'}
           metrics_filters.exclude: null
           metrics_filters.include: null
           metrics_path: /_status/vars
           metricsets:
             - collector
           password: null
-          period: ${kubernetes.hints.cockroachdb.status.period|'10s'}
+          period: ${kubernetes.hints.cockroachdb.status.period|kubernetes.hints.cockroachdb.period|'10s'}
           ssl.certificate_authorities: null
           use_types: true
           username: null
@@ -27,7 +27,7 @@ inputs:
       streams:
         - condition: ${kubernetes.hints.cockroachdb.container_logs.enabled} == true
           data_stream:
-            dataset: kubernetes.container_logs
+            dataset: cockroachdb.container_logs
             type: logs
           exclude_files: []
           exclude_lines: []

@@ -1,4 +1,25 @@
 inputs:
+    - name: filestream-synthetics
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.synthetics.container_logs.enabled} == true
+          data_stream:
+            dataset: synthetics.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
     - name: synthetics/http-synthetics
       type: synthetics/http
       use_output: default
@@ -37,7 +58,7 @@ inputs:
             dataset: tcp
             type: synthetics
           enabled: true
-          hosts: ${kubernetes.hints.synthetics.tcp.host|''}
+          hosts: ${kubernetes.hints.synthetics.tcp.host|kubernetes.hints.synthetics.host|''}
           name: null
           processors:
             - add_observer_metadata:
@@ -62,7 +83,7 @@ inputs:
             dataset: icmp
             type: synthetics
           enabled: true
-          hosts: ${kubernetes.hints.synthetics.icmp.host|''}
+          hosts: ${kubernetes.hints.synthetics.icmp.host|kubernetes.hints.synthetics.host|''}
           name: null
           processors:
             - add_observer_metadata:
@@ -124,25 +145,4 @@ inputs:
                 fields:
                     monitor.fleet_managed: true
                 target: ""
-      data_stream.namespace: default
-    - name: filestream-synthetics
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.synthetics.container_logs.enabled} == true
-          data_stream:
-            dataset: kubernetes.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
       data_stream.namespace: default

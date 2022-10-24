@@ -11,6 +11,7 @@ inputs:
             - .gz$
           exclude_lines:
             - ^#
+          ignore_older: 72h
           parsers:
             - container:
                 format: auto
@@ -30,6 +31,7 @@ inputs:
             - .gz$
           exclude_lines:
             - ^#
+          ignore_older: 72h
           parsers:
             - container:
                 format: auto
@@ -53,19 +55,19 @@ inputs:
             type: metrics
           metricsets:
             - application_pool
-          period: ${kubernetes.hints.iis.application_pool.period|'10s'}
+          period: ${kubernetes.hints.iis.application_pool.period|kubernetes.hints.iis.period|'10s'}
         - condition: ${kubernetes.hints.iis.webserver.enabled} == true or ${kubernetes.hints.iis.enabled} == true
           data_stream:
             dataset: iis.webserver
             type: metrics
           metricsets:
             - webserver
-          period: ${kubernetes.hints.iis.webserver.period|'10s'}
+          period: ${kubernetes.hints.iis.webserver.period|kubernetes.hints.iis.period|'10s'}
         - condition: ${kubernetes.hints.iis.website.enabled} == true or ${kubernetes.hints.iis.enabled} == true
           data_stream:
             dataset: iis.website
             type: metrics
           metricsets:
             - website
-          period: ${kubernetes.hints.iis.website.period|'10s'}
+          period: ${kubernetes.hints.iis.website.period|kubernetes.hints.iis.period|'10s'}
       data_stream.namespace: default

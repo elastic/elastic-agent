@@ -30,7 +30,7 @@ inputs:
       streams:
         - condition: ${kubernetes.hints.netflow.container_logs.enabled} == true
           data_stream:
-            dataset: kubernetes.container_logs
+            dataset: netflow.container_logs
             type: logs
           exclude_files: []
           exclude_lines: []
