@@ -59,17 +59,17 @@ inputs:
             dataset: logstash.stack_monitoring.node
             type: metrics
           hosts:
-            - ${kubernetes.hints.logstash.node.host|'http://localhost:9600'}
+            - ${kubernetes.hints.logstash.node.host|kubernetes.hints.logstash.host|'http://localhost:9600'}
           metricsets:
             - node
-          period: ${kubernetes.hints.logstash.node.period|'10s'}
+          period: ${kubernetes.hints.logstash.node.period|kubernetes.hints.logstash.period|'10s'}
         - condition: ${kubernetes.hints.logstash.node_stats.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
           data_stream:
             dataset: logstash.stack_monitoring.node_stats
             type: metrics
           hosts:
-            - ${kubernetes.hints.logstash.node_stats.host|'http://localhost:9600'}
+            - ${kubernetes.hints.logstash.node_stats.host|kubernetes.hints.logstash.host|'http://localhost:9600'}
           metricsets:
             - node_stats
-          period: ${kubernetes.hints.logstash.node_stats.period|'10s'}
+          period: ${kubernetes.hints.logstash.node_stats.period|kubernetes.hints.logstash.period|'10s'}
       data_stream.namespace: default

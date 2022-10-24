@@ -36,44 +36,44 @@ inputs:
             dataset: rabbitmq.connection
             type: metrics
           hosts:
-            - ${kubernetes.hints.rabbitmq.connection.host|'localhost:15672'}
+            - ${kubernetes.hints.rabbitmq.connection.host|kubernetes.hints.rabbitmq.host|'localhost:15672'}
           metricsets:
             - connection
-          password: ${kubernetes.hints.rabbitmq.connection.password|''}
-          period: ${kubernetes.hints.rabbitmq.connection.period|'10s'}
-          username: ${kubernetes.hints.rabbitmq.connection.username|''}
+          password: ${kubernetes.hints.rabbitmq.connection.password|kubernetes.hints.rabbitmq.password|''}
+          period: ${kubernetes.hints.rabbitmq.connection.period|kubernetes.hints.rabbitmq.period|'10s'}
+          username: ${kubernetes.hints.rabbitmq.connection.username|kubernetes.hints.rabbitmq.username|''}
         - condition: ${kubernetes.hints.rabbitmq.exchange.enabled} == true or ${kubernetes.hints.rabbitmq.enabled} == true
           data_stream:
             dataset: rabbitmq.exchange
             type: metrics
           hosts:
-            - ${kubernetes.hints.rabbitmq.exchange.host|'localhost:15672'}
+            - ${kubernetes.hints.rabbitmq.exchange.host|kubernetes.hints.rabbitmq.host|'localhost:15672'}
           metricsets:
             - exchange
-          password: ${kubernetes.hints.rabbitmq.exchange.password|''}
-          period: ${kubernetes.hints.rabbitmq.exchange.period|'10s'}
-          username: ${kubernetes.hints.rabbitmq.exchange.username|''}
+          password: ${kubernetes.hints.rabbitmq.exchange.password|kubernetes.hints.rabbitmq.password|''}
+          period: ${kubernetes.hints.rabbitmq.exchange.period|kubernetes.hints.rabbitmq.period|'10s'}
+          username: ${kubernetes.hints.rabbitmq.exchange.username|kubernetes.hints.rabbitmq.username|''}
         - condition: ${kubernetes.hints.rabbitmq.node.enabled} == true or ${kubernetes.hints.rabbitmq.enabled} == true
           data_stream:
             dataset: rabbitmq.node
             type: metrics
           hosts:
-            - ${kubernetes.hints.rabbitmq.node.host|'localhost:15672'}
+            - ${kubernetes.hints.rabbitmq.node.host|kubernetes.hints.rabbitmq.host|'localhost:15672'}
           metricsets:
             - node
           node.collect: node
-          password: ${kubernetes.hints.rabbitmq.node.password|''}
-          period: ${kubernetes.hints.rabbitmq.node.period|'10s'}
-          username: ${kubernetes.hints.rabbitmq.node.username|''}
+          password: ${kubernetes.hints.rabbitmq.node.password|kubernetes.hints.rabbitmq.password|''}
+          period: ${kubernetes.hints.rabbitmq.node.period|kubernetes.hints.rabbitmq.period|'10s'}
+          username: ${kubernetes.hints.rabbitmq.node.username|kubernetes.hints.rabbitmq.username|''}
         - condition: ${kubernetes.hints.rabbitmq.queue.enabled} == true or ${kubernetes.hints.rabbitmq.enabled} == true
           data_stream:
             dataset: rabbitmq.queue
             type: metrics
           hosts:
-            - ${kubernetes.hints.rabbitmq.queue.host|'localhost:15672'}
+            - ${kubernetes.hints.rabbitmq.queue.host|kubernetes.hints.rabbitmq.host|'localhost:15672'}
           metricsets:
             - queue
-          password: ${kubernetes.hints.rabbitmq.queue.password|''}
-          period: ${kubernetes.hints.rabbitmq.queue.period|'10s'}
-          username: ${kubernetes.hints.rabbitmq.queue.username|''}
+          password: ${kubernetes.hints.rabbitmq.queue.password|kubernetes.hints.rabbitmq.password|''}
+          period: ${kubernetes.hints.rabbitmq.queue.period|kubernetes.hints.rabbitmq.period|'10s'}
+          username: ${kubernetes.hints.rabbitmq.queue.username|kubernetes.hints.rabbitmq.username|''}
       data_stream.namespace: default

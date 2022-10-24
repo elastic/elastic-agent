@@ -30,44 +30,44 @@ inputs:
             dataset: mongodb.collstats
             type: metrics
           hosts:
-            - ${kubernetes.hints.mongodb.collstats.host|'localhost:27017'}
+            - ${kubernetes.hints.mongodb.collstats.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - collstats
-          period: ${kubernetes.hints.mongodb.collstats.period|'10s'}
+          period: ${kubernetes.hints.mongodb.collstats.period|kubernetes.hints.mongodb.period|'10s'}
         - condition: ${kubernetes.hints.mongodb.dbstats.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.dbstats
             type: metrics
           hosts:
-            - ${kubernetes.hints.mongodb.dbstats.host|'localhost:27017'}
+            - ${kubernetes.hints.mongodb.dbstats.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - dbstats
-          period: ${kubernetes.hints.mongodb.dbstats.period|'10s'}
+          period: ${kubernetes.hints.mongodb.dbstats.period|kubernetes.hints.mongodb.period|'10s'}
         - condition: ${kubernetes.hints.mongodb.metrics.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.metrics
             type: metrics
           hosts:
-            - ${kubernetes.hints.mongodb.metrics.host|'localhost:27017'}
+            - ${kubernetes.hints.mongodb.metrics.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - metrics
-          period: ${kubernetes.hints.mongodb.metrics.period|'10s'}
+          period: ${kubernetes.hints.mongodb.metrics.period|kubernetes.hints.mongodb.period|'10s'}
         - condition: ${kubernetes.hints.mongodb.replstatus.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.replstatus
             type: metrics
           hosts:
-            - ${kubernetes.hints.mongodb.replstatus.host|'localhost:27017'}
+            - ${kubernetes.hints.mongodb.replstatus.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - replstatus
-          period: ${kubernetes.hints.mongodb.replstatus.period|'10s'}
+          period: ${kubernetes.hints.mongodb.replstatus.period|kubernetes.hints.mongodb.period|'10s'}
         - condition: ${kubernetes.hints.mongodb.status.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.status
             type: metrics
           hosts:
-            - ${kubernetes.hints.mongodb.status.host|'localhost:27017'}
+            - ${kubernetes.hints.mongodb.status.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - status
-          period: ${kubernetes.hints.mongodb.status.period|'10s'}
+          period: ${kubernetes.hints.mongodb.status.period|kubernetes.hints.mongodb.period|'10s'}
       data_stream.namespace: default
