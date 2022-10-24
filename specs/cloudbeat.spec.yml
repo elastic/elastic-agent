@@ -25,3 +25,9 @@ inputs:
         - "setup.template.enabled=false"
         - "-E"
         - "gc_percent=${CLOUDBEAT_GOGC:100}"
+  - name: cloudbeat/cis_k8s
+    description: "CIS Kubernetes monitoring"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
