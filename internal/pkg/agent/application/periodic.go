@@ -51,6 +51,12 @@ func (p *periodic) Errors() <-chan error {
 	return p.errCh
 }
 
+// ActionErrors returns the error channel for actions.
+// Returns nil channel.
+func (p *periodic) ActionErrors() <-chan error {
+	return nil
+}
+
 func (p *periodic) Watch() <-chan coordinator.ConfigChange {
 	return p.ch
 }
