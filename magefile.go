@@ -10,14 +10,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -53,7 +51,7 @@ const (
 	externalArtifacts = "EXTERNAL"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
-	specSuffix        = ".spec.yml" // TODO: change after beat ignores yml config
+	specSuffix        = ".spec.yml"
 	checksumFilename  = "checksum.yml"
 )
 
@@ -96,48 +94,6 @@ type Demo mg.Namespace
 
 // Dev runs package and build for dev purposes.
 type Dev mg.Namespace
-
-// Notice regenerates the NOTICE.txt file.
-func Notice() error {
-	fmt.Println(">> Generating NOTICE")
-	fmt.Println(">> fmt - go mod tidy")
-	err := sh.RunV("go", "mod", "tidy", "-v")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go mod download")
-	err = sh.RunV("go", "mod", "download")
-	if err != nil {
-		return errors.Wrap(err, "failed running go mod download, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go list")
-	str, err := sh.Output("go", "list", "-m", "-json", "all")
-	if err != nil {
-		return errors.Wrap(err, "failed running go list, please fix the issues reported")
-	}
-	fmt.Println(">> fmt - go run")
-	cmd := exec.Command("go", "run", "go.elastic.co/go-licence-detector", "-includeIndirect", "-rules", "dev-tools/notice/rules.json", "-overrides", "dev-tools/notice/overrides.json", "-noticeTemplate", "dev-tools/notice/NOTICE.txt.tmpl",
-		"-noticeOut", "NOTICE.txt", "-depsOut", "\"\"")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return errors.Wrap(err, "failed running go run, please fix the issues reported")
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer stdin.Close()
-		defer wg.Done()
-		if _, err := io.WriteString(stdin, str); err != nil {
-			fmt.Println(err)
-		}
-	}()
-	wg.Wait()
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		return errors.Wrap(err, "failed combined output, please fix the issues reported")
-	}
-	return nil
-}
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")

@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 // Downloader is a downloader with a predefined set of downloaders.
@@ -49,4 +50,18 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	}
 
 	return "", err
+}
+
+func (e *Downloader) Reload(c *artifact.Config) error {
+	for _, d := range e.dd {
+		reloadable, ok := d.(download.Reloader)
+		if !ok {
+			continue
+		}
+
+		if err := reloadable.Reload(c); err != nil {
+			return errors.New(err, "failed reloading artifact config for composed downloader")
+		}
+	}
+	return nil
 }

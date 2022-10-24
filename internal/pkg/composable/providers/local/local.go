@@ -32,7 +32,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(_ *logger.Logger, c *config.Config) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(_ *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{}
 	if c != nil {
 		err := c.Unpack(p)

@@ -102,7 +102,7 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 }
 
 // DynamicProviderBuilder builds the dynamic provider.
-func DynamicProviderBuilder(logger *logger.Logger, c *config.Config) (composable.DynamicProvider, error) {
+func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (composable.DynamicProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()
@@ -146,7 +146,7 @@ func generateData(event bus.Event) (*dockerContainerData, error) {
 						"image":  container.Image,
 						"labels": processorLabelMap,
 					},
-					"to": "container",
+					"target": "container",
 				},
 			},
 		},

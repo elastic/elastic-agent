@@ -5,12 +5,11 @@
 package composed
 
 import (
-	"errors"
-
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 // Verifier is a verifier with a predefined set of verifiers.
@@ -53,4 +52,18 @@ func (e *Verifier) Verify(a artifact.Artifact, version string) error {
 	}
 
 	return err
+}
+
+func (e *Verifier) Reload(c *artifact.Config) error {
+	for _, v := range e.vv {
+		reloadable, ok := v.(download.Reloader)
+		if !ok {
+			continue
+		}
+
+		if err := reloadable.Reload(c); err != nil {
+			return errors.New(err, "failed reloading artifact config for composed verifier")
+		}
+	}
+	return nil
 }
