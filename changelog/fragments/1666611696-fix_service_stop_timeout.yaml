@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: "Fix: Windows Agent Left Unhealthy After Removing Endpoint Integration"
+pr: 1286
+issue: 1262
