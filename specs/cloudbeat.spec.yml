@@ -2,7 +2,7 @@ version: 2
 inputs:
   - name: cloudbeat
     description: "Cloudbeat"
-    platforms:
+    platforms: &platforms
       - linux/amd64
       - linux/arm64
       - darwin/amd64
@@ -10,13 +10,13 @@ inputs:
       - windows/amd64
       - container/amd64
       - container/arm64
-    outputs:
+    outputs: &outputs
       - elasticsearch
       - kafka
       - logstash
       - redis
     command:
-      args:
+      args: &args
         - "-E"
         - "management.enabled=true"
         - "-E"
@@ -25,3 +25,15 @@ inputs:
         - "setup.template.enabled=false"
         - "-E"
         - "gc_percent=${CLOUDBEAT_GOGC:100}"
+  - name: cloudbeat/cis_k8s
+    description: "CIS Kubernetes monitoring"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: cloudbeat/cis_eks
+    description: "CIS elastic Kubernetes monitoring"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
