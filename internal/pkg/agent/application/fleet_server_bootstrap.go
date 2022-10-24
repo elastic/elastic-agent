@@ -83,6 +83,9 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 	}
 }
 
+// EndpointComponentModifier the modifier for the Endpoint configuration.
+// The Endpoint expects the fleet configuration passed to it by the Agent
+// because it needs to be able to connect to the fleet server directly.
 func EndpointComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordinator.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
