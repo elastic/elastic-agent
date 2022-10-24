@@ -2,7 +2,7 @@ version: 2
 inputs:
   - name: cloudbeat
     description: "Cloudbeat"
-    platforms:
+    platforms: &platforms
       - linux/amd64
       - linux/arm64
       - darwin/amd64
@@ -10,13 +10,13 @@ inputs:
       - windows/amd64
       - container/amd64
       - container/arm64
-    outputs:
+    outputs: &outputs
       - elasticsearch
       - kafka
       - logstash
       - redis
     command:
-      args:
+      args: &args
         - "-E"
         - "management.enabled=true"
         - "-E"
