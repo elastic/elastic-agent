@@ -32,13 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
-const (
-	darwin  = "darwin"
-	windows = "windows"
-	unknown = "Unknown"
-	running = "Running"
-)
-
 var (
 	// ErrAppNotInstalled is returned when configuration is performed on not installed application.
 	ErrAppNotInstalled = errors.New("application is not installed", errors.TypeApplication)
