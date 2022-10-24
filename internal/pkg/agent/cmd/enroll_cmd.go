@@ -634,7 +634,7 @@ func yamlToReader(in interface{}) (io.Reader, error) {
 }
 
 func delay(ctx context.Context, d time.Duration) {
-	t := time.NewTimer(time.Duration(rand.Int63n(int64(d)))) //nolint:gosec // the RNG is allowed to be weak
+	t := time.NewTimer(time.Duration(rand.Int63n(int64(d))))
 	defer t.Stop()
 	select {
 	case <-ctx.Done():

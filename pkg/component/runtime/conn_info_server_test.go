@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
-	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 type mockCommunicator struct {
@@ -63,23 +62,6 @@ func (c *mockCommunicator) CheckinExpected(expected *proto.CheckinExpected) {
 
 func (c *mockCommunicator) CheckinObserved() <-chan *proto.CheckinObserved {
 	return c.ch
-}
-
-func (c *mockCommunicator) sendCheckingObserved(state client.UnitState, units []component.Unit) {
-	unitsObserved := make([]*proto.UnitObserved, 0, len(units))
-	for _, unit := range units {
-		unitsObserved = append(unitsObserved, &proto.UnitObserved{
-			Id:    unit.ID,
-			Type:  proto.UnitType(unit.Type),
-			State: proto.State(state),
-		})
-	}
-
-	go func() {
-		c.ch <- &proto.CheckinObserved{
-			Units: unitsObserved,
-		}
-	}()
 }
 
 const testPort = 6788
