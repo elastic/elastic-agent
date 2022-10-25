@@ -84,13 +84,11 @@ func (t *CommandTimeoutSpec) InitDefaults() {
 // ServiceTimeoutSpec is the timeout specification for subprocess.
 type ServiceTimeoutSpec struct {
 	Checkin time.Duration `config:"checkin" yaml:"checkin"`
-	Stop    time.Duration `config:"stop" yaml:"stop"`
 }
 
 // InitDefaults initialized the defaults for the timeouts.
 func (t *ServiceTimeoutSpec) InitDefaults() {
 	t.Checkin = 30 * time.Second
-	t.Stop = 3 * time.Minute
 }
 
 // ServiceSpec is the specification for an input that executes as a service.
