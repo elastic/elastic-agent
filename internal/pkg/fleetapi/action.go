@@ -33,6 +33,8 @@ const (
 	ActionTypeInputAction = "INPUT_ACTION"
 	// ActionTypeCancel specifies a cancel action.
 	ActionTypeCancel = "CANCEL"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypeDiagnostics = "DIAGNOSTICS"
 )
 
 // Error values that the Action interface can return
@@ -345,6 +347,31 @@ func (a *ActionCancel) String() string {
 	s.WriteString(a.ActionType)
 	s.WriteString(", target_id: ")
 	s.WriteString(a.TargetID)
+	return s.String()
+}
+
+// ActionDiagnostics is a request to gather and upload a diagnostics bundle.
+type ActionDiagnostics struct {
+	ActionID   string `json:"action_id"`
+	ActionType string `json:"type"`
+}
+
+// ID returns the ID of the action.
+func (a *ActionDiagnostics) ID() string {
+	return a.ActionID
+}
+
+// Type returns the type of the action.
+func (a *ActionDiagnostics) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionDiagnostics) String() string {
+	var s strings.Builder
+	s.WriteString("action_id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
 	return s.String()
 }
 

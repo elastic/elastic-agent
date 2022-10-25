@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/uploader"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
@@ -345,6 +346,15 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		handlers.NewCancel(
 			m.log,
 			m.actionQueue,
+		),
+	)
+
+	m.dispatcher.MustRegister(
+		&fleetapi.ActionDiagnostics{},
+		handlers.NewDiagnostics(
+			m.log,
+			m.coord,
+			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Uploader),
 		),
 	)
 

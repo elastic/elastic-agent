@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 
@@ -186,14 +185,14 @@ func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentR
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		r := h.Hook(ctx)
+		r, ts := h.Hook(ctx)
 		res = append(res, &cproto.DiagnosticFileResult{
 			Name:        h.Name,
 			Filename:    h.Filename,
 			Description: h.Description,
 			ContentType: h.ContentType,
 			Content:     r,
-			Generated:   timestamppb.New(time.Now().UTC()),
+			Generated:   timestamppb.New(ts),
 		})
 	}
 	if ctx.Err() != nil {

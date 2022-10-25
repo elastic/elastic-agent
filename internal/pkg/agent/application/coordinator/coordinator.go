@@ -8,23 +8,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"go.elastic.co/apm"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -285,7 +290,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	return nil
 }
 
-// AckUpgrade performs acknowledgement for upgrade.
+// AckUpgrade is the method used on startup to ack a prevously successful upgrade action.
 func (c *Coordinator) AckUpgrade(ctx context.Context, acker acker.Acker) error {
 	return c.upgradeMgr.Ack(ctx, acker)
 }
@@ -350,117 +355,245 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	}
 }
 
-// DiagnosticHooks returns diagnostic hooks that can be connected to the control server to provide diagnostic
-// information about the state of the Elastic Agent.
-func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
-	return diagnostics.Hooks{
-		{
-			Name:        "pre-config",
-			Filename:    "pre-config.yaml",
-			Description: "current pre-configuration of the running Elastic Agent before variable substitution",
-			ContentType: "application/yaml",
-			Hook: func(_ context.Context) []byte {
-				if c.state.ast == nil {
-					return []byte("error: failed no configuration by the coordinator")
-				}
-				cfg, err := c.state.ast.Map()
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
-				o, err := yaml.Marshal(cfg)
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
-				return o
-			},
-		},
-		{
-			Name:        "variables",
-			Filename:    "variables.yaml",
-			Description: "current variable contexts of the running Elastic Agent",
-			ContentType: "application/yaml",
-			Hook: func(_ context.Context) []byte {
-				if c.state.vars == nil {
-					return []byte("error: failed no variables by the coordinator")
-				}
-				vars := make([]map[string]interface{}, 0, len(c.state.vars))
-				for _, v := range c.state.vars {
-					m, err := v.Map()
-					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+// DiagnosticHooks returns diagnostic hooks callback that can be connected to the control server to provide
+// diagnostic information about the state of the Elastic Agent. A callback is used in order to all log files
+// at the time of diagnostics.
+func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
+	return func() diagnostics.Hooks {
+		hooks := diagnostics.Hooks{
+			diagnostics.Hook{
+				Name:        "pre-config",
+				Filename:    "pre-config.yaml",
+				Description: "current pre-configuration of the running Elastic Agent before variable substitution",
+				ContentType: "application/yaml",
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
+					if c.state.ast == nil {
+						return []byte("error: failed no configuration by the coordinator"), ts
 					}
-					vars = append(vars, m)
-				}
-				o, err := yaml.Marshal(struct {
-					Variables []map[string]interface{} `yaml:"variables"`
-				}{
-					Variables: vars,
-				})
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
-				return o
+					cfg, err := c.state.ast.Map()
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err)), ts
+					}
+					o, err := yaml.Marshal(cfg)
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err)), ts
+					}
+					return o, ts
+				},
 			},
-		},
-		{
-			Name:        "computed-config",
-			Filename:    "computed-config.yaml",
-			Description: "current computed configuration of the running Elastic Agent after variable substitution",
-			ContentType: "application/yaml",
-			Hook: func(_ context.Context) []byte {
-				if c.state.ast == nil || c.state.vars == nil {
-					return []byte("error: failed no configuration or variables received by the coordinator")
-				}
-				cfg, _, err := c.compute()
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
-				o, err := yaml.Marshal(cfg)
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
-				return o
+			diagnostics.Hook{
+				Name:        "variables",
+				Filename:    "variables.yaml",
+				Description: "current variable contexts of the running Elastic Agent",
+				ContentType: "application/yaml",
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
+					if c.state.vars == nil {
+						return []byte("error: failed no variables by the coordinator"), ts
+					}
+					vars := make([]map[string]interface{}, 0, len(c.state.vars))
+					for _, v := range c.state.vars {
+						m, err := v.Map()
+						if err != nil {
+							return []byte(fmt.Sprintf("error: %q", err)), ts
+						}
+						vars = append(vars, m)
+					}
+					o, err := yaml.Marshal(struct {
+						Variables []map[string]interface{} `yaml:"variables"`
+					}{
+						Variables: vars,
+					})
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err)), ts
+					}
+					return o, ts
+				},
 			},
-		},
-		{
-			Name:        "components",
-			Filename:    "components.yaml",
-			Description: "current expected components model of the running Elastic Agent",
-			ContentType: "application/yaml",
-			Hook: func(_ context.Context) []byte {
-				if c.state.ast == nil || c.state.vars == nil {
-					return []byte("error: failed no configuration or variables received by the coordinator")
-				}
-				_, comps, err := c.compute()
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
-				o, err := yaml.Marshal(struct {
-					Components []component.Component `yaml:"components"`
-				}{
-					Components: comps,
-				})
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
-				return o
+			diagnostics.Hook{
+				Name:        "computed-config",
+				Filename:    "computed-config.yaml",
+				Description: "current computed configuration of the running Elastic Agent after variable substitution",
+				ContentType: "application/yaml",
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
+					if c.state.ast == nil || c.state.vars == nil {
+						return []byte("error: failed no configuration or variables received by the coordinator"), ts
+					}
+					cfg, _, err := c.compute()
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err)), ts
+					}
+					o, err := yaml.Marshal(cfg)
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err)), ts
+					}
+					return o, ts
+				},
 			},
-		},
-		{
-			Name:        "state",
-			Filename:    "state.yaml",
-			Description: "current state of running components by the Elastic Agent",
-			ContentType: "application/yaml",
-			Hook: func(_ context.Context) []byte {
-				s := c.State(true)
-				o, err := yaml.Marshal(s)
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
-				return o
+			diagnostics.Hook{
+				Name:        "components",
+				Filename:    "components.yaml",
+				Description: "current expected components model of the running Elastic Agent",
+				ContentType: "application/yaml",
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
+					if c.state.ast == nil || c.state.vars == nil {
+						return []byte("error: failed no configuration or variables received by the coordinator"), ts
+					}
+					_, comps, err := c.compute()
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err)), ts
+					}
+					o, err := yaml.Marshal(struct {
+						Components []component.Component `yaml:"components"`
+					}{
+						Components: comps,
+					})
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err)), ts
+					}
+					return o, ts
+				},
 			},
-		},
+			diagnostics.Hook{
+				Name:        "state",
+				Filename:    "state.yaml",
+				Description: "current state of running components by the Elastic Agent",
+				ContentType: "application/yaml",
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
+					s := c.State(true)
+					o, err := yaml.Marshal(s)
+					if err != nil {
+						return []byte(fmt.Sprintf("error: %q", err)), ts
+					}
+					return o, ts
+				},
+			},
+		}
 	}
+}
+
+func (c *Coordinator) addLogHooks() []diagnostics.Hook {
+	hooks := []diagnostics.Hook{{
+		Name:        "logs directory",
+		Filename:    "logs/",
+		Description: "The logs directory for the agent.",
+		ContentType: diagnostics.ContentTypeDirectory,
+		Hook:        func(_ context.Context) ([]byte, time.Time) { return nil, time.Now().UTC() },
+	}}
+
+	logPath := filepath.Join(paths.Home(), "logs") + string(filepath.Separator)
+	err := filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+		if errors.Is(fErr, fs.ErrNotExist) {
+			return nil
+		}
+		if fErr != nil {
+			return fmt.Errorf("unable to walk log dir: %w", fErr)
+		}
+		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
+		if name == "" {
+			return nil
+		}
+		if d.IsDir() {
+			// TODO check if subdirectories in the logs dir can exist.
+			hooks = append(hooks, diagnostics.Hook{
+				Name:        "logs subdirectory",
+				Filename:    "logs/" + name + "/",
+				Description: "A logs subdirectory",
+				ContentType: diagnostics.ContentTypeDirectory,
+				Hook:        func(_ context.Context) ([]byte, time.Time) { return nil, time.Now().UTC() },
+			})
+		} else {
+			hooks = append(hooks, diagnostics.Hook{
+				Name:        "log file",
+				Filename:    "logs/" + name,
+				ContentType: "text/plain",
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
+					lf, err := os.Open(path)
+					if err != nil {
+						return []byte(fmt.Sprintf("unable to open log file: %v", err)), ts
+					}
+					if stat, err := lf.Stat(); err == nil {
+						ts = stat.ModTime().UTC()
+					}
+					defer lf.Close()
+					p, err := io.ReadAll(lf)
+					if err != nil {
+						return []byte(fmt.Sprintf("unable to read log file: %v", err)), ts
+					}
+					return p, ts
+				},
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		c.logger.With("err", err).Error("Unable to gather agent logs")
+	}
+	return hooks
+}
+
+func (c *Coordinator) addServiceLogHooks() []diagnostics.Hook {
+	hooks := []diagnostics.Hook{{
+		Name:        "services log dir",
+		Filename:    "services/",
+		ContentType: diagnostics.ContentTypeDirectory,
+		Hook:        func(_ context.Context) []byte { return nil },
+	}}
+	for _, spec := range c.specs.ServiceSpecs() {
+		if spec.Spec.Service.Log == nil || spec.Spec.Service.Log.Path == "" {
+			// no log path set in specification
+			continue
+		}
+
+		logPath := filepath.Dir(spec.Spec.Service.Log.Path) + string(filepath.Separator)
+		err := filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+			if errors.Is(fErr, fs.ErrNotExist) {
+				return nil
+			}
+			if fErr != nil {
+				return fmt.Errorf("unable to walk log directory %q for service input %s: %w", logPath, spec.InputType, fErr)
+			}
+			name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
+			if name == "" {
+				return nil
+			}
+			if d.IsDir() {
+				return nil
+			}
+			hooks = append(hooks, diagnostics.Hook{
+				Name:        "service logs",
+				Filename:    "services/" + name,
+				ContentType: "text/plain",
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
+					lf, err := os.Open(path)
+					if err != nil {
+						return []byte(fmt.Sprintf("unable to open log file: %v", err)), ts
+					}
+					if stat, err := lf.Stat(); err == nil {
+						ts = stat.ModTime().UTC()
+					}
+					defer lf.Close()
+					p, err := io.ReadAll(lf)
+					if err != nil {
+						return []byte(fmt.Sprintf("unable to read log file: %v", err)), ts
+					}
+					return p, ts
+
+				},
+			})
+			return nil
+		})
+		if err != nil {
+			c.logger.With("err", err).Error("Unable to gather component logs")
+		}
+	}
+	return hooks
 }
 
 // runner performs the actual work of running all the managers

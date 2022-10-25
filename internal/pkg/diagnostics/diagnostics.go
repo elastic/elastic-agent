@@ -5,13 +5,18 @@
 package diagnostics
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"runtime/pprof"
+	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
@@ -21,7 +26,7 @@ type Hook struct {
 	Filename    string
 	Description string
 	ContentType string
-	Hook        func(ctx context.Context) []byte
+	Hook        func(ctx context.Context) ([]byte, time.Time)
 }
 
 // Hooks is a set of diagnostic hooks.
@@ -35,13 +40,13 @@ func GlobalHooks() Hooks {
 			Filename:    "version.txt",
 			Description: "version information",
 			ContentType: "application/yaml",
-			Hook: func(_ context.Context) []byte {
+			Hook: func(_ context.Context) ([]byte, time.Time) {
 				v := release.Info()
 				o, err := yaml.Marshal(v)
 				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
+					return []byte(fmt.Sprintf("error: %q", err)), time.Now().UTC()
 				}
-				return o
+				return o, time.Now().UTC()
 			},
 		},
 		{
@@ -89,14 +94,100 @@ func GlobalHooks() Hooks {
 	}
 }
 
-func pprofDiag(name string) func(context.Context) []byte {
-	return func(_ context.Context) []byte {
+func pprofDiag(name string) func(context.Context) ([]byte, time.Time) {
+	return func(_ context.Context) ([]byte, time.Time) {
 		var w bytes.Buffer
 		err := pprof.Lookup(name).WriteTo(&w, 1)
 		if err != nil {
 			// error is returned as the content
-			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err))
+			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err)), time.Now().UTC()
 		}
-		return w.Bytes()
+		return w.Bytes(), time.Now().UTC()
 	}
+}
+
+// ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics.
+// If any error is encounted when writing the contents of the archive it is returned.
+func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+	// Create directories in the zip archive before writing any files
+	for _, ad := range agentDiag {
+		if ad.ContentType == ContentTypeDirectory {
+			_, err := zw.Create(ad.Filename)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Write agent diagnostics content
+	for _, ad := range agentDiag {
+		if ad.ContentType != ContentTypeDirectory {
+			zf, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     ad.Filename,
+				Method:   zip.Deflate,
+				Modified: ad.Generated,
+			})
+			if err != nil {
+				return err
+			}
+			_, err = zf.Write(ad.Content)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Handle unit diagnostics
+	// structure each unit into its own component directory
+	compDirs := make(map[string][]client.DiagnosticUnitResult)
+	for _, ud := range unitDiags {
+		compDir := strings.ReplaceAll(ud.ComponentID, "/", "-")
+		compDirs[compDir] = append(compDirs[compDir], ud)
+	}
+	// write each units diagnostics into its own directory
+	// layout becomes components/<component-id>/<unit-id>/<filename>
+	_, err := zw.Create("components/")
+	if err != nil {
+		return err
+	}
+	for dirName, units := range compDirs {
+		_, err = zw.Create(fmt.Sprintf("components/%s/", dirName))
+		if err != nil {
+			return err
+		}
+		for _, ud := range units {
+			unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
+			_, err = zw.Create(fmt.Sprintf("components/%s/%s/", dirName, unitDir))
+			if err != nil {
+				return err
+			}
+			if ud.Err != nil {
+				w, err := zw.Create(fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir))
+				if err != nil {
+					return err
+				}
+				_, err = w.Write([]byte(fmt.Sprintf("%s\n", ud.Err)))
+				if err != nil {
+					return err
+				}
+				continue
+			}
+			for _, fr := range ud.Results {
+				w, err := zw.CreateHeader(&zip.FileHeader{
+					Name:     fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name),
+					Method:   zip.Deflate,
+					Modified: fr.Generated,
+				})
+				if err != nil {
+					return err
+				}
+				_, err = w.Write(fr.Content)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
