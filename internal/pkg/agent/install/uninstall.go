@@ -150,7 +150,7 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 
 	// remove each service component
 	for _, comp := range comps {
-		if err := uninstallComponent(ctx, comp, log); err != nil {
+		if err := uninstallComponent(ctx, log, comp); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
 	}
@@ -158,7 +158,7 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 	return nil
 }
 
-func uninstallComponent(ctx context.Context, comp component.Component, log *logp.Logger) error {
+func uninstallComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
 	return comprt.UninstallService(ctx, log, comp)
 }
 

@@ -54,23 +54,23 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 
 	// channel for the last error message from the stderr output
 	errch := make(chan string, 1)
-	ctxstderr := contextio.NewReader(ctx, proc.Stderr)
-	if ctxstderr != nil {
+	ctxStderr := contextio.NewReader(ctx, proc.Stderr)
+	if ctxStderr != nil {
 		go func() {
-			var errtext string
-			scanner := bufio.NewScanner(ctxstderr)
+			var errText string
+			scanner := bufio.NewScanner(ctxStderr)
 			for scanner.Scan() {
-				line := scanner.Bytes()
+				line := scanner.Text()
 				if len(line) > 0 {
-					txt := strings.TrimSpace(string(line))
+					txt := strings.TrimSpace(line)
 					if len(txt) > 0 {
-						errtext = strings.TrimSpace(string(line))
+						errText = txt
 						// Log error output line
-						log.Error(errtext)
+						log.Error(errText)
 					}
 				}
 			}
-			errch <- errtext
+			errch <- errText
 		}()
 	}
 
@@ -94,6 +94,7 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 
 func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
 	if spec == nil {
+		log.Warnf("spec is nil, nothing to execute, binaryPath: %s", binaryPath)
 		return nil
 	}
 	return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)

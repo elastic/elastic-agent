@@ -44,7 +44,7 @@ var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
 // FleetServerComponentModifier modifies the comps to inject extra information from the policy into
 // the Fleet Server component and units needed to run Fleet Server correctly.
 func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) coordinator.ComponentsModifier {
-	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+	return func(comps []component.Component, _ map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
 			if comp.Spec.InputType == fleetServer {
 				for j, unit := range comp.Units {
@@ -101,7 +101,11 @@ func EndpointComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordin
 						// "host": {
 						// 	   "id": "b62e91be682a4108bbb080152cc5eeac"
 						// },
-						unitCfgMap["fleet"].(map[string]interface{})["host"] = cfg["host"]
+						if v, ok := unitCfgMap["fleet"]; ok {
+							if m, ok := v.(map[string]interface{}); ok {
+								m["host"] = cfg["host"]
+							}
+						}
 						unitCfg, err := component.ExpectedConfig(unitCfgMap)
 						if err != nil {
 							return nil, err

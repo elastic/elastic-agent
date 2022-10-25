@@ -16,7 +16,7 @@ The following are the steps the Endpoint goes through to establish the connectio
 
 The Agent can only call 3 commands on the endpoint binary that allows it to:
 1. Check if the Endpoint service is installed
-2. Install the Endpoint service. The Endpoint service is started automatically upon install.
+2. Install the Endpoint service. The Endpoint service is started automatically upon installation.
 3. Uninstall the Endpoint service.
 
 

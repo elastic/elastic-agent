@@ -401,18 +401,15 @@ func (s *ComponentState) forceState(state client.UnitState, msg string) bool {
 }
 
 // forceExpectedState force updates the expected state for the entire component, forcing that state on all expected units.
-func (s *ComponentState) forceExpectedState(state client.UnitState) bool {
-	changed := false
+func (s *ComponentState) forceExpectedState(state client.UnitState) {
 	for k, unit := range s.expectedUnits {
 		if unit.state != state {
 			unit.state = state
-			changed = true
 		}
 
 		// unit is a copy and must be set back into the map
 		s.expectedUnits[k] = unit
 	}
-	return changed
 }
 
 // compState updates just the component state not all the units.
