@@ -12,6 +12,7 @@ import (
 	"io"
 	"runtime/pprof"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -28,7 +29,7 @@ type Hook struct {
 	Filename    string
 	Description string
 	ContentType string
-	Hook        func(ctx context.Context) []byte
+	Hook        func(ctx context.Context) ([]byte, time.Time)
 }
 
 // Hooks is a set of diagnostic hooks.
@@ -42,13 +43,13 @@ func GlobalHooks() Hooks {
 			Filename:    "version.txt",
 			Description: "version information",
 			ContentType: "application/yaml",
-			Hook: func(_ context.Context) []byte {
+			Hook: func(_ context.Context) ([]byte, time.Time) {
 				v := release.Info()
 				o, err := yaml.Marshal(v)
 				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
+					return []byte(fmt.Sprintf("error: %q", err)), time.Now().UTC()
 				}
-				return o
+				return o, time.Now().UTC()
 			},
 		},
 		{
@@ -96,15 +97,15 @@ func GlobalHooks() Hooks {
 	}
 }
 
-func pprofDiag(name string) func(context.Context) []byte {
+func pprofDiag(name string) func(context.Context) ([]byte, time.Time) {
 	return func(_ context.Context) []byte {
 		var w bytes.Buffer
 		err := pprof.Lookup(name).WriteTo(&w, 1)
 		if err != nil {
 			// error is returned as the content
-			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err))
+			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err)), time.Now().UTC()
 		}
-		return w.Bytes()
+		return w.Bytes(), time.Now.UTC()
 	}
 }
 
@@ -123,10 +124,13 @@ func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags 
 		}
 	}
 	// Write agent diagnostics content
-	// TODO timestamps for log files
 	for _, ad := range agentDiag {
 		if ad.ContentType != ContentTypeDirectory {
-			zf, err := zw.Create(ad.Filename)
+			zf, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     ad.Filename,
+				Method:   zip.Deflate,
+				Modified: ad.Generated,
+			})
 			if err != nil {
 				return err
 			}
@@ -173,7 +177,11 @@ func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags 
 				continue
 			}
 			for _, fr := range ud.Results {
-				w, err := zw.Create(fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name))
+				w, err := zw.CreateHeader(&zip.FileHeader{
+					Name:     fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name),
+					Method:   zip.Deflate,
+					Modified: fr.Generated,
+				})
 				if err != nil {
 					return err
 				}

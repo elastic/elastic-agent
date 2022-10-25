@@ -9,17 +9,22 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 )
 
+// The following constants correspond with fleer-server API paths for file uploads.
 const (
-	NewUploadPath    = "/api/fleet/uploads"
-	ChunkPath        = "/api/fleet/uploads/%s/%d"
-	FinishUploadPath = "/api/fleet/uploads/%s"
+	PathNewUpload    = "/api/fleet/uploads"
+	PathChunk        = "/api/fleet/uploads/%s/%d"
+	PathFinishUpload = "/api/fleet/uploads/%s"
 )
 
+// FileData contains metadata about a file.
 type FileData struct {
 	Size        int64  `json:"size"`
 	Name        string `json:"name"`
@@ -50,6 +55,7 @@ type FileData struct {
 	UID         string   `json:"uid"`
 }
 
+// NewUploadRequest is the struct that is passed as the request body when starting a new file upload.
 type NewUploadRequest struct {
 	AgentID  string     `json:"agent_id"`
 	ActionID string     `json:"action_id"`
@@ -64,30 +70,74 @@ type NewUploadRequest struct {
 	} `json:"host"`
 }
 
+// NewUploadResponse is the body for the success case when requesting a new file upload.
 type NewUploadResponse struct {
 	UploadID  string `json:"upload_id"`
 	ChunkSize int64  `json:"chunck_size"`
 }
 
+// retrySender wraps the underlying Sender with retry logic.
+type retrySender struct {
+	c    *client.Sender
+	max  int
+	wait backoff.Backoff
+}
+
+// Send calls the underlying Sender's Send method. If a 429 status code is returned the request is retried after a short wait.
+// TODO What to do if another error or status is recieved?
+func (r *retrySender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (resp *http.Response, err error) {
+	r.wait.Reset()
+
+	var b bytes.Buffer
+	tr := io.TeeReader(body, &b)
+	for i := 0; i < r.max; i++ {
+		resp, err = r.c.Send(ctx, method, path, params, headers, tr)
+		if err != nil {
+			return resp, err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			tr = bytes.Reader(b.Bytes())
+			r.wait.Wait()
+			continue
+
+		}
+		return resp, err
+	}
+	return resp, err
+}
+
+// URI calls the underlying Sender's URI method.
+func (r *retrySender) URI() string {
+	return r.c.URI()
+}
+
+// Client provides methods to upload a file to ES through fleet-server.
 type Client struct {
 	c       *client.Sender
 	agentID string
 }
 
-func New(c *client.Client, id string) *Client {
+// New returns a new Client for the agent identified by the passed id.
+// The sender is wrapped with retry logic specified by the Uploader config.
+// Any request that would return a 429 (too many requests) is retried (up to maxRetries times) with a backoff.
+func New(id string, c *client.Sender, cfg config.Uploader) *Client {
 	return &client{
-		c:       c,
+		c: &retrySender{
+			c:    c,
+			max:  cfg.MaxRetries,
+			wait: backoff.NewEqualJitterBackoff(nil, cfg.InitDuration, cfg.MaxDuration),
+		},
 		agentID: id,
 	}
 }
 
-// New completes a new file upload request to the fleet-server.
+// New sends a new file upload request to the fleet-server.
 func (c *client) New(ctx context.Context, r *NewUploadRequest) (*NewUploadResponse, error) {
 	b, err := json.Marshall(r)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.c.Send(ctx, "POST", NewUploadPath, nil, nil, bytes.NewBuffer(b))
+	resp, err := c.c.Send(ctx, "POST", PathNewUpload, nil, nil, bytes.NewBuffer(b))
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +155,9 @@ func (c *client) New(ctx context.Context, r *NewUploadRequest) (*NewUploadRespon
 	return newUploadResp, nil
 }
 
-// Chunk uploads a new chunk to fleet-server.
+// Chunk uploads a chunk to fleet-server.
 func (c *client) Chunk(ctx context.Context, uploadID string, chunkID int, r io.Reader) error {
-	resp, err := c.c.Send(ctx, "PUT", fmt.Sprintf(ChunkPath, uploadID, chunkID), nil, nil, r)
+	resp, err := c.c.Send(ctx, "PUT", fmt.Sprintf(PathChunk, uploadID, chunkID), nil, nil, r)
 	if err != nil {
 		return err
 	}
@@ -121,7 +171,7 @@ func (c *client) Chunk(ctx context.Context, uploadID string, chunkID int, r io.R
 
 // Finish calls the finalize endpoint for the passed upload ID.
 func (c *client) Finish(ctx context.Context, id string) error {
-	resp, err := c.c.Send(ctx, "POST", fmt.Sprintf(FinishUploadPath, id), nil, nil, nil)
+	resp, err := c.c.Send(ctx, "POST", fmt.Sprintf(PathFinishUpload, id), nil, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -134,8 +184,6 @@ func (c *client) Finish(ctx context.Context, id string) error {
 }
 
 // UploadDiagnostics is a wrapper to upload a diagnostics request identified by the passed action id contained in the buffer to fleet-server.
-// TODO retries for 429 responses
-// TODO What to do if another error is recieved?
 func (c *client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buffer) error {
 	size := b.Len()
 	upReq := NewUploadRequest{
@@ -160,7 +208,7 @@ func (c *client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buff
 	chunckSize := upResp.ChunckSize
 	totalChunks := math.Ceil(float64(size) / float64(chunkSize))
 	for chunk := 0; chunk < totalChunks; chunk++ {
-		err := c.Chunk(ctx, uploadID, chunk, &io.LimitedReader{b, chunkSize})
+		err := c.Chunk(ctx, uploadID, chunk, io.LimitReader(b, chunkSize))
 		if err != nil {
 			return err
 		}

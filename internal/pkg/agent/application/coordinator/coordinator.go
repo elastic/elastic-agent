@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -356,19 +357,20 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 				Filename:    "pre-config.yaml",
 				Description: "current pre-configuration of the running Elastic Agent before variable substitution",
 				ContentType: "application/yaml",
-				Hook: func(_ context.Context) []byte {
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
 					if c.state.ast == nil {
-						return []byte("error: failed no configuration by the coordinator")
+						return []byte("error: failed no configuration by the coordinator"), ts
 					}
 					cfg, err := c.state.ast.Map()
 					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+						return []byte(fmt.Sprintf("error: %q", err)), ts
 					}
 					o, err := yaml.Marshal(cfg)
 					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+						return []byte(fmt.Sprintf("error: %q", err)), ts
 					}
-					return o
+					return o, ts
 				},
 			},
 			{
@@ -376,15 +378,16 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 				Filename:    "variables.yaml",
 				Description: "current variable contexts of the running Elastic Agent",
 				ContentType: "application/yaml",
-				Hook: func(_ context.Context) []byte {
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
 					if c.state.vars == nil {
-						return []byte("error: failed no variables by the coordinator")
+						return []byte("error: failed no variables by the coordinator"), ts
 					}
 					vars := make([]map[string]interface{}, 0, len(c.state.vars))
 					for _, v := range c.state.vars {
 						m, err := v.Map()
 						if err != nil {
-							return []byte(fmt.Sprintf("error: %q", err))
+							return []byte(fmt.Sprintf("error: %q", err)), ts
 						}
 						vars = append(vars, m)
 					}
@@ -394,9 +397,9 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 						Variables: vars,
 					})
 					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+						return []byte(fmt.Sprintf("error: %q", err)), ts
 					}
-					return o
+					return o, ts
 				},
 			},
 			{
@@ -404,19 +407,20 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 				Filename:    "computed-config.yaml",
 				Description: "current computed configuration of the running Elastic Agent after variable substitution",
 				ContentType: "application/yaml",
-				Hook: func(_ context.Context) []byte {
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
 					if c.state.ast == nil || c.state.vars == nil {
-						return []byte("error: failed no configuration or variables received by the coordinator")
+						return []byte("error: failed no configuration or variables received by the coordinator"), ts
 					}
 					cfg, _, err := c.compute()
 					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+						return []byte(fmt.Sprintf("error: %q", err)), ts
 					}
 					o, err := yaml.Marshal(cfg)
 					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+						return []byte(fmt.Sprintf("error: %q", err)), ts
 					}
-					return o
+					return o, ts
 				},
 			},
 			{
@@ -424,13 +428,14 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 				Filename:    "components.yaml",
 				Description: "current expected components model of the running Elastic Agent",
 				ContentType: "application/yaml",
-				Hook: func(_ context.Context) []byte {
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
 					if c.state.ast == nil || c.state.vars == nil {
-						return []byte("error: failed no configuration or variables received by the coordinator")
+						return []byte("error: failed no configuration or variables received by the coordinator"), ts
 					}
 					_, comps, err := c.compute()
 					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+						return []byte(fmt.Sprintf("error: %q", err)), ts
 					}
 					o, err := yaml.Marshal(struct {
 						Components []component.Component `yaml:"components"`
@@ -438,9 +443,9 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 						Components: comps,
 					})
 					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+						return []byte(fmt.Sprintf("error: %q", err)), ts
 					}
-					return o
+					return o, ts
 				},
 			},
 			{
@@ -448,13 +453,14 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 				Filename:    "state.yaml",
 				Description: "current state of running components by the Elastic Agent",
 				ContentType: "application/yaml",
-				Hook: func(_ context.Context) []byte {
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
 					s := c.State()
 					o, err := yaml.Marshal(s)
 					if err != nil {
-						return []byte(fmt.Sprintf("error: %q", err))
+						return []byte(fmt.Sprintf("error: %q", err)), ts
 					}
-					return o
+					return o, ts
 				},
 			},
 		}
@@ -471,7 +477,7 @@ func (c *Coordinator) addLogHooks() []diagnostics.Hook {
 		Filename:    "logs/",
 		Description: "The logs directory for the agent.",
 		ContentType: diagnostics.ContentTypeDirectory,
-		Hook:        func(_ context.Context) []byte { return nil },
+		Hook:        func(_ context.Context) ([]byte, time.Time) { return nil, time.Now().UTC() },
 	}}
 
 	logPath := filepath.Join(paths.Home(), "logs") + string(filepath.Separator)
@@ -493,26 +499,28 @@ func (c *Coordinator) addLogHooks() []diagnostics.Hook {
 				Filename:    "logs/" + name + "/",
 				Description: "A logs subdirectory",
 				ContentType: diagnostics.ContentTypeDirectory,
-				Hook: func(_ context.Context) []byte {
-					return nil
-				},
+				Hook:        func(_ context.Context) ([]byte, time.Time) { return nil, time.Now().UTC() },
 			})
 		} else {
 			hooks = append(hooks, diagnostics.Hook{
 				Name:        "log file",
 				Filename:    "logs/" + name,
 				ContentType: "text/plain",
-				Hook: func(_ context.Context) []byte {
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
 					lf, err := os.Open(path)
 					if err != nil {
-						return []byte(fmt.Sprintf("unable to open log file: %v", err))
+						return []byte(fmt.Sprintf("unable to open log file: %v", err)), ts
+					}
+					if stat, err := ls.Stat(); err == nil {
+						ts = stat.ModTime().UTC()
 					}
 					defer lf.Close()
 					p, err := io.ReadAll(lf)
 					if err != nil {
-						return []byte(fmt.Sprintf("unable to read log file: %v", err))
+						return []byte(fmt.Sprintf("unable to read log file: %v", err)), ts
 					}
-					return p
+					return p, ts
 				},
 			})
 		}
@@ -556,17 +564,21 @@ func (c *Coordinator) addServiceLogHooks() []diagnostics.Hook {
 				Name:        "service logs",
 				Filename:    "services/" + name,
 				ContentType: "text/plain",
-				Hook: func(_ context.Context) []byte {
+				Hook: func(_ context.Context) ([]byte, time.Time) {
+					ts := time.Now().UTC()
 					lf, err := os.Open(path)
 					if err != nil {
-						return []byte(fmt.Sprintf("unable to open log file: %v", err))
+						return []byte(fmt.Sprintf("unable to open log file: %v", err)), ts
+					}
+					if stat, err := ls.Stat(); err == nil {
+						ts = stat.ModTime().UTC()
 					}
 					defer lf.Close()
 					p, err := io.ReadAll(lf)
 					if err != nil {
-						return []byte(fmt.Sprintf("unable to read log file: %v", err))
+						return []byte(fmt.Sprintf("unable to read log file: %v", err)), ts
 					}
-					return p
+					return p, ts
 
 				},
 			})

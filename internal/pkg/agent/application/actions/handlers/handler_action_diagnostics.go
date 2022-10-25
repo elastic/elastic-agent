@@ -24,14 +24,15 @@ type Diagnostics struct {
 	uploader Uploader
 }
 
-func NewDiagnostics(log *logger.Logger, coord *coordinator.Coordinator) *Diagnostics {
+func NewDiagnostics(log *logger.Logger, coord *coordinator.Coordinator, uploader Uploader) *Diagnostics {
 	return &Diagnostics{
-		log:   log,
-		coord: coord,
+		log:      log,
+		coord:    coord,
+		uploader: uploader,
 	}
 }
 
-func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, _ acker.Acker) error {
+func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker) error {
 	h.log.Debugf("handlerDiagnostics: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionDiagnostics)
 	if !ok {
@@ -45,12 +46,15 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, _ acker.Ack
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+
+		p, ts := hook.Hook(ctx)
 		aDiag = append(aDiag, client.DiagnosticFileResult{
 			Name:        hook.Name,
 			Filename:    hook.Filename,
 			Description: hook.Description,
 			ContentType: hook.ContentType,
-			Content:     hook.Hook(ctx),
+			Content:     p,
+			Generated:   ts,
 		})
 	}
 
@@ -92,7 +96,7 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, _ acker.Ack
 	}
 
 	err = h.uploader.UploadDiagnostics(ctx, action.ActionID, &b)
-	// TODO ack
+	_ = ack.Ack(ctx, action) // TODO ack should have the file upload ID in it
 	if err != nil {
 		return fmt.Errorf("unable to upload diagnostics: %w", err)
 	}

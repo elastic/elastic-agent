@@ -4,6 +4,8 @@
 
 package config
 
+import "time"
+
 const defaultPort = 6791
 const defaultNamespace = "default"
 
@@ -18,6 +20,7 @@ type MonitoringConfig struct {
 	Pprof          *PprofConfig          `yaml:"pprof" config:"pprof"`
 	MonitorTraces  bool                  `yaml:"traces" config:"traces"`
 	APM            APMConfig             `yaml:"apm,omitempty" config:"apm,omitempty" json:"apm,omitempty"`
+	Uploader       Uploader              `yaml:"uploader,omitempty" json:"uploader,omitempty"`
 }
 
 // MonitoringHTTPConfig is a config defining HTTP endpoint published by agent
@@ -57,6 +60,7 @@ func DefaultConfig() *MonitoringConfig {
 		},
 		Namespace: defaultNamespace,
 		APM:       defaultAPMConfig(),
+		Uploader:  defaultUploader(),
 	}
 }
 
@@ -79,4 +83,19 @@ type APMTLS struct {
 
 func defaultAPMConfig() APMConfig {
 	return APMConfig{}
+}
+
+// Uploader contains the configuration for retries when uploading a file (diagnostics bundle) to fleet-server.
+type Uploader struct {
+	MaxRetries int           `config:"max_retries"`
+	InitDur    time.Duration `config:"init_duration"`
+	MaxDur     time.Duration `config:"max_duration"`
+}
+
+func defaultUploader() Uploader {
+	return Uploader{
+		MaxRetries:   10,
+		InitDuration: time.Second,
+		MaxDuration:  time.Minute * 10,
+	}
 }
