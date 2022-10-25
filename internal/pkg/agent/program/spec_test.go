@@ -146,7 +146,7 @@ func TestExport(t *testing.T) {
 	for _, spec := range Supported {
 		b, err := yaml.Marshal(spec)
 		require.NoError(t, err)
-		err = ioutil.WriteFile(filepath.Join(dir, strings.ToLower(spec.Name)+".yml"), b, 0666)
+		err = ioutil.WriteFile(filepath.Join(dir, strings.ToLower(spec.Name)+".yml"), b, 0600)
 		require.NoError(t, err)
 	}
 }
