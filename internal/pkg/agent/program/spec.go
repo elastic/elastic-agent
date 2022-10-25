@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -40,11 +41,25 @@ type Spec struct {
 	When                  string               `yaml:"when"`
 	Constraints           string               `yaml:"constraints"`
 	RestartOnOutputChange bool                 `yaml:"restart_on_output_change,omitempty"`
-	ExprtedMetrics        []string             `yaml:"exported_metrics,omitempty"`
+	ExportedMetrics       []string             `yaml:"exported_metrics,omitempty"`
+	Process               *ProcessSettings     `yaml:"process,omitempty"`
+}
+
+// ProcessSettings process specific settings
+type ProcessSettings struct {
+	// Allows to override the agent stop timeout settings and specify a different stop timeout for Endpoint service
+	StopTimeout time.Duration `yaml:"stop_timeout"`
+}
+
+// Service info
+type ServiceInfo struct {
+	Name  string `yaml:"name"`
+	Label string `yaml:"label"`
 }
 
 // ReadSpecs reads all the specs that match the provided globbing path.
 func ReadSpecs(path string) ([]Spec, error) {
+	//nolint:prealloc // false positive
 	var specs []Spec
 	files, err := filepath.Glob(path)
 	if err != nil {

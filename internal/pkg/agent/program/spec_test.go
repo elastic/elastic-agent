@@ -5,13 +5,16 @@
 package program
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -143,7 +146,48 @@ func TestExport(t *testing.T) {
 	for _, spec := range Supported {
 		b, err := yaml.Marshal(spec)
 		require.NoError(t, err)
-		err = ioutil.WriteFile(filepath.Join(dir, strings.ToLower(spec.Name)+".yml"), b, 0666)
+		err = ioutil.WriteFile(filepath.Join(dir, strings.ToLower(spec.Name)+".yml"), b, 0600)
 		require.NoError(t, err)
+	}
+}
+
+func TestSerializationProcessSettings(t *testing.T) {
+	ymlTmpl := `name: "Foobar"
+process:
+    stop_timeout: %v`
+
+	tests := []struct {
+		name  string
+		tonum int
+		to    time.Duration
+	}{
+		{"zero", 0, 0},
+		{"180ns", 180, 0},
+		{"180s", 0, 120 * time.Second},
+		{"3m", 0, 3 * time.Minute},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				yml         string
+				wantTimeout time.Duration
+			)
+			if tc.to == 0 {
+				yml = fmt.Sprintf(ymlTmpl, tc.tonum)
+				wantTimeout = time.Duration(tc.tonum)
+			} else {
+				yml = fmt.Sprintf(ymlTmpl, tc.to)
+				wantTimeout = tc.to
+			}
+			var spec Spec
+			err := yaml.Unmarshal([]byte(yml), &spec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			diff := cmp.Diff(wantTimeout, spec.Process.StopTimeout)
+			if diff != "" {
+				t.Fatal(diff)
+			}
+		})
 	}
 }
