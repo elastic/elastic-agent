@@ -200,8 +200,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		if err != nil {
 			u.log.Errorw("Unable to clean downloads after update", "error.message", err, "downloads.path", paths.Downloads())
 		}
-		u.log.Infow("Restarting after upgrade", "new_version", release.Version(), "prev_version", a.Version(),
-			"hash", trimmedNewHash, "home", paths.Home())
+
+		u.log.Infow("Restarting after upgrade",
+			"new_version", release.Version(),
+			"prev_version", a.Version(),
+			"hash", trimmedNewHash,
+			"home", paths.Home())
 		u.reexec.ReExec(cb)
 		return nil, nil
 	}
