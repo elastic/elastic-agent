@@ -419,7 +419,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		// no enrollment file exists or failed to stat it; nothing to do
-		return cfg, nil //nolint:nilerr // there is nothing to do
+		return cfg, nil
 	}
 	contents, err := ioutil.ReadFile(enrollPath)
 	if err != nil {
@@ -473,7 +473,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 	cfg := mcfg.APM
 
-	// nolint:godox // the TODO is intentional
+	//nolint:godox // the TODO is intentional
 	// TODO(stn): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
 	// but it doesn't exist today. Update this code once we have something
 	// available via the APM Go agent.
