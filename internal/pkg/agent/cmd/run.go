@@ -63,7 +63,14 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Short: "Start the elastic-agent.",
 		Run: func(_ *cobra.Command, _ []string) {
 			if err := run(nil); err != nil {
+				logp.NewLogger("cmd_run").
+					Errorw("run command finished with error",
+						"error.message", err)
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+
+				// TODO: remove it. os.Exit will be called on main and if it's called
+				// too early some goroutines with deferred functions related
+				// to the shutdown process might not run.
 				os.Exit(1)
 			}
 		},
@@ -237,13 +244,16 @@ func run(override cfgOverrider) error {
 		breakout := false
 		select {
 		case <-stop:
+			logger.Info("service.HandleSignals invoked stop function. Shutting down")
 			breakout = true
 		case <-rex.ShutdownChan():
+			logger.Info("reexec Shutdown channel triggered")
 			reexecing = true
 			breakout = true
 		case sig := <-signals:
+			logger.Infof("signal %q received", sig)
 			if sig == syscall.SIGHUP {
-				rexLogger.Infof("SIGHUP triggered re-exec")
+				logger.Infof("signals syscall.SIGHUP received, triggering agent restart")
 				rex.ReExec(nil)
 			} else {
 				breakout = true
@@ -252,6 +262,8 @@ func run(override cfgOverrider) error {
 		if breakout {
 			if !reexecing {
 				logger.Info("Shutting down Elastic Agent and sending last events...")
+			} else {
+				logger.Info("Restarting Elastic Agent")
 			}
 			break
 		}
@@ -407,7 +419,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
 		// no enrollment file exists or failed to stat it; nothing to do
-		return cfg, nil //nolint:nilerr // there is nothing to do
+		return cfg, nil
 	}
 	contents, err := ioutil.ReadFile(enrollPath)
 	if err != nil {
@@ -461,7 +473,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 	cfg := mcfg.APM
 
-	// nolint:godox // the TODO is intentional
+	//nolint:godox // the TODO is intentional
 	// TODO(stn): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
 	// but it doesn't exist today. Update this code once we have something
 	// available via the APM Go agent.

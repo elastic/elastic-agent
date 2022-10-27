@@ -62,6 +62,7 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker store.Fl
 		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", action.ActionID)
 	}
 
+	h.log.Info("SETTINGS action done, triggering agent restart")
 	h.reexec.ReExec(nil)
 	return nil
 }
