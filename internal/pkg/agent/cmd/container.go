@@ -791,8 +791,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	originalTop := paths.Top()
 	paths.SetTop(statePath) // change this?
 	paths.SetConfig(configPath)
-	// when custom top path is provided the home directory is not versioned
-	//paths.SetVersionHome(false)
+
 	// install path stays on container default mount (otherwise a bind mounted directory could have noexec set)
 	paths.SetInstall(originalInstall)
 	// set LOGS_PATH is given
