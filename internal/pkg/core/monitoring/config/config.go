@@ -94,8 +94,8 @@ type Uploader struct {
 
 func defaultUploader() Uploader {
 	return Uploader{
-		MaxRetries:   10,
-		InitDuration: time.Second,
-		MaxDuration:  time.Minute * 10,
+		MaxRetries: 10,
+		InitDur:    time.Second,
+		MaxDur:     time.Minute * 10,
 	}
 }
