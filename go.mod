@@ -15,7 +15,7 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
 	// TODO(Anderson): Update elastic-agent-libs once https://github.com/elastic/elastic-agent-libs/pull/87
 	// is merged and a new version published.
-	github.com/elastic/elastic-agent-libs v0.2.6
+	github.com/elastic/elastic-agent-libs v0.2.14
 	github.com/elastic/elastic-agent-system-metrics v0.3.0
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.7.1
