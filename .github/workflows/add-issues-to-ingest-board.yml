@@ -30,10 +30,10 @@ jobs:
                   }
                 }
               }
-          project_id: ${{ env.PROJECT_ASSIGNER_TOKEN }}
+          project_id: ${{ env.INGEST_PROJECT_ID }}
           content_id: ${{ github.event.issue.node_id }}
         env:
-          GITHUB_TOKEN: ${{ secrets.FLEET_TECH_KIBANA_USER_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PROJECT_ASSIGNER_TOKEN }}
       - uses: octokit/graphql-action@v2.x
         id: set_elastic_agent_area
         if: github.event.label.name == env.DATA_PLANE_LABEL || github.event.label.name == env.CONTROL_PLANE_LABEL || github.event.label.name == env.ELASTIC_AGENT_LABEL
