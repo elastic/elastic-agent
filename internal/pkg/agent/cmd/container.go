@@ -40,9 +40,9 @@ import (
 const (
 	requestRetrySleepEnv     = "KIBANA_REQUEST_RETRY_SLEEP"
 	maxRequestRetriesEnv     = "KIBANA_REQUEST_RETRY_COUNT"
-	defaultRequestRetrySleep = "1s"                             // sleep 1 sec between retries for HTTP requests
-	defaultMaxRequestRetries = "30"                             // maximum number of retries for HTTP requests
-	defaultStateDirectory    = "/usr/share/elastic-agent/state" // directory that will hold the state data
+	defaultRequestRetrySleep = "1s"                       // sleep 1 sec between retries for HTTP requests
+	defaultMaxRequestRetries = "30"                       // maximum number of retries for HTTP requests
+	defaultStateDirectory    = "/usr/share/elastic-agent" // directory that will hold the state data
 )
 
 var (
@@ -789,10 +789,10 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	}
 	originalInstall := paths.Install()
 	originalTop := paths.Top()
-	paths.SetTop(topPath)
+	paths.SetTop(statePath) // change this?
 	paths.SetConfig(configPath)
 	// when custom top path is provided the home directory is not versioned
-	paths.SetVersionHome(false)
+	//paths.SetVersionHome(false)
 	// install path stays on container default mount (otherwise a bind mounted directory could have noexec set)
 	paths.SetInstall(originalInstall)
 	// set LOGS_PATH is given
