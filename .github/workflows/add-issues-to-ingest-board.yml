@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: octokit/graphql-action@v2.x
         id: add_to_project
-        if: ${{ github.event.label.name == env.FLEET_LABEL }}
+        if: github.event.label.name == env.DATA_PLANE_LABEL || github.event.label.name == env.CONTROL_PLANE_LABEL || github.event.label.name == env.ELASTIC_AGENT_LABEL
         with:
           query: |
             # Variables have to be snake cased because of https://github.com/octokit/graphql-action/issues/164
@@ -30,7 +30,7 @@ jobs:
                   }
                 }
               }
-          project_id: ${{ env.INGEST_PROJECT_ID }}
+          project_id: ${{ env.PROJECT_ASSIGNER_TOKEN }}
           content_id: ${{ github.event.issue.node_id }}
         env:
           GITHUB_TOKEN: ${{ secrets.FLEET_TECH_KIBANA_USER_TOKEN }}
