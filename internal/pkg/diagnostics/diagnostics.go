@@ -98,7 +98,7 @@ func GlobalHooks() Hooks {
 }
 
 func pprofDiag(name string) func(context.Context) ([]byte, time.Time) {
-	return func(_ context.Context) []byte {
+	return func(_ context.Context) ([]byte, time.Time) {
 		var w bytes.Buffer
 		err := pprof.Lookup(name).WriteTo(&w, 1)
 		if err != nil {

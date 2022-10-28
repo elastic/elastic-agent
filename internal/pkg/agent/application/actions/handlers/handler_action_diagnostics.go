@@ -19,7 +19,7 @@ import (
 )
 
 type Uploader interface {
-	UploadDiagnostics(context.Context, string, *bytes.Buffer)
+	UploadDiagnostics(context.Context, string, *bytes.Buffer) error
 }
 
 type Diagnostics struct {
@@ -73,9 +73,9 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	runtimeDiag := h.coord.PerformDiagnostics(ctx, units...)
 	uDiag := make([]client.DiagnosticUnitResult, 0, len(runtimeDiag))
 	for _, diag := range runtimeDiag {
-		files := make(client.DiagnosticFileResult, 0, diag.Results)
+		files := make([]client.DiagnosticFileResult, 0, diag.Results)
 		for _, f := range diag.Results {
-			files := append(files, client.DiagnosticFileResult{
+			files = append(files, client.DiagnosticFileResult{
 				Name:        f.Name,
 				Filename:    f.Filename,
 				Description: f.Description,

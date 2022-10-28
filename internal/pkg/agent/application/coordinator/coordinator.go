@@ -362,7 +362,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 	return func() diagnostics.Hooks {
 		hooks := diagnostics.Hooks{
-			{
+			diagnostics.Hook{
 				Name:        "pre-config",
 				Filename:    "pre-config.yaml",
 				Description: "current pre-configuration of the running Elastic Agent before variable substitution",
@@ -383,7 +383,7 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 					return o, ts
 				},
 			},
-			{
+			diagnostics.Hook{
 				Name:        "variables",
 				Filename:    "variables.yaml",
 				Description: "current variable contexts of the running Elastic Agent",
@@ -412,7 +412,7 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 					return o, ts
 				},
 			},
-			{
+			diagnostics.Hook{
 				Name:        "computed-config",
 				Filename:    "computed-config.yaml",
 				Description: "current computed configuration of the running Elastic Agent after variable substitution",
@@ -433,7 +433,7 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 					return o, ts
 				},
 			},
-			{
+			diagnostics.Hook{
 				Name:        "components",
 				Filename:    "components.yaml",
 				Description: "current expected components model of the running Elastic Agent",
@@ -458,7 +458,7 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 					return o, ts
 				},
 			},
-			{
+			diagnostics.Hook{
 				Name:        "state",
 				Filename:    "state.yaml",
 				Description: "current state of running components by the Elastic Agent",
@@ -522,7 +522,7 @@ func (c *Coordinator) addLogHooks() []diagnostics.Hook {
 					if err != nil {
 						return []byte(fmt.Sprintf("unable to open log file: %v", err)), ts
 					}
-					if stat, err := ls.Stat(); err == nil {
+					if stat, err := lf.Stat(); err == nil {
 						ts = stat.ModTime().UTC()
 					}
 					defer lf.Close()
@@ -580,7 +580,7 @@ func (c *Coordinator) addServiceLogHooks() []diagnostics.Hook {
 					if err != nil {
 						return []byte(fmt.Sprintf("unable to open log file: %v", err)), ts
 					}
-					if stat, err := ls.Stat(); err == nil {
+					if stat, err := lf.Stat(); err == nil {
 						ts = stat.ModTime().UTC()
 					}
 					defer lf.Close()

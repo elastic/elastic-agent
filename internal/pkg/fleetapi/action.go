@@ -373,10 +373,6 @@ func (a *ActionDiagnostics) String() string {
 	s.WriteString(a.ActionID)
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
-	s.WriteString(", units: ")
-	s.WriteString(a.Units)
-	return s.String()
-	s.WriteString()
 	return s.String()
 }
 
