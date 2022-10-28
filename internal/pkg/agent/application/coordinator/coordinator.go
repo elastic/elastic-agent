@@ -130,6 +130,11 @@ type ErrorReporter interface {
 type ConfigManager interface {
 	Runner
 
+	// ActionErrors returns the error channel for actions.
+	// May return errors for fleet managed agents.
+	// Will always be empty for stand alone agents.
+	ActionErrors() <-chan error
+
 	// Watch returns the chanel to watch for configuration changes.
 	Watch() <-chan ConfigChange
 }
@@ -144,7 +149,7 @@ type VarsManager interface {
 
 // ComponentsModifier is a function that takes the computed components model and modifies it before
 // passing it into the components runtime manager.
-type ComponentsModifier func(comps []component.Component) ([]component.Component, error)
+type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
 
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
@@ -156,7 +161,7 @@ type State struct {
 // StateFetcher provides an interface to fetch the current state of the coordinator.
 type StateFetcher interface {
 	// State returns the current state of the coordinator.
-	State() State
+	State(bool) State
 }
 
 // Coordinator manages the entire state of the Elastic Agent.
@@ -176,6 +181,7 @@ type Coordinator struct {
 	runtimeMgrErr error
 	configMgr     ConfigManager
 	configMgrErr  error
+	actionsErr    error
 	varsMgr       VarsManager
 	varsMgrErr    error
 
@@ -206,7 +212,8 @@ func New(logger *logger.Logger, agentInfo *info.AgentInfo, specs component.Runti
 }
 
 // State returns the current state for the coordinator.
-func (c *Coordinator) State() (s State) {
+// local indicates if local configMgr errors should be reported as part of the state.
+func (c *Coordinator) State(local bool) (s State) {
 	s.State = c.state.state
 	s.Message = c.state.message
 	s.Components = c.runtimeMgr.State()
@@ -222,9 +229,12 @@ func (c *Coordinator) State() (s State) {
 		if c.runtimeMgrErr != nil {
 			s.State = agentclient.Failed
 			s.Message = c.runtimeMgrErr.Error()
-		} else if c.configMgrErr != nil {
+		} else if local && c.configMgrErr != nil {
 			s.State = agentclient.Failed
 			s.Message = c.configMgrErr.Error()
+		} else if c.actionsErr != nil {
+			s.State = agentclient.Failed
+			s.Message = c.actionsErr.Error()
 		} else if c.varsMgrErr != nil {
 			s.State = agentclient.Failed
 			s.Message = c.varsMgrErr.Error()
@@ -455,7 +465,7 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 				ContentType: "application/yaml",
 				Hook: func(_ context.Context) ([]byte, time.Time) {
 					ts := time.Now().UTC()
-					s := c.State()
+					s := c.State(true)
 					o, err := yaml.Marshal(s)
 					if err != nil {
 						return []byte(fmt.Sprintf("error: %q", err)), ts
@@ -660,6 +670,8 @@ func (c *Coordinator) runner(ctx context.Context) error {
 			c.runtimeMgrErr = runtimeErr
 		case configErr := <-c.configMgr.Errors():
 			c.configMgrErr = configErr
+		case actionsErr := <-c.configMgr.ActionErrors():
+			c.actionsErr = actionsErr
 		case varsErr := <-c.varsMgr.Errors():
 			c.varsMgrErr = varsErr
 		case change := <-configWatcher.Watch():
@@ -809,7 +821,7 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 	}
 
 	for _, modifier := range c.modifiers {
-		comps, err = modifier(comps)
+		comps, err = modifier(comps, cfg)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to modify components: %w", err)
 		}

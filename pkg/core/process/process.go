@@ -17,51 +17,78 @@ type Info struct {
 	PID     int
 	Process *os.Process
 	Stdin   io.WriteCloser
+	Stderr  io.ReadCloser
 }
 
-// Option is an option func to change the underlying command
-type Option func(c *exec.Cmd) error
+// CmdOption is an option func to change the underlying command
+type CmdOption func(c *exec.Cmd) error
+
+// StartConfig configuration for the process start set by the StartOption functions
+type StartConfig struct {
+	ctx       context.Context
+	uid, gid  int
+	args, env []string
+	cmdOpts   []CmdOption
+}
+
+// StartOption start options function
+type StartOption func(cfg *StartConfig)
 
 // Start starts a new process
-func Start(path string, uid, gid int, args []string, env []string, opts ...Option) (proc *Info, err error) {
-	return StartContext(nil, path, uid, gid, args, env, opts...) //nolint:staticcheck // calls a different function if no ctx
+func Start(path string, opts ...StartOption) (proc *Info, err error) {
+	// Apply options
+	c := StartConfig{
+		uid: os.Geteuid(),
+		gid: os.Getegid(),
+	}
+
+	for _, opt := range opts {
+		opt(&c)
+	}
+
+	return startContext(c.ctx, path, c.uid, c.gid, c.args, c.env, c.cmdOpts...)
 }
 
-// StartContext starts a new process with context.
-func StartContext(ctx context.Context, path string, uid, gid int, args []string, env []string, opts ...Option) (*Info, error) {
-	cmd, err := getCmd(ctx, path, env, uid, gid, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create command for %q: %w", path, err)
+// WithContext sets an optional context
+func WithContext(ctx context.Context) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.ctx = ctx
 	}
-	for _, o := range opts {
-		if err := o(cmd); err != nil {
-			return nil, fmt.Errorf("failed to set option command for %q: %w", path, err)
-		}
-	}
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
-	}
+}
 
-	// start process
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start %q: %w", path, err)
+// WithArgs sets arguments
+func WithArgs(args []string) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.args = args
 	}
+}
 
-	// Hook to JobObject on windows, noop on other platforms.
-	// This ties the application processes lifespan to the agent's.
-	// Fixes the orphaned beats processes left behind situation
-	// after the agent process gets killed.
-	if err := JobObject.Assign(cmd.Process); err != nil {
-		_ = killCmd(cmd.Process)
-		return nil, fmt.Errorf("failed job assignment %q: %w", path, err)
+// WithEnv sets the environment variables
+func WithEnv(env []string) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.env = env
 	}
+}
 
-	return &Info{
-		PID:     cmd.Process.Pid,
-		Process: cmd.Process,
-		Stdin:   stdin,
-	}, err
+// WithUID sets UID
+func WithUID(uid int) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.uid = uid
+	}
+}
+
+// WithGID sets GID
+func WithGID(gid int) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.gid = gid
+	}
+}
+
+// WithCmdOptions sets the exec.Cmd options
+func WithCmdOptions(cmdOpts ...CmdOption) StartOption {
+	return func(cfg *StartConfig) {
+		cfg.cmdOpts = cmdOpts
+	}
 }
 
 // Kill kills the process.
@@ -98,4 +125,50 @@ func (i *Info) Wait() <-chan *os.ProcessState {
 	}()
 
 	return ch
+}
+
+// startContext starts a new process with context. The context is optional and can be nil.
+func startContext(ctx context.Context, path string, uid, gid int, args []string, env []string, opts ...CmdOption) (*Info, error) {
+	cmd, err := getCmd(ctx, path, env, uid, gid, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create command for %q: %w", path, err)
+	}
+	for _, o := range opts {
+		if err := o(cmd); err != nil {
+			return nil, fmt.Errorf("failed to set option command for %q: %w", path, err)
+		}
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
+	}
+
+	var stderr io.ReadCloser
+	if cmd.Stderr == nil {
+		stderr, err = cmd.StderrPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stderr for %q: %w", path, err)
+		}
+	}
+
+	// start process
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start %q: %w", path, err)
+	}
+
+	// Hook to JobObject on windows, noop on other platforms.
+	// This ties the application processes lifespan to the agent's.
+	// Fixes the orphaned beats processes left behind situation
+	// after the agent process gets killed.
+	if err := JobObject.Assign(cmd.Process); err != nil {
+		_ = killCmd(cmd.Process)
+		return nil, fmt.Errorf("failed job assignment %q: %w", path, err)
+	}
+
+	return &Info{
+		PID:     cmd.Process.Pid,
+		Process: cmd.Process,
+		Stdin:   stdin,
+		Stderr:  stderr,
+	}, err
 }

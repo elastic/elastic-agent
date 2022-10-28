@@ -106,7 +106,7 @@ func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionRes
 func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateResponse, error) {
 	var err error
 
-	state := s.coord.State()
+	state := s.coord.State(true)
 	components := make([]*cproto.ComponentState, 0, len(state.Components))
 	for _, comp := range state.Components {
 		units := make([]*cproto.ComponentUnitState, 0, len(comp.State.Units))
@@ -165,7 +165,7 @@ func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartRes
 func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
 	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil)
 	if err != nil {
-		return &cproto.UpgradeResponse{ //nolint:nilerr // returns err as response
+		return &cproto.UpgradeResponse{
 			Status: cproto.ActionStatus_FAILURE,
 			Error:  err.Error(),
 		}, nil

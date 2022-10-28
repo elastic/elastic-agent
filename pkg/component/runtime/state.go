@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"errors"
 	"reflect"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -131,7 +132,7 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 			existing.configStateIdx = 1
 			changed = true
 		}
-		if existing.err != unit.Err {
+		if !errors.Is(existing.err, unit.Err) {
 			existing.err = unit.Err
 			if existing.err != nil {
 				existing.state = client.UnitStateFailed
@@ -221,10 +222,9 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		if unit.Payload != nil {
 			payload = unit.Payload.AsMap()
 		}
-
 		touched[key] = true
 		_, inExpected := s.expectedUnits[key]
-		existing, _ := s.Units[key]
+		existing := s.Units[key]
 		existing.unitState = client.UnitState(unit.State)
 		existing.unitMessage = unit.Message
 		existing.unitPayload = payload
@@ -398,6 +398,18 @@ func (s *ComponentState) forceState(state client.UnitState, msg string) bool {
 		s.Units[k] = unit
 	}
 	return changed
+}
+
+// forceExpectedState force updates the expected state for the entire component, forcing that state on all expected units.
+func (s *ComponentState) forceExpectedState(state client.UnitState) {
+	for k, unit := range s.expectedUnits {
+		if unit.state != state {
+			unit.state = state
+		}
+
+		// unit is a copy and must be set back into the map
+		s.expectedUnits[k] = unit
+	}
 }
 
 // compState updates just the component state not all the units.

@@ -41,6 +41,7 @@ type managedConfigManager struct {
 	store       storage.Store
 	stateStore  *store.StateStore
 	actionQueue *queue.ActionQueue
+	dispatcher  *dispatcher.ActionDispatcher
 	runtime     *runtime.Manager
 	coord       *coordinator.Coordinator
 
@@ -74,6 +75,11 @@ func newManagedConfigManager(
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
 
+	actionDispatcher, err := dispatcher.New(log, handlers.NewDefault(log), actionQueue)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
+	}
+
 	return &managedConfigManager{
 		log:         log,
 		agentInfo:   agentInfo,
@@ -82,6 +88,7 @@ func newManagedConfigManager(
 		store:       storeSaver,
 		stateStore:  stateStore,
 		actionQueue: actionQueue,
+		dispatcher:  actionDispatcher,
 		runtime:     runtime,
 		ch:          make(chan coordinator.ConfigChange),
 		errCh:       make(chan error),
@@ -109,11 +116,8 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	gatewayCtx, gatewayCancel := context.WithCancel(ctx)
 	defer gatewayCancel()
 
-	// Create the actionDispatcher.
-	actionDispatcher, policyChanger, err := newManagedActionDispatcher(m, gatewayCancel)
-	if err != nil {
-		return err
-	}
+	// Initialize the actionDispatcher.
+	policyChanger := m.initDispatcher(gatewayCancel)
 
 	// Create ackers to enqueue/retry failed acks
 	ack, err := fleet.NewAcker(m.log, m.agentInfo, m.client)
@@ -140,18 +144,6 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		close(retrierRun)
 	}()
 
-	// Gather errors from the dispatcher and pass to the error channel.
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case err := <-actionDispatcher.Errors():
-				m.errCh <- err // err is one or more failures from dispatching an action
-			}
-		}
-	}()
-
 	actions := m.stateStore.Actions()
 	stateRestored := false
 	if len(actions) > 0 && !m.wasUnenrolled() {
@@ -159,7 +151,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
-		actionDispatcher.Dispatch(ctx, actionAcker, actions...)
+		m.dispatcher.Dispatch(ctx, actionAcker, actions...)
 		stateRestored = true
 	}
 
@@ -222,13 +214,19 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case actions := <-gateway.Actions():
-				actionDispatcher.Dispatch(ctx, actionAcker, actions...)
+				m.dispatcher.Dispatch(ctx, actionAcker, actions...)
 			}
 		}
 	}()
 
 	<-ctx.Done()
 	return gatewayRunner.Err()
+}
+
+// ActionErrors returns the error channel for actions.
+// May return errors for fleet managed errors.
+func (m *managedConfigManager) ActionErrors() <-chan error {
+	return m.dispatcher.Errors()
 }
 
 func (m *managedConfigManager) Errors() <-chan error {
@@ -300,12 +298,7 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 	return false
 }
 
-func newManagedActionDispatcher(m *managedConfigManager, canceller context.CancelFunc) (*dispatcher.ActionDispatcher, *handlers.PolicyChange, error) {
-	actionDispatcher, err := dispatcher.New(m.log, handlers.NewDefault(m.log), m.actionQueue)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *handlers.PolicyChange {
 	policyChanger := handlers.NewPolicyChange(
 		m.log,
 		m.agentInfo,
@@ -314,17 +307,17 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 		m.ch,
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionPolicyChange{},
 		policyChanger,
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionPolicyReassign{},
 		handlers.NewPolicyReassign(m.log),
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionUnenroll{},
 		handlers.NewUnenroll(
 			m.log,
@@ -334,12 +327,12 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 		),
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionUpgrade{},
 		handlers.NewUpgrade(m.log, m.coord),
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionSettings{},
 		handlers.NewSettings(
 			m.log,
@@ -348,7 +341,7 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 		),
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionCancel{},
 		handlers.NewCancel(
 			m.log,
@@ -356,7 +349,7 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 		),
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionDiagnostics{},
 		handlers.NewDiagnostics(
 			m.log,
@@ -365,15 +358,15 @@ func newManagedActionDispatcher(m *managedConfigManager, canceller context.Cance
 		),
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionApp{},
 		handlers.NewAppAction(m.log, m.coord),
 	)
 
-	actionDispatcher.MustRegister(
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionUnknown{},
 		handlers.NewUnknown(m.log),
 	)
 
-	return actionDispatcher, policyChanger, nil
+	return policyChanger
 }

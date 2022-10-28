@@ -14,6 +14,7 @@ import (
 
 // SettingsConfig is an collection of agent settings configuration.
 type SettingsConfig struct {
+	ID               string                          `yaml:"id" config:"id" json:"id"`
 	DownloadConfig   *artifact.Config                `yaml:"download" config:"download" json:"download"`
 	ProcessConfig    *process.Config                 `yaml:"process" config:"process" json:"process"`
 	GRPC             *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
