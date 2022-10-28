@@ -766,13 +766,12 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	if statePath == "" {
 		statePath = defaultStateDirectory
 	}
-	topPath := filepath.Join(statePath, "data")
 	configPath = envWithDefault(configPath, "CONFIG_PATH")
 	if configPath == "" {
 		configPath = statePath
 	}
 	// ensure that the directory and sub-directory data exists
-	if err := os.MkdirAll(topPath, 0755); err != nil {
+	if err := os.MkdirAll(statePath, 0755); err != nil {
 		return fmt.Errorf("preparing STATE_PATH(%s) failed: %w", statePath, err)
 	}
 	// ensure that the elastic-agent.yml exists in the state directory or if given in the config directory
@@ -789,7 +788,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	}
 	originalInstall := paths.Install()
 	originalTop := paths.Top()
-	paths.SetTop(statePath) // change this?
+	paths.SetTop(statePath)
 	paths.SetConfig(configPath)
 
 	// install path stays on container default mount (otherwise a bind mounted directory could have noexec set)
