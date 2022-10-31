@@ -168,7 +168,27 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))
+=======
+	trimmedNewHash := release.TrimCommit(newHash)
+	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), trimmedNewHash)
+	if reexecNow {
+		u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads(), "rexec", reexecNow)
+		err = os.RemoveAll(paths.Downloads())
+		if err != nil {
+			u.log.Errorw("Unable to clean downloads after update", "error.message", err, "downloads.path", paths.Downloads())
+		}
+
+		u.log.Infow("Restarting after upgrade",
+			"new_version", release.Version(),
+			"prev_version", a.Version(),
+			"hash", trimmedNewHash,
+			"home", paths.Home())
+		u.reexec.ReExec(cb)
+		return nil, nil
+	}
+>>>>>>> 567f9e2dce (Improve shutdown logs (#1618) (#1627))
 
 	// Clean everything from the downloads dir
 	u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads())
