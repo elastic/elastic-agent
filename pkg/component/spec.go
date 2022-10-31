@@ -100,10 +100,22 @@ func (t *CommandTimeoutSpec) InitDefaults() {
 	t.Stop = 30 * time.Second
 }
 
+// ServiceTimeoutSpec is the timeout specification for subprocess.
+type ServiceTimeoutSpec struct {
+	Checkin time.Duration `config:"checkin" yaml:"checkin"`
+}
+
+// InitDefaults initialized the defaults for the timeouts.
+func (t *ServiceTimeoutSpec) InitDefaults() {
+	t.Checkin = 30 * time.Second
+}
+
 // ServiceSpec is the specification for an input that executes as a service.
 type ServiceSpec struct {
+	CPort      int                   `config:"cport" yaml:"cport" validate:"required"`
 	Log        *ServiceLogSpec       `config:"log,omitempty" yaml:"log,omitempty"`
 	Operations ServiceOperationsSpec `config:"operations" yaml:"operations" validate:"required"`
+	Timeouts   ServiceTimeoutSpec    `config:"timeouts" yaml:"timeouts"`
 }
 
 // ServiceLogSpec is the specification for the log path that the service logs to.

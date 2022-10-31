@@ -148,7 +148,6 @@ func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath strin
 
 	stateStoreExits, err := stateDiskStore.Exists()
 	if err != nil {
-		log.With()
 		log.Errorf("failed to check if state store %s exists: %v", stateStorePath, err)
 		return err
 	}

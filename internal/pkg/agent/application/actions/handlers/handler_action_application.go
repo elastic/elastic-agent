@@ -48,7 +48,7 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 		return fmt.Errorf("invalid type, expected ActionApp and received %T", a)
 	}
 
-	state := h.coord.State()
+	state := h.coord.State(false)
 	unit, ok := findUnitFromInputType(state, action.InputType)
 	if !ok {
 		// If the matching action is not found ack the action with the error for action result document

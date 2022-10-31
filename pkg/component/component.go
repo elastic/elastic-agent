@@ -128,6 +128,7 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 }
 
 func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Component, map[string]string, error) {
+	const revision = "revision"
 	outputsMap, err := toIntermediate(policy)
 	if err != nil {
 		return nil, nil, err
@@ -208,6 +209,11 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 				if !input.enabled {
 					// skip; not enabled
 					continue
+				}
+				if v, ok := policy[revision]; ok {
+					input.input["policy"] = map[string]interface{}{
+						revision: v,
+					}
 				}
 				cfg, cfgErr := ExpectedConfig(input.input)
 				if cfg != nil {

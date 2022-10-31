@@ -130,6 +130,8 @@ inputs:
     outputs:
       - shipper
     service:
+      name: "co.elastic.endpoint"
+      cport: 6788
       operations:
         install:
           args: ["install"]
