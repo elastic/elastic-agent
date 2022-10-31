@@ -251,6 +251,7 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 					InputSpec: &inputSpec,
 					Units:     units,
 				})
+				componentIdsInputMap[componentID] = inputSpec.BinaryName
 			}
 		}
 
@@ -306,7 +307,6 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 					ShipperSpec: &shipperSpec,
 					Units:       shipperUnits,
 				})
-				componentIdsInputMap[componentID] = inputSpec.BinaryName
 			}
 		}
 	}
