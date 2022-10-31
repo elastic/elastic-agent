@@ -787,6 +787,13 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	if err := syncDir(paths.Downloads(), destDownloads); err != nil {
 		return fmt.Errorf("syncing download directory to STATE_PATH(%s) failed: %w", statePath, err)
 	}
+
+	// sync components to data directory
+	destComponents := filepath.Join(statePath, "data", "components")
+	if err := syncDir(paths.Components(), destComponents); err != nil {
+		return fmt.Errorf("syncing components directory to STATE_PATH(%s) failed: %w", statePath, err)
+	}
+
 	originalInstall := paths.Install()
 	originalTop := paths.Top()
 	paths.SetTop(topPath)
@@ -867,6 +874,10 @@ func tryContainerLoadPaths() error {
 }
 
 func syncDir(src string, dest string) error {
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return fmt.Errorf("creating directory %q failed with error: %w", dest, err)
+	}
+
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
