@@ -105,7 +105,7 @@ func pprofDiag(name string) func(context.Context) ([]byte, time.Time) {
 			// error is returned as the content
 			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err)), time.Now().UTC()
 		}
-		return w.Bytes(), time.Now.UTC()
+		return w.Bytes(), time.Now().UTC()
 	}
 }
 

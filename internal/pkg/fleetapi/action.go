@@ -33,7 +33,7 @@ const (
 	ActionTypeInputAction = "INPUT_ACTION"
 	// ActionTypeCancel specifies a cancel action.
 	ActionTypeCancel = "CANCEL"
-	// ActioNTypeDiagnostics specifies a diagnostics action.
+	// ActionTypeDiagnostics specifies a diagnostics action.
 	ActionTypeDiagnostics = "DIAGNOSTICS"
 )
 
@@ -350,19 +350,18 @@ func (a *ActionCancel) String() string {
 	return s.String()
 }
 
+// ActionDiagnostics is a request to gather and upload a diagnostics bundle.
 type ActionDiagnostics struct {
 	ActionID   string `json:"action_id"`
 	ActionType string `json:"type"`
-	Units      []struct {
-		ID       string `json:"id"`
-		UnitType string `json:"type"`
-	} `json:"units"`
 }
 
+// ID returns the ID of the action.
 func (a *ActionDiagnostics) ID() string {
 	return a.ActionID
 }
 
+// Type returns the type of the action.
 func (a *ActionDiagnostics) Type() string {
 	return a.ActionType
 }

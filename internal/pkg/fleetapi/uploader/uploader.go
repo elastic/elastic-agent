@@ -71,7 +71,7 @@ type NewUploadRequest struct {
 		ID string `json:"id"`
 	} `json:"event"`
 	Host struct {
-		Hostname string `json::hostname`
+		Hostname string `json:"hostname"`
 	} `json:"host"`
 }
 
@@ -89,7 +89,7 @@ type retrySender struct {
 }
 
 // Send calls the underlying Sender's Send method. If a 429 status code is returned the request is retried after a backoff period.
-// TODO What to do if another error or status is recieved?
+// TODO What to do if another error or status is received?
 func (r *retrySender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (resp *http.Response, err error) {
 	r.wait.Reset()
 

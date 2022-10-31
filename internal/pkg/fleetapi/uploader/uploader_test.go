@@ -17,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockBackoff struct {
@@ -137,16 +138,12 @@ func Test_retrySender_bodyValidation(t *testing.T) {
 	sender.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		r := args.Get(5).(io.Reader)
 		body1, err = io.ReadAll(r)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}).Return(&http.Response{StatusCode: 429}, nil).Once()
 	sender.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		r := args.Get(5).(io.Reader)
 		body2, err = io.ReadAll(r)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}).Return(&http.Response{StatusCode: 200}, nil).Once()
 
 	backoff := &mockBackoff{}
@@ -158,7 +155,9 @@ func Test_retrySender_bodyValidation(t *testing.T) {
 		max:  3,
 		wait: backoff,
 	}
-	c.Send(context.Background(), "POST", "/", nil, nil, bytes.NewReader([]byte("abcd")))
+	resp, err := c.Send(context.Background(), "POST", "/", nil, nil, bytes.NewReader([]byte("abcd")))
+	require.NoError(t, err)
+	assert.Equal(t, resp.StatusCode, 200)
 	assert.Equal(t, []byte("abcd"), body1)
 	assert.Equal(t, []byte("abcd"), body2)
 	sender.AssertExpectations(t)
@@ -177,9 +176,7 @@ func Test_Client_UploadDiagnostics(t *testing.T) {
 	sender.On("Send", mock.Anything, "PUT", fmt.Sprintf(PathChunk, "test-upload", 0), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		r := args.Get(5).(io.Reader)
 		chunk0, err = io.ReadAll(r)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}).Return(&http.Response{
 		StatusCode: 200,
 		Body:       io.NopCloser(bytes.NewReader(nil)),
@@ -187,9 +184,7 @@ func Test_Client_UploadDiagnostics(t *testing.T) {
 	sender.On("Send", mock.Anything, "PUT", fmt.Sprintf(PathChunk, "test-upload", 1), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		r := args.Get(5).(io.Reader)
 		chunk1, err = io.ReadAll(r)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}).Return(&http.Response{
 		StatusCode: 200,
 		Body:       io.NopCloser(bytes.NewReader(nil)),
@@ -197,9 +192,7 @@ func Test_Client_UploadDiagnostics(t *testing.T) {
 	sender.On("Send", mock.Anything, "PUT", fmt.Sprintf(PathChunk, "test-upload", 2), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		r := args.Get(5).(io.Reader)
 		chunk2, err = io.ReadAll(r)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}).Return(&http.Response{
 		StatusCode: 200,
 		Body:       io.NopCloser(bytes.NewReader(nil)),
@@ -215,7 +208,7 @@ func Test_Client_UploadDiagnostics(t *testing.T) {
 		agentID: "test-agent",
 	}
 	err = c.UploadDiagnostics(context.Background(), "test-id", bytes.NewBufferString("abcde"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "ab", string(chunk0))
 	assert.Equal(t, "cd", string(chunk1))
 	assert.Equal(t, "e", string(chunk2))

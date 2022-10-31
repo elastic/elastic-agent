@@ -14,20 +14,23 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// Uploader is the interface used to upload a diagnostics bundle to fleet-server.
 type Uploader interface {
 	UploadDiagnostics(context.Context, string, *bytes.Buffer) error
 }
 
+// Diagnostics is the handler to process Diagnostics actions.
+// When a Diagnostics action is received a full diagnostics bundle is taken and uploaded to fleet-server.
 type Diagnostics struct {
 	log      *logger.Logger
 	coord    *coordinator.Coordinator // TODO use of coordinator or control server/client?
 	uploader Uploader
 }
 
+// NewDiagnostics returns a new Diagnostics handler.
 func NewDiagnostics(log *logger.Logger, coord *coordinator.Coordinator, uploader Uploader) *Diagnostics {
 	return &Diagnostics{
 		log:      log,
@@ -36,6 +39,7 @@ func NewDiagnostics(log *logger.Logger, coord *coordinator.Coordinator, uploader
 	}
 }
 
+// Handle processes the passed Diagnostics action.
 func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker) error {
 	h.log.Debugf("handlerDiagnostics: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionDiagnostics)
@@ -62,15 +66,7 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 		})
 	}
 
-	// Gather unit diagnostics
-	units := make([]component.Unit, 0, len(action.Units))
-	for _, u := range action.Units {
-		units = append(units, component.Unit{
-			ID:   u.ID,
-			Type: client.UnitType(u.UnitType),
-		})
-	}
-	runtimeDiag := h.coord.PerformDiagnostics(ctx, units...)
+	runtimeDiag := h.coord.PerformDiagnostics(ctx)
 	uDiag := make([]client.DiagnosticUnitResult, 0, len(runtimeDiag))
 	for _, diag := range runtimeDiag {
 		files := make([]client.DiagnosticFileResult, 0, diag.Results)
