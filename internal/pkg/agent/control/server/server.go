@@ -26,7 +26,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	monitoring "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/socket"
@@ -35,6 +34,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/sorted"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+)
+
+const (
+	agentName = "elastic-agent"
 )
 
 // Server is the daemon side of the control protocol.
@@ -178,6 +181,7 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 	}
 	cb, err := u.Upgrade(ctx, &upgradeRequest{request}, false)
 	if err != nil {
+		s.logger.Errorw("Upgrade failed", "error.message", err, "version", request.Version, "source_uri", request.SourceURI)
 		return &proto.UpgradeResponse{
 			Status: proto.ActionStatus_FAILURE,
 			Error:  err.Error(),
@@ -187,6 +191,7 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 	// this ensures that the upgrade response over GRPC is returned
 	go func() {
 		<-time.After(time.Second)
+		s.logger.Info("Restarting after upgrade", "version", request.Version)
 		s.rex.ReExec(cb)
 	}()
 	return &proto.UpgradeResponse{
@@ -225,7 +230,8 @@ func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaR
 	// gather spec data for all rk/apps running
 	specs := s.getSpecInfo("", "")
 	for _, si := range specs {
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
+		isSidecar := strings.HasSuffix(si.app, "_monitoring")
+		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, isSidecar)
 		client := newSocketRequester(si.app, si.rk, endpoint)
 
 		procMeta := client.procMeta(ctx)
@@ -258,9 +264,9 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 	ch := make(chan *proto.PprofResult, 1)
 
 	// retrieve elastic-agent pprof data if requested or application is unspecified.
-	if req.AppName == "" || req.AppName == "elastic-agent" {
-		endpoint := beats.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
-		c := newSocketRequester("elastic-agent", "", endpoint)
+	if req.AppName == "" || req.AppName == agentName {
+		endpoint := monitoring.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
+		c := newSocketRequester(agentName, "", endpoint)
 		for _, opt := range req.PprofType {
 			wg.Add(1)
 			go func(opt proto.PprofOption) {
@@ -273,11 +279,11 @@ func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.Ppr
 
 	// get requested rk/appname spec or all specs
 	var specs []specInfo
-	if req.AppName != "elastic-agent" {
+	if req.AppName != agentName {
 		specs = s.getSpecInfo(req.RouteKey, req.AppName)
 	}
 	for _, si := range specs {
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
+		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, false)
 		c := newSocketRequester(si.app, si.rk, endpoint)
 		// Launch a concurrent goroutine to gather all pprof endpoints from a socket.
 		for _, opt := range req.PprofType {
@@ -315,8 +321,8 @@ func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMe
 	}
 
 	// gather metrics buffer data from the elastic-agent
-	endpoint := beats.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
-	c := newSocketRequester("elastic-agent", "", endpoint)
+	endpoint := monitoring.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
+	c := newSocketRequester(agentName, "", endpoint)
 	metrics := c.procMetrics(ctx)
 
 	resp := &proto.ProcMetricsResponse{
@@ -326,7 +332,8 @@ func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMe
 	// gather metrics buffer data from all other processes
 	specs := s.getSpecInfo("", "")
 	for _, si := range specs {
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk)
+		isSidecar := strings.HasSuffix(si.app, "_monitoring")
+		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, isSidecar)
 		client := newSocketRequester(si.app, si.rk, endpoint)
 
 		s.logger.Infof("gather metrics from %s", endpoint)

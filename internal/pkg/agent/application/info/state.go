@@ -52,9 +52,6 @@ func RunningInstalled() bool {
 
 // IsInsideData returns true when the exePath is inside of the current Agents data path.
 func IsInsideData(exePath string) bool {
-	expectedPath := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-	if runtime.GOOS == darwin {
-		expectedPath = filepath.Join(expectedPath, "elastic-agent.app", "Contents", "MacOS")
-	}
+	expectedPath := paths.BinaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
 	return strings.HasSuffix(exePath, expectedPath)
 }

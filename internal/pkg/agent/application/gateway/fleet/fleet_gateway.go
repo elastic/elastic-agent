@@ -88,6 +88,7 @@ type fleetGateway struct {
 	checkinFailCounter int
 	statusController   status.Controller
 	statusReporter     status.Reporter
+	localReporter      status.Reporter
 	stateStore         stateStore
 	queue              actionQueue
 }
@@ -156,6 +157,7 @@ func newFleetGatewayWithScheduler(
 		done:             done,
 		acker:            acker,
 		statusReporter:   statusController.RegisterComponent("gateway"),
+		localReporter:    statusController.RegisterLocalComponent("gateway-checkin"),
 		statusController: statusController,
 		stateStore:       stateStore,
 		queue:            queue,
@@ -171,7 +173,7 @@ func (f *fleetGateway) worker() {
 			// Execute the checkin call and for any errors returned by the fleet-server API
 			// the function will retry to communicate with fleet-server with an exponential delay and some
 			// jitter to help better distribute the load from a fleet of agents.
-			resp, err := f.doExecute()
+			resp, err := f.executeCheckinWithRetries()
 			if err != nil {
 				continue
 			}
@@ -208,6 +210,7 @@ func (f *fleetGateway) worker() {
 				f.statusReporter.Update(state.Failed, errMsg, nil)
 			} else {
 				f.statusReporter.Update(state.Healthy, "", nil)
+				f.localReporter.Update(state.Healthy, "", nil) // we don't need to specifically set the local reporter to failed above, but it needs to be reset to healthy if a checkin succeeds
 			}
 
 		case <-f.bgContext.Done():
@@ -271,36 +274,50 @@ func (f *fleetGateway) gatherQueuedActions(ts time.Time) (queued, expired []flee
 	return queued, expired
 }
 
-func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
+func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, error) {
 	f.backoff.Reset()
 
 	// Guard if the context is stopped by a out of bound call,
 	// this mean we are rebooting to change the log level or the system is shutting us down.
 	for f.bgContext.Err() == nil {
-		f.log.Debugf("Checking started")
-		resp, err := f.execute(f.bgContext)
+		f.log.Debugf("Checkin started")
+		resp, took, err := f.executeCheckin(f.bgContext)
 		if err != nil {
 			f.checkinFailCounter++
-			f.log.Errorf("Could not communicate with fleet-server Checking API will retry, error: %s", err)
+
+			// Report the first two failures at warn level as they may be recoverable with retries.
+			if f.checkinFailCounter <= 2 {
+				f.log.Warnw("Possible transient error during checkin with fleet-server, retrying",
+					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
+					"retry_after_ns", f.backoff.NextWait())
+			} else {
+				// Only update the local status after repeated failures: https://github.com/elastic/elastic-agent/issues/1148
+				f.localReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
+				f.log.Errorw("Cannot checkin in with fleet-server, retrying",
+					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
+					"retry_after_ns", f.backoff.NextWait())
+			}
+
 			if !f.backoff.Wait() {
 				// Something bad has happened and we log it and we should update our current state.
 				err := errors.New(
-					"execute retry loop was stopped",
+					"checkin retry loop was stopped",
 					errors.TypeNetwork,
 					errors.M(errors.MetaKeyURI, f.client.URI()),
 				)
 
 				f.log.Error(err)
+				f.localReporter.Update(state.Failed, err.Error(), nil)
 				return nil, err
-			}
-			if f.checkinFailCounter > 1 {
-				// do not update status reporter with failure
-				// status reporter would report connection failure on first successful connection, leading to
-				// stale result for certain period causing slight confusion.
-				f.log.Errorf("checking number %d failed: %s", f.checkinFailCounter, err.Error())
 			}
 			continue
 		}
+
+		if f.checkinFailCounter > 0 {
+			// Log at same level as error logs above so subsequent successes are visible when log level is set to 'error'.
+			f.log.Errorf("Checkin request to fleet-server succeeded after %d failures", f.checkinFailCounter)
+		}
+
 		f.checkinFailCounter = 0
 		// Request was successful, return the collected actions.
 		return resp, nil
@@ -311,7 +328,7 @@ func (f *fleetGateway) doExecute() (*fleetapi.CheckinResponse, error) {
 	return nil, f.bgContext.Err()
 }
 
-func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, error) {
+func (f *fleetGateway) executeCheckin(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
 	ecsMeta, err := info.Metadata()
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -331,23 +348,23 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		Status:   f.statusController.StatusString(),
 	}
 
-	resp, err := cmd.Execute(ctx, req)
+	resp, took, err := cmd.Execute(ctx, req)
 	if isUnauth(err) {
 		f.unauthCounter++
 
 		if f.shouldUnenroll() {
-			f.log.Warnf("retrieved an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
+			f.log.Warnf("received an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
 			return &fleetapi.CheckinResponse{
 				Actions: []fleetapi.Action{&fleetapi.ActionUnenroll{ActionID: "", ActionType: "UNENROLL", IsDetected: true}},
-			}, nil
+			}, took, nil
 		}
 
-		return nil, err
+		return nil, took, err
 	}
 
 	f.unauthCounter = 0
 	if err != nil {
-		return nil, err
+		return nil, took, err
 	}
 
 	// Save the latest ackToken
@@ -359,7 +376,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		}
 	}
 
-	return resp, nil
+	return resp, took, nil
 }
 
 // shouldUnenroll checks if the max number of trying an invalid key is reached
@@ -386,6 +403,7 @@ func (f *fleetGateway) stop() {
 	f.log.Info("Fleet gateway is stopping")
 	defer f.scheduler.Stop()
 	f.statusReporter.Unregister()
+	f.localReporter.Unregister()
 	close(f.done)
 	f.wg.Wait()
 }

@@ -37,7 +37,7 @@ import (
 func TestExportedMetrics(t *testing.T) {
 	programName := "testing"
 	expectedMetricsName := "metric_name"
-	program.SupportedMap[programName] = program.Spec{ExprtedMetrics: []string{expectedMetricsName}}
+	program.SupportedMap[programName] = program.Spec{ExportedMetrics: []string{expectedMetricsName}}
 
 	exportedMetrics := normalizeHTTPCopyRules(programName)
 
@@ -212,7 +212,7 @@ type testMonitor struct {
 
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
-func (b *testMonitor) EnrichArgs(_ program.Spec, _ string, args []string, _ bool) []string {
+func (b *testMonitor) EnrichArgs(_ program.Spec, _ string, args []string) []string {
 	return args
 }
 
