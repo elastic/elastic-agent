@@ -1,4 +1,0 @@
-kind: bug-fix
-summary: Create separate status reporter for local only events so that degraded fleet-checkins no longer affect health on successful fleet-checkins.
-issue: https://github.com/elastic/elastic-agent/issues/1157
-pr: https://github.com/elastic/elastic-agent/pull/1285

@@ -1,3 +1,0 @@
-kind: breaking-change
-summary: Upgrade to Go 1.18. Certificates signed with SHA-1 are now rejected. See the Go 1.18 https//tip.golang.org/doc/go1.18#sha1[release notes] for details.
-pr: https://github.com/elastic/elastic-agent/pull/832
