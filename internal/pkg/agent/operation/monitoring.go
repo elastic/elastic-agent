@@ -373,6 +373,7 @@ func (o *Operator) getMonitoringMetricbeatConfig(outputType string, output inter
 	if len(hosts) == 0 {
 		return nil, false
 	}
+	//nolint:prealloc // false positive
 	var modules []interface{}
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 
@@ -668,7 +669,7 @@ func normalizeHTTPCopyRules(name string) []map[string]interface{} {
 		return fromToMap
 	}
 
-	for _, exportedMetric := range spec.ExprtedMetrics {
+	for _, exportedMetric := range spec.ExportedMetrics {
 		fromToMap = append(fromToMap, map[string]interface{}{
 			"from": fmt.Sprintf("http.agent.%s", exportedMetric),
 			"to":   exportedMetric,

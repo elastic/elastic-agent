@@ -58,7 +58,8 @@ func TestPortDefaults(t *testing.T) {
 			c, err := NewWithConfig(l, cfg, nil)
 			require.NoError(t, err)
 
-			r, err := c.nextRequester().request("GET", "/", nil, strings.NewReader(""))
+			c.sortClients()
+			r, err := c.clients[0].newRequest(http.MethodGet, "/", nil, strings.NewReader(""))
 			require.NoError(t, err)
 
 			if tc.ExpectedPort > 0 {
@@ -77,13 +78,13 @@ func TestHTTPClient(t *testing.T) {
 	l, err := logger.New("", false)
 	require.NoError(t, err)
 
+	const successResp = `{"message":"hello"}`
 	t.Run("Guard against double slashes on path", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/nested/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return addCatchAll(mux, t)
 		}, func(t *testing.T, host string) {
@@ -97,23 +98,22 @@ func TestHTTPClient(t *testing.T) {
 			client, err := NewWithConfig(l, c, noopWrapper)
 			require.NoError(t, err)
 
-			resp, err := client.Send(ctx, "GET", "/nested/echo-hello", nil, nil, nil)
+			resp, err := client.Send(ctx, http.MethodGet, "/nested/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
 	t.Run("Simple call", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -123,23 +123,22 @@ func TestHTTPClient(t *testing.T) {
 
 			client, err := NewWithRawConfig(nil, cfg, nil)
 			require.NoError(t, err)
-			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
+			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
 	t.Run("Simple call with a prefix path", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/mycustompath/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -150,23 +149,62 @@ func TestHTTPClient(t *testing.T) {
 
 			client, err := NewWithRawConfig(nil, cfg, nil)
 			require.NoError(t, err)
-			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
+			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
-	t.Run("Custom user agent", withServer(
+	t.Run("Tries all the hosts", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			one := &requestClient{host: "http://must.fail-1.co/"}
+			two := &requestClient{host: "http://must.fail-2.co/"}
+			three := &requestClient{host: fmt.Sprintf("http://%s/", host)}
+
+			c := &Client{clients: []*requestClient{one, two, three}, log: l}
+			require.NoError(t, err)
+			resp, err := c.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			body, err := ioutil.ReadAll(resp.Body)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, successResp, string(body))
+		},
+	))
+
+	t.Run("Return last error", func(t *testing.T) {
+		client := &Client{
+			log: l,
+			clients: []*requestClient{
+				{host: "http://must.fail-1.co/"},
+				{host: "http://must.fail-2.co/"},
+				{host: "http://must.fail-3.co/"},
+			}}
+
+		resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
+		assert.Contains(t, err.Error(), "http://must.fail-3.co/") // error contains last host
+		assert.Nil(t, resp)
+	})
+
+	t.Run("Custom user agent", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, successResp)
 				require.Equal(t, r.Header.Get("User-Agent"), "custom-agent")
 			})
 			return mux
@@ -180,23 +218,22 @@ func TestHTTPClient(t *testing.T) {
 			})
 
 			require.NoError(t, err)
-			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
+			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 
 	t.Run("Allows to debug HTTP request between a client and a server", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ "message": "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 			})
 			return mux
 		}, func(t *testing.T, host string) {
@@ -212,16 +249,16 @@ func TestHTTPClient(t *testing.T) {
 			})
 
 			require.NoError(t, err)
-			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, bytes.NewBuffer([]byte("hello")))
+			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, bytes.NewBuffer([]byte("hello")))
 			require.NoError(t, err)
 
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ "message": "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 
 			for _, m := range debugger.messages {
-				fmt.Println(m)
+				fmt.Println(m) //nolint:forbidigo // printing debug messages on a test.
 			}
 
 			assert.Equal(t, 1, len(debugger.messages))
@@ -230,11 +267,10 @@ func TestHTTPClient(t *testing.T) {
 
 	t.Run("RequestId", withServer(
 		func(t *testing.T) *http.ServeMux {
-			msg := `{ message: "hello" }`
 			mux := http.NewServeMux()
 			mux.HandleFunc("/echo-hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, msg)
+				fmt.Fprint(w, successResp)
 				require.NotEmpty(t, r.Header.Get("X-Request-ID"))
 			})
 			return mux
@@ -245,48 +281,58 @@ func TestHTTPClient(t *testing.T) {
 
 			client, err := NewWithRawConfig(nil, cfg, nil)
 			require.NoError(t, err)
-			resp, err := client.Send(ctx, "GET", "/echo-hello", nil, nil, nil)
+			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
 			require.NoError(t, err)
 
 			body, err := ioutil.ReadAll(resp.Body)
 			require.NoError(t, err)
 			defer resp.Body.Close()
-			assert.Equal(t, `{ message: "hello" }`, string(body))
+			assert.Equal(t, successResp, string(body))
 		},
 	))
 }
 
-func TestNextRequester(t *testing.T) {
+func TestSortClients(t *testing.T) {
 	t.Run("Picks first requester on initial call", func(t *testing.T) {
 		one := &requestClient{}
 		two := &requestClient{}
-		client, err := new(nil, Config{}, one, two)
+		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
-		assert.Equal(t, one, client.nextRequester())
+
+		client.sortClients()
+
+		assert.Equal(t, one, client.clients[0])
 	})
 
 	t.Run("Picks second requester when first has error", func(t *testing.T) {
 		one := &requestClient{
+			lastUsed:   time.Now().UTC(),
 			lastErr:    fmt.Errorf("fake error"),
 			lastErrOcc: time.Now().UTC(),
 		}
 		two := &requestClient{}
-		client, err := new(nil, Config{}, one, two)
+		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
-		assert.Equal(t, two, client.nextRequester())
+
+		client.sortClients()
+
+		assert.Equal(t, two, client.clients[0])
 	})
 
-	t.Run("Picks second requester when first has used", func(t *testing.T) {
+	t.Run("Picks second requester when first has been used", func(t *testing.T) {
 		one := &requestClient{
 			lastUsed: time.Now().UTC(),
 		}
 		two := &requestClient{}
-		client, err := new(nil, Config{}, one, two)
+		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
-		assert.Equal(t, two, client.nextRequester())
+
+		client.sortClients()
+
+		assert.Equal(t, two, client.clients[0])
 	})
 
-	t.Run("Picks second requester when its oldest", func(t *testing.T) {
+	t.Run("Picks second requester when it's the oldest", func(t *testing.T) {
 		one := &requestClient{
 			lastUsed: time.Now().UTC().Add(-time.Minute),
 		}
@@ -296,12 +342,15 @@ func TestNextRequester(t *testing.T) {
 		three := &requestClient{
 			lastUsed: time.Now().UTC().Add(-2 * time.Minute),
 		}
-		client, err := new(nil, Config{}, one, two, three)
+		client, err := newClient(nil, Config{}, one, two, three)
 		require.NoError(t, err)
-		assert.Equal(t, two, client.nextRequester())
+
+		client.sortClients()
+
+		assert.Equal(t, two, client.clients[0])
 	})
 
-	t.Run("Picks third requester when its second has error and first is last used", func(t *testing.T) {
+	t.Run("Picks third requester when second has error and first is last used", func(t *testing.T) {
 		one := &requestClient{
 			lastUsed: time.Now().UTC().Add(-time.Minute),
 		}
@@ -313,9 +362,11 @@ func TestNextRequester(t *testing.T) {
 		three := &requestClient{
 			lastUsed: time.Now().UTC().Add(-2 * time.Minute),
 		}
-		client, err := new(nil, Config{}, one, two, three)
-		require.NoError(t, err)
-		assert.Equal(t, three, client.nextRequester())
+		client := &Client{clients: []*requestClient{one, two, three}}
+
+		client.sortClients()
+
+		assert.Equal(t, three, client.clients[0])
 	})
 
 	t.Run("Picks second requester when its oldest and all have old errors", func(t *testing.T) {
@@ -334,9 +385,12 @@ func TestNextRequester(t *testing.T) {
 			lastErr:    fmt.Errorf("fake error"),
 			lastErrOcc: time.Now().Add(-2 * time.Minute),
 		}
-		client, err := new(nil, Config{}, one, two, three)
+		client, err := newClient(nil, Config{}, one, two, three)
 		require.NoError(t, err)
-		assert.Equal(t, two, client.nextRequester())
+
+		client.sortClients()
+
+		assert.Equal(t, two, client.clients[0])
 	})
 }
 

@@ -364,7 +364,7 @@ inputs:
       streams:
         - condition: ${kubernetes.hints.mimecast.container_logs.enabled} == true
           data_stream:
-            dataset: kubernetes.container_logs
+            dataset: mimecast.container_logs
             type: logs
           exclude_files: []
           exclude_lines: []

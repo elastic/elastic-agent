@@ -30,8 +30,8 @@ inputs:
             dataset: traefik.health
             type: metrics
           hosts:
-            - ${kubernetes.hints.traefik.health.host|'localhost:8080'}
+            - ${kubernetes.hints.traefik.health.host|kubernetes.hints.traefik.host|'localhost:8080'}
           metricsets:
             - health
-          period: ${kubernetes.hints.traefik.health.period|'10s'}
+          period: ${kubernetes.hints.traefik.health.period|kubernetes.hints.traefik.period|'10s'}
       data_stream.namespace: default

@@ -8,28 +8,28 @@ inputs:
             dataset: zookeeper.connection
             type: metrics
           hosts:
-            - ${kubernetes.hints.zookeeper.connection.host|'localhost:2181'}
+            - ${kubernetes.hints.zookeeper.connection.host|kubernetes.hints.zookeeper.host|'localhost:2181'}
           metricsets:
             - connection
-          period: ${kubernetes.hints.zookeeper.connection.period|'10s'}
+          period: ${kubernetes.hints.zookeeper.connection.period|kubernetes.hints.zookeeper.period|'10s'}
         - condition: ${kubernetes.hints.zookeeper.mntr.enabled} == true or ${kubernetes.hints.zookeeper.enabled} == true
           data_stream:
             dataset: zookeeper.mntr
             type: metrics
           hosts:
-            - ${kubernetes.hints.zookeeper.mntr.host|'localhost:2181'}
+            - ${kubernetes.hints.zookeeper.mntr.host|kubernetes.hints.zookeeper.host|'localhost:2181'}
           metricsets:
             - mntr
-          period: ${kubernetes.hints.zookeeper.mntr.period|'10s'}
+          period: ${kubernetes.hints.zookeeper.mntr.period|kubernetes.hints.zookeeper.period|'10s'}
         - condition: ${kubernetes.hints.zookeeper.server.enabled} == true or ${kubernetes.hints.zookeeper.enabled} == true
           data_stream:
             dataset: zookeeper.server
             type: metrics
           hosts:
-            - ${kubernetes.hints.zookeeper.server.host|'localhost:2181'}
+            - ${kubernetes.hints.zookeeper.server.host|kubernetes.hints.zookeeper.host|'localhost:2181'}
           metricsets:
             - server
-          period: ${kubernetes.hints.zookeeper.server.period|'10s'}
+          period: ${kubernetes.hints.zookeeper.server.period|kubernetes.hints.zookeeper.period|'10s'}
       data_stream.namespace: default
     - name: filestream-zookeeper
       type: filestream
@@ -37,7 +37,7 @@ inputs:
       streams:
         - condition: ${kubernetes.hints.zookeeper.container_logs.enabled} == true
           data_stream:
-            dataset: kubernetes.container_logs
+            dataset: zookeeper.container_logs
             type: logs
           exclude_files: []
           exclude_lines: []

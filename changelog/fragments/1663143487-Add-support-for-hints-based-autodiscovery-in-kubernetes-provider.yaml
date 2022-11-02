@@ -1,3 +1,0 @@
-kind: feature
-summary: Add support for hints' based autodiscovery in kubernetes provider.
-pr: https://github.com/elastic/elastic-agent/pull/698
