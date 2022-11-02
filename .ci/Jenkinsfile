@@ -425,7 +425,7 @@ pipeline {
     cleanup {
       notifyBuildResult(prComment: true,
                         analyzeFlakey: !isTag(), jobName: getFlakyJobName(withBranch: (isPR() ? env.CHANGE_TARGET : env.BRANCH_NAME)),
-                        githubIssue: isBranch() && currentBuild.currentResult != "SUCCESS",
+                        githubIssue: false, // Disable creating gh issues for build failures while the E2E tests are stabilized.
                         githubLabels: 'Team:Elastic-Agent-Control-Plane')
     }
   }
