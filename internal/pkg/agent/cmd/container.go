@@ -782,11 +782,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 			return err
 		}
 	}
-	// sync the downloads to the data directory
-	destDownloads := filepath.Join(statePath, "data", "downloads")
-	if err := syncDir(paths.Downloads(), destDownloads); err != nil {
-		return fmt.Errorf("syncing download directory to STATE_PATH(%s) failed: %w", statePath, err)
-	}
+
 	originalInstall := paths.Install()
 	originalTop := paths.Top()
 	paths.SetTop(topPath)
@@ -864,27 +860,6 @@ func tryContainerLoadPaths() error {
 		return fmt.Errorf("failed to unpack %s: %w", pathFile, err)
 	}
 	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, false)
-}
-
-func syncDir(src string, dest string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			if os.IsNotExist(err) {
-				// source dir exists only if there's agent artifact
-				return nil
-			}
-			return err
-		}
-		relativePath := strings.TrimPrefix(path, src)
-		if info.IsDir() {
-			err = os.MkdirAll(filepath.Join(dest, relativePath), info.Mode())
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-		return copyFile(filepath.Join(dest, relativePath), path, info.Mode())
-	})
 }
 
 func copyFile(destPath string, srcPath string, mode os.FileMode) error {
