@@ -226,15 +226,6 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	err := sh.RunV(
-		"protoc",
-		"--go_out=.", "--go_opt=paths=source_relative",
-		"--go-grpc_out=.", "--go-grpc_opt=paths=source_relative",
-		"pkg/component/fake/common/event.proto")
-	if err != nil {
-		return err
-	}
-
 	p := filepath.Join("pkg", "component", "fake")
 	for _, name := range []string{"component", "shipper"} {
 		binary := name
@@ -475,6 +466,15 @@ func ControlProto() error {
 		"--go_out=internal/pkg/agent/control/cproto", "--go_opt=paths=source_relative",
 		"--go-grpc_out=internal/pkg/agent/control/cproto", "--go-grpc_opt=paths=source_relative",
 		"control.proto")
+}
+
+// FakeShipperProto generates pkg/component/fake/common event protocol.
+func FakeShipperProto() error {
+	return sh.RunV(
+		"protoc",
+		"--go_out=.", "--go_opt=paths=source_relative",
+		"--go-grpc_out=.", "--go-grpc_opt=paths=source_relative",
+		"pkg/component/fake/common/event.proto")
 }
 
 func BuildPGP() error {
