@@ -179,7 +179,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -304,7 +304,7 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -475,7 +475,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -630,7 +630,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -756,7 +756,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -914,7 +914,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -1044,7 +1044,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -1183,7 +1183,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -1304,7 +1304,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -1428,7 +1428,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	runtimeSpec := component.InputRuntimeSpec{
 		InputType:  "fake",
 		BinaryName: "",
@@ -1640,7 +1640,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
 		InputSpec: &component.InputRuntimeSpec{
@@ -1755,6 +1755,7 @@ LOOP:
 	require.NoError(t, err)
 }
 
+/*
 func TestManager_FakeInput_WithShipper(t *testing.T) {
 	testPaths(t)
 
@@ -1762,7 +1763,7 @@ func TestManager_FakeInput_WithShipper(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1779,7 +1780,7 @@ func TestManager_FakeInput_WithShipper(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comps := []component.Component{
 		{
 			ID: "fake-default",
@@ -1923,6 +1924,7 @@ LOOP:
 	err = <-errCh
 	require.NoError(t, err)
 }
+*/
 
 func newErrorLogger(t *testing.T) *logger.Logger {
 	t.Helper()
@@ -1986,11 +1988,11 @@ func testPaths(t *testing.T) {
 	})
 }
 
-func testBinary(t *testing.T) string {
+func testBinary(t *testing.T, name string) string {
 	t.Helper()
 
 	var err error
-	binaryPath := filepath.Join("..", "fake", "fake")
+	binaryPath := filepath.Join("..", "fake", name, name)
 	binaryPath, err = filepath.Abs(binaryPath)
 	if err != nil {
 		t.Fatalf("failed abs %s: %s", binaryPath, err)

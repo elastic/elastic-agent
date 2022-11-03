@@ -46,7 +46,13 @@ type ServiceRuntime struct {
 
 // NewServiceRuntime creates a new command runtime for the provided component.
 func NewServiceRuntime(comp component.Component, logger *logger.Logger) (ComponentRuntime, error) {
-	if comp.Spec.Spec.Service == nil {
+	if comp.ShipperSpec != nil {
+		return nil, errors.New("service runtime not supported for a shipper specification")
+	}
+	if comp.InputSpec == nil {
+		return nil, errors.New("service runtime requires an input specification to be defined")
+	}
+	if comp.InputSpec.Spec.Service == nil {
 		return nil, errors.New("must have service defined in specification")
 	}
 
@@ -111,7 +117,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 				// Start connection info
 				if cis == nil {
-					cis, err = newConnInfoServer(s.log, comm, s.comp.Spec.Spec.Service.CPort)
+					cis, err = newConnInfoServer(s.log, comm, s.comp.InputSpec.Spec.Service.CPort)
 					if err != nil {
 						err = fmt.Errorf("failed to start connection info service %s: %w", s.name(), err)
 						break
@@ -321,7 +327,7 @@ func (s *ServiceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *t
 }
 
 func (s *ServiceRuntime) checkinPeriod() time.Duration {
-	checkinPeriod := s.comp.Spec.Spec.Service.Timeouts.Checkin
+	checkinPeriod := s.comp.InputSpec.Spec.Service.Timeouts.Checkin
 	if checkinPeriod == 0 {
 		checkinPeriod = defaultCheckServiceStatusInterval
 	}
@@ -395,27 +401,27 @@ func (s *ServiceRuntime) compState(state client.UnitState, missedCheckins int) {
 }
 
 func (s *ServiceRuntime) name() string {
-	return s.comp.Spec.Spec.Name
+	return s.comp.InputSpec.Spec.Name
 }
 
 // check executes the service check command
 func (s *ServiceRuntime) check(ctx context.Context) error {
-	if s.comp.Spec.Spec.Service.Operations.Check == nil {
-		s.log.Errorf("missing check spec for %s service", s.comp.Spec.BinaryName)
+	if s.comp.InputSpec.Spec.Service.Operations.Check == nil {
+		s.log.Errorf("missing check spec for %s service", s.comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
-	s.log.Debugf("check if the %s is installed", s.comp.Spec.BinaryName)
-	return s.executeServiceCommandImpl(ctx, s.log, s.comp.Spec.BinaryPath, s.comp.Spec.Spec.Service.Operations.Check)
+	s.log.Debugf("check if the %s is installed", s.comp.InputSpec.BinaryName)
+	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Check)
 }
 
 // install executes the service install command
 func (s *ServiceRuntime) install(ctx context.Context) error {
-	if s.comp.Spec.Spec.Service.Operations.Install == nil {
-		s.log.Errorf("missing install spec for %s service", s.comp.Spec.BinaryName)
+	if s.comp.InputSpec.Spec.Service.Operations.Install == nil {
+		s.log.Errorf("missing install spec for %s service", s.comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
-	s.log.Debugf("install %s service", s.comp.Spec.BinaryName)
-	return s.executeServiceCommandImpl(ctx, s.log, s.comp.Spec.BinaryPath, s.comp.Spec.Spec.Service.Operations.Install)
+	s.log.Debugf("install %s service", s.comp.InputSpec.BinaryName)
+	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Install)
 }
 
 // uninstall executes the service uninstall command
@@ -429,10 +435,10 @@ func UninstallService(ctx context.Context, log *logger.Logger, comp component.Co
 }
 
 func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc) error {
-	if comp.Spec.Spec.Service.Operations.Uninstall == nil {
-		log.Errorf("missing uninstall spec for %s service", comp.Spec.BinaryName)
+	if comp.InputSpec.Spec.Service.Operations.Uninstall == nil {
+		log.Errorf("missing uninstall spec for %s service", comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
-	log.Debugf("uninstall %s service", comp.Spec.BinaryName)
-	return executeServiceCommandImpl(ctx, log, comp.Spec.BinaryPath, comp.Spec.Spec.Service.Operations.Uninstall)
+	log.Debugf("uninstall %s service", comp.InputSpec.BinaryName)
+	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, comp.InputSpec.Spec.Service.Operations.Uninstall)
 }
