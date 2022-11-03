@@ -35,6 +35,7 @@ var (
 	configFilePath  string
 	logsPath        string
 	downloadsPath   string
+	componentsPath  string
 	installPath     string
 	unversionedHome bool
 	tmpCreator      sync.Once
@@ -46,14 +47,21 @@ func init() {
 	logsPath = topPath
 	unversionedHome = false // only versioned by container subcommand
 
+	// these should never change
+	versionedHome := VersionedHome(topPath)
+	downloadsPath = filepath.Join(versionedHome, "downloads")
+	componentsPath = filepath.Join(versionedHome, "components")
+
 	fs := flag.CommandLine
 	fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
 	fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
-	fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
 	fs.StringVar(&installPath, "path.install", installPath, "Install path contains binaries Agent extracts")
+
+	// enable user to download update artifacts to alternative place
+	fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
 }
 
 // Top returns the top directory for Elastic Agent, all the versioned
@@ -146,7 +154,7 @@ func Run() string {
 
 // Components returns the component directory for Agent
 func Components() string {
-	return filepath.Join(Home(), "components")
+	return componentsPath
 }
 
 // Logs returns the log directory for Agent
@@ -166,9 +174,6 @@ func VersionedHome(base string) string {
 
 // Downloads returns the downloads directory for Agent
 func Downloads() string {
-	if downloadsPath == "" {
-		return filepath.Join(Home(), "downloads")
-	}
 	return downloadsPath
 }
 
