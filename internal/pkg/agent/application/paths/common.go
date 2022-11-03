@@ -61,6 +61,8 @@ func init() {
 	fs.StringVar(&installPath, "path.install", installPath, "Install path contains binaries Agent extracts")
 
 	// enable user to download update artifacts to alternative place
+	// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
+	// `path.download` serves just as init value for `agent.download.targetDirectory`
 	fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
 }
 
