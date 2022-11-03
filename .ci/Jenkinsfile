@@ -113,6 +113,10 @@ pipeline {
             steps {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
+                  sh '''
+                  curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.19.4/protoc-3.19.4-linux-x86_64.zip
+                  unzip protoc.zip
+                  '''
                   dir("${BASE_DIR}"){
                     withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
                       cmd(label: 'Go unitTest', script: 'mage unitTest')
