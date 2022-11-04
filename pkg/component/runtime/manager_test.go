@@ -1758,6 +1758,19 @@ LOOP:
 }
 
 func TestManager_FakeShipper(t *testing.T) {
+	/*
+		This test runs one instance of the fake/component and an instance of the fake/shipper. They get connected
+		together, and it ensures that a test event is sent between each instance. Below is a breakdown on how this
+		test performs this work and ensures that an event is sent between the two instances.
+
+		1. Wait for the shipper input (GRPC server) is healthy.
+		2. Wait for the component output (GRPC client) is healthy.
+		3. Create a unique ID to use for the event ID.
+		4. Send `record_event` action to the shipper input (GRPC server); won't return until it actually gets the event.
+		5. Send `send_event` action to the component fake input (GRPC client); returns once sent.
+		6. Wait for `record_event` action to return from the shipper input (GRPC server).
+	*/
+
 	testPaths(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
