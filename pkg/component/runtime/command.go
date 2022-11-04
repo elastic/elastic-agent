@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,6 +51,7 @@ type procState struct {
 
 // CommandRuntime provides the command runtime for running a component as a subprocess.
 type CommandRuntime struct {
+	logger  *logger.Logger
 	current component.Component
 	monitor MonitoringManager
 
@@ -67,11 +69,13 @@ type CommandRuntime struct {
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
-func NewCommandRuntime(comp component.Component, monitor MonitoringManager) (ComponentRuntime, error) {
+func NewCommandRuntime(logger *logger.Logger, comp component.Component, monitor MonitoringManager) (ComponentRuntime, error) {
 	if comp.Spec.Spec.Command == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
+	logger = logger.With("component", comp.ID).With("type", comp.Spec.InputType)
 	return &CommandRuntime{
+		logger:      logger,
 		current:     comp,
 		ch:          make(chan ComponentState),
 		actionCh:    make(chan actionMode),
@@ -303,7 +307,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
-		process.WithCmdOptions(attachOutErr, dirPath(workDir)))
+		process.WithCmdOptions(attachOutErr(c.logger), dirPath(workDir)))
 	if err != nil {
 		return err
 	}
@@ -409,10 +413,12 @@ func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
 	return path, nil
 }
 
-func attachOutErr(cmd *exec.Cmd) error {
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return nil
+func attachOutErr(logger *logger.Logger) process.CmdOption {
+	return func(cmd *exec.Cmd) error {
+		cmd.Stdout = &commandLogger{logger}
+		cmd.Stderr = &commandLogger{logger}
+		return nil
+	}
 }
 
 func dirPath(path string) process.CmdOption {
