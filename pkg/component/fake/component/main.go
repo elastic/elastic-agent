@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -315,7 +314,7 @@ func (f *fakeShipperOutput) run(ctx context.Context, unit *client.Unit, cfg *pro
 			return errors.New("failed to append CA for shipper connection")
 		}
 	}
-	conn, err := grpc.DialContext(ctx, shipperCfg.Server, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(certPool, unit.ID())))
+	conn, err := dialContext(ctx, shipperCfg.Server, certPool, unit.ID())
 	if err != nil {
 		return fmt.Errorf("grpc client failed to connect: %w", err)
 	}
