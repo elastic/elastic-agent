@@ -12,9 +12,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/gofrs/uuid"
 	"go.elastic.co/apm"
@@ -54,6 +58,12 @@ var (
 type ComponentComponentState struct {
 	Component component.Component `yaml:"component"`
 	State     ComponentState      `yaml:"state"`
+}
+
+// ComponentUnitDiagnosticRequest used to request diagnostics from specific unit.
+type ComponentUnitDiagnosticRequest struct {
+	Component component.Component
+	Unit      component.Unit
 }
 
 // ComponentUnitDiagnostic provides a structure to map a component/unit to diagnostic results.
@@ -288,7 +298,7 @@ func (m *Manager) State() []ComponentComponentState {
 }
 
 // PerformAction executes an action on a unit.
-func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+func (m *Manager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
@@ -300,7 +310,7 @@ func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name s
 			return nil, err
 		}
 	}
-	runtime := m.getRuntimeFromUnit(unit)
+	runtime := m.getRuntimeFromUnit(comp, unit)
 	if runtime == nil {
 		return nil, ErrNoUnit
 	}
@@ -347,21 +357,21 @@ func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name s
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
-func (m *Manager) PerformDiagnostics(ctx context.Context, units ...component.Unit) []ComponentUnitDiagnostic {
+func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDiagnosticRequest) []ComponentUnitDiagnostic {
 	// build results from units
 	var results []ComponentUnitDiagnostic
-	if len(units) > 0 {
-		for _, u := range units {
-			r := m.getRuntimeFromUnit(u)
+	if len(req) > 0 {
+		for _, q := range req {
+			r := m.getRuntimeFromUnit(q.Component, q.Unit)
 			if r == nil {
 				results = append(results, ComponentUnitDiagnostic{
-					Unit: u,
+					Unit: q.Unit,
 					Err:  ErrNoUnit,
 				})
 			} else {
 				results = append(results, ComponentUnitDiagnostic{
 					Component: r.currComp,
-					Unit:      u,
+					Unit:      q.Unit,
 				})
 			}
 		}
@@ -397,7 +407,7 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, units ...component.Uni
 			// already in error don't perform diagnostics
 			continue
 		}
-		diag, err := m.performDiagAction(ctx, r.Unit)
+		diag, err := m.performDiagAction(ctx, r.Component, r.Unit)
 		if err != nil {
 			r.Err = err
 		} else {
@@ -751,13 +761,15 @@ func (m *Manager) getRuntimeFromToken(token string) *componentRuntimeState {
 	return nil
 }
 
-func (m *Manager) getRuntimeFromUnit(unit component.Unit) *componentRuntimeState {
+func (m *Manager) getRuntimeFromUnit(comp component.Component, unit component.Unit) *componentRuntimeState {
 	m.mx.RLock()
 	defer m.mx.RUnlock()
-	for _, comp := range m.current {
-		for _, u := range comp.currComp.Units {
-			if u.Type == unit.Type && u.ID == unit.ID {
-				return comp
+	for _, c := range m.current {
+		if c.currComp.ID == comp.ID {
+			for _, u := range c.currComp.Units {
+				if u.Type == unit.Type && u.ID == unit.ID {
+					return c
+				}
 			}
 		}
 	}
@@ -778,7 +790,7 @@ func (m *Manager) getListenAddr() string {
 	return m.listenAddr
 }
 
-func (m *Manager) performDiagAction(ctx context.Context, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
+func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
 	defer cancel()
 
@@ -787,7 +799,7 @@ func (m *Manager) performDiagAction(ctx context.Context, unit component.Unit) ([
 		return nil, err
 	}
 
-	runtime := m.getRuntimeFromUnit(unit)
+	runtime := m.getRuntimeFromUnit(comp, unit)
 	if runtime == nil {
 		return nil, ErrNoUnit
 	}
@@ -835,8 +847,12 @@ func (m *Manager) connectShippers(components []component.Component) error {
 				if err != nil {
 					return fmt.Errorf("failed to create connection CA for shipper %q: %w", comp.ID, err)
 				}
+				addr, err := getShipperAddr(comp.ID)
+				if err != nil {
+					return fmt.Errorf("failed to determine shipper pipe path: %w", err)
+				}
 				conn = &shipperConn{
-					addr:  "", // TODO: Add address
+					addr:  addr,
 					ca:    ca,
 					pairs: make(map[string]*authority.Pair),
 				}
@@ -910,7 +926,7 @@ func pairGetOrCreate(conn *shipperConn, pairID string) (*authority.Pair, error) 
 	if ok {
 		return pair, nil
 	}
-	pair, err = conn.ca.GeneratePair()
+	pair, err = conn.ca.GeneratePairWithName(pairID)
 	if err != nil {
 		return nil, err
 	}
@@ -924,7 +940,7 @@ func injectShipperConn(cfg *proto.UnitExpectedConfig, addr string, ca *authority
 		return cfg, nil
 	}
 	source := cfg.Source.AsMap()
-	source["host"] = addr
+	source["server"] = addr
 	source["ssl"] = map[string]interface{}{
 		"certificate_authorities": []interface{}{
 			string(ca.Crt()),
@@ -933,6 +949,20 @@ func injectShipperConn(cfg *proto.UnitExpectedConfig, addr string, ca *authority
 		"key":         string(pair.Key),
 	}
 	return component.ExpectedConfig(source)
+}
+
+func getShipperAddr(componentID string) (string, error) {
+	addr := filepath.Join(paths.Run(), fmt.Sprintf("%s-pipe", componentID))
+	if runtime.GOOS == component.Windows {
+		return fmt.Sprintf("npipe://%s", addr), nil
+	}
+	addr = fmt.Sprintf("unix://%s.sock", addr)
+	if len(addr) >= 108 {
+		// provides a better error than "bind: invalid socket" which is very unclear on why it failed
+		// see: https://github.com/golang/go/issues/6895
+		return "", fmt.Errorf("unix socket must be less than 108 characters, got %d with %q", len(addr), addr)
+	}
+	return addr, nil
 }
 
 type waitForReady struct {

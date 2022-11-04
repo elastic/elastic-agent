@@ -9,15 +9,16 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/protobuf/types/known/structpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -320,6 +321,10 @@ func (f *fakeShipperOutput) run(ctx context.Context, unit *client.Unit, cfg *pro
 	}
 	defer conn.Close()
 
+	connectedMsg := fmt.Sprintf("GRPC fake event pipe connected %q", shipperCfg.Server)
+	f.logger.Debug().Str("state", client.UnitStateHealthy.String()).Str("message", connectedMsg).Msg("connected to output")
+	_ = unit.UpdateState(client.UnitStateHealthy, connectedMsg, nil)
+
 	client := common.NewFakeEventProtocolClient(conn)
 	for {
 		select {
@@ -327,7 +332,7 @@ func (f *fakeShipperOutput) run(ctx context.Context, unit *client.Unit, cfg *pro
 			return ctx.Err()
 		case evt := <-f.evtCh:
 			evtCtx, evtCanceller := context.WithTimeout(ctx, evt.timeout)
-			_, err := client.SendEvent(evtCtx, evt.evt)
+			_, err := client.SendEvent(evtCtx, evt.evt, grpc.WaitForReady(true))
 			evtCanceller()
 			evt.doneCh <- err
 		}

@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// GenerateMonitoringCfgFn is a function that can inject information into the model generation process.
 type GenerateMonitoringCfgFn func(map[string]interface{}, map[string]string) (map[string]interface{}, error)
 
 const (
@@ -127,6 +128,8 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 	return components, nil
 }
 
+// PolicyToComponents takes the policy and generated a component model along with providing a mapping between component
+// and the running binary.
 func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Component, map[string]string, error) {
 	const revision = "revision"
 	outputsMap, err := toIntermediate(policy)

@@ -9,14 +9,15 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"io"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/rs/zerolog"
 
@@ -34,7 +35,7 @@ const (
 	stoppingMsg = "Stopping"
 	stoppedMsg  = "Stopped"
 
-	recordActionEventId = "id"
+	recordActionEventID = "id"
 )
 
 func main() {
@@ -159,14 +160,22 @@ func (s *stateManager) removed(unit *client.Unit) {
 }
 
 func (s *stateManager) received(ctx context.Context, event *common.Event) error {
-	if event.Content == nil {
-		return nil
+	var cnt map[string]interface{}
+	if event.Content != nil {
+		cnt = event.Content.AsMap()
 	}
-	val, ok := event.Content.Fields[recordActionEventId]
+	s.logger.Trace().Fields(map[string]interface{}{
+		"timestamp": event.Generated.AsTime(),
+		"content":   cnt,
+	}).Msg("received event")
+	idRaw, ok := cnt[recordActionEventID]
 	if !ok {
 		return nil
 	}
-	id := val.String()
+	id, ok := idRaw.(string)
+	if !ok {
+		return nil
+	}
 	s.unitsMx.RLock()
 	defer s.unitsMx.RUnlock()
 	for k, u := range s.units {
@@ -198,19 +207,23 @@ type fakeActionOutputRuntime struct {
 
 	subsMx sync.RWMutex
 	subs   map[string]chan *common.Event
+
+	previousMx sync.RWMutex
+	previous   map[string]*common.Event
 }
 
 func newFakeActionOutputRuntime(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeActionOutputRuntime, error) {
 	logger = logger.Level(toZerologLevel(logLevel))
 
 	i := &fakeActionOutputRuntime{
-		logger: logger,
-		unit:   unit,
-		cfg:    cfg,
-		subs:   make(map[string]chan *common.Event),
+		logger:   logger,
+		unit:     unit,
+		cfg:      cfg,
+		subs:     make(map[string]chan *common.Event),
+		previous: make(map[string]*common.Event),
 	}
 
-	logger.Trace().Msg("registering record-event action for unit")
+	logger.Trace().Msg("registering record event action for unit")
 	unit.RegisterAction(&recordEventAction{i})
 	logger.Trace().Msg("registering kill action for unit")
 	unit.RegisterAction(&killAction{logger})
@@ -249,6 +262,17 @@ func (f *fakeActionOutputRuntime) Update(u *client.Unit) error {
 }
 
 func (f *fakeActionOutputRuntime) subscribe(id string) <-chan *common.Event {
+	f.previousMx.RLock()
+	e, ok := f.previous[id]
+	if ok {
+		f.previousMx.RUnlock()
+		f.logger.Trace().Str(recordActionEventID, id).Msg("event already received; directly sending to subscription")
+		c := make(chan *common.Event, 1)
+		c <- e
+		return c
+	}
+	f.previousMx.RUnlock()
+
 	f.subsMx.Lock()
 	defer f.subsMx.Unlock()
 	c, ok := f.subs[id]
@@ -257,17 +281,15 @@ func (f *fakeActionOutputRuntime) subscribe(id string) <-chan *common.Event {
 	}
 	c = make(chan *common.Event, 1)
 	f.subs[id] = c
+	f.logger.Trace().Str(recordActionEventID, id).Msg("subscribing for an event")
 	return c
 }
 
 func (f *fakeActionOutputRuntime) unsubscribe(id string) {
 	f.subsMx.Lock()
 	defer f.subsMx.Unlock()
-	c, ok := f.subs[id]
-	if ok {
-		close(c)
-		delete(f.subs, id)
-	}
+	f.logger.Trace().Str(recordActionEventID, id).Msg("unsubscribing for an event")
+	delete(f.subs, id)
 }
 
 func (f *fakeActionOutputRuntime) cleanup() {
@@ -284,6 +306,10 @@ func (f *fakeActionOutputRuntime) received(ctx context.Context, id string, event
 	defer f.subsMx.RUnlock()
 	c, ok := f.subs[id]
 	if ok {
+		f.logger.Trace().Str("id", id).Msg("subscription exists for event id")
+		f.previousMx.Lock()
+		f.previous[id] = event
+		f.previousMx.Unlock()
 		select {
 		case <-ctx.Done():
 			return false
@@ -291,6 +317,7 @@ func (f *fakeActionOutputRuntime) received(ctx context.Context, id string, event
 			return true
 		}
 	}
+	f.logger.Trace().Str("id", id).Msg("no subscription exists for event id")
 	return false
 }
 
@@ -300,25 +327,29 @@ type recordEventAction struct {
 }
 
 func (r *recordEventAction) Name() string {
-	return "record-event"
+	return "record_event"
 }
 
 func (r *recordEventAction) Execute(ctx context.Context, params map[string]interface{}) (map[string]interface{}, error) {
-	eventIdRaw, ok := params[recordActionEventId]
+	eventIDRaw, ok := params[recordActionEventID]
 	if !ok {
 		return nil, fmt.Errorf("missing required 'id' parameter")
 	}
-	eventId, ok := eventIdRaw.(string)
+	eventID, ok := eventIDRaw.(string)
 	if !ok {
-		return nil, fmt.Errorf("'id' parameter not string type, got %T", eventIdRaw)
+		return nil, fmt.Errorf("'id' parameter not string type, got %T", eventIDRaw)
 	}
-	r.f.logger.Trace().Str(recordActionEventId, eventId).Msg("registering record event action")
-	c := r.f.subscribe(eventId)
-	defer r.f.unsubscribe(eventId)
+	r.f.logger.Trace().Str(recordActionEventID, eventID).Msg("registering record event action")
+	c := r.f.subscribe(eventID)
+	defer r.f.unsubscribe(eventID)
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case e, ok := <-c:
+		r.f.logger.Trace().Fields(map[string]interface{}{
+			"timestamp": e.Generated.AsTime(),
+			"content":   e.Content.AsMap(),
+		}).Msg("record_event action got subscribed event")
 		if !ok {
 			return nil, fmt.Errorf("never recieved event")
 		}

@@ -23,8 +23,10 @@ const (
 )
 
 var (
+	// ErrOperationSpecUndefined error for missing specification.
 	ErrOperationSpecUndefined = errors.New("operation spec undefined")
-	ErrInvalidServiceSpec     = errors.New("invalid service spec")
+	// ErrInvalidServiceSpec error invalid service specification.
+	ErrInvalidServiceSpec = errors.New("invalid service spec")
 )
 
 type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error

@@ -15,7 +15,7 @@ import (
 
 func createListener(path string) (net.Listener, error) {
 	if !strings.HasPrefix(path, "unix://") {
-		return nil, fmt.Errorf("listener path must start with unix://")
+		return nil, fmt.Errorf("listener path must start with unix://; got %s", path)
 	}
 	path = strings.TrimPrefix(path, "unix://")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {

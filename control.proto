@@ -193,6 +193,8 @@ message DiagnosticAgentResponse {
 
 // DiagnosticUnitRequest specifies a specific unit to gather diagnostics from.
 message DiagnosticUnitRequest {
+  // ID of the component.
+  string component_id = 1;
   // Type of unit.
   UnitType unit_type = 2;
   // ID of the unit.

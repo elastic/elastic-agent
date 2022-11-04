@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid"
+
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 
@@ -959,7 +961,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 							// subscription channel
 							go func() {
 								actionCtx, actionCancel := context.WithTimeout(context.Background(), 15*time.Second)
-								_, err := m.PerformAction(actionCtx, comp.Units[0], "set_state", map[string]interface{}{
+								_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "set_state", map[string]interface{}{
 									"state":   int(client.UnitStateDegraded),
 									"message": "Action Set Degraded",
 								})
@@ -1095,7 +1097,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 							if !killed {
 								killed = true
 								actionCtx, actionCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-								_, err := m.PerformAction(actionCtx, comp.Units[0], "kill", nil)
+								_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "kill", nil)
 								actionCancel()
 								if !errors.Is(err, context.DeadlineExceeded) {
 									// should have got deadline exceeded for this call
@@ -1346,7 +1348,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 						} else if unit.State == client.UnitStateHealthy {
 							actionCtx, actionCancel := context.WithTimeout(context.Background(), 5*time.Second)
-							_, err := m.PerformAction(actionCtx, comp.Units[0], "invalid_missing_action", nil)
+							_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "invalid_missing_action", nil)
 							actionCancel()
 							if err == nil {
 								subErrCh <- fmt.Errorf("should have returned an error")
@@ -1697,7 +1699,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 							}
 
 							actionCtx, actionCancel := context.WithTimeout(context.Background(), 5*time.Second)
-							_, err := m.PerformAction(actionCtx, comp.Units[0], "invalid_missing_action", nil)
+							_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "invalid_missing_action", nil)
 							actionCancel()
 							if err == nil {
 								subErrCh <- fmt.Errorf("should have returned an error")
@@ -1755,8 +1757,7 @@ LOOP:
 	require.NoError(t, err)
 }
 
-/*
-func TestManager_FakeInput_WithShipper(t *testing.T) {
+func TestManager_FakeShipper(t *testing.T) {
 	testPaths(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1780,20 +1781,22 @@ func TestManager_FakeInput_WithShipper(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t, "component")
+	componentPath := testBinary(t, "component")
+	shipperPath := testBinary(t, "shipper")
 	comps := []component.Component{
 		{
 			ID: "fake-default",
 			InputSpec: &component.InputRuntimeSpec{
 				InputType:  "fake",
 				BinaryName: "",
-				BinaryPath: binaryPath,
+				BinaryPath: componentPath,
 				Spec:       fakeInputSpec,
 			},
 			Units: []component.Unit{
 				{
-					ID:   "fake-input",
-					Type: client.UnitTypeInput,
+					ID:       "fake-input",
+					Type:     client.UnitTypeInput,
+					LogLevel: client.UnitLogLevelTrace,
 					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
 						"state":   int(client.UnitStateHealthy),
@@ -1801,8 +1804,9 @@ func TestManager_FakeInput_WithShipper(t *testing.T) {
 					}),
 				},
 				{
-					ID:   "fake-default",
-					Type: client.UnitTypeOutput,
+					ID:       "fake-default",
+					Type:     client.UnitTypeOutput,
+					LogLevel: client.UnitLogLevelTrace,
 					Config: component.MustExpectedConfig(map[string]interface{}{
 						"type": "fake-shipper",
 					}),
@@ -1818,15 +1822,17 @@ func TestManager_FakeInput_WithShipper(t *testing.T) {
 			ShipperSpec: &component.ShipperRuntimeSpec{
 				ShipperType: "fake-shipper",
 				BinaryName:  "",
-				BinaryPath:  binaryPath,
+				BinaryPath:  shipperPath,
 				Spec:        fakeShipperSpec,
 			},
 			Units: []component.Unit{
 				{
-					ID:   "fake-default",
-					Type: client.UnitTypeInput,
+					ID:       "fake-default",
+					Type:     client.UnitTypeInput,
+					LogLevel: client.UnitLogLevelTrace,
 					Config: component.MustExpectedConfig(map[string]interface{}{
-						"id": "fake-default",
+						"id":   "fake-default",
+						"type": "fake-shipper",
 						"units": []interface{}{
 							map[string]interface{}{
 								"id": "fake-input",
@@ -1840,10 +1846,11 @@ func TestManager_FakeInput_WithShipper(t *testing.T) {
 					}),
 				},
 				{
-					ID:   "fake-default",
-					Type: client.UnitTypeOutput,
+					ID:       "fake-default",
+					Type:     client.UnitTypeOutput,
+					LogLevel: client.UnitLogLevelTrace,
 					Config: component.MustExpectedConfig(map[string]interface{}{
-						"type": "elasticsearch",
+						"type": "fake-action-output",
 					}),
 				},
 			},
@@ -1854,29 +1861,116 @@ func TestManager_FakeInput_WithShipper(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe(subCtx, "fake-default")
+		shipperOn := false
+		compConnected := false
+
+		sendEvent := func() (bool, error) {
+			if !shipperOn || !compConnected {
+				// wait until connected
+				return false, nil
+			}
+
+			// send an event between component and the fake shipper
+			eventID, err := uuid.NewV4()
+			if err != nil {
+				return true, err
+			}
+
+			// wait for the event on the shipper side
+			gotEvt := make(chan error)
+			go func() {
+				actionCtx, actionCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				_, err := m.PerformAction(actionCtx, comps[1], comps[1].Units[1], "record_event", map[string]interface{}{
+					"id": eventID.String(),
+				})
+				actionCancel()
+				gotEvt <- err
+			}()
+
+			// send the fake event
+			actionCtx, actionCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, err = m.PerformAction(actionCtx, comps[0], comps[0].Units[0], "send_event", map[string]interface{}{
+				"id": eventID.String(),
+			})
+			actionCancel()
+			if err != nil {
+				return true, err
+			}
+
+			err = <-gotEvt
+			if err == nil {
+				t.Logf("successfully sent event from fake input to fake shipper, event ID: %s", eventID.String())
+			}
+			return true, err
+		}
+
+		shipperSub := m.Subscribe(subCtx, "fake-shipper-default")
+		compSub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
-				t.Logf("component state changed: %+v", state)
+			case state := <-shipperSub.Ch():
+				t.Logf("shipper state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
-					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+					subErrCh <- fmt.Errorf("shipper failed: %s", state.Message)
 				} else {
-					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
+					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}]
 					if ok {
 						if unit.State == client.UnitStateFailed {
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 						} else if unit.State == client.UnitStateHealthy {
-							// remove the component which will stop it
-							err := m.Update([]component.Component{})
-							if err != nil {
-								subErrCh <- err
+							shipperOn = true
+							ok, err := sendEvent()
+							if ok {
+								if err != nil {
+									subErrCh <- err
+								} else {
+									// successful; turn it all off
+									err := m.Update([]component.Component{})
+									if err != nil {
+										subErrCh <- err
+									}
+								}
 							}
 						} else if unit.State == client.UnitStateStopped {
 							subErrCh <- nil
 						} else if unit.State == client.UnitStateStarting {
+							// acceptable
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					} else {
+						subErrCh <- errors.New("unit missing: fake-input")
+					}
+				}
+			case state := <-compSub.Ch():
+				t.Logf("component state changed: %+v", state)
+				if state.State == client.UnitStateFailed {
+					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+				} else {
+					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
+					if ok {
+						if unit.State == client.UnitStateFailed {
+							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						} else if unit.State == client.UnitStateHealthy {
+							compConnected = true
+							ok, err := sendEvent()
+							if ok {
+								if err != nil {
+									subErrCh <- err
+								} else {
+									// successful; turn it all off
+									err := m.Update([]component.Component{})
+									if err != nil {
+										subErrCh <- err
+									}
+								}
+							}
+						} else if unit.State == client.UnitStateStopped {
+							subErrCh <- nil
+						} else if unit.State == client.UnitStateStarting || unit.State == client.UnitStateConfiguring {
 							// acceptable
 						} else {
 							// unknown state that should not have occurred
@@ -1924,7 +2018,6 @@ LOOP:
 	err = <-errCh
 	require.NoError(t, err)
 }
-*/
 
 func newErrorLogger(t *testing.T) *logger.Logger {
 	t.Helper()
@@ -1977,7 +2070,10 @@ func testPaths(t *testing.T) {
 	versioned := paths.IsVersionHome()
 	topPath := paths.Top()
 
-	tmpDir := t.TempDir()
+	tmpDir, err := os.MkdirTemp("", "at-*")
+	if err != nil {
+		t.Fatalf("failed to create temp directory: %s", err)
+	}
 	paths.SetVersionHome(false)
 	paths.SetTop(tmpDir)
 

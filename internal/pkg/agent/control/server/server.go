@@ -11,6 +11,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
+
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
@@ -202,15 +204,20 @@ func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentR
 
 // DiagnosticUnits returns diagnostic information for the specific units (or all units if non-provided).
 func (s *Server) DiagnosticUnits(ctx context.Context, req *cproto.DiagnosticUnitsRequest) (*cproto.DiagnosticUnitsResponse, error) {
-	units := make([]component.Unit, 0, len(req.Units))
+	reqs := make([]runtime.ComponentUnitDiagnosticRequest, 0, len(req.Units))
 	for _, u := range req.Units {
-		units = append(units, component.Unit{
-			ID:   u.UnitId,
-			Type: client.UnitType(u.UnitType),
+		reqs = append(reqs, runtime.ComponentUnitDiagnosticRequest{
+			Component: component.Component{
+				ID: u.ComponentId,
+			},
+			Unit: component.Unit{
+				ID:   u.UnitId,
+				Type: client.UnitType(u.UnitType),
+			},
 		})
 	}
 
-	diag := s.coord.PerformDiagnostics(ctx, units...)
+	diag := s.coord.PerformDiagnostics(ctx, reqs...)
 	res := make([]*cproto.DiagnosticUnitResponse, 0, len(diag))
 	for _, d := range diag {
 		r := &cproto.DiagnosticUnitResponse{
