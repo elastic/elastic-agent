@@ -53,7 +53,5 @@ elastic-agent.yml.*
 fleet.yml
 fleet.yml.lock
 fleet.yml.old
-pkg/component/fake/common/event.pb.go
-pkg/component/fake/common/event_grpc.pb.go
 pkg/component/fake/component/component
 pkg/component/fake/shipper/shipper
