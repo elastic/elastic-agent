@@ -5,7 +5,7 @@
 //go:build windows
 // +build windows
 
-package control
+package runtime
 
 import (
 	"crypto/sha256"
@@ -15,16 +15,15 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
-// Address returns the address to connect to Elastic Agent daemon.
-func Address() string {
-	// when installed the control address is fixed
+func getShipperAddr(componentID string) string {
+	// when installed the address is fixed to a location
 	if info.RunningInstalled() {
-		return paths.ControlSocketPath
+		return fmt.Sprintf(paths.ShipperSocketPipePattern, componentID)
 	}
 
 	// not install, adjust the path based on data path
 	data := paths.Data()
 	// entire string cannot be longer than 256 characters, this forces the
 	// length to always be 87 characters (but unique per data path)
-	return fmt.Sprintf(`\\.\pipe\elastic-agent-%x`, sha256.Sum256([]byte(data)))
+	return fmt.Sprintf(`\\.\pipe\elastic-agent-%x-%s-pipe`, sha256.Sum256([]byte(data)), componentID)
 }
