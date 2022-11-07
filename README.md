@@ -5,6 +5,24 @@
 The source files for the general Elastic Agent documentation are currently stored
 in the [observability-docs](https://github.com/elastic/observability-docs) repo. The following docs are only focused on getting developers started building code for Elastic Agent.
 
+### Changelog
+
+The changelog for the Elastic Agent is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool). Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/install.md)
+and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md#im-a-developer) instructions to get started.
+
+The changelog tool produces fragement files that are consolidated to generate a changelog for each release. Each PR containing a change with user
+impact (new feature, bug fix, etc.) must contain a changelog fragement describing the change. There is a GitHub action in CI that will fail
+if a PR does not contain a changelog fragment. For PRs that should not have a changelog entry, use the "skip-changelog" label to bypass
+this check.
+
+A simple example of a changelog fragment is below for reference:
+
+```yml
+kind: bug-fix
+summary: Fix a panic caused by a race condition when installing the Elastic Agent.
+pr: https://github.com/elastic/elastic-agent/pull/823
+```
+
 ## Testing
 
 Prerequisites:

@@ -393,7 +393,7 @@ func TestConfiguration(t *testing.T) {
 		},
 		"logstash_config": {
 			programs: map[string][]string{
-				"default":       {"filebeat", "fleet-server", "heartbeat", "metricbeat", "endpoint", "packetbeat"},
+				"default":       {"filebeat", "fleet-server", "metricbeat", "endpoint", "packetbeat"},
 				"elasticsearch": {"filebeat"},
 			},
 		},

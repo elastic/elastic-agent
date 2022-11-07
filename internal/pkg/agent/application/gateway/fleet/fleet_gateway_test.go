@@ -21,10 +21,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/core/state"
+	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
@@ -691,7 +694,7 @@ func TestRetriesOnFailures(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
 		dispatcher := newTestingDispatcher()
-		log, _ := logger.New("fleet_gateway", false)
+		log := newInfoLogger(t, "fleet_gateway")
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -703,13 +706,20 @@ func TestRetriesOnFailures(t *testing.T) {
 		queue.On("DequeueActions").Return([]fleetapi.Action{})
 		queue.On("Actions").Return([]fleetapi.Action{})
 
+		localReporter := &testutils.MockReporter{}
+		// The local state should only be reported as degraded after two consecutive failures.
+		localReporter.On("Update", state.Degraded, mock.Anything, mock.Anything).Once()
+		localReporter.On("Unregister").Maybe()
+
 		fleetReporter := &testutils.MockReporter{}
 		fleetReporter.On("Update", mock.Anything, mock.Anything, mock.Anything).Maybe()
 		fleetReporter.On("Unregister").Maybe()
 
 		statusController := &testutils.MockController{}
 		statusController.On("RegisterComponent", "gateway").Return(fleetReporter).Once()
+		statusController.On("RegisterLocalComponent", "gateway-checkin").Return(localReporter).Once()
 		statusController.On("StatusString").Return("string")
+		statusController.On("Status").Return(status.AgentStatus{Message: "message"})
 
 		gateway, err := newFleetGatewayWithScheduler(
 			ctx,
@@ -767,6 +777,7 @@ func TestRetriesOnFailures(t *testing.T) {
 		waitFn()
 		statusController.AssertExpectations(t)
 		fleetReporter.AssertExpectations(t)
+		localReporter.AssertExpectations(t)
 	})
 
 	t.Run("The retry loop is interruptible",
@@ -804,3 +815,16 @@ type testAgentInfo struct{}
 func (testAgentInfo) AgentID() string { return "agent-secret" }
 
 type request struct{}
+
+func newInfoLogger(t *testing.T, name string) *logger.Logger {
+	t.Helper()
+
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.InfoLevel
+	loggerCfg.ToFiles = false
+	loggerCfg.ToStderr = true
+
+	log, err := logger.NewFromConfig("", loggerCfg, false)
+	require.NoError(t, err)
+	return log
+}

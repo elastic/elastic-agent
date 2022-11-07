@@ -180,7 +180,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.ccr
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.ccr.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.ccr.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - ccr
           period: null
@@ -190,7 +190,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.cluster_stats
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.cluster_stats.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.cluster_stats.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - cluster_stats
           period: null
@@ -200,7 +200,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.enrich
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.enrich.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.enrich.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - enrich
           period: null
@@ -210,7 +210,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.index
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.index.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.index.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - index
           period: null
@@ -220,7 +220,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.index_recovery
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.index_recovery.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.index_recovery.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - index_recovery
           period: null
@@ -230,7 +230,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.index_summary
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.index_summary.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.index_summary.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - index_summary
           period: null
@@ -240,7 +240,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.ml_job
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.ml_job.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.ml_job.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - ml_job
           period: null
@@ -250,7 +250,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.node
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.node.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.node.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - node
           period: null
@@ -260,7 +260,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.node_stats
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.node_stats.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.node_stats.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - node_stats
           period: null
@@ -270,7 +270,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.pending_tasks
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.pending_tasks.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.pending_tasks.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - pending_tasks
           period: null
@@ -280,7 +280,7 @@ inputs:
             dataset: elasticsearch.stack_monitoring.shard
             type: metrics
           hosts:
-            - ${kubernetes.hints.elasticsearch.shard.host|'http://localhost:9200'}
+            - ${kubernetes.hints.elasticsearch.shard.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
           metricsets:
             - shard
           period: null

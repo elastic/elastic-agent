@@ -5,7 +5,7 @@ inputs:
       streams:
         - condition: ${kubernetes.hints.endpoint.container_logs.enabled} == true
           data_stream:
-            dataset: kubernetes.container_logs
+            dataset: endpoint.container_logs
             type: logs
           exclude_files: []
           exclude_lines: []

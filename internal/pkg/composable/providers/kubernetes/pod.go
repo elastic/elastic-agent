@@ -267,6 +267,12 @@ func generatePodData(
 		_ = safemapstr.Put(annotations, k, v)
 	}
 	k8sMapping["annotations"] = annotations
+	// Pass labels(not dedoted) to all events so that they can be used in templating.
+	labels := mapstr.M{}
+	for k, v := range pod.GetObjectMeta().GetLabels() {
+		_ = safemapstr.Put(labels, k, v)
+	}
+	k8sMapping["labels"] = labels
 
 	processors := []map[string]interface{}{}
 	// meta map includes metadata that go under kubernetes.*
@@ -305,6 +311,12 @@ func generateContainerData(
 		_ = safemapstr.Put(annotations, k, v)
 	}
 
+	// Pass labels to all events so that it can be used in templating.
+	labels := mapstr.M{}
+	for k, v := range pod.GetObjectMeta().GetLabels() {
+		_ = safemapstr.Put(labels, k, v)
+	}
+
 	for _, c := range containers {
 		// If it doesn't have an ID, container doesn't exist in
 		// the runtime, emit only an event if we are stopping, so
@@ -329,8 +341,9 @@ func generateContainerData(
 		if len(namespaceAnnotations) != 0 {
 			k8sMapping["namespace_annotations"] = namespaceAnnotations
 		}
-		// add annotations to be discoverable by templates
+		// add annotations and labels to be discoverable by templates
 		k8sMapping["annotations"] = annotations
+		k8sMapping["labels"] = labels
 
 		//container ECS fields
 		cmeta := mapstr.M{

@@ -4,10 +4,15 @@
 
 package backoff
 
+import "time"
+
 // Backoff defines the interface for backoff strategies.
 type Backoff interface {
 	// Wait blocks for a duration of time governed by the backoff strategy.
 	Wait() bool
+
+	// NextWait returns the duration of the next call to Wait().
+	NextWait() time.Duration
 
 	// Reset resets the backoff duration to an initial value governed by the backoff strategy.
 	Reset()

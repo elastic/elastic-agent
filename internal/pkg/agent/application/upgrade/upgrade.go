@@ -7,7 +7,6 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,6 +107,7 @@ func (u *Upgrader) Upgradeable() bool {
 // Upgrade upgrades running agent, function returns shutdown callback if some needs to be executed for cases when
 // reexec is called by caller.
 func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ reexec.ShutdownCallbackFn, err error) {
+	u.log.Infow("Upgrading agent", "version", a.Version(), "source_uri", a.SourceURI())
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
 	// report failed
@@ -126,9 +126,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 				"running under control of the systems supervisor")
 	}
 
-	err = preUpgradeCleanup(u.agentInfo.Version())
+	err = cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version())
 	if err != nil {
-		u.log.Errorf("Unable to clean downloads dir %q before update: %v", paths.Downloads(), err)
+		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
 
 	if u.caps != nil {
@@ -142,15 +142,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	sourceURI := u.sourceURI(a.SourceURI())
 	archivePath, err := u.downloadArtifact(ctx, a.Version(), sourceURI)
 	if err != nil {
-		// Run the same preUpgradeCleanup task to get rid of any newly downloaded files
+		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
-		if dErr := preUpgradeCleanup(u.agentInfo.Version()); dErr != nil {
-			u.log.Errorf("Unable to remove file after verification failure: %v", dErr)
+		if dErr := cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
+			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
 		}
 		return nil, err
 	}
 
-	newHash, err := u.unpack(ctx, a.Version(), archivePath)
+	newHash, err := u.unpack(a.Version(), archivePath)
 	if err != nil {
 		return nil, err
 	}
@@ -169,39 +169,51 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 		return nil, nil
 	}
 
-	if err := copyActionStore(newHash); err != nil {
+	if err := copyActionStore(u.log, newHash); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
-	if err := ChangeSymlink(ctx, newHash); err != nil {
-		rollbackInstall(ctx, newHash)
+	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
+		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, newHash, a); err != nil {
-		rollbackInstall(ctx, newHash)
+	if err := u.markUpgrade(ctx, u.log, newHash, a); err != nil {
+		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
 	if err := InvokeWatcher(u.log); err != nil {
-		rollbackInstall(ctx, newHash)
+		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
 		return nil, errors.New("failed to invoke rollback watcher", err)
 	}
 
-	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), release.TrimCommit(newHash))
+	trimmedNewHash := release.TrimCommit(newHash)
+	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), trimmedNewHash)
 	if reexecNow {
+		u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads(), "rexec", reexecNow)
 		err = os.RemoveAll(paths.Downloads())
 		if err != nil {
-			u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
+			u.log.Errorw("Unable to clean downloads after update", "error.message", err, "downloads.path", paths.Downloads())
 		}
+
+		u.log.Infow("Restarting after upgrade",
+			"new_version", release.Version(),
+			"prev_version", a.Version(),
+			"hash", trimmedNewHash,
+			"home", paths.Home())
 		u.reexec.ReExec(cb)
 		return nil, nil
 	}
 
 	// Clean everything from the downloads dir
+	u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads(), "rexec", reexecNow)
 	err = os.RemoveAll(paths.Downloads())
 	if err != nil {
-		u.log.Errorf("Unable to clean downloads dir %q after update: %v", paths.Downloads(), err)
+		u.log.Errorw("Unable to clean downloads after update", "error.message", err, "file.path", paths.Downloads())
 	}
 
 	return cb, nil
@@ -283,20 +295,21 @@ func (u *Upgrader) reportUpdating(version string) {
 	)
 }
 
-func rollbackInstall(ctx context.Context, hash string) {
+func rollbackInstall(ctx context.Context, log *logger.Logger, hash string) {
 	os.RemoveAll(filepath.Join(paths.Data(), fmt.Sprintf("%s-%s", agentName, hash)))
-	_ = ChangeSymlink(ctx, release.ShortCommit())
+	_ = ChangeSymlink(ctx, log, release.ShortCommit())
 }
 
-func copyActionStore(newHash string) error {
+func copyActionStore(log *logger.Logger, newHash string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
+	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
+	log.Debugw("Copying action store", "new_home_path", newHome)
 
 	for _, currentActionStorePath := range storePaths {
-		newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
-
-		currentActionStore, err := ioutil.ReadFile(currentActionStorePath)
+		log.Debugw("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
+		currentActionStore, err := os.ReadFile(currentActionStorePath)
 		if os.IsNotExist(err) {
 			// nothing to copy
 			continue
@@ -305,7 +318,7 @@ func copyActionStore(newHash string) error {
 			return err
 		}
 
-		if err := ioutil.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
+		if err := os.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
 			return err
 		}
 	}

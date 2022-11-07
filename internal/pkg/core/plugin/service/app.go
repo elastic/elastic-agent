@@ -165,8 +165,8 @@ func (a *Application) Start(ctx context.Context, _ app.Taggable, cfg map[string]
 	// already started
 	if a.srvState != nil {
 		a.setState(state.Starting, "Starting", nil)
-		a.srvState.SetStatus(proto.StateObserved_STARTING, a.state.Message, a.state.Payload)
-		a.srvState.UpdateConfig(a.srvState.Config())
+		_ = a.srvState.SetStatus(proto.StateObserved_STARTING, a.state.Message, a.state.Payload)
+		_ = a.srvState.UpdateConfig(a.srvState.Config())
 	} else {
 		a.setState(state.Starting, "Starting", nil)
 		a.srvState, err = a.srv.Register(a, string(cfgStr))
@@ -247,6 +247,13 @@ func (a *Application) Configure(ctx context.Context, config map[string]interface
 	return err
 }
 
+func (a *Application) getStopTimeout() time.Duration {
+	if a.desc.Spec().Process != nil && a.desc.Spec().Process.StopTimeout > 0 {
+		return a.desc.Spec().Process.StopTimeout
+	}
+	return a.processConfig.StopTimeout
+}
+
 // Stop stops the current application.
 func (a *Application) Stop() {
 	a.appLock.Lock()
@@ -257,21 +264,36 @@ func (a *Application) Stop() {
 		return
 	}
 
-	if err := srvState.Stop(a.processConfig.StopTimeout); err != nil {
-		a.appLock.Lock()
-		a.setState(
-			state.Failed,
-			fmt.Errorf("failed to stop after %s: %w", a.processConfig.StopTimeout, err).Error(),
-			nil)
-	} else {
-		a.appLock.Lock()
-		a.setState(state.Stopped, "Stopped", nil)
-	}
-	a.srvState = nil
+	name := a.desc.Spec().Name
+	to := a.getStopTimeout()
 
+	a.logger.Infof("Stop %v service, with %v timeout", name, to)
+	start := time.Now()
+
+	// Try to stop the service with timeout
+	// If timed out and the service is still not stopped the runtime is set to STOPPED state anyways.
+	// This avoids leaving the runtime indefinitely in the failed state.
+	//
+	// The Agent is not managing the Endpoint service state by design.
+	// The service runtime should send STOPPING state to the Endpoint service only before the Endpoint is expected to be uninstalled.
+	// So if the Agent never receives the STOPPING check-in from the Endpoint after this, it's ok to set the state
+	// to STOPPED following with the Endpoint service uninstall.
+	if err := srvState.Stop(to); err != nil {
+		// Log the error
+		a.logger.Errorf("Failed to stop %v service after %v timeout", name, to)
+	}
+
+	// Cleanup
+	a.appLock.Lock()
+	defer a.appLock.Unlock()
+
+	a.srvState = nil
 	a.cleanUp()
 	a.stopCredsListener()
-	a.appLock.Unlock()
+
+	// Set the service state to "stopped", otherwise the agent is stuck in the failed stop state until restarted
+	a.logger.Infof("setting %s service status to Stopped, took: %v", name, time.Since(start))
+	a.setState(state.Stopped, "Stopped", nil)
 }
 
 // Shutdown disconnects the service, but doesn't signal it to stop.
@@ -327,7 +349,7 @@ func (a *Application) setState(s state.Status, msg string, payload map[string]in
 }
 
 func (a *Application) cleanUp() {
-	a.monitor.Cleanup(a.desc.Spec(), a.pipelineID)
+	_ = a.monitor.Cleanup(a.desc.Spec(), a.pipelineID)
 }
 
 func (a *Application) startCredsListener() error {

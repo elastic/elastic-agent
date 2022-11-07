@@ -45,7 +45,7 @@ inputs:
       streams:
         - condition: ${kubernetes.hints.pfsense.container_logs.enabled} == true
           data_stream:
-            dataset: kubernetes.container_logs
+            dataset: pfsense.container_logs
             type: logs
           exclude_files: []
           exclude_lines: []
