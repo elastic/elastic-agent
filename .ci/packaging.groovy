@@ -6,8 +6,10 @@ pipeline {
   environment {
     REPO = 'elastic-agent'
     BASE_DIR = "src/github.com/elastic/${env.REPO}"
-    SLACK_CHANNEL = '#elastic-agent'
-    NOTIFY_TO = 'package+beats-contrib@elastic.co'
+    // SLACK_CHANNEL = '#elastic-agent'
+    SLACK_CHANNEL = '#observablt-bots'
+    // NOTIFY_TO = 'beats-contrib+build-package@elastic.co'
+    NOTIFY_TO = 'victor.martinez+elastic-agent@elastic.co'
     JOB_GCS_BUCKET = credentials('gcs-bucket')
     JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin'
     DOCKER_SECRET = 'secret/observability-team/ci/docker-registry/prod'
