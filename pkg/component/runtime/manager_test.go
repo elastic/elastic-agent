@@ -180,8 +180,9 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				ID:   "fake-input",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),

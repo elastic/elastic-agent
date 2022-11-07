@@ -58,7 +58,7 @@ func NewComponentRuntime(comp component.Component, logger *logger.Logger, monito
 	if comp.Err != nil {
 		return NewFailedRuntime(comp)
 	} else if comp.Spec.Spec.Command != nil {
-		return NewCommandRuntime(comp, monitor)
+		return NewCommandRuntime(comp, logger, monitor)
 	} else if comp.Spec.Spec.Service != nil {
 		return NewServiceRuntime(comp, logger)
 	}

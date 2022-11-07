@@ -8,12 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -69,7 +70,7 @@ type CommandRuntime struct {
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
-func NewCommandRuntime(logger *logger.Logger, comp component.Component, monitor MonitoringManager) (ComponentRuntime, error) {
+func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
 	if comp.Spec.Spec.Command == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
@@ -415,8 +416,8 @@ func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
 
 func attachOutErr(logger *logger.Logger) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
-		cmd.Stdout = &commandLogger{logger}
-		cmd.Stderr = &commandLogger{logger}
+		cmd.Stdout = newLogWriter(logger.Core())
+		cmd.Stderr = newLogWriter(logger.Core())
 		return nil
 	}
 }
