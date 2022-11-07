@@ -27,6 +27,9 @@ pipeline {
     // disable upstream trigger on a PR basis
     upstream("elastic-agent/elastic-agent-mbp/${ env.JOB_BASE_NAME.startsWith('PR-') ? 'none' : env.JOB_BASE_NAME }")
   }
+  parameters {
+    string(name: 'DEPENDENCY_VERSION', defaultValue: '', description: "Which versions of the agent's DRA dependencies are included in each build (if empty default behaviour).")
+  }
   stages {
     stage('Filter build') {
       agent { label 'ubuntu-20 && immutable' }
