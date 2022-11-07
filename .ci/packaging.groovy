@@ -15,6 +15,7 @@ pipeline {
     DOCKER_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
     DRA_OUTPUT = 'release-manager.out'
+    DEPENDENCY_VERSION = "${params.DEPENDENCY_VERSION}"
   }
   options {
     timeout(time: 2, unit: 'HOURS')
