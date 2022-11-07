@@ -58,7 +58,7 @@ var (
 	supportedBeatsComponents = []string{"filebeat", "metricbeat", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
-// Beats monitor is providing V1 monitoring support.
+// BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
 type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
@@ -178,21 +178,10 @@ func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
 		}
 	}
 
-	loggingPath := loggingPath(unit, b.operatingSystem)
-	if loggingPath != "" {
+	if !b.config.C.LogMetrics {
 		appendix = append(appendix,
-			"-E", "logging.files.path="+filepath.Dir(loggingPath),
-			"-E", "logging.files.name="+filepath.Base(loggingPath),
-			"-E", "logging.files.keepfiles=7",
-			"-E", "logging.files.permission=0640",
-			"-E", "logging.files.interval=1h",
+			"-E", "logging.metrics.enabled=false",
 		)
-
-		if !b.config.C.LogMetrics {
-			appendix = append(appendix,
-				"-E", "logging.metrics.enabled=false",
-			)
-		}
 	}
 
 	return append(args, appendix...)
