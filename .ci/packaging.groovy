@@ -12,6 +12,7 @@ pipeline {
     JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin'
     DOCKER_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
+    DRA_OUTPUT = 'release-manager.out'
   }
   options {
     timeout(time: 2, unit: 'HOURS')
@@ -62,45 +63,60 @@ pipeline {
             gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: false,
                         shallow: false, reference: "/var/lib/jenkins/.git-references/${REPO}.git")
             stash allowEmpty: true, name: 'source', useDefaultExcludes: false
-            // set environment variables globally since they are used afterwards but GIT_BASE_COMMIT won't
-            // be available until gitCheckout is executed.
-            setEnvVar('URI_SUFFIX', "commits/${env.REPO}/${env.GIT_BASE_COMMIT}")
-            // JOB_GCS_BUCKET contains the bucket and some folders, let's build the folder structure
-            setEnvVar('PATH_PREFIX', "${JOB_GCS_BUCKET.contains('/') ? JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + env.URI_SUFFIX : env.URI_SUFFIX}")
+            dir("${BASE_DIR}"){
+              setEnvVar('GO_VERSION', readFile(".go-version").trim())
+            }
             //TODO : uncomment
             //setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
-            setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable('main'))
+            setEnvVar('IS_BRANCH_AVAILABLE', 'true')
+            withMageEnv(version: "${env.GO_VERSION}"){
+              dir("${BASE_DIR}"){
+                setEnvVar('VERSION', sh(label: 'Get version', script: 'make get-version', returnStdout: true)?.trim())
+              }
+            }
           }
         }
         stage('Package') {
           options { skipDefaultCheckout() }
           steps {
+            // Probably this should be done also here, so manual builds work too
             echo 'Done as part of the main pipeline'
           }
         }
-        stage('DRA') {
+        stage('DRA Snapshot') {
+          options { skipDefaultCheckout() }
           // The Unified Release process keeps moving branches as soon as a new
           // minor version is created, therefore old release branches won't be able
           // to use the release manager as their definition is removed.
           when {
             expression { return env.IS_BRANCH_AVAILABLE == "true" }
           }
+          environment {
+            HOME = "${env.WORKSPACE}"
+          }
           steps {
-            googleStorageDownload(bucketUri: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}/*",
-                                  credentialsId: "${JOB_GCS_CREDENTIALS}",
-                                  localDirectory: "${BASE_DIR}/build/distributions",
-                                  pathPrefix: env.PATH_PREFIX)
-            dir("${BASE_DIR}") {
-              withMageEnv() {
-                sh(label: 'create dependencies file', script: 'make release-manager-dependencies-snapshot')
-              }
-              dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
-              script {
-                getVaultSecret.readSecretWrapper {
-                  sh(label: 'release-manager.sh', script: '.ci/scripts/release-manager.sh')
-                }
-              }
+            runReleaseManager(type: 'snapshot', outputFile: env.DRA_OUTPUT)
+          }
+          post {
+            failure {
+              notifyStatus(analyse: true,
+                           file: "${BASE_DIR}/${env.DRA_OUTPUT}",
+                           subject: "[${env.REPO}@${env.BRANCH_NAME}] The Daily releasable artifact failed.",
+                           body: 'Contact the Release Platform team [#platform-release].')
             }
+          }
+        }
+        stage('DRA Staging') {
+          options { skipDefaultCheckout() }
+          // The Unified Release process keeps moving branches as soon as a new
+          // minor version is created, therefore old release branches won't be able
+          // to use the release manager as their definition is removed.
+          when {
+            expression { return env.IS_BRANCH_AVAILABLE == "true" }
+            not { branch 'main' }
+          }
+          steps {
+            echo 'TBD'
           }
         }
       }
@@ -110,18 +126,72 @@ pipeline {
     cleanup {
       notifyBuildResult(prComment: false)
     }
-    failure {
-      echo 'disabled'
-    // notifyStatus(slackStatus: 'danger', subject: "[${env.REPO}@${env.BRANCH_NAME}] DRA failed", body: "Build: (<${env.RUN_DISPLAY_URL}|here>)")
-    }
   }
 }
 
 def notifyStatus(def args = [:]) {
-  releaseNotification(slackChannel: "${env.SLACK_CHANNEL}",
-                      slackColor: args.slackStatus,
-                      slackCredentialsId: 'jenkins-slack-integration-token',
-                      to: "${env.NOTIFY_TO}",
-                      subject: args.subject,
-                      body: args.body)
+  def releaseManagerFile = args.get('file', '')
+  def analyse = args.get('analyse', false)
+  def subject = args.get('subject', '')
+  def body = args.get('body', '')
+  releaseManagerNotification(file: releaseManagerFile,
+                             analyse: analyse,
+                             slackChannel: "${env.SLACK_CHANNEL}",
+                             slackColor: 'danger',
+                             slackCredentialsId: 'jenkins-slack-integration-token',
+                             to: "${env.NOTIFY_TO}",
+                             subject: subject,
+                             body: "Build: (<${env.RUN_DISPLAY_URL}|here>).\n ${body}")
+}
+
+def publishArtifacts(def args = [:]) {
+  // Copy those files to another location with the sha commit to test them afterward.
+  googleStorageUpload(bucket: getBucketLocation(args.type),
+    credentialsId: "${JOB_GCS_CREDENTIALS}",
+    pathPrefix: "${BASE_DIR}/build/distributions/",
+    pattern: "${BASE_DIR}/build/distributions/**/*",
+    sharedPublicly: true,
+    showInline: true)
+}
+
+def runReleaseManager(def args = [:]) {
+  deleteDir()
+  unstash 'source'
+  googleStorageDownload(bucketUri: "${getBucketLocation(args.type)}/*",
+                        credentialsId: "${JOB_GCS_CREDENTIALS}",
+                        localDirectory: "${BASE_DIR}/build/distributions",
+                        pathPrefix: getBucketPathPrefix(args.type))
+  dir("${BASE_DIR}") {
+    def mageGoal = args.type.equals('staging') ? 'release-manager-dependencies-release' : 'release-manager-dependencies-snapshot'
+    withMageEnv() {
+      sh(label: 'create dependencies file', script: "make ${mageGoal}")
+    }
+    // help to download the latest release-manager docker image
+    dockerLogin(secret: "${DOCKER_ELASTIC_SECRET}", registry: "${DOCKER_REGISTRY}")
+    releaseManager(project: 'elastic-agent-shipper',
+                   version: env.VERSION,
+                   branch: env.BRANCH_NAME,
+                   type: args.type,
+                   artifactsFolder: 'build/distributions',
+                   outputFile: args.outputFile)
+  }
+}
+
+def getBucketLocation(type) {
+  return "gs://${JOB_GCS_BUCKET}/${getBucketRelativeLocation(type)}"
+}
+
+def getBucketRelativeLocation(type) {
+  def folder = type.equals('snapshot') ? 'commits' : type
+  return "${env.REPO}/${folder}/${env.GIT_BASE_COMMIT}"
+}
+
+def getBucketPathPrefix(type) {
+  // JOB_GCS_BUCKET contains the bucket and some folders,
+  // let's build up the folder structure without the parent folder
+  def relative = getBucketRelativeLocation(type)
+  if (JOB_GCS_BUCKET.contains('/')) {
+    return JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + relative
+  }
+  return relative
 }
