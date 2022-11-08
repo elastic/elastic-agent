@@ -271,7 +271,7 @@ func (m *managedConfigManager) waitForFleetServer(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case compState := <-sub.Ch():
-			if compState.Component.Spec.InputType == "fleet-server" {
+			if compState.Component.InputSpec != nil && compState.Component.InputSpec.InputType == "fleet-server" {
 				if fleetServerRunning(compState.State) {
 					m.log.With("state", compState.State).Debugf("Fleet Server is running")
 					return nil

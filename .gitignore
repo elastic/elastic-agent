@@ -45,7 +45,6 @@ fleet.enc.lock
 # Files generated with the bump version automations
 *.bck
 
-
 # agent
 build/
 elastic-agent
@@ -54,9 +53,5 @@ elastic-agent.yml.*
 fleet.yml
 fleet.yml.lock
 fleet.yml.old
-internal/pkg/agent/application/fleet.yml
-internal/pkg/agent/transpiler/tests/exec-1.0-darwin-x86_64/exec
-pkg/component/fake/fake
-
-# VSCode
-/.vscode
+pkg/component/fake/component/component
+pkg/component/fake/shipper/shipper

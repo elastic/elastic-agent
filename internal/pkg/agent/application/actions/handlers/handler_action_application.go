@@ -49,7 +49,7 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 	}
 
 	state := h.coord.State(false)
-	unit, ok := findUnitFromInputType(state, action.InputType)
+	comp, unit, ok := findUnitFromInputType(state, action.InputType)
 	if !ok {
 		// If the matching action is not found ack the action with the error for action result document
 		action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
@@ -78,7 +78,7 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 		h.log.Debugf("handlerAppAction: action '%v' started with timeout: %v", action.ActionType, timeout)
 		ctx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
-		res, err = h.coord.PerformAction(ctx, unit, action.InputType, params)
+		res, err = h.coord.PerformAction(ctx, comp, unit, action.InputType, params)
 	}
 	end := time.Now().UTC()
 
@@ -151,13 +151,13 @@ func readMapString(m map[string]interface{}, key string, def string) string {
 	return def
 }
 
-func findUnitFromInputType(state coordinator.State, inputType string) (component.Unit, bool) {
+func findUnitFromInputType(state coordinator.State, inputType string) (component.Component, component.Unit, bool) {
 	for _, comp := range state.Components {
 		for _, unit := range comp.Component.Units {
 			if unit.Type == client.UnitTypeInput && unit.Config != nil && unit.Config.Type == inputType {
-				return unit, true
+				return comp.Component, unit, true
 			}
 		}
 	}
-	return component.Unit{}, false
+	return component.Component{}, component.Unit{}, false
 }

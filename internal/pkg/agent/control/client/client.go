@@ -58,6 +58,7 @@ type Version struct {
 	Snapshot  bool      `json:"snapshot" yaml:"snapshot"`
 }
 
+// ComponentVersionInfo is the version information for the component.
 type ComponentVersionInfo struct {
 	// Name of the component.
 	Name string `json:"name" yaml:"name"`
@@ -115,8 +116,9 @@ type DiagnosticFileResult struct {
 
 // DiagnosticUnitRequest allows a specific unit to be targeted for diagnostics.
 type DiagnosticUnitRequest struct {
-	UnitID   string
-	UnitType UnitType
+	ComponentID string
+	UnitID      string
+	UnitType    UnitType
 }
 
 // DiagnosticUnitResult is a set of results for a unit.
@@ -308,8 +310,9 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 	reqs := make([]*cproto.DiagnosticUnitRequest, 0, len(units))
 	for _, u := range units {
 		reqs = append(reqs, &cproto.DiagnosticUnitRequest{
-			UnitType: u.UnitType,
-			UnitId:   u.UnitID,
+			ComponentId: u.ComponentID,
+			UnitType:    u.UnitType,
+			UnitId:      u.UnitID,
 		})
 	}
 

@@ -173,7 +173,7 @@ func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Confi
 	}
 	var serviceComps []component.Component
 	for _, comp := range allComps {
-		if comp.Err == nil && comp.Spec.Spec.Service != nil {
+		if comp.Err == nil && comp.InputSpec != nil && comp.InputSpec.Spec.Service != nil {
 			// non-error and service based component
 			serviceComps = append(serviceComps, comp)
 		}

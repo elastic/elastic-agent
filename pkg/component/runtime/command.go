@@ -31,8 +31,8 @@ const (
 
 	runDirMod = 0770
 
-	envAgentComponentID        = "AGENT_COMPONENT_ID"
-	envAgentComponentInputType = "AGENT_COMPONENT_INPUT_TYPE"
+	envAgentComponentID   = "AGENT_COMPONENT_ID"
+	envAgentComponentType = "AGENT_COMPONENT_TYPE"
 
 	stateUnknownMessage = "Unknown"
 )
@@ -68,19 +68,21 @@ type CommandRuntime struct {
 
 // NewCommandRuntime creates a new command runtime for the provided component.
 func NewCommandRuntime(comp component.Component, monitor MonitoringManager) (ComponentRuntime, error) {
-	if comp.Spec.Spec.Command == nil {
-		return nil, errors.New("must have command defined in specification")
-	}
-	return &CommandRuntime{
+	c := &CommandRuntime{
 		current:     comp,
+		monitor:     monitor,
 		ch:          make(chan ComponentState),
 		actionCh:    make(chan actionMode),
 		procCh:      make(chan procState),
 		compCh:      make(chan component.Component),
 		actionState: actionStop,
 		state:       newComponentState(&comp),
-		monitor:     monitor,
-	}, nil
+	}
+	cmdSpec := c.getCommandSpec()
+	if cmdSpec == nil {
+		return nil, errors.New("must have command defined in specification")
+	}
+	return c, nil
 }
 
 // Run starts the runtime for the component.
@@ -89,8 +91,9 @@ func NewCommandRuntime(comp component.Component, monitor MonitoringManager) (Com
 // called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
 func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
-	checkinPeriod := c.current.Spec.Spec.Command.Timeouts.Checkin
-	restartPeriod := c.current.Spec.Spec.Command.Timeouts.Restart
+	cmdSpec := c.getCommandSpec()
+	checkinPeriod := cmdSpec.Timeouts.Checkin
+	restartPeriod := cmdSpec.Timeouts.Restart
 	c.forceCompState(client.UnitStateStarting, "Starting")
 	t := time.NewTicker(checkinPeriod)
 	defer t.Stop()
@@ -269,19 +272,19 @@ func (c *CommandRuntime) start(comm Communicator) error {
 		// already running
 		return nil
 	}
-	cmdSpec := c.current.Spec.Spec.Command
+	cmdSpec := c.getCommandSpec()
 	env := make([]string, 0, len(cmdSpec.Env)+2)
 	for _, e := range cmdSpec.Env {
 		env = append(env, fmt.Sprintf("%s=%s", e.Name, e.Value))
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
-	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentInputType, c.current.Spec.InputType))
+	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
 	uid, gid := os.Geteuid(), os.Getegid()
 	workDir, err := c.workDir(uid, gid)
 	if err != nil {
 		return err
 	}
-	path, err := filepath.Abs(c.current.Spec.BinaryPath)
+	path, err := filepath.Abs(c.getSpecBinaryPath())
 	if err != nil {
 		return fmt.Errorf("failed to determine absolute path: %w", err)
 	}
@@ -293,7 +296,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	if err := c.monitor.Prepare(); err != nil {
 		return err
 	}
-	args := c.monitor.EnrichArgs(c.current.ID, c.current.Spec.BinaryName, cmdSpec.Args)
+	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
 
 	// differentiate data paths
 	dataPath := filepath.Join(paths.Home(), "run", c.current.ID)
@@ -331,7 +334,7 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
 
-	cmdSpec := c.current.Spec.Spec.Command
+	cmdSpec := c.getCommandSpec()
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
 		defer t.Stop()
@@ -407,6 +410,46 @@ func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
 		return "", fmt.Errorf("failed to chmod %q: %w", path, err)
 	}
 	return path, nil
+}
+
+func (c *CommandRuntime) getSpecType() string {
+	if c.current.InputSpec != nil {
+		return c.current.InputSpec.InputType
+	}
+	if c.current.ShipperSpec != nil {
+		return c.current.ShipperSpec.ShipperType
+	}
+	return ""
+}
+
+func (c *CommandRuntime) getSpecBinaryName() string {
+	if c.current.InputSpec != nil {
+		return c.current.InputSpec.BinaryName
+	}
+	if c.current.ShipperSpec != nil {
+		return c.current.ShipperSpec.BinaryName
+	}
+	return ""
+}
+
+func (c *CommandRuntime) getSpecBinaryPath() string {
+	if c.current.InputSpec != nil {
+		return c.current.InputSpec.BinaryPath
+	}
+	if c.current.ShipperSpec != nil {
+		return c.current.ShipperSpec.BinaryPath
+	}
+	return ""
+}
+
+func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
+	if c.current.InputSpec != nil {
+		return c.current.InputSpec.Spec.Command
+	}
+	if c.current.ShipperSpec != nil {
+		return c.current.ShipperSpec.Spec.Command
+	}
+	return nil
 }
 
 func attachOutErr(cmd *exec.Cmd) error {

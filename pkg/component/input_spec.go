@@ -17,6 +17,7 @@ type InputSpec struct {
 	Description string      `config:"description" yaml:"description" validate:"required"`
 	Platforms   []string    `config:"platforms" yaml:"platforms" validate:"required,min=1"`
 	Outputs     []string    `config:"outputs" yaml:"outputs" validate:"required,min=1"`
+	Shippers    []string    `config:"shippers" yaml:"shippers"`
 	Runtime     RuntimeSpec `config:"runtime" yaml:"runtime"`
 
 	Command *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
@@ -42,6 +43,13 @@ func (s *InputSpec) Validate() error {
 		for j, b := range s.Outputs {
 			if i != j && a == b {
 				return fmt.Errorf("input '%s' defines the output '%s' more than once", s.Name, a)
+			}
+		}
+	}
+	for i, a := range s.Shippers {
+		for j, b := range s.Shippers {
+			if i != j && a == b {
+				return fmt.Errorf("input '%s' defines the shipper '%s' more than once", s.Name, a)
 			}
 		}
 	}

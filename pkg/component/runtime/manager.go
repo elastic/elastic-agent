@@ -56,6 +56,12 @@ type ComponentComponentState struct {
 	State     ComponentState      `yaml:"state"`
 }
 
+// ComponentUnitDiagnosticRequest used to request diagnostics from specific unit.
+type ComponentUnitDiagnosticRequest struct {
+	Component component.Component
+	Unit      component.Unit
+}
+
 // ComponentUnitDiagnostic provides a structure to map a component/unit to diagnostic results.
 type ComponentUnitDiagnostic struct {
 	Component component.Component
@@ -82,8 +88,9 @@ type Manager struct {
 	waitMx    sync.RWMutex
 	waitReady map[string]waitForReady
 
-	mx      sync.RWMutex
-	current map[string]*componentRuntimeState
+	mx           sync.RWMutex
+	current      map[string]*componentRuntimeState
+	shipperConns map[string]*shipperConn
 
 	subMx         sync.RWMutex
 	subscriptions map[string][]*Subscription
@@ -109,6 +116,7 @@ func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentI
 		tracer:        tracer,
 		waitReady:     make(map[string]waitForReady),
 		current:       make(map[string]*componentRuntimeState),
+		shipperConns:  make(map[string]*shipperConn),
 		subscriptions: make(map[string][]*Subscription),
 		errCh:         make(chan error),
 		monitor:       monitor,
@@ -286,7 +294,7 @@ func (m *Manager) State() []ComponentComponentState {
 }
 
 // PerformAction executes an action on a unit.
-func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+func (m *Manager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
@@ -298,7 +306,7 @@ func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name s
 			return nil, err
 		}
 	}
-	runtime := m.getRuntimeFromUnit(unit)
+	runtime := m.getRuntimeFromUnit(comp, unit)
 	if runtime == nil {
 		return nil, ErrNoUnit
 	}
@@ -345,21 +353,21 @@ func (m *Manager) PerformAction(ctx context.Context, unit component.Unit, name s
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
-func (m *Manager) PerformDiagnostics(ctx context.Context, units ...component.Unit) []ComponentUnitDiagnostic {
+func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDiagnosticRequest) []ComponentUnitDiagnostic {
 	// build results from units
 	var results []ComponentUnitDiagnostic
-	if len(units) > 0 {
-		for _, u := range units {
-			r := m.getRuntimeFromUnit(u)
+	if len(req) > 0 {
+		for _, q := range req {
+			r := m.getRuntimeFromUnit(q.Component, q.Unit)
 			if r == nil {
 				results = append(results, ComponentUnitDiagnostic{
-					Unit: u,
+					Unit: q.Unit,
 					Err:  ErrNoUnit,
 				})
 			} else {
 				results = append(results, ComponentUnitDiagnostic{
 					Component: r.currComp,
-					Unit:      u,
+					Unit:      q.Unit,
 				})
 			}
 		}
@@ -395,7 +403,7 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, units ...component.Uni
 			// already in error don't perform diagnostics
 			continue
 		}
-		diag, err := m.performDiagAction(ctx, r.Unit)
+		diag, err := m.performDiagAction(ctx, r.Component, r.Unit)
 		if err != nil {
 			r.Err = err
 		} else {
@@ -608,6 +616,13 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
+	// prepare the components to add consistent shipper connection information between
+	// the connected components in the model
+	err := m.connectShippers(components)
+	if err != nil {
+		return err
+	}
+
 	touched := make(map[string]bool)
 	for _, comp := range components {
 		touched[comp.ID] = true
@@ -742,13 +757,15 @@ func (m *Manager) getRuntimeFromToken(token string) *componentRuntimeState {
 	return nil
 }
 
-func (m *Manager) getRuntimeFromUnit(unit component.Unit) *componentRuntimeState {
+func (m *Manager) getRuntimeFromUnit(comp component.Component, unit component.Unit) *componentRuntimeState {
 	m.mx.RLock()
 	defer m.mx.RUnlock()
-	for _, comp := range m.current {
-		for _, u := range comp.currComp.Units {
-			if u.Type == unit.Type && u.ID == unit.ID {
-				return comp
+	for _, c := range m.current {
+		if c.currComp.ID == comp.ID {
+			for _, u := range c.currComp.Units {
+				if u.Type == unit.Type && u.ID == unit.ID {
+					return c
+				}
 			}
 		}
 	}
@@ -769,7 +786,7 @@ func (m *Manager) getListenAddr() string {
 	return m.listenAddr
 }
 
-func (m *Manager) performDiagAction(ctx context.Context, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
+func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
 	defer cancel()
 
@@ -778,7 +795,7 @@ func (m *Manager) performDiagAction(ctx context.Context, unit component.Unit) ([
 		return nil, err
 	}
 
-	runtime := m.getRuntimeFromUnit(unit)
+	runtime := m.getRuntimeFromUnit(comp, unit)
 	if runtime == nil {
 		return nil, ErrNoUnit
 	}
