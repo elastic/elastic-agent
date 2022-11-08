@@ -91,14 +91,14 @@ type RuntimeManager interface {
 	State() []runtime.ComponentComponentState
 
 	// PerformAction executes an action on a unit.
-	PerformAction(ctx context.Context, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
+	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 
 	// SubscribeAll provides an interface to watch for changes in all components.
 	SubscribeAll(context.Context) *runtime.SubscriptionAll
 
 	// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 	// it performs diagnostics for all current units.
-	PerformDiagnostics(context.Context, ...component.Unit) []runtime.ComponentUnitDiagnostic
+	PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -285,19 +285,20 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	return nil
 }
 
+// AckUpgrade performs acknowledgement for upgrade.
 func (c *Coordinator) AckUpgrade(ctx context.Context, acker acker.Acker) error {
 	return c.upgradeMgr.Ack(ctx, acker)
 }
 
 // PerformAction executes an action on a unit.
-func (c *Coordinator) PerformAction(ctx context.Context, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
-	return c.runtimeMgr.PerformAction(ctx, unit, name, params)
+func (c *Coordinator) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	return c.runtimeMgr.PerformAction(ctx, comp, unit, name, params)
 }
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
-func (c *Coordinator) PerformDiagnostics(ctx context.Context, units ...component.Unit) []runtime.ComponentUnitDiagnostic {
-	return c.runtimeMgr.PerformDiagnostics(ctx, units...)
+func (c *Coordinator) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+	return c.runtimeMgr.PerformDiagnostics(ctx, req...)
 }
 
 // Run runs the coordinator.

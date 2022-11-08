@@ -226,17 +226,23 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	p := filepath.Join("pkg", "component")
-	fakeBinary := "fake"
-	if runtime.GOOS == "windows" {
-		fakeBinary += ".exe"
+	p := filepath.Join("pkg", "component", "fake")
+	for _, name := range []string{"component", "shipper"} {
+		binary := name
+		if runtime.GOOS == "windows" {
+			binary += ".exe"
+		}
+		outputName := filepath.Join(p, name, binary)
+		err := RunGo("build", "-o", outputName, filepath.Join("github.com/elastic/elastic-agent", p, name, "..."))
+		if err != nil {
+			return err
+		}
+		err = os.Chmod(outputName, 0755)
+		if err != nil {
+			return err
+		}
 	}
-	outputName := filepath.Join(p, "fake", fakeBinary)
-	err := RunGo("build", "-o", outputName, filepath.Join(p, "fake", "main.go"))
-	if err != nil {
-		return err
-	}
-	return os.Chmod(outputName, 0755)
+	return nil
 }
 
 // All run all the code checks.
@@ -460,6 +466,15 @@ func ControlProto() error {
 		"--go_out=internal/pkg/agent/control/cproto", "--go_opt=paths=source_relative",
 		"--go-grpc_out=internal/pkg/agent/control/cproto", "--go-grpc_opt=paths=source_relative",
 		"control.proto")
+}
+
+// FakeShipperProto generates pkg/component/fake/common event protocol.
+func FakeShipperProto() error {
+	return sh.RunV(
+		"protoc",
+		"--go_out=.", "--go_opt=paths=source_relative",
+		"--go-grpc_out=.", "--go-grpc_opt=paths=source_relative",
+		"pkg/component/fake/common/event.proto")
 }
 
 func BuildPGP() error {

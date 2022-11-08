@@ -46,7 +46,7 @@ var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
 func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) coordinator.ComponentsModifier {
 	return func(comps []component.Component, _ map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
-			if comp.Spec.InputType == fleetServer {
+			if comp.InputSpec != nil && comp.InputSpec.InputType == fleetServer {
 				for j, unit := range comp.Units {
 					if unit.Type == client.UnitTypeOutput && unit.Config.Type == elasticsearch {
 						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &serverCfg.Output.Elasticsearch)
@@ -89,7 +89,7 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 func EndpointComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordinator.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
-			if comp.Spec.InputType == endpoint {
+			if comp.InputSpec != nil && comp.InputSpec.InputType == endpoint {
 				for j, unit := range comp.Units {
 					if unit.Type == client.UnitTypeInput && unit.Config.Type == endpoint {
 						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), map[string]interface{}{"fleet": fleetCfg})

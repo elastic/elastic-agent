@@ -57,12 +57,23 @@ type ComponentRuntime interface {
 func NewComponentRuntime(comp component.Component, logger *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
 	if comp.Err != nil {
 		return NewFailedRuntime(comp)
-	} else if comp.Spec.Spec.Command != nil {
-		return NewCommandRuntime(comp, logger, monitor)
-	} else if comp.Spec.Spec.Service != nil {
-		return NewServiceRuntime(comp, logger)
 	}
-	return nil, errors.New("unknown component runtime")
+	if comp.InputSpec != nil {
+		if comp.InputSpec.Spec.Command != nil {
+			return NewCommandRuntime(comp, monitor)
+		}
+		if comp.InputSpec.Spec.Service != nil {
+			return NewServiceRuntime(comp, logger)
+		}
+		return nil, errors.New("unknown component runtime")
+	}
+	if comp.ShipperSpec != nil {
+		if comp.ShipperSpec.Spec.Command != nil {
+			return NewCommandRuntime(comp, monitor)
+		}
+		return nil, errors.New("components for shippers can only support command runtime")
+	}
+	return nil, errors.New("component missing specification")
 }
 
 type componentRuntimeState struct {

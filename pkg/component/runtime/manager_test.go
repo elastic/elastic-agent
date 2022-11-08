@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid"
+
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 
@@ -35,6 +37,16 @@ const (
 var (
 	fakeInputSpec = component.InputSpec{
 		Name: "fake",
+		Command: &component.CommandSpec{
+			Timeouts: component.CommandTimeoutSpec{
+				Checkin: 30 * time.Second,
+				Restart: 10 * time.Millisecond, // quick restart during tests
+				Stop:    30 * time.Second,
+			},
+		},
+	}
+	fakeShipperSpec = component.ShipperSpec{
+		Name: "fake-shipper",
 		Command: &component.CommandSpec{
 			Timeouts: component.CommandTimeoutSpec{
 				Checkin: 30 * time.Second,
@@ -169,10 +181,10 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -295,10 +307,10 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -466,10 +478,10 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -621,10 +633,10 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -747,10 +759,10 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -905,10 +917,10 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -950,7 +962,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 							// subscription channel
 							go func() {
 								actionCtx, actionCancel := context.WithTimeout(context.Background(), 15*time.Second)
-								_, err := m.PerformAction(actionCtx, comp.Units[0], "set_state", map[string]interface{}{
+								_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "set_state", map[string]interface{}{
 									"state":   int(client.UnitStateDegraded),
 									"message": "Action Set Degraded",
 								})
@@ -1035,10 +1047,10 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -1086,7 +1098,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 							if !killed {
 								killed = true
 								actionCtx, actionCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-								_, err := m.PerformAction(actionCtx, comp.Units[0], "kill", nil)
+								_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "kill", nil)
 								actionCancel()
 								if !errors.Is(err, context.DeadlineExceeded) {
 									// should have got deadline exceeded for this call
@@ -1174,10 +1186,10 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -1295,10 +1307,10 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -1337,7 +1349,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 						} else if unit.State == client.UnitStateHealthy {
 							actionCtx, actionCancel := context.WithTimeout(context.Background(), 5*time.Second)
-							_, err := m.PerformAction(actionCtx, comp.Units[0], "invalid_missing_action", nil)
+							_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "invalid_missing_action", nil)
 							actionCancel()
 							if err == nil {
 								subErrCh <- fmt.Errorf("should have returned an error")
@@ -1419,7 +1431,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	runtimeSpec := component.InputRuntimeSpec{
 		InputType:  "fake",
 		BinaryName: "",
@@ -1428,8 +1440,8 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	}
 	components := []component.Component{
 		{
-			ID:   "fake-0",
-			Spec: runtimeSpec,
+			ID:        "fake-0",
+			InputSpec: &runtimeSpec,
 			Units: []component.Unit{
 				{
 					ID:   "fake-input-0-0",
@@ -1461,8 +1473,8 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 			},
 		},
 		{
-			ID:   "fake-1",
-			Spec: runtimeSpec,
+			ID:        "fake-1",
+			InputSpec: &runtimeSpec,
 			Units: []component.Unit{
 				{
 					ID:   "fake-input-1-0",
@@ -1494,8 +1506,8 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 			},
 		},
 		{
-			ID:   "fake-2",
-			Spec: runtimeSpec,
+			ID:        "fake-2",
+			InputSpec: &runtimeSpec,
 			Units: []component.Unit{
 				{
 					ID:   "fake-input-2-0",
@@ -1631,10 +1643,10 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	binaryPath := testBinary(t)
+	binaryPath := testBinary(t, "component")
 	comp := component.Component{
 		ID: "fake-default",
-		Spec: component.InputRuntimeSpec{
+		InputSpec: &component.InputRuntimeSpec{
 			InputType:  "fake",
 			BinaryName: "",
 			BinaryPath: binaryPath,
@@ -1688,7 +1700,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 							}
 
 							actionCtx, actionCancel := context.WithTimeout(context.Background(), 5*time.Second)
-							_, err := m.PerformAction(actionCtx, comp.Units[0], "invalid_missing_action", nil)
+							_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "invalid_missing_action", nil)
 							actionCancel()
 							if err == nil {
 								subErrCh <- fmt.Errorf("should have returned an error")
@@ -1719,6 +1731,281 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 	select {
 	case <-startTimer.C:
 		err = m.Update([]component.Component{comp})
+		require.NoError(t, err)
+	case err := <-errCh:
+		t.Fatalf("failed early: %s", err)
+	}
+
+	endTimer := time.NewTimer(30 * time.Second)
+	defer endTimer.Stop()
+LOOP:
+	for {
+		select {
+		case <-endTimer.C:
+			t.Fatalf("timed out after 30 seconds")
+		case err := <-errCh:
+			require.NoError(t, err)
+		case err := <-subErrCh:
+			require.NoError(t, err)
+			break LOOP
+		}
+	}
+
+	subCancel()
+	cancel()
+
+	err = <-errCh
+	require.NoError(t, err)
+}
+
+func TestManager_FakeShipper(t *testing.T) {
+	/*
+		This test runs one instance of the fake/component and an instance of the fake/shipper. They get connected
+		together, and it ensures that a test event is sent between each instance. Below is a breakdown on how this
+		test performs this work and ensures that an event is sent between the two instances.
+
+		1. Wait for the shipper input (GRPC server) is healthy.
+		2. Wait for the component output (GRPC client) is healthy.
+		3. Create a unique ID to use for the event ID.
+		4. Send `record_event` action to the shipper input (GRPC server); won't return until it actually gets the event.
+		5. Send `send_event` action to the component fake input (GRPC client); returns once sent.
+		6. Wait for `record_event` action to return from the shipper input (GRPC server).
+	*/
+
+	testPaths(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr())
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := m.WaitForReady(waitCtx); err != nil {
+		require.NoError(t, err)
+	}
+
+	componentPath := testBinary(t, "component")
+	shipperPath := testBinary(t, "shipper")
+	comps := []component.Component{
+		{
+			ID: "fake-default",
+			InputSpec: &component.InputRuntimeSpec{
+				InputType:  "fake",
+				BinaryName: "",
+				BinaryPath: componentPath,
+				Spec:       fakeInputSpec,
+			},
+			Units: []component.Unit{
+				{
+					ID:       "fake-input",
+					Type:     client.UnitTypeInput,
+					LogLevel: client.UnitLogLevelTrace,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type":    "fake",
+						"state":   int(client.UnitStateHealthy),
+						"message": "Fake Healthy",
+					}),
+				},
+				{
+					ID:       "fake-default",
+					Type:     client.UnitTypeOutput,
+					LogLevel: client.UnitLogLevelTrace,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type": "fake-shipper",
+					}),
+				},
+			},
+			Shipper: &component.ShipperReference{
+				ComponentID: "fake-shipper-default",
+				UnitID:      "fake-default",
+			},
+		},
+		{
+			ID: "fake-shipper-default",
+			ShipperSpec: &component.ShipperRuntimeSpec{
+				ShipperType: "fake-shipper",
+				BinaryName:  "",
+				BinaryPath:  shipperPath,
+				Spec:        fakeShipperSpec,
+			},
+			Units: []component.Unit{
+				{
+					ID:       "fake-default",
+					Type:     client.UnitTypeInput,
+					LogLevel: client.UnitLogLevelTrace,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"id":   "fake-default",
+						"type": "fake-shipper",
+						"units": []interface{}{
+							map[string]interface{}{
+								"id": "fake-input",
+								"config": map[string]interface{}{
+									"type":    "fake",
+									"state":   int(client.UnitStateHealthy),
+									"message": "Fake Healthy",
+								},
+							},
+						},
+					}),
+				},
+				{
+					ID:       "fake-default",
+					Type:     client.UnitTypeOutput,
+					LogLevel: client.UnitLogLevelTrace,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type": "fake-action-output",
+					}),
+				},
+			},
+		},
+	}
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	subErrCh := make(chan error)
+	go func() {
+		shipperOn := false
+		compConnected := false
+
+		sendEvent := func() (bool, error) {
+			if !shipperOn || !compConnected {
+				// wait until connected
+				return false, nil
+			}
+
+			// send an event between component and the fake shipper
+			eventID, err := uuid.NewV4()
+			if err != nil {
+				return true, err
+			}
+
+			// wait for the event on the shipper side
+			gotEvt := make(chan error)
+			go func() {
+				actionCtx, actionCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				_, err := m.PerformAction(actionCtx, comps[1], comps[1].Units[1], "record_event", map[string]interface{}{
+					"id": eventID.String(),
+				})
+				actionCancel()
+				gotEvt <- err
+			}()
+
+			// send the fake event
+			actionCtx, actionCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, err = m.PerformAction(actionCtx, comps[0], comps[0].Units[0], "send_event", map[string]interface{}{
+				"id": eventID.String(),
+			})
+			actionCancel()
+			if err != nil {
+				return true, err
+			}
+
+			err = <-gotEvt
+			if err == nil {
+				t.Logf("successfully sent event from fake input to fake shipper, event ID: %s", eventID.String())
+			}
+			return true, err
+		}
+
+		shipperSub := m.Subscribe(subCtx, "fake-shipper-default")
+		compSub := m.Subscribe(subCtx, "fake-default")
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case state := <-shipperSub.Ch():
+				t.Logf("shipper state changed: %+v", state)
+				if state.State == client.UnitStateFailed {
+					subErrCh <- fmt.Errorf("shipper failed: %s", state.Message)
+				} else {
+					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}]
+					if ok {
+						if unit.State == client.UnitStateFailed {
+							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						} else if unit.State == client.UnitStateHealthy {
+							shipperOn = true
+							ok, err := sendEvent()
+							if ok {
+								if err != nil {
+									subErrCh <- err
+								} else {
+									// successful; turn it all off
+									err := m.Update([]component.Component{})
+									if err != nil {
+										subErrCh <- err
+									}
+								}
+							}
+						} else if unit.State == client.UnitStateStopped {
+							subErrCh <- nil
+						} else if unit.State == client.UnitStateStarting {
+							// acceptable
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					} else {
+						subErrCh <- errors.New("unit missing: fake-input")
+					}
+				}
+			case state := <-compSub.Ch():
+				t.Logf("component state changed: %+v", state)
+				if state.State == client.UnitStateFailed {
+					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+				} else {
+					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
+					if ok {
+						if unit.State == client.UnitStateFailed {
+							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						} else if unit.State == client.UnitStateHealthy {
+							compConnected = true
+							ok, err := sendEvent()
+							if ok {
+								if err != nil {
+									subErrCh <- err
+								} else {
+									// successful; turn it all off
+									err := m.Update([]component.Component{})
+									if err != nil {
+										subErrCh <- err
+									}
+								}
+							}
+						} else if unit.State == client.UnitStateStopped {
+							subErrCh <- nil
+						} else if unit.State == client.UnitStateStarting || unit.State == client.UnitStateConfiguring {
+							// acceptable
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					} else {
+						subErrCh <- errors.New("unit missing: fake-input")
+					}
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(errCh)
+	defer drainErrChan(subErrCh)
+
+	startTimer := time.NewTimer(100 * time.Millisecond)
+	defer startTimer.Stop()
+	select {
+	case <-startTimer.C:
+		err = m.Update(comps)
 		require.NoError(t, err)
 	case err := <-errCh:
 		t.Fatalf("failed early: %s", err)
@@ -1797,7 +2084,10 @@ func testPaths(t *testing.T) {
 	versioned := paths.IsVersionHome()
 	topPath := paths.Top()
 
-	tmpDir := t.TempDir()
+	tmpDir, err := os.MkdirTemp("", "at-*")
+	if err != nil {
+		t.Fatalf("failed to create temp directory: %s", err)
+	}
 	paths.SetVersionHome(false)
 	paths.SetTop(tmpDir)
 
@@ -1808,11 +2098,11 @@ func testPaths(t *testing.T) {
 	})
 }
 
-func testBinary(t *testing.T) string {
+func testBinary(t *testing.T, name string) string {
 	t.Helper()
 
 	var err error
-	binaryPath := filepath.Join("..", "fake", "fake")
+	binaryPath := filepath.Join("..", "fake", name, name)
 	binaryPath, err = filepath.Abs(binaryPath)
 	if err != nil {
 		t.Fatalf("failed abs %s: %s", binaryPath, err)
