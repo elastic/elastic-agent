@@ -9,14 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"k8s.io/utils/strings/slices"
 	"strings"
 	"time"
 
 	"go.uber.org/zap"
-
 	"go.uber.org/zap/zapcore"
+
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 type zapcoreWriter interface {
@@ -145,7 +144,7 @@ func getTimestamp(evt map[string]interface{}, key string, format string) time.Ti
 func getFields(evt map[string]interface{}, ignore []string) []zapcore.Field {
 	fields := make([]zapcore.Field, 0, len(evt))
 	for k, v := range evt {
-		if len(ignore) > 0 && slices.Contains(ignore, k) {
+		if len(ignore) > 0 && contains(ignore, k) {
 			// ignore field
 			continue
 		}
@@ -164,4 +163,13 @@ func getStrVal(evt map[string]interface{}, key string) string {
 		return ""
 	}
 	return str
+}
+
+func contains(s []string, val string) bool {
+	for _, v := range s {
+		if v == val {
+			return true
+		}
+	}
+	return false
 }

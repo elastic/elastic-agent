@@ -5,7 +5,6 @@
 package runtime
 
 import (
-	"github.com/elastic/elastic-agent/pkg/component"
 	"sort"
 	"testing"
 	"time"
@@ -13,8 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-
 	"go.uber.org/zap/zapcore"
+
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 type wrote struct {
