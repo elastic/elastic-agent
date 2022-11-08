@@ -281,12 +281,10 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
-	inputs := []interface{}{
+
+	streams := []interface{}{
 		map[string]interface{}{
-			idKey:        "logs-monitoring-agent",
-			"name":       "logs-monitoring-agent",
-			"type":       "filestream",
-			useOutputKey: monitoringOutput,
+			idKey: "logs-monitoring-agent",
 			"data_stream": map[string]interface{}{
 				"type":      "logs",
 				"dataset":   "elastic_agent",
@@ -358,8 +356,20 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 						},
 						"ignore_missing": true,
 					},
-				},
+				}},
+		},
+	}
+
+	inputs := []interface{}{
+		map[string]interface{}{
+			idKey:        "logs-monitoring-agent",
+			"name":       "logs-monitoring-agent",
+			"type":       "filestream",
+			useOutputKey: monitoringOutput,
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
 			},
+			"streams": streams,
 		},
 	}
 	inputsNode, found := cfg[inputsKey]
