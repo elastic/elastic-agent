@@ -83,11 +83,11 @@ func TestLogWriter(t *testing.T) {
 		{
 			Name: "json log line split",
 			Config: component.CommandLogSpec{
-				LevelField:   "log.level",
-				TimeField:    "@timestamp",
-				TimeFormat:   time.RFC3339Nano,
-				MessageField: "message",
-				IgnoreFields: []string{"ignore"},
+				LevelKey:   "log.level",
+				TimeKey:    "@timestamp",
+				TimeFormat: time.RFC3339Nano,
+				MessageKey: "message",
+				IgnoreKeys: []string{"ignore"},
 			},
 			Lines: []string{
 				`{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "debug", "message": "message`,

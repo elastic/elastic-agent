@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -85,8 +86,11 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 	if cmdSpec == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
-
-	c.logger = logger.With("component", comp.ID).With("type", cmdSpec.)
+	c.logger = logger.With("component", map[string]interface{}{
+		"id":     comp.ID,
+		"type":   c.getSpecType(),
+		"binary": c.getSpecBinaryName(),
+	})
 	return c, nil
 }
 
@@ -311,7 +315,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
-		process.WithCmdOptions(attachOutErr(c.current), dirPath(workDir)))
+		process.WithCmdOptions(attachOutErr(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName()), dirPath(workDir)))
 	if err != nil {
 		return err
 	}
@@ -457,13 +461,17 @@ func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
 	return nil
 }
 
-func attachOutErr(comp component.Component) process.CmdOption {
+func attachOutErr(comp component.Component, cmdSpec *component.CommandSpec, typeStr string, binaryName string) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
-		logger := logger.NewWithoutConfig("").With("component", comp.ID).With("type", comp.Spec.InputType).With("event", map[string]interface{}{
-			"dataset": fmt.Sprintf("elastic_agent.%s", comp.ID),
+		logger := logger.NewWithoutConfig("").With("component", map[string]interface{}{
+			"id":     comp.ID,
+			"type":   typeStr,
+			"binary": binaryName,
+		}).With("event", map[string]interface{}{
+			"dataset": fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(comp.ID, "-", "_")),
 		})
-		cmd.Stdout = newLogWriter(logger.Core(), comp.Spec.Spec.Command.Log)
-		cmd.Stderr = newLogWriter(logger.Core(), comp.Spec.Spec.Command.Log)
+		cmd.Stdout = newLogWriter(logger.Core(), cmdSpec.Log)
+		cmd.Stderr = newLogWriter(logger.Core(), cmdSpec.Log)
 		return nil
 	}
 }

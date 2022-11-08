@@ -280,12 +280,13 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 
 func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
-	//fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
-
-	streams := []interface{}{
+	inputs := []interface{}{
 		map[string]interface{}{
-			idKey: "logs-monitoring-agent",
+			idKey:        "logs-monitoring-agent",
+			"name":       "logs-monitoring-agent",
+			"type":       "filestream",
+			useOutputKey: monitoringOutput,
 			"data_stream": map[string]interface{}{
 				"type":      "logs",
 				"dataset":   "elastic_agent",
@@ -357,100 +358,8 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 						},
 						"ignore_missing": true,
 					},
-				}},
-		},
-	}
-	/* TODO(blakerouse): Does shipping logs work with this disabled?
-	for unit, binaryName := range componentIDToBinary {
-		if !isSupportedBinary(binaryName) {
-			continue
-		}
-
-		fixedBinaryName := strings.ReplaceAll(binaryName, "-", "_")
-		name := strings.ReplaceAll(unit, "-", "_") // conform with index naming policy
-		logFile := loggingPath(unit, b.operatingSystem)
-		streams = append(streams, map[string]interface{}{
-			idKey: "logs-monitoring-" + name,
-			"data_stream": map[string]interface{}{
-				"type":      "logs",
-				"dataset":   fmt.Sprintf("elastic_agent.%s", fixedBinaryName),
-				"namespace": monitoringNamespace,
-			},
-			"index": fmt.Sprintf("logs-%%{[data_stream.dataset]}-%s", monitoringNamespace),
-			"paths": []interface{}{logFile, logFile + "*"},
-			"close": map[string]interface{}{
-				"on_state_change": map[string]interface{}{
-					"inactive": "5m",
 				},
 			},
-			"parsers": []interface{}{
-				map[string]interface{}{
-					"ndjson": map[string]interface{}{
-						"overwrite_keys": true,
-						"message_key":    "message",
-					},
-				},
-			},
-			"processors": []interface{}{
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
-							"type":      "logs",
-							"dataset":   fmt.Sprintf("elastic_agent.%s", fixedBinaryName),
-							"namespace": monitoringNamespace,
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": fmt.Sprintf("elastic_agent.%s", fixedBinaryName),
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       b.agentInfo.AgentID(),
-							"version":  b.agentInfo.Version(),
-							"snapshot": b.agentInfo.Snapshot(),
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": b.agentInfo.AgentID(),
-						},
-					},
-				},
-				map[string]interface{}{
-					"drop_fields": map[string]interface{}{
-						"fields": []interface{}{
-							"ecs.version", //coming from logger, already added by libbeat
-						},
-						"ignore_missing": true,
-					},
-				},
-			},
-		})
-	}
-	*/
-
-	inputs := []interface{}{
-		map[string]interface{}{
-			idKey:        "logs-monitoring-agent",
-			"name":       "logs-monitoring-agent",
-			"type":       "filestream",
-			useOutputKey: monitoringOutput,
-			"data_stream": map[string]interface{}{
-				"namespace": monitoringNamespace,
-			},
-			"streams": streams,
 		},
 	}
 	inputsNode, found := cfg[inputsKey]

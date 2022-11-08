@@ -93,10 +93,10 @@ func (r *logWriter) handleJSON(line string) bool {
 	if err := json.Unmarshal([]byte(line), &evt); err != nil {
 		return false
 	}
-	lvl := getLevel(evt, r.logCfg.LevelField)
-	ts := getTimestamp(evt, r.logCfg.TimeField, r.logCfg.TimeFormat)
-	msg := getMessage(evt, r.logCfg.MessageField)
-	fields := getFields(evt, r.logCfg.IgnoreFields)
+	lvl := getLevel(evt, r.logCfg.LevelKey)
+	ts := getTimestamp(evt, r.logCfg.TimeKey, r.logCfg.TimeFormat)
+	msg := getMessage(evt, r.logCfg.MessageKey)
+	fields := getFields(evt, r.logCfg.IgnoreKeys)
 	_ = r.loggerCore.Write(zapcore.Entry{
 		Level:   lvl,
 		Time:    ts,
@@ -105,11 +105,11 @@ func (r *logWriter) handleJSON(line string) bool {
 	return true
 }
 
-func getLevel(evt map[string]interface{}, field string) zapcore.Level {
+func getLevel(evt map[string]interface{}, key string) zapcore.Level {
 	lvl := zapcore.InfoLevel
-	err := unmarshalLevel(&lvl, getStrVal(evt, field))
+	err := unmarshalLevel(&lvl, getStrVal(evt, key))
 	if err == nil {
-		delete(evt, field)
+		delete(evt, key)
 	}
 	return lvl
 }
@@ -125,18 +125,18 @@ func unmarshalLevel(lvl *zapcore.Level, val string) error {
 	return lvl.UnmarshalText([]byte(val))
 }
 
-func getMessage(evt map[string]interface{}, field string) string {
-	msg := getStrVal(evt, field)
+func getMessage(evt map[string]interface{}, key string) string {
+	msg := getStrVal(evt, key)
 	if msg != "" {
-		delete(evt, field)
+		delete(evt, key)
 	}
 	return msg
 }
 
-func getTimestamp(evt map[string]interface{}, field string, format string) time.Time {
-	t, err := time.Parse(format, getStrVal(evt, field))
+func getTimestamp(evt map[string]interface{}, key string, format string) time.Time {
+	t, err := time.Parse(format, getStrVal(evt, key))
 	if err == nil {
-		delete(evt, field)
+		delete(evt, key)
 		return t
 	}
 	return time.Now()
@@ -154,8 +154,8 @@ func getFields(evt map[string]interface{}, ignore []string) []zapcore.Field {
 	return fields
 }
 
-func getStrVal(evt map[string]interface{}, field string) string {
-	raw, ok := evt[field]
+func getStrVal(evt map[string]interface{}, key string) string {
+	raw, ok := evt[key]
 	if !ok {
 		return ""
 	}

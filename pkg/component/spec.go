@@ -103,19 +103,19 @@ func (t *CommandTimeoutSpec) InitDefaults() {
 
 // CommandLogSpec is the logging specification for subprocess.
 type CommandLogSpec struct {
-	LevelField   string   `config:"level_field" yaml:"level_field"`
-	TimeField    string   `config:"time_field" yaml:"time_field"`
-	TimeFormat   string   `config:"time_format" yaml:"time_format"`
-	MessageField string   `config:"message_field" yaml:"message_field"`
-	IgnoreFields []string `config:"ignore_fields" yaml:"ignore_fields"`
+	LevelKey   string   `config:"level_key" yaml:"level_key"`
+	TimeKey    string   `config:"time_key" yaml:"time_key"`
+	TimeFormat string   `config:"time_format" yaml:"time_format"`
+	MessageKey string   `config:"message_key" yaml:"message_key"`
+	IgnoreKeys []string `config:"ignore_keys" yaml:"ignore_keys"`
 }
 
 // InitDefaults initialized the defaults for the log specification.
 func (t *CommandLogSpec) InitDefaults() {
-	t.LevelField = "log.level"
-	t.TimeField = "@timestamp"
+	t.LevelKey = "log.level"
+	t.TimeKey = "@timestamp"
 	t.TimeFormat = "2006-01-02T15:04:05.000Z0700"
-	t.MessageField = "message"
+	t.MessageKey = "message"
 }
 
 // ServiceTimeoutSpec is the timeout specification for subprocess.
