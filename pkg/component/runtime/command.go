@@ -308,7 +308,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
-		process.WithCmdOptions(attachOutErr(c.logger), dirPath(workDir)))
+		process.WithCmdOptions(attachOutErr(c.current), dirPath(workDir)))
 	if err != nil {
 		return err
 	}
@@ -414,10 +414,13 @@ func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
 	return path, nil
 }
 
-func attachOutErr(logger *logger.Logger) process.CmdOption {
+func attachOutErr(comp component.Component) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
-		cmd.Stdout = newLogWriter(logger.Core())
-		cmd.Stderr = newLogWriter(logger.Core())
+		logger := logger.NewWithoutConfig("").With("component", comp.ID).With("type", comp.Spec.InputType).With("event", map[string]interface{}{
+			"dataset": fmt.Sprintf("elastic_agent.%s", comp.ID),
+		})
+		cmd.Stdout = newLogWriter(logger.Core(), comp.Spec.Spec.Command.Log)
+		cmd.Stderr = newLogWriter(logger.Core(), comp.Spec.Spec.Command.Log)
 		return nil
 	}
 }

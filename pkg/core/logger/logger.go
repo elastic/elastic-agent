@@ -58,6 +58,13 @@ func NewFromConfig(name string, cfg *Config, logInternal bool) (*Logger, error) 
 	return new(name, cfg, logInternal)
 }
 
+// NewWithoutConfig returns a new logger without having a configuration.
+//
+// Use only when a clean logger is needed, and it is known that the logging configuration has already been performed.
+func NewWithoutConfig(name string) *Logger {
+	return logp.NewLogger(name)
+}
+
 func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 	commonCfg, err := toCommonConfig(cfg)
 	if err != nil {

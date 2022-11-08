@@ -295,7 +295,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 				filepath.Join(logsDrop, agentName+"-*.ndjson"),
 				filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
 			},
-			"index": fmt.Sprintf("logs-elastic_agent-%s", monitoringNamespace),
+			"index": fmt.Sprintf("logs-%%{[data_stream.dataset]}-%s", monitoringNamespace),
 			"close": map[string]interface{}{
 				"on_state_change": map[string]interface{}{
 					"inactive": "5m",
@@ -321,11 +321,15 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 					},
 				},
 				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": "elastic_agent",
+					"copy_fields": map[string]interface{}{
+						"fields": []interface{}{
+							map[string]interface{}{
+								"from": "event.dataset",
+								"to":   "data_stream.dataset",
+							},
 						},
+						"fail_on_error":  false,
+						"ignore_missing": true,
 					},
 				},
 				map[string]interface{}{
@@ -356,6 +360,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 				}},
 		},
 	}
+	/* TODO(blakerouse): Does shipping logs work with this disabled?
 	for unit, binaryName := range componentIDToBinary {
 		if !isSupportedBinary(binaryName) {
 			continue
@@ -371,7 +376,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 				"dataset":   fmt.Sprintf("elastic_agent.%s", fixedBinaryName),
 				"namespace": monitoringNamespace,
 			},
-			"index": fmt.Sprintf("logs-elastic_agent.%s-%s", fixedBinaryName, monitoringNamespace),
+			"index": fmt.Sprintf("logs-%%{[data_stream.dataset]}-%s", monitoringNamespace),
 			"paths": []interface{}{logFile, logFile + "*"},
 			"close": map[string]interface{}{
 				"on_state_change": map[string]interface{}{
@@ -434,6 +439,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 			},
 		})
 	}
+	*/
 
 	inputs := []interface{}{
 		map[string]interface{}{

@@ -8,6 +8,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"k8s.io/utils/strings/slices"
 	"strings"
 	"time"
 
@@ -25,12 +28,14 @@ type zapcoreWriter interface {
 // `Write` handles parsing lines as either ndjson or plain text.
 type logWriter struct {
 	loggerCore zapcoreWriter
+	logCfg     component.CommandLogSpec
 	remainder  []byte
 }
 
-func newLogWriter(core zapcoreWriter) *logWriter {
+func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec) *logWriter {
 	return &logWriter{
 		loggerCore: core,
+		logCfg:     logCfg,
 	}
 }
 
@@ -44,11 +49,7 @@ func (r *logWriter) Write(p []byte) (int, error) {
 		idx := bytes.IndexByte(p[offset:], '\n')
 		if idx < 0 {
 			// not all used add to remainder to be used on next call
-			if r.remainder == nil || len(r.remainder) == 0 {
-				r.remainder = p[offset:]
-			} else {
-				r.remainder = append(r.remainder, p[offset:]...)
-			}
+			r.remainder = append(r.remainder, p[offset:]...)
 			return len(p), nil
 		}
 
@@ -70,6 +71,9 @@ func (r *logWriter) Write(p []byte) (int, error) {
 			continue
 		}
 		str := strings.TrimSpace(string(line))
+		if str[0:1] == "ty" {
+			fmt.Println("found it")
+		}
 		// try to parse line as JSON
 		if str[0] == '{' && r.handleJSON(str) {
 			// handled as JSON
@@ -89,10 +93,10 @@ func (r *logWriter) handleJSON(line string) bool {
 	if err := json.Unmarshal([]byte(line), &evt); err != nil {
 		return false
 	}
-	lvl := getLevel(evt)
-	ts := getTimestamp(evt)
-	msg := getMessage(evt)
-	fields := getFields(evt)
+	lvl := getLevel(evt, r.logCfg.LevelField)
+	ts := getTimestamp(evt, r.logCfg.TimeField, r.logCfg.TimeFormat)
+	msg := getMessage(evt, r.logCfg.MessageField)
+	fields := getFields(evt, r.logCfg.IgnoreFields)
 	_ = r.loggerCore.Write(zapcore.Entry{
 		Level:   lvl,
 		Time:    ts,
@@ -101,21 +105,11 @@ func (r *logWriter) handleJSON(line string) bool {
 	return true
 }
 
-func getLevel(evt map[string]interface{}) zapcore.Level {
+func getLevel(evt map[string]interface{}, field string) zapcore.Level {
 	lvl := zapcore.InfoLevel
-	err := unmarshalLevel(&lvl, getStrVal(evt, "log.level"))
-	if err != nil {
-		err := unmarshalLevel(&lvl, getStrVal(evt, "log", "level"))
-		if err != nil {
-			err := unmarshalLevel(&lvl, getStrVal(evt, "level"))
-			if err == nil {
-				deleteVal(evt, "level")
-			}
-		} else {
-			deleteVal(evt, "log", "level")
-		}
-	} else {
-		deleteVal(evt, "log.level")
+	err := unmarshalLevel(&lvl, getStrVal(evt, field))
+	if err == nil {
+		delete(evt, field)
 	}
 	return lvl
 }
@@ -131,95 +125,43 @@ func unmarshalLevel(lvl *zapcore.Level, val string) error {
 	return lvl.UnmarshalText([]byte(val))
 }
 
-func getMessage(evt map[string]interface{}) string {
-	msg := getStrVal(evt, "message")
-	if msg == "" {
-		msg = getStrVal(evt, "msg")
-		if msg != "" {
-			deleteVal(evt, "msg")
-		}
-	} else {
-		deleteVal(evt, "message")
+func getMessage(evt map[string]interface{}, field string) string {
+	msg := getStrVal(evt, field)
+	if msg != "" {
+		delete(evt, field)
 	}
 	return msg
 }
 
-func getTimestamp(evt map[string]interface{}) time.Time {
-	t, err := time.Parse(time.RFC3339Nano, getStrVal(evt, "@timestamp"))
-	if err != nil {
-		t, err = time.Parse(time.RFC3339Nano, getStrVal(evt, "timestamp"))
-		if err != nil {
-			t, err = time.Parse(time.RFC3339Nano, getStrVal(evt, "time"))
-			if err != nil {
-				t = time.Now()
-			} else {
-				deleteVal(evt, "time")
-			}
-		} else {
-			deleteVal(evt, "timestamp")
-		}
-	} else {
-		deleteVal(evt, "@timestamp")
+func getTimestamp(evt map[string]interface{}, field string, format string) time.Time {
+	t, err := time.Parse(format, getStrVal(evt, field))
+	if err == nil {
+		delete(evt, field)
+		return t
 	}
-	return t
+	return time.Now()
 }
 
-func getFields(evt map[string]interface{}) []zapcore.Field {
+func getFields(evt map[string]interface{}, ignore []string) []zapcore.Field {
 	fields := make([]zapcore.Field, 0, len(evt))
 	for k, v := range evt {
+		if len(ignore) > 0 && slices.Contains(ignore, k) {
+			// ignore field
+			continue
+		}
 		fields = append(fields, zap.Any(k, v))
 	}
 	return fields
 }
 
-func getStrVal(evt map[string]interface{}, fields ...string) string {
-	if len(fields) == 0 {
-		panic("must provide at least one field")
+func getStrVal(evt map[string]interface{}, field string) string {
+	raw, ok := evt[field]
+	if !ok {
+		return ""
 	}
-	last := len(fields) - 1
-	for i, field := range fields {
-		if i == last {
-			raw, ok := evt[field]
-			if !ok {
-				return ""
-			}
-			str, ok := raw.(string)
-			if !ok {
-				return ""
-			}
-			return str
-		}
-		raw, ok := evt[field]
-		if !ok {
-			return ""
-		}
-		nested, ok := raw.(map[string]interface{})
-		if !ok {
-			return ""
-		}
-		evt = nested
+	str, ok := raw.(string)
+	if !ok {
+		return ""
 	}
-	return ""
-}
-
-func deleteVal(evt map[string]interface{}, fields ...string) {
-	if len(fields) == 0 {
-		panic("must provide at least one field")
-	}
-	last := len(fields) - 1
-	for i, field := range fields {
-		if i == last {
-			delete(evt, field)
-			return
-		}
-		raw, ok := evt[field]
-		if !ok {
-			return
-		}
-		nested, ok := raw.(map[string]interface{})
-		if !ok {
-			return
-		}
-		evt = nested
-	}
+	return str
 }

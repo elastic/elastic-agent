@@ -59,6 +59,7 @@ type CommandSpec struct {
 	Args     []string           `config:"args,omitempty" yaml:"args,omitempty"`
 	Env      []CommandEnvSpec   `config:"env,omitempty" yaml:"env,omitempty"`
 	Timeouts CommandTimeoutSpec `config:"timeouts" yaml:"timeouts"`
+	Log      CommandLogSpec     `config:"log" yaml:"log"`
 }
 
 // CommandEnvSpec is the specification that defines environment variables that will be set to execute the subprocess.
@@ -79,6 +80,23 @@ func (t *CommandTimeoutSpec) InitDefaults() {
 	t.Checkin = 30 * time.Second
 	t.Restart = 10 * time.Second
 	t.Stop = 30 * time.Second
+}
+
+// CommandLogSpec is the logging specification for subprocess.
+type CommandLogSpec struct {
+	LevelField   string   `config:"level_field" yaml:"level_field"`
+	TimeField    string   `config:"time_field" yaml:"time_field"`
+	TimeFormat   string   `config:"time_format" yaml:"time_format"`
+	MessageField string   `config:"message_field" yaml:"message_field"`
+	IgnoreFields []string `config:"ignore_fields" yaml:"ignore_fields"`
+}
+
+// InitDefaults initialized the defaults for the log specification.
+func (t *CommandLogSpec) InitDefaults() {
+	t.LevelField = "log.level"
+	t.TimeField = "@timestamp"
+	t.TimeFormat = "2006-01-02T15:04:05.000Z0700"
+	t.MessageField = "message"
 }
 
 // ServiceTimeoutSpec is the timeout specification for subprocess.

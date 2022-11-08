@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"github.com/elastic/elastic-agent/pkg/component"
 	"sort"
 	"testing"
 	"time"
@@ -23,9 +24,10 @@ type wrote struct {
 
 func TestLogWriter(t *testing.T) {
 	scenarios := []struct {
-		Name  string
-		Lines []string
-		Wrote []wrote
+		Name   string
+		Config component.CommandLogSpec
+		Lines  []string
+		Wrote  []wrote
 	}{
 		{
 			Name: "multi plain text line",
@@ -79,60 +81,30 @@ func TestLogWriter(t *testing.T) {
 			},
 		},
 		{
-			Name: "json log lines",
+			Name: "json log line split",
+			Config: component.CommandLogSpec{
+				LevelField:   "log.level",
+				TimeField:    "@timestamp",
+				TimeFormat:   time.RFC3339Nano,
+				MessageField: "message",
+				IgnoreFields: []string{"ignore"},
+			},
 			Lines: []string{
-				`{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "debug", "message": "message field", "string": "extra", "int": 50}`,
-				"\n",
-				`{"timestamp": "2009-11-10T23:00:01Z", "log": {"level": "warn"}, "msg": "msg field", "string": "extra next", "int": 100}`,
-				"\n",
-				`{"time": "2009-11-10T23:00:02Z", "level": "trace", "message": "message field", "nested": {"key": "value"}}`,
-				"\n",
-				`{"level": "error", "message": "error string"}`,
+				`{"@timestamp": "2009-11-10T23:00:00Z", "log.level": "debug", "message": "message`,
+				` field", "string": "extra", "int": 50, "ignore": "other"}`,
 				"\n",
 			},
 			Wrote: []wrote{
 				{
 					entry: zapcore.Entry{
 						Level:   zapcore.DebugLevel,
-						Time:    parseTime("2009-11-10T23:00:00Z"),
+						Time:    parseTime("2009-11-10T23:00:00Z", time.RFC3339Nano),
 						Message: "message field",
 					},
 					fields: []zapcore.Field{
 						zap.String("string", "extra"),
 						zap.Float64("int", 50),
 					},
-				},
-				{
-					entry: zapcore.Entry{
-						Level:   zapcore.WarnLevel,
-						Time:    parseTime("2009-11-10T23:00:01Z"),
-						Message: "msg field",
-					},
-					fields: []zapcore.Field{
-						zap.String("string", "extra next"),
-						zap.Float64("int", 100),
-						zap.Any("log", map[string]interface{}{}),
-					},
-				},
-				{
-					entry: zapcore.Entry{
-						Level:   zapcore.DebugLevel,
-						Time:    parseTime("2009-11-10T23:00:02Z"),
-						Message: "message field",
-					},
-					fields: []zapcore.Field{
-						zap.Any("nested", map[string]interface{}{
-							"key": "value",
-						}),
-					},
-				},
-				{
-					entry: zapcore.Entry{
-						Level:   zapcore.ErrorLevel,
-						Time:    time.Time{},
-						Message: "error string",
-					},
-					fields: []zapcore.Field{},
 				},
 			},
 		},
@@ -157,7 +129,7 @@ func TestLogWriter(t *testing.T) {
 	for _, scenario := range scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
 			c := &captureCore{}
-			w := newLogWriter(c)
+			w := newLogWriter(c, scenario.Config)
 			for _, line := range scenario.Lines {
 				l := len([]byte(line))
 				c, err := w.Write([]byte(line))
@@ -199,8 +171,8 @@ func (c *captureCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	return nil
 }
 
-func parseTime(t string) time.Time {
-	v, err := time.Parse(time.RFC3339Nano, t)
+func parseTime(t string, format string) time.Time {
+	v, err := time.Parse(format, t)
 	if err != nil {
 		panic(err)
 	}
