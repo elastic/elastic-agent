@@ -45,6 +45,7 @@ fleet.enc.lock
 # Files generated with the bump version automations
 *.bck
 
+
 # agent
 build/
 elastic-agent

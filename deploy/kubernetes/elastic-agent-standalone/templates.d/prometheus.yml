@@ -3,38 +3,35 @@ inputs:
       type: prometheus/metrics
       use_output: default
       streams:
-        - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          condition: ${kubernetes.hints.prometheus.collector.enabled} == true or ${kubernetes.hints.prometheus.enabled} == true
+        - condition: ${kubernetes.hints.prometheus.collector.enabled} == true or ${kubernetes.hints.prometheus.enabled} == true
           data_stream:
             dataset: prometheus.collector
             type: metrics
           hosts:
-            - ${kubernetes.hints.prometheus.collector.host|'localhost:9090'}
+            - ${kubernetes.hints.prometheus.collector.host|kubernetes.hints.prometheus.host|'localhost:9090'}
           metrics_filters.exclude: null
           metrics_filters.include: null
           metrics_path: /metrics
           metricsets:
             - collector
-          password: ${kubernetes.hints.prometheus.collector.password|'secret'}
-          period: ${kubernetes.hints.prometheus.collector.period|'10s'}
+          password: ${kubernetes.hints.prometheus.collector.password|kubernetes.hints.prometheus.password|'secret'}
+          period: ${kubernetes.hints.prometheus.collector.period|kubernetes.hints.prometheus.period|'10s'}
           rate_counters: true
-          ssl.certificate_authorities:
-            - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
           use_types: true
-          username: ${kubernetes.hints.prometheus.collector.username|'user'}
+          username: ${kubernetes.hints.prometheus.collector.username|kubernetes.hints.prometheus.username|'user'}
         - condition: ${kubernetes.hints.prometheus.query.enabled} == true and ${kubernetes.hints.prometheus.enabled} == true
           data_stream:
             dataset: prometheus.query
             type: metrics
           hosts:
-            - ${kubernetes.hints.prometheus.query.host|'localhost:9090'}
+            - ${kubernetes.hints.prometheus.query.host|kubernetes.hints.prometheus.host|'localhost:9090'}
           metricsets:
             - query
-          period: ${kubernetes.hints.prometheus.query.period|'10s'}
+          period: ${kubernetes.hints.prometheus.query.period|kubernetes.hints.prometheus.period|'10s'}
           queries:
             - name: instant_vector
               params:
-                query: sum(rate(prometheus_http_requests_total[1m]))
+                query: sum(rate(prometheus_http_requests_total[2m]))
               path: /api/v1/query
             - name: range_vector
               params:
@@ -73,7 +70,7 @@ inputs:
       streams:
         - condition: ${kubernetes.hints.prometheus.container_logs.enabled} == true
           data_stream:
-            dataset: kubernetes.container_logs
+            dataset: prometheus.container_logs
             type: logs
           exclude_files: []
           exclude_lines: []

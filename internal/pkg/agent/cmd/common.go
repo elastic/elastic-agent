@@ -69,7 +69,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newDiagnosticsCommand(args, streams))
 	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
 
-	// windows special hidden sub-command (only added on windows)
+	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
 	if reexec != nil {
 		cmd.AddCommand(reexec)

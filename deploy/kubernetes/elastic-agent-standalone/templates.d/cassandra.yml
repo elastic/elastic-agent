@@ -35,7 +35,7 @@ inputs:
             dataset: cassandra.metrics
             type: metrics
           hosts:
-            - ${kubernetes.hints.cassandra.metrics.host|'localhost:8778'}
+            - ${kubernetes.hints.cassandra.metrics.host|kubernetes.hints.cassandra.host|'localhost:8778'}
           jmx.mappings:
             - attributes:
                 - attr: ReleaseVersion
@@ -320,8 +320,8 @@ inputs:
           metricsets:
             - jmx
           namespace: metrics
-          password: ${kubernetes.hints.cassandra.metrics.password|'admin'}
+          password: ${kubernetes.hints.cassandra.metrics.password|kubernetes.hints.cassandra.password|'admin'}
           path: /jolokia/?ignoreErrors=true&amp;canonicalNaming=false
-          period: ${kubernetes.hints.cassandra.metrics.period|'10s'}
-          username: ${kubernetes.hints.cassandra.metrics.username|'admin'}
+          period: ${kubernetes.hints.cassandra.metrics.period|kubernetes.hints.cassandra.period|'10s'}
+          username: ${kubernetes.hints.cassandra.metrics.username|kubernetes.hints.cassandra.username|'admin'}
       data_stream.namespace: default
