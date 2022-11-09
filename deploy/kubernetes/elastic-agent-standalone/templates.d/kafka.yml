@@ -39,23 +39,23 @@ inputs:
             - localhost:8778
           metricsets:
             - broker
-          period: ${kubernetes.hints.kafka.broker.period|'10s'}
+          period: ${kubernetes.hints.kafka.broker.period|kubernetes.hints.kafka.period|'10s'}
         - condition: ${kubernetes.hints.kafka.consumergroup.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
           data_stream:
             dataset: kafka.consumergroup
             type: metrics
           hosts:
-            - ${kubernetes.hints.kafka.consumergroup.host|'localhost:9092'}
+            - ${kubernetes.hints.kafka.consumergroup.host|kubernetes.hints.kafka.host|'localhost:9092'}
           metricsets:
             - consumergroup
-          period: ${kubernetes.hints.kafka.consumergroup.period|'10s'}
+          period: ${kubernetes.hints.kafka.consumergroup.period|kubernetes.hints.kafka.period|'10s'}
         - condition: ${kubernetes.hints.kafka.partition.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
           data_stream:
             dataset: kafka.partition
             type: metrics
           hosts:
-            - ${kubernetes.hints.kafka.partition.host|'localhost:9092'}
+            - ${kubernetes.hints.kafka.partition.host|kubernetes.hints.kafka.host|'localhost:9092'}
           metricsets:
             - partition
-          period: ${kubernetes.hints.kafka.partition.period|'10s'}
+          period: ${kubernetes.hints.kafka.partition.period|kubernetes.hints.kafka.period|'10s'}
       data_stream.namespace: default

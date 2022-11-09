@@ -7,6 +7,7 @@ package component
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -164,9 +165,17 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 		return nil, nil, err
 	}
 
+	// order output keys; ensures result is always the same order
+	outputKeys := make([]string, 0, len(outputsMap))
+	for k := range outputsMap {
+		outputKeys = append(outputKeys, k)
+	}
+	sort.Strings(outputKeys)
+
 	var components []Component
 	componentIdsInputMap := make(map[string]string)
-	for outputName, output := range outputsMap {
+	for _, outputName := range outputKeys {
+		output := outputsMap[outputName]
 		if !output.enabled {
 			// skip; not enabled
 			continue

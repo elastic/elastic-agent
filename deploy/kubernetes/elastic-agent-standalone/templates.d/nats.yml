@@ -30,53 +30,53 @@ inputs:
             dataset: nats.connection
             type: metrics
           hosts:
-            - ${kubernetes.hints.nats.connection.host|'localhost:8222'}
+            - ${kubernetes.hints.nats.connection.host|kubernetes.hints.nats.host|'localhost:8222'}
           metricsets:
             - connection
-          period: ${kubernetes.hints.nats.connection.period|'10s'}
+          period: ${kubernetes.hints.nats.connection.period|kubernetes.hints.nats.period|'10s'}
         - condition: ${kubernetes.hints.nats.connections.enabled} == true or ${kubernetes.hints.nats.enabled} == true
           data_stream:
             dataset: nats.connections
             type: metrics
           hosts:
-            - ${kubernetes.hints.nats.connections.host|'localhost:8222'}
+            - ${kubernetes.hints.nats.connections.host|kubernetes.hints.nats.host|'localhost:8222'}
           metricsets:
             - connections
-          period: ${kubernetes.hints.nats.connections.period|'10s'}
+          period: ${kubernetes.hints.nats.connections.period|kubernetes.hints.nats.period|'10s'}
         - condition: ${kubernetes.hints.nats.route.enabled} == true and ${kubernetes.hints.nats.enabled} == true
           data_stream:
             dataset: nats.route
             type: metrics
           hosts:
-            - ${kubernetes.hints.nats.route.host|'localhost:8222'}
+            - ${kubernetes.hints.nats.route.host|kubernetes.hints.nats.host|'localhost:8222'}
           metricsets:
             - route
-          period: ${kubernetes.hints.nats.route.period|'10s'}
+          period: ${kubernetes.hints.nats.route.period|kubernetes.hints.nats.period|'10s'}
         - condition: ${kubernetes.hints.nats.routes.enabled} == true or ${kubernetes.hints.nats.enabled} == true
           data_stream:
             dataset: nats.routes
             type: metrics
           hosts:
-            - ${kubernetes.hints.nats.routes.host|'localhost:8222'}
+            - ${kubernetes.hints.nats.routes.host|kubernetes.hints.nats.host|'localhost:8222'}
           metricsets:
             - routes
-          period: ${kubernetes.hints.nats.routes.period|'10s'}
+          period: ${kubernetes.hints.nats.routes.period|kubernetes.hints.nats.period|'10s'}
         - condition: ${kubernetes.hints.nats.stats.enabled} == true or ${kubernetes.hints.nats.enabled} == true
           data_stream:
             dataset: nats.stats
             type: metrics
           hosts:
-            - ${kubernetes.hints.nats.stats.host|'localhost:8222'}
+            - ${kubernetes.hints.nats.stats.host|kubernetes.hints.nats.host|'localhost:8222'}
           metricsets:
             - stats
-          period: ${kubernetes.hints.nats.stats.period|'10s'}
+          period: ${kubernetes.hints.nats.stats.period|kubernetes.hints.nats.period|'10s'}
         - condition: ${kubernetes.hints.nats.subscriptions.enabled} == true or ${kubernetes.hints.nats.enabled} == true
           data_stream:
             dataset: nats.subscriptions
             type: metrics
           hosts:
-            - ${kubernetes.hints.nats.subscriptions.host|'localhost:8222'}
+            - ${kubernetes.hints.nats.subscriptions.host|kubernetes.hints.nats.host|'localhost:8222'}
           metricsets:
             - subscriptions
-          period: ${kubernetes.hints.nats.subscriptions.period|'10s'}
+          period: ${kubernetes.hints.nats.subscriptions.period|kubernetes.hints.nats.period|'10s'}
       data_stream.namespace: default
