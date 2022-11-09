@@ -61,11 +61,11 @@ inputs:
             dataset: hashicorp_vault.metrics
             type: metrics
           hosts:
-            - ${kubernetes.hints.hashicorp_vault.metrics.host|'http://localhost:8200'}
+            - ${kubernetes.hints.hashicorp_vault.metrics.host|kubernetes.hints.hashicorp_vault.host|'http://localhost:8200'}
           metrics_path: /v1/sys/metrics
           metricsets:
             - collector
-          period: ${kubernetes.hints.hashicorp_vault.metrics.period|'30s'}
+          period: ${kubernetes.hints.hashicorp_vault.metrics.period|kubernetes.hints.hashicorp_vault.period|'30s'}
           query:
             format: prometheus
           rate_counters: true

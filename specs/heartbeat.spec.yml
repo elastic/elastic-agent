@@ -21,9 +21,7 @@ inputs:
         - "-E"
         - "management.enabled=true"
         - "-E"
-        - "logging.level=info"
-        - "-E"
-        - "logging.to_stderr=true"
+        - "logging.level=debug"
         - "-E"
         - "gc_percent=${HEARTBEAT_GOGC:100}"
   - name: synthetics/http

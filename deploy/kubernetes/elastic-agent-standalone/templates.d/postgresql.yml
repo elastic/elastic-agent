@@ -34,35 +34,35 @@ inputs:
             dataset: postgresql.activity
             type: metrics
           hosts:
-            - ${kubernetes.hints.postgresql.activity.host|'postgres://localhost:5432'}
+            - ${kubernetes.hints.postgresql.activity.host|kubernetes.hints.postgresql.host|'postgres://localhost:5432'}
           metricsets:
             - activity
-          period: ${kubernetes.hints.postgresql.activity.period|'10s'}
+          period: ${kubernetes.hints.postgresql.activity.period|kubernetes.hints.postgresql.period|'10s'}
         - condition: ${kubernetes.hints.postgresql.bgwriter.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.bgwriter
             type: metrics
           hosts:
-            - ${kubernetes.hints.postgresql.bgwriter.host|'postgres://localhost:5432'}
+            - ${kubernetes.hints.postgresql.bgwriter.host|kubernetes.hints.postgresql.host|'postgres://localhost:5432'}
           metricsets:
             - bgwriter
-          period: ${kubernetes.hints.postgresql.bgwriter.period|'10s'}
+          period: ${kubernetes.hints.postgresql.bgwriter.period|kubernetes.hints.postgresql.period|'10s'}
         - condition: ${kubernetes.hints.postgresql.database.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.database
             type: metrics
           hosts:
-            - ${kubernetes.hints.postgresql.database.host|'postgres://localhost:5432'}
+            - ${kubernetes.hints.postgresql.database.host|kubernetes.hints.postgresql.host|'postgres://localhost:5432'}
           metricsets:
             - database
-          period: ${kubernetes.hints.postgresql.database.period|'10s'}
+          period: ${kubernetes.hints.postgresql.database.period|kubernetes.hints.postgresql.period|'10s'}
         - condition: ${kubernetes.hints.postgresql.statement.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.statement
             type: metrics
           hosts:
-            - ${kubernetes.hints.postgresql.statement.host|'postgres://localhost:5432'}
+            - ${kubernetes.hints.postgresql.statement.host|kubernetes.hints.postgresql.host|'postgres://localhost:5432'}
           metricsets:
             - statement
-          period: ${kubernetes.hints.postgresql.statement.period|'10s'}
+          period: ${kubernetes.hints.postgresql.statement.period|kubernetes.hints.postgresql.period|'10s'}
       data_stream.namespace: default

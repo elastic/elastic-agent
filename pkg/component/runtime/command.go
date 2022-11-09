@@ -15,12 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -74,13 +73,14 @@ type CommandRuntime struct {
 func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
 	c := &CommandRuntime{
 		current:     comp,
+		monitor:     monitor,
 		ch:          make(chan ComponentState),
 		actionCh:    make(chan actionMode),
 		procCh:      make(chan procState),
 		compCh:      make(chan component.Component),
 		actionState: actionStop,
 		state:       newComponentState(&comp),
-		monitor:     monitor,
+
 	}
 	cmdSpec := c.getCommandSpec()
 	if cmdSpec == nil {
