@@ -17,11 +17,11 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 type actionMode int
@@ -80,7 +80,6 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 		compCh:      make(chan component.Component),
 		actionState: actionStop,
 		state:       newComponentState(&comp),
-
 	}
 	cmdSpec := c.getCommandSpec()
 	if cmdSpec == nil {
