@@ -52,6 +52,13 @@ export COMPOSE_DOCKER_CLI_BUILD=0
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 ```
 
+If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
+```
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
 In Linux operating systems that you can not run docker as a root user you need to follow [linux-postinstall steps](https://docs.docker.com/engine/install/linux-postinstall/)
 
 ### Testing docker container

@@ -1,0 +1,72 @@
+name: Endpoint Security
+cmd: endpoint-security
+artifact: endpoint-dev
+service: 6788
+process:
+    # After discussion with Endpoint team the stop timeout is set to 3m,
+    # in order to give enough time for the Endpoint to stop gracefully.
+    # https://github.com/elastic/elastic-agent/issues/1262
+    stop_timeout: 3m
+action_input_types:
+- endpoint
+log_paths:
+  darwin: "/Library/Elastic/Endpoint/state/log/endpoint-*.log"
+  linux: "/opt/Elastic/Endpoint/state/log/endpoint-*.log"
+  windows: "C:\\Program Files\\Elastic\\Endpoint\\state\\log\\endpoint-*.log"
+check_install:
+- exec_file:
+    path: "endpoint-security"
+    args:
+    - "verify"
+    - "--log"
+    - "stderr"
+    timeout: 30
+post_install:
+- exec_file:
+    path: "endpoint-security"
+    args:
+    - "install"
+    - "--log"
+    - "stderr"
+    - "--upgrade"
+    - "--resources"
+    - "endpoint-security-resources.zip"
+    timeout: 600
+pre_uninstall:
+- exec_file:
+    path: "endpoint-security"
+    args:
+      - "uninstall"
+      - "--log"
+      - "stderr"
+    timeout: 600
+rules:
+- fix_stream: {}
+
+- filter_values:
+    selector: inputs
+    key: type
+    values:
+    - endpoint
+
+- filter_values:
+    selector: inputs
+    key: enabled
+    values:
+    - true
+
+- map:
+    path: fleet
+    rules:
+    - remove_key:
+        key: server
+
+- filter:
+    selectors:
+    - fleet
+    - inputs
+    - output
+    - revision
+
+when: length(${fleet}) > 0 and length(${inputs}) > 0 and hasKey(${output}, 'elasticsearch', 'logstash')
+constraints: not (${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7') 
