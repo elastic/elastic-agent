@@ -6,11 +6,9 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -31,14 +29,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/tar"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -235,12 +230,12 @@ func containerCmd(streams *cli.IOStreams) error {
 				wg.Done()
 				// sending kill signal to current process (elastic-agent)
 				logInfo(streams, "Initiate shutdown elastic-agent.")
-				mainProc.Signal(syscall.SIGTERM) // nolint:errcheck //not required
+				mainProc.Signal(syscall.SIGTERM) //nolint:errcheck //not required
 			}()
 
 			defer func() {
 				if apmProc != nil {
-					apmProc.Stop() // nolint:errcheck //not required
+					apmProc.Stop() //nolint:errcheck //not required
 					logInfo(streams, "Initiate shutdown legacy apm-server.")
 				}
 			}()
@@ -267,7 +262,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr)
+		return run(logToStderr, isContainer)
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -332,7 +327,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr)
+	return run(logToStderr, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -709,38 +704,31 @@ func truncateString(b []byte) string {
 func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, error) {
 	name := "apm-server"
 	logInfo(streams, "Preparing apm-server for legacy mode.")
-	cfg := artifact.DefaultConfig()
 
-	logInfo(streams, fmt.Sprintf("Extracting apm-server into install directory %s.", path))
-	installer, err := tar.NewInstaller(cfg)
+	platform, err := component.LoadPlatformDetail(isContainer)
 	if err != nil {
-		return nil, errors.New(err, "creating installer")
+		return nil, fmt.Errorf("failed to gather system information: %w", err)
 	}
-	spec := program.Spec{Name: name, Cmd: name, Artifact: name}
-	version := release.Version()
-	if release.Snapshot() {
-		version = fmt.Sprintf("%s-SNAPSHOT", version)
+
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
-	// Extract the bundled apm-server into the APM_SERVER_PATH
-	if err := installer.Install(context.Background(), spec, version, path); err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("installing %s (%s) from %s to %s", spec.Name, version, cfg.TargetDirectory, path))
+
+	spec, err := specs.GetInput(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect apm-server input: %w", err)
 	}
+
 	// Get the apm-server directory
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("reading directory %s", path))
 	}
 	if len(files) != 1 || !files[0].IsDir() {
 		return nil, errors.New("expected one directory")
 	}
-	apmDir := filepath.Join(path, files[0].Name())
-	// Start apm-server process respecting path ENVs
-	apmBinary := filepath.Join(apmDir, spec.Cmd)
-	log, err := logger.New("apm-server", false)
-	if err != nil {
-		return nil, err
-	}
+
 	// add APM Server specific configuration
 	var args []string
 	addEnv := func(arg, env string) {
@@ -761,7 +749,7 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	addEnv("--httpprof", "HTTPPROF")
 	addSettingEnv("gc_percent", "APMSERVER_GOGC")
 	logInfo(streams, "Starting legacy apm-server daemon as a subprocess.")
-	return process.Start(log, apmBinary, nil, os.Geteuid(), os.Getegid(), args)
+	return process.Start(spec.BinaryPath, process.WithArgs(args))
 }
 
 func logToStderr(cfg *configuration.Configuration) {
@@ -794,11 +782,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 			return err
 		}
 	}
-	// sync the downloads to the data directory
-	destDownloads := filepath.Join(statePath, "data", "downloads")
-	if err := syncDir(paths.Downloads(), destDownloads); err != nil {
-		return fmt.Errorf("syncing download directory to STATE_PATH(%s) failed: %w", statePath, err)
-	}
+
 	originalInstall := paths.Install()
 	originalTop := paths.Top()
 	paths.SetTop(topPath)
@@ -878,23 +862,6 @@ func tryContainerLoadPaths() error {
 	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, false)
 }
 
-func syncDir(src string, dest string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		relativePath := strings.TrimPrefix(path, src)
-		if info.IsDir() {
-			err = os.MkdirAll(filepath.Join(dest, relativePath), info.Mode())
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-		return copyFile(filepath.Join(dest, relativePath), path, info.Mode())
-	})
-}
-
 func copyFile(destPath string, srcPath string, mode os.FileMode) error {
 	// if mode is unset; set to the same as the source file
 	if mode == 0 {
@@ -971,4 +938,13 @@ func envIntWithDefault(defVal string, keys ...string) (int, error) {
 	}
 
 	return strconv.Atoi(valStr)
+}
+
+// isContainer changes the platform details to be a container.
+//
+// Runtime specifications can provide unique configurations when running in a container, this ensures that
+// those configurations are used versus the standard Linux configurations.
+func isContainer(detail component.PlatformDetail) component.PlatformDetail {
+	detail.OS = component.Container
+	return detail
 }

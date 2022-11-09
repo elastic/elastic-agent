@@ -2,34 +2,32 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// Package fleet handles interactions between the elastic-agent and fleet-server.
-// Specifically it will handle agent checkins, and action queueing/dispatch.
 package fleet
 
 import (
 	"context"
-	stderr "errors"
-	"fmt"
-	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-
+	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
+	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // Max number of times an invalid API Key is checked
 const maxUnauthCounter int = 6
+
+// Const for decraded state or linter complains
+const degraded = "degraded"
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
@@ -61,227 +59,129 @@ type stateStore interface {
 	AckToken() string
 	SetAckToken(ackToken string)
 	Save() error
-	SetQueue([]fleetapi.Action)
-	Actions() []fleetapi.Action
-}
-
-type actionQueue interface {
-	Add(fleetapi.Action, int64)
-	DequeueActions() []fleetapi.Action
-	Cancel(string) int
 	Actions() []fleetapi.Action
 }
 
 type fleetGateway struct {
-	bgContext          context.Context
 	log                *logger.Logger
-	dispatcher         pipeline.Dispatcher
 	client             client.Sender
 	scheduler          scheduler.Scheduler
-	backoff            backoff.Backoff
 	settings           *fleetGatewaySettings
 	agentInfo          agentInfo
-	done               chan struct{}
-	wg                 sync.WaitGroup
-	acker              store.FleetAcker
+	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	statusController   status.Controller
-	statusReporter     status.Reporter
-	localReporter      status.Reporter
+	stateFetcher       coordinator.StateFetcher
 	stateStore         stateStore
-	queue              actionQueue
+	errCh              chan error
+	actionCh           chan []fleetapi.Action
 }
 
 // New creates a new fleet gateway
 func New(
-	ctx context.Context,
 	log *logger.Logger,
 	agentInfo agentInfo,
 	client client.Sender,
-	d pipeline.Dispatcher,
-	acker store.FleetAcker,
-	statusController status.Controller,
+	acker acker.Acker,
+	stateFetcher coordinator.StateFetcher,
 	stateStore stateStore,
-	queue actionQueue,
 ) (gateway.FleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
-		ctx,
 		log,
 		defaultGatewaySettings,
 		agentInfo,
 		client,
-		d,
 		scheduler,
 		acker,
-		statusController,
+		stateFetcher,
 		stateStore,
-		queue,
 	)
 }
 
 func newFleetGatewayWithScheduler(
-	ctx context.Context,
 	log *logger.Logger,
 	settings *fleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
-	d pipeline.Dispatcher,
 	scheduler scheduler.Scheduler,
-	acker store.FleetAcker,
-	statusController status.Controller,
+	acker acker.Acker,
+	stateFetcher coordinator.StateFetcher,
 	stateStore stateStore,
-	queue actionQueue,
 ) (gateway.FleetGateway, error) {
-
-	// Backoff implementation doesn't support the use of a context [cancellation]
-	// as the shutdown mechanism.
-	// So we keep a done channel that will be closed when the current context is shutdown.
-	done := make(chan struct{})
-
 	return &fleetGateway{
-		bgContext:  ctx,
-		log:        log,
-		dispatcher: d,
-		client:     client,
-		settings:   settings,
-		agentInfo:  agentInfo,
-		scheduler:  scheduler,
-		backoff: backoff.NewEqualJitterBackoff(
-			done,
-			settings.Backoff.Init,
-			settings.Backoff.Max,
-		),
-		done:             done,
-		acker:            acker,
-		statusReporter:   statusController.RegisterComponent("gateway"),
-		localReporter:    statusController.RegisterLocalComponent("gateway-checkin"),
-		statusController: statusController,
-		stateStore:       stateStore,
-		queue:            queue,
+		log:          log,
+		client:       client,
+		settings:     settings,
+		agentInfo:    agentInfo,
+		scheduler:    scheduler,
+		acker:        acker,
+		stateFetcher: stateFetcher,
+		stateStore:   stateStore,
+		errCh:        make(chan error),
+		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
 }
 
-func (f *fleetGateway) worker() {
+func (f *fleetGateway) Actions() <-chan []fleetapi.Action {
+	return f.actionCh
+}
+
+func (f *fleetGateway) Run(ctx context.Context) error {
+	// Backoff implementation doesn't support the use of a context [cancellation] as the shutdown mechanism.
+	// So we keep a done channel that will be closed when the current context is shutdown.
+	done := make(chan struct{})
+	backoff := backoff.NewEqualJitterBackoff(
+		done,
+		f.settings.Backoff.Init,
+		f.settings.Backoff.Max,
+	)
+	go func() {
+		<-ctx.Done()
+		close(done)
+	}()
+
+	f.log.Info("Fleet gateway started")
 	for {
 		select {
-		case ts := <-f.scheduler.WaitTick():
+		case <-ctx.Done():
+			f.scheduler.Stop()
+			f.log.Info("Fleet gateway stopped")
+			return ctx.Err()
+		case <-f.scheduler.WaitTick():
 			f.log.Debug("FleetGateway calling Checkin API")
 
 			// Execute the checkin call and for any errors returned by the fleet-server API
 			// the function will retry to communicate with fleet-server with an exponential delay and some
 			// jitter to help better distribute the load from a fleet of agents.
-			resp, err := f.executeCheckinWithRetries()
+			resp, err := f.doExecute(ctx, backoff)
 			if err != nil {
 				continue
 			}
 
-			actions := f.queueScheduledActions(resp.Actions)
-			actions, err = f.dispatchCancelActions(actions)
-			if err != nil {
-				f.log.Error(err.Error())
+			actions := make([]fleetapi.Action, len(resp.Actions))
+			copy(actions, resp.Actions)
+			if len(actions) > 0 {
+				f.actionCh <- actions
 			}
-
-			queued, expired := f.gatherQueuedActions(ts.UTC())
-			f.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
-			f.log.Debugf("Expired actions: %v", expired)
-
-			actions = append(actions, queued...)
-
-			var errMsg string
-			// Persist state
-			f.stateStore.SetQueue(f.queue.Actions())
-			if err := f.stateStore.Save(); err != nil {
-				errMsg = fmt.Sprintf("failed to persist action_queue, error: %s", err)
-				f.log.Error(errMsg)
-				f.statusReporter.Update(state.Failed, errMsg, nil)
-			}
-
-			if err := f.dispatcher.Dispatch(context.Background(), f.acker, actions...); err != nil {
-				errMsg = fmt.Sprintf("failed to dispatch actions, error: %s", err)
-				f.log.Error(errMsg)
-				f.statusReporter.Update(state.Failed, errMsg, nil)
-			}
-
-			f.log.Debugf("FleetGateway is sleeping, next update in %s", f.settings.Duration)
-			if errMsg != "" {
-				f.statusReporter.Update(state.Failed, errMsg, nil)
-			} else {
-				f.statusReporter.Update(state.Healthy, "", nil)
-				f.localReporter.Update(state.Healthy, "", nil) // we don't need to specifically set the local reporter to failed above, but it needs to be reset to healthy if a checkin succeeds
-			}
-
-		case <-f.bgContext.Done():
-			f.stop()
-			return
 		}
 	}
 }
 
-// queueScheduledActions will add any action in actions with a valid start time to the queue and return the rest.
-// start time to current time comparisons are purposefully not made in case of cancel actions.
-func (f *fleetGateway) queueScheduledActions(input fleetapi.Actions) []fleetapi.Action {
-	actions := make([]fleetapi.Action, 0, len(input))
-	for _, action := range input {
-		start, err := action.StartTime()
-		if err == nil {
-			f.log.Debugf("Adding action id: %s to queue.", action.ID())
-			f.queue.Add(action, start.Unix())
-			continue
-		}
-		if !stderr.Is(err, fleetapi.ErrNoStartTime) {
-			f.log.Warnf("Issue gathering start time from action id %s: %v", action.ID(), err)
-		}
-		actions = append(actions, action)
-	}
-	return actions
+// Errors returns the channel to watch for reported errors.
+func (f *fleetGateway) Errors() <-chan error {
+	return f.errCh
 }
 
-// dispatchCancelActions will separate and dispatch any cancel actions from the actions list and return the rest of the list.
-// cancel actions are dispatched seperatly as they may remove items from the queue.
-func (f *fleetGateway) dispatchCancelActions(actions []fleetapi.Action) ([]fleetapi.Action, error) {
-	// separate cancel actions from the actions list
-	cancelActions := make([]fleetapi.Action, 0, len(actions))
-	for i := len(actions) - 1; i >= 0; i-- {
-		action := actions[i]
-		if action.Type() == fleetapi.ActionTypeCancel {
-			cancelActions = append(cancelActions, action)
-			actions = append(actions[:i], actions[i+1:]...)
-		}
-	}
-	// Dispatch cancel actions
-	if len(cancelActions) > 0 {
-		if err := f.dispatcher.Dispatch(context.Background(), f.acker, cancelActions...); err != nil {
-			return actions, fmt.Errorf("failed to dispatch cancel actions: %w", err)
-		}
-	}
-	return actions, nil
-}
-
-// gatherQueuedActions will dequeue actions from the action queue and separate those that have already expired.
-func (f *fleetGateway) gatherQueuedActions(ts time.Time) (queued, expired []fleetapi.Action) {
-	actions := f.queue.DequeueActions()
-	for _, action := range actions {
-		exp, _ := action.Expiration()
-		if ts.After(exp) {
-			expired = append(expired, action)
-			continue
-		}
-		queued = append(queued, action)
-	}
-	return queued, expired
-}
-
-func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, error) {
-	f.backoff.Reset()
+func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
+	bo.Reset()
 
 	// Guard if the context is stopped by a out of bound call,
 	// this mean we are rebooting to change the log level or the system is shutting us down.
-	for f.bgContext.Err() == nil {
-		f.log.Debugf("Checkin started")
-		resp, took, err := f.executeCheckin(f.bgContext)
+	for ctx.Err() == nil {
+		f.log.Debugf("Checking started")
+		resp, took, err := f.execute(ctx)
 		if err != nil {
 			f.checkinFailCounter++
 
@@ -289,16 +189,14 @@ func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, e
 			if f.checkinFailCounter <= 2 {
 				f.log.Warnw("Possible transient error during checkin with fleet-server, retrying",
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
-					"retry_after_ns", f.backoff.NextWait())
+					"retry_after_ns", bo.NextWait())
 			} else {
-				// Only update the local status after repeated failures: https://github.com/elastic/elastic-agent/issues/1148
-				f.localReporter.Update(state.Degraded, fmt.Sprintf("checkin failed: %v", err), nil)
 				f.log.Errorw("Cannot checkin in with fleet-server, retrying",
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
-					"retry_after_ns", f.backoff.NextWait())
+					"retry_after_ns", bo.NextWait())
 			}
 
-			if !f.backoff.Wait() {
+			if !bo.Wait() {
 				// Something bad has happened and we log it and we should update our current state.
 				err := errors.New(
 					"checkin retry loop was stopped",
@@ -307,9 +205,10 @@ func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, e
 				)
 
 				f.log.Error(err)
-				f.localReporter.Update(state.Failed, err.Error(), nil)
+				f.errCh <- err
 				return nil, err
 			}
+			f.errCh <- err
 			continue
 		}
 
@@ -325,10 +224,85 @@ func (f *fleetGateway) executeCheckinWithRetries() (*fleetapi.CheckinResponse, e
 
 	// This mean that the next loop was cancelled because of the context, we should return the error
 	// but we should not log it, because we are in the process of shutting down.
-	return nil, f.bgContext.Err()
+	return nil, ctx.Err()
 }
 
-func (f *fleetGateway) executeCheckin(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
+func (f *fleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
+	if components == nil {
+		return nil
+	}
+	stateString := func(s eaclient.UnitState) string {
+		switch s {
+		case eaclient.UnitStateStarting:
+			return "starting"
+		case eaclient.UnitStateConfiguring:
+			return "configuring"
+		case eaclient.UnitStateHealthy:
+			return "healthy"
+		case eaclient.UnitStateDegraded:
+			return degraded
+		case eaclient.UnitStateFailed:
+			return "failed"
+		case eaclient.UnitStateStopping:
+			return "stopping"
+		case eaclient.UnitStateStopped:
+			return "stopped"
+		}
+		return ""
+	}
+
+	unitTypeString := func(t eaclient.UnitType) string {
+		switch t {
+		case eaclient.UnitTypeInput:
+			return "input"
+		case eaclient.UnitTypeOutput:
+			return "output"
+		}
+		return ""
+	}
+
+	checkinComponents := make([]fleetapi.CheckinComponent, 0, len(components))
+
+	for _, item := range components {
+		component := item.Component
+		state := item.State
+
+		var shipperReference *fleetapi.CheckinShipperReference
+		if component.Shipper != nil {
+			shipperReference = &fleetapi.CheckinShipperReference{
+				ComponentID: component.Shipper.ComponentID,
+				UnitID:      component.Shipper.UnitID,
+			}
+		}
+		checkinComponent := fleetapi.CheckinComponent{
+			ID:      component.ID,
+			Type:    component.Type(),
+			Status:  stateString(state.State),
+			Message: state.Message,
+			Shipper: shipperReference,
+		}
+
+		if state.Units != nil {
+			units := make([]fleetapi.CheckinUnit, 0, len(state.Units))
+
+			for unitKey, unitState := range state.Units {
+				units = append(units, fleetapi.CheckinUnit{
+					ID:      unitKey.UnitID,
+					Type:    unitTypeString(unitKey.UnitType),
+					Status:  stateString(unitState.State),
+					Message: unitState.Message,
+					Payload: unitState.Payload,
+				})
+			}
+			checkinComponent.Units = units
+		}
+		checkinComponents = append(checkinComponents, checkinComponent)
+	}
+
+	return checkinComponents
+}
+
+func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
 	ecsMeta, err := info.Metadata()
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -340,13 +314,20 @@ func (f *fleetGateway) executeCheckin(ctx context.Context) (*fleetapi.CheckinRes
 		f.log.Debugf("using previously saved ack token: %v", ackToken)
 	}
 
+	// get current state
+	state := f.stateFetcher.State(false)
+
+	// convert components into checkin components structure
+	components := f.convertToCheckinComponents(state.Components)
+
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken: ackToken,
-		Metadata: ecsMeta,
-		Status:   f.statusController.StatusString(),
-		Message:  f.statusController.Status().Message,
+		AckToken:   ackToken,
+		Metadata:   ecsMeta,
+		Status:     agentStateToString(state.State),
+		Message:    state.Message,
+		Components: components,
 	}
 
 	resp, took, err := cmd.Execute(ctx, req)
@@ -354,7 +335,7 @@ func (f *fleetGateway) executeCheckin(ctx context.Context) (*fleetapi.CheckinRes
 		f.unauthCounter++
 
 		if f.shouldUnenroll() {
-			f.log.Warnf("received an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
+			f.log.Warnf("retrieved an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
 			return &fleetapi.CheckinResponse{
 				Actions: []fleetapi.Action{&fleetapi.ActionUnenroll{ActionID: "", ActionType: "UNENROLL", IsDetected: true}},
 			}, took, nil
@@ -389,26 +370,16 @@ func isUnauth(err error) bool {
 	return errors.Is(err, client.ErrInvalidAPIKey)
 }
 
-func (f *fleetGateway) Start() error {
-	f.wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer f.log.Info("Fleet gateway is stopped")
-		defer wg.Done()
-
-		f.worker()
-	}(&f.wg)
-	return nil
-}
-
-func (f *fleetGateway) stop() {
-	f.log.Info("Fleet gateway is stopping")
-	defer f.scheduler.Stop()
-	f.statusReporter.Unregister()
-	f.localReporter.Unregister()
-	close(f.done)
-	f.wg.Wait()
-}
-
 func (f *fleetGateway) SetClient(c client.Sender) {
 	f.client = c
+}
+
+func agentStateToString(state agentclient.State) string {
+	switch state {
+	case agentclient.Healthy:
+		return "online"
+	case agentclient.Failed:
+		return "error"
+	}
+	return degraded
 }

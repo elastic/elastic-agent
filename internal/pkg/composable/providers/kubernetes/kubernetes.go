@@ -32,7 +32,7 @@ const (
 const nodeScope = "node"
 
 func init() {
-	_ = composable.Providers.AddDynamicProvider("kubernetes", DynamicProviderBuilder)
+	composable.Providers.MustAddDynamicProvider("kubernetes", DynamicProviderBuilder)
 }
 
 type dynamicProvider struct {
@@ -61,37 +61,51 @@ func (p *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 		betalogger := logp.NewLogger("cfgwarn")
 		betalogger.Warnf("BETA: Hints' feature is beta.")
 	}
+	eventers := make([]Eventer, 0, 3)
 	if p.config.Resources.Pod.Enabled {
-		err := p.watchResource(comm, "pod")
+		eventer, err := p.watchResource(comm, "pod")
 		if err != nil {
 			return err
+		}
+		if eventer != nil {
+			eventers = append(eventers, eventer)
 		}
 	}
 	if p.config.Resources.Node.Enabled {
-		err := p.watchResource(comm, nodeScope)
+		eventer, err := p.watchResource(comm, nodeScope)
 		if err != nil {
 			return err
+		}
+		if eventer != nil {
+			eventers = append(eventers, eventer)
 		}
 	}
 	if p.config.Resources.Service.Enabled {
-		err := p.watchResource(comm, "service")
+		eventer, err := p.watchResource(comm, "service")
 		if err != nil {
 			return err
 		}
+		if eventer != nil {
+			eventers = append(eventers, eventer)
+		}
 	}
-	return nil
+	<-comm.Done()
+	for _, eventer := range eventers {
+		eventer.Stop()
+	}
+	return comm.Err()
 }
 
 // watchResource initializes the proper watcher according to the given resource (pod, node, service)
 // and starts watching for such resource's events.
 func (p *dynamicProvider) watchResource(
 	comm composable.DynamicProviderComm,
-	resourceType string) error {
+	resourceType string) (Eventer, error) {
 	client, err := kubernetes.GetKubernetesClient(p.config.KubeConfig, p.config.KubeClientOptions)
 	if err != nil {
 		// info only; return nil (do nothing)
 		p.logger.Debugf("Kubernetes provider for resource %s skipped, unable to connect: %s", resourceType, err)
-		return nil
+		return nil, nil
 	}
 
 	// Ensure that node is set correctly whenever the scope is set to "node". Make sure that node is empty
@@ -112,7 +126,7 @@ func (p *dynamicProvider) watchResource(
 		p.config.Node, err = kubernetes.DiscoverKubernetesNode(p.logger, nd)
 		if err != nil {
 			p.logger.Debugf("Kubernetes provider skipped, unable to discover node: %w", err)
-			return nil
+			return nil, nil
 		}
 
 	} else {
@@ -121,15 +135,15 @@ func (p *dynamicProvider) watchResource(
 
 	eventer, err := p.newEventer(resourceType, comm, client)
 	if err != nil {
-		return errors.New(err, "couldn't create kubernetes watcher for resource %s", resourceType)
+		return nil, errors.New(err, "couldn't create kubernetes watcher for resource %s", resourceType)
 	}
 
 	err = eventer.Start()
 	if err != nil {
-		return errors.New(err, "couldn't start kubernetes eventer for resource %s", resourceType)
+		return nil, errors.New(err, "couldn't start kubernetes eventer for resource %s", resourceType)
 	}
 
-	return nil
+	return eventer, nil
 }
 
 // Eventer allows defining ways in which kubernetes resource events are observed and processed

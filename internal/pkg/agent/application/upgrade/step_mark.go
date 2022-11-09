@@ -92,7 +92,7 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash string, action Action) error {
+func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash string, action *fleetapi.ActionUpgrade) error {
 	prevVersion := release.Version()
 	prevHash := release.Commit()
 	if len(prevHash) > hashLen {
@@ -104,7 +104,7 @@ func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash strin
 		UpdatedOn:   time.Now(),
 		PrevVersion: prevVersion,
 		PrevHash:    prevHash,
-		Action:      action.FleetAction(),
+		Action:      action,
 	}
 
 	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))

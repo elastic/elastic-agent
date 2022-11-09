@@ -19,7 +19,7 @@ import (
 func Address() string {
 	// when installed the control address is fixed
 	if info.RunningInstalled() {
-		return paths.SocketPath
+		return paths.ControlSocketPath
 	}
 
 	// not install, adjust the path based on data path

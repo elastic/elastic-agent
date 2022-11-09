@@ -20,7 +20,7 @@ import (
 func Address() string {
 	// when installed the control address is fixed
 	if info.RunningInstalled() {
-		return paths.SocketPath
+		return paths.ControlSocketPath
 	}
 
 	// unix socket path must be less than 104 characters

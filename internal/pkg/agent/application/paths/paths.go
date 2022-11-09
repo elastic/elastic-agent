@@ -14,8 +14,11 @@ const (
 	// InstallPath is the installation path using for install command.
 	InstallPath = "/opt/Elastic/Agent"
 
-	// SocketPath is the socket path used when installed.
-	SocketPath = "unix:///run/elastic-agent.sock"
+	// ControlSocketPath is the control socket path used when installed.
+	ControlSocketPath = "unix:///run/elastic-agent.sock"
+
+	// ShipperSocketPipePattern is the socket path used when installed for a shipper pipe.
+	ShipperSocketPipePattern = "unix:///run/elastic-agent-%s-pipe.sock"
 
 	// ServiceName is the service name when installed.
 	ServiceName = "elastic-agent"

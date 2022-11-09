@@ -8,11 +8,8 @@ import (
 	"errors"
 	"os"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
-
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -30,14 +27,13 @@ var (
 )
 
 type capabilitiesManager struct {
-	caps     []Capability
-	reporter status.Reporter
+	caps []Capability
 }
 
-type capabilityFactory func(*logger.Logger, *ruleDefinitions, status.Reporter) (Capability, error)
+type capabilityFactory func(*logger.Logger, *ruleDefinitions) (Capability, error)
 
 // Load loads capabilities files and prepares manager.
-func Load(capsFile string, log *logger.Logger, sc status.Controller) (Capability, error) {
+func Load(capsFile string, log *logger.Logger) (Capability, error) {
 	handlers := []capabilityFactory{
 		newInputsCapability,
 		newOutputsCapability,
@@ -45,8 +41,7 @@ func Load(capsFile string, log *logger.Logger, sc status.Controller) (Capability
 	}
 
 	cm := &capabilitiesManager{
-		caps:     make([]Capability, 0),
-		reporter: sc.RegisterComponentWithPersistance("capabilities", true),
+		caps: make([]Capability, 0),
 	}
 
 	// load capabilities from file
@@ -56,7 +51,7 @@ func Load(capsFile string, log *logger.Logger, sc status.Controller) (Capability
 	}
 
 	if os.IsNotExist(err) {
-		log.Infof("capabilities file not found in %s", capsFile)
+		log.Infof("Capabilities file not found in %s", capsFile)
 		return cm, nil
 	}
 	defer fd.Close()
@@ -69,7 +64,7 @@ func Load(capsFile string, log *logger.Logger, sc status.Controller) (Capability
 
 	// make list of handlers out of capabilities definition
 	for _, h := range handlers {
-		cap, err := h(log, definitions, cm.reporter)
+		cap, err := h(log, definitions)
 		if err != nil {
 			return nil, err
 		}
@@ -86,8 +81,6 @@ func Load(capsFile string, log *logger.Logger, sc status.Controller) (Capability
 
 func (mgr *capabilitiesManager) Apply(in interface{}) (interface{}, error) {
 	var err error
-	// reset health on start, child caps will update to fail if needed
-	mgr.reporter.Update(state.Healthy, "", nil)
 	for _, cap := range mgr.caps {
 		in, err = cap.Apply(in)
 		if err != nil {

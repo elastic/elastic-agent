@@ -29,6 +29,28 @@ Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
 - [Docker](https://docs.docker.com/get-docker/)
 - [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
+- [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) to add changelog fragments for changelog generation
+
+If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
+```
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
+If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
+```
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
+If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
+```
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
 
 If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
 ```

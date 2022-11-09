@@ -118,7 +118,9 @@ func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
 	agentConfigFile := paths.AgentConfigFile()
 	reader, err := s.Load()
 	if err != nil {
-		return err
+		return errors.New(err, "failed loading from store",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, agentConfigFile))
 	}
 
 	// reader is closed by this function
@@ -151,10 +153,16 @@ func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
 
 	r, err := yamlToReader(configMap)
 	if err != nil {
-		return err
+		return errors.New(err, "failed creating yaml reader")
 	}
 
-	return s.Save(r)
+	if err := s.Save(r); err != nil {
+		return errors.New(err, "failed saving agent info",
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, agentConfigFile))
+	}
+
+	return nil
 }
 
 func yamlToReader(in interface{}) (io.Reader, error) {

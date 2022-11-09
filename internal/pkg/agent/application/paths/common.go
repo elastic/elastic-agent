@@ -26,12 +26,16 @@ const (
 	darwin = "darwin"
 )
 
+// ExternalInputsPattern is a glob that matches the paths of external configuration files.
+var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
+
 var (
 	topPath         string
 	configPath      string
 	configFilePath  string
 	logsPath        string
 	downloadsPath   string
+	componentsPath  string
 	installPath     string
 	unversionedHome bool
 	tmpCreator      sync.Once
@@ -43,14 +47,23 @@ func init() {
 	logsPath = topPath
 	unversionedHome = false // only versioned by container subcommand
 
+	// these should never change
+	versionedHome := VersionedHome(topPath)
+	downloadsPath = filepath.Join(versionedHome, "downloads")
+	componentsPath = filepath.Join(versionedHome, "components")
+
 	fs := flag.CommandLine
 	fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
 	fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
 	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
-	fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
 	fs.StringVar(&installPath, "path.install", installPath, "Install path contains binaries Agent extracts")
+
+	// enable user to download update artifacts to alternative place
+	// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
+	// `path.download` serves just as init value for `agent.download.targetDirectory`
+	fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
 }
 
 // Top returns the top directory for Elastic Agent, all the versioned
@@ -71,9 +84,7 @@ func SetTop(path string) {
 func TempDir() string {
 	tmpDir := filepath.Join(Data(), tempSubdir)
 	tmpCreator.Do(func() {
-		// Create tempdir as it probably don't exists.
-		// The error was not checked here before and the linter is not happy about it.
-		// Changing this now would lead to the wide change scope that intended at the moment, so just making the linter happy for now.
+		// create tempdir as it probably don't exists
 		_ = os.MkdirAll(tmpDir, 0750)
 	})
 	return tmpDir
@@ -124,6 +135,11 @@ func ConfigFile() string {
 	return filepath.Join(Config(), configFilePath)
 }
 
+// ExternalInputs returns the path to load external inputs from.
+func ExternalInputs() string {
+	return filepath.Join(Config(), ExternalInputsPattern)
+}
+
 // Data returns the data directory for Agent
 func Data() string {
 	if unversionedHome {
@@ -133,7 +149,17 @@ func Data() string {
 	return filepath.Join(Top(), "data")
 }
 
-// Logs returns a the log directory for Agent
+// Run returns the run directory for Agent
+func Run() string {
+	return filepath.Join(Home(), "run")
+}
+
+// Components returns the component directory for Agent
+func Components() string {
+	return componentsPath
+}
+
+// Logs returns the log directory for Agent
 func Logs() string {
 	return logsPath
 }
@@ -150,9 +176,6 @@ func VersionedHome(base string) string {
 
 // Downloads returns the downloads directory for Agent
 func Downloads() string {
-	if downloadsPath == "" {
-		return filepath.Join(Home(), "downloads")
-	}
 	return downloadsPath
 }
 

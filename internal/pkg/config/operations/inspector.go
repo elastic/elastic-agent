@@ -26,7 +26,7 @@ var (
 
 // LoadFullAgentConfig load agent config based on provided paths and defined capabilities.
 // In case fleet is used, config from policy action is returned.
-func LoadFullAgentConfig(cfgPath string, failOnFleetMissing bool) (*config.Config, error) {
+func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissing bool) (*config.Config, error) {
 	rawConfig, err := loadConfig(cfgPath)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,21 @@ func LoadFullAgentConfig(cfgPath string, failOnFleetMissing bool) (*config.Confi
 	}
 
 	if configuration.IsStandalone(cfg.Fleet) {
-		return rawConfig, nil
+		// When in standalone we load the configuration again with inputs that are defined in the paths.ExternalInputs.
+		loader := config.NewLoader(logger, paths.ExternalInputs())
+		discover := config.Discoverer(cfgPath, cfg.Settings.Path, paths.ExternalInputs())
+		files, err := discover()
+		if err != nil {
+			return nil, fmt.Errorf("could not discover configuration files: %w", err)
+		}
+		if len(files) == 0 {
+			return nil, config.ErrNoConfiguration
+		}
+		c, err := loader.Load(files)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load or merge configuration: %w", err)
+		}
+		return c, nil
 	}
 
 	fleetConfig, err := loadFleetConfig()

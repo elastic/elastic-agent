@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"github.com/otiai10/copy"
 	"github.com/pkg/errors"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
@@ -36,6 +37,8 @@ import (
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
+
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -48,6 +51,8 @@ const (
 	externalArtifacts = "EXTERNAL"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
+	specSuffix        = ".spec.yml"
+	checksumFilename  = "checksum.yml"
 )
 
 // Aliases for commands required by master makefile
@@ -221,21 +226,23 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	p := filepath.Join("internal", "pkg", "agent", "operation", "tests", "scripts")
-	p2 := filepath.Join("internal", "pkg", "agent", "transpiler", "tests")
-	configurableName := "configurable"
-	serviceableName := "serviceable"
-	execName := "exec"
-	if runtime.GOOS == "windows" {
-		configurableName += ".exe"
-		serviceableName += ".exe"
-		execName += ".exe"
+	p := filepath.Join("pkg", "component", "fake")
+	for _, name := range []string{"component", "shipper"} {
+		binary := name
+		if runtime.GOOS == "windows" {
+			binary += ".exe"
+		}
+		outputName := filepath.Join(p, name, binary)
+		err := RunGo("build", "-o", outputName, filepath.Join("github.com/elastic/elastic-agent", p, name, "..."))
+		if err != nil {
+			return err
+		}
+		err = os.Chmod(outputName, 0755)
+		if err != nil {
+			return err
+		}
 	}
-	return combineErr(
-		RunGo("build", "-o", filepath.Join(p, "configurable-1.0-darwin-x86_64", configurableName), filepath.Join(p, "configurable-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p, "serviceable-1.0-darwin-x86_64", serviceableName), filepath.Join(p, "serviceable-1.0-darwin-x86_64", "main.go")),
-		RunGo("build", "-o", filepath.Join(p2, "exec-1.0-darwin-x86_64", execName), filepath.Join(p2, "exec-1.0-darwin-x86_64", "main.go")),
-	)
+	return nil
 }
 
 // All run all the code checks.
@@ -327,7 +334,7 @@ func AssembleDarwinUniversal() error {
 	cmd := "lipo"
 
 	if _, err := exec.LookPath(cmd); err != nil {
-		return fmt.Errorf("'%s' is required to assemble the universal binary: %w",
+		return fmt.Errorf("%q is required to assemble the universal binary: %w",
 			cmd, err)
 	}
 
@@ -377,19 +384,21 @@ func Package() {
 
 	packageAgent(requiredPackages, devtools.UseElasticAgentPackaging)
 }
+
 func getPackageName(beat, version, pkg string) (string, string) {
 	if _, ok := os.LookupEnv(snapshotEnv); ok {
 		version += "-SNAPSHOT"
 	}
 	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
 }
+
 func requiredPackagesPresent(basePath, beat, version string, requiredPackages []string) bool {
 	for _, pkg := range requiredPackages {
 		_, packageName := getPackageName(beat, version, pkg)
 		path := filepath.Join(basePath, "build", "distributions", packageName)
 
 		if _, err := os.Stat(path); err != nil {
-			fmt.Printf("Package '%s' does not exist on path: %s\n", packageName, path)
+			fmt.Printf("Package %q does not exist on path: %s\n", packageName, path)
 			return false
 		}
 	}
@@ -432,7 +441,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildSpec, BuildPGP, BuildFleetCfg)
+	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg)
 }
 
 // CrossBuild cross-builds the beat for all target platforms.
@@ -452,18 +461,20 @@ func Config() {
 
 // ControlProto generates pkg/agent/control/proto module.
 func ControlProto() error {
-	return sh.RunV("protoc", "--go_out=plugins=grpc:.", "control.proto")
+	return sh.RunV(
+		"protoc",
+		"--go_out=internal/pkg/agent/control/cproto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=internal/pkg/agent/control/cproto", "--go-grpc_opt=paths=source_relative",
+		"control.proto")
 }
 
-// BuildSpec make sure that all the suppported program spec are built into the binary.
-func BuildSpec() error {
-	// go run dev-tools/cmd/buildspec/buildspec.go --in internal/agent/spec/*.yml --out internal/pkg/agent/program/supported.go
-	goF := filepath.Join("dev-tools", "cmd", "buildspec", "buildspec.go")
-	in := filepath.Join("internal", "spec", "*.yml")
-	out := filepath.Join("internal", "pkg", "agent", "program", "supported.go")
-
-	fmt.Printf(">> Buildspec from %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+// FakeShipperProto generates pkg/component/fake/common event protocol.
+func FakeShipperProto() error {
+	return sh.RunV(
+		"protoc",
+		"--go_out=.", "--go_opt=paths=source_relative",
+		"--go-grpc_out=.", "--go-grpc_opt=paths=source_relative",
+		"pkg/component/fake/common/event.proto")
 }
 
 func BuildPGP() error {
@@ -613,23 +624,24 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		version = release.Version()
 	}
 
+	dropPath, found := os.LookupEnv(agentDropPath)
+	var archivePath string
+
 	// build deps only when drop is not provided
-	if dropPathEnv, found := os.LookupEnv(agentDropPath); !found || len(dropPathEnv) == 0 {
+	if !found || len(dropPath) == 0 {
 		// prepare new drop
-		dropPath := filepath.Join("build", "distributions", "elastic-agent-drop")
+		dropPath = filepath.Join("build", "distributions", "elastic-agent-drop")
 		dropPath, err := filepath.Abs(dropPath)
 		if err != nil {
 			panic(err)
 		}
 
-		if err := os.MkdirAll(dropPath, 0755); err != nil {
-			panic(err)
-		}
+		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 
+		defer os.RemoveAll(dropPath)
 		os.Setenv(agentDropPath, dropPath)
 
 		// cleanup after build
-		defer os.RemoveAll(dropPath)
 		defer os.Unsetenv(agentDropPath)
 
 		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
@@ -637,8 +649,10 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			ctx := context.Background()
 			for _, beat := range packedBeats {
 				for _, reqPackage := range requiredPackages {
+					targetPath := filepath.Join(archivePath, reqPackage)
+					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(beat, version, reqPackage)
-					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, dropPath)
+					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, targetPath)
 					if err != nil {
 						panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
 					}
@@ -669,10 +683,105 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 
 				// copy to new drop
 				sourcePath := filepath.Join(pwd, "build", "distributions")
-				if err := copyAll(sourcePath, dropPath); err != nil {
-					panic(err)
+				for _, rp := range requiredPackages {
+					files, err := filepath.Glob(filepath.Join(sourcePath, "*"+rp+"*"))
+					if err != nil {
+						panic(err)
+					}
+
+					targetPath := filepath.Join(archivePath, rp)
+					os.MkdirAll(targetPath, 0755)
+					for _, f := range files {
+						targetFile := filepath.Join(targetPath, filepath.Base(f))
+						if err := sh.Copy(targetFile, f); err != nil {
+							panic(err)
+						}
+					}
 				}
 			}
+		}
+	} else {
+		archivePath = movePackagesToArchive(dropPath, requiredPackages)
+	}
+	defer os.RemoveAll(archivePath)
+
+	// create flat dir
+	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
+	os.MkdirAll(flatPath, 0755)
+	defer os.RemoveAll(flatPath)
+
+	for _, rp := range requiredPackages {
+		targetPath := filepath.Join(archivePath, rp)
+		versionedFlatPath := filepath.Join(flatPath, rp)
+		versionedDropPath := filepath.Join(dropPath, rp)
+		os.MkdirAll(targetPath, 0755)
+		os.MkdirAll(versionedFlatPath, 0755)
+		os.MkdirAll(versionedDropPath, 0755)
+
+		// untar all
+		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
+		if err != nil {
+			panic(err)
+		}
+		zipMatches, err := filepath.Glob(filepath.Join(targetPath, "*zip"))
+		if err != nil {
+			panic(err)
+		}
+		matches = append(matches, zipMatches...)
+
+		for _, m := range matches {
+			stat, err := os.Stat(m)
+			if os.IsNotExist(err) {
+				continue
+			} else if err != nil {
+				panic(errors.Wrap(err, "failed stating file"))
+			}
+
+			if stat.IsDir() {
+				continue
+			}
+
+			if err := devtools.Extract(m, versionedFlatPath); err != nil {
+				panic(err)
+			}
+		}
+
+		files, err := filepath.Glob(filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", version)))
+		if err != nil {
+			panic(err)
+		}
+
+		checksums := make(map[string]string)
+		for _, f := range files {
+			options := copy.Options{
+				OnSymlink: func(_ string) copy.SymlinkAction {
+					return copy.Shallow
+				},
+				Sync: true,
+			}
+
+			err = copy.Copy(f, versionedDropPath, options)
+			if err != nil {
+				panic(err)
+			}
+
+			// cope spec file for match
+			specName := filepath.Base(f)
+			idx := strings.Index(specName, "-"+version)
+			if idx != -1 {
+				specName = specName[:idx]
+			}
+
+			checksum, err := copyComponentSpecs(specName, versionedDropPath)
+			if err != nil {
+				panic(err)
+			}
+
+			checksums[specName+specSuffix] = checksum
+		}
+
+		if err := appendComponentChecksums(versionedDropPath, checksums); err != nil {
+			panic(err)
 		}
 	}
 
@@ -682,6 +791,91 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 	mg.Deps(Update)
 	mg.Deps(CrossBuild, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
+}
+
+func copyComponentSpecs(componentName, versionedDropPath string) (string, error) {
+	sourceSpecFile := filepath.Join("specs", componentName+specSuffix)
+	targetPath := filepath.Join(versionedDropPath, componentName+specSuffix)
+	err := devtools.Copy(sourceSpecFile, targetPath)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed copying spec file %q to %q", sourceSpecFile, targetPath)
+	}
+
+	// compute checksum
+	return devtools.GetSHA512Hash(sourceSpecFile)
+}
+
+func appendComponentChecksums(versionedDropPath string, checksums map[string]string) error {
+	// for each spec file checksum calculate binary checksum as well
+	for file := range checksums {
+		if !strings.HasSuffix(file, specSuffix) {
+			continue
+		}
+
+		componentFile := strings.TrimSuffix(file, specSuffix)
+		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Printf(">>> Computing hash for %q failed: file not present\n", componentFile)
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		checksums[componentFile] = hash
+	}
+
+	content, err := yamlChecksum(checksums)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0644)
+}
+
+func movePackagesToArchive(dropPath string, requiredPackages []string) string {
+	archivePath := filepath.Join(dropPath, "archives")
+	os.MkdirAll(archivePath, 0755)
+
+	// move archives to archive path
+	matches, err := filepath.Glob(filepath.Join(dropPath, "*tar.gz*"))
+	if err != nil {
+		panic(err)
+	}
+	zipMatches, err := filepath.Glob(filepath.Join(dropPath, "*zip*"))
+	if err != nil {
+		panic(err)
+	}
+	matches = append(matches, zipMatches...)
+
+	for _, f := range matches {
+		for _, rp := range requiredPackages {
+			if !strings.Contains(f, rp) {
+				continue
+			}
+
+			stat, err := os.Stat(f)
+			if os.IsNotExist(err) {
+				continue
+			} else if err != nil {
+				panic(errors.Wrap(err, "failed stating file"))
+			}
+
+			if stat.IsDir() {
+				continue
+			}
+
+			targetPath := filepath.Join(archivePath, rp, filepath.Base(f))
+			targetDir := filepath.Dir(targetPath)
+			if err := os.MkdirAll(targetDir, 0750); err != nil {
+				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
+			}
+			if err := os.Rename(f, targetPath); err != nil {
+				panic(errors.Wrap(err, "failed renaming file"))
+			}
+		}
+	}
+
+	return archivePath
 }
 
 func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
@@ -707,7 +901,7 @@ func selectedPackageTypes() string {
 	return "PACKAGES=targz,zip"
 }
 
-func copyAll(from, to string) error {
+func copyAll(from, to string, suffixes ...[]string) error {
 	return filepath.Walk(from, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -772,6 +966,25 @@ func injectBuildVars(m map[string]string) {
 	for k, v := range buildVars() {
 		m[k] = v
 	}
+}
+
+func yamlChecksum(checksums map[string]string) ([]byte, error) {
+	filesMap := make(map[string][]checksumFile)
+	files := make([]checksumFile, 0, len(checksums))
+	for file, checksum := range checksums {
+		files = append(files, checksumFile{
+			Name:     file,
+			Checksum: checksum,
+		})
+	}
+
+	filesMap["files"] = files
+	return yaml.Marshal(filesMap)
+}
+
+type checksumFile struct {
+	Name     string `yaml:"name"`
+	Checksum string `yaml:"sha512"`
 }
 
 // Package packages elastic-agent for the IronBank distribution, relying on the

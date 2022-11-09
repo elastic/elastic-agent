@@ -12,32 +12,20 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/kardianos/service"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/uninstall"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
-	"github.com/elastic/elastic-agent/internal/pkg/core/app"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/component"
+	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-)
-
-const (
-	inputsKey  = "inputs"
-	outputsKey = "outputs"
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
@@ -59,7 +47,7 @@ func Uninstall(cfgFile string) error {
 	}
 	_ = svc.Uninstall()
 
-	if err := uninstallPrograms(context.Background(), cfgFile); err != nil {
+	if err := uninstallComponents(context.Background(), cfgFile); err != nil {
 		return err
 	}
 
@@ -124,13 +112,23 @@ func delayedRemoval(path string) {
 
 }
 
-func uninstallPrograms(ctx context.Context, cfgFile string) error {
+func uninstallComponents(ctx context.Context, cfgFile string) error {
 	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 	if err != nil {
 		return err
 	}
 
-	cfg, err := operations.LoadFullAgentConfig(cfgFile, false)
+	platform, err := component.LoadPlatformDetail()
+	if err != nil {
+		return fmt.Errorf("failed to gather system information: %w", err)
+	}
+
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
+	}
+
+	cfg, err := operations.LoadFullAgentConfig(log, cfgFile, false)
 	if err != nil {
 		return err
 	}
@@ -140,83 +138,47 @@ func uninstallPrograms(ctx context.Context, cfgFile string) error {
 		return err
 	}
 
-	pp, err := programsFromConfig(cfg)
+	comps, err := serviceComponentsFromConfig(specs, cfg)
 	if err != nil {
 		return err
 	}
 
 	// nothing to remove
-	if len(pp) == 0 {
+	if len(comps) == 0 {
 		return nil
 	}
 
-	uninstaller, err := uninstall.NewUninstaller()
-	if err != nil {
-		return err
-	}
-
-	currentVersion := release.Version()
-	if release.Snapshot() {
-		currentVersion = fmt.Sprintf("%s-SNAPSHOT", currentVersion)
-	}
-	artifactConfig := artifact.DefaultConfig()
-
-	for _, p := range pp {
-		descriptor := app.NewDescriptor(p.Spec, currentVersion, artifactConfig, nil)
-		if err := uninstaller.Uninstall(ctx, p.Spec, currentVersion, descriptor.Directory()); err != nil {
-			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall '%s': %v\n", p.Spec.Name, err))
+	// remove each service component
+	for _, comp := range comps {
+		if err := uninstallComponent(ctx, log, comp); err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
 	}
 
 	return nil
 }
 
-func programsFromConfig(cfg *config.Config) ([]program.Program, error) {
+func uninstallComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
+	return comprt.UninstallService(ctx, log, comp)
+}
+
+func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
 	mm, err := cfg.ToMapStr()
 	if err != nil {
 		return nil, errors.New("failed to create a map from config", err)
 	}
-
-	// if no input is defined nothing to remove
-	if _, found := mm[inputsKey]; !found {
-		return nil, nil
-	}
-
-	// if no output is defined nothing to remove
-	if _, found := mm[outputsKey]; !found {
-		return nil, nil
-	}
-
-	ast, err := transpiler.NewAST(mm)
+	allComps, err := specs.ToComponents(mm, nil)
 	if err != nil {
-		return nil, errors.New("failed to create a ast from config", err)
+		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
-
-	agentInfo, err := info.NewAgentInfo(false)
-	if err != nil {
-		return nil, errors.New("failed to get an agent info", err)
-	}
-
-	ppMap, err := program.Programs(agentInfo, ast)
-	if err != nil {
-		return nil, errors.New("failed to get programs from config", err)
-	}
-
-	var pp []program.Program
-	check := make(map[string]bool)
-
-	for _, v := range ppMap {
-		for _, p := range v {
-			if _, found := check[p.Spec.Cmd]; found {
-				continue
-			}
-
-			pp = append(pp, p)
-			check[p.Spec.Cmd] = true
+	var serviceComps []component.Component
+	for _, comp := range allComps {
+		if comp.Err == nil && comp.InputSpec != nil && comp.InputSpec.Spec.Service != nil {
+			// non-error and service based component
+			serviceComps = append(serviceComps, comp)
 		}
 	}
-
-	return pp, nil
+	return serviceComps, nil
 }
 
 func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) (*config.Config, error) {
@@ -233,35 +195,9 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	// apply dynamic inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		varsArray := make([]*transpiler.Vars, 0)
-
-		// Give some time for the providers to replace the variables
-		const timeout = 15 * time.Second
-		var doOnce sync.Once
-		ctx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-
-		// The composable system will continuously run, we are only interested in the first run on of the
-		// renderer to collect the variables we should stop the execution.
-		varsCallback := func(vv []*transpiler.Vars) {
-			doOnce.Do(func() {
-				varsArray = vv
-				cancel()
-			})
-		}
-
-		ctrl, err := composable.New(log, cfg, false)
+		varsArray, err := vars.WaitForVariables(ctx, log, cfg, 0)
 		if err != nil {
 			return nil, err
-		}
-		_ = ctrl.Run(ctx, varsCallback)
-
-		// Wait for the first callback to retrieve the variables from the providers.
-		<-ctx.Done()
-
-		// Bail out if callback was not executed in time.
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, errors.New("failed to get transpiler vars", err)
 		}
 
 		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
@@ -275,7 +211,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 	}
 
 	// apply caps
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log, status.NewController(log))
+	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
 		return nil, err
 	}

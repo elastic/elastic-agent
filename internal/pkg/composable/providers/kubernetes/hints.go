@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent-autodiscover/utils"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 )

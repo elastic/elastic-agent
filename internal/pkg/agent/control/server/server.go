@@ -8,93 +8,49 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
-	"runtime"
-	"strings"
-	"sync"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/proto"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	monitoring "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/beats"
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/socket"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/internal/pkg/sorted"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-)
-
-const (
-	agentName = "elastic-agent"
 )
 
 // Server is the daemon side of the control protocol.
 type Server struct {
-	logger        *logger.Logger
-	rex           reexec.ExecManager
-	statusCtrl    status.Controller
-	up            *upgrade.Upgrader
-	routeFn       func() *sorted.Set
-	monitoringCfg *monitoringCfg.MonitoringConfig
-	listener      net.Listener
-	server        *grpc.Server
-	tracer        *apm.Tracer
-	lock          sync.RWMutex
-}
+	cproto.UnimplementedElasticAgentControlServer
 
-type specer interface {
-	Specs() map[string]program.Spec
-}
-
-type specInfo struct {
-	spec program.Spec
-	app  string
-	rk   string
+	logger    *logger.Logger
+	agentInfo *info.AgentInfo
+	coord     *coordinator.Coordinator
+	listener  net.Listener
+	server    *grpc.Server
+	tracer    *apm.Tracer
+	diagHooks diagnostics.Hooks
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, rex reexec.ExecManager, statusCtrl status.Controller, up *upgrade.Upgrader, tracer *apm.Tracer) *Server {
+func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks) *Server {
 	return &Server{
-		logger:     log,
-		rex:        rex,
-		statusCtrl: statusCtrl,
-		tracer:     tracer,
-		up:         up,
+		logger:    log,
+		agentInfo: agentInfo,
+		coord:     coord,
+		tracer:    tracer,
+		diagHooks: diagHooks,
 	}
-}
-
-// SetUpgrader changes the upgrader.
-func (s *Server) SetUpgrader(up *upgrade.Upgrader) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.up = up
-}
-
-// SetRouteFn changes the route retrieval function.
-func (s *Server) SetRouteFn(routesFetchFn func() *sorted.Set) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.routeFn = routesFetchFn
-}
-
-// SetMonitoringCfg sets a reference to the monitoring config used by the running agent.
-// the controller references this config to find out if pprof is enabled for the agent or not
-func (s *Server) SetMonitoringCfg(cfg *monitoringCfg.MonitoringConfig) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.monitoringCfg = cfg
 }
 
 // Start starts the GRPC endpoint and accepts new connections.
@@ -116,7 +72,7 @@ func (s *Server) Start() error {
 	} else {
 		s.server = grpc.NewServer()
 	}
-	proto.RegisterElasticAgentControlServer(s.server, s)
+	cproto.RegisterElasticAgentControlServer(s.server, s)
 
 	// start serving GRPC connections
 	go func() {
@@ -140,8 +96,8 @@ func (s *Server) Stop() {
 }
 
 // Version returns the currently running version.
-func (s *Server) Version(_ context.Context, _ *proto.Empty) (*proto.VersionResponse, error) {
-	return &proto.VersionResponse{
+func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionResponse, error) {
+	return &cproto.VersionResponse{
 		Version:   release.Version(),
 		Commit:    release.Commit(),
 		BuildTime: release.BuildTime().Format(control.TimeFormat()),
@@ -149,457 +105,145 @@ func (s *Server) Version(_ context.Context, _ *proto.Empty) (*proto.VersionRespo
 	}, nil
 }
 
-// Status returns the overall status of the agent.
-func (s *Server) Status(_ context.Context, _ *proto.Empty) (*proto.StatusResponse, error) {
-	status := s.statusCtrl.Status()
-	return &proto.StatusResponse{
-		Status:       agentStatusToProto(status.Status),
-		Message:      status.Message,
-		Applications: agentAppStatusToProto(status.Applications),
+// State returns the overall state of the agent.
+func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateResponse, error) {
+	var err error
+
+	state := s.coord.State(true)
+	components := make([]*cproto.ComponentState, 0, len(state.Components))
+	for _, comp := range state.Components {
+		units := make([]*cproto.ComponentUnitState, 0, len(comp.State.Units))
+		for key, unit := range comp.State.Units {
+			payload := []byte("")
+			if unit.Payload != nil {
+				payload, err = json.Marshal(unit.Payload)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal componend %s unit %s payload: %w", comp.Component.ID, key.UnitID, err)
+				}
+			}
+			units = append(units, &cproto.ComponentUnitState{
+				UnitType: cproto.UnitType(key.UnitType),
+				UnitId:   key.UnitID,
+				State:    cproto.State(unit.State),
+				Message:  unit.Message,
+				Payload:  string(payload),
+			})
+		}
+		components = append(components, &cproto.ComponentState{
+			Id:      comp.Component.ID,
+			Name:    comp.Component.Type(),
+			State:   cproto.State(comp.State.State),
+			Message: comp.State.Message,
+			Units:   units,
+			VersionInfo: &cproto.ComponentVersionInfo{
+				Name:    comp.State.VersionInfo.Name,
+				Version: comp.State.VersionInfo.Version,
+				Meta:    comp.State.VersionInfo.Meta,
+			},
+		})
+	}
+	return &cproto.StateResponse{
+		Info: &cproto.StateAgentInfo{
+			Id:        s.agentInfo.AgentID(),
+			Version:   release.Version(),
+			Commit:    release.Commit(),
+			BuildTime: release.BuildTime().Format(control.TimeFormat()),
+			Snapshot:  release.Snapshot(),
+		},
+		State:      state.State,
+		Message:    state.Message,
+		Components: components,
 	}, nil
 }
 
 // Restart performs re-exec.
-func (s *Server) Restart(_ context.Context, _ *proto.Empty) (*proto.RestartResponse, error) {
-	s.rex.ReExec(nil)
-	return &proto.RestartResponse{
-		Status: proto.ActionStatus_SUCCESS,
+func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartResponse, error) {
+	s.coord.ReExec(nil)
+	return &cproto.RestartResponse{
+		Status: cproto.ActionStatus_SUCCESS,
 	}, nil
 }
 
 // Upgrade performs the upgrade operation.
-func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*proto.UpgradeResponse, error) {
-	s.lock.RLock()
-	u := s.up
-	s.lock.RUnlock()
-	if u == nil {
-		// not running with upgrader (must be controlled by Fleet)
-		return &proto.UpgradeResponse{
-			Status: proto.ActionStatus_FAILURE,
-			Error:  "cannot be upgraded; perform upgrading using Fleet",
-		}, nil
-	}
-	cb, err := u.Upgrade(ctx, &upgradeRequest{request}, false)
+func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
+	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil)
 	if err != nil {
-		s.logger.Errorw("Upgrade failed", "error.message", err, "version", request.Version, "source_uri", request.SourceURI)
-		return &proto.UpgradeResponse{
-			Status: proto.ActionStatus_FAILURE,
+		return &cproto.UpgradeResponse{
+			Status: cproto.ActionStatus_FAILURE,
 			Error:  err.Error(),
 		}, nil
 	}
-	// perform the re-exec after a 1 second delay
-	// this ensures that the upgrade response over GRPC is returned
-	go func() {
-		<-time.After(time.Second)
-		s.logger.Info("Restarting after upgrade", "version", request.Version)
-		s.rex.ReExec(cb)
-	}()
-	return &proto.UpgradeResponse{
-		Status:  proto.ActionStatus_SUCCESS,
+	return &cproto.UpgradeResponse{
+		Status:  cproto.ActionStatus_SUCCESS,
 		Version: request.Version,
 	}, nil
 }
 
-// BeatInfo is the metadata response a beat will provide when the root ("/") is queried.
-type BeatInfo struct {
-	Beat            string `json:"beat"`
-	Name            string `json:"name"`
-	Hostname        string `json:"hostname"`
-	ID              string `json:"uuid"`
-	EphemeralID     string `json:"ephemeral_id"`
-	Version         string `json:"version"`
-	Commit          string `json:"build_commit"`
-	Time            string `json:"build_time"`
-	Username        string `json:"username"`
-	UserID          string `json:"uid"`
-	GroupID         string `json:"gid"`
-	BinaryArch      string `json:"binary_arch"`
-	ElasticLicensed bool   `json:"elastic_licensed"`
-}
-
-// ProcMeta returns version and beat inforation for all running processes.
-func (s *Server) ProcMeta(ctx context.Context, _ *proto.Empty) (*proto.ProcMetaResponse, error) {
-	if s.routeFn == nil {
-		return nil, errors.New("route function is nil")
-	}
-
-	resp := &proto.ProcMetaResponse{
-		Procs: []*proto.ProcMeta{},
-	}
-
-	// gather spec data for all rk/apps running
-	specs := s.getSpecInfo("", "")
-	for _, si := range specs {
-		isSidecar := strings.HasSuffix(si.app, "_monitoring")
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, isSidecar)
-		client := newSocketRequester(si.app, si.rk, endpoint)
-
-		procMeta := client.procMeta(ctx)
-		resp.Procs = append(resp.Procs, procMeta)
-	}
-
-	return resp, nil
-}
-
-// Pprof returns /debug/pprof data for the requested applicaiont-route_key or all running applications.
-func (s *Server) Pprof(ctx context.Context, req *proto.PprofRequest) (*proto.PprofResponse, error) {
-	if s.monitoringCfg == nil || s.monitoringCfg.Pprof == nil || !s.monitoringCfg.Pprof.Enabled {
-		return nil, fmt.Errorf("agent.monitoring.pprof disabled")
-	}
-
-	if s.routeFn == nil {
-		return nil, errors.New("route function is nil")
-	}
-
-	dur, err := time.ParseDuration(req.TraceDuration)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse trace duration: %w", err)
-	}
-
-	resp := &proto.PprofResponse{
-		Results: []*proto.PprofResult{},
-	}
-
-	var wg sync.WaitGroup
-	ch := make(chan *proto.PprofResult, 1)
-
-	// retrieve elastic-agent pprof data if requested or application is unspecified.
-	if req.AppName == "" || req.AppName == agentName {
-		endpoint := monitoring.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
-		c := newSocketRequester(agentName, "", endpoint)
-		for _, opt := range req.PprofType {
-			wg.Add(1)
-			go func(opt proto.PprofOption) {
-				res := c.getPprof(ctx, opt, dur)
-				ch <- res
-				wg.Done()
-			}(opt)
+// DiagnosticAgent returns diagnostic information for this running Elastic Agent.
+func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentRequest) (*cproto.DiagnosticAgentResponse, error) {
+	res := make([]*cproto.DiagnosticFileResult, 0, len(s.diagHooks))
+	for _, h := range s.diagHooks {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
+		r := h.Hook(ctx)
+		res = append(res, &cproto.DiagnosticFileResult{
+			Name:        h.Name,
+			Filename:    h.Filename,
+			Description: h.Description,
+			ContentType: h.ContentType,
+			Content:     r,
+			Generated:   timestamppb.New(time.Now().UTC()),
+		})
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	return &cproto.DiagnosticAgentResponse{Results: res}, nil
+}
+
+// DiagnosticUnits returns diagnostic information for the specific units (or all units if non-provided).
+func (s *Server) DiagnosticUnits(ctx context.Context, req *cproto.DiagnosticUnitsRequest) (*cproto.DiagnosticUnitsResponse, error) {
+	reqs := make([]runtime.ComponentUnitDiagnosticRequest, 0, len(req.Units))
+	for _, u := range req.Units {
+		reqs = append(reqs, runtime.ComponentUnitDiagnosticRequest{
+			Component: component.Component{
+				ID: u.ComponentId,
+			},
+			Unit: component.Unit{
+				ID:   u.UnitId,
+				Type: client.UnitType(u.UnitType),
+			},
+		})
 	}
 
-	// get requested rk/appname spec or all specs
-	var specs []specInfo
-	if req.AppName != agentName {
-		specs = s.getSpecInfo(req.RouteKey, req.AppName)
-	}
-	for _, si := range specs {
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, false)
-		c := newSocketRequester(si.app, si.rk, endpoint)
-		// Launch a concurrent goroutine to gather all pprof endpoints from a socket.
-		for _, opt := range req.PprofType {
-			wg.Add(1)
-			go func(opt proto.PprofOption) {
-				res := c.getPprof(ctx, opt, dur)
-				ch <- res
-				wg.Done()
-			}(opt)
+	diag := s.coord.PerformDiagnostics(ctx, reqs...)
+	res := make([]*cproto.DiagnosticUnitResponse, 0, len(diag))
+	for _, d := range diag {
+		r := &cproto.DiagnosticUnitResponse{
+			ComponentId: d.Component.ID,
+			UnitType:    cproto.UnitType(d.Unit.Type),
+			UnitId:      d.Unit.ID,
+			Error:       "",
+			Results:     nil,
 		}
-	}
-
-	// wait for the waitgroup to be done and close the channel
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
-
-	// gather all results from channel until closed.
-	for res := range ch {
-		resp.Results = append(resp.Results, res)
-	}
-	return resp, nil
-}
-
-// ProcMetrics returns all buffered metrics data for the agent and running processes.
-// If the agent.monitoring.http.buffer variable is not set, or set to false, a nil result attribute is returned
-func (s *Server) ProcMetrics(ctx context.Context, _ *proto.Empty) (*proto.ProcMetricsResponse, error) {
-	if s.monitoringCfg == nil || s.monitoringCfg.HTTP == nil || s.monitoringCfg.HTTP.Buffer == nil || !s.monitoringCfg.HTTP.Buffer.Enabled {
-		return &proto.ProcMetricsResponse{}, nil
-	}
-
-	if s.routeFn == nil {
-		return nil, errors.New("route function is nil")
-	}
-
-	// gather metrics buffer data from the elastic-agent
-	endpoint := monitoring.AgentMonitoringEndpoint(runtime.GOOS, s.monitoringCfg.HTTP)
-	c := newSocketRequester(agentName, "", endpoint)
-	metrics := c.procMetrics(ctx)
-
-	resp := &proto.ProcMetricsResponse{
-		Result: []*proto.MetricsResponse{metrics},
-	}
-
-	// gather metrics buffer data from all other processes
-	specs := s.getSpecInfo("", "")
-	for _, si := range specs {
-		isSidecar := strings.HasSuffix(si.app, "_monitoring")
-		endpoint := monitoring.MonitoringEndpoint(si.spec, runtime.GOOS, si.rk, isSidecar)
-		client := newSocketRequester(si.app, si.rk, endpoint)
-
-		s.logger.Infof("gather metrics from %s", endpoint)
-		metrics := client.procMetrics(ctx)
-		resp.Result = append(resp.Result, metrics)
-	}
-	return resp, nil
-}
-
-// getSpecs will return the specs for the program associated with the specified route key/app name, or all programs if no key(s) are specified.
-// if matchRK or matchApp are empty all results will be returned.
-func (s *Server) getSpecInfo(matchRK, matchApp string) []specInfo {
-	routes := s.routeFn()
-
-	// find specInfo for a specified rk/app
-	if matchRK != "" && matchApp != "" {
-		programs, ok := routes.Get(matchRK)
-		if !ok {
-			s.logger.With("route_key", matchRK).Debug("No matching route key found.")
-			return []specInfo{}
+		if d.Err != nil {
+			r.Error = d.Err.Error()
+		} else {
+			results := make([]*cproto.DiagnosticFileResult, 0, len(d.Results))
+			for _, fr := range d.Results {
+				results = append(results, &cproto.DiagnosticFileResult{
+					Name:        fr.Name,
+					Filename:    fr.Filename,
+					Description: fr.Description,
+					ContentType: fr.ContentType,
+					Content:     fr.Content,
+					Generated:   fr.Generated,
+				})
+			}
+			r.Results = results
 		}
-		sp, ok := programs.(specer)
-		if !ok {
-			s.logger.With("route_key", matchRK, "route", programs).Warn("Unable to cast route as specer.")
-			return []specInfo{}
-		}
-		specs := sp.Specs()
-
-		spec, ok := specs[matchApp]
-		if !ok {
-			s.logger.With("route_key", matchRK, "application_name", matchApp).Debug("No matching route key/application name found.")
-			return []specInfo{}
-		}
-		return []specInfo{specInfo{spec: spec, app: matchApp, rk: matchRK}}
+		res = append(res, r)
 	}
-
-	// gather specInfo for all rk/app values
-	res := make([]specInfo, 0)
-	for _, rk := range routes.Keys() {
-		programs, ok := routes.Get(rk)
-		if !ok {
-			// we do not expect to ever hit this code path
-			// if this log message occurs then the agent is unable to access one of the keys that is returned by the route function
-			// might be a race condition if someone tries to update the policy to remove an output?
-			s.logger.With("route_key", rk).Warn("Unable to retrieve route.")
-			continue
-		}
-		sp, ok := programs.(specer)
-		if !ok {
-			s.logger.With("route_key", matchRK, "route", programs).Warn("Unable to cast route as specer.")
-			continue
-		}
-		for n, spec := range sp.Specs() {
-			res = append(res, specInfo{
-				rk:   rk,
-				app:  n,
-				spec: spec,
-			})
-		}
-	}
-	return res
-}
-
-// socketRequester is a struct to gather (diagnostics) data from a socket opened by elastic-agent or one if it's processes
-type socketRequester struct {
-	c        http.Client
-	endpoint string
-	appName  string
-	routeKey string
-}
-
-func newSocketRequester(appName, routeKey, endpoint string) *socketRequester {
-	c := http.Client{}
-	if strings.HasPrefix(endpoint, "unix://") {
-		c.Transport = &http.Transport{
-			Proxy:       nil,
-			DialContext: socket.DialContext(strings.TrimPrefix(endpoint, "unix://")),
-		}
-		endpoint = "unix"
-	} else if strings.HasPrefix(endpoint, "npipe://") {
-		c.Transport = &http.Transport{
-			Proxy:       nil,
-			DialContext: socket.DialContext(strings.TrimPrefix(endpoint, "npipe:///")),
-		}
-		endpoint = "npipe"
-	}
-	return &socketRequester{
-		c:        c,
-		appName:  appName,
-		routeKey: routeKey,
-		endpoint: endpoint,
-	}
-}
-
-// getPath creates a get request for the specified path.
-// Will return an error if that status code is not 200.
-func (r *socketRequester) getPath(ctx context.Context, path string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", "http://"+r.endpoint+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	res, err := r.c.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != 200 {
-		res.Body.Close()
-		return nil, fmt.Errorf("response status is %d", res.StatusCode)
-	}
-	return res, nil
-
-}
-
-// procMeta will return process metadata by querying the "/" path.
-func (r *socketRequester) procMeta(ctx context.Context) *proto.ProcMeta {
-	pm := &proto.ProcMeta{
-		Name:     r.appName,
-		RouteKey: r.routeKey,
-	}
-
-	res, err := r.getPath(ctx, "/")
-	if err != nil {
-		pm.Error = err.Error()
-		return pm
-	}
-	defer res.Body.Close()
-
-	bi := &BeatInfo{}
-	dec := json.NewDecoder(res.Body)
-	if err := dec.Decode(bi); err != nil {
-		pm.Error = err.Error()
-		return pm
-	}
-
-	pm.Process = bi.Beat
-	pm.Hostname = bi.Hostname
-	pm.Id = bi.ID
-	pm.EphemeralId = bi.EphemeralID
-	pm.Version = bi.Version
-	pm.BuildCommit = bi.Commit
-	pm.BuildTime = bi.Time
-	pm.Username = bi.Username
-	pm.UserId = bi.UserID
-	pm.UserGid = bi.GroupID
-	pm.Architecture = bi.BinaryArch
-	pm.ElasticLicensed = bi.ElasticLicensed
-
-	return pm
-}
-
-var pprofEndpoints = map[proto.PprofOption]string{
-	proto.PprofOption_ALLOCS:       "/debug/pprof/allocs",
-	proto.PprofOption_BLOCK:        "/debug/pprof/block",
-	proto.PprofOption_CMDLINE:      "/debug/pprof/cmdline",
-	proto.PprofOption_GOROUTINE:    "/debug/pprof/goroutine",
-	proto.PprofOption_HEAP:         "/debug/pprof/heap",
-	proto.PprofOption_MUTEX:        "/debug/pprof/mutex",
-	proto.PprofOption_PROFILE:      "/debug/pprof/profile",
-	proto.PprofOption_THREADCREATE: "/debug/pprof/threadcreate",
-	proto.PprofOption_TRACE:        "/debug/pprof/trace",
-}
-
-// getProf will gather pprof data specified by the option.
-func (r *socketRequester) getPprof(ctx context.Context, opt proto.PprofOption, dur time.Duration) *proto.PprofResult {
-	res := &proto.PprofResult{
-		AppName:   r.appName,
-		RouteKey:  r.routeKey,
-		PprofType: opt,
-	}
-
-	path, ok := pprofEndpoints[opt]
-	if !ok {
-		res.Error = "unknown path for option"
-		return res
-	}
-
-	if opt == proto.PprofOption_PROFILE || opt == proto.PprofOption_TRACE {
-		path += fmt.Sprintf("?seconds=%0.f", dur.Seconds())
-	}
-
-	resp, err := r.getPath(ctx, path)
-	if err != nil {
-		res.Error = err.Error()
-		return res
-	}
-	defer resp.Body.Close()
-
-	p, err := io.ReadAll(resp.Body)
-	if err != nil {
-		res.Error = err.Error()
-		return res
-	}
-	res.Result = p
-	return res
-}
-
-// procMetrics will gather metrics buffer data
-func (r *socketRequester) procMetrics(ctx context.Context) *proto.MetricsResponse {
-	res := &proto.MetricsResponse{
-		AppName:  r.appName,
-		RouteKey: r.routeKey,
-	}
-
-	resp, err := r.getPath(ctx, "/buffer")
-	if err != nil {
-		res.Error = err.Error()
-		return res
-	}
-	defer resp.Body.Close()
-
-	p, err := io.ReadAll(resp.Body)
-	if err != nil {
-		res.Error = err.Error()
-		return res
-	}
-
-	if len(p) == 0 {
-		res.Error = "no content"
-		return res
-	}
-	res.Result = p
-	return res
-}
-
-type upgradeRequest struct {
-	*proto.UpgradeRequest
-}
-
-func (r *upgradeRequest) Version() string {
-	return r.GetVersion()
-}
-
-func (r *upgradeRequest) SourceURI() string {
-	return r.GetSourceURI()
-}
-
-func (r *upgradeRequest) FleetAction() *fleetapi.ActionUpgrade {
-	// upgrade request not from Fleet
-	return nil
-}
-
-func agentStatusToProto(code status.AgentStatusCode) proto.Status {
-	if code == status.Degraded {
-		return proto.Status_DEGRADED
-	}
-	if code == status.Failed {
-		return proto.Status_FAILED
-	}
-	return proto.Status_HEALTHY
-}
-
-func agentAppStatusToProto(apps []status.AgentApplicationStatus) []*proto.ApplicationStatus {
-	s := make([]*proto.ApplicationStatus, len(apps))
-	for i, a := range apps {
-		var payload []byte
-		if a.Payload != nil {
-			payload, _ = json.Marshal(a.Payload)
-		}
-		s[i] = &proto.ApplicationStatus{
-			Id:      a.ID,
-			Name:    a.Name,
-			Status:  proto.Status(a.Status.ToProto()),
-			Message: a.Message,
-			Payload: string(payload),
-		}
-	}
-	return s
+	return &cproto.DiagnosticUnitsResponse{Units: res}, nil
 }

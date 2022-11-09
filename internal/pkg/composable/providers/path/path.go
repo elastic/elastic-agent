@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	_ = composable.Providers.AddContextProvider("path", ContextProviderBuilder)
+	composable.Providers.AddContextProvider("path", ContextProviderBuilder)
 }
 
 type contextProvider struct{}
@@ -34,6 +34,6 @@ func (*contextProvider) Run(comm corecomp.ContextProviderComm) error {
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(_ *logger.Logger, _ *config.Config, managed bool) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(_ *logger.Logger, _ *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	return &contextProvider{}, nil
 }

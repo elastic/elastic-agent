@@ -47,7 +47,20 @@ func (m *mockAction) Expiration() (time.Time, error) {
 	return args.Get(0).(time.Time), args.Error(1)
 }
 
-func TestNewActionQueue(t *testing.T) {
+type mockSaver struct {
+	mock.Mock
+}
+
+func (m *mockSaver) SetQueue(a []fleetapi.Action) {
+	m.Called(a)
+}
+
+func (m *mockSaver) Save() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func TestNewQueue(t *testing.T) {
 	ts := time.Now()
 	a1 := &mockAction{}
 	a1.On("ID").Return("test-1")
@@ -60,21 +73,21 @@ func TestNewActionQueue(t *testing.T) {
 	a3.On("StartTime").Return(ts.Add(time.Minute), nil)
 
 	t.Run("nil actions slice", func(t *testing.T) {
-		q, err := NewActionQueue(nil)
+		q, err := newQueue(nil)
 		require.NoError(t, err)
 		assert.NotNil(t, q)
 		assert.Empty(t, q)
 	})
 
 	t.Run("empty actions slice", func(t *testing.T) {
-		q, err := NewActionQueue([]fleetapi.Action{})
+		q, err := newQueue([]fleetapi.Action{})
 		require.NoError(t, err)
 		assert.NotNil(t, q)
 		assert.Empty(t, q)
 	})
 
 	t.Run("ordered actions list", func(t *testing.T) {
-		q, err := NewActionQueue([]fleetapi.Action{a1, a2, a3})
+		q, err := newQueue([]fleetapi.Action{a1, a2, a3})
 		assert.NotNil(t, q)
 		require.NoError(t, err)
 		assert.Len(t, *q, 3)
@@ -89,7 +102,7 @@ func TestNewActionQueue(t *testing.T) {
 	})
 
 	t.Run("unordered actions list", func(t *testing.T) {
-		q, err := NewActionQueue([]fleetapi.Action{a3, a2, a1})
+		q, err := newQueue([]fleetapi.Action{a3, a2, a1})
 		require.NoError(t, err)
 		assert.NotNil(t, q)
 		assert.Len(t, *q, 3)
@@ -106,13 +119,13 @@ func TestNewActionQueue(t *testing.T) {
 	t.Run("start time error", func(t *testing.T) {
 		a := &mockAction{}
 		a.On("StartTime").Return(time.Time{}, errors.New("oh no"))
-		q, err := NewActionQueue([]fleetapi.Action{a})
+		q, err := newQueue([]fleetapi.Action{a})
 		assert.EqualError(t, err, "oh no")
 		assert.Nil(t, q)
 	})
 }
 
-func assertOrdered(t *testing.T, q *ActionQueue) {
+func assertOrdered(t *testing.T, q *queue) {
 	t.Helper()
 	require.Len(t, *q, 3)
 	i := heap.Pop(q).(*item)
@@ -137,48 +150,56 @@ func Test_ActionQueue_Add(t *testing.T) {
 	a3.On("ID").Return("test-3")
 
 	t.Run("ascending order", func(t *testing.T) {
-		q := &ActionQueue{}
-		q.Add(a1, 1)
-		q.Add(a2, 2)
-		q.Add(a3, 3)
+		aq := &ActionQueue{
+			q: &queue{},
+		}
+		aq.Add(a1, 1)
+		aq.Add(a2, 2)
+		aq.Add(a3, 3)
 
-		assertOrdered(t, q)
+		assertOrdered(t, aq.q)
 	})
 
 	t.Run("Add descending order", func(t *testing.T) {
-		q := &ActionQueue{}
-		q.Add(a3, 3)
-		q.Add(a2, 2)
-		q.Add(a1, 1)
+		aq := &ActionQueue{
+			q: &queue{},
+		}
+		aq.Add(a3, 3)
+		aq.Add(a2, 2)
+		aq.Add(a1, 1)
 
-		assertOrdered(t, q)
+		assertOrdered(t, aq.q)
 	})
 
 	t.Run("mixed order", func(t *testing.T) {
-		q := &ActionQueue{}
-		q.Add(a1, 1)
-		q.Add(a3, 3)
-		q.Add(a2, 2)
+		aq := &ActionQueue{
+			q: &queue{},
+		}
+		aq.Add(a1, 1)
+		aq.Add(a3, 3)
+		aq.Add(a2, 2)
 
-		assertOrdered(t, q)
+		assertOrdered(t, aq.q)
 	})
 
 	t.Run("two items have same priority", func(t *testing.T) {
-		q := &ActionQueue{}
-		q.Add(a1, 1)
-		q.Add(a2, 2)
-		q.Add(a3, 2)
+		aq := &ActionQueue{
+			q: &queue{},
+		}
+		aq.Add(a1, 1)
+		aq.Add(a2, 2)
+		aq.Add(a3, 2)
 
-		require.Len(t, *q, 3)
-		i := heap.Pop(q).(*item)
+		require.Len(t, *aq.q, 3)
+		i := heap.Pop(aq.q).(*item)
 		assert.Equal(t, int64(1), i.priority)
 		assert.Equal(t, "test-1", i.action.ID())
 		// next two items have same priority, however the ids may not match insertion order
-		i = heap.Pop(q).(*item)
+		i = heap.Pop(aq.q).(*item)
 		assert.Equal(t, int64(2), i.priority)
-		i = heap.Pop(q).(*item)
+		i = heap.Pop(aq.q).(*item)
 		assert.Equal(t, int64(2), i.priority)
-		assert.Empty(t, *q)
+		assert.Empty(t, *aq.q)
 	})
 }
 
@@ -191,17 +212,19 @@ func Test_ActionQueue_DequeueActions(t *testing.T) {
 	a3.On("ID").Return("test-3")
 
 	t.Run("empty queue", func(t *testing.T) {
-		q := &ActionQueue{}
+		aq := &ActionQueue{
+			q: &queue{},
+		}
 
-		actions := q.DequeueActions()
+		actions := aq.DequeueActions()
 
 		assert.Empty(t, actions)
-		assert.Empty(t, *q)
+		assert.Empty(t, *aq.q)
 	})
 
 	t.Run("one action from queue", func(t *testing.T) {
 		ts := time.Now()
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: ts.Add(-1 * time.Minute).Unix(),
 			index:    0,
@@ -215,8 +238,9 @@ func Test_ActionQueue_DequeueActions(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		actions := q.DequeueActions()
+		actions := aq.DequeueActions()
 
 		require.Len(t, actions, 1)
 		assert.Equal(t, "test-1", actions[0].ID())
@@ -234,7 +258,7 @@ func Test_ActionQueue_DequeueActions(t *testing.T) {
 
 	t.Run("two actions from queue", func(t *testing.T) {
 		ts := time.Now()
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: ts.Add(-1 * time.Minute).Unix(),
 			index:    0,
@@ -248,8 +272,9 @@ func Test_ActionQueue_DequeueActions(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		actions := q.DequeueActions()
+		actions := aq.DequeueActions()
 
 		require.Len(t, actions, 2)
 		assert.Equal(t, "test-2", actions[0].ID())
@@ -265,7 +290,7 @@ func Test_ActionQueue_DequeueActions(t *testing.T) {
 
 	t.Run("all actions from queue", func(t *testing.T) {
 		ts := time.Now()
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: ts.Add(-1 * time.Minute).Unix(),
 			index:    0,
@@ -279,8 +304,9 @@ func Test_ActionQueue_DequeueActions(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		actions := q.DequeueActions()
+		actions := aq.DequeueActions()
 
 		require.Len(t, actions, 3)
 		assert.Equal(t, "test-3", actions[0].ID())
@@ -292,7 +318,7 @@ func Test_ActionQueue_DequeueActions(t *testing.T) {
 
 	t.Run("no actions from queue", func(t *testing.T) {
 		ts := time.Now()
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: ts.Add(1 * time.Minute).Unix(),
 			index:    0,
@@ -306,8 +332,9 @@ func Test_ActionQueue_DequeueActions(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		actions := q.DequeueActions()
+		actions := aq.DequeueActions()
 		assert.Empty(t, actions)
 
 		require.Len(t, *q, 3)
@@ -333,15 +360,16 @@ func Test_ActionQueue_Cancel(t *testing.T) {
 	a3.On("ID").Return("test-3")
 
 	t.Run("empty queue", func(t *testing.T) {
-		q := &ActionQueue{}
+		q := &queue{}
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		n := q.Cancel("test-1")
+		n := aq.Cancel("test-1")
 		assert.Zero(t, n)
 		assert.Empty(t, *q)
 	})
 
 	t.Run("one item cancelled", func(t *testing.T) {
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: 1,
 			index:    0,
@@ -355,8 +383,9 @@ func Test_ActionQueue_Cancel(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		n := q.Cancel("test-1")
+		n := aq.Cancel("test-1")
 		assert.Equal(t, 1, n)
 
 		assert.Len(t, *q, 2)
@@ -370,7 +399,7 @@ func Test_ActionQueue_Cancel(t *testing.T) {
 	})
 
 	t.Run("two items cancelled", func(t *testing.T) {
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: 1,
 			index:    0,
@@ -384,8 +413,9 @@ func Test_ActionQueue_Cancel(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		n := q.Cancel("test-1")
+		n := aq.Cancel("test-1")
 		assert.Equal(t, 2, n)
 
 		assert.Len(t, *q, 1)
@@ -396,7 +426,7 @@ func Test_ActionQueue_Cancel(t *testing.T) {
 	})
 
 	t.Run("all items cancelled", func(t *testing.T) {
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: 1,
 			index:    0,
@@ -410,14 +440,15 @@ func Test_ActionQueue_Cancel(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		n := q.Cancel("test-1")
+		n := aq.Cancel("test-1")
 		assert.Equal(t, 3, n)
 		assert.Empty(t, *q)
 	})
 
 	t.Run("no items cancelled", func(t *testing.T) {
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: 1,
 			index:    0,
@@ -431,8 +462,9 @@ func Test_ActionQueue_Cancel(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		n := q.Cancel("test-0")
+		n := aq.Cancel("test-0")
 		assert.Zero(t, n)
 
 		assert.Len(t, *q, 3)
@@ -451,8 +483,9 @@ func Test_ActionQueue_Cancel(t *testing.T) {
 
 func Test_ActionQueue_Actions(t *testing.T) {
 	t.Run("empty queue", func(t *testing.T) {
-		q := &ActionQueue{}
-		actions := q.Actions()
+		q := &queue{}
+		aq := &ActionQueue{q, &mockSaver{}}
+		actions := aq.Actions()
 		assert.Len(t, actions, 0)
 	})
 
@@ -463,7 +496,7 @@ func Test_ActionQueue_Actions(t *testing.T) {
 		a2.On("ID").Return("test-2")
 		a3 := &mockAction{}
 		a3.On("ID").Return("test-3")
-		q := &ActionQueue{&item{
+		q := &queue{&item{
 			action:   a1,
 			priority: 1,
 			index:    0,
@@ -477,9 +510,72 @@ func Test_ActionQueue_Actions(t *testing.T) {
 			index:    2,
 		}}
 		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
 
-		actions := q.Actions()
+		actions := aq.Actions()
 		assert.Len(t, actions, 3)
 		assert.Equal(t, "test-1", actions[0].ID())
+	})
+}
+
+func Test_ActionQueue_CancelType(t *testing.T) {
+	a1 := &mockAction{}
+	a1.On("ID").Return("test-1")
+	a1.On("Type").Return("upgrade")
+	a2 := &mockAction{}
+	a2.On("ID").Return("test-2")
+	a2.On("Type").Return("upgrade")
+	a3 := &mockAction{}
+	a3.On("ID").Return("test-3")
+	a3.On("Type").Return("unknown")
+
+	t.Run("empty queue", func(t *testing.T) {
+		aq := &ActionQueue{&queue{}, &mockSaver{}}
+
+		n := aq.CancelType("upgrade")
+		assert.Equal(t, 0, n)
+	})
+
+	t.Run("single item in queue", func(t *testing.T) {
+		q := &queue{&item{
+			action:   a1,
+			priority: 1,
+			index:    0,
+		}}
+		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
+
+		n := aq.CancelType("upgrade")
+		assert.Equal(t, 1, n)
+	})
+
+	t.Run("no matches in queue", func(t *testing.T) {
+		q := &queue{&item{
+			action:   a3,
+			priority: 1,
+			index:    0,
+		}}
+		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
+
+		n := aq.CancelType("upgrade")
+		assert.Equal(t, 0, n)
+	})
+
+	t.Run("all items cancelled", func(t *testing.T) {
+		q := &queue{&item{
+			action:   a1,
+			priority: 1,
+			index:    0,
+		}, &item{
+			action:   a2,
+			priority: 2,
+			index:    1,
+		}}
+		heap.Init(q)
+		aq := &ActionQueue{q, &mockSaver{}}
+
+		n := aq.CancelType("upgrade")
+		assert.Equal(t, 2, n)
 	})
 }

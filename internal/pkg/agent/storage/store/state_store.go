@@ -16,21 +16,12 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type dispatcher interface {
-	Dispatch(context.Context, FleetAcker, ...action) error
-}
-
 type store interface {
 	Save(io.Reader) error
-}
-
-// FleetAcker is an acker of actions to fleet.
-type FleetAcker interface {
-	Ack(ctx context.Context, action fleetapi.Action) error
-	Commit(ctx context.Context) error
 }
 
 type storeLoad interface {
@@ -93,7 +84,7 @@ func NewStateStoreWithMigration(log *logger.Logger, actionStorePath, stateStoreP
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
-func NewStateStoreActionAcker(acker FleetAcker, store *StateStore) *StateStoreActionAcker {
+func NewStateStoreActionAcker(acker acker.Acker, store *StateStore) *StateStoreActionAcker {
 	return &StateStoreActionAcker{acker: acker, store: store}
 }
 
@@ -103,7 +94,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	// persisted and we return an empty store.
 	reader, err := store.Load()
 	if err != nil {
-		return &StateStore{log: log, store: store}, nil //nolint:nilerr // expected results
+		return &StateStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
 
@@ -157,7 +148,6 @@ func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath strin
 
 	stateStoreExits, err := stateDiskStore.Exists()
 	if err != nil {
-		log.With()
 		log.Errorf("failed to check if state store %s exists: %v", stateStorePath, err)
 		return err
 	}
@@ -326,7 +316,7 @@ func (s *StateStore) AckToken() string {
 // its up to the action store to decide if we need to persist the event for future replay or just
 // discard the event.
 type StateStoreActionAcker struct {
-	acker FleetAcker
+	acker acker.Acker
 	store *StateStore
 }
 
@@ -343,23 +333,6 @@ func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action)
 // Commit commits acks.
 func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 	return a.acker.Commit(ctx)
-}
-
-// ReplayActions replays list of actions.
-func ReplayActions(
-	ctx context.Context,
-	log *logger.Logger,
-	dispatcher dispatcher,
-	acker FleetAcker,
-	actions ...action,
-) error {
-	log.Info("restoring current policy from disk")
-
-	if err := dispatcher.Dispatch(ctx, acker, actions...); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func yamlToReader(in interface{}) (io.Reader, error) {
