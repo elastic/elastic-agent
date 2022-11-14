@@ -142,6 +142,11 @@ func (Dev) Package() {
 	defer os.Setenv(devEnv, dev)
 
 	os.Setenv(devEnv, "true")
+
+	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
+		devtools.ExternalBuild = true
+	}
+
 	devtools.DevBuild = true
 	Package()
 }
