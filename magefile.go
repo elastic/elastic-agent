@@ -644,10 +644,18 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		// cleanup after build
 		defer os.Unsetenv(agentDropPath)
 
-		packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
 		if devtools.ExternalBuild == true {
+			// for external go for all dependencies
+			dependencies := []string{
+				"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat", // beat dependencies
+				"apm-server",
+				// "cloudbeat", // TODO: add once working
+				"elastic-agent-shipper",
+				"endpoint-security",
+				"fleet-server",
+			}
 			ctx := context.Background()
-			for _, beat := range packedBeats {
+			for _, beat := range dependencies {
 				for _, reqPackage := range requiredPackages {
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
@@ -659,6 +667,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				}
 			}
 		} else {
+			packedBeats := []string{"filebeat", "heartbeat", "metricbeat", "osquerybeat"}
 			// build from local repo, will assume beats repo is located on the same root level
 			for _, b := range packedBeats {
 				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
