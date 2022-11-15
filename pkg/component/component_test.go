@@ -11,12 +11,14 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestToComponents(t *testing.T) {
@@ -1501,13 +1503,26 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.ShipperSpec.ShipperType, actual.ShipperSpec.ShipperType)
 						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
 						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
-						assert.EqualValues(t, expected.Units, actual.Units)
 						assert.Nil(t, actual.Shipper)
+						assert.Len(t, actual.Units, len(expected.Units))
+						for i := range expected.Units {
+							assertEqualUnit(t, &expected.Units[i], &actual.Units[i])
+						}
 					}
 				}
 			}
 		})
 	}
+}
+
+func assertEqualUnit(t *testing.T, expected *Unit, actual *Unit) {
+	t.Helper()
+	assert.Equal(t, expected.ID, actual.ID)
+	assert.Equal(t, expected.Type, actual.Type)
+	assert.Equal(t, expected.LogLevel, actual.LogLevel)
+	assert.Equal(t, expected.Err, actual.Err)
+	diff := cmp.Diff(expected.Config, actual.Config, protocmp.Transform())
+	assert.Empty(t, diff)
 }
 
 func sortComponents(components []Component) {
