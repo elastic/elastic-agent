@@ -13,13 +13,13 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestToComponents(t *testing.T) {
@@ -1504,12 +1504,9 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.ShipperSpec.ShipperType, actual.ShipperSpec.ShipperType)
 						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
 						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
-						expectedUnitsRaw, _ := json.Marshal(expected.Units)
-						expectedUnits := string(expectedUnitsRaw)
-						actualUnitsRaw, _ := json.Marshal(actual.Units)
-						actualUnits := string(actualUnitsRaw)
+						expectedUnits, _ := json.Marshal(expected.Units)
+						actualUnits, _ := json.Marshal(actual.Units)
 						assert.EqualValues(t, expected.Units, actual.Units, "%d units not equal expected: \n%q \nactual:\n%q", i, string(expectedUnits), string(actualUnits))
-						// assert.EqualValues(t, expected.Units, actual.Units, "unit number %d", i)
 
 						assert.Nil(t, actual.Shipper)
 					}
@@ -1547,7 +1544,7 @@ func sortComponents(components []Component) {
 			})
 			newSource, err := structpb.NewStruct(source)
 			if err != nil {
-				panic(err)
+				panic(fmt.Errorf("failed to create new struct from map: %w", err))
 			}
 			unit.Config.Source = newSource
 		}
