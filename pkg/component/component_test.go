@@ -6,13 +6,14 @@
 package component
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stretchr/testify/assert"
@@ -1504,16 +1505,27 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.ShipperSpec.ShipperType, actual.ShipperSpec.ShipperType)
 						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
 						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
-						expectedUnits, _ := json.Marshal(expected.Units)
-						actualUnits, _ := json.Marshal(actual.Units)
-						assert.EqualValues(t, expected.Units, actual.Units, "%d units not equal expected: \n%q \nactual:\n%q", i, string(expectedUnits), string(actualUnits))
 
 						assert.Nil(t, actual.Shipper)
+						assert.Len(t, actual.Units, len(expected.Units))
+						for i := range expected.Units {
+							assertEqualUnitExpectedConfigs(t, &expected.Units[i], &actual.Units[i])
+						}
 					}
 				}
 			}
 		})
 	}
+}
+
+func assertEqualUnitExpectedConfigs(t *testing.T, expected *Unit, actual *Unit) {
+	t.Helper()
+	assert.Equal(t, expected.ID, actual.ID)
+	assert.Equal(t, expected.Type, actual.Type)
+	assert.Equal(t, expected.LogLevel, actual.LogLevel)
+	assert.Equal(t, expected.Err, actual.Err)
+	diff := cmp.Diff(expected.Config, actual.Config, protocmp.Transform())
+	assert.Empty(t, diff)
 }
 
 func sortComponents(components []Component) {
