@@ -6,12 +6,15 @@
 package component
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"testing"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1501,7 +1504,13 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.ShipperSpec.ShipperType, actual.ShipperSpec.ShipperType)
 						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
 						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
-						assert.EqualValues(t, expected.Units, actual.Units)
+						expectedUnitsRaw, _ := json.Marshal(expected.Units)
+						expectedUnits := string(expectedUnitsRaw)
+						actualUnitsRaw, _ := json.Marshal(actual.Units)
+						actualUnits := string(actualUnitsRaw)
+						assert.EqualValues(t, expected.Units, actual.Units, "%d units not equal expected: \n%q \nactual:\n%q", i, string(expectedUnits), string(actualUnits))
+						// assert.EqualValues(t, expected.Units, actual.Units, "unit number %d", i)
+
 						assert.Nil(t, actual.Shipper)
 					}
 				}
@@ -1515,6 +1524,33 @@ func sortComponents(components []Component) {
 		sort.Slice(comp.Units, func(i, j int) bool {
 			return comp.Units[i].ID < comp.Units[j].ID
 		})
+
+		// need to sort config.source as well
+		for _, unit := range comp.Units {
+			if unit.Config == nil || unit.Config.Source == nil {
+				continue
+			}
+			source := unit.Config.Source.AsMap()
+			units, found := source["units"]
+			if !found {
+				continue
+			}
+			unitsSliceRaw, ok := units.([]interface{})
+			if !ok {
+				continue
+			}
+
+			sort.Slice(unitsSliceRaw, func(i, j int) bool {
+				unitsSliceI := unitsSliceRaw[i].(map[string]interface{})
+				unitsSliceJ := unitsSliceRaw[j].(map[string]interface{})
+				return fmt.Sprint(unitsSliceI["id"]) < fmt.Sprint(unitsSliceJ["id"])
+			})
+			newSource, err := structpb.NewStruct(source)
+			if err != nil {
+				panic(err)
+			}
+			unit.Config.Source = newSource
+		}
 	}
 	sort.Slice(components[:], func(i, j int) bool {
 		return components[i].Units[0].ID < components[j].Units[0].ID
