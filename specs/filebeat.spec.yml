@@ -45,6 +45,13 @@ inputs:
     shippers: *shippers
     command:
       args: *args
+  - name: cel
+    description: "Common Expression Language Input"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command:
+      args: *args
   - name: cloudfoundry
     description: "PCF Cloudfoundry"
     platforms: *platforms
