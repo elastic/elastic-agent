@@ -178,9 +178,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		_ = serverStopFn()
 	}()
 
-	diagHooks := diagnostics.GlobalHooks()
-	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
-	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagHooks)
+	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagnostics.GlobalHooks, coord.DiagnosticHooks())
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err
@@ -395,7 +393,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 	cfg := mcfg.APM
 
-	// nolint:godox // the TODO is intentional
+	//nolint:godox // the TODO is intentional
 	// TODO(stn): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
 	// but it doesn't exist today. Update this code once we have something
 	// available via the APM Go agent.

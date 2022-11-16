@@ -15,7 +15,6 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -31,48 +30,23 @@ const (
 
 // FileData contains metadata about a file.
 type FileData struct {
-	Size        int64  `json:"size"`
-	Name        string `json:"name"`
-	Extension   string `json:"ext"`
-	Mime        string `json:"mime_type"`
-	Compression string `json:"Compression"`
-	Hash        struct {
+	Size      int64  `json:"size"`
+	Name      string `json:"name"`
+	Extension string `json:"ext"`
+	Mime      string `json:"mime_type"`
+	Hash      struct {
 		SHA256 string `json:"sha256"`
 		MD5    string `json:"md5"`
 	} `json:"hash"`
-	Accessed    string   `json:"accessed"`
-	Attributes  []string `json:"attributes"`
-	Created     string   `json:"created"`
-	CTime       string   `json:"ctime"`
-	Device      string   `json:"device"`
-	Directory   string   `json:"directory"`
-	DriveLetter string   `json:"drive_letter"`
-	Ext         string   `json:"extension"`
-	GID         string   `json:"gid"`
-	Group       string   `json:"group"`
-	INode       string   `json:"inode"`
-	Mode        string   `json:"mode"`
-	MTime       string   `json:"mtime"`
-	Owner       string   `json:"owner"`
-	Path        string   `json:"path"`
-	TargetPath  string   `json:"target_path"`
-	Type        string   `json:"type"`
-	UID         string   `json:"uid"`
 }
 
 // NewUploadRequest is the struct that is passed as the request body when starting a new file upload.
 type NewUploadRequest struct {
-	AgentID  string     `json:"agent_id"`
 	ActionID string     `json:"action_id"`
+	AgentID  string     `json:"agent_id"`
 	Source   string     `json:"source"`
 	File     FileData   `json:"file"`
 	Contents []FileData `json:"contents"`
-	Event    struct {
-		ID string `json:"id"`
-	} `json:"event"`
-	Host struct {
-		Hostname string `json:"hostname"`
-	} `json:"host"`
 }
 
 // NewUploadResponse is the body for the success case when requesting a new file upload.
@@ -89,7 +63,6 @@ type retrySender struct {
 }
 
 // Send calls the underlying Sender's Send method. If a 429 status code is returned the request is retried after a backoff period.
-// TODO What to do if another error or status is received?
 func (r *retrySender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (resp *http.Response, err error) {
 	r.wait.Reset()
 
@@ -191,21 +164,20 @@ func (c *Client) Finish(ctx context.Context, id string) error {
 func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buffer) error {
 	size := b.Len()
 	upReq := NewUploadRequest{
-		AgentID:  c.agentID,
 		ActionID: id,
+		AgentID:  c.agentID,
+		Source:   "elastic-agent",
 		File: FileData{
-			Size:        int64(size),
-			Name:        fmt.Sprintf("elastic-agent-diagnostics-%s-%s.zip", c.agentID, id),
-			Extension:   "zip",
-			Mime:        "application/zip",
-			Compression: "Deflate",
+			Size:      int64(size),
+			Name:      fmt.Sprintf("elastic-agent-diagnostics-%s-%s.zip", c.agentID, id),
+			Extension: "zip",
+			Mime:      "application/zip",
 			Hash: struct {
 				SHA256 string `json:"sha256"`
 				MD5    string `json:"md5"`
 			}{
 				SHA256: fmt.Sprintf("%x", sha256.Sum256(b.Bytes())),
 			},
-			Created: time.Now().UTC().Format(time.RFC3339),
 		},
 	}
 	upResp, err := c.New(ctx, &upReq)

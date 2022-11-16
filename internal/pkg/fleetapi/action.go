@@ -582,6 +582,16 @@ func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
 					"fail to decode CANCEL_ACTION action",
 					errors.TypeConfig)
 			}
+		case ActionTypeDiagnostics:
+			action = &ActionDiagnostics{
+				ActionID:   n.ActionID,
+				ActionType: n.ActionType,
+			}
+			if err := json.Unmarshal(n.Data, action); err != nil {
+				return errors.New(err,
+					"fail to decode DIAGNOSTICS_ACTION action",
+					errors.TypeConfig)
+			}
 		default:
 			action = &ActionUnknown{
 				ActionID:     n.ActionID,

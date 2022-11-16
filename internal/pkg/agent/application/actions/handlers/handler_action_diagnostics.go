@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -26,15 +25,15 @@ type Uploader interface {
 // When a Diagnostics action is received a full diagnostics bundle is taken and uploaded to fleet-server.
 type Diagnostics struct {
 	log      *logger.Logger
-	coord    *coordinator.Coordinator // TODO use of coordinator or control server/client?
+	client   client.Client
 	uploader Uploader
 }
 
 // NewDiagnostics returns a new Diagnostics handler.
-func NewDiagnostics(log *logger.Logger, coord *coordinator.Coordinator, uploader Uploader) *Diagnostics {
+func NewDiagnostics(log *logger.Logger, uploader Uploader) *Diagnostics {
 	return &Diagnostics{
 		log:      log,
-		coord:    coord,
+		client:   client.New(),
 		uploader: uploader,
 	}
 }
@@ -48,49 +47,17 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	}
 
 	// Gather agent diagnostics
-	diagHooks := append(diagnostics.GlobalHooks(), h.coord.DiagnosticHooks()()...)
-	aDiag := make([]client.DiagnosticFileResult, 0, len(diagHooks))
-	for _, hook := range diagHooks {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		p, ts := hook.Hook(ctx)
-		aDiag = append(aDiag, client.DiagnosticFileResult{
-			Name:        hook.Name,
-			Filename:    hook.Filename,
-			Description: hook.Description,
-			ContentType: hook.ContentType,
-			Content:     p,
-			Generated:   ts,
-		})
+	aDiag, err := h.client.DiagnosticAgent(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to gather agent diagnostics: %w", err)
 	}
-
-	runtimeDiag := h.coord.PerformDiagnostics(ctx)
-	uDiag := make([]client.DiagnosticUnitResult, 0, len(runtimeDiag))
-	for _, diag := range runtimeDiag {
-		files := make([]client.DiagnosticFileResult, 0, diag.Results)
-		for _, f := range diag.Results {
-			files = append(files, client.DiagnosticFileResult{
-				Name:        f.Name,
-				Filename:    f.Filename,
-				Description: f.Description,
-				ContentType: f.ContentType,
-				Content:     f.Content,
-				Generated:   f.Generated.AsTime(),
-			})
-		}
-		uDiag = append(uDiag, client.DiagnosticUnitResult{
-			ComponentID: diag.Component.ID,
-			UnitID:      diag.Unit.ID,
-			UnitType:    diag.Unit.Type,
-			Err:         diag.Err,
-			Results:     files,
-		})
+	uDiag, err := h.client.DiagnosticUnits(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to gather unit diagnostics: %w", err)
 	}
 
 	var b bytes.Buffer
-	err := diagnostics.ZipArchive(b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
+	err = diagnostics.ZipArchive(&b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
 	if err != nil {
 		return fmt.Errorf("error creating diagnostics bundle: %w", err)
 	}

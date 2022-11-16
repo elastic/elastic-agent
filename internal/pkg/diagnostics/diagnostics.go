@@ -20,6 +20,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
+// ContentTypeDirectory should be used to indicate that a directory should be made in the resulting bundle
+const ContentTypeDirectory = "directory"
+
 // Hook is a hook that gets used when diagnostic information is requested from the Elastic Agent.
 type Hook struct {
 	Name        string
@@ -107,7 +110,7 @@ func pprofDiag(name string) func(context.Context) ([]byte, time.Time) {
 }
 
 // ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics.
-// If any error is encounted when writing the contents of the archive it is returned.
+// If any error is encountered when writing the contents of the archive it is returned.
 func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
 	zw := zip.NewWriter(w)
 	defer zw.Close()

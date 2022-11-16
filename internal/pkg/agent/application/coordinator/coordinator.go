@@ -17,8 +17,9 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"go.elastic.co/apm"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -473,6 +474,10 @@ func (c *Coordinator) DiagnosticHooks() func() diagnostics.Hooks {
 				},
 			},
 		}
+		hooks = append(hooks, c.addLogHooks()...)
+		hooks = append(hooks, c.addServiceLogHooks()...)
+
+		return hooks
 	}
 }
 
@@ -542,7 +547,7 @@ func (c *Coordinator) addServiceLogHooks() []diagnostics.Hook {
 		Name:        "services log dir",
 		Filename:    "services/",
 		ContentType: diagnostics.ContentTypeDirectory,
-		Hook:        func(_ context.Context) []byte { return nil },
+		Hook:        func(_ context.Context) ([]byte, time.Time) { return nil, time.Time{} },
 	}}
 	for _, spec := range c.specs.ServiceSpecs() {
 		if spec.Spec.Service.Log == nil || spec.Spec.Service.Log.Path == "" {
