@@ -296,12 +296,14 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 
 	streams := []interface{}{
 		map[string]interface{}{
-			idKey: "logs-monitoring-agent",
+			idKey: "filestream-monitoring-agent",
+			// "data_stream" is not used when creating an Input on Filebeat
 			"data_stream": map[string]interface{}{
-				"type":      "logs",
+				"type":      "filestream",
 				"dataset":   "elastic_agent",
 				"namespace": monitoringNamespace,
 			},
+			"type": "filestream",
 			"paths": []interface{}{
 				filepath.Join(logsDrop, agentName+"-*.ndjson"),
 				filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
@@ -315,8 +317,10 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 			"parsers": []interface{}{
 				map[string]interface{}{
 					"ndjson": map[string]interface{}{
-						"overwrite_keys": true,
 						"message_key":    "message",
+						"overwrite_keys": true,
+						"add_error_key":  true,
+						"target":         "",
 					},
 				},
 			},
@@ -376,12 +380,14 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 		name := strings.ReplaceAll(unit, "-", "_") // conform with index naming policy
 		logFile := loggingPath(unit, b.operatingSystem)
 		streams = append(streams, map[string]interface{}{
-			idKey: "logs-monitoring-" + name,
+			idKey: "filestream-monitoring-" + name,
 			"data_stream": map[string]interface{}{
-				"type":      "logs",
+				// "data_stream" is not used when creating an Input on Filebeat
+				"type":      "filestream",
 				"dataset":   fmt.Sprintf("elastic_agent.%s", fixedBinaryName),
 				"namespace": monitoringNamespace,
 			},
+			"type":  "filestream",
 			"index": fmt.Sprintf("logs-elastic_agent.%s-%s", fixedBinaryName, monitoringNamespace),
 			"paths": []interface{}{logFile, logFile + "*"},
 			"close": map[string]interface{}{
@@ -392,8 +398,10 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 			"parsers": []interface{}{
 				map[string]interface{}{
 					"ndjson": map[string]interface{}{
-						"overwrite_keys": true,
 						"message_key":    "message",
+						"overwrite_keys": true,
+						"add_error_key":  true,
+						"target":         "",
 					},
 				},
 			},
@@ -448,8 +456,8 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 
 	inputs := []interface{}{
 		map[string]interface{}{
-			idKey:        "logs-monitoring-agent",
-			"name":       "logs-monitoring-agent",
+			idKey:        "filestream-monitoring-agent",
+			"name":       "filestream-monitoring-agent",
 			"type":       "filestream",
 			useOutputKey: monitoringOutput,
 			"data_stream": map[string]interface{}{
