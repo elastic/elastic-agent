@@ -7,16 +7,20 @@ package component
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"testing"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestToComponents(t *testing.T) {
@@ -1501,8 +1505,12 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.ShipperSpec.ShipperType, actual.ShipperSpec.ShipperType)
 						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
 						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
-						assert.EqualValues(t, expected.Units, actual.Units)
+
 						assert.Nil(t, actual.Shipper)
+						assert.Len(t, actual.Units, len(expected.Units))
+						for i := range expected.Units {
+							assertEqualUnitExpectedConfigs(t, &expected.Units[i], &actual.Units[i])
+						}
 					}
 				}
 			}
@@ -1510,11 +1518,48 @@ func TestToComponents(t *testing.T) {
 	}
 }
 
+func assertEqualUnitExpectedConfigs(t *testing.T, expected *Unit, actual *Unit) {
+	t.Helper()
+	assert.Equal(t, expected.ID, actual.ID)
+	assert.Equal(t, expected.Type, actual.Type)
+	assert.Equal(t, expected.LogLevel, actual.LogLevel)
+	assert.Equal(t, expected.Err, actual.Err)
+	diff := cmp.Diff(expected.Config, actual.Config, protocmp.Transform())
+	assert.Empty(t, diff)
+}
+
 func sortComponents(components []Component) {
 	for _, comp := range components {
 		sort.Slice(comp.Units, func(i, j int) bool {
 			return comp.Units[i].ID < comp.Units[j].ID
 		})
+
+		// need to sort config.source as well
+		for _, unit := range comp.Units {
+			if unit.Config == nil || unit.Config.Source == nil {
+				continue
+			}
+			source := unit.Config.Source.AsMap()
+			units, found := source["units"]
+			if !found {
+				continue
+			}
+			unitsSliceRaw, ok := units.([]interface{})
+			if !ok {
+				continue
+			}
+
+			sort.Slice(unitsSliceRaw, func(i, j int) bool {
+				unitsSliceI := unitsSliceRaw[i].(map[string]interface{})
+				unitsSliceJ := unitsSliceRaw[j].(map[string]interface{})
+				return fmt.Sprint(unitsSliceI["id"]) < fmt.Sprint(unitsSliceJ["id"])
+			})
+			newSource, err := structpb.NewStruct(source)
+			if err != nil {
+				panic(fmt.Errorf("failed to create new struct from map: %w", err))
+			}
+			unit.Config.Source = newSource
+		}
 	}
 	sort.Slice(components[:], func(i, j int) bool {
 		return components[i].Units[0].ID < components[j].Units[0].ID

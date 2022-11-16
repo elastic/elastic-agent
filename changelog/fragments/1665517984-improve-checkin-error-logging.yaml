@@ -1,5 +1,0 @@
-kind: enhancement
-summary: Improve logging of Fleet check-in errors.
-description: Improve logging of Fleet check-in errors and only report the local state as degraded after two consecutive failed check-ins.
-pr: 1477
-issue: 1154
