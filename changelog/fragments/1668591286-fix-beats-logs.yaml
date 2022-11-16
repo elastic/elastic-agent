@@ -16,8 +16,8 @@ summary: "monitoring: fix JSON logs parsing for Beats"
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 description: >-
-  This commit fixes the JSON parsing from Beats logs. The configuration sent to
-  Filebeat did not contain the input type, hence a log input  instead of a
+  Fixes the JSON parsing from Beats logs. The configuration sent to
+  Filebeat did not contain the input type, hence a log input instead of a
   filestream one was being started.
 
   This commit also improves the configuraiton of the ndjson parser.
