@@ -22,6 +22,7 @@ const (
 	elasticsearch = "elasticsearch"
 	fleetServer   = "fleet-server"
 	endpoint      = "endpoint"
+	apmServer     = "apm"
 )
 
 // injectFleetServerInput is the base configuration that is used plus the FleetServerComponentModifier that adjusts
@@ -83,15 +84,14 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 	}
 }
 
-// EndpointComponentModifier the modifier for the Endpoint configuration.
-// The Endpoint expects the fleet configuration passed to it by the Agent
-// because it needs to be able to connect to the fleet server directly.
-func EndpointComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordinator.ComponentsModifier {
+// InjectFleetConfigComponentModifier The modifier that injects the fleet configuration for the components
+// that need to be able to connect to fleet server.
+func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordinator.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
-			if comp.InputSpec != nil && comp.InputSpec.InputType == endpoint {
+			if comp.InputSpec != nil && (comp.InputSpec.InputType == endpoint || comp.InputSpec.InputType == apmServer) {
 				for j, unit := range comp.Units {
-					if unit.Type == client.UnitTypeInput && unit.Config.Type == endpoint {
+					if unit.Type == client.UnitTypeInput && (unit.Config.Type == endpoint || unit.Config.Type == apmServer) {
 						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), map[string]interface{}{"fleet": fleetCfg})
 						if err != nil {
 							return nil, err
