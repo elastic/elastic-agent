@@ -53,6 +53,10 @@ func (m *mockAction) String() string {
 	args := m.Called()
 	return args.String(0)
 }
+func (m *mockAction) AckEvent() fleetapi.AckEvent {
+	args := m.Called()
+	return args.Get(0).(fleetapi.AckEvent)
+}
 func (m *mockScheduledAction) StartTime() (time.Time, error) {
 	args := m.Called()
 	return args.Get(0).(time.Time), args.Error(1)

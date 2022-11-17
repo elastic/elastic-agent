@@ -140,9 +140,10 @@ func (a *ActionUnknown) OriginalType() string {
 
 func (a *ActionUnknown) AckEvent() AckEvent {
 	return AckEvent{
-		EventType: "ERROR", // TODO Discuss EventType/SubType needed - by default only ACTION_RESULT was used - what is (or was) the intended purpose of these attributes? Are they documented? Can we change them to better support acking an error or a retry?
-		SubType:   "FAILED",
+		EventType: "ACTION_RESULT", // TODO Discuss EventType/SubType needed - by default only ACTION_RESULT was used - what is (or was) the intended purpose of these attributes? Are they documented? Can we change them to better support acking an error or a retry?
+		SubType:   "ACKNOWLEDGED",
 		ActionID:  a.ActionID,
+		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
 		Error:     fmt.Sprintf("Action %q of type %q is unknown to the elastic-agent", a.ActionID, a.originalType),
 	}
 }
@@ -207,7 +208,7 @@ func (a *ActionPolicyChange) ID() string {
 	return a.ActionID
 }
 
-func (a *ActionPolicyPolicyChange) AckEvent() AckEvent {
+func (a *ActionPolicyChange) AckEvent() AckEvent {
 	return AckEvent{
 		EventType: "ACTION_RESULT",
 		SubType:   "ACKNOWLEDGED",
@@ -472,7 +473,7 @@ func (a *ActionDiagnostics) AckEvent() AckEvent {
 			UploadID string `json:"upload_id"`
 		}
 		payload.UploadID = a.UploadID
-		p, _ := json.Marshall(payload)
+		p, _ := json.Marshal(payload)
 		event.Payload = p
 	}
 

@@ -207,8 +207,9 @@ func Test_Client_UploadDiagnostics(t *testing.T) {
 		c:       sender,
 		agentID: "test-agent",
 	}
-	err = c.UploadDiagnostics(context.Background(), "test-id", bytes.NewBufferString("abcde"))
+	id, err := c.UploadDiagnostics(context.Background(), "test-id", bytes.NewBufferString("abcde"))
 	require.NoError(t, err)
+	assert.Equal(t, "test-upload", id)
 	assert.Equal(t, "ab", string(chunk0))
 	assert.Equal(t, "cd", string(chunk1))
 	assert.Equal(t, "e", string(chunk2))
