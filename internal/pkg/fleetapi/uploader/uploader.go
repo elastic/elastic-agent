@@ -161,7 +161,7 @@ func (c *Client) Finish(ctx context.Context, id string) error {
 }
 
 // UploadDiagnostics is a wrapper to upload a diagnostics request identified by the passed action id contained in the buffer to fleet-server.
-func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buffer) error {
+func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buffer) (string, error) {
 	size := b.Len()
 	upReq := NewUploadRequest{
 		ActionID: id,
@@ -182,7 +182,7 @@ func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buff
 	}
 	upResp, err := c.New(ctx, &upReq)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	uploadID := upResp.UploadID
@@ -191,9 +191,10 @@ func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buff
 	for chunk := 0; chunk < totalChunks; chunk++ {
 		err := c.Chunk(ctx, uploadID, chunk, io.LimitReader(b, chunkSize))
 		if err != nil {
-			return err
+			return uploadID, err
 		}
 	}
 
-	return c.Finish(ctx, uploadID)
+	err = c.Finish(ctx, uploadID)
+	return uploadID, err
 }

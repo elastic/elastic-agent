@@ -18,7 +18,7 @@ import (
 
 // Uploader is the interface used to upload a diagnostics bundle to fleet-server.
 type Uploader interface {
-	UploadDiagnostics(context.Context, string, *bytes.Buffer) error
+	UploadDiagnostics(context.Context, string, *bytes.Buffer) (string, error)
 }
 
 // Diagnostics is the handler to process Diagnostics actions.
@@ -49,21 +49,29 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	// Gather agent diagnostics
 	aDiag, err := h.client.DiagnosticAgent(ctx)
 	if err != nil {
+		action.Err = err
+		_ = ack.Ack(ctx, action)
 		return fmt.Errorf("unable to gather agent diagnostics: %w", err)
 	}
 	uDiag, err := h.client.DiagnosticUnits(ctx)
 	if err != nil {
+		action.Err = err
+		_ = ack.Ack(ctx, action)
 		return fmt.Errorf("unable to gather unit diagnostics: %w", err)
 	}
 
 	var b bytes.Buffer
 	err = diagnostics.ZipArchive(&b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
 	if err != nil {
+		action.Err = err
+		_ = ack.Ack(ctx, action)
 		return fmt.Errorf("error creating diagnostics bundle: %w", err)
 	}
 
-	err = h.uploader.UploadDiagnostics(ctx, action.ActionID, &b)
-	_ = ack.Ack(ctx, action) // TODO ack should have the file upload ID in it
+	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, &b)
+	action.Err = err
+	action.UploadID = uploadID
+	_ = ack.Ack(ctx, action)
 	if err != nil {
 		return fmt.Errorf("unable to upload diagnostics: %w", err)
 	}
