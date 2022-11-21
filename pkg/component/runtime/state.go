@@ -8,10 +8,11 @@ import (
 	"errors"
 	"reflect"
 
+	gproto "google.golang.org/protobuf/proto"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/pkg/component"
-	gproto "google.golang.org/protobuf/proto"
 )
 
 const (
