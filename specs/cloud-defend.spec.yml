@@ -9,16 +9,6 @@ inputs:
       - elasticsearch
     command:
       args: &args
-        - "-E"
-        - "logging.level=debug"
-        - "-E"
-        - "management.enabled=true"
-        - "-E"
-        - "setup.ilm.enabled=false"
-        - "-E"
-        - "setup.template.enabled=false"
-        - "-E"
-        - "gc_percent=${CLOUDDEFEND_GOGC:100}"
         - "run"
         - "--fleet-managed"
         - "--process-managed"
