@@ -1518,6 +1518,68 @@ func TestToComponents(t *testing.T) {
 	}
 }
 
+func TestInjectingInputPolicyID(t *testing.T) {
+	const testRevision = 10
+	fleetPolicy := map[string]interface{}{
+		"revision": testRevision,
+	}
+
+	tests := []struct {
+		name   string
+		policy map[string]interface{}
+		in     map[string]interface{}
+		out    map[string]interface{}
+	}{
+		{"NilEverything", nil, nil, nil},
+		{"NilInput", fleetPolicy, nil, nil},
+		{"NilPolicy", nil,
+			map[string]interface{}{},
+			map[string]interface{}{},
+		},
+		{"EmptyPolicy", map[string]interface{}{},
+			map[string]interface{}{},
+			map[string]interface{}{},
+		},
+		{"CreatePolicyRevision", fleetPolicy,
+			map[string]interface{}{},
+			map[string]interface{}{
+				"policy": map[string]interface{}{"revision": testRevision},
+			},
+		},
+		{"NilPolicyObjectType", fleetPolicy,
+			map[string]interface{}{
+				"policy": nil,
+			},
+			map[string]interface{}{
+				"policy": map[string]interface{}{"revision": testRevision},
+			},
+		},
+		{"InjectPolicyRevision", fleetPolicy,
+			map[string]interface{}{
+				"policy": map[string]interface{}{"key": "value"},
+			},
+			map[string]interface{}{
+				"policy": map[string]interface{}{"key": "value", "revision": testRevision},
+			},
+		},
+		{"UnknownPolicyObjectType", fleetPolicy,
+			map[string]interface{}{
+				"policy": map[string]int{"key": 10},
+			},
+			map[string]interface{}{
+				"policy": map[string]int{"key": 10},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			injectInputPolicyID(tc.policy, tc.in)
+			assert.Equal(t, tc.out, tc.in)
+		})
+	}
+}
+
 func assertEqualUnitExpectedConfigs(t *testing.T, expected *Unit, actual *Unit) {
 	t.Helper()
 	assert.Equal(t, expected.ID, actual.ID)

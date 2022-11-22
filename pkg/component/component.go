@@ -132,7 +132,6 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 // PolicyToComponents takes the policy and generated a component model along with providing a mapping between component
 // and the running binary.
 func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Component, map[string]string, error) {
-	const revision = "revision"
 	outputsMap, err := toIntermediate(policy)
 	if err != nil {
 		return nil, nil, err
@@ -222,11 +221,11 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 					// skip; not enabled
 					continue
 				}
-				if v, ok := policy[revision]; ok {
-					input.input["policy"] = map[string]interface{}{
-						revision: v,
-					}
-				}
+
+				// Inject the top level fleet policy revision into each into configuration. This
+				// allows individual inputs (like endpoint) to detect policy changes more easily.
+				injectInputPolicyID(policy, input.input)
+
 				cfg, cfgErr := ExpectedConfig(input.input)
 				if cfg != nil {
 					cfg.Type = inputType // ensure alias is replaced in the ExpectedConfig to be non-alias type
@@ -324,6 +323,31 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 	}
 
 	return components, componentIdsInputMap, nil
+}
+
+// Injects or creates a policy.revision sub-object in the input map.
+func injectInputPolicyID(fleetPolicy map[string]interface{}, input map[string]interface{}) {
+	// If there is no top level fleet policy revision, there's nothing to inject.
+	revision, exists := fleetPolicy["revision"]
+	if !exists || input == nil {
+		return
+	}
+
+	// Check if a policy key exists with a non-nil policy object.
+	policyObj, exists := input["policy"]
+	if exists && policyObj != nil {
+		// If the policy object converts to map[string]interface{}, inject the revision key.
+		// Note that if the interface conversion here fails, we do nothing because we don't
+		// know what type of object exists with the policy key.
+		if policyMap, ok := policyObj.(map[string]interface{}); ok {
+			policyMap["revision"] = revision
+		}
+	} else {
+		// If there was no policy key or the value was nil, then inject a policy object with a revision key.
+		input["policy"] = map[string]interface{}{
+			"revision": revision,
+		}
+	}
 }
 
 func componentToShipperConfig(comp Component) (*proto.UnitExpectedConfig, error) {
