@@ -327,9 +327,13 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 
 // Injects or creates a policy.revision sub-object in the input map.
 func injectInputPolicyID(fleetPolicy map[string]interface{}, input map[string]interface{}) {
+	if input == nil {
+		return
+	}
+
 	// If there is no top level fleet policy revision, there's nothing to inject.
 	revision, exists := fleetPolicy["revision"]
-	if !exists || input == nil {
+	if !exists {
 		return
 	}
 
