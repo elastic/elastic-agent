@@ -9,9 +9,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gorilla/mux"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/gorilla/mux"
 )
 
 const processIDKey = "processID"
