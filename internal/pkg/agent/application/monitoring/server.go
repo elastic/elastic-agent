@@ -63,7 +63,6 @@ func exposeMetricsEndpoint(
 		r.Handle("/processes", createHandler(processesHandler(coord)))
 		r.Handle("/processes/{processID}", createHandler(processHandler(coord, statsHandler)))
 		r.Handle("/processes/{processID}/", createHandler(processHandler(coord, statsHandler)))
-		r.Handle("/processes/{processID}/{beatsPath}", createHandler(processHandler(coord, statsHandler)))
 	}
 
 	mux := http.NewServeMux()
