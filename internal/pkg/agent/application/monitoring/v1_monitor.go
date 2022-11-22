@@ -55,7 +55,7 @@ const (
 
 var (
 	supportedComponents      = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "endpoint-security", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
-	supportedBeatsComponents = []string{"filebeat", "metricbeat", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedBeatsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
 // BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
@@ -284,12 +284,14 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 
 	streams := []interface{}{
 		map[string]interface{}{
-			idKey: "logs-monitoring-agent",
+			idKey: "filestream-monitoring-agent",
+			// "data_stream" is not used when creating an Input on Filebeat
 			"data_stream": map[string]interface{}{
-				"type":      "logs",
+				"type":      "filestream",
 				"dataset":   "elastic_agent",
 				"namespace": monitoringNamespace,
 			},
+			"type": "filestream",
 			"paths": []interface{}{
 				filepath.Join(logsDrop, agentName+"-*.ndjson"),
 				filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
@@ -303,8 +305,10 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 			"parsers": []interface{}{
 				map[string]interface{}{
 					"ndjson": map[string]interface{}{
-						"overwrite_keys": true,
 						"message_key":    "message",
+						"overwrite_keys": true,
+						"add_error_key":  true,
+						"target":         "",
 					},
 				},
 			},
@@ -362,8 +366,8 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 
 	inputs := []interface{}{
 		map[string]interface{}{
-			idKey:        "logs-monitoring-agent",
-			"name":       "logs-monitoring-agent",
+			idKey:        "filestream-monitoring-agent",
+			"name":       "filestream-monitoring-agent",
 			"type":       "filestream",
 			useOutputKey: monitoringOutput,
 			"data_stream": map[string]interface{}{
