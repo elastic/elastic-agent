@@ -255,7 +255,7 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 // Upgrade runs the upgrade process.
 func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) error {
 	// early check outside of upgrader before overridding the state
-	if c.upgradeMgr.Upgradeable() {
+	if !c.upgradeMgr.Upgradeable() {
 		return ErrNotUpgradable
 	}
 
