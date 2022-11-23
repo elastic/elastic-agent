@@ -49,9 +49,11 @@ func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, 
 		state := coord.State(false)
 
 		for _, c := range state.Components {
-			procs = append(procs, process{c.Component.ID, c.Component.InputSpec.BinaryName,
-				c.LegacyPID,
-				sourceFromComponentID(c.Component.ID)})
+			if c.Component.InputSpec != nil {
+				procs = append(procs, process{c.Component.ID, c.Component.InputSpec.BinaryName,
+					c.LegacyPID,
+					sourceFromComponentID(c.Component.ID)})
+			}
 		}
 		data := struct {
 			Processes []process `json:"processes"`
