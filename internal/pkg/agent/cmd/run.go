@@ -103,11 +103,6 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		return err
 	}
 
-	// add event.dataset to all log messages; required so all logs go to correct data_stream
-	logger = logger.With("event", map[string]interface{}{
-		"dataset": "elastic_agent",
-	})
-
 	cfg, err = tryDelayEnroll(ctx, logger, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")
