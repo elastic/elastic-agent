@@ -176,7 +176,7 @@ func NewWithConfig(grpcConfig *configuration.GRPCConfig) Client {
 // Connect connects to the running Elastic Agent.
 func (c *client) Connect(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	conn, err := dialContext(ctx)
+	conn, err := dialContext(ctx, c.grpcConfig)
 	if err != nil {
 		return err
 	}
