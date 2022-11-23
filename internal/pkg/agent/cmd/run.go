@@ -395,7 +395,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 	cfg := mcfg.APM
 
-	// nolint:godox // the TODO is intentional
+	//nolint:godox // the TODO is intentional
 	// TODO(stn): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
 	// but it doesn't exist today. Update this code once we have something
 	// available via the APM Go agent.
