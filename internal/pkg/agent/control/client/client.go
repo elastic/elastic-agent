@@ -335,7 +335,7 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 	for {
 		var u *cproto.DiagnosticUnitResponse
 		u, err = respStream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
