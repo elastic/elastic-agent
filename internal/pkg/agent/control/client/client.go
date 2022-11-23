@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 )
@@ -152,21 +153,29 @@ type Client interface {
 
 // client manages the state and communication to the Elastic Agent.
 type client struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	client cproto.ElasticAgentControlClient
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	client     cproto.ElasticAgentControlClient
+	grpcConfig *configuration.GRPCConfig
 }
 
-// New creates a client connection to Elastic Agent.
+// New creates a client connection to Elastic Agent. It uses default grpc configuration for client initialization.
 func New() Client {
-	return &client{}
+	return NewWithConfig(configuration.DefaultGRPCConfig())
+}
+
+// NewWithConfig creates a client connection to Elastic Agent.
+func NewWithConfig(grpcConfig *configuration.GRPCConfig) Client {
+	return &client{
+		grpcConfig: grpcConfig,
+	}
 }
 
 // Connect connects to the running Elastic Agent.
 func (c *client) Connect(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	conn, err := dialContext(ctx)
+	conn, err := dialContext(ctx, c.grpcConfig)
 	if err != nil {
 		return err
 	}

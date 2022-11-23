@@ -83,6 +83,9 @@ inputs:
 #   address: localhost
 #   # port for the GRPC server that spawned processes connect back to.
 #   port: 6789
+#   # max_message_size limits the message size in agent internal communication
+#   # default is 15MB 
+#   max_message_size: 15728640
 
 # agent.retry:
 #   # Enabled determines whether retry is possible. Default is false.
