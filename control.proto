@@ -244,5 +244,5 @@ service ElasticAgentControl {
   rpc DiagnosticAgent(DiagnosticAgentRequest) returns (DiagnosticAgentResponse);
 
   // Gather diagnostic information for the running units.
-  rpc DiagnosticUnits(DiagnosticUnitsRequest) returns (DiagnosticUnitsResponse);
+  rpc DiagnosticUnits(DiagnosticUnitsRequest) returns (stream DiagnosticUnitResponse);
 }

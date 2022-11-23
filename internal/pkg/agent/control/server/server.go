@@ -30,6 +30,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+const (
+	apiStatusTimeout = 45 * time.Second
+)
+
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
@@ -206,7 +210,7 @@ func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentR
 }
 
 // DiagnosticUnits returns diagnostic information for the specific units (or all units if non-provided).
-func (s *Server) DiagnosticUnits(ctx context.Context, req *cproto.DiagnosticUnitsRequest) (*cproto.DiagnosticUnitsResponse, error) {
+func (s *Server) DiagnosticUnits(req *cproto.DiagnosticUnitsRequest, srv cproto.ElasticAgentControl_DiagnosticUnitsServer) error {
 	reqs := make([]runtime.ComponentUnitDiagnosticRequest, 0, len(req.Units))
 	for _, u := range req.Units {
 		reqs = append(reqs, runtime.ComponentUnitDiagnosticRequest{
@@ -220,8 +224,10 @@ func (s *Server) DiagnosticUnits(ctx context.Context, req *cproto.DiagnosticUnit
 		})
 	}
 
+	ctx, cancelFn := context.WithTimeout(context.Background(), apiStatusTimeout)
+	defer cancelFn()
+
 	diag := s.coord.PerformDiagnostics(ctx, reqs...)
-	res := make([]*cproto.DiagnosticUnitResponse, 0, len(diag))
 	for _, d := range diag {
 		r := &cproto.DiagnosticUnitResponse{
 			ComponentId: d.Component.ID,
@@ -246,7 +252,11 @@ func (s *Server) DiagnosticUnits(ctx context.Context, req *cproto.DiagnosticUnit
 			}
 			r.Results = results
 		}
-		res = append(res, r)
+
+		if err := srv.Send(r); err != nil {
+			return err
+		}
 	}
-	return &cproto.DiagnosticUnitsResponse{Units: res}, nil
+
+	return nil
 }

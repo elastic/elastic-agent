@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -325,13 +326,22 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 		})
 	}
 
-	resp, err := c.client.DiagnosticUnits(ctx, &cproto.DiagnosticUnitsRequest{Units: reqs})
+	respStream, err := c.client.DiagnosticUnits(ctx, &cproto.DiagnosticUnitsRequest{Units: reqs})
 	if err != nil {
 		return nil, err
 	}
 
-	results := make([]DiagnosticUnitResult, 0, len(resp.Units))
-	for _, u := range resp.Units {
+	results := make([]DiagnosticUnitResult, 0)
+	for {
+		var u *cproto.DiagnosticUnitResponse
+		u, err = respStream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve unit diagnostics: %w", err)
+		}
+
 		files := make([]DiagnosticFileResult, 0, len(u.Results))
 		for _, f := range u.Results {
 			files = append(files, DiagnosticFileResult{
@@ -355,5 +365,6 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 			Results:     files,
 		})
 	}
+
 	return results, nil
 }
