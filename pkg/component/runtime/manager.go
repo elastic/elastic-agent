@@ -54,6 +54,7 @@ var (
 type ComponentComponentState struct {
 	Component component.Component `yaml:"component"`
 	State     ComponentState      `yaml:"state"`
+	LegacyPID string              `yaml:"-"` // To propagate PID for the /processes, and yes, it was a string
 }
 
 // ComponentUnitDiagnosticRequest used to request diagnostics from specific unit.
@@ -284,9 +285,21 @@ func (m *Manager) State() []ComponentComponentState {
 	states := make([]ComponentComponentState, 0, len(m.current))
 	for _, crs := range m.current {
 		crs.latestMx.RLock()
+		var legacyPID string
+		if crs.runtime != nil {
+			if commandRuntime, ok := crs.runtime.(*CommandRuntime); ok {
+				if commandRuntime != nil {
+					procInfo := commandRuntime.proc
+					if procInfo != nil {
+						legacyPID = fmt.Sprint(commandRuntime.proc.PID)
+					}
+				}
+			}
+		}
 		states = append(states, ComponentComponentState{
 			Component: crs.currComp,
 			State:     crs.latestState.Copy(),
+			LegacyPID: legacyPID,
 		})
 		crs.latestMx.RUnlock()
 	}
