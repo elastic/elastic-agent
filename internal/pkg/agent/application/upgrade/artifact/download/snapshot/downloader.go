@@ -131,11 +131,9 @@ func snapshotURI(versionOverride string, config *artifact.Config) (string, error
 		}
 
 		index := strings.Index(uri, "/beats/elastic-agent/")
-		if index == -1 {
-			return "", fmt.Errorf("not an agent uri: '%s'", uri)
+		if index != -1 {
+			return uri[:index], nil
 		}
-
-		return uri[:index], nil
 	}
 
 	return "", fmt.Errorf("uri not detected")
