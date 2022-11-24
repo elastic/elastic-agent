@@ -36,7 +36,7 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 		state := coord.State(false)
 
 		for _, c := range state.Components {
-			if c.Component.ID == id {
+			if matchesCloudProcessID(&c.Component, id) {
 				data := struct {
 					State   string `json:"state"`
 					Message string `json:"message"`
