@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	processIDKey = "processID"
-	timeout      = 10 * time.Second
+	processIDKey      = "processID"
+	timeout           = 10 * time.Second
+	fleetServerPrefix = "fleet-server"
 )
 
 var redirectPathAllowlist = map[string]struct{}{
@@ -33,7 +34,7 @@ var redirectPathAllowlist = map[string]struct{}{
 
 var redirectableProcesses = []string{
 	"apm-server",
-	"fleet-server",
+	fleetServerPrefix,
 }
 
 func processHandler(coord *coordinator.Coordinator, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
@@ -58,6 +59,10 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 				return redirectToPath(w, r, id, metricsPath, operatingSystem)
 			}
 			return errorfWithStatus(http.StatusNotFound, "endpoint not found")
+		} else if strings.HasPrefix(id, fleetServerPrefix) {
+			// special case, fleet server is expected to return stats right away
+			// removing this would be breaking
+			return redirectToPath(w, r, id, "stats", operatingSystem)
 		}
 
 		state := coord.State(false)
