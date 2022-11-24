@@ -3,8 +3,9 @@ package monitoring
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/elastic/elastic-agent/pkg/component"
-	"gotest.tools/assert"
 )
 
 func TestExpectedCloudProcessID(t *testing.T) {
