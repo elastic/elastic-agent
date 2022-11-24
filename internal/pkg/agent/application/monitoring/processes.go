@@ -50,7 +50,15 @@ func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, 
 
 		for _, c := range state.Components {
 			if c.Component.InputSpec != nil {
-				procs = append(procs, process{c.Component.ID, c.Component.InputSpec.BinaryName,
+				displayID := c.Component.ID
+				if strings.Contains(displayID, "apm") {
+					// Cloud explicitly looks for an ID of "apm-server" to determine if APM is in managed mode.
+					// Ensure that this is the ID we use, at the time of writing it is "apm-default".
+					// Otherwise apm-server won't be routable/accessible in cloud.
+					// https://github.com/elastic/elastic-agent/issues/1731#issuecomment-1325862913
+					displayID = "apm-server"
+				}
+				procs = append(procs, process{displayID, c.Component.InputSpec.BinaryName,
 					c.LegacyPID,
 					sourceFromComponentID(c.Component.ID)})
 			}
