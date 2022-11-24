@@ -30,10 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const (
-	apiStatusTimeout = 45 * time.Second
-)
-
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
@@ -224,10 +220,7 @@ func (s *Server) DiagnosticUnits(req *cproto.DiagnosticUnitsRequest, srv cproto.
 		})
 	}
 
-	ctx, cancelFn := context.WithTimeout(context.Background(), apiStatusTimeout)
-	defer cancelFn()
-
-	diag := s.coord.PerformDiagnostics(ctx, reqs...)
+	diag := s.coord.PerformDiagnostics(srv.Context(), reqs...)
 	for _, d := range diag {
 		r := &cproto.DiagnosticUnitResponse{
 			ComponentId: d.Component.ID,
