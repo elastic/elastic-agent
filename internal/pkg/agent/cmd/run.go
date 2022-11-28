@@ -181,7 +181,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
-	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagHooks)
+	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err
@@ -465,7 +465,7 @@ func setupMetrics(
 		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
 	}
 
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg))
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}

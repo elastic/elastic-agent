@@ -50,9 +50,12 @@ func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, 
 
 		for _, c := range state.Components {
 			if c.Component.InputSpec != nil {
-				procs = append(procs, process{c.Component.ID, c.Component.InputSpec.BinaryName,
-					c.LegacyPID,
-					sourceFromComponentID(c.Component.ID)})
+				procs = append(procs, process{
+					ID:     expectedCloudProcessID(&c.Component),
+					PID:    c.LegacyPID,
+					Binary: c.Component.InputSpec.BinaryName,
+					Source: sourceFromComponentID(c.Component.ID),
+				})
 			}
 		}
 		data := struct {
