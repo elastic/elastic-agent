@@ -30,6 +30,7 @@ func NewServer(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 	enableProcessStats bool,
+	operatingSystem string,
 ) (*api.Server, error) {
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
@@ -41,7 +42,7 @@ func NewServer(
 		return nil, err
 	}
 
-	return exposeMetricsEndpoint(log, cfg, ns, tracer, coord, enableProcessStats)
+	return exposeMetricsEndpoint(log, cfg, ns, tracer, coord, enableProcessStats, operatingSystem)
 }
 
 func exposeMetricsEndpoint(
@@ -51,6 +52,7 @@ func exposeMetricsEndpoint(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 	enableProcessStats bool,
+	operatingSystem string,
 ) (*api.Server, error) {
 	r := mux.NewRouter()
 	if tracer != nil {
@@ -61,8 +63,9 @@ func exposeMetricsEndpoint(
 
 	if enableProcessStats {
 		r.Handle("/processes", createHandler(processesHandler(coord)))
-		r.Handle("/processes/{processID}", createHandler(processHandler(coord, statsHandler)))
-		r.Handle("/processes/{processID}/", createHandler(processHandler(coord, statsHandler)))
+		r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
 	}
 
 	mux := http.NewServeMux()
