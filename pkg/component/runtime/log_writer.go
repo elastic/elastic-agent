@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -70,9 +69,6 @@ func (r *logWriter) Write(p []byte) (int, error) {
 			continue
 		}
 		str := strings.TrimSpace(string(line))
-		if str[0:1] == "ty" {
-			fmt.Println("found it")
-		}
 		// try to parse line as JSON
 		if str[0] == '{' && r.handleJSON(str) {
 			// handled as JSON
