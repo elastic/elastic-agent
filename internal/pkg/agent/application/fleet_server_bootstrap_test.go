@@ -7,7 +7,6 @@ package application
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -78,8 +77,17 @@ func TestInjectFleetConfigComponentModifier(t *testing.T) {
 	hostsRaw, found := fleetMap["hosts"]
 	require.True(t, found)
 
-	fmt.Println(hostRaw)
-	fmt.Println(hostsRaw)
+	hostMap, ok := hostRaw.(map[string]interface{})
+	require.True(t, ok)
+
+	idRaw, found := hostMap["id"]
+	require.True(t, found)
+	require.Equal(t, "agent-id", idRaw.(string))
+
+	hostsSlice, ok := hostsRaw.([]interface{})
+	require.True(t, ok)
+	require.Equal(t, 1, len(hostsSlice))
+	require.Equal(t, "sample.host", hostsSlice[0].(string))
 
 }
 
