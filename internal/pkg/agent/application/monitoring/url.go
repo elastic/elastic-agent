@@ -30,7 +30,6 @@ type hostData struct {
 // Values from the rawHost take precedence over the defaults.
 func parseURL(rawHost, scheme, user, pass, path, query string) (hostData, error) {
 	u, transport, err := getURL(rawHost, scheme, user, pass, path, query)
-
 	if err != nil {
 		return hostData{}, err
 	}
@@ -146,7 +145,7 @@ func getURL(
 		u.Path = path
 	}
 
-	//Adds the query params in the url
+	// Adds the query params in the url
 	u, err = setQueryParams(u, query)
 	return u, t, err
 }

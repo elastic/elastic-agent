@@ -22,8 +22,10 @@ import (
 )
 
 const (
-	processIDKey      = "processID"
+	componentIDKey    = "componentID"
+	metricsPathKey    = "metricsPath"
 	timeout           = 10 * time.Second
+	apmPrefix         = "apm-server"
 	fleetServerPrefix = "fleet-server"
 )
 
@@ -33,7 +35,7 @@ var redirectPathAllowlist = map[string]struct{}{
 }
 
 var redirectableProcesses = []string{
-	"apm-server",
+	apmPrefix,
 	fleetServerPrefix,
 }
 
@@ -43,32 +45,32 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 
 		vars := mux.Vars(r)
 
-		id, found := vars[processIDKey]
+		componentID, found := vars[componentIDKey]
 		if !found {
-			return errorfWithStatus(http.StatusNotFound, "productID not found")
+			return errorfWithStatus(http.StatusNotFound, "process with specified ID not found")
 		}
 
-		if id == "" || id == paths.BinaryName {
+		if componentID == "" || componentID == paths.BinaryName {
 			// proxy stats for elastic agent process
 			return statsHandler(w, r)
 		}
 
-		metricsPath := vars["metricsPath"]
+		metricsPath := vars[metricsPathKey]
 		if _, ok := redirectPathAllowlist[metricsPath]; ok {
-			if isProcessRedirectable(id) {
-				return redirectToPath(w, r, id, metricsPath, operatingSystem)
+			if isProcessRedirectable(componentID) {
+				return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
 			}
-			return errorfWithStatus(http.StatusNotFound, "endpoint not found")
-		} else if strings.HasPrefix(id, fleetServerPrefix) {
+			return errorfWithStatus(http.StatusNotFound, "process specified does not expose metrics")
+		} else if strings.HasPrefix(componentID, fleetServerPrefix) {
 			// special case, fleet server is expected to return stats right away
 			// removing this would be breaking
-			return redirectToPath(w, r, id, "stats", operatingSystem)
+			return redirectToPath(w, r, componentID, "stats", operatingSystem)
 		}
 
 		state := coord.State(false)
 
 		for _, c := range state.Components {
-			if c.Component.ID == id {
+			if c.Component.ID == componentID {
 				data := struct {
 					State   string `json:"state"`
 					Message string `json:"message"`
@@ -90,12 +92,12 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 			}
 		}
 
-		return errorWithStatus(http.StatusNotFound, fmt.Errorf("matching component %v not found", id))
+		return errorWithStatus(http.StatusNotFound, fmt.Errorf("matching component %v not found", componentID))
 	}
 }
 
-func isProcessRedirectable(processName string) bool {
-	processNameLower := strings.ToLower(processName)
+func isProcessRedirectable(componentID string) bool {
+	processNameLower := strings.ToLower(componentID)
 	for _, prefix := range redirectableProcesses {
 		if strings.HasPrefix(processNameLower, prefix) {
 			return true
@@ -137,7 +139,7 @@ func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, er
 		},
 	}
 
-	req, err := http.NewRequest("GET", hostData.uri, nil)
+	req, err := http.NewRequest(http.MethodGet, hostData.uri, nil)
 	if err != nil {
 		return nil, 0, errorWithStatus(
 			http.StatusInternalServerError,

@@ -63,9 +63,9 @@ func exposeMetricsEndpoint(
 
 	if enableProcessStats {
 		r.Handle("/processes", createHandler(processesHandler(coord)))
-		r.Handle("/processes/{processID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
-		r.Handle("/processes/{processID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
-		r.Handle("/processes/{processID}/{metricsPath}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processMetricsHandler(coord, statsHandler, operatingSystem)))
 	}
 
 	mux := http.NewServeMux()
