@@ -6,6 +6,7 @@ package monitoring
 
 import (
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -75,7 +76,7 @@ func exposeMetricsEndpoint(
 }
 
 func createAgentMonitoringDrop(drop string) error {
-	if drop == "" || runtime.GOOS == "windows" {
+	if drop == "" || runtime.GOOS == "windows" || isHttpUrl(drop) {
 		return nil
 	}
 
@@ -97,4 +98,9 @@ func createAgentMonitoringDrop(drop string) error {
 	}
 
 	return os.Chown(path, os.Geteuid(), os.Getegid())
+}
+
+func isHttpUrl(s string) bool {
+	u, err := url.Parse(strings.TrimSpace(s))
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
