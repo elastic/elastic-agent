@@ -311,6 +311,23 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 				},
 			},
 			"processors": []interface{}{
+				// drop all events from filestream monitoring component (do it early; no need for extra processing)
+				// without dropping these events the filestream gets stuck in an infinite loop
+				// if filestream hits an issue publishing the events it logs an error which then filestream monitor
+				// will read from the logs and try to also publish that new log message (thus the infinite loop)
+				map[string]interface{}{
+					"drop_event": map[string]interface{}{
+						"when": map[string]interface{}{
+							"or": []interface{}{
+								map[string]interface{}{
+									"equals": map[string]interface{}{
+										"component.dataset": fmt.Sprintf("elastic_agent.filestream_%s", monitoringOutput),
+									},
+								},
+							},
+						},
+					},
+				},
 				// copy original dataset so we can drop the dataset field
 				map[string]interface{}{
 					"copy_fields": map[string]interface{}{
