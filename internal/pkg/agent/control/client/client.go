@@ -9,9 +9,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 )
@@ -152,21 +154,29 @@ type Client interface {
 
 // client manages the state and communication to the Elastic Agent.
 type client struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	client cproto.ElasticAgentControlClient
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	client     cproto.ElasticAgentControlClient
+	grpcConfig *configuration.GRPCConfig
 }
 
-// New creates a client connection to Elastic Agent.
+// New creates a client connection to Elastic Agent. It uses default grpc configuration for client initialization.
 func New() Client {
-	return &client{}
+	return NewWithConfig(configuration.DefaultGRPCConfig())
+}
+
+// NewWithConfig creates a client connection to Elastic Agent.
+func NewWithConfig(grpcConfig *configuration.GRPCConfig) Client {
+	return &client{
+		grpcConfig: grpcConfig,
+	}
 }
 
 // Connect connects to the running Elastic Agent.
 func (c *client) Connect(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	conn, err := dialContext(ctx)
+	conn, err := dialContext(ctx, c.grpcConfig)
 	if err != nil {
 		return err
 	}
@@ -316,13 +326,22 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 		})
 	}
 
-	resp, err := c.client.DiagnosticUnits(ctx, &cproto.DiagnosticUnitsRequest{Units: reqs})
+	respStream, err := c.client.DiagnosticUnits(ctx, &cproto.DiagnosticUnitsRequest{Units: reqs})
 	if err != nil {
 		return nil, err
 	}
 
-	results := make([]DiagnosticUnitResult, 0, len(resp.Units))
-	for _, u := range resp.Units {
+	results := make([]DiagnosticUnitResult, 0)
+	for {
+		var u *cproto.DiagnosticUnitResponse
+		u, err = respStream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve unit diagnostics: %w", err)
+		}
+
 		files := make([]DiagnosticFileResult, 0, len(u.Results))
 		for _, f := range u.Results {
 			files = append(files, DiagnosticFileResult{
@@ -346,5 +365,6 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 			Results:     files,
 		})
 	}
+
 	return results, nil
 }
