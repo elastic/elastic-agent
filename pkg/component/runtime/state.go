@@ -8,6 +8,8 @@ import (
 	"errors"
 	"reflect"
 
+	gproto "google.golang.org/protobuf/proto"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -120,7 +122,7 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 				existing.logLevel = unit.LogLevel
 				changed = true
 			}
-			if !reflect.DeepEqual(existing.config, unit.Config) {
+			if !gproto.Equal(existing.config, unit.Config) {
 				existing.config = unit.Config
 				existing.configStateIdx++
 				changed = true
