@@ -58,7 +58,7 @@ var (
 	supportedBeatsComponents = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
-// Beats monitor is providing V1 monitoring support.
+// BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
 type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
@@ -178,21 +178,10 @@ func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
 		}
 	}
 
-	loggingPath := loggingPath(unit, b.operatingSystem)
-	if loggingPath != "" {
+	if !b.config.C.LogMetrics {
 		appendix = append(appendix,
-			"-E", "logging.files.path="+filepath.Dir(loggingPath),
-			"-E", "logging.files.name="+filepath.Base(loggingPath),
-			"-E", "logging.files.keepfiles=7",
-			"-E", "logging.files.permission=0640",
-			"-E", "logging.files.interval=1h",
+			"-E", "logging.metrics.enabled=false",
 		)
-
-		if !b.config.C.LogMetrics {
-			appendix = append(appendix,
-				"-E", "logging.metrics.enabled=false",
-			)
-		}
 	}
 
 	return append(args, appendix...)
@@ -291,24 +280,21 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 
 func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
-	//fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
 
 	streams := []interface{}{
 		map[string]interface{}{
-			idKey: "filestream-monitoring-agent",
-			// "data_stream" is not used when creating an Input on Filebeat
-			"data_stream": map[string]interface{}{
-				"type":      "filestream",
-				"dataset":   "elastic_agent",
-				"namespace": monitoringNamespace,
-			},
+			idKey:  "filestream-monitoring-agent",
 			"type": "filestream",
 			"paths": []interface{}{
 				filepath.Join(logsDrop, agentName+"-*.ndjson"),
 				filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
 			},
-			"index": fmt.Sprintf("logs-elastic_agent-%s", monitoringNamespace),
+			"data_stream": map[string]interface{}{
+				"type":      "logs",
+				"dataset":   "elastic_agent",
+				"namespace": monitoringNamespace,
+			},
 			"close": map[string]interface{}{
 				"on_state_change": map[string]interface{}{
 					"inactive": "5m",
@@ -325,133 +311,86 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 				},
 			},
 			"processors": []interface{}{
+				// copy original dataset so we can drop the dataset field
 				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
-							"type":      "logs",
-							"dataset":   "elastic_agent",
-							"namespace": monitoringNamespace,
+					"copy_fields": map[string]interface{}{
+						"fields": []interface{}{
+							map[string]interface{}{
+								"from": "data_stream.dataset",
+								"to":   "data_stream.dataset_original",
+							},
 						},
 					},
 				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": "elastic_agent",
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       b.agentInfo.AgentID(),
-							"version":  b.agentInfo.Version(),
-							"snapshot": b.agentInfo.Snapshot(),
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": b.agentInfo.AgentID(),
-						},
-					},
-				},
+				// drop the dataset field so following copy_field can copy to it
 				map[string]interface{}{
 					"drop_fields": map[string]interface{}{
 						"fields": []interface{}{
-							"ecs.version", //coming from logger, already added by libbeat
+							"data_stream.dataset",
+						},
+					},
+				},
+				// copy component.dataset as the real dataset
+				map[string]interface{}{
+					"copy_fields": map[string]interface{}{
+						"fields": []interface{}{
+							map[string]interface{}{
+								"from": "component.dataset",
+								"to":   "data_stream.dataset",
+							},
+						},
+						"fail_on_error":  false,
+						"ignore_missing": true,
+					},
+				},
+				// possible it's a log message from agent itself (doesn't have component.dataset)
+				map[string]interface{}{
+					"copy_fields": map[string]interface{}{
+						"fields": []interface{}{
+							map[string]interface{}{
+								"from": "data_stream.dataset_original",
+								"to":   "data_stream.dataset",
+							},
+						},
+						"fail_on_error": false,
+					},
+				},
+				// drop the original dataset copied and the event.dataset (as it will be updated)
+				map[string]interface{}{
+					"drop_fields": map[string]interface{}{
+						"fields": []interface{}{
+							"data_stream.dataset_original",
+							"event.dataset",
+						},
+					},
+				},
+				// update event.dataset with the now used data_stream.dataset
+				map[string]interface{}{
+					"copy_fields": map[string]interface{}{
+						"fields": []interface{}{
+							map[string]interface{}{
+								"from": "data_stream.dataset",
+								"to":   "event.dataset",
+							},
+						},
+					},
+				},
+				// coming from logger, added by agent (drop)
+				map[string]interface{}{
+					"drop_fields": map[string]interface{}{
+						"fields": []interface{}{
+							"ecs.version",
 						},
 						"ignore_missing": true,
+					},
+				},
+				// adjust destination data_stream based on the data_stream fields
+				map[string]interface{}{
+					"add_formatted_index": map[string]interface{}{
+						"index": "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
 					},
 				}},
 		},
-	}
-	for unit, binaryName := range componentIDToBinary {
-		if !isSupportedBinary(binaryName) {
-			continue
-		}
-
-		fixedBinaryName := strings.ReplaceAll(binaryName, "-", "_")
-		name := strings.ReplaceAll(unit, "-", "_") // conform with index naming policy
-		logFile := loggingPath(unit, b.operatingSystem)
-		streams = append(streams, map[string]interface{}{
-			idKey: "filestream-monitoring-" + name,
-			"data_stream": map[string]interface{}{
-				// "data_stream" is not used when creating an Input on Filebeat
-				"type":      "filestream",
-				"dataset":   fmt.Sprintf("elastic_agent.%s", fixedBinaryName),
-				"namespace": monitoringNamespace,
-			},
-			"type":  "filestream",
-			"index": fmt.Sprintf("logs-elastic_agent.%s-%s", fixedBinaryName, monitoringNamespace),
-			"paths": []interface{}{logFile, logFile + "*"},
-			"close": map[string]interface{}{
-				"on_state_change": map[string]interface{}{
-					"inactive": "5m",
-				},
-			},
-			"parsers": []interface{}{
-				map[string]interface{}{
-					"ndjson": map[string]interface{}{
-						"message_key":    "message",
-						"overwrite_keys": true,
-						"add_error_key":  true,
-						"target":         "",
-					},
-				},
-			},
-			"processors": []interface{}{
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
-							"type":      "logs",
-							"dataset":   fmt.Sprintf("elastic_agent.%s", fixedBinaryName),
-							"namespace": monitoringNamespace,
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": fmt.Sprintf("elastic_agent.%s", fixedBinaryName),
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       b.agentInfo.AgentID(),
-							"version":  b.agentInfo.Version(),
-							"snapshot": b.agentInfo.Snapshot(),
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": b.agentInfo.AgentID(),
-						},
-					},
-				},
-				map[string]interface{}{
-					"drop_fields": map[string]interface{}{
-						"fields": []interface{}{
-							"ecs.version", //coming from logger, already added by libbeat
-						},
-						"ignore_missing": true,
-					},
-				},
-			},
-		})
 	}
 
 	inputs := []interface{}{
@@ -460,10 +399,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 			"name":       "filestream-monitoring-agent",
 			"type":       "filestream",
 			useOutputKey: monitoringOutput,
-			"data_stream": map[string]interface{}{
-				"namespace": monitoringNamespace,
-			},
-			"streams": streams,
+			"streams":    streams,
 		},
 	}
 	inputsNode, found := cfg[inputsKey]
