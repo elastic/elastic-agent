@@ -13,10 +13,83 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
+
+func TestInjectFleetConfigComponentModifier(t *testing.T) {
+	fleetConfig := &configuration.FleetAgentConfig{
+		Enabled: true,
+		Client: remote.Config{
+			Host: "sample.host",
+		},
+	}
+
+	cfg := map[string]interface{}{
+		"host": map[string]interface{}{
+			"id": "agent-id",
+		},
+	}
+
+	modifier := InjectFleetConfigComponentModifier(fleetConfig)
+	apmSource, err := structpb.NewStruct(map[string]interface{}{
+		"sample": "config",
+	})
+	require.NoError(t, err)
+
+	apmComponent := component.Component{
+		InputSpec: &component.InputRuntimeSpec{
+			InputType: "apm",
+		},
+		Units: []component.Unit{
+			{
+				Type: client.UnitTypeInput,
+				Config: &proto.UnitExpectedConfig{
+					Type:   "apm",
+					Source: apmSource,
+				},
+			},
+		},
+	}
+	comps := []component.Component{apmComponent}
+	resComps, err := modifier(comps, cfg)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(resComps))
+	require.Equal(t, 1, len(resComps[0].Units))
+	resConfig := resComps[0].Units[0].Config.Source.AsMap()
+	fleet, ok := resConfig["fleet"]
+	require.True(t, ok)
+
+	fleetMap, ok := fleet.(map[string]interface{})
+	require.True(t, ok)
+
+	hostRaw, found := fleetMap["host"]
+	require.True(t, found)
+
+	hostsRaw, found := fleetMap["hosts"]
+	require.True(t, found)
+
+	hostMap, ok := hostRaw.(map[string]interface{})
+	require.True(t, ok)
+
+	idRaw, found := hostMap["id"]
+	require.True(t, found)
+	require.Equal(t, "agent-id", idRaw.(string))
+
+	hostsSlice, ok := hostsRaw.([]interface{})
+	require.True(t, ok)
+	require.Equal(t, 1, len(hostsSlice))
+	require.Equal(t, "sample.host", hostsSlice[0].(string))
+
+}
 
 func TestFleetServerBootstrapManager(t *testing.T) {
 	l := testutils.NewErrorLogger(t)

@@ -88,6 +88,12 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 // that need to be able to connect to fleet server.
 func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordinator.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+		hostsStr := fleetCfg.Client.GetHosts()
+		fleetHosts := make([]interface{}, 0, len(hostsStr))
+		for _, host := range hostsStr {
+			fleetHosts = append(fleetHosts, host)
+		}
+
 		for i, comp := range comps {
 			if comp.InputSpec != nil && (comp.InputSpec.InputType == endpoint || comp.InputSpec.InputType == apmServer) {
 				for j, unit := range comp.Units {
@@ -104,6 +110,7 @@ func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig
 						if v, ok := unitCfgMap["fleet"]; ok {
 							if m, ok := v.(map[string]interface{}); ok {
 								m["host"] = cfg["host"]
+								m["hosts"] = fleetHosts
 							}
 						}
 						unitCfg, err := component.ExpectedConfig(unitCfgMap)

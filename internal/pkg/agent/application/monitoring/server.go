@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -27,6 +28,9 @@ func NewServer(
 	endpointConfig api.Config,
 	ns func(string) *monitoring.Namespace,
 	tracer *apm.Tracer,
+	coord *coordinator.Coordinator,
+	enableProcessStats bool,
+	operatingSystem string,
 ) (*api.Server, error) {
 	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
 		// log but ignore
@@ -38,7 +42,7 @@ func NewServer(
 		return nil, err
 	}
 
-	return exposeMetricsEndpoint(log, cfg, ns, tracer)
+	return exposeMetricsEndpoint(log, cfg, ns, tracer, coord, enableProcessStats, operatingSystem)
 }
 
 func exposeMetricsEndpoint(
@@ -46,6 +50,9 @@ func exposeMetricsEndpoint(
 	config *config.C,
 	ns func(string) *monitoring.Namespace,
 	tracer *apm.Tracer,
+	coord *coordinator.Coordinator,
+	enableProcessStats bool,
+	operatingSystem string,
 ) (*api.Server, error) {
 	r := mux.NewRouter()
 	if tracer != nil {
@@ -53,6 +60,13 @@ func exposeMetricsEndpoint(
 	}
 	statsHandler := statsHandler(ns("stats"))
 	r.Handle("/stats", createHandler(statsHandler))
+
+	if enableProcessStats {
+		r.Handle("/processes", createHandler(processesHandler(coord)))
+		r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+		r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/", r)
