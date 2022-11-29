@@ -24,7 +24,9 @@ inputs:
         - "-E"
         - "management.enabled=true"
         - "-E"
-        - "logging.level=debug"
+        - "logging.level=info"
+        - "-E"
+        - "logging.to_stderr=true"
         - "-E"
         - "gc_percent=${CLOUDBEAT_GOGC:100}"
   - name: cloudbeat/cis_k8s
