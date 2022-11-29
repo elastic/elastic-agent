@@ -1,6 +1,6 @@
 version: 2
 inputs:
-  - name: synthetics/synthetics
+  - name: synthetics/browser
     description: "Synthetics Browser Monitor"
     platforms: &platforms
       - linux/amd64
