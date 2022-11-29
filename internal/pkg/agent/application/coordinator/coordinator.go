@@ -255,7 +255,7 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 // Upgrade runs the upgrade process.
 func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) error {
 	// early check outside of upgrader before overridding the state
-	if c.upgradeMgr.Upgradeable() {
+	if !c.upgradeMgr.Upgradeable() {
 		return ErrNotUpgradable
 	}
 
@@ -751,21 +751,21 @@ func newCoordinatorComponentLogState(state *runtime.ComponentComponentState) coo
 func newCoordinatorComponentStateStr(state client.UnitState) string {
 	switch state {
 	case client.UnitStateStarting:
-		return "Starting"
+		return "STARTING"
 	case client.UnitStateConfiguring:
-		return "Configuring"
+		return "CONFIGURING"
 	case client.UnitStateDegraded:
-		return "Degraded"
+		return "DEGRADED"
 	case client.UnitStateHealthy:
-		return "Healthy"
+		return "HEALTHY"
 	case client.UnitStateFailed:
-		return "Failed"
+		return "FAILED"
 	case client.UnitStateStopping:
-		return "Stopping"
+		return "STOPPING"
 	case client.UnitStateStopped:
-		return "Stopped"
+		return "STOPPED"
 	}
-	return "Unknown"
+	return "UNKNOWN"
 }
 
 func hasState(components []runtime.ComponentComponentState, state client.UnitState) bool {
