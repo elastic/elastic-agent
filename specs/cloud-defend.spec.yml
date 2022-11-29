@@ -1,0 +1,14 @@
+version: 2
+inputs:
+  - name: cloud_defend
+    description: "Cloud defend for containers"
+    platforms: &platforms
+      - container/amd64
+      - container/arm64
+    outputs: &outputs
+      - elasticsearch
+    command:
+      args: &args
+        - "run"
+        - "--fleet-managed"
+        - "--process-managed"
