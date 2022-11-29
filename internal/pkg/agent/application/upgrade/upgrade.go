@@ -195,12 +195,17 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 		return nil
 	}
 
-	if err := acker.Ack(ctx, marker.Action); err != nil {
-		return err
-	}
+	// Action can be nil if the upgrade was called locally.
+	// Should handle gracefully
+	// https://github.com/elastic/elastic-agent/issues/1788
+	if marker.Action != nil {
+		if err := acker.Ack(ctx, marker.Action); err != nil {
+			return err
+		}
 
-	if err := acker.Commit(ctx); err != nil {
-		return err
+		if err := acker.Commit(ctx); err != nil {
+			return err
+		}
 	}
 
 	marker.Acked = true
