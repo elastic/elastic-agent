@@ -465,7 +465,7 @@ func setupMetrics(
 		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
 	}
 
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg))
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
