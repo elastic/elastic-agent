@@ -545,7 +545,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				"metricsets": []interface{}{"stats", "state"},
 				"hosts":      endpoints,
 				"period":     "10s",
-				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
 				"processors": []interface{}{
 					map[string]interface{}{
 						"add_fields": map[string]interface{}{
