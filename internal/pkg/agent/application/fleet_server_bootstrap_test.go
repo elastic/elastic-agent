@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -38,7 +39,7 @@ func TestInjectFleetConfigComponentModifier(t *testing.T) {
 		},
 	}
 
-	modifier := InjectFleetConfigComponentModifier(fleetConfig)
+	modifier := InjectFleetConfigComponentModifier(fleetConfig, nil)
 	apmSource, err := structpb.NewStruct(map[string]interface{}{
 		"sample": "config",
 	})
@@ -126,4 +127,47 @@ func TestFleetServerBootstrapManager(t *testing.T) {
 
 	require.NotNil(t, change)
 	assert.NotNil(t, change.Config())
+}
+
+type testLogLevelProvider struct {
+	logLevel string
+}
+
+func (l *testLogLevelProvider) LogLevel() string {
+	return l.logLevel
+}
+
+func TestInjectAgentLoggingLevel(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  map[string]interface{}
+		llp  logLevelProvider
+		res  map[string]interface{}
+	}{
+		{
+			name: "nil",
+		},
+		{
+			name: "empty",
+			cfg:  map[string]interface{}{},
+			llp:  &testLogLevelProvider{"debug"},
+			res:  map[string]interface{}{"agent": map[string]interface{}{"logging": map[string]interface{}{"level": string("debug")}}},
+		},
+		{
+			name: "existing agent",
+			cfg:  map[string]interface{}{"agent": map[string]interface{}{"id": "123456"}},
+			llp:  &testLogLevelProvider{"info"},
+			res:  map[string]interface{}{"agent": map[string]interface{}{"id": "123456", "logging": map[string]interface{}{"level": string("info")}}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			injectAgentLoggingLevel(tc.cfg, tc.llp)
+			diff := cmp.Diff(tc.res, tc.cfg)
+			if diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
 }
