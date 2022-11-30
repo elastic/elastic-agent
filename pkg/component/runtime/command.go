@@ -462,7 +462,7 @@ func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
 
 func attachOutErr(comp component.Component, cmdSpec *component.CommandSpec, typeStr string, binaryName string) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
-		dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(comp.ID, "-", "_"), "/", "_"))
+		dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 		logger := logger.NewWithoutConfig("").With("component", map[string]interface{}{
 			"id":      comp.ID,
 			"type":    typeStr,
