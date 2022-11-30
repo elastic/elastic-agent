@@ -226,6 +226,9 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 				// allows individual inputs (like endpoint) to detect policy changes more easily.
 				injectInputPolicyID(policy, input.input)
 
+				// Propagate type into streams so it can be picked up by beats.
+				copyStreamTypeIntoStreams(policy, input.input)
+
 				cfg, cfgErr := ExpectedConfig(input.input)
 				if cfg != nil {
 					cfg.Type = inputType // ensure alias is replaced in the ExpectedConfig to be non-alias type
@@ -350,6 +353,58 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, input map[string]in
 		// If there was no policy key or the value was nil, then inject a policy object with a revision key.
 		input["policy"] = map[string]interface{}{
 			"revision": revision,
+		}
+	}
+}
+
+func copyStreamTypeIntoStreams(fleetPolicy map[string]interface{}, input map[string]interface{}) {
+	inputsRaw, found := fleetPolicy["inputs"]
+	if !found {
+		// no inputs nothing to process
+		return
+	}
+
+	inputsList, ok := inputsRaw.([]interface{})
+	if !ok {
+		return
+	}
+	for _, input := range inputsList {
+		inputMap, ok := input.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		streamsRaw, found := inputMap["streams"]
+		if !found {
+			// no streams defined, nothing to process
+			return
+		}
+
+		streamsArray, ok := streamsRaw.([]interface{})
+		if !ok {
+			// not expected type
+			return
+		}
+
+		inputTypeRaw, found := inputMap["type"]
+		if !found {
+			// nothing to inject
+			return
+		}
+
+		for _, streamRaw := range streamsArray {
+			streamMap, ok := streamRaw.(map[string]interface{})
+			if !ok {
+				// not a map, no way to inject
+				continue
+			}
+
+			if _, found := streamMap["type"]; found {
+				// nothing to inject, type already provided
+				continue
+			}
+
+			streamMap["type"] = inputTypeRaw
 		}
 	}
 }
