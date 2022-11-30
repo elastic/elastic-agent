@@ -532,7 +532,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		}
 
 		endpoints := []interface{}{prefixedEndpoint(endpointPath(unit, b.operatingSystem))}
-		name := strings.ReplaceAll(unit, "-", "_") // conform with index naming policy
+		name := strings.ReplaceAll(strings.ReplaceAll(unit, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {
 			beatsStreams = append(beatsStreams, map[string]interface{}{
@@ -545,7 +545,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				"metricsets": []interface{}{"stats", "state"},
 				"hosts":      endpoints,
 				"period":     "10s",
-				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
 				"processors": []interface{}{
 					map[string]interface{}{
 						"add_fields": map[string]interface{}{
