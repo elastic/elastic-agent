@@ -14,6 +14,7 @@ spec:
     metadata:
       labels:
         app: elastic-agent
+        
     spec:
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
