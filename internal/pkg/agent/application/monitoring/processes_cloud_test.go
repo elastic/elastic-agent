@@ -8,6 +8,51 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+func TestCloudComponentIDToAgentInputType(t *testing.T) {
+	testcases := []struct {
+		name        string
+		componentID string
+		expectedID  string
+	}{
+		{
+			"apm server",
+			"apm-server-default",
+			"apm-default",
+		},
+		{
+			"not apm",
+			"filestream-default",
+			"filestream-default",
+		},
+		{
+			"almost apm",
+			"apm-java-attacher-default",
+			"apm-java-attacher-default",
+		},
+		{
+			"apm in output name",
+			"endpoint-apm-output",
+			"endpoint-apm-output",
+		},
+		{
+			"apm-server in output name",
+			"endpoint-apm-server-output",
+			"endpoint-apm-server-output",
+		},
+		{
+			"apm-server everywhere",
+			"apm-server-with-apm-server-output",
+			"apm-with-apm-server-output",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expectedID, cloudComponentIDToAgentInputType(tc.componentID))
+		})
+	}
+}
+
 func TestExpectedCloudProcessID(t *testing.T) {
 	testcases := []struct {
 		name      string
@@ -20,7 +65,7 @@ func TestExpectedCloudProcessID(t *testing.T) {
 				ID:        "apm-default",
 				InputSpec: &component.InputRuntimeSpec{BinaryName: "apm-server"},
 			},
-			"apm-server",
+			"apm-server-default",
 		},
 		{
 			"NotAPM",
