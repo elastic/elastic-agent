@@ -26,6 +26,7 @@ const (
 	metricsPathKey    = "metricsPath"
 	timeout           = 10 * time.Second
 	apmPrefix         = "apm-server"
+	apmTypePrefix     = "apm"
 	fleetServerPrefix = "fleet-server"
 )
 
@@ -69,6 +70,10 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 				// special case, fleet server is expected to return stats right away
 				// removing this would be breaking
 				metricsPath = "stats"
+			}
+			if strings.HasPrefix(componentID, apmPrefix) {
+				// from binary name back to input type, keep the output name as is (apm-default)
+				componentID = strings.Replace(componentID, apmPrefix, apmTypePrefix, -1)
 			}
 
 			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)

@@ -12,7 +12,8 @@ func expectedCloudProcessID(c *component.Component) string {
 	// Otherwise apm-server won't be routable/accessible in cloud.
 	// https://github.com/elastic/elastic-agent/issues/1731#issuecomment-1325862913
 	if strings.Contains(c.InputSpec.BinaryName, "apm-server") {
-		return "apm-server"
+		// cloud understands `apm-server-default` and does not understand `apm-default`
+		return strings.Replace(c.ID, "apm-", "apm-server-", 1)
 	}
 
 	return c.ID
