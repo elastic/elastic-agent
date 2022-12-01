@@ -32,12 +32,6 @@ func TestLoadRuntimeSpecs(t *testing.T) {
 			// unknown input
 			_, err = runtime.GetInput("unknown")
 			require.ErrorIs(t, err, ErrInputNotSupported)
-
-			// endpoint not support on container platforms
-			if platform.OS == "container" {
-				_, err = runtime.GetInput("endpoint")
-				assert.ErrorIs(t, err, ErrInputNotSupportedOnPlatform)
-			}
 		})
 	}
 }
