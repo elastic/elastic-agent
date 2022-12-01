@@ -30,6 +30,7 @@ const (
 )
 
 var redirectPathAllowlist = map[string]struct{}{
+	"":      {},
 	"stats": {},
 	"state": {},
 }
@@ -55,16 +56,22 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 			return statsHandler(w, r)
 		}
 
-		metricsPath := vars[metricsPathKey]
-		if _, ok := redirectPathAllowlist[metricsPath]; ok {
-			if isProcessRedirectable(componentID) {
-				return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
-			}
-			return errorfWithStatus(http.StatusNotFound, "process specified does not expose metrics")
-		} else if strings.HasPrefix(componentID, fleetServerPrefix) {
+		if strings.HasPrefix(componentID, fleetServerPrefix) {
 			// special case, fleet server is expected to return stats right away
 			// removing this would be breaking
 			return redirectToPath(w, r, componentID, "stats", operatingSystem)
+		}
+
+		if isProcessRedirectable(componentID) {
+			// special handling for redirectable processes
+			// apm needs its own output even for no path
+			metricsPath := vars[metricsPathKey]
+			_, ok := redirectPathAllowlist[metricsPath]
+			if !ok {
+				return errorfWithStatus(http.StatusNotFound, "process specified does not expose metrics")
+			}
+
+			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
 		}
 
 		state := coord.State(false)
