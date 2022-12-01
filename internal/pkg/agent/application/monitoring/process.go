@@ -37,7 +37,7 @@ var redirectPathAllowlist = map[string]struct{}{
 }
 
 var redirectableProcesses = []string{
-	apmPrefix,
+	apmTypePrefix,
 	fleetServerPrefix,
 }
 
@@ -57,6 +57,8 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 			return statsHandler(w, r)
 		}
 
+		componentID = cloudComponentIDToAgentInputType(componentID)
+
 		if isProcessRedirectable(componentID) {
 			// special handling for redirectable processes
 			// apm needs its own output even for no path
@@ -70,10 +72,6 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 				// special case, fleet server is expected to return stats right away
 				// removing this would be breaking
 				metricsPath = "stats"
-			}
-			if strings.HasPrefix(componentID, apmPrefix) {
-				// from binary name back to input type, keep the output name as is (apm-default)
-				componentID = strings.Replace(componentID, apmPrefix, apmTypePrefix, -1)
 			}
 
 			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)

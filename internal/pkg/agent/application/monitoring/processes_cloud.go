@@ -6,6 +6,14 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+func cloudComponentIDToAgentInputType(componentID string) string {
+	if strings.HasPrefix(componentID, apmPrefix) {
+		// from binary name back to input type, keep the output name as is (apm-default)
+		return strings.Replace(componentID, apmPrefix, apmTypePrefix, 1)
+	}
+	return componentID
+}
+
 func expectedCloudProcessID(c *component.Component) string {
 	// Cloud explicitly looks for an ID of "apm-server" to determine if APM is in managed mode.
 	// Ensure that this is the ID we use, in agent v2 the ID is usually "apm-default".
