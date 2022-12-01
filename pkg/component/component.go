@@ -145,7 +145,7 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 	if err != nil {
 		return nil, nil, err
 	}
-	vars, err := transpiler.NewVars(map[string]interface{}{
+	vars, err := transpiler.NewVars("", map[string]interface{}{
 		"runtime": map[string]interface{}{
 			"platform": r.platform.String(),
 			"os":       r.platform.OS,

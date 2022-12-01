@@ -21,6 +21,7 @@ var ErrNoMatch = fmt.Errorf("no matching vars")
 
 // Vars is a context of variables that also contain a list of processors that go with the mapping.
 type Vars struct {
+	id                    string
 	tree                  *AST
 	processorsKey         string
 	processors            Processors
@@ -28,17 +29,17 @@ type Vars struct {
 }
 
 // NewVars returns a new instance of vars.
-func NewVars(mapping map[string]interface{}, fetchContextProviders mapstr.M) (*Vars, error) {
-	return NewVarsWithProcessors(mapping, "", nil, fetchContextProviders)
+func NewVars(id string, mapping map[string]interface{}, fetchContextProviders mapstr.M) (*Vars, error) {
+	return NewVarsWithProcessors(id, mapping, "", nil, fetchContextProviders)
 }
 
 // NewVarsWithProcessors returns a new instance of vars with attachment of processors.
-func NewVarsWithProcessors(mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders mapstr.M) (*Vars, error) {
+func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders mapstr.M) (*Vars, error) {
 	tree, err := NewAST(mapping)
 	if err != nil {
 		return nil, err
 	}
-	return &Vars{tree, processorKey, processors, fetchContextProviders}, nil
+	return &Vars{id, tree, processorKey, processors, fetchContextProviders}, nil
 }
 
 // Replace returns a new value based on variable replacement.
@@ -89,6 +90,11 @@ func (v *Vars) Replace(value string) (Node, error) {
 		}
 	}
 	return NewStrValWithProcessors(result+value[lastIndex:], processors), nil
+}
+
+// ID returns the unique ID for the vars.
+func (v *Vars) ID() string {
+	return v.id
 }
 
 // Lookup returns the value from the vars.
