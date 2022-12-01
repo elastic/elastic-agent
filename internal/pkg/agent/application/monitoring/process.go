@@ -56,12 +56,6 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 			return statsHandler(w, r)
 		}
 
-		if strings.HasPrefix(componentID, fleetServerPrefix) {
-			// special case, fleet server is expected to return stats right away
-			// removing this would be breaking
-			return redirectToPath(w, r, componentID, "stats", operatingSystem)
-		}
-
 		if isProcessRedirectable(componentID) {
 			// special handling for redirectable processes
 			// apm needs its own output even for no path
@@ -69,6 +63,12 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 			_, ok := redirectPathAllowlist[metricsPath]
 			if !ok {
 				return errorfWithStatus(http.StatusNotFound, "process specified does not expose metrics")
+			}
+
+			if strings.HasPrefix(componentID, fleetServerPrefix) && metricsPathKey == "" {
+				// special case, fleet server is expected to return stats right away
+				// removing this would be breaking
+				metricsPath = "stats"
 			}
 
 			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
