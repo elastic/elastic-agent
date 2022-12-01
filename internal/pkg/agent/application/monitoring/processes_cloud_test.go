@@ -20,7 +20,7 @@ func TestExpectedCloudProcessID(t *testing.T) {
 				ID:        "apm-default",
 				InputSpec: &component.InputRuntimeSpec{BinaryName: "apm-server"},
 			},
-			"apm-server",
+			"apm-server-default",
 		},
 		{
 			"NotAPM",
