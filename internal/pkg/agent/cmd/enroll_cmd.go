@@ -305,7 +305,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 	if c.options.FleetServer.InternalPort == 0 {
 		c.options.FleetServer.InternalPort = defaultFleetServerInternalPort
 	}
-	_, err := getDaemonStatus(ctx)
+	_, err := getDaemonState(ctx)
 	if err != nil {
 		if !c.options.FleetServer.SpawnAgent {
 			// wait longer to try and communicate with the Elastic Agent
