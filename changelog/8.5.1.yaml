@@ -1,0 +1,38 @@
+version: 8.5.1
+entries:
+    - kind: bug-fix
+      summary: Fix how multiple Fleet Server hosts are handled
+      description: It fixes the bug when the Elastic Agent would be enrolled using a valid Fleet Server URL, but the policy would contain more than one, being the first URL unreachable. In that case the Elastic Agent would enroll with Fleet Server, but become unhealthy as it'd get stuck trying only the first, unreachable Fleet Server host.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1329
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1328
+      timestamp: 1666281194
+      file:
+        name: 1666281194-Fix-how-multiple-Fleet-Server-hosts-are-handled.yaml
+        checksum: 6fb9e56c4b750ec352431cef72a4c45251f54c7f
+    - kind: bug-fix
+      summary: 'Fix: Windows Agent Left Unhealthy After Removing Endpoint Integration'
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1286
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1262
+      timestamp: 1666611696
+      file:
+        name: 1666611696-fix_service_stop_timeout.yaml
+        checksum: 212c7142d5ac4f6f061f7da0149d7600e97df2d5
+    - kind: feature
+      summary: Improve shutdown logs
+      description: ""
+      component: cmd, handler, upgrade
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1618
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1358
+      timestamp: 1666789812
+      file:
+        name: 1666789812-Improve-shutdown-logs.yaml
+        checksum: 0292242b3855f5e8e7701f9149404a71b04729f9
