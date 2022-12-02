@@ -731,6 +731,44 @@ func TestRenderInputs(t *testing.T) {
 					}),
 			},
 		},
+		"input removal with stream conditions": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("type", NewStrVal("logfile")),
+					NewKey("streams", NewList([]Node{
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
+							})),
+							NewKey("condition", NewStrVal("${var1.name} != 'value1'")),
+						}),
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
+							})),
+							NewKey("condition", NewStrVal("${var1.name} != 'value1'")),
+						}),
+					})),
+				}),
+			})),
+			expected: NewList([]Node{}),
+			varsArray: []*Vars{
+				mustMakeVarsP("value1", map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				},
+					"var1",
+					nil),
+				mustMakeVarsP("value2", map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				},
+					"var1",
+					nil),
+			},
+		},
 	}
 
 	for name, test := range testcases {
