@@ -227,6 +227,7 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 		},
 	}
 	vars, err := NewVarsWithProcessors(
+		"",
 		map[string]interface{}{
 			"testing": map[string]interface{}{
 				"key1": "data1",
@@ -293,6 +294,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 		"kubernetes_secrets": mockFetchProvider,
 	}
 	vars, err := NewVarsWithProcessors(
+		"id",
 		map[string]interface{}{
 			"testing": map[string]interface{}{
 				"key1": "data1",
