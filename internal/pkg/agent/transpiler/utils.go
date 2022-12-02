@@ -9,6 +9,13 @@ import (
 	"fmt"
 )
 
+const (
+	// streamsKey is the name of the dictionary key for streams that an input can have. In the case that
+	// an input defines a set of streams and after conditions are applied all the streams are removed then
+	// the entire input is removed.
+	streamsKey = "streams"
+)
+
 // RenderInputs renders dynamic inputs section
 func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	l, ok := inputs.Value().(*List)
@@ -22,6 +29,10 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			dict, ok := node.Clone().(*Dict)
 			if !ok {
 				continue
+			}
+			hadStreams := false
+			if streams := getStreams(dict); streams != nil {
+				hadStreams = true
 			}
 			n, err := dict.Apply(vars)
 			if errors.Is(err, ErrNoMatch) {
@@ -37,6 +48,13 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 				continue
 			}
 			dict = n.(*Dict)
+			if hadStreams {
+				streams := getStreams(dict)
+				if streams == nil {
+					// conditions removed all streams (input is removed)
+					continue
+				}
+			}
 			hash := string(dict.Hash())
 			_, exists := nodesMap[hash]
 			if !exists {
@@ -50,6 +68,29 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 		nInputs = append(nInputs, promoteProcessors(node))
 	}
 	return NewList(nInputs), nil
+}
+
+func getStreams(dict *Dict) *List {
+	node, ok := dict.Find(streamsKey)
+	if !ok {
+		return nil
+	}
+	key, ok := node.(*Key)
+	if !ok {
+		return nil
+	}
+	if key.value == nil {
+		return nil
+	}
+	list, ok := key.value.(*List)
+	if !ok {
+		return nil
+	}
+	if len(list.value) == 0 {
+		// didn't have any streams defined in the list (so no removal should be done)
+		return nil
+	}
+	return list
 }
 
 func promoteProcessors(dict *Dict) *Dict {

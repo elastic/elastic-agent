@@ -721,6 +721,62 @@ func TestRenderInputs(t *testing.T) {
 					}),
 			},
 		},
+		"input removal with stream conditions": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("type", NewStrVal("logfile")),
+					NewKey("streams", NewList([]Node{
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
+							})),
+							NewKey("condition", NewStrVal("${var1.name} != 'value1'")),
+						}),
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
+							})),
+							NewKey("condition", NewStrVal("${var1.name} != 'value1'")),
+						}),
+					})),
+				}),
+			})),
+			expected: NewList([]Node{}),
+			varsArray: []*Vars{
+				mustMakeVarsP(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				},
+					"var1",
+					[]map[string]interface{}{
+						{
+							"add_fields": map[string]interface{}{
+								"fields": map[string]interface{}{
+									"custom": "value1",
+								},
+								"to": "dynamic",
+							},
+						},
+					}),
+				mustMakeVarsP(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				},
+					"var1",
+					[]map[string]interface{}{
+						{
+							"add_fields": map[string]interface{}{
+								"fields": map[string]interface{}{
+									"custom": "value2",
+								},
+								"to": "dynamic",
+							},
+						},
+					}),
+			},
+		},
 	}
 
 	for name, test := range testcases {
