@@ -1,4 +1,0 @@
-kind: bug-fix
-summary: "Fix: Windows Agent Left Unhealthy After Removing Endpoint Integration"
-pr: https://github.com/elastic/elastic-agent/pull/1286
-issue: https://github.com/elastic/elastic-agent/issues/1262
