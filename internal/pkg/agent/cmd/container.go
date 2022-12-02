@@ -739,8 +739,16 @@ func runLegacyAPMServer(streams *cli.IOStreams) (*process.Info, error) {
 	addEnv("--path.logs", "LOGS_PATH")
 	addEnv("--httpprof", "HTTPPROF")
 	addSettingEnv("gc_percent", "APMSERVER_GOGC")
-	logInfo(streams, "Starting legacy apm-server daemon as a subprocess.")
-	return process.Start(spec.BinaryPath, process.WithArgs(args))
+	logInfo(streams, "Starting legacy apm-server daemon as a subprocess."+spec.BinaryPath)
+	options := []process.StartOption{process.WithArgs(args)}
+	wdir := filepath.Dir(spec.BinaryPath)
+	if wdir != "." {
+		options = append(options, process.WithCmdOptions(func(c *exec.Cmd) error {
+			c.Dir = wdir
+			return nil
+		}))
+	}
+	return process.Start(spec.BinaryPath, options...)
 }
 
 func logToStderr(cfg *configuration.Configuration) {
