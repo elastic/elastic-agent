@@ -753,7 +753,7 @@ func TestRenderInputs(t *testing.T) {
 			})),
 			expected: NewList([]Node{}),
 			varsArray: []*Vars{
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 					},
@@ -769,7 +769,7 @@ func TestRenderInputs(t *testing.T) {
 							},
 						},
 					}),
-				mustMakeVarsP(map[string]interface{}{
+				mustMakeVarsP("value2", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 					},
