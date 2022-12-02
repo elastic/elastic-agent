@@ -1840,7 +1840,7 @@ func TestLookupString(t *testing.T) {
 }
 
 func mustMakeVars(mapping map[string]interface{}) *Vars {
-	v, err := NewVars(mapping, nil)
+	v, err := NewVars("", mapping, nil)
 	if err != nil {
 		panic(err)
 	}

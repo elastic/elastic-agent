@@ -193,15 +193,16 @@ func (c *controller) Run(ctx context.Context) error {
 			mapping[name] = state.Current()
 		}
 		// this is ensured not to error, by how the mappings states are verified
-		vars[0], _ = transpiler.NewVars(mapping, fetchContextProviders)
+		vars[0], _ = transpiler.NewVars("", mapping, fetchContextProviders)
 
 		// add to the vars list for each dynamic providers mappings
 		for name, state := range c.dynamicProviders {
 			for _, mappings := range state.Mappings() {
 				local, _ := cloneMap(mapping) // will not fail; already been successfully cloned once
 				local[name] = mappings.mapping
+				id := fmt.Sprintf("%s-%s", name, mappings.id)
 				// this is ensured not to error, by how the mappings states are verified
-				v, _ := transpiler.NewVarsWithProcessors(local, name, mappings.processors, fetchContextProviders)
+				v, _ := transpiler.NewVarsWithProcessors(id, local, name, mappings.processors, fetchContextProviders)
 				vars = append(vars, v)
 			}
 		}
@@ -237,7 +238,7 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 		return err
 	}
 	// ensure creating vars will not error
-	_, err = transpiler.NewVars(mapping, nil)
+	_, err = transpiler.NewVars("", mapping, nil)
 	if err != nil {
 		return err
 	}
@@ -262,6 +263,7 @@ func (c *contextProviderState) Current() map[string]interface{} {
 }
 
 type dynamicProviderMapping struct {
+	id         string
 	priority   int
 	mapping    map[string]interface{}
 	processors transpiler.Processors
@@ -292,7 +294,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		return err
 	}
 	// ensure creating vars will not error
-	_, err = transpiler.NewVars(mapping, nil)
+	_, err = transpiler.NewVars("", mapping, nil)
 	if err != nil {
 		return err
 	}
@@ -305,6 +307,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		return nil
 	}
 	c.mappings[id] = dynamicProviderMapping{
+		id:         id,
 		priority:   priority,
 		mapping:    mapping,
 		processors: processors,
