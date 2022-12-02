@@ -759,32 +759,14 @@ func TestRenderInputs(t *testing.T) {
 					},
 				},
 					"var1",
-					[]map[string]interface{}{
-						{
-							"add_fields": map[string]interface{}{
-								"fields": map[string]interface{}{
-									"custom": "value1",
-								},
-								"to": "dynamic",
-							},
-						},
-					}),
+					nil),
 				mustMakeVarsP("value2", map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 					},
 				},
 					"var1",
-					[]map[string]interface{}{
-						{
-							"add_fields": map[string]interface{}{
-								"fields": map[string]interface{}{
-									"custom": "value2",
-								},
-								"to": "dynamic",
-							},
-						},
-					}),
+					nil),
 			},
 		},
 	}
