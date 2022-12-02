@@ -126,11 +126,6 @@ type inspectConfigOpts struct {
 }
 
 func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, streams *cli.IOStreams) error {
-	err := tryContainerLoadPaths()
-	if err != nil {
-		return err
-	}
-
 	l, err := newErrorLogger()
 	if err != nil {
 		return err
@@ -232,12 +227,6 @@ type inspectComponentsOpts struct {
 
 func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponentsOpts, streams *cli.IOStreams) error {
 	l, err := newErrorLogger()
-	if err != nil {
-		return err
-	}
-
-	// Ensure that when running inside a container that the correct paths are used.
-	err = tryContainerLoadPaths()
 	if err != nil {
 		return err
 	}
