@@ -208,7 +208,7 @@ func containerCmd(streams *cli.IOStreams) error {
 			if err != nil {
 				return errors.New(err, "finding current process")
 			}
-			if apmProc, err = runLegacyAPMServer(streams, apmPath); err != nil {
+			if apmProc, err = runLegacyAPMServer(streams); err != nil {
 				return errors.New(err, "starting legacy apm-server")
 			}
 			wg.Add(1) // apm-server legacy process
@@ -701,8 +701,8 @@ func truncateString(b []byte) string {
 
 // runLegacyAPMServer extracts the bundled apm-server from elastic-agent
 // to path and runs it with args.
-func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, error) {
-	name := "apm-server"
+func runLegacyAPMServer(streams *cli.IOStreams) (*process.Info, error) {
+	name := "apm"
 	logInfo(streams, "Preparing apm-server for legacy mode.")
 
 	platform, err := component.LoadPlatformDetail(isContainer)
@@ -718,15 +718,6 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	spec, err := specs.GetInput(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect apm-server input: %w", err)
-	}
-
-	// Get the apm-server directory
-	files, err := os.ReadDir(path)
-	if err != nil {
-		return nil, errors.New(err, fmt.Sprintf("reading directory %s", path))
-	}
-	if len(files) != 1 || !files[0].IsDir() {
-		return nil, errors.New("expected one directory")
 	}
 
 	// add APM Server specific configuration
@@ -748,8 +739,16 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	addEnv("--path.logs", "LOGS_PATH")
 	addEnv("--httpprof", "HTTPPROF")
 	addSettingEnv("gc_percent", "APMSERVER_GOGC")
-	logInfo(streams, "Starting legacy apm-server daemon as a subprocess.")
-	return process.Start(spec.BinaryPath, process.WithArgs(args))
+	logInfo(streams, "Starting legacy apm-server daemon as a subprocess."+spec.BinaryPath)
+	options := []process.StartOption{process.WithArgs(args)}
+	wdir := filepath.Dir(spec.BinaryPath)
+	if wdir != "." {
+		options = append(options, process.WithCmdOptions(func(c *exec.Cmd) error {
+			c.Dir = wdir
+			return nil
+		}))
+	}
+	return process.Start(spec.BinaryPath, options...)
 }
 
 func logToStderr(cfg *configuration.Configuration) {
