@@ -321,58 +321,6 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name: "Invalid: inputs endpoint not support on container platform",
-			Platform: PlatformDetail{
-				Platform: Platform{
-					OS:   Container,
-					Arch: AMD64,
-					GOOS: Linux,
-				},
-			},
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "endpoint",
-						"id":         "endpoint-0",
-						"use_output": "default",
-						"enabled":    true,
-					},
-				},
-			},
-			Result: []Component{
-				{
-					ID:        "endpoint-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       ErrInputNotSupportedOnPlatform,
-					Units: []Unit{
-						{
-							ID:       "endpoint-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "endpoint-default-endpoint-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "endpoint",
-								"id":   "endpoint-0",
-							}),
-						},
-					},
-				},
-			},
-		},
-		{
 			Name:     "Invalid: inputs endpoint doesn't support logstash",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
