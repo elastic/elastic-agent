@@ -230,7 +230,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	if localFleetServer {
 		// Ensure that the agent does not use a proxy configuration
 		// when connecting to the local fleet server.
-		// TODO At this point remote config has $HOSTNAME:8220 - is that expected or do we part port 8221?
+		// Note that when running fleet-server the enroll request will be sent to :8220,
+		// however when the agent is running afterwards requests will be sent to :8221
 		c.remoteConfig.Transport.Proxy.Disable = true
 	}
 
