@@ -552,8 +552,8 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		if c.options.InternalURL != "" {
 			fleetConfig.Client.Host = c.options.InternalURL
 			// fleet-server will bind the internal listenter to localhost:8221
-			// InternalURL is localhost:8221, however cert uses $HOSTNAME, so we need to disable verification.
-			fleetConfig.Client.Transport.TLS.VerificationMode = tlscommon.VerifyNone
+			// InternalURL is localhost:8221, however cert uses $HOSTNAME, so we need to disable hostname verification.
+			fleetConfig.Client.Transport.TLS.VerificationMode = tlscommon.VerifyCertificate
 		}
 	}
 
