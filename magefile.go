@@ -654,7 +654,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 			dependencies := []string{
 				"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat", // beat dependencies
 				"apm-server",
-				// "cloudbeat", // TODO: add once working
+				"cloudbeat", // only supporting linux/amd64 or linux/arm64
 				"elastic-agent-shipper",
 				"endpoint-security",
 				"fleet-server",

@@ -18,15 +18,13 @@ inputs:
     command:
       args: &args
         - "-E"
+        - "management.enabled=true"
+        - "-E"
         - "setup.ilm.enabled=false"
         - "-E"
         - "setup.template.enabled=false"
         - "-E"
         - "logging.to_stderr=true"
-        - "-E"
-        - "management.enabled=true"
-        - "-E"
-        - "logging.level=debug"
         - "-E"
         - "gc_percent=${CLOUDBEAT_GOGC:100}"
   - name: cloudbeat/cis_k8s
