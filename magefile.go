@@ -365,29 +365,12 @@ func Package() {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-	platformPackages := []struct {
-		platform string
-		packages string
-	}{
-		{"darwin/amd64", "darwin-x86_64.tar.gz"},
-		{"darwin/arm64", "darwin-aarch64.tar.gz"},
-		{"linux/amd64", "linux-x86_64.tar.gz"},
-		{"linux/arm64", "linux-arm64.tar.gz"},
-		{"windows/amd64", "windows-x86_64.zip"},
+	platforms := devtools.Platforms.Names()
+	if len(platforms) == 0 {
+		panic("elastic-agent package is expected to build at least one platform package")
 	}
 
-	var requiredPackages []string
-	for _, p := range platformPackages {
-		if _, enabled := devtools.Platforms.Get(p.platform); enabled {
-			requiredPackages = append(requiredPackages, p.packages)
-		}
-	}
-
-	if len(requiredPackages) == 0 {
-		panic("elastic-agent package is expected to include other packages")
-	}
-
-	packageAgent(requiredPackages, devtools.UseElasticAgentPackaging)
+	packageAgent(platforms, devtools.UseElasticAgentPackaging)
 }
 
 func getPackageName(beat, version, pkg string) (string, string) {
@@ -575,7 +558,7 @@ func runAgent(env map[string]string) error {
 	if !strings.Contains(dockerImageOut, tag) {
 		// produce docker package
 		packageAgent([]string{
-			"linux-x86_64.tar.gz",
+			"linux/amd64",
 		}, devtools.UseElasticAgentDemoPackaging)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
@@ -623,7 +606,7 @@ func runAgent(env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(requiredPackages []string, packagingFn func()) {
+func packageAgent(platforms []string, packagingFn func()) {
 	version, found := os.LookupEnv("BEAT_VERSION")
 	if !found {
 		version = release.Version()
@@ -631,6 +614,19 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 
 	dropPath, found := os.LookupEnv(agentDropPath)
 	var archivePath string
+
+	platformPackages := map[string]string{
+		"darwin/amd64":  "darwin-x86_64.tar.gz",
+		"darwin/arm64":  "darwin-aarch64.tar.gz",
+		"linux/amd64":   "linux-x86_64.tar.gz",
+		"linux/arm64":   "linux-arm64.tar.gz",
+		"windows/amd64": "windows-x86_64.zip",
+	}
+
+	requiredPackages := []string{}
+	for _, p := range platforms {
+		requiredPackages = append(requiredPackages, platformPackages[p])
+	}
 
 	// build deps only when drop is not provided
 	if !found || len(dropPath) == 0 {
@@ -650,22 +646,44 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		defer os.Unsetenv(agentDropPath)
 
 		if devtools.ExternalBuild == true {
-			// for external go for all dependencies
-			dependencies := []string{
-				"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat", // beat dependencies
-				"apm-server",
+			// Map of every binary the agent can run to a map of that binary's unsupported platforms.
+			// A dependency with a nil unsupported platform map supports all platforms. A platform is
+			// considered unsupported for a binary when it appears in the unsupported platform map with
+			// a value of true (indicating it is unsupported).
+			dependencies := map[string]map[string]bool{
+				"auditbeat":   nil,
+				"filebeat":    nil,
+				"heartbeat":   nil,
+				"metricbeat":  nil,
+				"osquerybeat": nil,
+				"packetbeat":  nil,
+				"apm-server": {
+					"darwin/arm64": true, // APM server for darwin/arm64 is not published for download.
+				},
+				"elastic-agent-shipper": nil,
+				"endpoint-security":     nil,
+				"fleet-server":          nil,
 				// "cloudbeat", // TODO: add once working
-				"elastic-agent-shipper",
-				"endpoint-security",
-				"fleet-server",
 			}
+
 			ctx := context.Background()
-			for _, beat := range dependencies {
-				for _, reqPackage := range requiredPackages {
+			for binary, unsupportedPlatforms := range dependencies {
+				for _, platform := range platforms {
+					if unsupportedPlatforms != nil && unsupportedPlatforms[platform] {
+						continue
+					}
+
+					reqPackage := platformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
-					newVersion, packageName := getPackageName(beat, version, reqPackage)
-					err := fetchBinaryFromArtifactsApi(ctx, packageName, beat, newVersion, targetPath)
+					newVersion, packageName := getPackageName(binary, version, reqPackage)
+
+					defer func() {
+						if err := recover(); err != nil {
+							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
+						}
+					}()
+					err := fetchBinaryFromArtifactsApi(ctx, packageName, binary, newVersion, targetPath)
 					if err != nil {
 						panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
 					}
