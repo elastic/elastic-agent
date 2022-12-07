@@ -34,8 +34,8 @@ const (
 	apiStatusTimeout = 15 * time.Second
 )
 
-// PolicyChange is a handler for POLICY_CHANGE action.
-type PolicyChange struct {
+// PolicyChangeHandler is a handler for POLICY_CHANGE action.
+type PolicyChangeHandler struct {
 	log       *logger.Logger
 	agentInfo *info.AgentInfo
 	config    *configuration.Configuration
@@ -44,16 +44,16 @@ type PolicyChange struct {
 	setters   []actions.ClientSetter
 }
 
-// NewPolicyChange creates a new PolicyChange handler.
-func NewPolicyChange(
+// NewPolicyChangeHandler creates a new PolicyChange handler.
+func NewPolicyChangeHandler(
 	log *logger.Logger,
 	agentInfo *info.AgentInfo,
 	config *configuration.Configuration,
 	store storage.Store,
 	ch chan coordinator.ConfigChange,
 	setters ...actions.ClientSetter,
-) *PolicyChange {
-	return &PolicyChange{
+) *PolicyChangeHandler {
+	return &PolicyChangeHandler{
 		log:       log,
 		agentInfo: agentInfo,
 		config:    config,
@@ -64,7 +64,7 @@ func NewPolicyChange(
 }
 
 // AddSetter adds a setter into a collection of client setters.
-func (h *PolicyChange) AddSetter(cs actions.ClientSetter) {
+func (h *PolicyChangeHandler) AddSetter(cs actions.ClientSetter) {
 	if h.setters == nil {
 		h.setters = make([]actions.ClientSetter, 0)
 	}
@@ -73,7 +73,7 @@ func (h *PolicyChange) AddSetter(cs actions.ClientSetter) {
 }
 
 // Handle handles policy change action.
-func (h *PolicyChange) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
+func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerPolicyChange: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionPolicyChange)
 	if !ok {
@@ -91,21 +91,16 @@ func (h *PolicyChange) Handle(ctx context.Context, a fleetapi.Action, acker acke
 		return err
 	}
 
-	h.ch <- &policyChange{
-		ctx:    ctx,
-		cfg:    c,
-		action: a,
-		acker:  acker,
-	}
+	h.ch <- newPolicyChange(ctx, c, a, acker, false)
 	return nil
 }
 
 // Watch returns the channel for configuration change notifications.
-func (h *PolicyChange) Watch() <-chan coordinator.ConfigChange {
+func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChange) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
+func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *config.Config) (err error) {
 	// do not update fleet-server host from policy; no setters provided with local Fleet Server
 	if len(h.setters) == 0 {
 		return nil
@@ -226,11 +221,33 @@ func fleetToReader(agentInfo *info.AgentInfo, cfg *configuration.Configuration) 
 }
 
 type policyChange struct {
-	ctx    context.Context
-	cfg    *config.Config
-	action fleetapi.Action
-	acker  acker.Acker
-	commit bool
+	ctx        context.Context
+	cfg        *config.Config
+	action     fleetapi.Action
+	acker      acker.Acker
+	commit     bool
+	ackWatcher chan struct{}
+}
+
+func newPolicyChange(
+	ctx context.Context,
+	config *config.Config,
+	action fleetapi.Action,
+	acker acker.Acker,
+	commit bool) *policyChange {
+	var ackWatcher chan struct{}
+	if commit {
+		// we don't need it otherwise
+		ackWatcher = make(chan struct{})
+	}
+	return &policyChange{
+		ctx:        ctx,
+		cfg:        config,
+		action:     action,
+		acker:      acker,
+		commit:     true,
+		ackWatcher: ackWatcher,
+	}
 }
 
 func (l *policyChange) Config() *config.Config {
@@ -246,9 +263,28 @@ func (l *policyChange) Ack() error {
 		return err
 	}
 	if l.commit {
-		return l.acker.Commit(l.ctx)
+		err := l.acker.Commit(l.ctx)
+		if l.ackWatcher != nil && err == nil {
+			close(l.ackWatcher)
+		}
+		return err
 	}
 	return nil
+}
+
+// WaitAck waits for policy change to be acked.
+// Policy change ack is awaitable only in case commit flag was set.
+// Caller is responsible to use any reasonable deadline otherwise
+// function call can be endlessly blocking.
+func (l *policyChange) WaitAck(ctx context.Context) {
+	if !l.commit || l.ackWatcher == nil {
+		return
+	}
+
+	select {
+	case <-l.ackWatcher:
+	case <-ctx.Done():
+	}
 }
 
 func (l *policyChange) Fail(_ error) {

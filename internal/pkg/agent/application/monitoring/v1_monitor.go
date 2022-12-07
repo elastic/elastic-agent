@@ -54,6 +54,7 @@ const (
 )
 
 var (
+	errNoOuputPresent        = errors.New("outputs not part of the config")
 	supportedComponents      = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "endpoint-security", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
 	supportedBeatsComponents = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
@@ -124,7 +125,7 @@ func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, component
 
 	cfg := make(map[string]interface{})
 
-	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil {
+	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil && !errors.Is(err, errNoOuputPresent) {
 		return nil, errors.New(err, "failed to inject monitoring output")
 	}
 
@@ -256,7 +257,7 @@ func (b *BeatsMonitor) initInputs(cfg map[string]interface{}) {
 func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{}, monitoringOutputName string) error {
 	outputsNode, found := source[outputsKey]
 	if !found {
-		return fmt.Errorf("outputs not part of the config")
+		return errNoOuputPresent
 	}
 
 	outputs, ok := outputsNode.(map[string]interface{})
