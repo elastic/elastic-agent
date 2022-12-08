@@ -26,7 +26,7 @@ type logSource uint8
 
 const (
 	logSourceStdout logSource = 0
-	logSourceStderr           = 1
+	logSourceStderr logSource = 1
 )
 
 // logWriter is an `io.Writer` that takes lines and passes them through the logger.
