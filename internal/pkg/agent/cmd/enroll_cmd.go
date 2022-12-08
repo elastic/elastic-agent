@@ -232,6 +232,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	if localFleetServer {
 		// Ensure that the agent does not use a proxy configuration
 		// when connecting to the local fleet server.
+		// Note that when running fleet-server the enroll request will be sent to :8220,
+		// however when the agent is running afterwards requests will be sent to :8221
 		c.remoteConfig.Transport.Proxy.Disable = true
 	}
 
@@ -303,7 +305,14 @@ func (c *enrollCmd) writeDelayEnroll(streams *cli.IOStreams) error {
 func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig map[string]interface{}) (string, error) {
 	c.log.Debug("verifying communication with running Elastic Agent daemon")
 	agentRunning := true
+<<<<<<< HEAD
 	_, err := getDaemonStatus(ctx)
+=======
+	if c.options.FleetServer.InternalPort == 0 {
+		c.options.FleetServer.InternalPort = defaultFleetServerInternalPort
+	}
+	_, err := getDaemonState(ctx)
+>>>>>>> 8c7537bd4a (Change local fleet-server connection to localhost:8221 (#1867))
 	if err != nil {
 		if !c.options.FleetServer.SpawnAgent {
 			// wait longer to try and communicate with the Elastic Agent
@@ -338,6 +347,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 	if err != nil {
 		return "", err
 	}
+	c.options.FleetServer.InternalPort = fleetConfig.Server.InternalPort
 
 	configToStore := map[string]interface{}{
 		"agent": agentConfig,
@@ -547,6 +557,9 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		// use internal URL for future requests
 		if c.options.InternalURL != "" {
 			fleetConfig.Client.Host = c.options.InternalURL
+			// fleet-server will bind the internal listenter to localhost:8221
+			// InternalURL is localhost:8221, however cert uses $HOSTNAME, so we need to disable hostname verification.
+			fleetConfig.Client.Transport.TLS.VerificationMode = tlscommon.VerifyCertificate
 		}
 	}
 
