@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"gopkg.in/yaml.v2"

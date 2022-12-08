@@ -8,10 +8,11 @@ package component
 import (
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"path/filepath"
 	"sort"
 	"testing"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"

@@ -8,13 +8,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 

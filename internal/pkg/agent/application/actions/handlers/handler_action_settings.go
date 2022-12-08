@@ -7,6 +7,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"

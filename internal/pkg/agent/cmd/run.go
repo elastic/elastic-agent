@@ -7,13 +7,14 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/spf13/cobra"
 	"go.elastic.co/apm"

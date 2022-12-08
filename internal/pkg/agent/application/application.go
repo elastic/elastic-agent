@@ -6,6 +6,7 @@ package application
 
 import (
 	"fmt"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"go.elastic.co/apm"
