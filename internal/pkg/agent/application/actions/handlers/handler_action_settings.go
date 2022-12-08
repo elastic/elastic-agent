@@ -12,16 +12,11 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-type reexecManager interface {
-	ReExec(cb reexec.ShutdownCallbackFn, argOverrides ...string)
-}
 
 // Settings handles settings change coming from fleet and updates log level.
 type Settings struct {
