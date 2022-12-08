@@ -38,6 +38,7 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -646,46 +647,29 @@ func packageAgent(platforms []string, packagingFn func()) {
 		defer os.Unsetenv(agentDropPath)
 
 		if devtools.ExternalBuild == true {
-			// Map of every binary the agent can run to a map of that binary's unsupported platforms.
-			// A dependency with a nil unsupported platform map supports all platforms. A platform is
-			// considered unsupported for a binary when it appears in the unsupported platform map with
-			// a value of true (indicating it is unsupported).
-			dependencies := map[string]map[string]bool{
-				"auditbeat":   nil,
-				"filebeat":    nil,
-				"heartbeat":   nil,
-				"metricbeat":  nil,
-				"osquerybeat": nil,
-				"packetbeat":  nil,
-				"apm-server": {
-					"darwin/arm64": true, // APM server for darwin/arm64 is not published for download.
-				},
-				"elastic-agent-shipper": nil,
-				"endpoint-security":     nil,
-				"fleet-server":          nil,
+			externalBinaries := []string{
+				"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat",
 				// "cloudbeat", // TODO: add once working
+				"elastic-agent-shipper",
+				"apm-server",
+				"endpoint-security",
+				"fleet-server",
 			}
 
 			ctx := context.Background()
-			for binary, unsupportedPlatforms := range dependencies {
+			for _, binary := range externalBinaries {
 				for _, platform := range platforms {
-					if unsupportedPlatforms != nil && unsupportedPlatforms[platform] {
-						continue
-					}
-
 					reqPackage := platformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
 					newVersion, packageName := getPackageName(binary, version, reqPackage)
-
-					defer func() {
-						if err := recover(); err != nil {
-							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
-						}
-					}()
 					err := fetchBinaryFromArtifactsApi(ctx, packageName, binary, newVersion, targetPath)
 					if err != nil {
-						panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
+						if strings.Contains(err.Error(), "object not found") {
+							fmt.Printf("Downloading %s: unsupported on %s, skipping\n", binary, platform)
+						} else {
+							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
+						}
 					}
 				}
 			}
@@ -911,6 +895,14 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 }
 
 func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, version, downloadPath string) error {
+	// Only log fatal logs for logs produced using logrus. This is the global logger
+	// used by github.com/elastic/e2e-testing/pkg/downloads which can only be configured globally like this or via
+	// environment variables.
+	//
+	// Using FatalLevel avoids filling the build log with scary looking errors when we attempt to
+	// download artifacts on unsupported platforms and choose to ignore the errors.
+	logrus.SetLevel(logrus.FatalLevel)
+
 	location, err := downloads.FetchBeatsBinary(
 		ctx,
 		packageName,
@@ -920,8 +912,11 @@ func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, ver
 		false,
 		downloadPath,
 		true)
-	fmt.Println("downloaded binaries on location:", location)
+	if err != nil {
+		return err
+	}
 
+	fmt.Println("downloaded binaries on location:", location)
 	return err
 }
 
