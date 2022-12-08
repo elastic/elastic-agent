@@ -7,6 +7,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -53,6 +54,12 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		return fmt.Errorf("invalid log level, expected debug|info|warning|error and received '%s'", action.LogLevel)
 	}
 
+	lvl := logp.InfoLevel
+	err := lvl.Unpack(action.LogLevel)
+	if err != nil {
+		return errors.New("failed to unpack log level", err)
+	}
+
 	if err := h.agentInfo.SetLogLevel(action.LogLevel); err != nil {
 		return errors.New("failed to update log level", err)
 	}
@@ -63,8 +70,7 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", action.ActionID)
 	}
 
-	h.coord.ReExec(nil)
-	return nil
+	return h.coord.SetLogLevel(ctx, lvl)
 }
 
 func isSupportedLogLevel(level string) bool {

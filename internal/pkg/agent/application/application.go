@@ -6,6 +6,7 @@ package application
 
 import (
 	"fmt"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"go.elastic.co/apm"
 
@@ -28,6 +29,7 @@ import (
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	log *logger.Logger,
+	logLevel logp.Level,
 	agentInfo *info.AgentInfo,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
@@ -120,7 +122,7 @@ func New(
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, compModifiers...)
+	coord := coordinator.New(log, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

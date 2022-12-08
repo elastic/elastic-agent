@@ -8,6 +8,7 @@ package component
 import (
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -36,6 +37,7 @@ func TestToComponents(t *testing.T) {
 		Name     string
 		Platform PlatformDetail
 		Policy   map[string]interface{}
+		LogLevel logp.Level
 		Err      string
 		Result   []Component
 	}{
@@ -565,6 +567,113 @@ func TestToComponents(t *testing.T) {
 							ID:       "filestream-default-filestream-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "Debug log level",
+			Platform: linuxAMD64Platform,
+			LogLevel: logp.DebugLevel,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-1",
+						"enabled": false,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: client.UnitLogLevelDebug,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: client.UnitLogLevelDebug,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "Unique log level",
+			Platform: linuxAMD64Platform,
+			LogLevel: logp.ErrorLevel,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":      "filestream",
+						"id":        "filestream-0",
+						"enabled":   true,
+						"log_level": "debug",
+					},
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-1",
+						"enabled": false,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: client.UnitLogLevelError,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: client.UnitLogLevelDebug,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
 								"id":   "filestream-0",
@@ -1424,7 +1533,7 @@ func TestToComponents(t *testing.T) {
 			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
 			require.NoError(t, err)
 
-			result, err := runtime.ToComponents(scenario.Policy, nil)
+			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel)
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {

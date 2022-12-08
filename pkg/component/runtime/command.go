@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.uber.org/zap/zapcore"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,7 +53,10 @@ type procState struct {
 
 // CommandRuntime provides the command runtime for running a component as a subprocess.
 type CommandRuntime struct {
-	logger  *logger.Logger
+	logger *logger.Logger
+	logStd *logWriter
+	logErr *logWriter
+
 	current component.Component
 	monitor MonitoringManager
 
@@ -90,6 +94,10 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 		"type":   c.getSpecType(),
 		"binary": c.getSpecBinaryName(),
 	})
+	ll, unitLevels := getLogLevels(comp)
+	c.logStd = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStdout)
+	ll, unitLevels = getLogLevels(comp) // don't want to share mapping of units (so new map is generated)
+	c.logErr = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStderr)
 	return c, nil
 }
 
@@ -132,6 +140,8 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				}
 			}
 		case newComp := <-c.compCh:
+			c.current = newComp
+			c.syncLogLevels()
 			sendExpected := c.state.syncExpected(&newComp)
 			changed := c.state.syncUnits(&newComp)
 			if sendExpected || c.state.unsettled() {
@@ -314,7 +324,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
-		process.WithCmdOptions(attachOutErr(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName()), dirPath(workDir)))
+		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir)))
 	if err != nil {
 		return err
 	}
@@ -460,19 +470,62 @@ func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
 	return nil
 }
 
-func attachOutErr(comp component.Component, cmdSpec *component.CommandSpec, typeStr string, binaryName string) process.CmdOption {
+func (c *CommandRuntime) syncLogLevels() {
+	ll, unitLevels := getLogLevels(c.current)
+	c.logStd.SetLevels(ll, unitLevels)
+	ll, unitLevels = getLogLevels(c.current) // don't want to share mapping of units (so new map is generated)
+	c.logErr.SetLevels(ll, unitLevels)
+}
+
+func attachOutErr(stdOut *logWriter, stdErr *logWriter) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
-		dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
-		logger := logger.NewWithoutConfig("").With("component", map[string]interface{}{
-			"id":      comp.ID,
-			"type":    typeStr,
-			"binary":  binaryName,
-			"dataset": dataset,
-		})
-		cmd.Stdout = newLogWriter(logger.Core(), cmdSpec.Log)
-		cmd.Stderr = newLogWriter(logger.Core(), cmdSpec.Log)
+		cmd.Stdout = stdOut
+		cmd.Stderr = stdErr
 		return nil
 	}
+}
+
+func createLogWriter(comp component.Component, cmdSpec *component.CommandSpec, typeStr string, binaryName string, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
+	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
+	logger := logger.NewWithoutConfig("").With("component", map[string]interface{}{
+		"id":      comp.ID,
+		"type":    typeStr,
+		"binary":  binaryName,
+		"dataset": dataset,
+	})
+	return newLogWriter(logger.Core(), cmdSpec.Log, ll, unitLevels, src)
+}
+
+// getLogLevels returns the lowest log level and a mapping between each unit and its defined log level.
+func getLogLevels(comp component.Component) (zapcore.Level, map[string]zapcore.Level) {
+	baseLevel := zapcore.ErrorLevel
+	unitLevels := make(map[string]zapcore.Level)
+	for _, unit := range comp.Units {
+		ll := toZapcoreLevel(unit.LogLevel)
+		unitLevels[unit.ID] = ll
+		if ll < baseLevel {
+			baseLevel = ll
+		}
+	}
+	return baseLevel, unitLevels
+}
+
+func toZapcoreLevel(unitLevel client.UnitLogLevel) zapcore.Level {
+	switch unitLevel {
+	case client.UnitLogLevelError:
+		return zapcore.ErrorLevel
+	case client.UnitLogLevelWarn:
+		return zapcore.WarnLevel
+	case client.UnitLogLevelInfo:
+		return zapcore.InfoLevel
+	case client.UnitLogLevelDebug:
+		return zapcore.DebugLevel
+	case client.UnitLogLevelTrace:
+		// zap doesn't support trace
+		return zapcore.DebugLevel
+	}
+	// unknown level (default to info)
+	return zapcore.InfoLevel
 }
 
 func dirPath(path string) process.CmdOption {

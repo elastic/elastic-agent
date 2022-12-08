@@ -105,6 +105,11 @@ func toCommonConfig(cfg *Config) (*config.C, error) {
 	return commonLogp, nil
 }
 
+// SetLevel changes the overall log level of the global logger.
+func SetLevel(lvl logp.Level) {
+	logp.SetLevel(lvl.ZapLevel())
+}
+
 // DefaultLoggingConfig returns default configuration for agent logging.
 func DefaultLoggingConfig() *Config {
 	cfg := logp.DefaultConfig(logp.DefaultEnvironment)
