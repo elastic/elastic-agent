@@ -242,7 +242,7 @@ func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Comp
 				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
 				if usingShipper {
 					// using shipper for this component
-					connected, _ := shipperMap[supportedShipper.ShipperType]
+					connected := shipperMap[supportedShipper.ShipperType]
 					connected = append(connected, componentID)
 					shipperMap[supportedShipper.ShipperType] = connected
 				} else {
