@@ -916,7 +916,7 @@ func fetchBinaryFromArtifactsApi(ctx context.Context, packageName, artifact, ver
 		return err
 	}
 
-	fmt.Println("downloaded binaries on location:", location)
+	fmt.Println("downloaded binaries on", location)
 	return err
 }
 
