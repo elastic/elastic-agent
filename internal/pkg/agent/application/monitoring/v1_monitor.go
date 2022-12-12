@@ -90,7 +90,8 @@ func (b *BeatsMonitor) Enabled() bool {
 
 // Reload refreshes monitoring configuration.
 func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
-	if !b.Enabled() {
+	if !b.enabled {
+		// it's disabled regardless of config
 		return nil
 	}
 
@@ -127,6 +128,9 @@ func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, component
 
 	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil && !errors.Is(err, errNoOuputPresent) {
 		return nil, errors.New(err, "failed to inject monitoring output")
+	} else if errors.Is(err, errNoOuputPresent) {
+		// nothing to inject, no monitoring output
+		return nil, nil
 	}
 
 	// initializes inputs collection so injectors don't have to deal with it
