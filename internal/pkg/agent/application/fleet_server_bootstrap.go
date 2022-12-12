@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -22,6 +23,7 @@ const (
 	elasticsearch = "elasticsearch"
 	fleetServer   = "fleet-server"
 	endpoint      = "endpoint"
+	apmServer     = "apm"
 )
 
 // injectFleetServerInput is the base configuration that is used plus the FleetServerComponentModifier that adjusts
@@ -83,15 +85,20 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 	}
 }
 
-// EndpointComponentModifier the modifier for the Endpoint configuration.
-// The Endpoint expects the fleet configuration passed to it by the Agent
-// because it needs to be able to connect to the fleet server directly.
-func EndpointComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordinator.ComponentsModifier {
+// InjectFleetConfigComponentModifier The modifier that injects the fleet configuration for the components
+// that need to be able to connect to fleet server.
+func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig, agentInfo *info.AgentInfo) coordinator.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+		hostsStr := fleetCfg.Client.GetHosts()
+		fleetHosts := make([]interface{}, 0, len(hostsStr))
+		for _, host := range hostsStr {
+			fleetHosts = append(fleetHosts, host)
+		}
+
 		for i, comp := range comps {
-			if comp.InputSpec != nil && comp.InputSpec.InputType == endpoint {
+			if comp.InputSpec != nil && (comp.InputSpec.InputType == endpoint || comp.InputSpec.InputType == apmServer) {
 				for j, unit := range comp.Units {
-					if unit.Type == client.UnitTypeInput && unit.Config.Type == endpoint {
+					if unit.Type == client.UnitTypeInput && (unit.Config.Type == endpoint || unit.Config.Type == apmServer) {
 						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), map[string]interface{}{"fleet": fleetCfg})
 						if err != nil {
 							return nil, err
@@ -104,6 +111,10 @@ func EndpointComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordin
 						if v, ok := unitCfgMap["fleet"]; ok {
 							if m, ok := v.(map[string]interface{}); ok {
 								m["host"] = cfg["host"]
+								m["hosts"] = fleetHosts
+
+								// Inject agent log level
+								injectAgentLoggingLevel(m, agentInfo)
 							}
 						}
 						unitCfg, err := component.ExpectedConfig(unitCfgMap)
@@ -118,6 +129,37 @@ func EndpointComponentModifier(fleetCfg *configuration.FleetAgentConfig) coordin
 			comps[i] = comp
 		}
 		return comps, nil
+	}
+}
+
+type logLevelProvider interface {
+	LogLevel() string
+}
+
+func injectAgentLoggingLevel(cfg map[string]interface{}, llp logLevelProvider) {
+	if cfg == nil || llp == nil {
+		return
+	}
+
+	var agentMap, loggingMap map[string]interface{}
+	if v, ok := cfg["agent"]; ok {
+		agentMap, _ = v.(map[string]interface{})
+	} else {
+		agentMap = make(map[string]interface{})
+		cfg["agent"] = agentMap
+	}
+
+	if agentMap != nil {
+		if v, ok := agentMap["logging"]; ok {
+			loggingMap, _ = v.(map[string]interface{})
+		} else {
+			loggingMap = make(map[string]interface{})
+			agentMap["logging"] = loggingMap
+		}
+	}
+
+	if loggingMap != nil {
+		loggingMap["level"] = llp.LogLevel()
 	}
 }
 

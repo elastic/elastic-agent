@@ -321,58 +321,6 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name: "Invalid: inputs endpoint not support on container platform",
-			Platform: PlatformDetail{
-				Platform: Platform{
-					OS:   Container,
-					Arch: AMD64,
-					GOOS: Linux,
-				},
-			},
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "endpoint",
-						"id":         "endpoint-0",
-						"use_output": "default",
-						"enabled":    true,
-					},
-				},
-			},
-			Result: []Component{
-				{
-					ID:        "endpoint-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       ErrInputNotSupportedOnPlatform,
-					Units: []Unit{
-						{
-							ID:       "endpoint-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "endpoint-default-endpoint-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "endpoint",
-								"id":   "endpoint-0",
-							}),
-						},
-					},
-				},
-			},
-		},
-		{
 			Name:     "Invalid: inputs endpoint doesn't support logstash",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
@@ -1514,6 +1462,68 @@ func TestToComponents(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestInjectingInputPolicyID(t *testing.T) {
+	const testRevision = 10
+	fleetPolicy := map[string]interface{}{
+		"revision": testRevision,
+	}
+
+	tests := []struct {
+		name   string
+		policy map[string]interface{}
+		in     map[string]interface{}
+		out    map[string]interface{}
+	}{
+		{"NilEverything", nil, nil, nil},
+		{"NilInput", fleetPolicy, nil, nil},
+		{"NilPolicy", nil,
+			map[string]interface{}{},
+			map[string]interface{}{},
+		},
+		{"EmptyPolicy", map[string]interface{}{},
+			map[string]interface{}{},
+			map[string]interface{}{},
+		},
+		{"CreatePolicyRevision", fleetPolicy,
+			map[string]interface{}{},
+			map[string]interface{}{
+				"policy": map[string]interface{}{"revision": testRevision},
+			},
+		},
+		{"NilPolicyObjectType", fleetPolicy,
+			map[string]interface{}{
+				"policy": nil,
+			},
+			map[string]interface{}{
+				"policy": map[string]interface{}{"revision": testRevision},
+			},
+		},
+		{"InjectPolicyRevision", fleetPolicy,
+			map[string]interface{}{
+				"policy": map[string]interface{}{"key": "value"},
+			},
+			map[string]interface{}{
+				"policy": map[string]interface{}{"key": "value", "revision": testRevision},
+			},
+		},
+		{"UnknownPolicyObjectType", fleetPolicy,
+			map[string]interface{}{
+				"policy": map[string]int{"key": 10},
+			},
+			map[string]interface{}{
+				"policy": map[string]int{"key": 10},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			injectInputPolicyID(tc.policy, tc.in)
+			assert.Equal(t, tc.out, tc.in)
 		})
 	}
 }

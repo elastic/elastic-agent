@@ -67,7 +67,7 @@ func New(
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
 	monitor := monitoring.New(cfg.Settings.V1MonitoringEnabled, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
-	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), agentInfo, tracer, monitor)
+	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), agentInfo, tracer, monitor, cfg.Settings.GRPC)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
@@ -105,7 +105,7 @@ func New(
 
 			composableManaged = true
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
-				EndpointComponentModifier(cfg.Fleet))
+				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo))
 
 			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
 			if err != nil {

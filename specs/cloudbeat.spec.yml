@@ -18,11 +18,15 @@ inputs:
     command:
       args: &args
         - "-E"
-        - "management.enabled=true"
-        - "-E"
         - "setup.ilm.enabled=false"
         - "-E"
         - "setup.template.enabled=false"
+        - "-E"
+        - "management.enabled=true"
+        - "-E"
+        - "logging.level=info"
+        - "-E"
+        - "logging.to_stderr=true"
         - "-E"
         - "gc_percent=${CLOUDBEAT_GOGC:100}"
   - name: cloudbeat/cis_k8s
@@ -33,6 +37,12 @@ inputs:
       args: *args
   - name: cloudbeat/cis_eks
     description: "CIS elastic Kubernetes monitoring"
+    platforms: *platforms
+    outputs: *outputs
+    command:
+      args: *args
+  - name: cloudbeat/cis_aws
+    description: "CIS AWS monitoring"
     platforms: *platforms
     outputs: *outputs
     command:

@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/atomic"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -54,6 +55,7 @@ var (
 type ComponentComponentState struct {
 	Component component.Component `yaml:"component"`
 	State     ComponentState      `yaml:"state"`
+	LegacyPID string              `yaml:"-"` // To propagate PID for the /processes, and yes, it was a string
 }
 
 // ComponentUnitDiagnosticRequest used to request diagnostics from specific unit.
@@ -80,6 +82,7 @@ type Manager struct {
 	agentInfo  *info.AgentInfo
 	tracer     *apm.Tracer
 	monitor    MonitoringManager
+	grpcConfig *configuration.GRPCConfig
 
 	netMx    sync.RWMutex
 	listener net.Listener
@@ -103,7 +106,7 @@ type Manager struct {
 }
 
 // NewManager creates a new manager.
-func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentInfo, tracer *apm.Tracer, monitor MonitoringManager) (*Manager, error) {
+func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentInfo, tracer *apm.Tracer, monitor MonitoringManager, grpcConfig *configuration.GRPCConfig) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
 		return nil, err
@@ -120,6 +123,7 @@ func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentI
 		subscriptions: make(map[string][]*Subscription),
 		errCh:         make(chan error),
 		monitor:       monitor,
+		grpcConfig:    grpcConfig,
 	}
 	return m, nil
 }
@@ -153,9 +157,13 @@ func (m *Manager) Run(ctx context.Context) error {
 		server = grpc.NewServer(
 			grpc.UnaryInterceptor(apmInterceptor),
 			grpc.Creds(creds),
+			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
 		)
 	} else {
-		server = grpc.NewServer(grpc.Creds(creds))
+		server = grpc.NewServer(
+			grpc.Creds(creds),
+			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
+		)
 	}
 	m.netMx.Lock()
 	m.server = server
@@ -284,9 +292,21 @@ func (m *Manager) State() []ComponentComponentState {
 	states := make([]ComponentComponentState, 0, len(m.current))
 	for _, crs := range m.current {
 		crs.latestMx.RLock()
+		var legacyPID string
+		if crs.runtime != nil {
+			if commandRuntime, ok := crs.runtime.(*CommandRuntime); ok {
+				if commandRuntime != nil {
+					procInfo := commandRuntime.proc
+					if procInfo != nil {
+						legacyPID = fmt.Sprint(commandRuntime.proc.PID)
+					}
+				}
+			}
+		}
 		states = append(states, ComponentComponentState{
 			Component: crs.currComp,
 			State:     crs.latestState.Copy(),
+			LegacyPID: legacyPID,
 		})
 		crs.latestMx.RUnlock()
 	}

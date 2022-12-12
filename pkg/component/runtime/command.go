@@ -12,14 +12,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/pkg/utils"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 type actionMode int
@@ -50,6 +52,7 @@ type procState struct {
 
 // CommandRuntime provides the command runtime for running a component as a subprocess.
 type CommandRuntime struct {
+	logger  *logger.Logger
 	current component.Component
 	monitor MonitoringManager
 
@@ -67,7 +70,7 @@ type CommandRuntime struct {
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
-func NewCommandRuntime(comp component.Component, monitor MonitoringManager) (ComponentRuntime, error) {
+func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
 	c := &CommandRuntime{
 		current:     comp,
 		monitor:     monitor,
@@ -82,6 +85,11 @@ func NewCommandRuntime(comp component.Component, monitor MonitoringManager) (Com
 	if cmdSpec == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
+	c.logger = logger.With("component", map[string]interface{}{
+		"id":     comp.ID,
+		"type":   c.getSpecType(),
+		"binary": c.getSpecBinaryName(),
+	})
 	return c, nil
 }
 
@@ -306,7 +314,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
-		process.WithCmdOptions(attachOutErr, dirPath(workDir)))
+		process.WithCmdOptions(attachOutErr(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName()), dirPath(workDir)))
 	if err != nil {
 		return err
 	}
@@ -452,10 +460,19 @@ func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
 	return nil
 }
 
-func attachOutErr(cmd *exec.Cmd) error {
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return nil
+func attachOutErr(comp component.Component, cmdSpec *component.CommandSpec, typeStr string, binaryName string) process.CmdOption {
+	return func(cmd *exec.Cmd) error {
+		dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
+		logger := logger.NewWithoutConfig("").With("component", map[string]interface{}{
+			"id":      comp.ID,
+			"type":    typeStr,
+			"binary":  binaryName,
+			"dataset": dataset,
+		})
+		cmd.Stdout = newLogWriter(logger.Core(), cmdSpec.Log)
+		cmd.Stderr = newLogWriter(logger.Core(), cmdSpec.Log)
+		return nil
+	}
 }
 
 func dirPath(path string) process.CmdOption {

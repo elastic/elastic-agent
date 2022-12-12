@@ -9,19 +9,30 @@ import (
 	"fmt"
 )
 
+const (
+	// streamsKey is the name of the dictionary key for streams that an input can have. In the case that
+	// an input defines a set of streams and after conditions are applied all the streams are removed then
+	// the entire input is removed.
+	streamsKey = "streams"
+)
+
 // RenderInputs renders dynamic inputs section
 func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	l, ok := inputs.Value().(*List)
 	if !ok {
 		return nil, fmt.Errorf("inputs must be an array")
 	}
-	nodes := []*Dict{}
+	var nodes []varIDMap
 	nodesMap := map[string]*Dict{}
 	for _, vars := range varsArray {
 		for _, node := range l.Value().([]Node) {
 			dict, ok := node.Clone().(*Dict)
 			if !ok {
 				continue
+			}
+			hadStreams := false
+			if streams := getStreams(dict); streams != nil {
+				hadStreams = true
 			}
 			n, err := dict.Apply(vars)
 			if errors.Is(err, ErrNoMatch) {
@@ -37,19 +48,82 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 				continue
 			}
 			dict = n.(*Dict)
+			if hadStreams {
+				streams := getStreams(dict)
+				if streams == nil {
+					// conditions removed all streams (input is removed)
+					continue
+				}
+			}
 			hash := string(dict.Hash())
 			_, exists := nodesMap[hash]
 			if !exists {
 				nodesMap[hash] = dict
-				nodes = append(nodes, dict)
+				nodes = append(nodes, varIDMap{vars.ID(), dict})
 			}
 		}
 	}
-	nInputs := []Node{}
+	var nInputs []Node
 	for _, node := range nodes {
-		nInputs = append(nInputs, promoteProcessors(node))
+		if node.id != "" {
+			// vars has unique ID, concat ID onto existing ID
+			idNode, ok := node.d.Find("id")
+			if ok {
+				idKey, _ := idNode.(*Key) // always a Key
+
+				// clone original and update its key to 'original_id'
+				origKey, _ := idKey.Clone().(*Key) // always a Key
+				origKey.name = "original_id"
+				node.d.Insert(origKey)
+
+				// update id field to concat the id of the variable context set
+				switch idVal := idKey.value.(type) {
+				case *StrVal:
+					idVal.value = fmt.Sprintf("%s-%s", idVal.value, node.id)
+				case *IntVal:
+					idKey.value = NewStrVal(fmt.Sprintf("%d-%s", idVal.value, node.id))
+				case *UIntVal:
+					idKey.value = NewStrVal(fmt.Sprintf("%d-%s", idVal.value, node.id))
+				case *FloatVal:
+					idKey.value = NewStrVal(fmt.Sprintf("%f-%s", idVal.value, node.id))
+				default:
+					return nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
+				}
+			} else {
+				node.d.Insert(NewKey("id", NewStrVal(node.id)))
+			}
+		}
+		nInputs = append(nInputs, promoteProcessors(node.d))
 	}
 	return NewList(nInputs), nil
+}
+
+type varIDMap struct {
+	id string
+	d  *Dict
+}
+
+func getStreams(dict *Dict) *List {
+	node, ok := dict.Find(streamsKey)
+	if !ok {
+		return nil
+	}
+	key, ok := node.(*Key)
+	if !ok {
+		return nil
+	}
+	if key.value == nil {
+		return nil
+	}
+	list, ok := key.value.(*List)
+	if !ok {
+		return nil
+	}
+	if len(list.value) == 0 {
+		// didn't have any streams defined in the list (so no removal should be done)
+		return nil
+	}
+	return list
 }
 
 func promoteProcessors(dict *Dict) *Dict {

@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
@@ -31,24 +32,25 @@ import (
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
-
 	logger      *logger.Logger
 	agentInfo   *info.AgentInfo
 	coord       *coordinator.Coordinator
 	listener    net.Listener
 	server      *grpc.Server
 	tracer      *apm.Tracer
+	grpcConfig  *configuration.GRPCConfig
 	diagHooksFn []func() diagnostics.Hooks
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooksFn ...func() diagnostics.Hooks) *Server {
+func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, grpcConfig *configuration.GRPCConfig, diagHooksFn ...func() diagnostics.Hooks) *Server {
 	return &Server{
-		logger:      log,
-		agentInfo:   agentInfo,
-		coord:       coord,
-		tracer:      tracer,
-		diagHooksFn: diagHooksFn,
+		logger:     log,
+		agentInfo:  agentInfo,
+		coord:      coord,
+		tracer:     tracer,
+		grpcConfig: grpcConfig,
+		diagHooks:  diagHooksFn,
 	}
 }
 
@@ -67,9 +69,9 @@ func (s *Server) Start() error {
 	s.listener = lis
 	if s.tracer != nil {
 		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(s.tracer))
-		s.server = grpc.NewServer(grpc.UnaryInterceptor(apmInterceptor))
+		s.server = grpc.NewServer(grpc.UnaryInterceptor(apmInterceptor), grpc.MaxRecvMsgSize(s.grpcConfig.MaxMsgSize))
 	} else {
-		s.server = grpc.NewServer()
+		s.server = grpc.NewServer(grpc.MaxRecvMsgSize(s.grpcConfig.MaxMsgSize))
 	}
 	cproto.RegisterElasticAgentControlServer(s.server, s)
 
@@ -207,7 +209,7 @@ func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentR
 }
 
 // DiagnosticUnits returns diagnostic information for the specific units (or all units if non-provided).
-func (s *Server) DiagnosticUnits(ctx context.Context, req *cproto.DiagnosticUnitsRequest) (*cproto.DiagnosticUnitsResponse, error) {
+func (s *Server) DiagnosticUnits(req *cproto.DiagnosticUnitsRequest, srv cproto.ElasticAgentControl_DiagnosticUnitsServer) error {
 	reqs := make([]runtime.ComponentUnitDiagnosticRequest, 0, len(req.Units))
 	for _, u := range req.Units {
 		reqs = append(reqs, runtime.ComponentUnitDiagnosticRequest{
@@ -221,8 +223,7 @@ func (s *Server) DiagnosticUnits(ctx context.Context, req *cproto.DiagnosticUnit
 		})
 	}
 
-	diag := s.coord.PerformDiagnostics(ctx, reqs...)
-	res := make([]*cproto.DiagnosticUnitResponse, 0, len(diag))
+	diag := s.coord.PerformDiagnostics(srv.Context(), reqs...)
 	for _, d := range diag {
 		r := &cproto.DiagnosticUnitResponse{
 			ComponentId: d.Component.ID,
@@ -247,7 +248,11 @@ func (s *Server) DiagnosticUnits(ctx context.Context, req *cproto.DiagnosticUnit
 			}
 			r.Results = results
 		}
-		res = append(res, r)
+
+		if err := srv.Send(r); err != nil {
+			return err
+		}
 	}
-	return &cproto.DiagnosticUnitsResponse{Units: res}, nil
+
+	return nil
 }

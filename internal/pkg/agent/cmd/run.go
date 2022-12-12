@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
@@ -170,7 +171,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		return err
 	}
 
-	serverStopFn, err := setupMetrics(logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer)
+	serverStopFn, err := setupMetrics(logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return err
 	}
@@ -178,7 +179,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		_ = serverStopFn()
 	}()
 
-	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagnostics.GlobalHooks, coord.DiagnosticHooks())
+	control := server.New(logger.Named("control"), agentInfo, coord, tracer, cfg.Settings.GRPC, diagnostics.GlobalHooks, coord.DiagnosticHooks())
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err
@@ -450,6 +451,7 @@ func setupMetrics(
 	operatingSystem string,
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
+	coord *coordinator.Coordinator,
 ) (func() error, error) {
 	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
@@ -461,7 +463,7 @@ func setupMetrics(
 		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
 	}
 
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer)
+	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, isProcessStatsEnabled(cfg), operatingSystem)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
@@ -469,4 +471,8 @@ func setupMetrics(
 
 	// return server stopper
 	return s.Stop, nil
+}
+
+func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
+	return cfg != nil && cfg.HTTP.Enabled
 }

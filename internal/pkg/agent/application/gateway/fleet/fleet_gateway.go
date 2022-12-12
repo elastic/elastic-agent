@@ -27,7 +27,7 @@ import (
 const maxUnauthCounter int = 6
 
 // Const for decraded state or linter complains
-const degraded = "degraded"
+const degraded = "DEGRADED"
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
@@ -234,19 +234,19 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 	stateString := func(s eaclient.UnitState) string {
 		switch s {
 		case eaclient.UnitStateStarting:
-			return "starting"
+			return "STARTING"
 		case eaclient.UnitStateConfiguring:
-			return "configuring"
+			return "CONFIGURING"
 		case eaclient.UnitStateHealthy:
-			return "healthy"
+			return "HEALTHY"
 		case eaclient.UnitStateDegraded:
 			return degraded
 		case eaclient.UnitStateFailed:
-			return "failed"
+			return "FAILED"
 		case eaclient.UnitStateStopping:
-			return "stopping"
+			return "STOPPING"
 		case eaclient.UnitStateStopped:
-			return "stopped"
+			return "STOPPED"
 		}
 		return ""
 	}

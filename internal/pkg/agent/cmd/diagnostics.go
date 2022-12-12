@@ -42,15 +42,10 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		fileName = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
 	}
 
-	err := tryContainerLoadPaths()
-	if err != nil {
-		return err
-	}
-
 	ctx := handleSignal(context.Background())
 
 	daemon := client.New()
-	err = daemon.Connect(ctx)
+	err := daemon.Connect(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect to daemon: %w", err)
 	}

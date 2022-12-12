@@ -39,7 +39,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChange(log, agentInfo, cfg, nullStore, ch)
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch)
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestPolicyAcked(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChange(log, agentInfo, cfg, nullStore, ch)
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch)
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)

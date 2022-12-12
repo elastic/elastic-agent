@@ -11,25 +11,21 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Fix how multiple Fleet Server hosts are handled
+summary: V2 Provide fleet configuration to APM server
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: It fixes the bug when the Elastic Agent would be enrolled using
-  a valid Fleet Server URL, but the policy would contain more than one, being
-  the first URL unreachable. In that case the Elastic Agent would enroll with
-  Fleet Server, but become unhealthy as it'd get stuck trying only the first,
-  unreachable Fleet Server host.
+#description:
 
 # Affected component; a word indicating the component this changeset affects.
-#component:
+component:
 
 # PR number; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-pr: 1329
+# pr: 1234
 
 # Issue number; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-#issue: 1234
+issue: 1737
