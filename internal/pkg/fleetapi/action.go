@@ -100,6 +100,15 @@ type FleetAction struct {
 	//MinimumExecutionDuration int64 // disabled, used by fleet-server for scheduling
 }
 
+func newAckEvent(id, aType string) AckEvent {
+	return AckEvent{
+		EventType: "ACTION_RESULT",
+		SubType:   "ACKNOWLEDGED",
+		ActionID:  id,
+		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", id, aType),
+	}
+}
+
 // ActionUnknown is an action that is not know by the current version of the Agent and we don't want
 // to return an error at parsing time but at execution time we can report or ignore.
 //
@@ -174,12 +183,7 @@ func (a *ActionPolicyReassign) ID() string {
 }
 
 func (a *ActionPolicyReassign) AckEvent() AckEvent {
-	return AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  a.ActionID,
-		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-	}
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionPolicyChange is a request to apply a new
@@ -209,12 +213,7 @@ func (a *ActionPolicyChange) ID() string {
 }
 
 func (a *ActionPolicyChange) AckEvent() AckEvent {
-	return AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  a.ActionID,
-		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-	}
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionUpgrade is a request for agent to upgrade.
@@ -239,12 +238,7 @@ func (a *ActionUpgrade) String() string {
 }
 
 func (a *ActionUpgrade) AckEvent() AckEvent {
-	event := AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  a.ActionID,
-		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-	}
+	event := newAckEvent(a.ActionID, a.ActionType)
 	if a.Err != nil {
 		// FIXME Do we want to change EventType/SubType here?
 		event.Error = a.Err.Error()
@@ -349,12 +343,7 @@ func (a *ActionUnenroll) ID() string {
 }
 
 func (a *ActionUnenroll) AckEvent() AckEvent {
-	return AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  a.ActionID,
-		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-	}
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionSettings is a request to change agent settings.
@@ -386,12 +375,7 @@ func (a *ActionSettings) String() string {
 }
 
 func (a *ActionSettings) AckEvent() AckEvent {
-	return AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  a.ActionID,
-		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-	}
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionCancel is a request to cancel an action.
@@ -423,12 +407,7 @@ func (a *ActionCancel) String() string {
 }
 
 func (a *ActionCancel) AckEvent() AckEvent {
-	return AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  a.ActionID,
-		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-	}
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionDiagnostics is a request to gather and upload a diagnostics bundle.
@@ -459,12 +438,7 @@ func (a *ActionDiagnostics) String() string {
 }
 
 func (a *ActionDiagnostics) AckEvent() AckEvent {
-	event := AckEvent{
-		EventType: "ACTION_RESULT",
-		SubType:   "ACKNOWLEDGED",
-		ActionID:  a.ActionID,
-		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
-	}
+	event := newAckEvent(a.ActionID, a.ActionType)
 	if a.Err != nil {
 		event.Error = a.Err.Error()
 	}
