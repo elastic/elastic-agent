@@ -10,16 +10,11 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-type reexecManager interface {
-	ReExec(cb reexec.ShutdownCallbackFn, argOverrides ...string)
-}
 
 // Settings handles settings change coming from fleet and updates log level.
 type Settings struct {
@@ -63,7 +58,7 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", action.ActionID)
 	}
 
-	h.log.Info("SETTINGS action done, triggering agent restart")
+	h.log.Info("Settings action done, triggering agent restart")
 	h.coord.ReExec(nil)
 	return nil
 }

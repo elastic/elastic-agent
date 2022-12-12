@@ -212,11 +212,11 @@ LOOP:
 			logger.Info("service.HandleSignals invoked stop function. Shutting down")
 			break LOOP
 		case <-appDone:
-			logger.Info("application done, coordinator finished")
+			logger.Info("application done, coordinator exited")
 			logShutdown = false
 			break LOOP
 		case <-rex.ShutdownChan():
-			logger.Info("reexec Shutdown channel triggered")
+			logger.Info("reexec shutdown channel triggered")
 			isRex = true
 			logShutdown = false
 			break LOOP
