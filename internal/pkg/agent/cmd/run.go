@@ -166,7 +166,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		logger.Info("APM instrumentation disabled")
 	}
 
-	coord, err := application.New(logger, agentInfo, rex, tracer, modifiers...)
+	coord, err := application.New(logger, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
