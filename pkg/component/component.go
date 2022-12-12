@@ -132,7 +132,7 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 // PolicyToComponents takes the policy and generated a component model along with providing a mapping between component
 // and the running binary.
 func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Component, map[string]string, error) {
-	outputsMap, err := toIntermediate(policy)
+	outputsMap, err := toIntermediate(policy, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -419,7 +419,7 @@ func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntime
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
 // of components.
-func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
+func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string) (map[string]outputI, error) {
 	const (
 		outputsKey = "outputs"
 		enabledKey = "enabled"
@@ -500,6 +500,11 @@ func toIntermediate(policy map[string]interface{}) (map[string]outputI, error) {
 		t, ok := typeRaw.(string)
 		if !ok {
 			return nil, fmt.Errorf("invalid 'inputs.%d.type', expected a string not a %T", idx, typeRaw)
+		}
+		if realInputType, found := aliasMapping[t]; found {
+			t = realInputType
+			// by replacing type we make sure component understands aliasing
+			input[typeKey] = t
 		}
 		idRaw, ok := input[idKey]
 		if !ok {

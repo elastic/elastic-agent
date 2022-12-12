@@ -738,7 +738,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-0",
 							}, "log"),
 						},
@@ -773,7 +773,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-2",
 							}, "log"),
 						},
@@ -799,7 +799,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-3",
 							}, "log"),
 						},
@@ -825,7 +825,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-4",
 							}, "log"),
 						},
@@ -1137,7 +1137,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-0",
 							}, "log"),
 						},
@@ -1198,7 +1198,7 @@ func TestToComponents(t *testing.T) {
 									map[string]interface{}{
 										"id": "log-default-logfile-0",
 										"config": map[string]interface{}{
-											"type": "logfile",
+											"type": "log",
 											"id":   "logfile-0",
 										},
 									},
@@ -1247,7 +1247,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-2",
 							}, "log"),
 						},
@@ -1274,7 +1274,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-3",
 							}, "log"),
 						},
@@ -1302,7 +1302,7 @@ func TestToComponents(t *testing.T) {
 									map[string]interface{}{
 										"id": "log-stashit-logfile-3",
 										"config": map[string]interface{}{
-											"type": "logfile",
+											"type": "log",
 											"id":   "logfile-3",
 										},
 									},
@@ -1341,7 +1341,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-4",
 							}, "log"),
 						},
@@ -1369,7 +1369,7 @@ func TestToComponents(t *testing.T) {
 									map[string]interface{}{
 										"id": "log-redis-logfile-4",
 										"config": map[string]interface{}{
-											"type": "logfile",
+											"type": "log",
 											"id":   "logfile-4",
 										},
 									},
@@ -1417,6 +1417,67 @@ func TestToComponents(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:     "Alias representation",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "logfile",
+						"id":      "some-id",
+						"enabled": true,
+					},
+					map[string]interface{}{
+						"type":    "log",
+						"id":      "log-1",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "log",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "log-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "log-default-some-id",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "log",
+								"id":   "some-id",
+							}),
+						},
+						{
+							ID:       "log-default-log-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "log",
+								"id":   "log-1",
+							}),
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, scenario := range scenarios {
@@ -1442,6 +1503,9 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
 						assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
 						assert.Equal(t, expected.InputSpec.BinaryPath, actual.InputSpec.BinaryPath)
+						for i, eu := range expected.Units {
+							assert.EqualValues(t, eu.Config, actual.Units[i].Config)
+						}
 						assert.EqualValues(t, expected.Units, actual.Units)
 						if expected.Shipper != nil {
 							assert.Equal(t, *expected.Shipper, *actual.Shipper)
