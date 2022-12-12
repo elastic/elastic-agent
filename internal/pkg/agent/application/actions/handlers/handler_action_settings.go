@@ -63,12 +63,8 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", action.ActionID)
 	}
 
-<<<<<<< HEAD:internal/pkg/agent/application/actions/handlers/handler_action_settings.go
-	h.coord.ReExec(nil)
-=======
 	h.log.Info("SETTINGS action done, triggering agent restart")
-	h.reexec.ReExec(nil)
->>>>>>> 567f9e2dce (Improve shutdown logs (#1618) (#1627)):internal/pkg/agent/application/pipeline/actions/handlers/handler_action_settings.go
+	h.coord.ReExec(nil)
 	return nil
 }
 

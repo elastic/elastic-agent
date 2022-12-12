@@ -58,14 +58,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Use:   "run",
 		Short: "Start the elastic-agent.",
 		Run: func(_ *cobra.Command, _ []string) {
-<<<<<<< HEAD
 			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
-=======
-			if err := run(nil); err != nil {
-				logp.NewLogger("cmd_run").
-					Errorw("run command finished with error",
-						"error.message", err)
->>>>>>> 567f9e2dce (Improve shutdown logs (#1618) (#1627))
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
 				// TODO: remove it. os.Exit will be called on main and if it's called
@@ -216,45 +209,25 @@ LOOP:
 	for {
 		select {
 		case <-stop:
-<<<<<<< HEAD
+			logger.Info("service.HandleSignals invoked stop function. Shutting down")
 			break LOOP
 		case <-appDone:
+			logger.Info("application done, coordinator finished")
 			logShutdown = false
 			break LOOP
 		case <-rex.ShutdownChan():
+			logger.Info("reexec Shutdown channel triggered")
 			isRex = true
 			logShutdown = false
 			break LOOP
-=======
-			logger.Info("service.HandleSignals invoked stop function. Shutting down")
-			breakout = true
-		case <-rex.ShutdownChan():
-			logger.Info("reexec Shutdown channel triggered")
-			reexecing = true
-			breakout = true
->>>>>>> 567f9e2dce (Improve shutdown logs (#1618) (#1627))
 		case sig := <-signals:
 			logger.Infof("signal %q received", sig)
 			if sig == syscall.SIGHUP {
-<<<<<<< HEAD
 				rexLogger.Infof("SIGHUP triggered re-exec")
 				isRex = true
 				rex.ReExec(nil)
 			} else {
 				break LOOP
-=======
-				logger.Infof("signals syscall.SIGHUP received, triggering agent restart")
-				rex.ReExec(nil)
-			} else {
-				breakout = true
-			}
-		}
-		if breakout {
-			if !reexecing {
-				logger.Info("Shutting down Elastic Agent and sending last events...")
-			} else {
-				logger.Info("Restarting Elastic Agent")
->>>>>>> 567f9e2dce (Improve shutdown logs (#1618) (#1627))
 			}
 		}
 	}
