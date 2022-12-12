@@ -132,7 +132,7 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 // PolicyToComponents takes the policy and generated a component model along with providing a mapping between component
 // and the running binary.
 func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}) ([]Component, map[string]string, error) {
-	outputsMap, err := toIntermediate(policy, nil)
+	outputsMap, err := toIntermediate(policy, r.aliasMapping)
 	if err != nil {
 		return nil, nil, err
 	}
