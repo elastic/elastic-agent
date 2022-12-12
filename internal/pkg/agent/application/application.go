@@ -34,6 +34,7 @@ func New(
 	agentInfo *info.AgentInfo,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
+	disableMonitoring bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, error) {
 	platform, err := component.LoadPlatformDetail(modifiers...)
@@ -67,8 +68,10 @@ func New(
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
+	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
-	monitor := monitoring.New(cfg.Settings.V1MonitoringEnabled, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
+	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
 	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), agentInfo, tracer, monitor, cfg.Settings.GRPC)
 	if err != nil {
