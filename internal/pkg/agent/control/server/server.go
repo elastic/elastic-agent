@@ -45,12 +45,12 @@ type Server struct {
 // New creates a new control protocol server.
 func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, grpcConfig *configuration.GRPCConfig, diagHooksFn ...func() diagnostics.Hooks) *Server {
 	return &Server{
-		logger:     log,
-		agentInfo:  agentInfo,
-		coord:      coord,
-		tracer:     tracer,
-		grpcConfig: grpcConfig,
-		diagHooks:  diagHooksFn,
+		logger:      log,
+		agentInfo:   agentInfo,
+		coord:       coord,
+		tracer:      tracer,
+		grpcConfig:  grpcConfig,
+		diagHooksFn: diagHooksFn,
 	}
 }
 
