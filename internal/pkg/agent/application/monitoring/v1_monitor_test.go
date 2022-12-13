@@ -5,37 +5,40 @@
 package monitoring
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestEndpointPath(t *testing.T) {
+	sep := string(filepath.Separator)
 	testCases := []struct {
 		Name       string
 		OS         string
 		ID         string
 		ExpectedID string
 	}{
+		// using filepath join so windows runner is happy, filepath is used internally.
 		// simple
-		{"simple linux", "linux", "simple", "unix:///tmp/elastic-agent/simple.sock"},
+		{"simple linux", "linux", "simple", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "simple.sock")},
+		{"simple darwin", "darwin", "simple", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "simple.sock")},
 		{"simple windows", "windows", "simple", "npipe:///simple"},
-		{"simple darwin", "darwin", "simple", "unix:///tmp/elastic-agent/simple.sock"},
 
 		// special chars
-		{"simple linux", "linux", "complex43@#$", "unix:///tmp/elastic-agent/complex43@#$.sock"},
+		{"simple linux", "linux", "complex43@#$", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "complex43@#$.sock")},
+		{"simple darwin", "darwin", "complex43@#$", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "complex43@#$.sock")},
 		{"simple windows", "windows", "complex43@#$", "npipe:///complex43@#$"},
-		{"simple darwin", "darwin", "complex43@#$", "unix:///tmp/elastic-agent/complex43@#$.sock"},
 
 		// slash
-		{"simple linux", "linux", "slash/sample", "unix:///tmp/elastic-agent/slash-sample.sock"},
+		{"simple linux", "linux", "slash/sample", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "slash-sample.sock")},
+		{"simple darwin", "darwin", "slash/sample", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "slash-sample.sock")},
 		{"simple windows", "windows", "slash/sample", "npipe:///slash-sample"},
-		{"simple darwin", "darwin", "slash/sample", "unix:///tmp/elastic-agent/slash-sample.sock"},
 
 		// backslash
-		{"simple linux", "linux", "back\\slash", "unix:///tmp/elastic-agent/back\\slash.sock"},
+		{"simple linux", "linux", "back\\slash", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "back\\slash.sock")},
+		{"simple darwin", "darwin", "back\\slash", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "back\\slash.sock")},
 		{"simple windows", "windows", "back\\slash", "npipe:///back-slash"},
-		{"simple darwin", "darwin", "back\\slash", "unix:///tmp/elastic-agent/back\\slash.sock"},
 	}
 
 	for _, tc := range testCases {
