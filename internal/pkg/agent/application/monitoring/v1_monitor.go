@@ -193,18 +193,18 @@ func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
 }
 
 // Prepare executes steps in order for monitoring to work correctly
-func (b *BeatsMonitor) Prepare() error {
+func (b *BeatsMonitor) Prepare(unit string) error {
 	if !b.Enabled() {
 		return nil
 	}
 	drops := make([]string, 0, 2)
 	if b.config.C.MonitorLogs {
-		logsDrop := loggingPath("unit", b.operatingSystem)
+		logsDrop := loggingPath(unit, b.operatingSystem)
 		drops = append(drops, filepath.Dir(logsDrop))
 	}
 
 	if b.config.C.MonitorMetrics {
-		metricsDrop := monitoringDrop(endpointPath("unit", b.operatingSystem))
+		metricsDrop := monitoringDrop(endpointPath(unit, b.operatingSystem))
 		drops = append(drops, metricsDrop)
 	}
 
