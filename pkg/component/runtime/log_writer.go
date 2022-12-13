@@ -33,13 +33,16 @@ const (
 //
 // `Write` handles parsing lines as either ndjson or plain text.
 type logWriter struct {
-	loggerCore   zapcoreWriter
-	logCfg       component.CommandLogSpec
-	logLevel     zap.AtomicLevel
-	unitLevels   map[string]zapcore.Level
-	levelMx      sync.RWMutex
+	loggerCore zapcoreWriter
+	logCfg     component.CommandLogSpec
+	logLevel   zap.AtomicLevel
+	unitLevels map[string]zapcore.Level
+	levelMx    sync.RWMutex
+	remainder  []byte
+
+	// inheritLevel is the level that will be used for a log message in the case it doesn't define a log level
+	// for stdout it is INFO and for stderr it is ERROR.
 	inheritLevel zapcore.Level
-	remainder    []byte
 }
 
 func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {

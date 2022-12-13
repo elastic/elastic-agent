@@ -26,6 +26,9 @@ const agentName = "elastic-agent"
 
 const iso8601Format = "2006-01-02T15:04:05.000Z0700"
 
+// Level is the level used in agent.
+type Level = logp.Level
+
 // DefaultLogLevel used in agent and its processes.
 const DefaultLogLevel = logp.InfoLevel
 

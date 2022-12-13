@@ -12,8 +12,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -54,11 +52,11 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	lvl := logp.InfoLevel
 	err := lvl.Unpack(action.LogLevel)
 	if err != nil {
-		return errors.New("failed to unpack log level", err)
+		return fmt.Errorf("failed to unpack log level: %w", err)
 	}
 
 	if err := h.agentInfo.SetLogLevel(action.LogLevel); err != nil {
-		return errors.New("failed to update log level", err)
+		return fmt.Errorf("failed to update log level: %w", err)
 	}
 
 	if err := acker.Ack(ctx, a); err != nil {

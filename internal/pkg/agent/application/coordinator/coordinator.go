@@ -169,7 +169,7 @@ type Coordinator struct {
 
 	specs component.RuntimeSpecs
 
-	llCh chan logp.Level
+	logLevelCh chan logp.Level
 
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
@@ -195,7 +195,7 @@ func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, 
 		logger:     logger,
 		agentInfo:  agentInfo,
 		specs:      specs,
-		llCh:       make(chan logp.Level),
+		logLevelCh: make(chan logp.Level),
 		reexecMgr:  reexecMgr,
 		upgradeMgr: upgradeMgr,
 		runtimeMgr: runtimeMgr,
@@ -314,7 +314,7 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case c.llCh <- lvl:
+	case c.logLevelCh <- lvl:
 		// set global once the level change has been taken by the channel
 		logger.SetLevel(lvl)
 		return nil
@@ -580,7 +580,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 					c.logger.Errorf("%s", err)
 				}
 			}
-		case ll := <-c.llCh:
+		case ll := <-c.logLevelCh:
 			if ctx.Err() == nil {
 				if err := c.processLogLevel(ctx, ll); err != nil {
 					c.state.state = agentclient.Failed

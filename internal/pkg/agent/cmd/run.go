@@ -188,7 +188,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, err := application.New(logger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, err := application.New(l, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
@@ -227,19 +227,19 @@ LOOP:
 	for {
 		select {
 		case <-stop:
-			logger.Info("service.HandleSignals invoked stop function. Shutting down")
+			l.Info("service.HandleSignals invoked stop function. Shutting down")
 			break LOOP
 		case <-appDone:
-			logger.Info("application done, coordinator exited")
+			l.Info("application done, coordinator exited")
 			logShutdown = false
 			break LOOP
 		case <-rex.ShutdownChan():
-			logger.Info("reexec shutdown channel triggered")
+			l.Info("reexec shutdown channel triggered")
 			isRex = true
 			logShutdown = false
 			break LOOP
 		case sig := <-signals:
-			logger.Infof("signal %q received", sig)
+			l.Infof("signal %q received", sig)
 			if sig == syscall.SIGHUP {
 				rexLogger.Infof("SIGHUP triggered re-exec")
 				isRex = true

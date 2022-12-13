@@ -394,7 +394,7 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 func getLogLevel(rawCfg *config.Config, cfgPath string) (logp.Level, error) {
 	cfg, err := configuration.NewFromConfig(rawCfg)
 	if err != nil {
-		return logp.InfoLevel, errors.New(err,
+		return logger.DefaultLogLevel, errors.New(err,
 			fmt.Sprintf("could not parse configuration file %s", cfgPath),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, cfgPath))
@@ -402,7 +402,7 @@ func getLogLevel(rawCfg *config.Config, cfgPath string) (logp.Level, error) {
 	if cfg.Settings.LoggingConfig != nil {
 		return cfg.Settings.LoggingConfig.Level, nil
 	}
-	return logp.InfoLevel, nil
+	return logger.DefaultLogLevel, nil
 }
 
 func printComponents(components []component.Component, streams *cli.IOStreams) error {
