@@ -701,12 +701,18 @@ func loggingPath(id, operatingSystem string) string {
 }
 
 func endpointPath(id, operatingSystem string) (endpointPath string) {
-	id = strings.ReplaceAll(id, string(filepath.Separator), "-")
+	return endpointPathWithDir(id, operatingSystem, paths.TempDir(), string(filepath.Separator))
+}
+
+func endpointPathWithDir(id, operatingSystem, tempDir, separator string) (endpointPath string) {
+	id = strings.ReplaceAll(id, separator, "-")
 	if operatingSystem == windowsOS {
+		// on windows named pipe `/` separates pipe name from a computer/server name
+		id = strings.ReplaceAll(id, "/", "-")
 		return fmt.Sprintf(mbEndpointFileFormatWin, id)
 	}
 	// unix socket path must be less than 104 characters
-	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), id))
+	path := fmt.Sprintf("unix://%s.sock", filepath.Join(tempDir, id))
 	if len(path) < 104 {
 		return path
 	}
