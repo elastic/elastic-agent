@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -66,6 +67,7 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", action.ActionID)
 	}
 
+	h.log.Infof("Settings action done, setting agent log level to %s", lvl.String())
 	return h.coord.SetLogLevel(ctx, lvl)
 }
 

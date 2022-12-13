@@ -62,6 +62,10 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Run: func(_ *cobra.Command, _ []string) {
 			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+
+				// TODO: remove it. os.Exit will be called on main and if it's called
+				// too early some goroutines with deferred functions related
+				// to the shutdown process might not run.
 				os.Exit(1)
 			}
 		},
@@ -223,15 +227,19 @@ LOOP:
 	for {
 		select {
 		case <-stop:
+			logger.Info("service.HandleSignals invoked stop function. Shutting down")
 			break LOOP
 		case <-appDone:
+			logger.Info("application done, coordinator exited")
 			logShutdown = false
 			break LOOP
 		case <-rex.ShutdownChan():
+			logger.Info("reexec shutdown channel triggered")
 			isRex = true
 			logShutdown = false
 			break LOOP
 		case sig := <-signals:
+			logger.Infof("signal %q received", sig)
 			if sig == syscall.SIGHUP {
 				rexLogger.Infof("SIGHUP triggered re-exec")
 				isRex = true

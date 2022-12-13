@@ -43,7 +43,7 @@ const (
 
 type MonitoringManager interface {
 	EnrichArgs(string, string, []string) []string
-	Prepare() error
+	Prepare(string) error
 	Cleanup(string) error
 }
 
@@ -312,7 +312,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}
 
-	if err := c.monitor.Prepare(); err != nil {
+	if err := c.monitor.Prepare(c.current.ID); err != nil {
 		return err
 	}
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
