@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/spf13/cobra"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
@@ -103,15 +105,19 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		return err
 	}
 
-	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
+	logLvl := logger.DefaultLogLevel
+	if cfg.Settings.LoggingConfig != nil {
+		logLvl = cfg.Settings.LoggingConfig.Level
+	}
+	l, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
 	if err != nil {
 		return err
 	}
 
-	cfg, err = tryDelayEnroll(ctx, logger, cfg, override)
+	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")
-		logger.Error(err)
+		l.Error(err)
 		return err
 	}
 	pathConfigFile := paths.AgentConfigFile()
@@ -139,21 +145,33 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 			errors.M(errors.MetaKeyPath, pathConfigFile))
 	}
 
+	// Ensure that the log level now matches what is configured in the agentInfo.
+	if agentInfo.LogLevel() != "" {
+		var lvl logp.Level
+		err = lvl.Unpack(agentInfo.LogLevel())
+		if err != nil {
+			l.Error(errors.New(err, "failed to parse agent information log level"))
+		} else {
+			logLvl = lvl
+			logger.SetLevel(lvl)
+		}
+	}
+
 	// initiate agent watcher
-	if err := upgrade.InvokeWatcher(logger); err != nil {
+	if err := upgrade.InvokeWatcher(l); err != nil {
 		// we should not fail because watcher is not working
-		logger.Error(errors.New(err, "failed to invoke rollback watcher"))
+		l.Error(errors.New(err, "failed to invoke rollback watcher"))
 	}
 
 	if allowEmptyPgp, _ := release.PGP(); allowEmptyPgp {
-		logger.Info("Elastic Agent has been built with security disabled. Elastic Agent will not verify signatures of upgrade artifact.")
+		l.Info("Elastic Agent has been built with security disabled. Elastic Agent will not verify signatures of upgrade artifact.")
 	}
 
 	execPath, err := reexecPath()
 	if err != nil {
 		return err
 	}
-	rexLogger := logger.Named("reexec")
+	rexLogger := l.Named("reexec")
 	rex := reexec.NewManager(rexLogger, execPath)
 
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
@@ -161,21 +179,21 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		return fmt.Errorf("could not initiate APM tracer: %w", err)
 	}
 	if tracer != nil {
-		logger.Info("APM instrumentation enabled")
+		l.Info("APM instrumentation enabled")
 		defer func() {
 			tracer.Flush(nil)
 			tracer.Close()
 		}()
 	} else {
-		logger.Info("APM instrumentation disabled")
+		l.Info("APM instrumentation disabled")
 	}
 
-	coord, err := application.New(logger, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, err := application.New(l, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
 
-	serverStopFn, err := setupMetrics(logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	serverStopFn, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return err
 	}
@@ -185,7 +203,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
-	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+	control := server.New(l.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err
@@ -209,19 +227,19 @@ LOOP:
 	for {
 		select {
 		case <-stop:
-			logger.Info("service.HandleSignals invoked stop function. Shutting down")
+			l.Info("service.HandleSignals invoked stop function. Shutting down")
 			break LOOP
 		case <-appDone:
-			logger.Info("application done, coordinator exited")
+			l.Info("application done, coordinator exited")
 			logShutdown = false
 			break LOOP
 		case <-rex.ShutdownChan():
-			logger.Info("reexec shutdown channel triggered")
+			l.Info("reexec shutdown channel triggered")
 			isRex = true
 			logShutdown = false
 			break LOOP
 		case sig := <-signals:
-			logger.Infof("signal %q received", sig)
+			l.Infof("signal %q received", sig)
 			if sig == syscall.SIGHUP {
 				rexLogger.Infof("SIGHUP triggered re-exec")
 				isRex = true
@@ -233,13 +251,13 @@ LOOP:
 	}
 
 	if logShutdown {
-		logger.Info("Shutting down Elastic Agent and sending last events...")
+		l.Info("Shutting down Elastic Agent and sending last events...")
 	}
 	cancel()
 	err = <-appErr
 
 	if logShutdown {
-		logger.Info("Shutting down completed.")
+		l.Info("Shutting down completed.")
 	}
 	if isRex {
 		rex.ShutdownComplete()
