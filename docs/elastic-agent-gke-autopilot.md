@@ -178,7 +178,7 @@ The Kubenretes Integration is an additional package to be installed in your Elas
 
 ![Agent](./images/3.png)
 
-1. Verify Ingestion of Logs/Metrics
+7. **Step 7: Verify Ingestion of Logs/Metrics**
 
 Verify in your Agent logs that basic components of Agent have started
 
