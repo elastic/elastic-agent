@@ -10,19 +10,19 @@ Goal of this document is to assist users to Kubernetes Observability of Autopilo
 - [Elastic Agent](https://www.elastic.co/elastic-agent)
 - [Elastic Cloud](https://www.elastic.co/guide/en/cloud/current/ec-create-deployment.html)
 
-
-
 **Prerequisities:**
 
 - Active Google Cloud Subscription and enrollment to specific project
 - [Gcloud Cli](https://cloud.google.com/sdk/gcloud) tool installed
 - Elastic Cloud credentials (ES_HOST, ES_USERNAME, ES_PASSWORD)
-  On the deployment overview page of your cloud setup, copy down the Kibana Endpoint.
-  Cloud credentials will be provided upon Elastic Cloud creation.
+  
+  On the deployment overview page of your cloud setup, copy down the Elasticsearch Endpoint(ES_HOST).
+  Authentication username and password (ES_USERNAME, ES_PASSWORD) will be provided upon Elastic Cloud creation.
 
 Folow below steps to configure GKE with Elastic Agent:
 
 1. **Step 1: Initialise and login to your Google project**
+
 This is the project where your GKE cluster will be hosted
 
 ```bash
@@ -32,8 +32,8 @@ gcloud init
 You are logged in as: [xxx].
 
 Pick cloud project to use:
- [1] example-1
- [2] example-2
+[1] example-1
+[2] example-2
 
 Please enter numeric choice or text value (must exactly match list item):  1
 
@@ -42,13 +42,13 @@ Your current project has been set to: [example-1].
 Do you want to configure a default Compute Region and Zone? (Y/n)?  n
 ```
 
-Make sure you also login:
+Make sure you have also login:
 
 ```bash
 >gcloud auth login
-```
+  ```
 
-1. **Create your GKE cluster in autopilot:**
+2. **Step2: Create Autopilot GKE cluster**
 
 ```bash=
 >export REGION=us-central1
@@ -80,9 +80,9 @@ CURRENT   NAME                                                                  
 *         gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1   gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1   gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1
 ```
 
-> In case you are connected to a diffrent context, visit the link provided in your installation bove, eg https://container.googleapis.com/v1/projects/elastic-obs-integrations-dev/zones/us-central1/clusters/cloudnativeautopilot-cluster-1 .
+> In case you are connected to a diffrent context, visit the link provided in your installation bove, eg <https://container.googleapis.com/v1/projects/elastic-obs-integrations-dev/zones/us-central1/clusters/cloudnativeautopilot-cluster-1> .
 
-1. **Edit provided Agent Manifest**
+3. **Step 3: Edit provided Agent Manifest**
 
 Examples for both Agent Installation modes are provided:
 
@@ -112,7 +112,7 @@ containers:
 
 ```
 
-1. **Install Elastic Agent Manifest:**
+4. **Step 4: Install Elastic Agent Manifest:**
 
 ```bash=
 >kubectl apply -f elastic-agent-reduced-namespace_work.yaml
@@ -132,7 +132,7 @@ serviceaccount/elastic-agent-standalone created
 
 > Elastic Agent is installed in namespace `elastic-agent`
 
-1. **Install Kube-state metrics**
+5. **Step 5: Install Kube-state metrics**
 
 > Kube-state Metrics is needed to be installed in the same namespace as Elastic Agent
 
@@ -164,7 +164,7 @@ gk3-cloudnativeautopilot-default-pool-f9bc1966-lmrd   Ready    <none>   158m    
 gk3-cloudnativeautopilot-nap-1ei06cgr-897ebe30-565t   Ready    <none>   6m48s   v1.25.3-gke.800
 ```
 
-1. Install Kubernetes Integration in your Elastic Cloud
+6. **Step 6: Install Kubernetes Integration in your Elastic Cloud**
 
 The Kubenretes Integration is an additional package to be installed in your Elastic Cloud setup and will give us better user experience for Kubenrtes Observability installing aditonal assets in our Elastic stack.
 
@@ -202,5 +202,5 @@ Choose Metrics Dataview to view metrics:
 Also because you have installed the relevant kubernetes integration on step 6, dashboards are availbale for users to observe your cluster.
 Navigate to **Analytics>Dashboards**
 
-![Cluster Overview](./images/6.jpg)
+![Cluster Overview](./images/6.png)
 ([Metrics Kubernetes] Cluster Overview Dashbard)
