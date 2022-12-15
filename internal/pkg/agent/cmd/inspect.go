@@ -139,7 +139,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 	if !opts.variables && !opts.includeMonitoring {
 		return printConfig(fullCfg, l, streams)
 	}
-	cfg, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
+	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
-		_, binaryMapping, err := specs.PolicyToComponents(cfg)
+		_, binaryMapping, err := specs.PolicyToComponents(cfg, lvl)
 		if err != nil {
 			return fmt.Errorf("failed to get binary mappings: %w", err)
 		}
@@ -242,7 +242,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
-	m, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
+	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	}
 
 	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, monitorFn)
+	comps, err := specs.ToComponents(m, monitorFn, lvl)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
 	}
@@ -333,39 +333,43 @@ func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCf
 	return monitor.MonitoringConfig, nil
 }
 
-func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration) (map[string]interface{}, error) {
+func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration) (map[string]interface{}, logp.Level, error) {
 	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
 	if err != nil {
-		return nil, fmt.Errorf("failed to determine capabilities: %w", err)
+		return nil, logp.InfoLevel, fmt.Errorf("failed to determine capabilities: %w", err)
 	}
 
 	cfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
 	if err != nil {
-		return nil, err
+		return nil, logp.InfoLevel, err
+	}
+	lvl, err := getLogLevel(cfg, cfgPath)
+	if err != nil {
+		return nil, logp.InfoLevel, err
 	}
 	m, err := cfg.ToMapStr()
 	if err != nil {
-		return nil, err
+		return nil, lvl, err
 	}
 	ast, err := transpiler.NewAST(m)
 	if err != nil {
-		return nil, fmt.Errorf("could not create the AST from the configuration: %w", err)
+		return nil, lvl, fmt.Errorf("could not create the AST from the configuration: %w", err)
 	}
 
 	var ok bool
 	updatedAst, err := caps.Apply(ast)
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply capabilities: %w", err)
+		return nil, lvl, fmt.Errorf("failed to apply capabilities: %w", err)
 	}
 	ast, ok = updatedAst.(*transpiler.AST)
 	if !ok {
-		return nil, fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
+		return nil, lvl, fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
 	}
 
 	// Wait for the variables based on the timeout.
 	vars, err := vars.WaitForVariables(ctx, l, cfg, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to gather variables: %w", err)
+		return nil, lvl, fmt.Errorf("failed to gather variables: %w", err)
 	}
 
 	// Render the inputs using the discovered inputs.
@@ -373,18 +377,32 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	if ok {
 		renderedInputs, err := transpiler.RenderInputs(inputs, vars)
 		if err != nil {
-			return nil, fmt.Errorf("rendering inputs failed: %w", err)
+			return nil, lvl, fmt.Errorf("rendering inputs failed: %w", err)
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
-			return nil, fmt.Errorf("inserting rendered inputs failed: %w", err)
+			return nil, lvl, fmt.Errorf("inserting rendered inputs failed: %w", err)
 		}
 	}
 	m, err = ast.Map()
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+		return nil, lvl, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
-	return m, nil
+	return m, lvl, nil
+}
+
+func getLogLevel(rawCfg *config.Config, cfgPath string) (logp.Level, error) {
+	cfg, err := configuration.NewFromConfig(rawCfg)
+	if err != nil {
+		return logger.DefaultLogLevel, errors.New(err,
+			fmt.Sprintf("could not parse configuration file %s", cfgPath),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, cfgPath))
+	}
+	if cfg.Settings.LoggingConfig != nil {
+		return cfg.Settings.LoggingConfig.Level, nil
+	}
+	return logger.DefaultLogLevel, nil
 }
 
 func printComponents(components []component.Component, streams *cli.IOStreams) error {

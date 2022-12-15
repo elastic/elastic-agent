@@ -22,4 +22,6 @@ inputs:
         - "-E"
         - "gc_percent=${APMSERVER_GOGC:100}"
         - "-E"
+        - "logging.level=debug"
+        - "-E"
         - "logging.to_stderr=true"

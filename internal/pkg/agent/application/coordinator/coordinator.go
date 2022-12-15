@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"gopkg.in/yaml.v2"
 
 	"go.elastic.co/apm"
@@ -155,6 +157,7 @@ type State struct {
 	State      agentclient.State                 `yaml:"state"`
 	Message    string                            `yaml:"message"`
 	Components []runtime.ComponentComponentState `yaml:"components"`
+	LogLevel   logp.Level                        `yaml:"log_level"`
 }
 
 // StateFetcher provides an interface to fetch the current state of the coordinator.
@@ -171,6 +174,8 @@ type Coordinator struct {
 	agentInfo *info.AgentInfo
 
 	specs component.RuntimeSpecs
+
+	logLevelCh chan logp.Level
 
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
@@ -191,11 +196,12 @@ type Coordinator struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, modifiers ...ComponentsModifier) *Coordinator {
 	return &Coordinator{
 		logger:     logger,
 		agentInfo:  agentInfo,
 		specs:      specs,
+		logLevelCh: make(chan logp.Level),
 		reexecMgr:  reexecMgr,
 		upgradeMgr: upgradeMgr,
 		runtimeMgr: runtimeMgr,
@@ -204,7 +210,8 @@ func New(logger *logger.Logger, agentInfo *info.AgentInfo, specs component.Runti
 		caps:       caps,
 		modifiers:  modifiers,
 		state: coordinatorState{
-			state: agentclient.Starting,
+			state:    agentclient.Starting,
+			logLevel: logLevel,
 		},
 		monitorMgr: monitorMgr,
 	}
@@ -216,6 +223,7 @@ func (c *Coordinator) State(local bool) (s State) {
 	s.State = c.state.state
 	s.Message = c.state.message
 	s.Components = c.runtimeMgr.State()
+	s.LogLevel = c.state.logLevel
 	if c.state.overrideState != nil {
 		// state has been overridden due to an action that is occurring
 		s.State = c.state.overrideState.state
@@ -305,6 +313,18 @@ func (c *Coordinator) PerformAction(ctx context.Context, comp component.Componen
 // it performs diagnostics for all current units.
 func (c *Coordinator) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	return c.runtimeMgr.PerformDiagnostics(ctx, req...)
+}
+
+// SetLogLevel changes the entire log level for the running Elastic Agent.
+func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case c.logLevelCh <- lvl:
+		// set global once the level change has been taken by the channel
+		logger.SetLevel(lvl)
+		return nil
+	}
 }
 
 // Run runs the coordinator.
@@ -698,6 +718,14 @@ func (c *Coordinator) runner(ctx context.Context) error {
 					c.logger.Errorf("%s", err)
 				}
 			}
+		case ll := <-c.logLevelCh:
+			if ctx.Err() == nil {
+				if err := c.processLogLevel(ctx, ll); err != nil {
+					c.state.state = agentclient.Failed
+					c.state.message = err.Error()
+					c.logger.Errorf("%s", err)
+				}
+			}
 		}
 	}
 }
@@ -768,6 +796,21 @@ func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) 
 	return nil
 }
 
+func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) (err error) {
+	span, ctx := apm.StartSpan(ctx, "log_level", "app.internal")
+	defer func() {
+		apm.CaptureError(ctx, err).Send()
+		span.End()
+	}()
+
+	c.state.logLevel = ll
+
+	if c.state.ast != nil && c.state.vars != nil {
+		return c.process(ctx)
+	}
+	return nil
+}
+
 func (c *Coordinator) process(ctx context.Context) (err error) {
 	span, ctx := apm.StartSpan(ctx, "process", "app.internal")
 	defer func() {
@@ -815,7 +858,7 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
-	comps, err := c.specs.ToComponents(cfg, configInjector)
+	comps, err := c.specs.ToComponents(cfg, configInjector, c.state.logLevel)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to render components: %w", err)
 	}
@@ -835,9 +878,10 @@ type coordinatorState struct {
 	message       string
 	overrideState *coordinatorOverrideState
 
-	config *config.Config
-	ast    *transpiler.AST
-	vars   []*transpiler.Vars
+	config   *config.Config
+	ast      *transpiler.AST
+	vars     []*transpiler.Vars
+	logLevel logp.Level
 }
 
 type coordinatorOverrideState struct {

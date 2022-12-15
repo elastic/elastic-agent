@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -21,20 +22,48 @@ type zapcoreWriter interface {
 	Write(zapcore.Entry, []zapcore.Field) error
 }
 
+type logSource uint8
+
+const (
+	logSourceStdout logSource = 0
+	logSourceStderr logSource = 1
+)
+
 // logWriter is an `io.Writer` that takes lines and passes them through the logger.
 //
 // `Write` handles parsing lines as either ndjson or plain text.
 type logWriter struct {
 	loggerCore zapcoreWriter
 	logCfg     component.CommandLogSpec
+	logLevel   zap.AtomicLevel
+	unitLevels map[string]zapcore.Level
+	levelMx    sync.RWMutex
 	remainder  []byte
+
+	// inheritLevel is the level that will be used for a log message in the case it doesn't define a log level
+	// for stdout it is INFO and for stderr it is ERROR.
+	inheritLevel zapcore.Level
 }
 
-func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec) *logWriter {
-	return &logWriter{
-		loggerCore: core,
-		logCfg:     logCfg,
+func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
+	inheritLevel := zapcore.InfoLevel
+	if src == logSourceStderr {
+		inheritLevel = zapcore.ErrorLevel
 	}
+	return &logWriter{
+		loggerCore:   core,
+		logCfg:       logCfg,
+		logLevel:     zap.NewAtomicLevelAt(ll),
+		unitLevels:   unitLevels,
+		inheritLevel: inheritLevel,
+	}
+}
+
+func (r *logWriter) SetLevels(ll zapcore.Level, unitLevels map[string]zapcore.Level) {
+	r.logLevel.SetLevel(ll)
+	r.levelMx.Lock()
+	defer r.levelMx.Unlock()
+	r.unitLevels = unitLevels
 }
 
 func (r *logWriter) Write(p []byte) (int, error) {
@@ -74,12 +103,14 @@ func (r *logWriter) Write(p []byte) (int, error) {
 			// handled as JSON
 			continue
 		}
-		// considered standard text being it's not JSON, log at basic info level
-		_ = r.loggerCore.Write(zapcore.Entry{
-			Level:   zapcore.InfoLevel,
-			Time:    time.Now(),
-			Message: str,
-		}, nil)
+		// considered standard text being it's not JSON, log at inherit level (if enabled)
+		if r.logLevel.Level().Enabled(r.inheritLevel) {
+			_ = r.loggerCore.Write(zapcore.Entry{
+				Level:   r.inheritLevel,
+				Time:    time.Now(),
+				Message: str,
+			}, nil)
+		}
 	}
 }
 
@@ -92,11 +123,25 @@ func (r *logWriter) handleJSON(line string) bool {
 	ts := getTimestamp(evt, r.logCfg.TimeKey, r.logCfg.TimeFormat)
 	msg := getMessage(evt, r.logCfg.MessageKey)
 	fields := getFields(evt, r.logCfg.IgnoreKeys)
-	_ = r.loggerCore.Write(zapcore.Entry{
-		Level:   lvl,
-		Time:    ts,
-		Message: msg,
-	}, fields)
+
+	allowedLvl := r.logLevel.Level()
+	unitId := getUnitId(evt)
+	if unitId != "" {
+		r.levelMx.RLock()
+		if r.unitLevels != nil {
+			if unitLevel, ok := r.unitLevels[unitId]; ok {
+				allowedLvl = unitLevel
+			}
+		}
+		r.levelMx.RUnlock()
+	}
+	if allowedLvl.Enabled(lvl) {
+		_ = r.loggerCore.Write(zapcore.Entry{
+			Level:   lvl,
+			Time:    ts,
+			Message: msg,
+		}, fields)
+	}
 	return true
 }
 
@@ -168,4 +213,22 @@ func contains(s []string, val string) bool {
 		}
 	}
 	return false
+}
+
+func getUnitId(evt map[string]interface{}) string {
+	if unitIdRaw, ok := evt["unit.id"]; ok {
+		if unitId, ok := unitIdRaw.(string); ok && unitId != "" {
+			return unitId
+		}
+	}
+	if unitMapRaw, ok := evt["unit"]; ok {
+		if unitMap, ok := unitMapRaw.(map[string]interface{}); ok {
+			if unitIdRaw, ok := unitMap["id"]; ok {
+				if unitId, ok := unitIdRaw.(string); ok && unitId != "" {
+					return unitId
+				}
+			}
+		}
+	}
+	return ""
 }
