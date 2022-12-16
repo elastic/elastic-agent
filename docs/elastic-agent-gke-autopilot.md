@@ -95,13 +95,13 @@ The Kubenretes Integration is an additional package to be installed in your Elas
 
 ![Integration](./images/2.png)
 
-- Ma
-  - a) For Managed Elastic Agent choose `Add Elastic Agent to your Hosts` . On this step required  `FLEET_URL` and `FLEET_ENROLLMENT_TOKEN` will be provided
+- Choose Elastic Agent Installation:
+  - a) For Managed Elastic Agent choose `Add Elastic Agent to your Hosts` . Once butoon cliked, the required  `FLEET_URL` and `FLEET_ENROLLMENT_TOKEN` will be provided for later usage inside Elastic Managed Manifest.
   - b) For Stanadlone Elastic Agent choose `Add Elastic Agent Later`
 
 ![Agent](./images/3.png)
 
-**Use Manfests of next Step 4 to complete installation**
+**Use Manifests of next Step 4 to complete installation**
 
 4. **Step 4: Edit provided Agent Manifest**
 
@@ -209,7 +209,7 @@ gk3-cloudnativeautopilot-nap-1ei06cgr-897ebe30-565t   Ready    <none>   6m48s   
 
 7. **Step 7: Verify Ingestion of Logs/Metrics**
 
-Verify in your Agent logs that basic components of Agent have started
+Verify in your Agent logs that basic components of Agent have started:
 
 ```bash=
 ❯ kubectl logs -n elastic-agent elastic-agent-f8ctm | grep -i running | grep metricbeat
@@ -219,16 +219,18 @@ Verify in your Agent logs that basic components of Agent have started
 {"log.level":"info","@timestamp":"2022-12-15T08:05:41.064Z","log.origin":{"file.name":"log/reporter.go","file.line":40},"message":"2022-12-15T08:05:41Z - message: Application: filebeat--8.5.0[4aa5da9b-f40f-4fea-9290-5697a40c0544]: State changed to STARTING: Starting - type: 'STATE' - sub_type: 'STARTING'","ecs.version":"1.6.0"}
 ```
 
-Login to your Elastic Cloud Instance and navigate **Analytics>Discover**:
+Login to your Elastic Cloud Instance and navigate to **Analytics>Discover**:
 
 Choose Logs Dataview to view logs:
 
 ![Logs](./images/4.png)
 
 Choose Metrics Dataview to view metrics:
+
 ![Metrics](./images/5.png)
 
-Also because you have installed the relevant kubernetes integration on step 6, dashboards are availbale for users to observe your cluster.
+Because kubernetes integration is already installed, dashboards are availbale for users to observe kubernetes cluster status.
+
 Navigate to **Analytics>Dashboards**
 
 ![Cluster Overview](./images/6.png)
