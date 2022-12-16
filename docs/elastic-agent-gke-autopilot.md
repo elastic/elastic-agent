@@ -79,9 +79,9 @@ CURRENT   NAME                                                                  
 *         gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1   gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1   gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1
 ```
 
-> In case of problems to connect to your kubernetes cluster visit `https://console.cloud.google.com/kubernetes/clusters/details/<region>/<name_cluster>/details?project=<google_project` eg. <https://console.cloud.google.com/kubernetes/clusters/details/us-central1/cloudnativeautopilot-cluster-1/details?project=elastic-obs-integrations-dev>.
+> In case of problems to connect to your kubernetes cluster visit `Deploy` tab under `https://console.cloud.google.com/kubernetes/clusters/details/<region>/<name_cluster>/details?project=<google_project>`.
 
-3. **Step 3: Install Kubernetes Integration in your Elastic Cloud**
+1. **Step 3: Install Kubernetes Integration in your Elastic Cloud**
 
 Kubernetes observability is supported through both Elastic Agent installation scenarios ([managed](https://www.elastic.co/guide/en/fleet/current/install-fleet-managed-elastic-agent.html) and [standalone](https://www.elastic.co/guide/en/fleet/current/install-standalone-elastic-agent.html)).
 
