@@ -24,9 +24,7 @@ data:
         username: '${ES_USERNAME}'
         password: '${ES_PASSWORD}'
     inputs:
-      - id: kubernetes/metrics-kubelet-18f23297-3b0f-4803-9b92-4d164174cb83
-        revision: 1
-        name: kubernetes-1
+      - name: kubernetes-1
         type: kubernetes/metrics
         data_stream:
           namespace: default
@@ -76,9 +74,7 @@ data:
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
-          - id: >-
-              kubernetes/metrics-kubernetes.volume-18f23297-3b0f-4803-9b92-4d164174cb83
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.volume
             metricsets:
@@ -274,9 +270,7 @@ data:
           namespace: default
         use_output: default
         streams:
-          - id: >-
-              kubernetes/metrics-kubernetes.proxy-18f23297-3b0f-4803-9b92-4d164174cb83
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.proxy
             metricsets:
@@ -290,9 +284,7 @@ data:
           namespace: default
         use_output: default
         streams:
-          - id: >-
-              kubernetes/metrics-kubernetes.event-18f23297-3b0f-4803-9b92-4d164174cb83
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.event
             metricsets:
@@ -307,9 +299,7 @@ data:
           namespace: default
         use_output: default
         streams:
-          - id: >-
-              kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
-            data_stream:
+          - data_stream:
               type: logs
               dataset: kubernetes.container_logs
             paths:
@@ -361,9 +351,9 @@ spec:
               value: "elastic"
             # The basic authentication password used to connect to Elasticsearch
             - name: ES_PASSWORD
-              value: "j1K1tuDD711wZj103NR76YdG"
+              value: "changeme"
             - name: ES_HOST
-              value: "https://new8-5-3.es.us-central1.gcp.cloud.es.io:443"
+              value: "https://<url>.us-central1.gcp.cloud.es.io:443"
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

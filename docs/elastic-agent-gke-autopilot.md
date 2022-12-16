@@ -17,9 +17,9 @@ Goal of this document is to assist users to Kubernetes Observability of Autopilo
 - Elastic Cloud credentials (ES_HOST, ES_USERNAME, ES_PASSWORD)
   
   On the deployment overview page of your cloud setup, copy down the Elasticsearch Endpoint(ES_HOST).
-  Authentication username and password (ES_USERNAME, ES_PASSWORD) will be provided upon Elastic Cloud creation.
+  Username and password (ES_USERNAME, ES_PASSWORD) will be provided upon Elastic Cloud creation.
 
-Folow below steps to configure GKE with Elastic Agent:
+## Folow below steps to configure GKE with Elastic Agent:
 
 1. **Step 1: Initialise and login to your Google project**
 
@@ -69,29 +69,70 @@ NAME                            LOCATION     MASTER_VERSION  MASTER_IP      MACH
 cloudnativeautopilot-cluster-1  us-central1  1.25.3-gke.800  34.121.193.11  e2-medium     1.25.3-gke.800  3          RUNNING
 ```
 
-For Cluster version see more information in [Release Notes](https://cloud.google.com/kubernetes-engine/docs/release-notes-rapid?_ga=2.26767933.-1835820382.1670922779)
+For Cluster versions see more information in [Release Notes](https://cloud.google.com/kubernetes-engine/docs/release-notes-rapid?_ga=2.26767933.-1835820382.1670922779)
 
 Verify that you are connected to your cluster:
 
 ```bash=
-Example:
-kubectl config get-contexts
+>kubectl config get-contexts
 CURRENT   NAME                                                                          CLUSTER                                                                       AUTHINFO                                                                      NAMESPACE
 *         gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1   gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1   gke_elastic-obs-integrations-dev_us-central1_cloudnativeautopilot-cluster-1
 ```
 
-> In case you are connected to a diffrent context, visit the link provided in your installation bove, eg <https://container.googleapis.com/v1/projects/elastic-obs-integrations-dev/zones/us-central1/clusters/cloudnativeautopilot-cluster-1> .
+> In case of problems to connect to your kubernetes cluster visit `https://console.cloud.google.com/kubernetes/clusters/details/<region>/<name_cluster>/details?project=<google_project` eg. <https://console.cloud.google.com/kubernetes/clusters/details/us-central1/cloudnativeautopilot-cluster-1/details?project=elastic-obs-integrations-dev>.
 
-3. **Step 3: Edit provided Agent Manifest**
+3. **Step 3: Install Kubernetes Integration in your Elastic Cloud**
 
-Examples for both Agent Installation modes are provided:
+Kubernetes observability is supported through both Elastic Agent installation scenarios ([managed](https://www.elastic.co/guide/en/fleet/current/install-fleet-managed-elastic-agent.html) and [standalone](https://www.elastic.co/guide/en/fleet/current/install-standalone-elastic-agent.html)).
 
-- Elastic [Managed Manifest](./manifests/elastic-agent-managed-kubernetes_gke_autopilot_redused.yaml)
-- Elastic [Stanadlone Manifest](./manifests/elastic-agent-standalone_gke_autopilot_redused.yaml)
+The Kubenretes Integration is an additional package to be installed in your Elastic Cloud and will enhance user experience for Kubenrtes Observability by installing aditonal assets in our Elastic stack.
+
+- Add [Kubernetes Integration](https://docs.elastic.co/integrations/kubernetes)
+  
+![Cloudid](./images/1.png)
+
+- Use default Values and click `Save and Continue`
+
+![Integration](./images/2.png)
+
+- Ma
+  - a) For Managed Elastic Agent choose `Add Elastic Agent to your Hosts` . On this step required  `FLEET_URL` and `FLEET_ENROLLMENT_TOKEN` will be provided
+  - b) For Stanadlone Elastic Agent choose `Add Elastic Agent Later`
+
+![Agent](./images/3.png)
+
+**Use Manfests of next Step 4 to complete installation**
+
+4. **Step 4: Edit provided Agent Manifest**
+
+Depending on the Elastc agent mode chosen, pick relevant manifest below:
+
+1. [Elastic Agent Managed Manifest](./manifests/elastic-agent-managed-kubernetes_gke_autopilot_redused.yaml)
 
 - Set Container Image version of Elastic Agent
 
-```bash=
+```yaml
+containers:
+    - name: elastic-agent-standalone
+      image: docker.elastic.co/beats/elastic-agent:8.5.3
+```
+
+- Provide Elastic Cloud Credentials (In managed scenario you only neeed `FLEET_URL` and `FLEET_ENROLLMENT_TOKEN`)
+  
+```yaml
+- name: FLEET_URL
+  value: "https://123456.fleet.us-central1.gcp.cloud.es.io:443"
+  # Elasticsearch API key used to enroll Elastic Agents in Fleet (https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens)
+  # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
+  - name: FLEET_ENROLLMENT_TOKEN
+  value: "WmpQbUVJVUJnX0kE6aDg0OGVtNG1TTDJqWlM2VGp"
+  ```
+
+2. [Elastic Agent Stanadlone Manifest](./manifests/elastic-agent-standalone_gke_autopilot_redused.yaml)
+
+- Set Container Image version of Elastic Agent
+
+```yaml
 containers:
     - name: elastic-agent-standalone
       image: docker.elastic.co/beats/elastic-agent:8.5.3
@@ -99,7 +140,8 @@ containers:
 
 - Provide Elastic Cloud Credentials
   
-```bash=
+```yaml
+# This user needs the privileges required to publish events to Elasticsearch.
 - name: ES_USERNAME
   value: "elastic"
 # The basic authentication password used to connect to Elasticsearch
@@ -109,13 +151,14 @@ containers:
 - name: ES_HOST
   value: "https://<url>.kb.us-central1.gcp.cloud.es.io:9243"
 - name: NODE_NAME
-
 ```
 
-4. **Step 4: Install Elastic Agent Manifest:**
+5. **Step 5: Install Elastic Agent Manifest:**
+
+For example:
 
 ```bash=
->kubectl apply -f elastic-agent-reduced-namespace_work.yaml
+>kubectl apply -f elastic-agent-managed-kubernetes_gke_autopilot_redused.yaml
 
 namespace/elastic-agent created
 configmap/agent-node-datastreams created
@@ -132,9 +175,9 @@ serviceaccount/elastic-agent-standalone created
 
 > Elastic Agent is installed in namespace `elastic-agent`
 
-5. **Step 5: Install Kube-state metrics**
+6. **Step 6: Install Kube-state metrics**
 
-> Kube-state Metrics is needed to be installed in the same namespace as Elastic Agent
+> Kube-state Metrics needs to be installed in the same namespace as Elastic Agent
 
 ```bash
 git clone git@github.com:kubernetes/kube-state-metrics.git
@@ -163,20 +206,6 @@ gk3-cloudnativeautopilot-default-pool-324d684e-73lk   Ready    <none>   158m    
 gk3-cloudnativeautopilot-default-pool-f9bc1966-lmrd   Ready    <none>   158m    v1.25.3-gke.800
 gk3-cloudnativeautopilot-nap-1ei06cgr-897ebe30-565t   Ready    <none>   6m48s   v1.25.3-gke.800
 ```
-
-6. **Step 6: Install Kubernetes Integration in your Elastic Cloud**
-
-The Kubenretes Integration is an additional package to be installed in your Elastic Cloud setup and will give us better user experience for Kubenrtes Observability installing aditonal assets in our Elastic stack.
-
-- Add [Kubernetes Integration](https://docs.elastic.co/integrations/kubernetes)
-![Cloudid](./images/1.png)
-
-- Use default Values
-![Integration](./images/2.png)
-
-- Choose `Add Elastic Agent later`
-
-![Agent](./images/3.png)
 
 7. **Step 7: Verify Ingestion of Logs/Metrics**
 
