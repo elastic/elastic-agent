@@ -48,7 +48,7 @@ Make sure you have also login:
 >gcloud auth login
   ```
 
-2. **Step2: Create Autopilot GKE cluster**
+2. **Step 2: Create Autopilot GKE cluster**
 
 ```bash=
 >export REGION=us-central1
