@@ -221,13 +221,13 @@ Verify in your Agent logs that basic components of Agent have started:
 
 Login to your Elastic Cloud Instance and navigate to **Analytics>Discover**:
 
-Choose Logs Dataview to view logs:
+Choose `Logs-* Dataview` to view logs:
 
-![Logs](./images/4.png)
+![Logs](./images/5.png)
 
-Choose Metrics Dataview to view metrics:
+Choose `Metrics-* Dataview` to view metrics:
 
-![Metrics](./images/5.png)
+![Metrics](./images/4.png)
 
 Because kubernetes integration is already installed, dashboards are availbale for users to observe kubernetes cluster status.
 
