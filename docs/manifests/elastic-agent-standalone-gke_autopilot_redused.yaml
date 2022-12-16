@@ -1,9 +1,9 @@
-# kind: Namespace
-# apiVersion: v1
-# metadata:
-#   name: elastic-agent
-#   labels:
-#     name: elastic-agent
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: elastic-agent
+  labels:
+    name: elastic-agent
 ---
 # For more information refer https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
 apiVersion: v1
