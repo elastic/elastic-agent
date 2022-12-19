@@ -30,10 +30,6 @@ spec:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       serviceAccountName: elastic-agent
-      #hostNetwork: true
-      # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
-      # Sharing the host process ID namespace gives visibility of all processes running on the same host.
-      #hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
@@ -53,14 +49,6 @@ spec:
             # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
             - name: FLEET_ENROLLMENT_TOKEN
               value: "<replace_with_token>"
-            - name: KIBANA_HOST
-              value: "http://kibana:5601"
-            # The basic authentication username used to connect to Kibana and retrieve a service_token to enable Fleet
-            - name: KIBANA_FLEET_USERNAME
-              value: "elastic"
-            # The basic authentication password used to connect to Kibana and retrieve a service_token to enable Fleet
-            - name: KIBANA_FLEET_PASSWORD
-              value: "changeme"
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

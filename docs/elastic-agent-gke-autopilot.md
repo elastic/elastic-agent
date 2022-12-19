@@ -107,7 +107,7 @@ The Kubenretes Integration is an additional package to be installed in your Elas
 
 Depending on the Elastc agent mode chosen, pick relevant manifest below:
 
-1. [Elastic Agent Managed Manifest](./manifests/elastic-agent-managed-kubernetes_gke_autopilot_redused.yaml)
+1. [Elastic Agent Managed Manifest](./manifests/elastic-agent-managed-kubernetes_gke_autopilot.yaml)
 
 - Set Container Image version of Elastic Agent
 
@@ -128,7 +128,7 @@ containers:
   value: "WmpQbUVJVUJnX0kE6aDg0OGVtNG1TTDJqWlM2VGp"
   ```
 
-2. [Elastic Agent Stanadlone Manifest](./manifests/elastic-agent-standalone_gke_autopilot_redused.yaml)
+2. [Elastic Agent Stanadlone Manifest](./manifests/elastic-agent-standalone_gke_autopilot.yaml)
 
 - Set Container Image version of Elastic Agent
 
@@ -158,7 +158,7 @@ containers:
 For example:
 
 ```bash=
->kubectl apply -f elastic-agent-managed-kubernetes_gke_autopilot_redused.yaml
+>kubectl apply -f elastic-agent-managed-kubernetes_gke_autopilot.yaml
 
 namespace/elastic-agent created
 configmap/agent-node-datastreams created
