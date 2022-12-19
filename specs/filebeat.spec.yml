@@ -65,7 +65,7 @@ inputs:
     description: "CometD input"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippersa
+    shippers: *shippers
     command:
       args: *args
   - name: container
