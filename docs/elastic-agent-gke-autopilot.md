@@ -1,6 +1,6 @@
 # GKE Observability with Elastic Agent
 
-Goal of this document is to assist users to Kubernetes Observability of Autopilot Google Kubernetes Engine Clusters (Autopilot GKE) with Elastic Agent. Monitoring, observing and alerting of Google Kubernetes Cluster made easy with following simple steps. Elastic Agent is installed as daemonset inside Google Kubernetes Cluster and will send metrics/ logs to a configured Elastic Cloud instance.
+The goal of this document is to assist users to Kubernetes Observability of Autopilot Google Kubernetes Engine Clusters (Autopilot GKE) with Elastic Agent. Monitoring, observing and alerting of a Google Kubernetes Cluster made easy with the following simple steps. Elastic Agent is installed as daemonset inside Google Kubernetes Cluster and will send metrics/logs to a configured Elastic Cloud instance.
 
 > Elastic Agent can be configured with multiple output setups, as part of this demo we will use Elastic Cloud
 
