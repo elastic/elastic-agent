@@ -179,7 +179,7 @@ func (m *Manager) Run(ctx context.Context) error {
 		for {
 			err := server.Serve(lis)
 			if err != nil {
-				m.logger.Errorf("control protocol failed: %w", err)
+				m.logger.Errorf("control protocol failed: %s", err)
 			}
 			if ctx.Err() != nil {
 				// context has an error don't start again
