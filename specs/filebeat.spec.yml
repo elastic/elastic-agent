@@ -61,6 +61,13 @@ inputs:
     shippers: *shippers
     command:
       args: *args
+  - name: cometd
+    description: "CometD input"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command:
+      args: *args
   - name: container
     description: "Container logs"
     platforms: *platforms
