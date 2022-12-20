@@ -1,20 +1,30 @@
 syntax = "proto3";
 
+// NOTE: This is the same package name that is used for the ElasticAgent service that implements the control protocol.
+// https://github.com/elastic/elastic-agent-client/blob/15881a8e64ef95f32f688c933319cd926ff500b0/elastic-agent-client.proto#L7
+//
+// We need to keep the package name the same in both cases for backwards compatibility reasons. There is nothing wrong with
+// both of these files using the same package, besides that we need to avoid name collisions between the types in both files.
 package proto;
 
 option cc_enable_arenas = true;
 option go_package = "pkg/agent/control/proto;proto";
 
 // Status codes for the current state.
+// Add a V1_ prefix to avoid conflicts in the global Go proto registry:
+// https://developers.google.com/protocol-buffers/docs/reference/go/faq#namespace-conflict
+// Changes to the enum name are backwards compatible since we are not using the proto JSON
+// wire encoding. The enum values need to be the same as they were in 8.5 and below:
+// https://github.com/elastic/elastic-agent/blob/1fa24b7a28c0e9e30647f17d945a03168055bde5/control.proto#L13-L22
 enum Status {
-  STARTING = 0;
-  CONFIGURING = 1;
-  HEALTHY = 2;
-  DEGRADED = 3;
-  FAILED = 4;
-  STOPPING = 5;
-  UPGRADING = 6;
-  ROLLBACK = 7;
+  V1_STARTING = 0;
+  V1_CONFIGURING = 1;
+  V1_HEALTHY = 2;
+  V1_DEGRADED = 3;
+  V1_FAILED = 4;
+  V1_STOPPING = 5;
+  V1_UPGRADING = 6;
+  V1_ROLLBACK = 7;
 }
 
 message Empty {
@@ -45,7 +55,7 @@ message StatusResponse {
 }
 
 // Only implements the Status method as required by the upgrade watcher in versions of the
-// agent before 8.6
+// agent before 8.6.
 service ElasticAgentControl {
   // Fetches the currently status of the Elastic Agent.
   rpc Status(Empty) returns (StatusResponse);

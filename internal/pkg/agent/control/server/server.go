@@ -119,7 +119,7 @@ func (s *Server) Version(_ context.Context, _ *v2proto.Empty) (*v2proto.VersionR
 
 func (s *Server) Status(_ context.Context, _ *v1proto.Empty) (*v1proto.StatusResponse, error) {
 	return &v1proto.StatusResponse{
-		Status:  v1proto.Status_FAILED,
+		Status:  v1proto.Status_V1_FAILED,
 		Message: "this is a test",
 	}, nil
 }
