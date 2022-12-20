@@ -7,7 +7,7 @@ syntax = "proto3";
 package cproto;
 
 option cc_enable_arenas = true;
-option go_package = "internal/pkg/agent/control/cproto";
+option go_package = "internal/pkg/agent/control/v2/cproto";
 import "google/protobuf/timestamp.proto";
 
 // State codes for the current state.
@@ -106,7 +106,7 @@ message ComponentUnitState {
   UnitType unit_type = 1;
   // ID of the unit in the component.
   string unit_id = 2;
-  // Current state.
+  // Current status.
   State state = 3;
   // Current state message.
   string message = 4;
@@ -130,7 +130,7 @@ message ComponentState {
   string id = 1;
   // Component name.
   string name = 2;
-  // Current state.
+  // Current status.
   State state = 3;
   // Current state message.
   string message = 4;
@@ -157,7 +157,7 @@ message StateAgentInfo {
 message StateResponse {
   // Overall information of Elastic Agent.
   StateAgentInfo info = 1;
-  // Overall state of Elastic Agent.
+  // Overall status of Elastic Agent.
   State state = 2;
   // Overall status message of Elastic Agent.
   string message = 3;

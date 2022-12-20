@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package control_test
+package v1_test
 
 import (
 	"context"
@@ -15,15 +15,15 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/server"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestServerClient_Version(t *testing.T) {
 	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer, nil, configuration.DefaultGRPCConfig())
-	err := srv.Start()
+	err := srv.Start(false)
 	require.NoError(t, err)
 	defer srv.Stop()
 

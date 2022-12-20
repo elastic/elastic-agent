@@ -16,7 +16,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/server"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -59,7 +59,7 @@ func TestCmdBinaryOnlyYAML(t *testing.T) {
 
 func TestCmdDaemon(t *testing.T) {
 	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer, nil, configuration.DefaultGRPCConfig())
-	require.NoError(t, srv.Start())
+	require.NoError(t, srv.Start(false))
 	defer srv.Stop()
 
 	streams, _, out, _ := cli.NewTestingIOStreams()
@@ -75,7 +75,7 @@ func TestCmdDaemon(t *testing.T) {
 
 func TestCmdDaemonYAML(t *testing.T) {
 	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer, nil, configuration.DefaultGRPCConfig())
-	require.NoError(t, srv.Start())
+	require.NoError(t, srv.Start(false))
 	defer srv.Stop()
 
 	streams, _, out, _ := cli.NewTestingIOStreams()

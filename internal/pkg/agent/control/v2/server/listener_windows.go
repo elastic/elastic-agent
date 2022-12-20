@@ -5,7 +5,7 @@
 //go:build windows
 // +build windows
 
-package server
+package control
 
 import (
 	"net"
@@ -15,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/elastic-agent-libs/api/npipe"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -30,7 +29,7 @@ func createListener(log *logger.Logger) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	return npipe.NewListener(control.Address(), sd)
+	return npipe.NewListener(Address(), sd)
 }
 
 func cleanupListener(_ *logger.Logger) {

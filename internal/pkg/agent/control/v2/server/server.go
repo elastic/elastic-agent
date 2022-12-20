@@ -23,7 +23,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/proto"
+	v1server "github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/server"
+	cproto "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -57,7 +59,7 @@ func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coord
 }
 
 // Start starts the GRPC endpoint and accepts new connections.
-func (s *Server) Start() error {
+func (s *Server) Start(startV1Wrapper bool) error {
 	if s.server != nil {
 		// already started
 		return nil
@@ -76,6 +78,11 @@ func (s *Server) Start() error {
 		s.server = grpc.NewServer(grpc.MaxRecvMsgSize(s.grpcConfig.MaxMsgSize))
 	}
 	cproto.RegisterElasticAgentControlServer(s.server, s)
+
+	if startV1Wrapper {
+		v1Wrapper := v1server.New(s.logger, s, s.tracer)
+		proto.RegisterElasticAgentControlServer(s.server, v1Wrapper)
+	}
 
 	// start serving GRPC connections
 	go func() {

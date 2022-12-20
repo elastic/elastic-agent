@@ -15,7 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
+	cproto "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 )
 
 // UnitType is the type of the unit
