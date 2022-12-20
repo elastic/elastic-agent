@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package proto;
+
+option cc_enable_arenas = true;
+option go_package = "pkg/agent/control/proto;proto";
+
+// Status codes for the current state.
+enum Status {
+  STARTING = 0;
+  CONFIGURING = 1;
+  HEALTHY = 2;
+  DEGRADED = 3;
+  FAILED = 4;
+  STOPPING = 5;
+  UPGRADING = 6;
+  ROLLBACK = 7;
+}
+
+message Empty {
+}
+
+// Current status of the application in Elastic Agent.
+message ApplicationStatus {
+  // Unique application ID.
+  string id = 1;
+  // Application name.
+  string name = 2;
+  // Current status.
+  Status status = 3;
+  // Current status message.
+  string message = 4;
+  // Current status payload.
+  string payload = 5;
+}
+
+// Status is the current status of Elastic Agent.
+message StatusResponse {
+  // Overall status of Elastic Agent.
+  Status status = 1;
+  // Overall status message of Elastic Agent.
+  string message = 2;
+  // Status of each application in Elastic Agent.
+  repeated ApplicationStatus applications = 3;
+}
+
+// Only implements the Status method as required by the upgrade watcher in versions of the
+// agent before 8.6
+service ElasticAgentControl {
+  // Fetches the currently status of the Elastic Agent.
+  rpc Status(Empty) returns (StatusResponse);
+}

@@ -466,11 +466,24 @@ func Config() {
 
 // ControlProto generates pkg/agent/control/proto module.
 func ControlProto() error {
-	return sh.RunV(
+	err := sh.RunV(
 		"protoc",
 		"--go_out=internal/pkg/agent/control/cproto", "--go_opt=paths=source_relative",
 		"--go-grpc_out=internal/pkg/agent/control/cproto", "--go-grpc_opt=paths=source_relative",
 		"control.proto")
+	if err != nil {
+		return err
+	}
+
+	err = sh.RunV(
+		"protoc",
+		"--go_out=internal/pkg/agent/control/proto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=internal/pkg/agent/control/proto", "--go-grpc_opt=paths=source_relative",
+		"control_v1.proto")
+	if err != nil {
+		return err
+	}
+	return err
 }
 
 // FakeShipperProto generates pkg/component/fake/common event protocol.
