@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -82,7 +83,11 @@ func TestLazyAcker(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	log, _ := logger.New("", false)
+	cfg := logger.DefaultLoggingConfig()
+	cfg.Level = logp.DebugLevel
+	// cfg.ToFiles = false
+	cfg.ToStderr = true
+	log, _ := logger.NewFromConfig("", cfg, true)
 
 	// Tests
 	tests := []struct {
