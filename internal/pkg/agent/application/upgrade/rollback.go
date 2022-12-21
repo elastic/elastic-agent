@@ -114,7 +114,7 @@ func InvokeWatcher(log *logger.Logger) error {
 	defer func() {
 		if cmd.Process != nil {
 			log.Debugf("releasing watcher %v", cmd.Process.Pid)
-			cmd.Process.Release()
+			_ = cmd.Process.Release()
 		}
 	}()
 

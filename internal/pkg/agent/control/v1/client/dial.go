@@ -15,10 +15,16 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func dialContext(ctx context.Context) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, strings.TrimPrefix(control.Address(), "unix://"), grpc.WithInsecure(), grpc.WithContextDialer(dialer))
+	return grpc.DialContext(
+		ctx,
+		strings.TrimPrefix(control.Address(), "unix://"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
+	)
 }
 
 func dialer(ctx context.Context, addr string) (net.Conn, error) {

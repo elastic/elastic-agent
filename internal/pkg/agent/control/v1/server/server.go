@@ -6,7 +6,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 
 	"go.elastic.co/apm"
 
@@ -57,7 +56,7 @@ func (s *Server) Status(ctx context.Context, _ *proto.Empty) (*proto.StatusRespo
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(resp)
+
 	return &proto.StatusResponse{
 		Status:       agentStateToProto(resp.State),
 		Message:      resp.Message,

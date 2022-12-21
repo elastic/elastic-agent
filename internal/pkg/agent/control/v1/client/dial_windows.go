@@ -18,7 +18,12 @@ import (
 )
 
 func dialContext(ctx context.Context) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, control.Address(), grpc.WithInsecure(), grpc.WithContextDialer(dialer))
+	return grpc.DialContext(
+		ctx,
+		control.Address(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
+	)
 }
 
 func dialer(ctx context.Context, addr string) (net.Conn, error) {
