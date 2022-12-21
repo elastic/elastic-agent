@@ -570,7 +570,7 @@ type ComponentUnitState struct {
 	UnitType UnitType `protobuf:"varint,1,opt,name=unit_type,json=unitType,proto3,enum=cproto.UnitType" json:"unit_type,omitempty"`
 	// ID of the unit in the component.
 	UnitId string `protobuf:"bytes,2,opt,name=unit_id,json=unitId,proto3" json:"unit_id,omitempty"`
-	// Current status.
+	// Current state.
 	State State `protobuf:"varint,3,opt,name=state,proto3,enum=cproto.State" json:"state,omitempty"`
 	// Current state message.
 	Message string `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
@@ -722,7 +722,7 @@ type ComponentState struct {
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Component name.
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	// Current status.
+	// Current state.
 	State State `protobuf:"varint,3,opt,name=state,proto3,enum=cproto.State" json:"state,omitempty"`
 	// Current state message.
 	Message string `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
@@ -898,11 +898,11 @@ type StateResponse struct {
 
 	// Overall information of Elastic Agent.
 	Info *StateAgentInfo `protobuf:"bytes,1,opt,name=info,proto3" json:"info,omitempty"`
-	// Overall status of Elastic Agent.
+	// Overall state of Elastic Agent.
 	State State `protobuf:"varint,2,opt,name=state,proto3,enum=cproto.State" json:"state,omitempty"`
-	// Overall status message of Elastic Agent.
+	// Overall state message of Elastic Agent.
 	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	// Status of each component in Elastic Agent.
+	// State of each component in Elastic Agent.
 	Components []*ComponentState `protobuf:"bytes,4,rep,name=components,proto3" json:"components,omitempty"`
 }
 

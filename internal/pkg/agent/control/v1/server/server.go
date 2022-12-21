@@ -104,10 +104,21 @@ func agentStateToProto(state v2proto.State) proto.Status {
 func componentStateToProto(components []*v2proto.ComponentState) []*proto.ApplicationStatus {
 	s := make([]*proto.ApplicationStatus, len(components))
 	for i, c := range components {
+		compState := agentStateToProto(c.State)
+		// respect unhealthy unit state
+		// unit state can be worse than a component one
+		if compState == proto.Status_V1_HEALTHY {
+			for _, u := range c.Units {
+				if unitState := agentStateToProto(u.State); unitState != proto.Status_V1_HEALTHY {
+					compState = unitState
+				}
+			}
+		}
+
 		s[i] = &proto.ApplicationStatus{
 			Id:      c.Id,
 			Name:    c.Name,
-			Status:  agentStateToProto(c.State),
+			Status:  compState,
 			Message: c.Message,
 			Payload: "",
 		}
