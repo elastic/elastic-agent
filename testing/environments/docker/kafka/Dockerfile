@@ -1,4 +1,4 @@
-FROM debian:11.5
+FROM debian:bullseye
 
 ENV KAFKA_HOME /kafka
 # The advertised host is kafka. This means it will not work if container is started locally and connected from localhost to it
