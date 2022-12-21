@@ -133,11 +133,9 @@ func TestActionDispatcher(t *testing.T) {
 		success1.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		success2.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		d.Dispatch(ctx, ack, action1, action2)
-		select {
-		case err := <-d.Errors():
+		go d.Dispatch(ctx, ack, action1, action2)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 
 		success1.AssertExpectations(t)
@@ -159,11 +157,9 @@ func TestActionDispatcher(t *testing.T) {
 		action := &mockOtherAction{}
 		action.On("Type").Return("action")
 		action.On("ID").Return("id")
-		d.Dispatch(ctx, ack, action)
-		select {
-		case err := <-d.Errors():
+		go d.Dispatch(ctx, ack, action)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 
 		def.AssertExpectations(t)
@@ -209,11 +205,9 @@ func TestActionDispatcher(t *testing.T) {
 		action2.On("Type").Return("action")
 		action2.On("ID").Return("id")
 
-		d.Dispatch(context.Background(), ack, action1, action2)
-		select {
-		case err := <-d.Errors():
+		go d.Dispatch(context.Background(), ack, action1, action2)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
@@ -236,11 +230,12 @@ func TestActionDispatcher(t *testing.T) {
 		action.On("Type").Return(fleetapi.ActionTypeCancel)
 		action.On("ID").Return("id")
 
-		d.Dispatch(context.Background(), ack, action)
+		go d.Dispatch(context.Background(), ack, action)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		default:
+		case <-time.After(200 * time.Microsecond):
+			// we're not expecting any reset,
 		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
@@ -269,11 +264,9 @@ func TestActionDispatcher(t *testing.T) {
 		action2.On("Type").Return(fleetapi.ActionTypeCancel)
 		action2.On("ID").Return("id")
 
-		d.Dispatch(context.Background(), ack, action2)
-		select {
-		case err := <-d.Errors():
+		go d.Dispatch(context.Background(), ack, action2)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
@@ -292,11 +285,12 @@ func TestActionDispatcher(t *testing.T) {
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
 
-		d.Dispatch(context.Background(), ack)
+		go d.Dispatch(context.Background(), ack)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		default:
+		case <-time.After(500 * time.Microsecond):
+			// we're not expecting any reset
 		}
 		def.AssertNotCalled(t, "Handle", mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -324,11 +318,9 @@ func TestActionDispatcher(t *testing.T) {
 		action.On("SetRetryAttempt", 1).Once()
 		action.On("SetStartTime", mock.Anything).Once()
 
-		d.Dispatch(context.Background(), ack, action)
-		select {
-		case err := <-d.Errors():
+		go d.Dispatch(context.Background(), ack, action)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
