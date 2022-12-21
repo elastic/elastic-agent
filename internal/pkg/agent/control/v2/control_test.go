@@ -23,7 +23,7 @@ import (
 
 func TestServerClient_Version(t *testing.T) {
 	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer, nil, configuration.DefaultGRPCConfig())
-	err := srv.Start(false)
+	err := srv.Start()
 	require.NoError(t, err)
 	defer srv.Stop()
 

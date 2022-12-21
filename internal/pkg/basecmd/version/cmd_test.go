@@ -59,7 +59,7 @@ func TestCmdBinaryOnlyYAML(t *testing.T) {
 
 func TestCmdDaemon(t *testing.T) {
 	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer, nil, configuration.DefaultGRPCConfig())
-	require.NoError(t, srv.Start(false))
+	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
 	streams, _, out, _ := cli.NewTestingIOStreams()
@@ -75,7 +75,7 @@ func TestCmdDaemon(t *testing.T) {
 
 func TestCmdDaemonYAML(t *testing.T) {
 	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer, nil, configuration.DefaultGRPCConfig())
-	require.NoError(t, srv.Start(false))
+	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
 	streams, _, out, _ := cli.NewTestingIOStreams()

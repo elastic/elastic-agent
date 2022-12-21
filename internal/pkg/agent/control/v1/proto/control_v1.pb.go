@@ -8,6 +8,11 @@
 // 	protoc        v3.21.9
 // source: control_v1.proto
 
+// proto namespace/package name is shared with elastic-agent-client
+// we need to be careful with modifications to avoid name collisions
+// proto is here to maintain backward compatibility and cannot be changed.
+// elastic-agent-client namespace is likely change after 8.6
+
 package proto
 
 import (

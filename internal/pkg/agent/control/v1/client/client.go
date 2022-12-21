@@ -53,33 +53,6 @@ type ApplicationStatus struct {
 	Payload map[string]interface{}
 }
 
-// ProcMeta is the running version and ID information for a running process.
-type ProcMeta struct {
-	Process            string
-	Name               string
-	Hostname           string
-	ID                 string
-	EphemeralID        string
-	Version            string
-	BuildCommit        string
-	BuildTime          time.Time
-	Username           string
-	UserID             string
-	UserGID            string
-	BinaryArchitecture string
-	RouteKey           string
-	ElasticLicensed    bool
-	Error              string
-}
-
-// ProcPProf returns pprof data for a process.
-type ProcPProf struct {
-	Name     string
-	RouteKey string
-	Result   []byte
-	Error    string
-}
-
 // AgentStatus is the current status of the Elastic Agent.
 type AgentStatus struct {
 	Status       Status

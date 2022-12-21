@@ -59,7 +59,7 @@ func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coord
 }
 
 // Start starts the GRPC endpoint and accepts new connections.
-func (s *Server) Start(startV1Wrapper bool) error {
+func (s *Server) Start() error {
 	if s.server != nil {
 		// already started
 		return nil
@@ -79,10 +79,8 @@ func (s *Server) Start(startV1Wrapper bool) error {
 	}
 	cproto.RegisterElasticAgentControlServer(s.server, s)
 
-	if startV1Wrapper {
-		v1Wrapper := v1server.New(s.logger, s, s.tracer)
-		proto.RegisterElasticAgentControlServer(s.server, v1Wrapper)
-	}
+	v1Wrapper := v1server.New(s.logger, s, s.tracer)
+	proto.RegisterElasticAgentControlServer(s.server, v1Wrapper)
 
 	// start serving GRPC connections
 	go func() {

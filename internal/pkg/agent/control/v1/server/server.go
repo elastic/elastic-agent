@@ -11,15 +11,15 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/proto"
-	cproto "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
+	v2proto "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type serverV2 interface {
-	State(_ context.Context, _ *cproto.Empty) (*cproto.StateResponse, error)
-	Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartResponse, error)
-	Upgrade(_ context.Context, _ *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error)
+	State(_ context.Context, _ *v2proto.Empty) (*v2proto.StateResponse, error)
+	Restart(_ context.Context, _ *v2proto.Empty) (*v2proto.RestartResponse, error)
+	Upgrade(_ context.Context, _ *v2proto.UpgradeRequest) (*v2proto.UpgradeResponse, error)
 }
 
 // Server is the daemon side of the control protocol.
@@ -52,7 +52,7 @@ func (s *Server) Version(ctx context.Context, _ *proto.Empty) (*proto.VersionRes
 
 // Status returns the overall status of the agent.
 func (s *Server) Status(ctx context.Context, _ *proto.Empty) (*proto.StatusResponse, error) {
-	resp, err := s.v2Server.State(ctx, &cproto.Empty{})
+	resp, err := s.v2Server.State(ctx, &v2proto.Empty{})
 	if err != nil {
 		return nil, err
 	}
@@ -66,19 +66,19 @@ func (s *Server) Status(ctx context.Context, _ *proto.Empty) (*proto.StatusRespo
 
 // Restart performs re-exec.
 func (s *Server) Restart(ctx context.Context, _ *proto.Empty) (*proto.RestartResponse, error) {
-	_, err := s.v2Server.Restart(ctx, &cproto.Empty{})
+	_, err := s.v2Server.Restart(ctx, &v2proto.Empty{})
 	return &proto.RestartResponse{Status: proto.ActionStatus_V1_SUCCESS}, err
 
 }
 
 // Upgrade performs the upgrade operation.
 func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*proto.UpgradeResponse, error) {
-	resp, _ := s.v2Server.Upgrade(ctx, &cproto.UpgradeRequest{
+	resp, _ := s.v2Server.Upgrade(ctx, &v2proto.UpgradeRequest{
 		Version:   request.Version,
 		SourceURI: request.SourceURI,
 	})
 
-	if resp.Status == cproto.ActionStatus_FAILURE {
+	if resp.Status == v2proto.ActionStatus_FAILURE {
 		return &proto.UpgradeResponse{
 			Status:  proto.ActionStatus_V1_FAILURE,
 			Version: resp.Error,
@@ -91,17 +91,17 @@ func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*p
 	}, nil
 }
 
-func agentStateToProto(state cproto.State) proto.Status {
-	if state == cproto.State_DEGRADED {
+func agentStateToProto(state v2proto.State) proto.Status {
+	if state == v2proto.State_DEGRADED {
 		return proto.Status_V1_DEGRADED
 	}
-	if state == cproto.State_FAILED {
+	if state == v2proto.State_FAILED {
 		return proto.Status_V1_FAILED
 	}
 	return proto.Status_V1_HEALTHY
 }
 
-func componentStateToProto(components []*cproto.ComponentState) []*proto.ApplicationStatus {
+func componentStateToProto(components []*v2proto.ComponentState) []*proto.ApplicationStatus {
 	s := make([]*proto.ApplicationStatus, len(components))
 	for i, c := range components {
 		s[i] = &proto.ApplicationStatus{

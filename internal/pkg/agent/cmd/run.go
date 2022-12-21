@@ -205,7 +205,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	control := server.New(l.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
 	// start the control listener
-	if err := control.Start(true); err != nil {
+	if err := control.Start(); err != nil {
 		return err
 	}
 	defer control.Stop()
