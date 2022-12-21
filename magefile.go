@@ -658,6 +658,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 				"elastic-agent-shipper",
 				"endpoint-security",
 				"fleet-server",
+				"pf-host-agent",
 			}
 			ctx := context.Background()
 			for _, beat := range dependencies {
