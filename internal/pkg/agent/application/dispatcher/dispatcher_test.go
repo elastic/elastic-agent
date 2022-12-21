@@ -367,6 +367,44 @@ func TestActionDispatcher(t *testing.T) {
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
 	})
+
+	t.Run("Dispatch multiples events in separate batch returns one error second one resets it", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Times(2)
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Times(2)
+
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+		err = d.Register(&mockAction{}, def)
+		require.NoError(t, err)
+
+		action1 := &mockAction{}
+		action1.On("Type").Return("action")
+		action1.On("ID").Return("id")
+		action2 := &mockAction{}
+		action2.On("Type").Return("action")
+		action2.On("ID").Return("id")
+
+		// Kind of a dirty work around to test an error return.
+		// launch in another routing and sleep to check if an error is generated
+		go d.Dispatch(context.Background(), ack, action1)
+		time.Sleep(time.Millisecond * 300)
+		if err := <-d.Errors(); err == nil {
+			t.Fatal("Expecting error")
+		}
+		go d.Dispatch(context.Background(), ack, action2)
+		time.Sleep(time.Millisecond * 300)
+		if err := <-d.Errors(); err != nil {
+			t.Fatal("Unexpected error")
+		}
+
+		def.AssertExpectations(t)
+		queue.AssertExpectations(t)
+	})
 }
 
 func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
