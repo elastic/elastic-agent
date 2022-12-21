@@ -411,17 +411,23 @@ func TestActionDispatcher(t *testing.T) {
 		dispatchCtx1, cancelFn1 := context.WithCancel(context.Background())
 		defer cancelFn1()
 		go d.Dispatch(dispatchCtx1, ack, action1)
-		time.Sleep(time.Millisecond * 300)
-		if err := <-d.Errors(); err == nil {
-			t.Fatal("Expecting error")
+		select {
+		case err := <-d.Errors():
+			if err == nil {
+				t.Fatal("Expecting error")
+			}
+		case <-time.After(300 * time.Millisecond):
 		}
 
 		dispatchCtx2, cancelFn2 := context.WithCancel(context.Background())
 		defer cancelFn2()
 		go d.Dispatch(dispatchCtx2, ack, action2)
-		time.Sleep(time.Millisecond * 300)
-		if err := <-d.Errors(); err != nil {
-			t.Fatal("Unexpected error")
+		select {
+		case err := <-d.Errors():
+			if err != nil {
+				t.Fatal("Unexpected error")
+			}
+		case <-time.After(300 * time.Millisecond):
 		}
 
 		def.AssertExpectations(t)
