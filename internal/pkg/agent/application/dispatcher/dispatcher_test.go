@@ -133,7 +133,9 @@ func TestActionDispatcher(t *testing.T) {
 		success1.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		success2.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		go d.Dispatch(ctx, ack, action1, action2)
+		dispatchCtx, cancelFn := context.WithCancel(ctx)
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action1, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -157,7 +159,10 @@ func TestActionDispatcher(t *testing.T) {
 		action := &mockOtherAction{}
 		action.On("Type").Return("action")
 		action.On("ID").Return("id")
-		go d.Dispatch(ctx, ack, action)
+
+		dispatchCtx, cancelFn := context.WithCancel(ctx)
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -205,7 +210,9 @@ func TestActionDispatcher(t *testing.T) {
 		action2.On("Type").Return("action")
 		action2.On("ID").Return("id")
 
-		go d.Dispatch(context.Background(), ack, action1, action2)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action1, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -230,7 +237,9 @@ func TestActionDispatcher(t *testing.T) {
 		action.On("Type").Return(fleetapi.ActionTypeCancel)
 		action.On("ID").Return("id")
 
-		go d.Dispatch(context.Background(), ack, action)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
@@ -264,7 +273,9 @@ func TestActionDispatcher(t *testing.T) {
 		action2.On("Type").Return(fleetapi.ActionTypeCancel)
 		action2.On("ID").Return("id")
 
-		go d.Dispatch(context.Background(), ack, action2)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action2)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -285,7 +296,9 @@ func TestActionDispatcher(t *testing.T) {
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
 
-		go d.Dispatch(context.Background(), ack)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
@@ -318,7 +331,9 @@ func TestActionDispatcher(t *testing.T) {
 		action.On("SetRetryAttempt", 1).Once()
 		action.On("SetStartTime", mock.Anything).Once()
 
-		go d.Dispatch(context.Background(), ack, action)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action)
 		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -350,7 +365,9 @@ func TestActionDispatcher(t *testing.T) {
 
 		// Kind of a dirty work around to test an error return.
 		// launch in another routing and sleep to check if an error is generated
-		go d.Dispatch(context.Background(), ack, action1, action2)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action1, action2)
 		time.Sleep(time.Millisecond * 200)
 		select {
 		case <-d.Errors():
@@ -391,12 +408,17 @@ func TestActionDispatcher(t *testing.T) {
 
 		// Kind of a dirty work around to test an error return.
 		// launch in another routing and sleep to check if an error is generated
-		go d.Dispatch(context.Background(), ack, action1)
+		dispatchCtx1, cancelFn1 := context.WithCancel(context.Background())
+		defer cancelFn1()
+		go d.Dispatch(dispatchCtx1, ack, action1)
 		time.Sleep(time.Millisecond * 300)
 		if err := <-d.Errors(); err == nil {
 			t.Fatal("Expecting error")
 		}
-		go d.Dispatch(context.Background(), ack, action2)
+
+		dispatchCtx2, cancelFn2 := context.WithCancel(context.Background())
+		defer cancelFn2()
+		go d.Dispatch(dispatchCtx2, ack, action2)
 		time.Sleep(time.Millisecond * 300)
 		if err := <-d.Errors(); err != nil {
 			t.Fatal("Unexpected error")
