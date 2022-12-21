@@ -7,7 +7,7 @@ syntax = "proto3";
 package cproto;
 
 option cc_enable_arenas = true;
-option go_package = "internal/pkg/agent/control/cproto";
+option go_package = "internal/pkg/agent/control/v2/cproto";
 import "google/protobuf/timestamp.proto";
 
 // State codes for the current state.
@@ -159,9 +159,9 @@ message StateResponse {
   StateAgentInfo info = 1;
   // Overall state of Elastic Agent.
   State state = 2;
-  // Overall status message of Elastic Agent.
+  // Overall state message of Elastic Agent.
   string message = 3;
-  // Status of each component in Elastic Agent.
+  // State of each component in Elastic Agent.
   repeated ComponentState components = 4;
 }
 
