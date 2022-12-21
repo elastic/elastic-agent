@@ -36,7 +36,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/server"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"

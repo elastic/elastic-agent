@@ -23,7 +23,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
+	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"

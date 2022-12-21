@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
