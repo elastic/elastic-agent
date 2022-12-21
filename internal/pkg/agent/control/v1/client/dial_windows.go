@@ -12,6 +12,7 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
