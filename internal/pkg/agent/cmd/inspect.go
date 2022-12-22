@@ -160,11 +160,11 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
-		_, binaryMapping, err := specs.PolicyToComponents(cfg, lvl)
+		components, binaryMapping, err := specs.PolicyToComponents(cfg, lvl)
 		if err != nil {
 			return fmt.Errorf("failed to get binary mappings: %w", err)
 		}
-		monitorCfg, err := monitorFn(cfg, binaryMapping)
+		monitorCfg, err := monitorFn(cfg, components, binaryMapping)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring config: %w", err)
 		}

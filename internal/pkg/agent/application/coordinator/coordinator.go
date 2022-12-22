@@ -68,7 +68,7 @@ type MonitorManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// InjectMonitoring injects monitoring configuration into resolved ast tree.
-	MonitoringConfig(map[string]interface{}, map[string]string) (map[string]interface{}, error)
+	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string) (map[string]interface{}, error)
 }
 
 // Runner provides interface to run a manager and receive running errors.
