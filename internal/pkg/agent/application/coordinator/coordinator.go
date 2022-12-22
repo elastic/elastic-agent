@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -339,11 +340,21 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			case s := <-sub.Ch():
 				logState := newCoordinatorComponentLogState(&s)
 				_, ok := state[s.Component.ID]
+				var logMsg string
 				if !ok {
-					c.logger.With("component", logState).Info("New component created")
+					logMsg = "New component created"
 				} else {
-					c.logger.With("component", logState).Info("Existing component state changed")
+					logMsg = "Existing component state changed"
 				}
+
+				inputSummaries := make([]string, 0, len(logState.Inputs))
+				for _, input := range logState.Inputs {
+					inputSummaries = append(inputSummaries, fmt.Sprintf("[%s: %s]", input.ID, input.State))
+				}
+				inputSummary := strings.Join(inputSummaries, ",")
+
+				c.logger.With("component", logState).Infof("[%s][%s] %s: %s, inputs: [%s], output: [%s: %s]", logState.ID, logState.State, logMsg, logState.Message, inputSummary, logState.Output.ID, logState.Output.State)
+
 				state[s.Component.ID] = logState
 				if s.State.State == client.UnitStateStopped {
 					delete(state, s.Component.ID)
