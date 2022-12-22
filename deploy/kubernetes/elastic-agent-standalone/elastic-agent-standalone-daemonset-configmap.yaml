@@ -29,6 +29,7 @@ data:
       #hints.enabled: true
     inputs:
       - name: kubernetes-cluster-metrics
+        id: kubernetes-cluster-metrics
         condition: ${kubernetes_leaderelection.leader} == true
         type: kubernetes/metrics
         use_output: default
@@ -268,6 +269,7 @@ data:
             # ssl.certificate_authorities:
             #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
       - name: system-logs
+        id: system-logs
         type: logfile
         use_output: default
         meta:
@@ -382,6 +384,7 @@ data:
                     }
                   }
       - name: system-metrics
+        id: system-metrics
         type: system/metrics
         use_output: default
         meta:
@@ -480,6 +483,7 @@ data:
               - socket_summary
             system.hostfs: /hostfs
       - name: kubernetes-node-metrics
+        id: kubernetes-node-metrics
         type: kubernetes/metrics
         use_output: default
         meta:
@@ -603,7 +607,8 @@ data:
       # Add extra input blocks here, based on conditions
       # so as to automatically identify targeted Pods and start monitoring them
       # using a predefined integration. For instance:
-      #- name: redis
+      #- name: redis-metrics
+      #  id: redis-metrics
       #  type: redis/metrics
       #  use_output: default
       #  meta:
