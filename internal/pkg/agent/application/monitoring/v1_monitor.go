@@ -14,6 +14,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/elastic/elastic-agent/pkg/component"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -102,7 +104,7 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 }
 
 // MonitoringConfig adds monitoring inputs to a configuration based on retrieved list of components to run.
-func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, componentIDToBinary map[string]string) (map[string]interface{}, error) {
+func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, components []component.Component, componentIDToBinary map[string]string) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
 	}
@@ -137,7 +139,7 @@ func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, component
 	b.initInputs(cfg)
 
 	if b.config.C.MonitorLogs {
-		if err := b.injectLogsInput(cfg, componentIDToBinary, monitoringOutput); err != nil {
+		if err := b.injectLogsInput(cfg, components, monitoringOutput); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -283,7 +285,7 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 	return nil
 }
 
-func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutput string) error {
+func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []component.Component, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
 
@@ -425,6 +427,40 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 					},
 				}},
 		},
+	}
+
+	for _, comp := range components {
+		if comp.InputSpec == nil || comp.InputSpec.Spec.Service == nil || comp.InputSpec.Spec.Service.Log == nil || comp.InputSpec.Spec.Service.Log.Path == "" {
+			// only monitor service inputs that define a log path
+			continue
+		}
+		streams = append(streams, map[string]interface{}{
+			idKey:  fmt.Sprintf("filestream-monitoring-%s", comp.ID),
+			"type": "filestream",
+			"paths": []interface{}{
+				comp.InputSpec.Spec.Service.Log.Path,
+			},
+			"data_stream": map[string]interface{}{
+				"type":      "logs",
+				"dataset":   fmt.Sprintf("elastic_agent.%s", comp.InputSpec.BinaryName),
+				"namespace": monitoringNamespace,
+			},
+			"close": map[string]interface{}{
+				"on_state_change": map[string]interface{}{
+					"inactive": "5m",
+				},
+			},
+			"parsers": []interface{}{
+				map[string]interface{}{
+					"ndjson": map[string]interface{}{
+						"message_key":    "message",
+						"overwrite_keys": true,
+						"add_error_key":  true,
+						"target":         "",
+					},
+				},
+			},
+		})
 	}
 
 	inputs := []interface{}{
