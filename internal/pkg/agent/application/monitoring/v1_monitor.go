@@ -429,11 +429,13 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 		},
 	}
 
+	// service components that define a log path are monitored using its own stream in the monitor
 	for _, comp := range components {
 		if comp.InputSpec == nil || comp.InputSpec.Spec.Service == nil || comp.InputSpec.Spec.Service.Log == nil || comp.InputSpec.Spec.Service.Log.Path == "" {
 			// only monitor service inputs that define a log path
 			continue
 		}
+		dataset := fmt.Sprintf("elastic_agent.%s", comp.InputSpec.BinaryName)
 		streams = append(streams, map[string]interface{}{
 			idKey:  fmt.Sprintf("filestream-monitoring-%s", comp.ID),
 			"type": "filestream",
@@ -442,7 +444,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 			},
 			"data_stream": map[string]interface{}{
 				"type":      "logs",
-				"dataset":   fmt.Sprintf("elastic_agent.%s", comp.InputSpec.BinaryName),
+				"dataset":   dataset,
 				"namespace": monitoringNamespace,
 			},
 			"close": map[string]interface{}{
@@ -457,6 +459,20 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 						"overwrite_keys": true,
 						"add_error_key":  true,
 						"target":         "",
+					},
+				},
+			},
+			"processors": []interface{}{
+				map[string]interface{}{
+					// component information must be injected because it's not a subprocess
+					"add_fields": map[string]interface{}{
+						"target": "component",
+						"fields": map[string]interface{}{
+							"id":      comp.ID,
+							"type":    comp.InputSpec.InputType,
+							"binary":  comp.InputSpec.BinaryName,
+							"dataset": dataset,
+						},
 					},
 				},
 			},
