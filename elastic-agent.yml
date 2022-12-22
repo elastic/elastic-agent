@@ -17,7 +17,7 @@ outputs:
 
 inputs:
   - type: system/metrics
-    # Each input listed in the agent policy must have a unique ID.
+    # Each input must have a unique ID.
     id: unique-system-metrics-input
     # Namespace name must conform to the naming conventions for Elasticsearch indices, cannot contain dashes (-), and cannot exceed 100 bytes
     # For index naming restrictions, see https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-create-index.html#indices-create-api-path-params
