@@ -21,7 +21,7 @@ import (
 )
 
 // GenerateMonitoringCfgFn is a function that can inject information into the model generation process.
-type GenerateMonitoringCfgFn func(map[string]interface{}, map[string]string) (map[string]interface{}, error)
+type GenerateMonitoringCfgFn func(map[string]interface{}, []Component, map[string]string) (map[string]interface{}, error)
 
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
@@ -112,7 +112,7 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 	}
 
 	if monitoringInjector != nil {
-		monitoringCfg, err := monitoringInjector(policy, binaryMapping)
+		monitoringCfg, err := monitoringInjector(policy, components, binaryMapping)
 		if err != nil {
 			return nil, fmt.Errorf("failed to inject monitoring: %w", err)
 		}
