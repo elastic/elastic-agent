@@ -11,7 +11,8 @@ outputs:
 
 inputs:
   - type: system/metrics
-
+    # Each input must have a unique ID.
+    id: unique-system-metrics-input
     # Namespace name must conform to the naming conventions for Elasticsearch indices, cannot contain dashes (-), and cannot exceed 100 bytes
     # For index naming restrictions, see https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-create-index.html#indices-create-api-path-params
     data_stream.namespace: default
@@ -118,7 +119,7 @@ inputs:
 #   # port for the GRPC server that spawned processes connect back to.
 #   port: 6789
 #   # max_message_size limits the message size in agent internal communication
-#   # default is 100MB 
+#   # default is 100MB
 #   max_message_size: 104857600
 
 # agent.retry:
