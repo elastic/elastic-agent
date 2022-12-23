@@ -329,7 +329,7 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
 func (c *Coordinator) Run(ctx context.Context) error {
 	// log all changes in the state of the runtime
 	go func() {
-		state := make(map[string]coordinatorComponentLogState)
+		state := make(map[string]runtime.ComponentState)
 
 		sub := c.runtimeMgr.SubscribeAll(ctx)
 		for {
@@ -337,14 +337,55 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case s := <-sub.Ch():
-				logState := newCoordinatorComponentLogState(&s)
-				_, ok := state[s.Component.ID]
+				oldState, ok := state[s.Component.ID]
 				if !ok {
-					c.logger.With("component", logState).Info("New component created")
+					componentLog := coordinatorComponentLog{
+						ID:    s.Component.ID,
+						State: s.State.State.String(),
+					}
+					logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Spawned new component %s: %s", s.Component.ID, s.State.Message), "component", componentLog)
+					for ui, us := range s.State.Units {
+						unitLog := coordinatorUnitLog{
+							ID:    ui.UnitID,
+							Type:  ui.UnitType.String(),
+							State: us.State.String(),
+						}
+						logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new component/unit %s/%s: %s", s.Component.ID, ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
+					}
 				} else {
-					c.logger.With("component", logState).Info("Existing component state changed")
+					componentLog := coordinatorComponentLog{
+						ID:    s.Component.ID,
+						State: s.State.State.String(),
+					}
+					if oldState.State != s.State.State {
+						cl := coordinatorComponentLog{
+							ID:       s.Component.ID,
+							State:    s.State.State.String(),
+							OldState: oldState.State.String(),
+						}
+						logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Component state changed %s (%s->%s): %s", s.Component.ID, oldState.State.String(), s.State.State.String(), s.State.Message), "component", cl)
+					}
+					for ui, us := range s.State.Units {
+						oldUS, ok := oldState.Units[ui]
+						if !ok {
+							unitLog := coordinatorUnitLog{
+								ID:    ui.UnitID,
+								Type:  ui.UnitType.String(),
+								State: us.State.String(),
+							}
+							logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new component/unit %s/%s: %s", s.Component.ID, ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
+						} else {
+							unitLog := coordinatorUnitLog{
+								ID:       ui.UnitID,
+								Type:     ui.UnitType.String(),
+								State:    us.State.String(),
+								OldState: oldUS.State.String(),
+							}
+							logBasedOnState(c.logger, us.State, fmt.Sprintf("Component/unit state changed %s/%s (%s->%s): %s", s.Component.ID, ui.UnitID, oldState.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
+						}
+					}
 				}
-				state[s.Component.ID] = logState
+				state[s.Component.ID] = s.State
 				if s.State.State == client.UnitStateStopped {
 					delete(state, s.Component.ID)
 				}
@@ -751,65 +792,17 @@ type coordinatorOverrideState struct {
 	message string
 }
 
-type coordinatorComponentLogState struct {
-	ID      string                             `json:"id"`
-	State   string                             `json:"state"`
-	Message string                             `json:"message"`
-	Inputs  []coordinatorComponentUnitLogState `json:"inputs"`
-	Output  coordinatorComponentUnitLogState   `json:"output,omitempty"`
+type coordinatorComponentLog struct {
+	ID       string `json:"id"`
+	State    string `json:"state"`
+	OldState string `json:"old_state,omitempty"`
 }
 
-type coordinatorComponentUnitLogState struct {
-	ID      string `json:"id"`
-	State   string `json:"state"`
-	Message string `json:"message"`
-}
-
-func newCoordinatorComponentLogState(state *runtime.ComponentComponentState) coordinatorComponentLogState {
-	var output coordinatorComponentUnitLogState
-	inputs := make([]coordinatorComponentUnitLogState, 0, len(state.State.Units))
-	for key, unit := range state.State.Units {
-		if key.UnitType == client.UnitTypeInput {
-			inputs = append(inputs, coordinatorComponentUnitLogState{
-				ID:      key.UnitID,
-				State:   newCoordinatorComponentStateStr(unit.State),
-				Message: unit.Message,
-			})
-		} else {
-			output = coordinatorComponentUnitLogState{
-				ID:      key.UnitID,
-				State:   newCoordinatorComponentStateStr(unit.State),
-				Message: unit.Message,
-			}
-		}
-	}
-	return coordinatorComponentLogState{
-		ID:      state.Component.ID,
-		State:   newCoordinatorComponentStateStr(state.State.State),
-		Message: state.State.Message,
-		Inputs:  inputs,
-		Output:  output,
-	}
-}
-
-func newCoordinatorComponentStateStr(state client.UnitState) string {
-	switch state {
-	case client.UnitStateStarting:
-		return "STARTING"
-	case client.UnitStateConfiguring:
-		return "CONFIGURING"
-	case client.UnitStateDegraded:
-		return "DEGRADED"
-	case client.UnitStateHealthy:
-		return "HEALTHY"
-	case client.UnitStateFailed:
-		return "FAILED"
-	case client.UnitStateStopping:
-		return "STOPPING"
-	case client.UnitStateStopped:
-		return "STOPPED"
-	}
-	return "UNKNOWN"
+type coordinatorUnitLog struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	State    string `json:"state"`
+	OldState string `json:"old_state,omitempty"`
 }
 
 func hasState(components []runtime.ComponentComponentState, state client.UnitState) bool {
@@ -824,4 +817,24 @@ func hasState(components []runtime.ComponentComponentState, state client.UnitSta
 		}
 	}
 	return false
+}
+
+func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args ...interface{}) {
+	switch state {
+	case client.UnitStateStarting:
+		l.With(args...).Info(msg)
+	case client.UnitStateConfiguring:
+		l.With(args...).Info(msg)
+	case client.UnitStateDegraded:
+		l.With(args...).Warn(msg)
+	case client.UnitStateHealthy:
+		l.With(args...).Info(msg)
+	case client.UnitStateFailed:
+		l.With(args...).Error(msg)
+	case client.UnitStateStopping:
+		l.With(args...).Info(msg)
+	case client.UnitStateStopped:
+		l.With(args...).Info(msg)
+	}
+	l.With(args...).Info(msg)
 }
