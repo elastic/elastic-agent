@@ -56,9 +56,9 @@ const (
 )
 
 var (
-	errNoOuputPresent        = errors.New("outputs not part of the config")
-	supportedComponents      = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "cloud-defend", "endpoint-security", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
-	supportedBeatsComponents = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
+	errNoOuputPresent          = errors.New("outputs not part of the config")
+	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "cloud-defend", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
 // BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
@@ -584,7 +584,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		},
 	}
 	for unit, binaryName := range componentIDToBinary {
-		if !isSupportedBinary(binaryName) {
+		if !isSupportedMetricsBinary(binaryName) {
 			continue
 		}
 
@@ -889,8 +889,8 @@ func httpCopyRules() []interface{} {
 	return fromToMap
 }
 
-func isSupportedBinary(binaryName string) bool {
-	for _, supportedBinary := range supportedComponents {
+func isSupportedMetricsBinary(binaryName string) bool {
+	for _, supportedBinary := range supportedMetricsComponents {
 		if strings.EqualFold(supportedBinary, binaryName) {
 			return true
 		}
