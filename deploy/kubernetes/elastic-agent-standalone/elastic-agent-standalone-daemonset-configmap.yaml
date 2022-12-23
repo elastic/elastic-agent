@@ -28,8 +28,7 @@ data:
       #Uncomment to enable hints' support
       #hints.enabled: true
     inputs:
-      - name: kubernetes-cluster-metrics
-        id: kubernetes-cluster-metrics
+      - id: kubernetes-cluster-metrics
         condition: ${kubernetes_leaderelection.leader} == true
         type: kubernetes/metrics
         use_output: default
@@ -268,8 +267,7 @@ data:
             # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             # ssl.certificate_authorities:
             #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
-      - name: system-logs
-        id: system-logs
+      - id: system-logs
         type: logfile
         use_output: default
         meta:
@@ -311,8 +309,7 @@ data:
                   target: ''
                   fields:
                     ecs.version: 1.12.0
-      - name: container-log
-        id: container-log-${kubernetes.pod.name}-${kubernetes.container.id}
+      - id: container-log-${kubernetes.pod.name}-${kubernetes.container.id}
         type: filestream
         use_output: default
         meta:
@@ -337,8 +334,7 @@ data:
               #     match: after
             paths:
               - /var/log/containers/*${kubernetes.container.id}.log
-      - name: audit-log
-        id: audit-log
+      - id: audit-log
         type: filestream
         use_output: default
         meta:
@@ -383,8 +379,7 @@ data:
                         throw "expected kubernetes.audit.annotations.authorization_k8s_io/decision === allow";
                     }
                   }
-      - name: system-metrics
-        id: system-metrics
+      - id: system-metrics
         type: system/metrics
         use_output: default
         meta:
@@ -482,8 +477,7 @@ data:
             metricsets:
               - socket_summary
             system.hostfs: /hostfs
-      - name: kubernetes-node-metrics
-        id: kubernetes-node-metrics
+      - id: kubernetes-node-metrics
         type: kubernetes/metrics
         use_output: default
         meta:
@@ -607,8 +601,7 @@ data:
       # Add extra input blocks here, based on conditions
       # so as to automatically identify targeted Pods and start monitoring them
       # using a predefined integration. For instance:
-      #- name: redis-metrics
-      #  id: redis-metrics
+      #- id: redis-metrics
       #  type: redis/metrics
       #  use_output: default
       #  meta:
