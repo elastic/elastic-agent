@@ -12,10 +12,10 @@ inputs:
       - container/arm64
     outputs: &outputs
       - elasticsearch
-    command:
+    command: &command
       restart_monitoring_period: 15s
       maximum_restarts_per_period: 3
-      args: &args
+      args:
         - "-E"
         - "setup.ilm.enabled=false"
         - "-E"
@@ -34,23 +34,14 @@ inputs:
     description: "Synthetics HTTP Monitor"
     platforms: *platforms
     outputs: *outputs
-    command:
-      restart_monitoring_period: 15s
-      maximum_restarts_per_period: 3
-      args: *args
+    command: *command
   - name: synthetics/icmp
     description: "Synthetics ICMP Monitor"
     platforms: *platforms
     outputs: *outputs
-    command:
-      restart_monitoring_period: 15s
-      maximum_restarts_per_period: 3
-      args: *args
+    command: *command
   - name: synthetics/tcp
     description: "Synthetics TCP Monitor"
     platforms: *platforms
     outputs: *outputs
-    command:
-      restart_monitoring_period: 15s
-      maximum_restarts_per_period: 3
-      args: *args
+    command: *command

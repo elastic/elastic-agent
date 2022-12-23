@@ -15,10 +15,10 @@ inputs:
       - kafka
       - logstash
       - redis
-    command:
+    command: &command
       restart_monitoring_period: 15s
       maximum_restarts_per_period: 3
-      args: &args
+      args:
         - "-E"
         - "setup.ilm.enabled=false"
         - "-E"
@@ -37,23 +37,14 @@ inputs:
     description: "CIS Kubernetes monitoring"
     platforms: *platforms
     outputs: *outputs
-    command:
-      restart_monitoring_period: 15s
-      maximum_restarts_per_period: 3
-      args: *args
+    command: *command
   - name: cloudbeat/cis_eks
     description: "CIS elastic Kubernetes monitoring"
     platforms: *platforms
     outputs: *outputs
-    command:
-      restart_monitoring_period: 15s
-      maximum_restarts_per_period: 3
-      args: *args
+    command: *command
   - name: cloudbeat/cis_aws
     description: "CIS AWS monitoring"
     platforms: *platforms
     outputs: *outputs
-    command:
-      restart_monitoring_period: 15s
-      maximum_restarts_per_period: 3
-      args: *args
+    command: *command
