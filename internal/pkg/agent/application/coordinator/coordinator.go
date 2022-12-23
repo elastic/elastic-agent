@@ -381,7 +381,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 								State:    us.State.String(),
 								OldState: oldUS.State.String(),
 							}
-							logBasedOnState(c.logger, us.State, fmt.Sprintf("State changed %s (%s->%s): %s", ui.UnitID, oldState.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
+							logBasedOnState(c.logger, us.State, fmt.Sprintf("State changed %s (%s->%s): %s", ui.UnitID, oldUS.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
 						}
 					}
 				}
