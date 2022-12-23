@@ -17,7 +17,7 @@ summary: Each input in an agent policy must have a unique ID.
 # this field accommodate a description without length limits.
 description: |
   Each input in an agent policy must have a unique ID, like "id: my-unique-input-id".
-  This only applies to standalone agents. Unique IDs are automatically generated in
+  This only affects standalone agents. Unique IDs are automatically generated in
   agent policies managed by Fleet.
 
 # Affected component; a word indicating the component this changeset affects.
