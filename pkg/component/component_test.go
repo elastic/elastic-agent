@@ -195,7 +195,7 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 			},
-			Err: `invalid 'inputs.1.id', has a duplicate id "filestream". Please add a unique value for the 'id' field to each input in the agent policy.`,
+			Err: `invalid 'inputs.1.id', has a duplicate id "filestream". Please add a unique value for the 'id' field to each input in the agent policy`,
 		},
 		{
 			Name:     "Invalid: inputs entry id not a string",
