@@ -596,20 +596,20 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				idKey: "metrics-monitoring-" + name,
 				"data_stream": map[string]interface{}{
 					"type":      "metrics",
-					"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+					"dataset":   fmt.Sprintf("elastic_agent.%s", binaryName),
 					"namespace": monitoringNamespace,
 				},
 				"metricsets": []interface{}{"stats", "state"},
 				"hosts":      endpoints,
 				"period":     "10s",
-				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
+				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", binaryName, monitoringNamespace),
 				"processors": []interface{}{
 					map[string]interface{}{
 						"add_fields": map[string]interface{}{
 							"target": "data_stream",
 							"fields": map[string]interface{}{
 								"type":      "metrics",
-								"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+								"dataset":   fmt.Sprintf("elastic_agent.%s", binaryName),
 								"namespace": monitoringNamespace,
 							},
 						},
@@ -618,7 +618,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 						"add_fields": map[string]interface{}{
 							"target": "event",
 							"fields": map[string]interface{}{
-								"dataset": fmt.Sprintf("elastic_agent.%s", name),
+								"dataset": fmt.Sprintf("elastic_agent.%s", binaryName),
 							},
 						},
 					},
