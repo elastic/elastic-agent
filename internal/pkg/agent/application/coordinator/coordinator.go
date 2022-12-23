@@ -835,6 +835,7 @@ func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args 
 		l.With(args...).Info(msg)
 	case client.UnitStateStopped:
 		l.With(args...).Info(msg)
+    default:
+        l.With(args...).Info(msg)
 	}
-	l.With(args...).Info(msg)
 }
