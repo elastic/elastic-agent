@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
 )
 
 func TestAddToBucket(t *testing.T) {
