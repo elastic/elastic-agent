@@ -103,7 +103,6 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 	c.logErr = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStderr)
 
 	if cmdSpec.RestartMonitoringPeriod > 0 && cmdSpec.MaxRestartsPerPeriod > 0 {
-		logger.Errorf("TODO: remove; bucket enabled %v: %v", cmdSpec.RestartMonitoringPeriod, cmdSpec.MaxRestartsPerPeriod)
 		bucketSize := cmdSpec.MaxRestartsPerPeriod
 		restartBucket, err := tokenbucket.NewTokenBucket(context.Background(), bucketSize, bucketSize, cmdSpec.RestartMonitoringPeriod)
 		if err != nil {
@@ -409,8 +408,6 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 		if c.restartBucket != nil {
 			// report failure only if bucket is full of restart events
 			reportFailure = tryAddToBucket(c.restartBucket)
-
-			c.logger.Errorf("TODO: remove; checking with bucket: %v", reportFailure)
 		}
 
 		if reportFailure {
@@ -559,7 +556,7 @@ func dirPath(path string) process.CmdOption {
 	}
 }
 
-// tryAddToBucket adds item to bucket, it returns true and cancells adding in case adding is blocked.
+// tryAddToBucket adds item to bucket, it returns true and cancels adding in case adding is blocked.
 // otherwise it returns false
 func tryAddToBucket(b *tokenbucket.Bucket) bool {
 	select {
