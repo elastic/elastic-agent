@@ -343,14 +343,14 @@ func (c *Coordinator) Run(ctx context.Context) error {
 						ID:    s.Component.ID,
 						State: s.State.State.String(),
 					}
-					logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Spawned new %s: %s", s.Component.ID, s.State.Message), "component", componentLog)
+					logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Spawned new component %s: %s", s.Component.ID, s.State.Message), "component", componentLog)
 					for ui, us := range s.State.Units {
 						unitLog := coordinatorUnitLog{
 							ID:    ui.UnitID,
 							Type:  ui.UnitType.String(),
 							State: us.State.String(),
 						}
-						logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
+						logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
 					}
 				} else {
 					componentLog := coordinatorComponentLog{
@@ -363,7 +363,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 							State:    s.State.State.String(),
 							OldState: oldState.State.String(),
 						}
-						logBasedOnState(c.logger, s.State.State, fmt.Sprintf("State changed %s (%s->%s): %s", s.Component.ID, oldState.State.String(), s.State.State.String(), s.State.Message), "component", cl)
+						logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Component state changed %s (%s->%s): %s", s.Component.ID, oldState.State.String(), s.State.State.String(), s.State.Message), "component", cl)
 					}
 					for ui, us := range s.State.Units {
 						oldUS, ok := oldState.Units[ui]
@@ -373,7 +373,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 								Type:  ui.UnitType.String(),
 								State: us.State.String(),
 							}
-							logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
+							logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
 						} else if oldUS.State != us.State {
 							unitLog := coordinatorUnitLog{
 								ID:       ui.UnitID,
@@ -381,7 +381,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 								State:    us.State.String(),
 								OldState: oldUS.State.String(),
 							}
-							logBasedOnState(c.logger, us.State, fmt.Sprintf("State changed %s (%s->%s): %s", ui.UnitID, oldUS.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
+							logBasedOnState(c.logger, us.State, fmt.Sprintf("Unit state changed %s (%s->%s): %s", ui.UnitID, oldUS.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
 						}
 					}
 				}
