@@ -13,16 +13,22 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/pkg/component"
+)
+
+const (
+	REDACTED = "<REDACTED>"
 )
 
 func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -69,7 +75,7 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("failed to fetch component/unit diagnostics: %w", err)
 	}
 
-	err = createZip(fileName, agentDiag, unitDiags)
+	err = createZip(streams, fileName, agentDiag, unitDiags)
 	if err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
 	}
@@ -80,9 +86,9 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 // createZip creates a zip archive with the passed fileName.
 //
-// The passed DiagnosticsInfo and AgentConfig data is written in the specified output format.
+// The passed DiagnosticsInfo and AgentConfig data is written in the format supplied by the unit.
 // Any local log files are collected and copied into the archive.
-func createZip(fileName string, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
+func createZip(streams *cli.IOStreams, fileName string, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return err
@@ -95,7 +101,7 @@ func createZip(fileName string, agentDiag []client.DiagnosticFileResult, unitDia
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
-		_, err = zf.Write(ad.Content)
+		err = writeRedacted(streams, ad.Filename, ad, zf)
 		if err != nil {
 			return closeHandlers(err, zw, f)
 		}
@@ -137,11 +143,12 @@ func createZip(fileName string, agentDiag []client.DiagnosticFileResult, unitDia
 				continue
 			}
 			for _, fr := range ud.Results {
-				w, err := zw.Create(fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name))
+				fullFilePath := fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Filename)
+				zf, err := zw.Create(fullFilePath)
 				if err != nil {
 					return closeHandlers(err, zw, f)
 				}
-				_, err = w.Write(fr.Content)
+				err = writeRedacted(streams, fullFilePath, fr, zf)
 				if err != nil {
 					return closeHandlers(err, zw, f)
 				}
@@ -154,6 +161,72 @@ func createZip(fileName string, agentDiag []client.DiagnosticFileResult, unitDia
 	}
 
 	return closeHandlers(nil, zw, f)
+}
+
+func writeRedacted(streams *cli.IOStreams, fullFilePath string, fr client.DiagnosticFileResult, w io.Writer) error {
+	out := &fr.Content
+
+	// Should we support json too?
+	if fr.ContentType == "application/yaml" {
+		unmarshalled := map[string]interface{}{}
+		err := yaml.Unmarshal(fr.Content, &unmarshalled)
+
+		if err != nil {
+			// Best effort, output a warning but still include the file
+			fmt.Fprintf(streams.Err, "[warning] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
+		} else {
+			redacted, err := yaml.Marshal(redactMap(unmarshalled))
+			if err != nil {
+				// Best effort, output a warning but still include the file
+				fmt.Fprintf(streams.Err, "[warning] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
+			}
+	
+			out = &redacted
+		}
+	}
+
+	_, err := w.Write(*out)
+	return err
+}
+
+func redactMap(m map[string]interface{}) map[string]interface{} {
+	for k, v := range m {
+		if v != nil && reflect.TypeOf(v).Kind() == reflect.Map {
+			v = redactMap(toMapStr(v))
+		}
+		if redactKey(k) {
+			v = REDACTED
+		}
+		m[k] = v
+	}
+	return m
+}
+
+func toMapStr(v interface{}) map[string]interface{} {
+	mm := map[string]interface{}{}
+	m, ok := v.(map[interface{}]interface{})
+	if !ok {
+		return mm
+	}
+
+	for k, v := range m {
+		mm[k.(string)] = v
+	}
+	return mm
+}
+
+func redactKey(k string) bool {
+	// "routekey" shouldn't be redacted.
+	// Add any other exceptions here.
+	if k == "routekey" {
+		return false
+	}
+
+	return strings.Contains(k, "certificate") ||
+		strings.Contains(k, "passphrase") ||
+		strings.Contains(k, "password") ||
+		strings.Contains(k, "token") ||
+		strings.Contains(k, "key")
 }
 
 // zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
