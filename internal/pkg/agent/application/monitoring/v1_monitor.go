@@ -56,15 +56,9 @@ const (
 )
 
 var (
-<<<<<<< HEAD
-	errNoOuputPresent        = errors.New("outputs not part of the config")
-	supportedComponents      = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "endpoint-security", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
-	supportedBeatsComponents = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
-=======
 	errNoOuputPresent          = errors.New("outputs not part of the config")
-	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "cloud-defend", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
 	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
->>>>>>> 1bccb1b989 (Do not collect endpoint metrics on /stats endpoint (#1998))
 )
 
 // BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
