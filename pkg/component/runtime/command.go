@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -72,6 +73,7 @@ type CommandRuntime struct {
 	state          ComponentState
 	lastCheckin    time.Time
 	missedCheckins int
+	restartBucket  *tokenbucket.Bucket
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
@@ -99,6 +101,17 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 	c.logStd = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStdout)
 	ll, unitLevels = getLogLevels(comp) // don't want to share mapping of units (so new map is generated)
 	c.logErr = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStderr)
+
+	if cmdSpec.RestartMonitoringPeriod > 0 && cmdSpec.MaxRestartsPerPeriod > 0 {
+		logger.Errorf("TODO: remove; bucket enabled %v: %v", cmdSpec.RestartMonitoringPeriod, cmdSpec.MaxRestartsPerPeriod)
+		bucketSize := cmdSpec.MaxRestartsPerPeriod
+		restartBucket, err := tokenbucket.NewTokenBucket(context.Background(), bucketSize, bucketSize, cmdSpec.RestartMonitoringPeriod)
+		if err != nil {
+			return nil, err
+		}
+		c.restartBucket = restartBucket
+	}
+
 	return c, nil
 }
 
@@ -352,7 +365,7 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
-
+	c.restartBucket.Close()
 	cmdSpec := c.getCommandSpec()
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
@@ -392,8 +405,18 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 	switch c.actionState {
 	case actionStart:
 		// should still be running
-		stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
-		c.forceCompState(client.UnitStateFailed, stopMsg)
+		reportFailure := true
+		if c.restartBucket != nil {
+			// report failure only if bucket is full of restart events
+			reportFailure = tryAddToBucket(c.restartBucket)
+
+			c.logger.Errorf("TODO: remove; checking with bucket: %v", reportFailure)
+		}
+
+		if reportFailure {
+			stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+			c.forceCompState(client.UnitStateFailed, stopMsg)
+		}
 		return true
 	case actionStop, actionTeardown:
 		// stopping (should have exited)
@@ -533,5 +556,16 @@ func dirPath(path string) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
 		cmd.Dir = path
 		return nil
+	}
+}
+
+// tryAddToBucket adds item to bucket, it returns true and cancells adding in case adding is blocked.
+// otherwise it returns false
+func tryAddToBucket(b *tokenbucket.Bucket) bool {
+	select {
+	case b.Chan() <- struct{}{}:
+		return false
+	default:
+		return true
 	}
 }

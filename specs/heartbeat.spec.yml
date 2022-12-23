@@ -13,6 +13,8 @@ inputs:
     outputs: &outputs
       - elasticsearch
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: &args
         - "-E"
         - "setup.ilm.enabled=false"
@@ -33,16 +35,22 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: synthetics/icmp
     description: "Synthetics ICMP Monitor"
     platforms: *platforms
     outputs: *outputs
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: synthetics/tcp
     description: "Synthetics TCP Monitor"
     platforms: *platforms
     outputs: *outputs
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args

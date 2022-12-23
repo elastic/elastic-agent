@@ -18,6 +18,8 @@ inputs:
     shippers: &shippers
       - shipper
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: &args
         - "-E"
         - "setup.ilm.enabled=false"
@@ -41,6 +43,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: elasticsearch/metrics
     description: "Elasticsearch metrics"
@@ -48,6 +52,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: kibana/metrics
     description: "Kibana metrics"
@@ -55,6 +61,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: kubernetes/metrics
     description: "Kubernetes metrics"
@@ -62,6 +70,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: linux/metrics
     description: "Linux metrics"
@@ -69,6 +79,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: logstash/metrics
     description: "Logstash metrics"
@@ -76,6 +88,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: mongodb/metrics
     description: "Mongodb metrics"
@@ -83,6 +97,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: mysql/metrics
     description: "MySQL metrics"
@@ -90,6 +106,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: postgresql/metrics
     description: "PostgreSQL metrics"
@@ -97,6 +115,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: redis/metrics
     description: "Redis metrics"
@@ -104,6 +124,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: system/metrics
     description: "System metrics"
@@ -111,6 +133,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: uwsgi/metrics
     description: "UWSGI metrics"
@@ -118,6 +142,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: windows/metrics
     description: "Windows metrics"
@@ -125,6 +151,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: aws/metrics
     description: "AWS metrics"
@@ -132,6 +160,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: awsfargate/metrics
     description: "AWS Fargate metrics"
@@ -139,6 +169,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: azure/metrics
     description: "Azure metrics"
@@ -146,6 +178,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: cloudfoundry/metrics
     description: "PCF Cloudfoundry metrics"
@@ -153,6 +187,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: containerd/metrics
     description: "Containerd metrics"
@@ -160,6 +196,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: mssql/metrics
     description: "Microsoft SQL Server metrics"
@@ -167,6 +205,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: oracle/metrics
     description: "Oracle Database metrics"
@@ -174,6 +214,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: syncgateway/metrics
     description: "Couchbase Sync Gateway metrics"
@@ -181,6 +223,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: http/metrics
     description: "HTTP metrics"
@@ -188,6 +232,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: activemq/metrics
     description: "ActiveMQ metrics"
@@ -195,6 +241,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: apache/metrics
     description: "Apache metrics"
@@ -202,6 +250,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: etcd/metrics
     description: "Etcd metrics"
@@ -209,6 +259,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: gcp/metrics
     description: "GCP metrics"
@@ -216,6 +268,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: haproxy/metrics
     description: "HAProxy metrics"
@@ -223,6 +277,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: iis/metrics
     description: "IIS metrics"
@@ -230,6 +286,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: jolokia/metrics
     description: "Jolokia metrics"
@@ -237,6 +295,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: kafka/metrics
     description: "Kafka metrics"
@@ -244,6 +304,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: nats/metrics
     description: "NATS metrics"
@@ -251,6 +313,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: nginx/metrics
     description: "NGINX metrics"
@@ -258,6 +322,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: prometheus/metrics
     description: "Prometheus metrics"
@@ -265,6 +331,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: rabbitmq/metrics
     description: "RabbitMQ metrics"
@@ -272,6 +340,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: sql/metrics
     description: "SQL metrics"
@@ -279,6 +349,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: stan/metrics
     description: "Stan metrics"
@@ -286,6 +358,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: traefik/metrics
     description: "Traefik metrics"
@@ -293,6 +367,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: vsphere/metrics
     description: "VSphere metrics"
@@ -300,6 +376,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: zookeeper/metrics
     description: "ZooKeeper metrics"
@@ -307,4 +385,6 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args

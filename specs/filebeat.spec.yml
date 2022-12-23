@@ -18,6 +18,8 @@ inputs:
     shippers: &shippers
       - shipper
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: &args
         - "-E"
         - "setup.ilm.enabled=false"
@@ -41,6 +43,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: azure-eventhub
     description: "Azure Eventhub"
@@ -48,6 +52,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: cel
     description: "Common Expression Language Input"
@@ -55,6 +61,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: cloudfoundry
     description: "PCF Cloudfoundry"
@@ -62,6 +70,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: cometd
     description: "CometD input"
@@ -69,6 +79,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: container
     description: "Container logs"
@@ -76,6 +88,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: docker
     aliases:
@@ -85,6 +99,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: gcp-pubsub
     description: "GCP Pub-Sub"
@@ -92,6 +108,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: http_endpoint
     description: "HTTP Endpoint"
@@ -99,6 +117,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: httpjson
     description: "HTTP JSON Endpoint"
@@ -106,6 +126,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: journald
     description: "Journald"
@@ -113,6 +135,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: kafka
     description: "Kafka"
@@ -120,6 +144,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: log
     aliases:
@@ -130,6 +156,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: mqtt
     description: "MQTT"
@@ -137,6 +165,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: netflow
     description: "Netflow"
@@ -144,6 +174,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: o365audit
     description: "Office 365 Audit"
@@ -151,6 +183,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: redis
     aliases:
@@ -160,6 +194,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: syslog
     aliases:
@@ -169,6 +205,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: tcp
     aliases:
@@ -178,6 +216,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: udp
     aliases:
@@ -187,6 +227,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: unix
     description: "Unix Socket"
@@ -194,6 +236,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: winlog
     description: "Winlog"
@@ -201,6 +245,8 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
   - name: filestream
     description: "Filestream"
@@ -208,4 +254,6 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command:
+      restart_monitoring_period: 15s
+      maximum_restarts_per_period: 3
       args: *args
