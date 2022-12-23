@@ -188,7 +188,7 @@ agent.logging.to_stderr: true
 
   # Configure log file size limit. If limit is reached, log file will be
   # automatically rotated
-  #rotateeverybytes: 10485760 # = 10MB
+  #rotateeverybytes: 20971520 # = 20MB
 
   # Number of rotated log files to keep. Oldest files will be deleted first.
   #keepfiles: 7
