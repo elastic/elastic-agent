@@ -287,6 +287,13 @@ inputs:
     shippers: *shippers
     command:
       args: *args
+  - name: statsd/metrics
+    description: "Statsd metrics"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command:
+      args: *args
   - name: traefik/metrics
     description: "Traefik metrics"
     platforms: *platforms
