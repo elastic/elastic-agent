@@ -13,8 +13,8 @@ inputs:
     outputs: &outputs
       - elasticsearch
     command: &command
-      restart_monitoring_period: 15s
-      maximum_restarts_per_period: 3
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
       args:
         - "-E"
         - "setup.ilm.enabled=false"
