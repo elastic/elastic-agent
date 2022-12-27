@@ -5,13 +5,10 @@
 package runtime
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
 )
 
 func TestAddToBucket(t *testing.T) {
@@ -32,18 +29,17 @@ func TestAddToBucket(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			dropRate := 500 * time.Millisecond
-			b, err := tokenbucket.NewTokenBucket(context.Background(), tc.bucketSize, tc.bucketSize, dropRate)
-			require.NoError(t, err)
+			b := newRateLimiter(dropRate, tc.bucketSize)
 
 			blocked := false
-			tryAddToBucket(b)
+			b.Allow()
 			<-time.After(dropRate + 200*time.Millisecond) // init ticker
 
 			for i := 0; i < tc.add; i++ {
-				blocked = blocked || tryAddToBucket(b)
+				wasBlocked := !b.Allow()
+				blocked = blocked || wasBlocked
 				<-time.After(tc.addSleep)
 			}
-			b.Close()
 			require.Equal(t, tc.shouldBlock, blocked)
 		})
 	}

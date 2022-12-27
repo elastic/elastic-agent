@@ -16,11 +16,11 @@ import (
 	"time"
 
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/tokenbucket"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -73,7 +73,7 @@ type CommandRuntime struct {
 	state          ComponentState
 	lastCheckin    time.Time
 	missedCheckins int
-	restartBucket  *tokenbucket.Bucket
+	restartBucket  *rate.Limiter
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
@@ -102,14 +102,7 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 	ll, unitLevels = getLogLevels(comp) // don't want to share mapping of units (so new map is generated)
 	c.logErr = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStderr)
 
-	if cmdSpec.RestartMonitoringPeriod > 0 && cmdSpec.MaxRestartsPerPeriod > 0 {
-		bucketSize := cmdSpec.MaxRestartsPerPeriod
-		restartBucket, err := tokenbucket.NewTokenBucket(context.Background(), bucketSize, bucketSize, cmdSpec.RestartMonitoringPeriod)
-		if err != nil {
-			return nil, err
-		}
-		c.restartBucket = restartBucket
-	}
+	c.restartBucket = newRateLimiter(cmdSpec.RestartMonitoringPeriod, cmdSpec.MaxRestartsPerPeriod)
 
 	return c, nil
 }
@@ -364,9 +357,6 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
-	if c.restartBucket != nil {
-		c.restartBucket.Close()
-	}
 	cmdSpec := c.getCommandSpec()
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
@@ -409,7 +399,7 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 		reportFailure := true
 		if c.restartBucket != nil {
 			// report failure only if bucket is full of restart events
-			reportFailure = tryAddToBucket(c.restartBucket)
+			reportFailure = !c.restartBucket.Allow()
 		}
 
 		if reportFailure {
@@ -560,13 +550,18 @@ func dirPath(path string) process.CmdOption {
 	}
 }
 
-// tryAddToBucket adds item to bucket, it returns true and cancels adding in case adding is blocked.
-// otherwise it returns false
-func tryAddToBucket(b *tokenbucket.Bucket) bool {
-	select {
-	case b.Chan() <- struct{}{}:
-		return false
-	default:
-		return true
+func newRateLimiter(restartMonitoringPeriod time.Duration, maxEventsPerPeriod int) *rate.Limiter {
+	if restartMonitoringPeriod <= 0 || maxEventsPerPeriod <= 0 {
+		return nil
 	}
+
+	freq := restartMonitoringPeriod.Seconds()
+	events := float64(maxEventsPerPeriod)
+	perSecond := events / freq
+	if perSecond > 0 {
+		bucketSize := rate.Limit(perSecond)
+		return rate.NewLimiter(bucketSize, maxEventsPerPeriod)
+	}
+
+	return nil
 }
