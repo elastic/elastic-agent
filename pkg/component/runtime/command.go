@@ -364,7 +364,9 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
-	c.restartBucket.Close()
+	if c.restartBucket != nil {
+		c.restartBucket.Close()
+	}
 	cmdSpec := c.getCommandSpec()
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
@@ -413,6 +415,8 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 		if reportFailure {
 			stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 			c.forceCompState(client.UnitStateFailed, stopMsg)
+		} else {
+			c.logger.Info("Suppressing FAILED state due to restart for '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		}
 		return true
 	case actionStop, actionTeardown:
