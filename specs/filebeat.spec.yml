@@ -62,18 +62,7 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-<<<<<<< HEAD
-    command:
-      args: *args
-=======
     command: *command
-  - name: cometd
-    description: "CometD input"
-    platforms: *platforms
-    outputs: *outputs
-    shippers: *shippers
-    command: *command
->>>>>>> 464f9f786e (Add configurable numbness for component restarts (#2003))
   - name: container
     description: "Container logs"
     platforms: *platforms
