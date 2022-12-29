@@ -201,4 +201,16 @@ func TestCancellation(t *testing.T) {
 		})
 		timeout += 10 * time.Millisecond
 	}
+
+	t.Run("immediate cancellation", func(t *testing.T) {
+		c, err := composable.New(log, cfg, false)
+		require.NoError(t, err)
+		ctx, cancelFn := context.WithTimeout(context.Background(), 0)
+		cancelFn()
+		err = c.Run(ctx)
+		// test will time out and fail if cancellation is not proper
+		if err != nil {
+			require.True(t, errors.Is(err, context.DeadlineExceeded))
+		}
+	})
 }
