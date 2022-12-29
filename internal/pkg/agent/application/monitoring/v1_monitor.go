@@ -589,7 +589,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		}
 
 		endpoints := []interface{}{prefixedEndpoint(endpointPath(unit, b.operatingSystem))}
-		name := strings.ReplaceAll(strings.ReplaceAll(unit, "-", "_"), "/", "_") // conform with index naming policy
+		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {
 			beatsStreams = append(beatsStreams, map[string]interface{}{
