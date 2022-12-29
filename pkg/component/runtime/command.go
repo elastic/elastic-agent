@@ -395,18 +395,13 @@ func (c *CommandRuntime) startWatcher(info *process.Info, comm Communicator) {
 func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 	switch c.actionState {
 	case actionStart:
-		// should still be running
-		reportFailure := true
-		if c.restartBucket != nil {
+		if c.restartBucket != nil && c.restartBucket.Allow() {
+			stopMsg := fmt.Sprintf("Suppressing FAILED state due to restart for '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+			c.forceCompState(client.UnitStateStopped, stopMsg)
+		} else {
 			// report failure only if bucket is full of restart events
-			reportFailure = !c.restartBucket.Allow()
-		}
-
-		if reportFailure {
 			stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 			c.forceCompState(client.UnitStateFailed, stopMsg)
-		} else {
-			c.logger.Info("Suppressing FAILED state due to restart for '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		}
 		return true
 	case actionStop, actionTeardown:
