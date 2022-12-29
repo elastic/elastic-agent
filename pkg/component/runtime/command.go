@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
@@ -72,6 +73,7 @@ type CommandRuntime struct {
 	state          ComponentState
 	lastCheckin    time.Time
 	missedCheckins int
+	restartBucket  *rate.Limiter
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
@@ -99,6 +101,9 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 	c.logStd = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStdout)
 	ll, unitLevels = getLogLevels(comp) // don't want to share mapping of units (so new map is generated)
 	c.logErr = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStderr)
+
+	c.restartBucket = newRateLimiter(cmdSpec.RestartMonitoringPeriod, cmdSpec.MaxRestartsPerPeriod)
+
 	return c, nil
 }
 
@@ -352,7 +357,6 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
-
 	cmdSpec := c.getCommandSpec()
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
@@ -391,9 +395,14 @@ func (c *CommandRuntime) startWatcher(info *process.Info, comm Communicator) {
 func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 	switch c.actionState {
 	case actionStart:
-		// should still be running
-		stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
-		c.forceCompState(client.UnitStateFailed, stopMsg)
+		if c.restartBucket != nil && c.restartBucket.Allow() {
+			stopMsg := fmt.Sprintf("Suppressing FAILED state due to restart for '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+			c.forceCompState(client.UnitStateStopped, stopMsg)
+		} else {
+			// report failure only if bucket is full of restart events
+			stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+			c.forceCompState(client.UnitStateFailed, stopMsg)
+		}
 		return true
 	case actionStop, actionTeardown:
 		// stopping (should have exited)
@@ -534,4 +543,20 @@ func dirPath(path string) process.CmdOption {
 		cmd.Dir = path
 		return nil
 	}
+}
+
+func newRateLimiter(restartMonitoringPeriod time.Duration, maxEventsPerPeriod int) *rate.Limiter {
+	if restartMonitoringPeriod <= 0 || maxEventsPerPeriod <= 0 {
+		return nil
+	}
+
+	freq := restartMonitoringPeriod.Seconds()
+	events := float64(maxEventsPerPeriod)
+	perSecond := events / freq
+	if perSecond > 0 {
+		bucketSize := rate.Limit(perSecond)
+		return rate.NewLimiter(bucketSize, maxEventsPerPeriod)
+	}
+
+	return nil
 }
