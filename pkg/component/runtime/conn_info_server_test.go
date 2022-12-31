@@ -60,6 +60,9 @@ func (c *mockCommunicator) WriteConnInfo(w io.Writer, services ...client.Service
 func (c *mockCommunicator) CheckinExpected(expected *proto.CheckinExpected) {
 }
 
+func (c *mockCommunicator) ClearPendingCheckinExpected() {
+}
+
 func (c *mockCommunicator) CheckinObserved() <-chan *proto.CheckinObserved {
 	return c.ch
 }
