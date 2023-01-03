@@ -137,11 +137,11 @@ func TestActionDispatcher(t *testing.T) {
 		success1.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		success2.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		d.Dispatch(ctx, ack, action1, action2)
-		select {
-		case err := <-d.Errors():
+		dispatchCtx, cancelFn := context.WithCancel(ctx)
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action1, action2)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 
 		success1.AssertExpectations(t)
@@ -163,11 +163,12 @@ func TestActionDispatcher(t *testing.T) {
 		action := &mockOtherAction{}
 		action.On("Type").Return("action")
 		action.On("ID").Return("id")
-		d.Dispatch(ctx, ack, action)
-		select {
-		case err := <-d.Errors():
+
+		dispatchCtx, cancelFn := context.WithCancel(ctx)
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 
 		def.AssertExpectations(t)
@@ -213,11 +214,11 @@ func TestActionDispatcher(t *testing.T) {
 		action2.On("Type").Return("action")
 		action2.On("ID").Return("id")
 
-		d.Dispatch(context.Background(), ack, action1, action2)
-		select {
-		case err := <-d.Errors():
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action1, action2)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
@@ -240,11 +241,14 @@ func TestActionDispatcher(t *testing.T) {
 		action.On("Type").Return(fleetapi.ActionTypeCancel)
 		action.On("ID").Return("id")
 
-		d.Dispatch(context.Background(), ack, action)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		default:
+		case <-time.After(200 * time.Microsecond):
+			// we're not expecting any reset,
 		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
@@ -273,11 +277,11 @@ func TestActionDispatcher(t *testing.T) {
 		action2.On("Type").Return(fleetapi.ActionTypeCancel)
 		action2.On("ID").Return("id")
 
-		d.Dispatch(context.Background(), ack, action2)
-		select {
-		case err := <-d.Errors():
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action2)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
@@ -296,11 +300,14 @@ func TestActionDispatcher(t *testing.T) {
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
 
-		d.Dispatch(context.Background(), ack)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack)
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		default:
+		case <-time.After(500 * time.Microsecond):
+			// we're not expecting any reset
 		}
 		def.AssertNotCalled(t, "Handle", mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -328,11 +335,11 @@ func TestActionDispatcher(t *testing.T) {
 		action.On("SetRetryAttempt", 1).Once()
 		action.On("SetStartTime", mock.Anything).Once()
 
-		d.Dispatch(context.Background(), ack, action)
-		select {
-		case err := <-d.Errors():
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action)
+		if err := <-d.Errors(); err != nil {
 			t.Fatalf("Unexpected error: %v", err)
-		default:
 		}
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
@@ -362,7 +369,9 @@ func TestActionDispatcher(t *testing.T) {
 
 		// Kind of a dirty work around to test an error return.
 		// launch in another routing and sleep to check if an error is generated
-		go d.Dispatch(context.Background(), ack, action1, action2)
+		dispatchCtx, cancelFn := context.WithCancel(context.Background())
+		defer cancelFn()
+		go d.Dispatch(dispatchCtx, ack, action1, action2)
 		time.Sleep(time.Millisecond * 200)
 		select {
 		case <-d.Errors():
@@ -374,6 +383,55 @@ func TestActionDispatcher(t *testing.T) {
 		case <-d.Errors():
 			t.Fatal(err)
 		default:
+		}
+
+		def.AssertExpectations(t)
+		queue.AssertExpectations(t)
+	})
+
+	t.Run("Dispatch multiples events in separate batch returns one error second one resets it", func(t *testing.T) {
+		def := &mockHandler{}
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		queue := &mockQueue{}
+		queue.On("Save").Return(nil).Times(2)
+		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Times(2)
+
+		d, err := New(nil, def, queue)
+		require.NoError(t, err)
+		err = d.Register(&mockAction{}, def)
+		require.NoError(t, err)
+
+		action1 := &mockAction{}
+		action1.On("Type").Return("action")
+		action1.On("ID").Return("id")
+		action2 := &mockAction{}
+		action2.On("Type").Return("action")
+		action2.On("ID").Return("id")
+
+		// Kind of a dirty work around to test an error return.
+		// launch in another routing and sleep to check if an error is generated
+		dispatchCtx1, cancelFn1 := context.WithCancel(context.Background())
+		defer cancelFn1()
+		go d.Dispatch(dispatchCtx1, ack, action1)
+		select {
+		case err := <-d.Errors():
+			if err == nil {
+				t.Fatal("Expecting error")
+			}
+		case <-time.After(300 * time.Millisecond):
+		}
+
+		dispatchCtx2, cancelFn2 := context.WithCancel(context.Background())
+		defer cancelFn2()
+		go d.Dispatch(dispatchCtx2, ack, action2)
+		select {
+		case err := <-d.Errors():
+			if err != nil {
+				t.Fatal("Unexpected error")
+			}
+		case <-time.After(300 * time.Millisecond):
 		}
 
 		def.AssertExpectations(t)

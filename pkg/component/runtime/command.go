@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
@@ -72,6 +73,7 @@ type CommandRuntime struct {
 	state          ComponentState
 	lastCheckin    time.Time
 	missedCheckins int
+	restartBucket  *rate.Limiter
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
@@ -99,6 +101,9 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 	c.logStd = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStdout)
 	ll, unitLevels = getLogLevels(comp) // don't want to share mapping of units (so new map is generated)
 	c.logErr = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStderr)
+
+	c.restartBucket = newRateLimiter(cmdSpec.RestartMonitoringPeriod, cmdSpec.MaxRestartsPerPeriod)
+
 	return c, nil
 }
 
@@ -322,6 +327,14 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	_ = os.MkdirAll(dataPath, 0755)
 	args = append(args, "-E", "path.data="+dataPath)
 
+	// reset checkin state before starting the process.
+	c.lastCheckin = time.Time{}
+	c.missedCheckins = 0
+
+	// Ensure there is no pending checkin expected message buffered to avoid sending the new process
+	// the expected state of the previous process: https://github.com/elastic/beats/issues/34137
+	comm.ClearPendingCheckinExpected()
+
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
@@ -329,8 +342,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	if err != nil {
 		return err
 	}
-	c.lastCheckin = time.Time{}
-	c.missedCheckins = 0
+
 	c.proc = proc
 	c.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: spawned pid '%d'", c.proc.PID))
 	c.startWatcher(proc, comm)
@@ -352,7 +364,6 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
-
 	cmdSpec := c.getCommandSpec()
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
@@ -391,9 +402,14 @@ func (c *CommandRuntime) startWatcher(info *process.Info, comm Communicator) {
 func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 	switch c.actionState {
 	case actionStart:
-		// should still be running
-		stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
-		c.forceCompState(client.UnitStateFailed, stopMsg)
+		if c.restartBucket != nil && c.restartBucket.Allow() {
+			stopMsg := fmt.Sprintf("Suppressing FAILED state due to restart for '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+			c.forceCompState(client.UnitStateStopped, stopMsg)
+		} else {
+			// report failure only if bucket is full of restart events
+			stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+			c.forceCompState(client.UnitStateFailed, stopMsg)
+		}
 		return true
 	case actionStop, actionTeardown:
 		// stopping (should have exited)
@@ -534,4 +550,20 @@ func dirPath(path string) process.CmdOption {
 		cmd.Dir = path
 		return nil
 	}
+}
+
+func newRateLimiter(restartMonitoringPeriod time.Duration, maxEventsPerPeriod int) *rate.Limiter {
+	if restartMonitoringPeriod <= 0 || maxEventsPerPeriod <= 0 {
+		return nil
+	}
+
+	freq := restartMonitoringPeriod.Seconds()
+	events := float64(maxEventsPerPeriod)
+	perSecond := events / freq
+	if perSecond > 0 {
+		bucketSize := rate.Limit(perSecond)
+		return rate.NewLimiter(bucketSize, maxEventsPerPeriod)
+	}
+
+	return nil
 }

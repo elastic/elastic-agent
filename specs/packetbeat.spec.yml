@@ -16,6 +16,10 @@ inputs:
       - logstash
       - redis
     command:
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
       args:
         - "-E"
         - "setup.ilm.enabled=false"
@@ -24,7 +28,9 @@ inputs:
         - "-E"
         - "management.enabled=true"
         - "-E"
-        - "logging.level=debug"
+        - "management.restart_on_output_change=true"
+        - "-E"
+        - "logging.level=info"
         - "-E"
         - "logging.to_stderr=true"
         - "-E"

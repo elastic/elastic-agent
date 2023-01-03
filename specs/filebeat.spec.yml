@@ -17,8 +17,12 @@ inputs:
       - redis
     shippers: &shippers
       - shipper
-    command:
-      args: &args
+    command: &command
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
+      args: 
         - "-E"
         - "setup.ilm.enabled=false"
         - "-E"
@@ -26,7 +30,9 @@ inputs:
         - "-E"
         - "management.enabled=true"
         - "-E"
-        - "logging.level=debug"
+        - "management.restart_on_output_change=true"
+        - "-E"
+        - "logging.level=info"
         - "-E"
         - "logging.to_stderr=true"
         - "-E"
@@ -38,36 +44,37 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: azure-eventhub
     description: "Azure Eventhub"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: cel
     description: "Common Expression Language Input"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: cloudfoundry
     description: "PCF Cloudfoundry"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
+  - name: cometd
+    description: "CometD input"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
   - name: container
     description: "Container logs"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: docker
     aliases:
       - log/docker
@@ -75,43 +82,37 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: gcp-pubsub
     description: "GCP Pub-Sub"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: http_endpoint
     description: "HTTP Endpoint"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: httpjson
     description: "HTTP JSON Endpoint"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: journald
     description: "Journald"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: kafka
     description: "Kafka"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: log
     aliases:
       - logfile
@@ -120,29 +121,25 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: mqtt
     description: "MQTT"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: netflow
     description: "Netflow"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: o365audit
     description: "Office 365 Audit"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: redis
     aliases:
       - log/redis_slowlog
@@ -150,8 +147,7 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: syslog
     aliases:
       - log/syslog
@@ -159,8 +155,7 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: tcp
     aliases:
       - event/tcp
@@ -168,8 +163,7 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: udp
     aliases:
       - event/udp
@@ -177,26 +171,22 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: unix
     description: "Unix Socket"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: winlog
     description: "Winlog"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: filestream
     description: "Filestream"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command

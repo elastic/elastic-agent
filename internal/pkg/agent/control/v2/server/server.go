@@ -22,7 +22,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/cproto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/proto"
+	v1server "github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/server"
+	cproto "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -74,6 +76,9 @@ func (s *Server) Start() error {
 		s.server = grpc.NewServer(grpc.MaxRecvMsgSize(s.grpcConfig.MaxMsgSize))
 	}
 	cproto.RegisterElasticAgentControlServer(s.server, s)
+
+	v1Wrapper := v1server.New(s.logger, s, s.tracer)
+	proto.RegisterElasticAgentControlServer(s.server, v1Wrapper)
 
 	// start serving GRPC connections
 	go func() {

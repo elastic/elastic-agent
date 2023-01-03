@@ -14,6 +14,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/elastic/elastic-agent/pkg/component"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -54,9 +56,9 @@ const (
 )
 
 var (
-	errNoOuputPresent        = errors.New("outputs not part of the config")
-	supportedComponents      = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "cloud-defend", "endpoint-security", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
-	supportedBeatsComponents = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
+	errNoOuputPresent          = errors.New("outputs not part of the config")
+	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "cloud-defend", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
 // BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
@@ -102,7 +104,7 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 }
 
 // MonitoringConfig adds monitoring inputs to a configuration based on retrieved list of components to run.
-func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, componentIDToBinary map[string]string) (map[string]interface{}, error) {
+func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, components []component.Component, componentIDToBinary map[string]string) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
 	}
@@ -137,7 +139,7 @@ func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, component
 	b.initInputs(cfg)
 
 	if b.config.C.MonitorLogs {
-		if err := b.injectLogsInput(cfg, componentIDToBinary, monitoringOutput); err != nil {
+		if err := b.injectLogsInput(cfg, components, monitoringOutput); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -283,7 +285,7 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 	return nil
 }
 
-func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutput string) error {
+func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []component.Component, monitoringOutput string) error {
 	monitoringNamespace := b.monitoringNamespace()
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
 
@@ -427,6 +429,58 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentIDTo
 		},
 	}
 
+	// service components that define a log path are monitored using its own stream in the monitor
+	for _, comp := range components {
+		if comp.InputSpec == nil || comp.InputSpec.Spec.Service == nil || comp.InputSpec.Spec.Service.Log == nil || comp.InputSpec.Spec.Service.Log.Path == "" {
+			// only monitor service inputs that define a log path
+			continue
+		}
+
+		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.InputSpec.BinaryName, "-", "_"), "/", "_") // conform with index naming policy
+		dataset := fmt.Sprintf("elastic_agent.%s", fixedBinaryName)
+		streams = append(streams, map[string]interface{}{
+			idKey:  fmt.Sprintf("filestream-monitoring-%s", comp.ID),
+			"type": "filestream",
+			"paths": []interface{}{
+				comp.InputSpec.Spec.Service.Log.Path,
+			},
+			"data_stream": map[string]interface{}{
+				"type":      "logs",
+				"dataset":   dataset,
+				"namespace": monitoringNamespace,
+			},
+			"close": map[string]interface{}{
+				"on_state_change": map[string]interface{}{
+					"inactive": "5m",
+				},
+			},
+			"parsers": []interface{}{
+				map[string]interface{}{
+					"ndjson": map[string]interface{}{
+						"message_key":    "message",
+						"overwrite_keys": true,
+						"add_error_key":  true,
+						"target":         "",
+					},
+				},
+			},
+			"processors": []interface{}{
+				map[string]interface{}{
+					// component information must be injected because it's not a subprocess
+					"add_fields": map[string]interface{}{
+						"target": "component",
+						"fields": map[string]interface{}{
+							"id":      comp.ID,
+							"type":    comp.InputSpec.InputType,
+							"binary":  comp.InputSpec.BinaryName,
+							"dataset": dataset,
+						},
+					},
+				},
+			},
+		})
+	}
+
 	inputs := []interface{}{
 		map[string]interface{}{
 			idKey:        "filestream-monitoring-agent",
@@ -532,12 +586,12 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		},
 	}
 	for unit, binaryName := range componentIDToBinary {
-		if !isSupportedBinary(binaryName) {
+		if !isSupportedMetricsBinary(binaryName) {
 			continue
 		}
 
 		endpoints := []interface{}{prefixedEndpoint(endpointPath(unit, b.operatingSystem))}
-		name := strings.ReplaceAll(strings.ReplaceAll(unit, "-", "_"), "/", "_") // conform with index naming policy
+		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {
 			beatsStreams = append(beatsStreams, map[string]interface{}{
@@ -837,8 +891,8 @@ func httpCopyRules() []interface{} {
 	return fromToMap
 }
 
-func isSupportedBinary(binaryName string) bool {
-	for _, supportedBinary := range supportedComponents {
+func isSupportedMetricsBinary(binaryName string) bool {
+	for _, supportedBinary := range supportedMetricsComponents {
 		if strings.EqualFold(supportedBinary, binaryName) {
 			return true
 		}

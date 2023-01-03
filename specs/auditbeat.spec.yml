@@ -15,8 +15,12 @@ inputs:
       - kafka
       - logstash
       - redis
-    command:
-      args: &args
+    command: &command
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
+      args:
         - "-E"
         - "setup.ilm.enabled=false"
         - "-E"
@@ -24,7 +28,9 @@ inputs:
         - "-E"
         - "management.enabled=true"
         - "-E"
-        - "logging.level=debug"
+        - "management.restart_on_output_change=true"
+        - "-E"
+        - "logging.level=info"
         - "-E"
         - "logging.to_stderr=true"
         - "-E"
@@ -35,11 +41,9 @@ inputs:
     description: "Audit File Integrity"
     platforms: *platforms
     outputs: *outputs
-    command:
-      args: *args
+    command: *command
   - name: audit/system
     description: "Audit System"
     platforms: *platforms
     outputs: *outputs
-    command:
-      args: *args
+    command: *command

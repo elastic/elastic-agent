@@ -1,7 +1,7 @@
 version: 2
 inputs:
-  - name: cloud_defend
-    description: "Cloud defend for containers"
+  - name: cloud_defend/control
+    description: "Defend for containers"
     platforms: &platforms
       - container/amd64
       - container/arm64
