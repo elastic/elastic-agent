@@ -109,12 +109,12 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	if cfg.Settings.LoggingConfig != nil {
 		logLvl = cfg.Settings.LoggingConfig.Level
 	}
-	genLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
+	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
 	if err != nil {
 		return err
 	}
 
-	l := genLogger.With("service.name", agentName)
+	l := baseLogger.With("service.name", agentName)
 
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
@@ -190,7 +190,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, err := application.New(l, genLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
