@@ -76,13 +76,14 @@ type ComponentUnitDiagnostic struct {
 type Manager struct {
 	proto.UnimplementedElasticAgentServer
 
-	logger     *logger.Logger
-	ca         *authority.CertificateAuthority
-	listenAddr string
-	agentInfo  *info.AgentInfo
-	tracer     *apm.Tracer
-	monitor    MonitoringManager
-	grpcConfig *configuration.GRPCConfig
+	logger        *logger.Logger
+	genericLogger *logger.Logger
+	ca            *authority.CertificateAuthority
+	listenAddr    string
+	agentInfo     *info.AgentInfo
+	tracer        *apm.Tracer
+	monitor       MonitoringManager
+	grpcConfig    *configuration.GRPCConfig
 
 	netMx    sync.RWMutex
 	listener net.Listener
@@ -106,13 +107,14 @@ type Manager struct {
 }
 
 // NewManager creates a new manager.
-func NewManager(logger *logger.Logger, listenAddr string, agentInfo *info.AgentInfo, tracer *apm.Tracer, monitor MonitoringManager, grpcConfig *configuration.GRPCConfig) (*Manager, error) {
+func NewManager(logger, genericLogger *logger.Logger, listenAddr string, agentInfo *info.AgentInfo, tracer *apm.Tracer, monitor MonitoringManager, grpcConfig *configuration.GRPCConfig) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
 		return nil, err
 	}
 	m := &Manager{
 		logger:        logger,
+		genericLogger: genericLogger,
 		ca:            ca,
 		listenAddr:    listenAddr,
 		agentInfo:     agentInfo,
@@ -655,7 +657,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 			}
 		} else {
 			// new component; create its runtime
-			logger := m.logger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
+			logger := m.genericLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
 			state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
 			if err != nil {
 				return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)

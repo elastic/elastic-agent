@@ -63,7 +63,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -165,7 +165,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -290,7 +290,7 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -461,7 +461,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -616,7 +616,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -742,7 +742,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -900,7 +900,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1030,7 +1030,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1169,7 +1169,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1290,7 +1290,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1414,7 +1414,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1626,7 +1626,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1778,7 +1778,7 @@ func TestManager_FakeShipper(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
