@@ -137,7 +137,7 @@ func createZip(fileName string, agentDiag []client.DiagnosticFileResult, unitDia
 				continue
 			}
 			for _, fr := range ud.Results {
-				w, err := zw.Create(fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name))
+				w, err := zw.Create(fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Filename))
 				if err != nil {
 					return closeHandlers(err, zw, f)
 				}
