@@ -170,15 +170,14 @@ func writeRedacted(streams *cli.IOStreams, fullFilePath string, fr client.Diagno
 	if fr.ContentType == "application/yaml" {
 		unmarshalled := map[string]interface{}{}
 		err := yaml.Unmarshal(fr.Content, &unmarshalled)
-
 		if err != nil {
 			// Best effort, output a warning but still include the file
-			fmt.Fprintf(streams.Err, "[warning] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
+			fmt.Fprintf(streams.Err, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 		} else {
 			redacted, err := yaml.Marshal(redactMap(unmarshalled))
 			if err != nil {
 				// Best effort, output a warning but still include the file
-				fmt.Fprintf(streams.Err, "[warning] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
+				fmt.Fprintf(streams.Err, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
 			} else {
 				out = &redacted
 			}
