@@ -9,6 +9,7 @@ inputs:
       - container/arm64
     outputs:
       - elasticsearch
+      - logstash
     runtime:
       preventions:
         - condition: ${runtime.user.root} == false
@@ -48,6 +49,7 @@ inputs:
       - darwin/arm64
     outputs:
       - elasticsearch
+      - logstash
     service:
       cport: 6788
       log:
@@ -59,6 +61,7 @@ inputs:
       - windows/amd64
     outputs:
       - elasticsearch
+      - logstash
     runtime:
       preventions:
         - condition: ${runtime.user.root} == false

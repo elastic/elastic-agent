@@ -334,19 +334,19 @@ func TestToComponents(t *testing.T) {
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
-						"type": "endpoint",
-						"id":   "endpoint-0",
+						"type": "fleet-server",
+						"id":   "fleet-server-0",
 					},
 				},
 			},
 			Result: []Component{
 				{
-					ID:        "endpoint-default",
+					ID:        "fleet-server-default",
 					InputSpec: &InputRuntimeSpec{},
 					Err:       ErrOutputNotSupported,
 					Units: []Unit{
 						{
-							ID:       "endpoint-default",
+							ID:       "fleet-server-default",
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
@@ -354,12 +354,12 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 						{
-							ID:       "endpoint-default-endpoint-0",
+							ID:       "fleet-server-default-fleet-server-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "endpoint",
-								"id":   "endpoint-0",
+								"type": "fleet-server",
+								"id":   "fleet-server-0",
 							}),
 						},
 					},
