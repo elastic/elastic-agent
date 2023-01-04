@@ -173,6 +173,7 @@ func (c *controller) Run(ctx context.Context) error {
 					}
 				}()
 
+				close(c.ch)
 				wg.Wait()
 				return ctx.Err()
 			case <-notify:
@@ -207,7 +208,11 @@ func (c *controller) Run(ctx context.Context) error {
 			}
 		}
 
-		c.ch <- vars
+		select {
+		case c.ch <- vars:
+		case <-ctx.Done():
+			// coordinator is handling cancellation it won't drain the channel
+		}
 	}
 }
 

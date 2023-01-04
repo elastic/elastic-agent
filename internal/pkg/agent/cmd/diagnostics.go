@@ -180,7 +180,7 @@ func writeRedacted(streams *cli.IOStreams, fullFilePath string, fr client.Diagno
 				// Best effort, output a warning but still include the file
 				fmt.Fprintf(streams.Err, "[warning] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
 			}
-	
+
 			out = &redacted
 		}
 	}

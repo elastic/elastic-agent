@@ -435,7 +435,9 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 			// only monitor service inputs that define a log path
 			continue
 		}
-		dataset := fmt.Sprintf("elastic_agent.%s", comp.InputSpec.BinaryName)
+
+		fixedBinaryName := strings.ReplaceAll(strings.ReplaceAll(comp.InputSpec.BinaryName, "-", "_"), "/", "_") // conform with index naming policy
+		dataset := fmt.Sprintf("elastic_agent.%s", fixedBinaryName)
 		streams = append(streams, map[string]interface{}{
 			idKey:  fmt.Sprintf("filestream-monitoring-%s", comp.ID),
 			"type": "filestream",
@@ -589,7 +591,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		}
 
 		endpoints := []interface{}{prefixedEndpoint(endpointPath(unit, b.operatingSystem))}
-		name := strings.ReplaceAll(strings.ReplaceAll(unit, "-", "_"), "/", "_") // conform with index naming policy
+		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {
 			beatsStreams = append(beatsStreams, map[string]interface{}{
