@@ -96,14 +96,24 @@ func Test_retrySender_Send(t *testing.T) {
 		status: 503,
 		err:    nil,
 	}, {
-		name: "error",
+		name: "context error",
 		sender: func() *mockSender {
 			m := &mockSender{}
-			m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&http.Response{}, errors.New("oh no")).Once()
+			m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&http.Response{}, context.Canceled).Once()
 			return m
 		},
 		status: 0,
-		err:    errors.New("oh no"),
+		err:    context.Canceled,
+	}, {
+		name: "non-context error will retry",
+		sender: func() *mockSender {
+			m := &mockSender{}
+			m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&http.Response{}, errors.New("oh no")).Once()
+			m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&http.Response{StatusCode: 200}, nil).Once()
+			return m
+		},
+		status: 200,
+		err:    nil,
 	}}
 
 	backoff := &mockBackoff{}

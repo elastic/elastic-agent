@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -62,7 +63,8 @@ type retrySender struct {
 	wait backoff.Backoff
 }
 
-// Send calls the underlying Sender's Send method. If a 429 status code is returned the request is retried after a backoff period.
+// Send calls the underlying Sender's Send method.
+// If a non context-related error is returned or the 429 status code is returned the request is retried after a backoff period.
 func (r *retrySender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (resp *http.Response, err error) {
 	r.wait.Reset()
 
@@ -71,7 +73,12 @@ func (r *retrySender) Send(ctx context.Context, method, path string, params url.
 	for i := 0; i < r.max; i++ {
 		resp, err = r.c.Send(ctx, method, path, params, headers, tr)
 		if err != nil {
-			return resp, err
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return resp, err
+			}
+			tr = bytes.NewReader(b.Bytes())
+			r.wait.Wait()
+			continue
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			tr = bytes.NewReader(b.Bytes())

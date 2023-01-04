@@ -45,18 +45,17 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionDiagnostics and received %T", a)
 	}
+	defer ack.Ack(ctx, action)
 
 	// Gather agent diagnostics
 	aDiag, err := h.client.DiagnosticAgent(ctx)
 	if err != nil {
 		action.Err = err
-		_ = ack.Ack(ctx, action)
 		return fmt.Errorf("unable to gather agent diagnostics: %w", err)
 	}
 	uDiag, err := h.client.DiagnosticUnits(ctx)
 	if err != nil {
 		action.Err = err
-		_ = ack.Ack(ctx, action)
 		return fmt.Errorf("unable to gather unit diagnostics: %w", err)
 	}
 
@@ -64,14 +63,12 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	err = diagnostics.ZipArchive(&b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
 	if err != nil {
 		action.Err = err
-		_ = ack.Ack(ctx, action)
 		return fmt.Errorf("error creating diagnostics bundle: %w", err)
 	}
 
 	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, &b)
 	action.Err = err
 	action.UploadID = uploadID
-	_ = ack.Ack(ctx, action)
 	if err != nil {
 		return fmt.Errorf("unable to upload diagnostics: %w", err)
 	}
