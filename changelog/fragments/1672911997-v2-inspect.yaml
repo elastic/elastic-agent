@@ -12,7 +12,7 @@ kind: breaking-change
 
 # Change summary; a 80ish characters long description of the change.
 summary: | 
-  Inspect command is inspecting the state of the v2 runtime (elastic-agent inspect components).
+  Add inspect components command to inspect the computed components/units model of the current configuration (elastic-agent inspect components).
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
