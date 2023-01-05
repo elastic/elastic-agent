@@ -14,9 +14,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zapio"
 )
 
 // Uploader is the interface used to upload a diagnostics bundle to fleet-server.
@@ -48,7 +45,7 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionDiagnostics and received %T", a)
 	}
-	defer ack.Ack(ctx, action)
+	defer ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
 
 	// Gather agent diagnostics
 	aDiag, err := h.client.DiagnosticAgent(ctx)
@@ -63,9 +60,16 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	}
 
 	var b bytes.Buffer
-	eLog := zapio.Writer{Log, h.log, Level, zapcore.WarnLevel} // create a writer that outputs to the log at level:warn
-	defer eLog.Sync()
-	err = diagnostics.ZipArchive(eLog, &b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
+	// create a buffer that any redaction error messages are written into as warnings.
+	// if the buffer is not empty after the bundle is assembled then the message is written to the log
+	// zapio.Writer would be a better way to pass a writer to ZipArchive, but logp embeds the zap.Logger so we are unable to access it here.
+	var wBuf bytes.Buffer
+	defer func() {
+		if str := wBuf.String(); str != "" {
+			h.log.Warn(str)
+		}
+	}()
+	err = diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
 	if err != nil {
 		action.Err = err
 		return fmt.Errorf("error creating diagnostics bundle: %w", err)
