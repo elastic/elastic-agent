@@ -12,7 +12,7 @@ kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
 summary: | 
-  Health Status: Elastic Agent indicates which integration is failing.
+  Health Status: Elastic Agent now indicates detailed status information for each component/unit.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
