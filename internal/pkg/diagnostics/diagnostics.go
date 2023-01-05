@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"runtime/pprof"
 	"strings"
 	"time"
@@ -20,8 +21,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
-// ContentTypeDirectory should be used to indicate that a directory should be made in the resulting bundle
-const ContentTypeDirectory = "directory"
+const (
+	// ContentTypeDirectory should be used to indicate that a directory should be made in the resulting bundle
+	ContentTypeDirectory = "directory"
+	// REDACTED is used to replace sensative fields
+	REDACTED = "<REDACTED>"
+)
 
 // Hook is a hook that gets used when diagnostic information is requested from the Elastic Agent.
 type Hook struct {
@@ -111,7 +116,7 @@ func pprofDiag(name string) func(context.Context) ([]byte, time.Time) {
 
 // ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics.
 // If any error is encountered when writing the contents of the archive it is returned.
-func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
+func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
 	zw := zip.NewWriter(w)
 	defer zw.Close()
 	// Create directories in the zip archive before writing any files
@@ -134,7 +139,7 @@ func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags 
 			if err != nil {
 				return err
 			}
-			_, err = zf.Write(ad.Content)
+			err = writeRedacted(errOut, zf, ad.Filename, ad)
 			if err != nil {
 				return err
 			}
@@ -177,15 +182,16 @@ func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags 
 				continue
 			}
 			for _, fr := range ud.Results {
+				filePath := fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name)
 				w, err := zw.CreateHeader(&zip.FileHeader{
-					Name:     fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name),
+					Name:     filePath,
 					Method:   zip.Deflate,
 					Modified: fr.Generated,
 				})
 				if err != nil {
 					return err
 				}
-				_, err = w.Write(fr.Content)
+				err = writeRedacted(errOut, w, filePath, fr)
 				if err != nil {
 					return err
 				}
@@ -193,4 +199,69 @@ func ZipArchive(w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags 
 		}
 	}
 	return nil
+}
+
+func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.DiagnosticFileResult) error {
+	out := &fr.Content
+
+	// Should we support json too?
+	if fr.ContentType == "application/yaml" {
+		unmarshalled := map[string]interface{}{}
+		err := yaml.Unmarshal(fr.Content, &unmarshalled)
+		if err != nil {
+			// Best effort, output a warning but still include the file
+			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
+		} else {
+			redacted, err := yaml.Marshal(redactMap(unmarshalled))
+			if err != nil {
+				// Best effort, output a warning but still include the file
+				fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
+			} else {
+				out = &redacted
+			}
+		}
+	}
+
+	_, err := w.Write(*out)
+	return err
+}
+
+func redactMap(m map[string]interface{}) map[string]interface{} {
+	for k, v := range m {
+		if v != nil && reflect.TypeOf(v).Kind() == reflect.Map {
+			v = redactMap(toMapStr(v))
+		}
+		if redactKey(k) {
+			v = REDACTED
+		}
+		m[k] = v
+	}
+	return m
+}
+
+func toMapStr(v interface{}) map[string]interface{} {
+	mm := map[string]interface{}{}
+	m, ok := v.(map[interface{}]interface{})
+	if !ok {
+		return mm
+	}
+
+	for k, v := range m {
+		mm[k.(string)] = v
+	}
+	return mm
+}
+
+func redactKey(k string) bool {
+	// "routekey" shouldn't be redacted.
+	// Add any other exceptions here.
+	if k == "routekey" {
+		return false
+	}
+
+	return strings.Contains(k, "certificate") ||
+		strings.Contains(k, "passphrase") ||
+		strings.Contains(k, "password") ||
+		strings.Contains(k, "token") ||
+		strings.Contains(k, "key")
 }

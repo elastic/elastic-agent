@@ -67,7 +67,7 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	defer f.Close()
 
-	if err := diagnostics.ZipArchive(f, agentDiag, unitDiags); err != nil {
+	if err := diagnostics.ZipArchive(streams.Err, f, agentDiag, unitDiags); err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", fileName, err)
 	}
 	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", fileName)

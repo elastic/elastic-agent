@@ -14,6 +14,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zapio"
 )
 
 // Uploader is the interface used to upload a diagnostics bundle to fleet-server.
@@ -60,7 +63,9 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	}
 
 	var b bytes.Buffer
-	err = diagnostics.ZipArchive(&b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
+	eLog := zapio.Writer{Log, h.log, Level, zapcore.WarnLevel} // create a writer that outputs to the log at level:warn
+	defer eLog.Sync()
+	err = diagnostics.ZipArchive(eLog, &b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
 	if err != nil {
 		action.Err = err
 		return fmt.Errorf("error creating diagnostics bundle: %w", err)
