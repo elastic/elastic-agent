@@ -12,7 +12,7 @@ kind: breaking-change
 
 # Change summary; a 80ish characters long description of the change.
 summary: | 
-  Diagnostic: new behavior following the Elastic Agent v2 control protocol.
+  Diagnostic: --pprof argument has been removed, it's now always provided.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
