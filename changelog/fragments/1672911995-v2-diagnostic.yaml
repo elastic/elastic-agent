@@ -17,7 +17,7 @@ summary: |
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 description: |
-  The diagnostic command is gathering diagnostic informations about the Elastic Agent and each
+  The diagnostic command is gathering diagnostic information about the Elastic Agent and each
   component/unit ran by the Elastic Agent. --pprof argument has been removed: it's now always provided.
 
 # Affected component; a word indicating the component this changeset affects.
