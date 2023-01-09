@@ -12,18 +12,6 @@ entries:
         name: 1665780486-heartbeat-es-output-only.yaml
         checksum: 361f993ba3220aef531f7949308e61d2cbf82e03
     - kind: feature
-      summary: Service runtime for V2
-      description: Service runtime for V2, tailored specifically for Endpoint service.
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1529
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/1069
-      timestamp: 1666095433
-      file:
-        name: 1666095433-service_runtime_v2.yaml
-        checksum: 94f777454bf571caf8da848441c43eb6d7b3bc10
-    - kind: feature
       summary: Upgrade node to 18.12.0
       description: ""
       component: ""
@@ -58,19 +46,7 @@ entries:
         name: 1668483030-common-expression-language.yaml
         checksum: 82427fc514372c067e140837177c8d81131ed424
     - kind: feature
-      summary: Reimplement processes route
-      description: Re-implement processes route to restore compatibility with the current cloud health checks
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1773
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/1731
-      timestamp: 1669159455
-      file:
-        name: 1669159455-reimplement-processes-route.yaml
-        checksum: cbeb5b5766bf733dd5e200a69353e326c642a971
-    - kind: feature
-      summary: Capture stdout/stderr of all spawned components and adjust default log level to info for all components
+      summary: Capture stdout/stderr of all subprocesses and adjust default log level to info for all components.
       description: ""
       component: ""
       pr:
@@ -81,53 +57,6 @@ entries:
       file:
         name: 1669236059-Capture-stdout-stderr-of-all-spawned-components-to-simplify-logging.yaml
         checksum: b4cf9cff0ef13bd168cadc80f89c4969b49fb378
-    - kind: bug-fix
-      summary: Fix Elastic-Agent fails to re-start during upgrade
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1805
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/1788
-      timestamp: 1669665017
-      file:
-        name: 1669665017-fix-nil-action-ack-crash-after-local-upgrade.yaml
-        checksum: 80fb772957944cd3687aa999595d6be1b4d96d2a
-    - kind: bug-fix
-      summary: Fix osqueryd and osquery-extension.ext permissions
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1829
-      issue: []
-      timestamp: 1669739947
-      file:
-        name: 1669739947-fix-osqueryd-and-osquery-extension.ext-permissions.yaml
-        checksum: cc8d9c7ab91b7e4c45a11b5b1347238d3e757453
-    - kind: feature
-      summary: Add agent logging level to fleet configuration
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1856
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/1853
-      timestamp: 1669845868
-      file:
-        name: 1669845868-add-agent-logging-level-to-fleet-configuration.yaml
-        checksum: 33cbf01b52f8cf30971d84fadbba10163197fe61
-    - kind: feature
-      summary: Ensure unique input ID when variable substition occurs from a dynamic provider
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1866
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/1751
-      timestamp: 1669928791
-      file:
-        name: 1669928791-Ensure-unique-input-ID-when-variable-substition-occurs-from-a-dynamic-provider.yaml
-        checksum: c057e4c3420b9549dc31c8e13e58ad3992a8eb49
     - kind: bug-fix
       summary: Elastic-agent will use local port when running fleet-server
       description: The elastic-agent will now use the 8221 locally bound port when running fleet-server instead of the external port (8220).
@@ -178,7 +107,7 @@ entries:
       file:
         name: 1671748292-input-ids-are-required.yaml
         checksum: 3ca6d7c10ce16c72c74b67b18916407ad09459fd
-    - kind: breaking-change
+    - kind: upgrade
       summary: "New control protocol between the Elastic Agent and its subprocesses. \nEnables per integration health reporting and simplifies new input development, among other things.\n"
       description: ""
       component: agent
