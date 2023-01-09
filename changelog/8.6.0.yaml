@@ -35,7 +35,7 @@ entries:
         name: 1667571017-Add-support-for-running-the-elastic-agent-shipper.yaml
         checksum: b2f5a0a8f9933c9ee624457116295aa674ef2a23
     - kind: feature
-      summary: Add Common Expression Language input mapping to the Filebeat spec.
+      summary: Add support for the Common Expression Language (CEL) Filebeat input type.
       description: ""
       component: spec
       pr:
@@ -46,7 +46,7 @@ entries:
         name: 1668483030-common-expression-language.yaml
         checksum: 82427fc514372c067e140837177c8d81131ed424
     - kind: feature
-      summary: Capture stdout/stderr of all subprocesses and adjust default log level to info for all components.
+      summary: Collect logs from sub-processes via stdout and stderr and write them to a single, unified Elastic Agent log file.
       description: ""
       component: ""
       pr:
@@ -107,9 +107,11 @@ entries:
       file:
         name: 1671748292-input-ids-are-required.yaml
         checksum: 3ca6d7c10ce16c72c74b67b18916407ad09459fd
-    - kind: upgrade
-      summary: "New control protocol between the Elastic Agent and its subprocesses. \nEnables per integration health reporting and simplifies new input development, among other things.\n"
-      description: ""
+    - kind: feature
+      summary: New control protocol between the Elastic Agent and its subprocesses.
+      description: |
+        New control protocol between the Elastic Agent and its subprocesses. 
+        Enables per integration health reporting and simplifies new input development, among other things.
       component: agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/1701
@@ -119,9 +121,9 @@ entries:
       file:
         name: 1672911992-v2-control-protocol.yaml
         checksum: 837bf1d3f02ab63b94b5fbe5853b8163aaeb6f31
-    - kind: upgrade
-      summary: "Internal directory structure change: addition of the components directory \n(and removal of the downloads directory) to contain binaries and their associated artifacts.\n"
-      description: ""
+    - kind: feature
+      summary: Internal directory structure change
+      description: Addition of the components directory (and removal of the downloads directory) to contain binaries and their associated artifacts.
       component: agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/1701
@@ -131,9 +133,8 @@ entries:
       file:
         name: 1672911993-v2-directory.yaml
         checksum: 6ab87446b15a94993186754952e08c00a72c13ba
-    - kind: upgrade
-      summary: |
-        All binaries for every supported integration will be bundled in the Elastic Agent by default.
+    - kind: feature
+      summary: All binaries for every supported integration will be bundled in the Elastic Agent by default.
       description: ""
       component: agent
       pr:
@@ -186,8 +187,10 @@ entries:
         name: 1672911999-v2-health-status.yaml
         checksum: eeb54c42273e877893abda9f56a92c2d31c4fa46
     - kind: bug-fix
-      summary: "Correctly preserve the Filebeat registry and other persistent input state during upgrades. \nEliminates event duplication after Elastic agent upgrades.\n"
-      description: ""
+      summary: Preserve persistent input state during upgrades.
+      description: |
+        Correctly preserve the Filebeat registry and other persistent input state during upgrades.
+        Eliminates event duplication after Elastic agent upgrades.
       component: agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/1701
