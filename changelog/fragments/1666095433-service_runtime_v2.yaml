@@ -1,5 +1,0 @@
-kind: feature
-summary: Service runtime for V2
-description: Service runtime for V2, tailored specifically for Endpoint service.
-pr: https://github.com/elastic/elastic-agent/pull/1529
-issue: https://github.com/elastic/elastic-agent/issues/1069

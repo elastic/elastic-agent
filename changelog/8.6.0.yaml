@@ -1,0 +1,330 @@
+version: 8.6.0
+entries:
+    - kind: feature
+      summary: Only support elasticsearch as an output for the beta synthetics integration.
+      description: ""
+      component: synthetics-integration
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1491
+      issue: []
+      timestamp: 1665780486
+      file:
+        name: 1665780486-heartbeat-es-output-only.yaml
+        checksum: 361f993ba3220aef531f7949308e61d2cbf82e03
+    - kind: feature
+      summary: Service runtime for V2
+      description: Service runtime for V2, tailored specifically for Endpoint service.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1529
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1069
+      timestamp: 1666095433
+      file:
+        name: 1666095433-service_runtime_v2.yaml
+        checksum: 94f777454bf571caf8da848441c43eb6d7b3bc10
+    - kind: feature
+      summary: Upgrade node to 18.12.0
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1657
+      issue: []
+      timestamp: 1667243040
+      file:
+        name: 1667243040-Upgrade-node-to-18.12.0.yaml
+        checksum: 38b5473e0ee1165ad9c5d74ee969a9228c3fa68a
+    - kind: feature
+      summary: Add experimental support for running the elastic-agent-shipper
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1527
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/219
+      timestamp: 1667571017
+      file:
+        name: 1667571017-Add-support-for-running-the-elastic-agent-shipper.yaml
+        checksum: b2f5a0a8f9933c9ee624457116295aa674ef2a23
+    - kind: feature
+      summary: Add Common Expression Language input mapping to the Filebeat spec.
+      description: ""
+      component: spec
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1719
+      issue: []
+      timestamp: 1668483030
+      file:
+        name: 1668483030-common-expression-language.yaml
+        checksum: 82427fc514372c067e140837177c8d81131ed424
+    - kind: bug-fix
+      summary: V2 Provide Fleet configuration to APM server
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1745
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1737
+      timestamp: 1668645651
+      file:
+        name: 1668645651-apm-fleet-config.yaml
+        checksum: ce8dc3cc4c598555ef05bfa0aa4f8daf0ac680b2
+    - kind: bug-fix
+      summary: apm-monitoring
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1748
+      issue: []
+      timestamp: 1668679987
+      file:
+        name: 1668679987-apm-monitoring.yaml
+        checksum: ef78089de487eeea3728f872de9d544bdecf1c5b
+    - kind: bug-fix
+      summary: Change config comparison to fix false unit update events
+      description: ""
+      component: runtime
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1766
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1738
+      timestamp: 1669066497
+      file:
+        name: 1669066497-struct-compare-unit-update.yaml
+        checksum: 513333eb8795e990ef632df7e2b71120feeaf892
+    - kind: feature
+      summary: Reimplement processes route
+      description: Re-implement processes route to restore compatibility with the current cloud health checks
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1773
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1731
+      timestamp: 1669159455
+      file:
+        name: 1669159455-reimplement-processes-route.yaml
+        checksum: cbeb5b5766bf733dd5e200a69353e326c642a971
+    - kind: feature
+      summary: Capture stdout/stderr of all spawned components and adjust default log level to info for all components
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1702
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/221
+      timestamp: 1669236059
+      file:
+        name: 1669236059-Capture-stdout-stderr-of-all-spawned-components-to-simplify-logging.yaml
+        checksum: b4cf9cff0ef13bd168cadc80f89c4969b49fb378
+    - kind: bug-fix
+      summary: Fix Elastic-Agent fails to re-start during upgrade
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1805
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1788
+      timestamp: 1669665017
+      file:
+        name: 1669665017-fix-nil-action-ack-crash-after-local-upgrade.yaml
+        checksum: 80fb772957944cd3687aa999595d6be1b4d96d2a
+    - kind: bug-fix
+      summary: Fix erroneous http url directory created for monitoring
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1811
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1806
+      timestamp: 1669668741
+      file:
+        name: 1669668741-fix-erroneous-http-url-directory-created-for-monitoring.yaml
+        checksum: d2c3b670e658413f5aa3bd650d79900dc7bc720a
+    - kind: bug-fix
+      summary: Fix osqueryd and osquery-extension.ext permissions
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1829
+      issue: []
+      timestamp: 1669739947
+      file:
+        name: 1669739947-fix-osqueryd-and-osquery-extension.ext-permissions.yaml
+        checksum: cc8d9c7ab91b7e4c45a11b5b1347238d3e757453
+    - kind: feature
+      summary: Add agent logging level to fleet configuration
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1856
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1853
+      timestamp: 1669845868
+      file:
+        name: 1669845868-add-agent-logging-level-to-fleet-configuration.yaml
+        checksum: 33cbf01b52f8cf30971d84fadbba10163197fe61
+    - kind: feature
+      summary: Ensure unique input ID when variable substition occurs from a dynamic provider
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1866
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1751
+      timestamp: 1669928791
+      file:
+        name: 1669928791-Ensure-unique-input-ID-when-variable-substition-occurs-from-a-dynamic-provider.yaml
+        checksum: c057e4c3420b9549dc31c8e13e58ad3992a8eb49
+    - kind: bug-fix
+      summary: Elastic-agent will use local port when running fleet-server
+      description: The elastic-agent will now use the 8221 locally bound port when running fleet-server instead of the external port (8220).
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1867
+      issue:
+        - https://github.com/elastic/ingest-dev/issues/1394
+      timestamp: 1669929902
+      file:
+        name: 1669929902-fix-local-fleet-server-port.yaml
+        checksum: 94f37fd1ff74bd320ec25cfcf2e2a0890eda494a
+    - kind: feature
+      summary: Remove inputs when all streams are removed
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1869
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1868
+      timestamp: 1669940990
+      file:
+        name: 1669940990-Remove-inputs-when-all-streams-are-removed.yaml
+        checksum: 3fcf26a5bbb988db85c0c5923d4bd2284dc95866
+    - kind: feature
+      summary: No longer restart Elastic Agent on log level change
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1914
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1896
+      timestamp: 1670518841
+      file:
+        name: 1670518841-No-longer-restart-Elastic-Agent-on-log-level-change.yaml
+        checksum: 12b34904cd47182a45e6e113518ef91ec718ebac
+    - kind: breaking-change
+      summary: Each input in an agent policy must have a unique ID.
+      description: |
+        Each input in an agent policy must have a unique ID, like "id: my-unique-input-id".
+        This only affects standalone agents. Unique IDs are automatically generated in
+        agent policies managed by Fleet.
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1994
+      issue: []
+      timestamp: 1671748292
+      file:
+        name: 1671748292-input-ids-are-required.yaml
+        checksum: 3ca6d7c10ce16c72c74b67b18916407ad09459fd
+    - kind: breaking-change
+      summary: "New control protocol between the Elastic Agent and its subprocesses. \nEnables per integration health reporting and simplifies new input development, among other things.\n"
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1701
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/836
+      timestamp: 1672911992
+      file:
+        name: 1672911992-v2-control-protocol.yaml
+        checksum: 837bf1d3f02ab63b94b5fbe5853b8163aaeb6f31
+    - kind: upgrade
+      summary: "Internal directory structure change: addition of the components directory \n(and removal of the downloads directory) to contain binaries and their associated artifacts.\n"
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1701
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/836
+      timestamp: 1672911993
+      file:
+        name: 1672911993-v2-directory.yaml
+        checksum: 6ab87446b15a94993186754952e08c00a72c13ba
+    - kind: upgrade
+      summary: |
+        All binaries for every supported integration will be bundled in the Elastic Agent by default.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent-shipper/pull/126
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/836
+      timestamp: 1672911994
+      file:
+        name: 1672911994-v2-packaging.yaml
+        checksum: b6ae49ca5e99b94901d9585d1c21d326065a5cc6
+    - kind: breaking-change
+      summary: |
+        Diagnostic: --pprof argument has been removed, it's now always provided.
+      description: |
+        The diagnostic command is gathering diagnostic information about the Elastic Agent and each
+        component/unit ran by the Elastic Agent. --pprof argument has been removed: it's now always provided.
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1140
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/836
+      timestamp: 1672911995
+      file:
+        name: 1672911995-v2-diagnostic.yaml
+        checksum: 2ca011d608585e5b81446389da7590c0aecada7b
+    - kind: feature
+      summary: |
+        Add inspect components command to inspect the computed components/units model of the current configuration (elastic-agent inspect components).
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1701
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/836
+      timestamp: 1672911997
+      file:
+        name: 1672911997-v2-inspect.yaml
+        checksum: 464bdde8aaadcd25590b89165d32131f4a4b168c
+    - kind: enhancement
+      summary: |
+        Health Status: Elastic Agent now indicates detailed status information for each component/unit.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/fleet-server/pull/1747
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/100
+      timestamp: 1672911999
+      file:
+        name: 1672911999-v2-health-status.yaml
+        checksum: eeb54c42273e877893abda9f56a92c2d31c4fa46
+    - kind: bug-fix
+      summary: "Correctly preserve the Filebeat registry and other persistent input state during upgrades. \nEliminates event duplication after Elastic agent upgrades.\n"
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1701
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/836
+      timestamp: 1672912001
+      file:
+        name: 1672912001-fix-duplicate-entries-on-upgrade.yaml
+        checksum: 4a06860accf7fcbae88034b9aaf669445071168e
+    - kind: known-issue
+      summary: |
+        OSQuery live query results can take up to 5 mins to show up in Kibana
+      description: ""
+      component: osquery
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2076
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2066
+      timestamp: 1672912002
+      file:
+        name: 1672912002-osquery-known-issue.yaml
+        checksum: e0f4d4d25322bd42298f080c62f9a86c361e7af1
