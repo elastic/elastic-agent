@@ -20,7 +20,7 @@ entries:
       issue:
         - https://github.com/elastic/elastic-agent/issues/1069
       timestamp: 1666095433
-      file:x
+      file:
         name: 1666095433-service_runtime_v2.yaml
         checksum: 94f777454bf571caf8da848441c43eb6d7b3bc10
     - kind: feature
