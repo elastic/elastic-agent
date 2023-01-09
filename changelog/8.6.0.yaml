@@ -20,7 +20,7 @@ entries:
       issue:
         - https://github.com/elastic/elastic-agent/issues/1069
       timestamp: 1666095433
-      file:
+      file:x
         name: 1666095433-service_runtime_v2.yaml
         checksum: 94f777454bf571caf8da848441c43eb6d7b3bc10
     - kind: feature
@@ -57,41 +57,6 @@ entries:
       file:
         name: 1668483030-common-expression-language.yaml
         checksum: 82427fc514372c067e140837177c8d81131ed424
-    - kind: bug-fix
-      summary: V2 Provide Fleet configuration to APM server
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1745
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/1737
-      timestamp: 1668645651
-      file:
-        name: 1668645651-apm-fleet-config.yaml
-        checksum: ce8dc3cc4c598555ef05bfa0aa4f8daf0ac680b2
-    - kind: bug-fix
-      summary: apm-monitoring
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1748
-      issue: []
-      timestamp: 1668679987
-      file:
-        name: 1668679987-apm-monitoring.yaml
-        checksum: ef78089de487eeea3728f872de9d544bdecf1c5b
-    - kind: bug-fix
-      summary: Change config comparison to fix false unit update events
-      description: ""
-      component: runtime
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1766
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/1738
-      timestamp: 1669066497
-      file:
-        name: 1669066497-struct-compare-unit-update.yaml
-        checksum: 513333eb8795e990ef632df7e2b71120feeaf892
     - kind: feature
       summary: Reimplement processes route
       description: Re-implement processes route to restore compatibility with the current cloud health checks
@@ -128,18 +93,6 @@ entries:
       file:
         name: 1669665017-fix-nil-action-ack-crash-after-local-upgrade.yaml
         checksum: 80fb772957944cd3687aa999595d6be1b4d96d2a
-    - kind: bug-fix
-      summary: Fix erroneous http url directory created for monitoring
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/1811
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/1806
-      timestamp: 1669668741
-      file:
-        name: 1669668741-fix-erroneous-http-url-directory-created-for-monitoring.yaml
-        checksum: d2c3b670e658413f5aa3bd650d79900dc7bc720a
     - kind: bug-fix
       summary: Fix osqueryd and osquery-extension.ext permissions
       description: ""
