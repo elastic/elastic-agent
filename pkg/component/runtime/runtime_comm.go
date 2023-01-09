@@ -34,6 +34,8 @@ type Communicator interface {
 	WriteConnInfo(w io.Writer, services ...client.Service) error
 	// CheckinExpected sends the expected state to the component.
 	CheckinExpected(expected *proto.CheckinExpected)
+	// ClearPendingCheckinExpected clears eny pending checkin expected messages.
+	ClearPendingCheckinExpected()
 	// CheckinObserved receives the observed state from the component.
 	CheckinObserved() <-chan *proto.CheckinObserved
 }
@@ -144,15 +146,19 @@ func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected) {
 	c.checkinExpectedLock.Lock()
 
 	// Empty the channel
-	select {
-	case <-c.checkinExpected:
-	default:
-	}
+	c.ClearPendingCheckinExpected()
 
 	// Put the new expected state in
 	c.checkinExpected <- expected
 
 	c.checkinExpectedLock.Unlock()
+}
+
+func (c *runtimeComm) ClearPendingCheckinExpected() {
+	select {
+	case <-c.checkinExpected:
+	default:
+	}
 }
 
 func (c *runtimeComm) CheckinObserved() <-chan *proto.CheckinObserved {

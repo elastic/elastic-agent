@@ -75,10 +75,12 @@ type RuntimePreventionSpec struct {
 
 // CommandSpec is the specification for an input that executes as a subprocess.
 type CommandSpec struct {
-	Args     []string           `config:"args,omitempty" yaml:"args,omitempty"`
-	Env      []CommandEnvSpec   `config:"env,omitempty" yaml:"env,omitempty"`
-	Timeouts CommandTimeoutSpec `config:"timeouts" yaml:"timeouts"`
-	Log      CommandLogSpec     `config:"log" yaml:"log"`
+	Args                    []string           `config:"args,omitempty" yaml:"args,omitempty"`
+	Env                     []CommandEnvSpec   `config:"env,omitempty" yaml:"env,omitempty"`
+	Timeouts                CommandTimeoutSpec `config:"timeouts" yaml:"timeouts"`
+	Log                     CommandLogSpec     `config:"log" yaml:"log"`
+	RestartMonitoringPeriod time.Duration      `config:"restart_monitoring_period,omitempty" yaml:"restart_monitoring_period,omitempty"`
+	MaxRestartsPerPeriod    int                `config:"maximum_restarts_per_period,omitempty" yaml:"maximum_restarts_per_period,omitempty"`
 }
 
 // CommandEnvSpec is the specification that defines environment variables that will be set to execute the subprocess.

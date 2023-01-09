@@ -114,6 +114,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				// Initial state on start
 				lastCheckin = time.Time{}
 				missedCheckins = 0
+				comm.ClearPendingCheckinExpected()
 				checkinTimer.Stop()
 				cisStop()
 

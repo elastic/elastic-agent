@@ -518,7 +518,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			return nil, fmt.Errorf("invalid 'inputs.%d.id', expected a string not a %T", idx, idRaw)
 		}
 		if hasDuplicate(outputsMap, id) {
-			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id %q (id is required to be unique)", idx, id)
+			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id %q. Please add a unique value for the 'id' key to each input in the agent policy", idx, id)
 		}
 		outputName := "default"
 		if outputRaw, ok := input[useKey]; ok {

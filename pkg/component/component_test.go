@@ -195,7 +195,7 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 			},
-			Err: `invalid 'inputs.1.id', has a duplicate id "filestream" (id is required to be unique)`,
+			Err: `invalid 'inputs.1.id', has a duplicate id "filestream". Please add a unique value for the 'id' key to each input in the agent policy`,
 		},
 		{
 			Name:     "Invalid: inputs entry id not a string",
@@ -334,19 +334,19 @@ func TestToComponents(t *testing.T) {
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
-						"type": "endpoint",
-						"id":   "endpoint-0",
+						"type": "fleet-server",
+						"id":   "fleet-server-0",
 					},
 				},
 			},
 			Result: []Component{
 				{
-					ID:        "endpoint-default",
+					ID:        "fleet-server-default",
 					InputSpec: &InputRuntimeSpec{},
 					Err:       ErrOutputNotSupported,
 					Units: []Unit{
 						{
-							ID:       "endpoint-default",
+							ID:       "fleet-server-default",
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
@@ -354,12 +354,12 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 						{
-							ID:       "endpoint-default-endpoint-0",
+							ID:       "fleet-server-default-fleet-server-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "endpoint",
-								"id":   "endpoint-0",
+								"type": "fleet-server",
+								"id":   "fleet-server-0",
 							}),
 						},
 					},
