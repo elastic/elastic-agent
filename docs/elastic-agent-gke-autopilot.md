@@ -234,4 +234,3 @@ Because kubernetes integration is already installed, dashboards are availbale fo
 Navigate to **Analytics>Dashboards**
 
 ![Cluster Overview](./images/6.png)
-([Metrics Kubernetes] Cluster Overview Dashbard)
