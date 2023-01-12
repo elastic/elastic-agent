@@ -1,6 +1,6 @@
 # Basic debian file with curl, wget and nano installed to fetch files
 # an update config files
-FROM debian:11.5
+FROM debian:bullseye-20221219
 MAINTAINER Nicolas Ruflin <ruflin@elastic.co>
 
 RUN apt-get update && \
