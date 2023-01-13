@@ -14,7 +14,7 @@ require (
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
 	github.com/elastic/elastic-agent-autodiscover v0.2.1
 	github.com/elastic/elastic-agent-client/v7 v7.0.2-0.20221129150247-15881a8e64ef
-	github.com/elastic/elastic-agent-libs v0.2.15
+	github.com/elastic/elastic-agent-libs v0.2.16
 	github.com/elastic/elastic-agent-system-metrics v0.4.4
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.8.1
