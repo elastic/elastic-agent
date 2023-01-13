@@ -121,7 +121,6 @@ func injectShipperConn(cfg *proto.UnitExpectedConfig, addr string, ca *authority
 			string(ca.Crt()),
 		},
 		"certificate": string(pair.Crt),
-		"key":         string(pair.Key),
 	}
 	return component.ExpectedConfig(source)
 }
