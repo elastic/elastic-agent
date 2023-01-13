@@ -52,8 +52,7 @@ func (m *Manager) connectShippers(components []component.Component) error {
 
 			// cleanup any pairs that are no-longer used
 			for pairID := range conn.pairs {
-				touch, _ := pairsTouched[pairID]
-				if !touch {
+				if !pairsTouched[pairID] {
 					delete(conn.pairs, pairID)
 				}
 			}
@@ -63,8 +62,7 @@ func (m *Manager) connectShippers(components []component.Component) error {
 
 	// cleanup any shippers that are no-longer used
 	for shipperID := range m.shipperConns {
-		touch, _ := shippersTouched[shipperID]
-		if !touch {
+		if !shippersTouched[shipperID] {
 			delete(m.shipperConns, shipperID)
 		}
 	}
