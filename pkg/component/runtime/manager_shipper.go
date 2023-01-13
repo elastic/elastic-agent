@@ -43,7 +43,7 @@ func (m *Manager) connectShippers(components []component.Component) error {
 					if err != nil {
 						return fmt.Errorf("failed to get/create certificate pait for shipper %q/%q: %w", comp.ID, unit.ID, err)
 					}
-					cfg, cfgErr := injectShipperConn(unit.Config, conn.addr, conn.ca, pair)
+					cfg, cfgErr := injectShipperConn(unit.Config, conn.addr, conn.ca, pair, false)
 					unit.Config = cfg
 					unit.Err = cfgErr
 					comp.Units[j] = unit
@@ -82,7 +82,7 @@ func (m *Manager) connectShippers(components []component.Component) error {
 			}
 			for j, unit := range comp.Units {
 				if unit.Type == client.UnitTypeOutput {
-					cfg, cfgErr := injectShipperConn(unit.Config, conn.addr, conn.ca, pair)
+					cfg, cfgErr := injectShipperConn(unit.Config, conn.addr, conn.ca, pair, true)
 					unit.Config = cfg
 					unit.Err = cfgErr
 					comp.Units[j] = unit
@@ -109,18 +109,22 @@ func pairGetOrCreate(conn *shipperConn, pairID string) (*authority.Pair, error) 
 	return pair, nil
 }
 
-func injectShipperConn(cfg *proto.UnitExpectedConfig, addr string, ca *authority.CertificateAuthority, pair *authority.Pair) (*proto.UnitExpectedConfig, error) {
+func injectShipperConn(cfg *proto.UnitExpectedConfig, addr string, ca *authority.CertificateAuthority, pair *authority.Pair, includeKey bool) (*proto.UnitExpectedConfig, error) {
 	if cfg == nil {
 		// unit configuration had an error generating (do nothing)
 		return cfg, nil
 	}
 	source := cfg.Source.AsMap()
 	source["server"] = addr
-	source["ssl"] = map[string]interface{}{
+	sslConfig := map[string]interface{}{
 		"certificate_authorities": []interface{}{
 			string(ca.Crt()),
 		},
 		"certificate": string(pair.Crt),
+	}
+	source["ssl"] = sslConfig
+	if includeKey {
+		sslConfig["key"] = string(pair.Key)
 	}
 	return component.ExpectedConfig(source)
 }
