@@ -1,5 +1,6 @@
 resources:
   - ../../base/elastic-agent-managed
+  - github.com/kubernetes/kube-state-metrics?ref=main
 
 images:
   - name: docker.elastic.co/beats/elastic-agent

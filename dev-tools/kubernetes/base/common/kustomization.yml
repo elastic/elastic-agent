@@ -5,4 +5,3 @@ resources:
   - cluster-role.yaml
   - role-binding-leases.yaml
   - cluster-role-binding.yaml
-  - github.com/kubernetes/kube-state-metrics?ref=main
