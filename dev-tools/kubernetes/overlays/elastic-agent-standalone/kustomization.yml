@@ -5,3 +5,9 @@ images:
   - name: docker.elastic.co/beats/elastic-agent
     newTag: "8.6.0"
 
+configMapGenerator:
+  - name: elastic-agent-configs
+    namespace: kube-system
+    behavior: merge
+    envs:
+    - .env

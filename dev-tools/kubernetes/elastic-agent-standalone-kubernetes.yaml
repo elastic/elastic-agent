@@ -801,6 +801,18 @@ metadata:
   name: elastic-agent-agent-node-datastreams
   namespace: kube-system
 ---
+apiVersion: v1
+data:
+  ES_HOST: ""
+  ES_PASSWORD: changeme
+  ES_USERNAME: elastic
+kind: ConfigMap
+metadata:
+  labels:
+    k8s-app: elastic-agent
+  name: elastic-agent-configs-7757btch74
+  namespace: kube-system
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -825,12 +837,6 @@ spec:
         - /etc/elastic-agent/agent.yml
         - -e
         env:
-        - name: ES_USERNAME
-          value: elastic
-        - name: ES_PASSWORD
-          value: changeme
-        - name: ES_HOST
-          value: ""
         - name: NODE_NAME
           valueFrom:
             fieldRef:
@@ -841,6 +847,9 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /etc/elastic-agent
+        envFrom:
+        - configMapRef:
+            name: elastic-agent-configs-7757btch74
         image: docker.elastic.co/beats/elastic-agent:8.6.0
         name: elastic-agent
         resources:

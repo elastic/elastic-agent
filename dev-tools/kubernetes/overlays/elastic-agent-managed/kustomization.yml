@@ -6,7 +6,7 @@ images:
     newTag: "8.6.0"
 
 configMapGenerator:
-  - name: elastic-agent-fleet-configs
+  - name: elastic-agent-configs
     namespace: kube-system
     behavior: merge
     envs:

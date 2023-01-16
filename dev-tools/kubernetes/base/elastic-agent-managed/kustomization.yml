@@ -7,6 +7,6 @@ resources:
   - daemonset.yaml
 
 configMapGenerator:
-  - name: fleet-configs
+  - name: configs
     envs:
     - .env

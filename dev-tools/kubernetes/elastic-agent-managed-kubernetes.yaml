@@ -146,12 +146,16 @@ subjects:
 apiVersion: v1
 data:
   FLEET_ENROLLMENT_TOKEN: RHlQMHVZVUJQRm5CejFaZHpiUkQ6LVltLUxPdXNUbWFhbXZEWGxPc3RUUQ==
+  FLEET_INSECURE: "true"
   FLEET_URL: https://fleet-server:8220
+  KIBANA_FLEET_PASSWORD: changeme
+  KIBANA_FLEET_USERNAME: elastic
+  KIBANA_HOST: http://kibana:5601
 kind: ConfigMap
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-fleet-configs-kd6c787kk4
+  name: elastic-agent-configs-566k85kgg9
   namespace: kube-system
 ---
 apiVersion: apps/v1
@@ -174,14 +178,6 @@ spec:
       - env:
         - name: FLEET_ENROLL
           value: "1"
-        - name: FLEET_INSECURE
-          value: "true"
-        - name: KIBANA_HOST
-          value: http://kibana:5601
-        - name: KIBANA_FLEET_USERNAME
-          value: elastic
-        - name: KIBANA_FLEET_PASSWORD
-          value: changeme
         - name: NODE_NAME
           valueFrom:
             fieldRef:
@@ -192,7 +188,7 @@ spec:
               fieldPath: metadata.name
         envFrom:
         - configMapRef:
-            name: elastic-agent-fleet-configs-kd6c787kk4
+            name: elastic-agent-configs-566k85kgg9
         image: docker.elastic.co/beats/elastic-agent:8.6.0
         name: elastic-agent
         resources:

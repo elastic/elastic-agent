@@ -8,3 +8,8 @@ resources:
   - role-binding-kubeadm-config.yaml
   - config-map.yaml
   - daemonset.yaml
+
+configMapGenerator:
+  - name: configs
+    envs:
+    - .env

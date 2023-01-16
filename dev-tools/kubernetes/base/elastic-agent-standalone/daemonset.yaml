@@ -43,16 +43,6 @@ spec:
             "-e",
           ]
           env:
-            # The basic authentication username used to connect to Elasticsearch
-            # This user needs the privileges required to publish events to Elasticsearch.
-            - name: ES_USERNAME
-              value: "elastic"
-            # The basic authentication password used to connect to Elasticsearch
-            - name: ES_PASSWORD
-              value: "changeme"
-            # The Elasticsearch host to communicate with
-            - name: ES_HOST
-              value: ""
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -63,6 +53,19 @@ spec:
                   fieldPath: metadata.name
             - name: STATE_PATH
               value: "/etc/elastic-agent"
+          envFrom:
+          - configMapRef:
+              # # The basic authentication username used to connect to Elasticsearch
+              # # This user needs the privileges required to publish events to Elasticsearch.
+              # - name: ES_USERNAME
+              #   value: "elastic"
+              # # The basic authentication password used to connect to Elasticsearch
+              # - name: ES_PASSWORD
+              #   value: "changeme"
+              # # The Elasticsearch host to communicate with
+              # - name: ES_HOST
+              #   value: ""
+              name: configs
           securityContext:
             runAsUser: 0
           resources:
