@@ -11,6 +11,9 @@ data:
         hosts:
           - >-
             ${ES_HOST}
+        protocol: https
+        ssl.verification_mode: "${ES_SSL_VERIFICATION_MODE}"
+        allow_older_versions: ${ES_ALLOW_OLDER_VERSIONS}
         username: ${ES_USERNAME}
         password: ${ES_PASSWORD}
     agent:
