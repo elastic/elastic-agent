@@ -58,7 +58,7 @@ const (
 	checksumFilename  = "checksum.yml"
 	commitLen         = 7
 
-	cloudImageTmpl = "docker.elastic.co/beats-ci/elastic-agent:$%s-%s"
+	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s-%s"
 )
 
 // Aliases for commands required by master makefile
@@ -563,39 +563,54 @@ func (Cloud) Image() {
 	packages := os.Getenv(packagesEnv)
 	defer os.Setenv(packagesEnv, packages)
 
-	os.Setenv(platformsEnv, "+all linux/amd64")
+	snapshot := os.Getenv(snapshotEnv)
+	defer os.Setenv(snapshotEnv, snapshot)
+
+	dev := os.Getenv(devEnv)
+	defer os.Setenv(devEnv, dev)
+
+	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
-	if _, ok := os.LookupEnv(snapshotEnv); !ok {
-		os.Setenv(snapshotEnv, "true")
-	}
+	os.Setenv(snapshotEnv, "true")
+	os.Setenv(devEnv, "true")
+
+	devtools.Snapshot = true
+	devtools.DevBuild = true
+	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
+	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
 		devtools.ExternalBuild = true
 	}
 
-	mg.Deps(Dev.Package)
+	Package()
 }
 
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {
+	snapshot := os.Getenv(snapshotEnv)
+	defer os.Setenv(snapshotEnv, snapshot)
+
+	os.Setenv(snapshotEnv, "true")
+
 	version := getVersion()
 	commit := dockerCommitHash()
 
-	mg.Deps(Cloud.Image)
+	// mg.Deps(Cloud.Image)
 
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
 	targetCloudImageName := fmt.Sprintf(cloudImageTmpl, version, commit)
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
-	err := sh.Run("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
 		return fmt.Errorf("Failed setting a docker image tag: %w", err)
 	}
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
-	err = sh.Run("docker", "image", "push", targetCloudImageName)
+	err = sh.RunV("docker", "image", "push", targetCloudImageName)
 	if err != nil {
 		return fmt.Errorf("Failed pushing docker image: %w", err)
 	}
