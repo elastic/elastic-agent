@@ -56,6 +56,7 @@ const (
 	agentDropPath     = "AGENT_DROP_PATH"
 	specSuffix        = ".spec.yml"
 	checksumFilename  = "checksum.yml"
+	commitLen         = 7
 
 	cloudImageTmpl = "docker.elastic.co/beats-ci/elastic-agent:$%s-%s"
 )
@@ -574,7 +575,7 @@ func (Cloud) Image() {
 
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
-func (Cloud) Push() {
+func (Cloud) Push() error {
 	version := getVersion()
 	commit := dockerCommitHash()
 
@@ -591,7 +592,7 @@ func (Cloud) Push() {
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
-	err := sh.Run("docker", "image", "push", targetCloudImageName)
+	err = sh.Run("docker", "image", "push", targetCloudImageName)
 	if err != nil {
 		return fmt.Errorf("Failed pushing docker image: %w", err)
 	}
@@ -603,7 +604,7 @@ func (Cloud) Push() {
 func dockerCommitHash() string {
 	commit, err := devtools.CommitHash()
 	if err == nil && len(commit) > commitLen {
-		commit[:commitLen]
+		return commit[:commitLen]
 	}
 
 	return ""
@@ -619,6 +620,8 @@ func getVersion() string {
 			version += "-SNAPSHOT"
 		}
 	}
+
+	return version
 }
 
 func runAgent(env map[string]string) error {
@@ -1032,7 +1035,6 @@ func dockerBuild(tag string) error {
 }
 
 func dockerTag() string {
-	const commitLen = 7
 	tagBase := "elastic-agent"
 
 	commit := dockerCommitHash()
