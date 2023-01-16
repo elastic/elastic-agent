@@ -222,7 +222,7 @@ func (ad *ActionDispatcher) gatherQueuedActions(ts time.Time) (queued, expired [
 	actions := ad.queue.DequeueActions()
 	for _, action := range actions {
 		exp, err := action.Expiration()
-		if !errors.Is(err, fleetapi.ErrNoExpiration) && ts.After(exp) {
+		if (err == nil || !errors.Is(err, fleetapi.ErrNoExpiration)) && ts.After(exp) {
 			expired = append(expired, action)
 			continue
 		}
