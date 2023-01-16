@@ -189,7 +189,7 @@ spec:
         envFrom:
         - configMapRef:
             name: elastic-agent-configs-566k85kgg9
-        image: docker.elastic.co/beats/elastic-agent:8.6.0
+        image: docker.elastic.co/beats/elastic-agent:8.6.1
         name: elastic-agent
         resources:
           limits:

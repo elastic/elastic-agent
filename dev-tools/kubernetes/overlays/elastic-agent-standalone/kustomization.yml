@@ -3,7 +3,7 @@ resources:
 
 images:
   - name: docker.elastic.co/beats/elastic-agent
-    newTag: "8.6.0"
+    newTag: "8.6.1"
 
 configMapGenerator:
   - name: elastic-agent-configs

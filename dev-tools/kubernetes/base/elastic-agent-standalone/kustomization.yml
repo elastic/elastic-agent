@@ -2,6 +2,11 @@ namespace: kube-system
 commonLabels:
   k8s-app: elastic-agent
 namePrefix: elastic-agent-
+
+images:
+  - name: docker.elastic.co/beats/elastic-agent
+    newTag: "8.6.0"
+
 resources:
   - ../../base/common
   - role-kubeadm-config.yaml
@@ -12,4 +17,4 @@ resources:
 configMapGenerator:
   - name: configs
     envs:
-    - .env
+      - .env
