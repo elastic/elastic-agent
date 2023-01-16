@@ -1,0 +1,7 @@
+resources:
+  - ../../base/elastic-agent-standalone
+
+images:
+  - name: docker.elastic.co/beats/elastic-agent
+    newTag: "8.6.0"
+

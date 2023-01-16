@@ -11,23 +11,6 @@ kind: Role
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-role-kubeadm-config
-  namespace: kube-system
-rules:
-- apiGroups:
-  - ""
-  resourceNames:
-  - kubeadm-config
-  resources:
-  - configmaps
-  verbs:
-  - get
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  labels:
-    k8s-app: elastic-agent
   name: elastic-agent-role-leases
   namespace: kube-system
 rules:
@@ -128,22 +111,6 @@ rules:
   - get
   - list
   - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  labels:
-    k8s-app: elastic-agent
-  name: elastic-agent-role-binding-kubeadm-config
-  namespace: kube-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: elastic-agent-role-kubeadm-config
-subjects:
-- kind: ServiceAccount
-  name: elastic-agent-service-account
-  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

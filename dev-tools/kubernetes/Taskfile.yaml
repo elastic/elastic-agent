@@ -15,6 +15,7 @@ tasks:
 
       # note: create overlay
       - kustomize build overlays/elastic-agent-managed > elastic-agent-managed-kubernetes.yaml
+      - kustomize build overlays/elastic-agent-standalone > elastic-agent-standalone-kubernetes.yaml
       # - kustomize build base/common > common.yaml
 
       # note: apply overlay
