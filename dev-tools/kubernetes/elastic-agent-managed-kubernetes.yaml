@@ -3,7 +3,7 @@ kind: ServiceAccount
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-service-account
+  name: elastic-agent-managed-service-account
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -11,7 +11,7 @@ kind: Role
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-role-leases
+  name: elastic-agent-managed-role-leases
   namespace: kube-system
 rules:
 - apiGroups:
@@ -28,7 +28,7 @@ kind: ClusterRole
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-cluster-role
+  name: elastic-agent-managed-cluster-role
 rules:
 - apiGroups:
   - ""
@@ -117,15 +117,15 @@ kind: RoleBinding
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-role-binding-leases
+  name: elastic-agent-managed-role-binding-leases
   namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: elastic-agent-role-leases
+  name: elastic-agent-managed-role-leases
 subjects:
 - kind: ServiceAccount
-  name: elastic-agent-service-account
+  name: elastic-agent-managed-service-account
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -133,14 +133,14 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-cluster-role-binding
+  name: elastic-agent-managed-cluster-role-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: elastic-agent-cluster-role
+  name: elastic-agent-managed-cluster-role
 subjects:
 - kind: ServiceAccount
-  name: elastic-agent-service-account
+  name: elastic-agent-managed-service-account
   namespace: kube-system
 ---
 apiVersion: v1
@@ -155,7 +155,7 @@ kind: ConfigMap
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-configs-566k85kgg9
+  name: elastic-agent-managed-configs-566k85kgg9
   namespace: kube-system
 ---
 apiVersion: apps/v1
@@ -163,7 +163,7 @@ kind: DaemonSet
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-daemonset
+  name: elastic-agent-managed-daemonset
   namespace: kube-system
 spec:
   selector:
@@ -188,8 +188,8 @@ spec:
               fieldPath: metadata.name
         envFrom:
         - configMapRef:
-            name: elastic-agent-configs-566k85kgg9
-        image: docker.elastic.co/beats/elastic-agent:8.6.1
+            name: elastic-agent-managed-configs-566k85kgg9
+        image: docker.elastic.co/beats/elastic-agent:8.6.0
         name: elastic-agent
         resources:
           limits:
@@ -224,7 +224,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       hostPID: true
-      serviceAccountName: elastic-agent-service-account
+      serviceAccountName: elastic-agent-managed-service-account
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/control-plane

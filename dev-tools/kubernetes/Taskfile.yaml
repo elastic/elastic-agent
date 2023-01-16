@@ -5,31 +5,31 @@ version: '3'
 tasks:
   default:
     cmds:
-      - task: elastic-agent-managed
-      # - task: elastic-agent-standalone
+      # - task: elastic-agent-managed
+      - task: elastic-agent-standalone
 
-  elastic-agent-managed:
+  elastic-agent-build:
     cmds:
-      # # note: create original
-      # - kustomize build base/elastic-agent-managed > base/elastic-agent-managed-kubernetes.yaml
-
       # note: create overlay
       - kustomize build overlays/elastic-agent-managed > elastic-agent-managed-kubernetes.yaml
       - kustomize build overlays/elastic-agent-standalone > elastic-agent-standalone-kubernetes.yaml
-      # - kustomize build base/common > common.yaml
 
-      # note: apply overlay
-      # - kubectl apply -k overlays/elastic-agent-managed
+  elastic-agent-managed:
+    deps:
+      - elastic-agent-build
+    cmds:
+      - kubectl apply -k overlays/elastic-agent-managed
 
   elastic-agent-managed-delete:
     cmds:
       - kubectl delete -k overlays/elastic-agent-managed
 
-
   elastic-agent-standalone:
+    deps:
+      - elastic-agent-build
     cmds:
-      # # note: create original
-      # - kustomize build base/elastic-agent-standalone > base/elastic-agent-standalone-kubernetes.yaml
+      - kubectl apply -k overlays/elastic-agent-standalone
 
-      # note: create overlay
-      - kustomize build overlays/elastic-agent-standalone > elastic-agent-standalone-kubernetes.yaml
+  elastic-agent-standalone-delete:
+    cmds:
+      - kubectl delete -k overlays/elastic-agent-standalone

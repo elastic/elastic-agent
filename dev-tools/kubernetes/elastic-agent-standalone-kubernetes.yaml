@@ -3,7 +3,7 @@ kind: ServiceAccount
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-service-account
+  name: elastic-agent-standalone-service-account
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -11,7 +11,7 @@ kind: Role
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-role-kubeadm-config
+  name: elastic-agent-standalone-role-kubeadm-config
   namespace: kube-system
 rules:
 - apiGroups:
@@ -28,7 +28,7 @@ kind: Role
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-role-leases
+  name: elastic-agent-standalone-role-leases
   namespace: kube-system
 rules:
 - apiGroups:
@@ -45,7 +45,7 @@ kind: ClusterRole
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-cluster-role
+  name: elastic-agent-standalone-cluster-role
 rules:
 - apiGroups:
   - ""
@@ -134,15 +134,15 @@ kind: RoleBinding
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-role-binding-kubeadm-config
+  name: elastic-agent-standalone-role-binding-kubeadm-config
   namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: elastic-agent-role-kubeadm-config
+  name: elastic-agent-standalone-role-kubeadm-config
 subjects:
 - kind: ServiceAccount
-  name: elastic-agent-service-account
+  name: elastic-agent-standalone-service-account
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -150,15 +150,15 @@ kind: RoleBinding
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-role-binding-leases
+  name: elastic-agent-standalone-role-binding-leases
   namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: elastic-agent-role-leases
+  name: elastic-agent-standalone-role-leases
 subjects:
 - kind: ServiceAccount
-  name: elastic-agent-service-account
+  name: elastic-agent-standalone-service-account
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -166,14 +166,14 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-cluster-role-binding
+  name: elastic-agent-standalone-cluster-role-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: elastic-agent-cluster-role
+  name: elastic-agent-standalone-cluster-role
 subjects:
 - kind: ServiceAccount
-  name: elastic-agent-service-account
+  name: elastic-agent-standalone-service-account
   namespace: kube-system
 ---
 apiVersion: v1
@@ -798,19 +798,19 @@ kind: ConfigMap
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-agent-node-datastreams
+  name: elastic-agent-standalone-agent-node-datastreams
   namespace: kube-system
 ---
 apiVersion: v1
 data:
-  ES_HOST: ""
+  ES_HOST: https://elasticsearch:9200
   ES_PASSWORD: changeme
   ES_USERNAME: elastic
 kind: ConfigMap
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-configs-7757btch74
+  name: elastic-agent-standalone-configs-7bmk6fdmgc
   namespace: kube-system
 ---
 apiVersion: apps/v1
@@ -818,7 +818,7 @@ kind: DaemonSet
 metadata:
   labels:
     k8s-app: elastic-agent
-  name: elastic-agent-daemonset
+  name: elastic-agent-standalone-daemonset
   namespace: kube-system
 spec:
   selector:
@@ -847,8 +847,8 @@ spec:
           value: /etc/elastic-agent
         envFrom:
         - configMapRef:
-            name: elastic-agent-configs-7757btch74
-        image: docker.elastic.co/beats/elastic-agent:8.6.1
+            name: elastic-agent-standalone-configs-7bmk6fdmgc
+        image: docker.elastic.co/beats/elastic-agent:8.6.0
         name: elastic-agent
         resources:
           limits:
@@ -883,7 +883,7 @@ spec:
           readOnly: true
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
-      serviceAccountName: elastic-agent-service-account
+      serviceAccountName: elastic-agent-standalone-service-account
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/control-plane
@@ -892,7 +892,7 @@ spec:
       volumes:
       - configMap:
           defaultMode: 416
-          name: elastic-agent-agent-node-datastreams
+          name: elastic-agent-standalone-agent-node-datastreams
         name: datastreams
       - hostPath:
           path: /proc
