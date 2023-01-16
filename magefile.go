@@ -50,10 +50,14 @@ const (
 	snapshotEnv       = "SNAPSHOT"
 	devEnv            = "DEV"
 	externalArtifacts = "EXTERNAL"
+	platformsEnv      = "PLATFORMS"
+	packagesEnv       = "PACKAGES"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	specSuffix        = ".spec.yml"
 	checksumFilename  = "checksum.yml"
+
+	cloudImageTmpl = "docker.elastic.co/beats-ci/elastic-agent:$%s-%s"
 )
 
 // Aliases for commands required by master makefile
@@ -95,6 +99,9 @@ type Demo mg.Namespace
 
 // Dev runs package and build for dev purposes.
 type Dev mg.Namespace
+
+// Cloud produces or pushes cloud image for cloud testing.
+type Cloud mg.Namespace
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -547,6 +554,73 @@ func (Demo) NoEnroll() error {
 	return runAgent(env)
 }
 
+// Image builds a cloud image
+func (Cloud) Image() {
+	platforms := os.Getenv(platformsEnv)
+	defer os.Setenv(platformsEnv, platforms)
+
+	packages := os.Getenv(packagesEnv)
+	defer os.Setenv(packagesEnv, packages)
+
+	os.Setenv(platformsEnv, "+all linux/amd64")
+	os.Setenv(packagesEnv, "docker")
+
+	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
+		devtools.ExternalBuild = true
+	}
+
+	mg.Deps(Dev.Package)
+}
+
+// Push builds a cloud image tags it correctly and pushes to remote image repo.
+// Previous login to elastic registry is required!
+func (Cloud) Push() {
+	version := getVersion()
+	commit := dockerCommitHash()
+
+	mg.Deps(Cloud.Image)
+
+	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
+	targetCloudImageName := fmt.Sprintf(cloudImageTmpl, version, commit)
+
+	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
+	err := sh.Run("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	if err != nil {
+		return fmt.Errorf("Failed setting a docker image tag: %w", err)
+	}
+	fmt.Println(">> Docker image tag updated successfully")
+
+	fmt.Println(">> Pushing a docker image to remote registry")
+	err := sh.Run("docker", "image", "push", targetCloudImageName)
+	if err != nil {
+		return fmt.Errorf("Failed pushing docker image: %w", err)
+	}
+	fmt.Println(">> Docker image pushed to remote registry successfully")
+
+	return nil
+}
+
+func dockerCommitHash() string {
+	commit, err := devtools.CommitHash()
+	if err == nil && len(commit) > commitLen {
+		commit[:commitLen]
+	}
+
+	return ""
+}
+
+func getVersion() string {
+	version, found := os.LookupEnv("BEAT_VERSION")
+	if !found {
+		version = release.Version()
+	}
+	if !strings.Contains(version, "SNAPSHOT") {
+		if _, ok := os.LookupEnv(snapshotEnv); ok {
+			version += "-SNAPSHOT"
+		}
+	}
+}
+
 func runAgent(env map[string]string) error {
 	prevPlatforms := os.Getenv("PLATFORMS")
 	defer os.Setenv("PLATFORMS", prevPlatforms)
@@ -961,9 +1035,9 @@ func dockerTag() string {
 	const commitLen = 7
 	tagBase := "elastic-agent"
 
-	commit, err := devtools.CommitHash()
-	if err == nil && len(commit) > commitLen {
-		return fmt.Sprintf("%s-%s", tagBase, commit[:commitLen])
+	commit := dockerCommitHash()
+	if len(commit) > 0 {
+		return fmt.Sprintf("%s-%s", tagBase, commit)
 	}
 
 	return tagBase
