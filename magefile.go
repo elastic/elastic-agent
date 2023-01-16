@@ -565,7 +565,9 @@ func (Cloud) Image() {
 
 	os.Setenv(platformsEnv, "+all linux/amd64")
 	os.Setenv(packagesEnv, "docker")
-	os.Setenv(snapshotEnv, "true")
+	if _, ok := os.LookupEnv(snapshotEnv); !ok {
+		os.Setenv(snapshotEnv, "true")
+	}
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
 		devtools.ExternalBuild = true
