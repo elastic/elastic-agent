@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: elastic-agent-cluster-role
+  name: cluster-role
 rules:
   - apiGroups: [""]
     resources:
@@ -69,7 +69,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: elastic-agent-role-leases
+  name: role-leases
 rules:
   - apiGroups:
       - coordination.k8s.io
@@ -80,7 +80,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: elastic-agent-role-kubeadm-config
+  name: role-kubeadm-config
 rules:
   - apiGroups: [""]
     resources:

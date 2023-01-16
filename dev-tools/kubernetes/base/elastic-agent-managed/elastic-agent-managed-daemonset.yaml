@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: elastic-agent
+  name: daemonset
 spec:
   selector:
     matchLabels:
@@ -19,7 +19,7 @@ spec:
           effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
-      serviceAccountName: elastic-agent-service-account
+      serviceAccountName: service-account
       hostNetwork: true
       # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
       # Sharing the host process ID namespace gives visibility of all processes running on the same host.
@@ -61,7 +61,7 @@ spec:
               # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
               # - name: FLEET_ENROLLMENT_TOKEN
               #   value: "token-id"
-              name: elastic-agent-fleet-configs
+              name: fleet-configs
           securityContext:
             runAsUser: 0
           resources:

@@ -1,6 +1,7 @@
 namespace: kube-system
 commonLabels:
   k8s-app: elastic-agent
+namePrefix: elastic-agent-
 images:
   - name: docker.elastic.co/beats/elastic-agent
     newTag: "8.3.0"
@@ -11,7 +12,6 @@ resources:
   - elastic-agent-managed-daemonset.yaml
 
 configMapGenerator:
-  - name: elastic-agent-fleet-configs
-    namespace: kube-system
+  - name: fleet-configs
     envs:
     - .env
