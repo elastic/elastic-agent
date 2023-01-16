@@ -12,3 +12,6 @@ configMapGenerator:
     behavior: merge
     envs:
     - .env
+
+generatorOptions:
+  disableNameSuffixHash: true
