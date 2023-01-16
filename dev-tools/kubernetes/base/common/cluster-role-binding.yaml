@@ -5,7 +5,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: service-account
-    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: cluster-role
