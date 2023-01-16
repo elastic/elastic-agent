@@ -1,0 +1,17 @@
+namespace: kube-system
+commonLabels:
+  k8s-app: elastic-agent
+images:
+  - name: docker.elastic.co/beats/elastic-agent
+    newTag: "8.3.0"
+resources:
+  - elastic-agent-managed-service-account.yaml
+  - elastic-agent-managed-role.yaml
+  - elastic-agent-managed-role-binding.yaml
+  - elastic-agent-managed-daemonset.yaml
+
+configMapGenerator:
+  - name: elastic-agent-fleet-configs
+    namespace: kube-system
+    envs:
+    - .env
