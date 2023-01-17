@@ -1,0 +1,17 @@
+resources:
+  - ../../base/elastic-agent-managed
+  - github.com/kubernetes/kube-state-metrics?ref=main
+
+images:
+  - name: docker.elastic.co/beats/elastic-agent
+    newTag: "8.6.0"
+
+configMapGenerator:
+  - name: elastic-agent-managed-configs
+    namespace: kube-system
+    behavior: merge
+    envs:
+    - .env
+
+generatorOptions:
+  disableNameSuffixHash: true
