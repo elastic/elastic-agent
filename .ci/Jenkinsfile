@@ -240,7 +240,7 @@ pipeline {
             steps {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.14.0', context: "K8s-${K8S_VERSION}")
+              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.17.0', context: "K8s-${K8S_VERSION}")
             }
             post {
               always {
