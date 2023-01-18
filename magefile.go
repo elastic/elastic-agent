@@ -58,7 +58,7 @@ const (
 	checksumFilename  = "checksum.yml"
 	commitLen         = 7
 
-	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s-%s"
+	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 )
 
 // Aliases for commands required by master makefile
@@ -595,12 +595,24 @@ func (Cloud) Push() error {
 	os.Setenv(snapshotEnv, "true")
 
 	version := getVersion()
-	commit := dockerCommitHash()
+	var tag string
+	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
+		tag = envTag
+	} else {
+		commit := dockerCommitHash()
+		time := time.Now().Unix()
 
+		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
+	}
 	// mg.Deps(Cloud.Image)
 
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
-	targetCloudImageName := fmt.Sprintf(cloudImageTmpl, version, commit)
+	var targetCloudImageName string
+	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
+		targetCloudImageName = fmt.Sprintf("%s:%s%s", customImage, version, tag)
+	} else {
+		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, tag)
+	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
 	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
