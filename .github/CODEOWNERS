@@ -2,3 +2,4 @@
 * @elastic/elastic-agent-control-plane
 
 /deploy/kubernetes @elastic/obs-cloudnative-monitoring
+/dev-tools/kubernetes @elastic/obs-cloudnative-monitoring
