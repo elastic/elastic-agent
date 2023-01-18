@@ -1308,7 +1308,7 @@ LOOP:
 	for {
 		select {
 		case <-endTimer.C:
-			t.Fatalf("timed out after 30 seconds")
+			t.Fatalf("timed out after 1 minute")
 		case err := <-errCh:
 			require.NoError(t, err)
 		case err := <-subErrCh:
@@ -1370,10 +1370,10 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 				Type:     client.UnitTypeInput,
 				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
-					"type":    "fake",
-					"state":   int(client.UnitStateHealthy),
-					"message": "Fake Healthy",
-					"killer":  true,
+					"type":             "fake",
+					"state":            int(client.UnitStateHealthy),
+					"message":          "Fake Healthy",
+					"kill_on_interval": true,
 				}),
 			},
 		},
@@ -1408,10 +1408,10 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 
 								// send new config on each healthy report
 								comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
-									"type":    "fake",
-									"state":   int(client.UnitStateHealthy),
-									"message": fmt.Sprintf("Fake Healthy %d", lastStoppedCount),
-									"killer":  true,
+									"type":             "fake",
+									"state":            int(client.UnitStateHealthy),
+									"message":          fmt.Sprintf("Fake Healthy %d", lastStoppedCount),
+									"kill_on_interval": true,
 								})
 								err := m.Update([]component.Component{comp})
 								if err != nil {
@@ -1457,7 +1457,7 @@ LOOP:
 	for {
 		select {
 		case <-endTimer.C:
-			t.Fatalf("timed out after 30 seconds")
+			t.Fatalf("timed out after 1 minute")
 		case err := <-errCh:
 			require.NoError(t, err)
 		case err := <-subErrCh:

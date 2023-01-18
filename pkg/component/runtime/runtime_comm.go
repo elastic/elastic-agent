@@ -229,6 +229,8 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 			close(sendDone)
 		}()
 	WAIT:
+		// wait until the goroutine should start listening on the `checkinExpected channel
+		// see comment below about why this waits until the `waitExp` is closed
 		for {
 			select {
 			case <-checkinDone:

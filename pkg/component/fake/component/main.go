@@ -453,9 +453,9 @@ func (f *fakeInput) parseConfig(config *proto.UnitExpectedConfig) {
 	}
 
 	// handle a case where random killing of the component is enabled
-	_, killer := cfg["killer"]
-	f.logger.Trace().Bool("killer", killer).Msg("killer config set value")
-	if killer {
+	_, killOnInterval := cfg["kill_on_interval"]
+	f.logger.Trace().Bool("kill_on_interval", killOnInterval).Msg("kill_on_interval config set value")
+	if killOnInterval {
 		f.logger.Info().Msg("starting interval killer")
 		f.runKiller()
 	} else {
