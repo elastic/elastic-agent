@@ -1,7 +1,10 @@
 MAKEFILE_PATH:=$(abspath $(lastword ${MAKEFILE_LIST}))
 MAKEFILE_DIR:=$(dir ${MAKEFILE_PATH})
 REPO_ROOT:=$(abspath ${MAKEFILE_DIR}/../../../)
-IMAGE_TAG?=$(shell grep docker.elastic.co/kibana ${REPO_ROOT}/docker-compose.yml | cut -d: -f3)
+ifeq (${SNAPSHOT}, true)
+SNAPSHOT_SUFFIX:=-SNAPSHOT
+endif
+VERSION:=$(shell grep defaultBeatVersion ${REPO_ROOT}/version/version.go | cut -d\" -f2)${SNAPSHOT_SUFFIX}
 
 export DOCKER_BUILDKIT=1
 
@@ -15,7 +18,7 @@ CI_KIBANA_DOCKER_IMAGE=docker.elastic.co/observability-ci/kibana
 # Tag custom images with the username and current timestamp.
 # The timestamp must be included to force images to be pulled.
 USER_NAME?=${USER}
-CUSTOM_IMAGE_TAG:=${IMAGE_TAG}-${USER_NAME}-$(shell date +%s)
+CUSTOM_IMAGE_TAG:=${VERSION}-${USER_NAME}-$(shell date +%s)
 
 USER_ELASTIC_AGENT_DOCKER_IMAGE=docker.elastic.co/observability-ci/${USER_NAME}-elastic-agent
 USER_KIBANA_DOCKER_IMAGE=docker.elastic.co/observability-ci/${USER_NAME}-kibana
@@ -28,8 +31,8 @@ USER_KIBANA_DOCKER_IMAGE=docker.elastic.co/observability-ci/${USER_NAME}-kibana
 ##############################################################################
 
 docker_image.auto.tfvars: kibana_docker_image elastic_agent_docker_image
-	@echo 'docker_image_override={"elasticsearch":"${ELASTICSEARCH_DOCKER_IMAGE}","kibana":"${CI_KIBANA_DOCKER_IMAGE}","agent":"${CI_ELASTIC_AGENT_DOCKER_IMAGE}"}' > $@
-	@echo 'docker_image_tag_override={"elasticsearch":"${IMAGE_TAG}","kibana":"${CUSTOM_IMAGE_TAG}","agent":"${CUSTOM_IMAGE_TAG}"}' >> $@
+	@echo 'docker_image_override={"elasticsearch":"${ELASTICSEARCH_DOCKER_IMAGE}","kibana":"${CI_KIBANA_DOCKER_IMAGE}","apm":"${CI_ELASTIC_AGENT_DOCKER_IMAGE}"}' > $@
+	@echo 'docker_image_tag_override={"elasticsearch":"${VERSION}","kibana":"${VERSION}","apm":"${CUSTOM_IMAGE_TAG}"}' >> $@
 
 ##############################################################################
 # Terraform shortcut rules.
@@ -42,6 +45,13 @@ apply:
 .PHONY: destroy
 destroy:
 	@terraform destroy -auto-approve
+
+
+.PHONY: deploy_local
+deploy_local: build_elastic_agent_docker_image push_elastic_agent_docker_image
+	@echo 'docker_image_override={"elasticsearch":"${ELASTICSEARCH_DOCKER_IMAGE}","kibana":"${KIBANA_DOCKER_IMAGE}","apm":"${CI_ELASTIC_AGENT_DOCKER_IMAGE}"}' > docker_image.auto.tfvars
+	@echo 'docker_image_tag_override={"elasticsearch":"${VERSION}","kibana":"${VERSION}","apm":"${CUSTOM_IMAGE_TAG}"}' >> docker_image.auto.tfvars
+	@terraform apply -auto-approve
 
 ##############################################################################
 # Targets for building and pushing custom Kibana and Elastic Agent images.
@@ -68,7 +78,7 @@ build_kibana_docker_image:
 # 8.7.0-SNAPSHOT-doe-1673961915
 # unless overridden.
 .PHONY: build_elastic_agent_docker_image
-elastic_agent_docker_image: 
+push_elastic_agent_docker_image: 
 	cd ${REPO_ROOT}; CI_ELASTIC_AGENT_DOCKER_IMAGE=${CI_ELASTIC_AGENT_DOCKER_IMAGE} CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG} mage cloud:push
 build_elastic_agent_docker_image:
 	cd ${REPO_ROOT}; mage cloud:image

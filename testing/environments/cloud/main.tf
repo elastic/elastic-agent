@@ -11,9 +11,8 @@ terraform {
 provider "ec" {}
 
 locals {
-  docker_image_tag = regex("docker.elastic.co/.*:(.*)", file("${path.module}/../../docker-compose.yml"))[0]
-  match            = regex("(?:(.*)(?:-.*)-(?:SNAPSHOT))|(.*)", local.docker_image_tag)
-  stack_version    = local.match[0] != null ? format("%s-SNAPSHOT", local.match[0]) : local.match[1]
+  match            = regex("const defaultBeatVersion = \"(.*)\"", file("${path.module}/../../../version/version.go"))[0]
+  stack_version    = format("%s-SNAPSHOT", local.match) 
 }
 
 module "ec_deployment" {
@@ -33,8 +32,8 @@ module "ec_deployment" {
 
   docker_image = var.docker_image_override
   docker_image_tag_override = {
-    "elasticsearch" : coalesce(var.docker_image_tag_override["elasticsearch"], local.docker_image_tag),
-    "kibana" : coalesce(var.docker_image_tag_override["kibana"], local.docker_image_tag),
-    "agent" : coalesce(var.docker_image_tag_override["agent"], local.docker_image_tag)
+    "elasticsearch" : coalesce(var.docker_image_tag_override["elasticsearch"], local.stack_version),
+    "kibana" : coalesce(var.docker_image_tag_override["kibana"], local.stack_version),
+    "apm" : coalesce(var.docker_image_tag_override["apm"], local.stack_version)
   }
 }

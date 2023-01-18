@@ -604,12 +604,11 @@ func (Cloud) Push() error {
 
 		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
 	}
-	// mg.Deps(Cloud.Image)
 
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
-		targetCloudImageName = fmt.Sprintf("%s:%s%s", customImage, version, tag)
+		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, tag)
 	} else {
 		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, tag)
 	}

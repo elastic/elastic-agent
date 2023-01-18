@@ -15,4 +15,7 @@ package when it first starts up, so any changes to the package will be disregard
 updating an existing deployment.
 
 
-To specify custom images create your `docker_image.``auto.tfvars` file similar to `docker_image.auto.tfvars.sample`. 
+To specify custom images create your `docker_image.auto.tfvars` file similar to `docker_image.auto.tfvars.sample`. 
+
+Running `make deploy_local` will build Agent, tag docker image correctly, push it to repository and deploy to cloud.
+For main you want to run `EC_API_KEY={your_ec_api_key} SNAPSHOT=true make apply_local`.
