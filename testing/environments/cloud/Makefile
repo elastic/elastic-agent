@@ -81,4 +81,7 @@ build_kibana_docker_image:
 push_elastic_agent_docker_image: 
 	cd ${REPO_ROOT}; CI_ELASTIC_AGENT_DOCKER_IMAGE=${CI_ELASTIC_AGENT_DOCKER_IMAGE} CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG} mage cloud:push
 build_elastic_agent_docker_image:
+	export DOCKER_BUILDKIT=0
+	export COMPOSE_DOCKER_CLI_BUILD=0
+	export DOCKER_DEFAULT_PLATFORM=linux/amd64
 	cd ${REPO_ROOT}; mage cloud:image
