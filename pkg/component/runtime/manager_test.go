@@ -1201,8 +1201,8 @@ func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
 
 	// adjust input spec to allow restart
 	cmdSpec := *fakeInputSpec.Command
-	cmdSpec.RestartMonitoringPeriod = 5 * time.Second
-	cmdSpec.MaxRestartsPerPeriod = 1
+	cmdSpec.RestartMonitoringPeriod = 1 * time.Second
+	cmdSpec.MaxRestartsPerPeriod = 10
 	inputSpec := fakeInputSpec
 	inputSpec.Command = &cmdSpec
 
@@ -1351,7 +1351,7 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 	// adjust input spec to allow restart
 	cmdSpec := *fakeInputSpec.Command
 	cmdSpec.RestartMonitoringPeriod = 1 * time.Second
-	cmdSpec.MaxRestartsPerPeriod = 1
+	cmdSpec.MaxRestartsPerPeriod = 10
 	inputSpec := fakeInputSpec
 	inputSpec.Command = &cmdSpec
 
