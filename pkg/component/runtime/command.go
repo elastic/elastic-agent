@@ -331,10 +331,6 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	c.lastCheckin = time.Time{}
 	c.missedCheckins = 0
 
-	// Ensure there is no pending checkin expected message buffered to avoid sending the new process
-	// the expected state of the previous process: https://github.com/elastic/beats/issues/34137
-	comm.ClearPendingCheckinExpected()
-
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),

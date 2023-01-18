@@ -34,8 +34,6 @@ type Communicator interface {
 	WriteConnInfo(w io.Writer, services ...client.Service) error
 	// CheckinExpected sends the expected state to the component.
 	CheckinExpected(expected *proto.CheckinExpected)
-	// ClearPendingCheckinExpected clears eny pending checkin expected messages.
-	ClearPendingCheckinExpected()
 	// CheckinObserved receives the observed state from the component.
 	CheckinObserved() <-chan *proto.CheckinObserved
 }
@@ -54,9 +52,7 @@ type runtimeComm struct {
 	checkinDone chan bool
 	checkinLock sync.RWMutex
 
-	checkinExpectedLock sync.Mutex
-	checkinExpected     chan *proto.CheckinExpected
-
+	checkinExpected chan *proto.CheckinExpected
 	checkinObserved chan *proto.CheckinObserved
 
 	actionsConn     bool
@@ -88,7 +84,7 @@ func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.Cert
 		token:           token.String(),
 		cert:            pair,
 		checkinConn:     true,
-		checkinExpected: make(chan *proto.CheckinExpected, 1), // size of 1 channel to keep the latest expected checkin state
+		checkinExpected: make(chan *proto.CheckinExpected, 10), // size of 10 gives a buffer for expected, only last is used
 		checkinObserved: make(chan *proto.CheckinObserved),
 		actionsConn:     true,
 		actionsRequest:  make(chan *proto.ActionRequest),
@@ -141,28 +137,63 @@ func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected) {
 	} else {
 		expected.AgentInfo = nil
 	}
-
-	// Lock to avoid race if this function is called from the different go routines
-	c.checkinExpectedLock.Lock()
-
-	// Empty the channel
-	c.ClearPendingCheckinExpected()
-
-	// Put the new expected state in
 	c.checkinExpected <- expected
-
-	c.checkinExpectedLock.Unlock()
-}
-
-func (c *runtimeComm) ClearPendingCheckinExpected() {
-	select {
-	case <-c.checkinExpected:
-	default:
-	}
 }
 
 func (c *runtimeComm) CheckinObserved() <-chan *proto.CheckinObserved {
 	return c.checkinObserved
+}
+
+// latestCheckinExpected ensures that the latest expected checkin is used
+func (c *runtimeComm) latestCheckinExpected(exp *proto.CheckinExpected) *proto.CheckinExpected {
+	latest := exp
+	latestByKey := make(map[ComponentUnitKey]*proto.UnitExpected)
+	if latest != nil {
+		for _, unit := range latest.Units {
+			latestByKey[ComponentUnitKey{client.UnitType(unit.Type), unit.Id}] = unit
+		}
+	}
+	for {
+		select {
+		case next := <-c.checkinExpected:
+			// ensure that this message includes data from a previous message
+			//
+			// it is possible that this next message did not include the `Config` for the unit because the
+			// previous message include it already thinking that the component got that unit config
+			//
+			// ensure that if that is the case that we copy the config from the previous onto the latest
+			//
+			// this really should not happen and this is very defensive in design, but I believe it is better
+			// to be very defensive to ensure that the component always receive its needed configuration for
+			// a unit then have a very rare chance that we don't send it
+			for _, unit := range next.Units {
+				if unit.Config != nil {
+					// has a config and its latest, nothing to do
+					continue
+				}
+				prevUnit, ok := latestByKey[ComponentUnitKey{client.UnitType(unit.Type), unit.Id}]
+				if !ok {
+					// previous didn't have the unit at all; so nothing to do
+					continue
+				}
+				if prevUnit.Config != nil && prevUnit.ConfigStateIdx == unit.ConfigStateIdx {
+					// copy the unit from the previous onto the new latest
+					unit.Config = prevUnit.Config
+				}
+			}
+			if latest != nil && latest.AgentInfo != nil && next.AgentInfo == nil {
+				// copy the agent info to the new latest
+				next.AgentInfo = latest.AgentInfo
+			}
+			latest = next
+			latestByKey = make(map[ComponentUnitKey]*proto.UnitExpected, len(latest.Units))
+			for _, unit := range latest.Units {
+				latestByKey[ComponentUnitKey{client.UnitType(unit.Type), unit.Id}] = unit
+			}
+		default:
+			return latest
+		}
+	}
 }
 
 func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *proto.CheckinObserved) error {
@@ -190,12 +221,24 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		c.checkinLock.Unlock()
 	}()
 
+	waitExp := make(chan bool)
 	recvDone := make(chan bool)
 	sendDone := make(chan bool)
 	go func() {
 		defer func() {
 			close(sendDone)
 		}()
+	WAIT:
+		for {
+			select {
+			case <-checkinDone:
+				return
+			case <-recvDone:
+				return
+			case <-waitExp:
+				break WAIT
+			}
+		}
 		for {
 			var expected *proto.CheckinExpected
 			select {
@@ -204,6 +247,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 			case <-recvDone:
 				return
 			case expected = <-c.checkinExpected:
+				expected = c.latestCheckinExpected(expected)
 			}
 
 			err := server.Send(expected)
@@ -216,7 +260,14 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		}
 	}()
 
+	// at this point the client is connected, and it has sent it's first initial checkin
+	// all other previous messages on `c.checkinExpected` are void. The push onto `c.checkinObserved`
+	// should result in a new message on `c.checkinExpected` so before that push we want to clear
+	// the channel as well as prevent the sender channel from reading from `c.checkinExpected` until
+	// we have sent the message on `c.checkinObserved`.
+	c.latestCheckinExpected(nil)
 	c.checkinObserved <- init
+	close(waitExp)
 
 	go func() {
 		for {
