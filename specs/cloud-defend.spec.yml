@@ -7,6 +7,10 @@ inputs:
       - container/arm64
     outputs: &outputs
       - elasticsearch
+    runtime:
+      preventions:
+        - condition: ${runtime.user.root} == false
+          message: "Elastic agent must be running as root"
     command:
       args: &args
         - "run"
