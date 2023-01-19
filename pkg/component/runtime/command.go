@@ -151,7 +151,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 			sendExpected := c.state.syncExpected(&newComp)
 			changed := c.state.syncUnits(&newComp)
 			if sendExpected || c.state.unsettled() {
-				comm.CheckinExpected(c.state.toCheckinExpected())
+				comm.CheckinExpected(c.state.toCheckinExpected(), nil)
 			}
 			if changed {
 				c.sendObserved()
@@ -177,7 +177,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				sendExpected = true
 			}
 			if sendExpected {
-				comm.CheckinExpected(c.state.toCheckinExpected())
+				comm.CheckinExpected(c.state.toCheckinExpected(), checkin)
 			}
 			if changed {
 				c.sendObserved()

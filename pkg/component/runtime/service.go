@@ -205,7 +205,7 @@ func (s *ServiceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 			if checkedIn {
 				s.log.Debugf("send stopping state to %s service", name)
 				s.state.forceExpectedState(client.UnitStateStopping)
-				comm.CheckinExpected(s.state.toCheckinExpected())
+				comm.CheckinExpected(s.state.toCheckinExpected(), nil)
 			} else {
 				s.log.Debugf("%s service had never checked in, proceed to uninstall", name)
 			}
@@ -250,7 +250,7 @@ func (s *ServiceRuntime) processNewComp(newComp component.Component, comm Commun
 	sendExpected := s.state.syncExpected(&newComp)
 	changed := s.state.syncUnits(&newComp)
 	if sendExpected || s.state.unsettled() {
-		comm.CheckinExpected(s.state.toCheckinExpected())
+		comm.CheckinExpected(s.state.toCheckinExpected(), nil)
 	}
 	if changed {
 		s.sendObserved()
@@ -287,7 +287,7 @@ func (s *ServiceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Com
 		sendExpected = true
 	}
 	if sendExpected {
-		comm.CheckinExpected(s.state.toCheckinExpected())
+		comm.CheckinExpected(s.state.toCheckinExpected(), checkin)
 	}
 	if changed {
 		s.sendObserved()
