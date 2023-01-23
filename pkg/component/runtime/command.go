@@ -145,7 +145,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 			sendExpected := c.state.syncExpected(&newComp)
 			changed := c.state.syncUnits(&newComp)
 			if sendExpected || c.state.unsettled() {
-				comm.CheckinExpected(c.state.toCheckinExpected())
+				comm.CheckinExpected(c.state.toCheckinExpected(), nil)
 			}
 			if changed {
 				c.sendObserved()
@@ -171,7 +171,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				sendExpected = true
 			}
 			if sendExpected {
-				comm.CheckinExpected(c.state.toCheckinExpected())
+				comm.CheckinExpected(c.state.toCheckinExpected(), checkin)
 			}
 			if changed {
 				c.sendObserved()
@@ -324,10 +324,6 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	// reset checkin state before starting the process.
 	c.lastCheckin = time.Time{}
 	c.missedCheckins = 0
-
-	// Ensure there is no pending checkin expected message buffered to avoid sending the new process
-	// the expected state of the previous process: https://github.com/elastic/beats/issues/34137
-	comm.ClearPendingCheckinExpected()
 
 	proc, err := process.Start(path,
 		process.WithArgs(args),

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"testing"
 	"time"
@@ -63,7 +64,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -165,7 +166,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -193,8 +194,9 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				ID:   "fake-input",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -290,7 +292,7 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -318,8 +320,9 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				ID:   "fake-input",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -360,8 +363,9 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 							updatedComp.Units = make([]component.Unit, len(comp.Units))
 							copy(updatedComp.Units, comp.Units)
 							updatedComp.Units[1] = component.Unit{
-								ID:   "bad-input",
-								Type: client.UnitTypeInput,
+								ID:       "bad-input",
+								Type:     client.UnitTypeInput,
+								LogLevel: client.UnitLogLevelTrace,
 								Config: component.MustExpectedConfig(map[string]interface{}{
 									"type":    "fake",
 									"state":   int(client.UnitStateHealthy),
@@ -461,7 +465,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -489,8 +493,9 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				ID:   "fake-input",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -498,8 +503,9 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 				}),
 			},
 			{
-				ID:   "good-input",
-				Type: client.UnitTypeInput,
+				ID:       "good-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -616,7 +622,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -644,8 +650,9 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				ID:   "fake-input",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -742,7 +749,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -770,8 +777,9 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				ID:   "fake-input-0",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input-0",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -779,8 +787,9 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 				}),
 			},
 			{
-				ID:   "fake-input-1",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input-1",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -900,7 +909,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -928,8 +937,9 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				ID:   "fake-input",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -1030,7 +1040,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1058,8 +1068,9 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				ID:   "fake-input",
-				Type: client.UnitTypeInput,
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
 				Config: component.MustExpectedConfig(map[string]interface{}{
 					"type":    "fake",
 					"state":   int(client.UnitStateHealthy),
@@ -1097,6 +1108,8 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 							// force the input to exit and it should be restarted
 							if !killed {
 								killed = true
+
+								t.Log("triggering kill through action")
 								actionCtx, actionCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 								_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "kill", nil)
 								actionCancel()
@@ -1162,6 +1175,304 @@ LOOP:
 	require.NoError(t, err)
 }
 
+func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
+	testPaths(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := m.WaitForReady(waitCtx); err != nil {
+		require.NoError(t, err)
+	}
+
+	// adjust input spec to allow restart
+	cmdSpec := *fakeInputSpec.Command
+	cmdSpec.RestartMonitoringPeriod = 1 * time.Second
+	cmdSpec.MaxRestartsPerPeriod = 10
+	inputSpec := fakeInputSpec
+	inputSpec.Command = &cmdSpec
+
+	binaryPath := testBinary(t, "component")
+	comp := component.Component{
+		ID: "fake-default",
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryName: "",
+			BinaryPath: binaryPath,
+			Spec:       inputSpec,
+		},
+		Units: []component.Unit{
+			{
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy",
+				}),
+			},
+		},
+	}
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	subErrCh := make(chan error)
+	go func() {
+		killed := false
+
+		sub := m.Subscribe(subCtx, "fake-default")
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case state := <-sub.Ch():
+				t.Logf("component state changed: %+v", state)
+				if state.State == client.UnitStateFailed {
+					if !killed {
+						subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+					}
+				} else {
+					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
+					if ok {
+						if unit.State == client.UnitStateFailed {
+							if !killed {
+								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+							}
+						} else if unit.State == client.UnitStateHealthy {
+							// force the input to exit and it should be restarted
+							if !killed {
+								killed = true
+
+								r := regexp.MustCompile(`pid \'(?P<pid>\d+)\'`)
+								rp := r.FindStringSubmatch(state.Message)
+								t.Logf("triggering kill through config on pid %s", rp)
+								comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
+									"type":    "fake",
+									"state":   int(client.UnitStateHealthy),
+									"message": "Fake Healthy",
+									"kill":    rp[1],
+								})
+								err := m.Update([]component.Component{comp})
+								if err != nil {
+									subErrCh <- err
+								}
+							} else {
+								// got back to healthy after kill
+								subErrCh <- nil
+							}
+						} else if unit.State == client.UnitStateStarting || unit.State == client.UnitStateStopped {
+							// acceptable
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					} else {
+						subErrCh <- errors.New("unit missing: fake-input")
+					}
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(errCh)
+	defer drainErrChan(subErrCh)
+
+	startTimer := time.NewTimer(100 * time.Millisecond)
+	defer startTimer.Stop()
+	select {
+	case <-startTimer.C:
+		err = m.Update([]component.Component{comp})
+		require.NoError(t, err)
+	case err := <-errCh:
+		t.Fatalf("failed early: %s", err)
+	}
+
+	endTimer := time.NewTimer(1 * time.Minute)
+	defer endTimer.Stop()
+LOOP:
+	for {
+		select {
+		case <-endTimer.C:
+			t.Fatalf("timed out after 1 minute")
+		case err := <-errCh:
+			require.NoError(t, err)
+		case err := <-subErrCh:
+			require.NoError(t, err)
+			break LOOP
+		}
+	}
+
+	subCancel()
+	cancel()
+
+	err = <-errCh
+	require.NoError(t, err)
+}
+
+func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
+	testPaths(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := m.WaitForReady(waitCtx); err != nil {
+		require.NoError(t, err)
+	}
+
+	// adjust input spec to allow restart
+	cmdSpec := *fakeInputSpec.Command
+	cmdSpec.RestartMonitoringPeriod = 1 * time.Second
+	cmdSpec.MaxRestartsPerPeriod = 10
+	inputSpec := fakeInputSpec
+	inputSpec.Command = &cmdSpec
+
+	binaryPath := testBinary(t, "component")
+	comp := component.Component{
+		ID: "fake-default",
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryName: "",
+			BinaryPath: binaryPath,
+			Spec:       inputSpec,
+		},
+		Units: []component.Unit{
+			{
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelTrace,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":             "fake",
+					"state":            int(client.UnitStateHealthy),
+					"message":          "Fake Healthy",
+					"kill_on_interval": true,
+				}),
+			},
+		},
+	}
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	subErrCh := make(chan error)
+	go func() {
+		lastStoppedCount := 0
+		stoppedCount := 0
+
+		sub := m.Subscribe(subCtx, "fake-default")
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case state := <-sub.Ch():
+				t.Logf("component state changed: %+v", state)
+				if state.State == client.UnitStateFailed {
+					// should not go failed because we allow restart per period
+					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+				} else {
+					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
+					if ok {
+						if unit.State == client.UnitStateFailed {
+							// unit should not be failed because we allow restart per period
+							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						} else if unit.State == client.UnitStateHealthy {
+							if lastStoppedCount != stoppedCount {
+								lastStoppedCount = stoppedCount
+
+								// send new config on each healthy report
+								comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
+									"type":             "fake",
+									"state":            int(client.UnitStateHealthy),
+									"message":          fmt.Sprintf("Fake Healthy %d", lastStoppedCount),
+									"kill_on_interval": true,
+								})
+								err := m.Update([]component.Component{comp})
+								if err != nil {
+									subErrCh <- err
+								}
+							}
+							if stoppedCount >= 3 {
+								// got stopped 3 times and got back to healthy
+								subErrCh <- nil
+							}
+						} else if unit.State == client.UnitStateStarting {
+							// acceptable
+						} else if unit.State == client.UnitStateStopped {
+							stoppedCount += 1
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					} else {
+						subErrCh <- errors.New("unit missing: fake-input")
+					}
+				}
+			}
+		}
+	}()
+
+	defer drainErrChan(errCh)
+	defer drainErrChan(subErrCh)
+
+	startTimer := time.NewTimer(100 * time.Millisecond)
+	defer startTimer.Stop()
+	select {
+	case <-startTimer.C:
+		err = m.Update([]component.Component{comp})
+		require.NoError(t, err)
+	case err := <-errCh:
+		t.Fatalf("failed early: %s", err)
+	}
+
+	endTimer := time.NewTimer(1 * time.Minute)
+	defer endTimer.Stop()
+LOOP:
+	for {
+		select {
+		case <-endTimer.C:
+			t.Fatalf("timed out after 1 minute")
+		case err := <-errCh:
+			require.NoError(t, err)
+		case err := <-subErrCh:
+			require.NoError(t, err)
+			break LOOP
+		}
+	}
+
+	subCancel()
+	cancel()
+
+	err = <-errCh
+	require.NoError(t, err)
+}
+
 func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	testPaths(t)
 
@@ -1169,7 +1480,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1290,7 +1601,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1414,7 +1725,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1626,7 +1937,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1778,7 +2089,7 @@ func TestManager_FakeShipper(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newErrorLogger(t), newErrorLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -2033,11 +2344,12 @@ LOOP:
 	require.NoError(t, err)
 }
 
-func newErrorLogger(t *testing.T) *logger.Logger {
+func newDebugLogger(t *testing.T) *logger.Logger {
 	t.Helper()
 
 	loggerCfg := logger.DefaultLoggingConfig()
-	loggerCfg.Level = logp.ErrorLevel
+	loggerCfg.Level = logp.DebugLevel
+	loggerCfg.ToStderr = true
 
 	log, err := logger.NewFromConfig("", loggerCfg, false)
 	require.NoError(t, err)
