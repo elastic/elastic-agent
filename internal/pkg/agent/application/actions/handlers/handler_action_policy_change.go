@@ -127,9 +127,11 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	prevProtocol := h.config.Fleet.Client.Protocol
 	prevPath := h.config.Fleet.Client.Path
 	prevHosts := h.config.Fleet.Client.Hosts
+	prevProxy := h.config.Fleet.Client.Transport.Proxy
 	h.config.Fleet.Client.Protocol = cfg.Fleet.Client.Protocol
 	h.config.Fleet.Client.Path = cfg.Fleet.Client.Path
 	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
+	h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
 
 	// rollback on failure
 	defer func() {
@@ -137,6 +139,7 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 			h.config.Fleet.Client.Protocol = prevProtocol
 			h.config.Fleet.Client.Path = prevPath
 			h.config.Fleet.Client.Hosts = prevHosts
+			h.config.Fleet.Client.Transport.Proxy = prevProxy
 		}
 	}()
 
