@@ -657,11 +657,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 			}
 		} else {
 			// new component; create its runtime
-			logger := m.baseLogger.
-				Named(fmt.Sprintf("component.runtime.%s", comp.ID)).
-				With("log", map[string]interface{}{
-					"source": comp.ID,
-				})
+			logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
 			state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
 			if err != nil {
 				return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)

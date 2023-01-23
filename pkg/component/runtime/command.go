@@ -55,7 +55,6 @@ type procState struct {
 
 // CommandRuntime provides the command runtime for running a component as a subprocess.
 type CommandRuntime struct {
-	logger *logger.Logger
 	logStd *logWriter
 	logErr *logWriter
 
@@ -77,7 +76,7 @@ type CommandRuntime struct {
 }
 
 // NewCommandRuntime creates a new command runtime for the provided component.
-func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
+func NewCommandRuntime(comp component.Component, monitor MonitoringManager) (ComponentRuntime, error) {
 	c := &CommandRuntime{
 		current:     comp,
 		monitor:     monitor,
@@ -92,11 +91,6 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 	if cmdSpec == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
-	c.logger = logger.With("component", map[string]interface{}{
-		"id":     comp.ID,
-		"type":   c.getSpecType(),
-		"binary": c.getSpecBinaryName(),
-	})
 	ll, unitLevels := getLogLevels(comp)
 	c.logStd = createLogWriter(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStdout)
 	ll, unitLevels = getLogLevels(comp) // don't want to share mapping of units (so new map is generated)
@@ -504,12 +498,18 @@ func attachOutErr(stdOut *logWriter, stdErr *logWriter) process.CmdOption {
 
 func createLogWriter(comp component.Component, cmdSpec *component.CommandSpec, typeStr string, binaryName string, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
-	logger := logger.NewWithoutConfig("").With("component", map[string]interface{}{
-		"id":      comp.ID,
-		"type":    typeStr,
-		"binary":  binaryName,
-		"dataset": dataset,
-	})
+	logger := logger.NewWithoutConfig("").
+		With(
+			"component", map[string]interface{}{
+				"id":      comp.ID,
+				"type":    typeStr,
+				"binary":  binaryName,
+				"dataset": dataset,
+			},
+			"log", map[string]interface{}{
+				"source": comp.ID,
+			},
+		)
 	return newLogWriter(logger.Core(), cmdSpec.Log, ll, unitLevels, src)
 }
 
