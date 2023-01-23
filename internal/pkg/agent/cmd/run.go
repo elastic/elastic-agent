@@ -114,8 +114,8 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		return err
 	}
 
-	l := baseLogger.With("component", map[string]interface{}{
-		"binary": agentName,
+	l := baseLogger.With("log", map[string]interface{}{
+		"source": agentName,
 	})
 
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
