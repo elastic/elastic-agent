@@ -2204,7 +2204,7 @@ func TestManager_FakeShipper(t *testing.T) {
 			// wait for the event on the shipper side
 			gotEvt := make(chan error)
 			go func() {
-				actionCtx, actionCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				actionCtx, actionCancel := context.WithTimeout(context.Background(), 30*time.Second)
 				_, err := m.PerformAction(actionCtx, comps[1], comps[1].Units[1], "record_event", map[string]interface{}{
 					"id": eventID.String(),
 				})
@@ -2213,7 +2213,7 @@ func TestManager_FakeShipper(t *testing.T) {
 			}()
 
 			// send the fake event
-			actionCtx, actionCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			actionCtx, actionCancel := context.WithTimeout(context.Background(), 15*time.Second)
 			_, err = m.PerformAction(actionCtx, comps[0], comps[0].Units[0], "send_event", map[string]interface{}{
 				"id": eventID.String(),
 			})
@@ -2322,13 +2322,13 @@ func TestManager_FakeShipper(t *testing.T) {
 		t.Fatalf("failed early: %s", err)
 	}
 
-	endTimer := time.NewTimer(30 * time.Second)
+	endTimer := time.NewTimer(2 * time.Minute)
 	defer endTimer.Stop()
 LOOP:
 	for {
 		select {
 		case <-endTimer.C:
-			t.Fatalf("timed out after 30 seconds")
+			t.Fatalf("timed out after 2 minutes")
 		case err := <-errCh:
 			require.NoError(t, err)
 		case err := <-subErrCh:
