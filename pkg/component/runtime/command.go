@@ -327,6 +327,14 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	_ = os.MkdirAll(dataPath, 0755)
 	args = append(args, "-E", "path.data="+dataPath)
 
+	// reset checkin state before starting the process.
+	c.lastCheckin = time.Time{}
+	c.missedCheckins = 0
+
+	// Ensure there is no pending checkin expected message buffered to avoid sending the new process
+	// the expected state of the previous process: https://github.com/elastic/beats/issues/34137
+	comm.ClearPendingCheckinExpected()
+
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
@@ -334,8 +342,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	if err != nil {
 		return err
 	}
-	c.lastCheckin = time.Time{}
-	c.missedCheckins = 0
+
 	c.proc = proc
 	c.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: spawned pid '%d'", c.proc.PID))
 	c.startWatcher(proc, comm)
