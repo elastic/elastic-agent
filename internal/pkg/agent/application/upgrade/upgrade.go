@@ -34,18 +34,14 @@ const (
 	runDirMod       = 0770
 )
 
-var (
-	agentArtifact = artifact.Artifact{
-		Name:     "Elastic Agent",
-		Cmd:      agentName,
-		Artifact: "beats/" + agentName,
-	}
-)
+var agentArtifact = artifact.Artifact{
+	Name:     "Elastic Agent",
+	Cmd:      agentName,
+	Artifact: "beats/" + agentName,
+}
 
-var (
-	// ErrSameVersion error is returned when the upgrade results in the same installed version.
-	ErrSameVersion = errors.New("upgrade did not occur because its the same version")
-)
+// ErrSameVersion error is returned when the upgrade results in the same installed version.
+var ErrSameVersion = errors.New("upgrade did not occur because its the same version")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -249,7 +245,7 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 			return err
 		}
 
-		if err := os.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
+		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
 			return err
 		}
 	}

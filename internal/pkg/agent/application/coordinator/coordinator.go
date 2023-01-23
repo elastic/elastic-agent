@@ -33,12 +33,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-var (
-	// ErrNotUpgradable error is returned when upgrade cannot be performed.
-	ErrNotUpgradable = errors.New(
-		"cannot be upgraded; must be installed with install sub-command and " +
-			"running under control of the systems supervisor")
-)
+// ErrNotUpgradable error is returned when upgrade cannot be performed.
+var ErrNotUpgradable = errors.New(
+	"cannot be upgraded; must be installed with install sub-command and " +
+		"running under control of the systems supervisor")
 
 // ReExecManager provides an interface to perform re-execution of the entire agent.
 type ReExecManager interface {
@@ -119,8 +117,7 @@ type ConfigChange interface {
 }
 
 // ErrorReporter provides an interface for any manager that is handled by the coordinator to report errors.
-type ErrorReporter interface {
-}
+type ErrorReporter interface{}
 
 // ConfigManager provides an interface to run and watch for configuration changes.
 type ConfigManager interface {
