@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -20,6 +21,13 @@ func createListener(path string) (net.Listener, error) {
 	path = strings.TrimPrefix(path, "unix://")
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		os.Remove(path)
+	}
+	dir := filepath.Dir(path)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.MkdirAll(dir, 0750)
+		if err != nil {
+			return nil, err
+		}
 	}
 	lis, err := net.Listen("unix", path)
 	if err != nil {

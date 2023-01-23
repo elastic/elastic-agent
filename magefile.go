@@ -789,7 +789,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 				panic(err)
 			}
 
-			// cope spec file for match
+			// copy spec file for match
 			specName := filepath.Base(f)
 			idx := strings.Index(specName, "-"+version)
 			if idx != -1 {
@@ -818,15 +818,20 @@ func packageAgent(platforms []string, packagingFn func()) {
 }
 
 func copyComponentSpecs(componentName, versionedDropPath string) (string, error) {
-	sourceSpecFile := filepath.Join("specs", componentName+specSuffix)
-	targetPath := filepath.Join(versionedDropPath, componentName+specSuffix)
-	err := devtools.Copy(sourceSpecFile, targetPath)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed copying spec file %q to %q", sourceSpecFile, targetPath)
+	specFileName := componentName + specSuffix
+	targetPath := filepath.Join(versionedDropPath, specFileName)
+
+	if _, err := os.Stat(targetPath); err != nil {
+		// spec not present copy from local
+		sourceSpecFile := filepath.Join("specs", specFileName)
+		err := devtools.Copy(sourceSpecFile, targetPath)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed copying spec file %q to %q", sourceSpecFile, targetPath)
+		}
 	}
 
 	// compute checksum
-	return devtools.GetSHA512Hash(sourceSpecFile)
+	return devtools.GetSHA512Hash(targetPath)
 }
 
 func appendComponentChecksums(versionedDropPath string, checksums map[string]string) error {
