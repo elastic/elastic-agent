@@ -34,7 +34,7 @@ const (
 	// ActionTypeCancel specifies a cancel action.
 	ActionTypeCancel = "CANCEL"
 	// ActionTypeDiagnostics specifies a diagnostics action.
-	ActionTypeDiagnostics = "DIAGNOSTICS"
+	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
 )
 
 // Error values that the Action interface can return
@@ -414,7 +414,7 @@ func (a *ActionCancel) AckEvent() AckEvent {
 type ActionDiagnostics struct {
 	ActionID   string `json:"action_id"`
 	ActionType string `json:"type"`
-	UploadID   string `json:"-"`
+	FileID     string `json:"-"`
 	Err        error  `json:"-"`
 }
 
@@ -442,13 +442,13 @@ func (a *ActionDiagnostics) AckEvent() AckEvent {
 	if a.Err != nil {
 		event.Error = a.Err.Error()
 	}
-	if a.UploadID != "" {
-		var payload struct {
-			UploadID string `json:"upload_id"`
+	if a.FileID != "" {
+		var data struct {
+			FileID string `json:"file_id"`
 		}
-		payload.UploadID = a.UploadID
-		p, _ := json.Marshal(payload)
-		event.Payload = p
+		data.FileID = a.FileID
+		p, _ := json.Marshal(data)
+		event.Data = p
 	}
 
 	return event

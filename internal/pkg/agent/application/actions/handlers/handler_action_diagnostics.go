@@ -77,7 +77,7 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 
 	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, &b)
 	action.Err = err
-	action.UploadID = uploadID
+	action.FileID = uploadID
 	if err != nil {
 		return fmt.Errorf("unable to upload diagnostics: %w", err)
 	}

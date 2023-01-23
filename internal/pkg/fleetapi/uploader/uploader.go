@@ -121,7 +121,7 @@ func (c *Client) New(ctx context.Context, r *NewUploadRequest) (*NewUploadRespon
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.c.Send(ctx, "POST", PathNewUpload, nil, nil, bytes.NewBuffer(b))
+	resp, err := c.c.Send(ctx, http.MethodPost, PathNewUpload, nil, nil, bytes.NewBuffer(b))
 	if err != nil {
 		return nil, err
 	}
