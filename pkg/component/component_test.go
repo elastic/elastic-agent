@@ -41,6 +41,7 @@ func TestToComponents(t *testing.T) {
 		LogLevel logp.Level
 		Err      string
 		Result   []Component
+		headers  HeadersProvider
 	}{
 		{
 			Name:     "Empty policy",
@@ -1588,6 +1589,165 @@ func TestToComponents(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:     "Headers injection",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+								"headers": map[string]interface{}{
+									"header-one": "val-1",
+								},
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+			headers: &testHeadersProvider{headers: map[string]string{
+				"header-one": "val-1",
+			}},
+		}, {
+			Name:     "Headers injection merge",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+						"headers": map[string]interface{}{
+							"header-two": "val-2",
+						},
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+								"headers": map[string]interface{}{
+									"header-two": "val-2",
+									"header-one": "val-1",
+								},
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+			headers: &testHeadersProvider{headers: map[string]string{
+				"header-one": "val-1",
+			}},
+		},
+		{
+			Name:     "Headers injection not injecting kafka",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "kafka",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "kafka",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+			headers: &testHeadersProvider{headers: map[string]string{
+				"header-one": "val-1",
+			}},
+		},
 	}
 
 	for _, scenario := range scenarios {
@@ -1595,7 +1755,7 @@ func TestToComponents(t *testing.T) {
 			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
 			require.NoError(t, err)
 
-			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel)
+			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers)
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -1754,4 +1914,12 @@ func mustExpectedConfigForceType(cfg map[string]interface{}, forceType string) *
 	res := MustExpectedConfig(cfg)
 	res.Type = forceType
 	return res
+}
+
+type testHeadersProvider struct {
+	headers map[string]string
+}
+
+func (h *testHeadersProvider) Headers() map[string]string {
+	return h.headers
 }

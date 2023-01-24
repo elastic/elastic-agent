@@ -23,9 +23,15 @@ import (
 // GenerateMonitoringCfgFn is a function that can inject information into the model generation process.
 type GenerateMonitoringCfgFn func(map[string]interface{}, []Component, map[string]string) (map[string]interface{}, error)
 
+type HeadersProvider interface {
+	Headers() map[string]string
+}
+
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
 	defaultUnitLogLevel = client.UnitLogLevelInfo
+	headersKey          = "headers"
+	elasticsearchType   = "elasticsearch"
 )
 
 // ErrInputRuntimeCheckFail error is used when an input specification runtime prevention check occurs.
@@ -105,8 +111,8 @@ func (c *Component) Type() string {
 }
 
 // ToComponents returns the components that should be running based on the policy and the current runtime specification.
-func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInjector GenerateMonitoringCfgFn, ll logp.Level) ([]Component, error) {
-	components, binaryMapping, err := r.PolicyToComponents(policy, ll)
+func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInjector GenerateMonitoringCfgFn, ll logp.Level, headers HeadersProvider) ([]Component, error) {
+	components, binaryMapping, err := r.PolicyToComponents(policy, ll, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +125,7 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 
 		if monitoringCfg != nil {
 			// monitoring is enabled
-			monitoringComps, _, err := r.PolicyToComponents(monitoringCfg, ll)
+			monitoringComps, _, err := r.PolicyToComponents(monitoringCfg, ll, headers)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
 			}
@@ -133,8 +139,8 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 
 // PolicyToComponents takes the policy and generated a component model along with providing a mapping between component
 // and the running binary.
-func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}, ll logp.Level) ([]Component, map[string]string, error) {
-	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll)
+func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}, ll logp.Level, headers HeadersProvider) ([]Component, map[string]string, error) {
+	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -421,7 +427,7 @@ func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntime
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
 // of components.
-func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level) (map[string]outputI, error) {
+func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
 	const (
 		outputsKey = "outputs"
 		enabledKey = "enabled"
@@ -470,6 +476,28 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		if err != nil {
 			return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", name, err)
 		}
+
+		// inject headers configured during enroll
+		if t == elasticsearchType && headers != nil {
+			// can be nil when called from install/uninstall
+			if agentHeaders := headers.Headers(); len(agentHeaders) > 0 {
+				headers := make(map[string]interface{})
+				if existingHeadersRaw, found := output[headersKey]; found {
+					existingHeaders, ok := existingHeadersRaw.(map[string]interface{})
+					if !ok {
+						return nil, fmt.Errorf("invalid 'outputs.headers', expected a map not a %T", outputRaw)
+					}
+					headers = existingHeaders
+				}
+
+				for headerName, headerVal := range agentHeaders {
+					headers[headerName] = headerVal
+				}
+
+				output[headersKey] = headers
+			}
+		}
+
 		outputsMap[name] = outputI{
 			name:       name,
 			enabled:    enabled,
