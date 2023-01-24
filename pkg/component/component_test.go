@@ -1748,6 +1748,56 @@ func TestToComponents(t *testing.T) {
 				"header-one": "val-1",
 			}},
 		},
+		{
+			Name:     "Headers injection not injecting logstash",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "logstash",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "logstash",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+			headers: &testHeadersProvider{headers: map[string]string{
+				"header-one": "val-1",
+			}},
+		},
 	}
 
 	for _, scenario := range scenarios {
