@@ -1,0 +1,14 @@
+version: 8.6.1
+entries:
+    - kind: bug-fix
+      summary: Fix issue where its possible for a component to receive a unit without a config
+      description: ""
+      component: "elastic-agent"
+      pr:
+        - "https://github.com/elastic/elastic-agent/pull/2138"
+      issue:
+        - "https://github.com/elastic/elastic-agent/issues/2086"
+      timestamp: 1674071325
+      file:
+        name: 1674071325-Fix-issue-where-its-possible-for-a-component-to-receive-a-unit-without-a-config.yaml
+        checksum: d59417809560d08f577ee533bf8c0cb542918634
