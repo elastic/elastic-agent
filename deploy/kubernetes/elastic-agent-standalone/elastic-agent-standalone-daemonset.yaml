@@ -100,6 +100,16 @@ spec:
             - name: var-lib
               mountPath: /hostfs/var/lib
               readOnly: true
+            - name: boot
+              mountPath: /boot
+              readOnly: true
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+            - name: sys-fs-bpf
+              mountPath: /sys/fs/bpf
+            - name: sys-kernel-security
+              mountPath: /sys/kernel/security
+              readOnly: true
       volumes:
         - name: datastreams
           configMap:
@@ -129,3 +139,16 @@ spec:
         - name: var-lib
           hostPath:
             path: /var/lib
+        # The following volumes are needed for 'Defend for containers' integration (cloud-defend)
+        # If you are not using this integration, then these volumes and the corresponding
+        # mounts can be removed.
+        - name: boot
+          mountPath: /boot
+          readOnly: true
+        - name: sys-kernel-debug
+          mountPath: /sys/kernel/debug
+        - name: sys-fs-bpf
+          mountPath: /sys/fs/bpf
+        - name: sys-kernel-security
+          mountPath: /sys/kernel/security
+          readOnly: true
