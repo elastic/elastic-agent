@@ -47,6 +47,11 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	}
 	defer ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
 
+	if err := h.client.Connect(ctx); err != nil {
+		action.Err = err
+		return fmt.Errorf("failed to connect to control server: %w", err)
+	}
+
 	h.log.Debug("Gathering agent diagnostics.")
 	// Gather agent diagnostics
 	aDiag, err := h.client.DiagnosticAgent(ctx)

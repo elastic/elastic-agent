@@ -45,7 +45,7 @@ type FileData struct {
 type NewUploadRequest struct {
 	ActionID string     `json:"action_id"`
 	AgentID  string     `json:"agent_id"`
-	Source   string     `json:"source"`
+	Source   string     `json:"src"`
 	File     FileData   `json:"file"`
 	Contents []FileData `json:"contents"`
 }
@@ -54,6 +54,13 @@ type NewUploadRequest struct {
 type NewUploadResponse struct {
 	UploadID  string `json:"upload_id"`
 	ChunkSize int64  `json:"chunk_size"`
+}
+
+// FinishRequest is the struct that is used when finalizing an upload.
+type FinishRequest struct {
+	TransitHash struct {
+		SHA256 string `json:"sha256"`
+	} `json:"transithash"`
 }
 
 // retrySender wraps the underlying Sender with retry logic.
@@ -140,8 +147,9 @@ func (c *Client) New(ctx context.Context, r *NewUploadRequest) (*NewUploadRespon
 }
 
 // Chunk uploads a file chunk to fleet-server.
-func (c *Client) Chunk(ctx context.Context, uploadID string, chunkID int, r io.Reader) error {
-	resp, err := c.c.Send(ctx, "PUT", fmt.Sprintf(PathChunk, uploadID, chunkID), nil, nil, r)
+func (c *Client) Chunk(ctx context.Context, uploadID string, chunkID int, sha256Hash []byte, r io.Reader) error {
+	h := http.Header{"X-Chunk-Sha2": {fmt.Sprintf("%x", sha256Hash)}}
+	resp, err := c.c.Send(ctx, "PUT", fmt.Sprintf(PathChunk, uploadID, chunkID), nil, h, r)
 	if err != nil {
 		return err
 	}
@@ -154,8 +162,13 @@ func (c *Client) Chunk(ctx context.Context, uploadID string, chunkID int, r io.R
 }
 
 // Finish calls the finalize endpoint for the file upload.
-func (c *Client) Finish(ctx context.Context, id string) error {
-	resp, err := c.c.Send(ctx, "POST", fmt.Sprintf(PathFinishUpload, id), nil, nil, nil)
+func (c *Client) Finish(ctx context.Context, id string, r *FinishRequest) error {
+	b, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.c.Send(ctx, "POST", fmt.Sprintf(PathFinishUpload, id), nil, nil, bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}
@@ -168,6 +181,8 @@ func (c *Client) Finish(ctx context.Context, id string) error {
 }
 
 // UploadDiagnostics is a wrapper to upload a diagnostics request identified by the passed action id contained in the buffer to fleet-server.
+//
+// A buffer is used instead of a reader as we need to know the file length before uploading.
 func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buffer) (string, error) {
 	size := b.Len()
 	upReq := NewUploadRequest{
@@ -179,12 +194,6 @@ func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buff
 			Name:      fmt.Sprintf("elastic-agent-diagnostics-%s-%s.zip", c.agentID, id),
 			Extension: "zip",
 			Mime:      "application/zip",
-			Hash: struct {
-				SHA256 string `json:"sha256"`
-				MD5    string `json:"md5"`
-			}{
-				SHA256: fmt.Sprintf("%x", sha256.Sum256(b.Bytes())),
-			},
 		},
 	}
 	upResp, err := c.New(ctx, &upReq)
@@ -195,13 +204,20 @@ func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buff
 	uploadID := upResp.UploadID
 	chunkSize := upResp.ChunkSize
 	totalChunks := int(math.Ceil(float64(size) / float64(chunkSize)))
+	transitHash := sha256.New()
 	for chunk := 0; chunk < totalChunks; chunk++ {
-		err := c.Chunk(ctx, uploadID, chunk, io.LimitReader(b, chunkSize))
+		var data bytes.Buffer
+		io.CopyN(&data, b, chunkSize) //nolint:errcheck // copy chunkSize bytes to a buffer so we can get the checksum
+		hash := sha256.Sum256(data.Bytes())
+		err := c.Chunk(ctx, uploadID, chunk, hash[:], &data) // hash[:] uses the array as a slice
 		if err != nil {
 			return uploadID, err
 		}
+		transitHash.Write(hash[:]) //nolint:errcheck // used to calculate transit hash, no need to check errors on this write
 	}
+	var fr FinishRequest
+	fr.TransitHash.SHA256 = fmt.Sprintf("%x", transitHash.Sum(nil))
 
-	err = c.Finish(ctx, uploadID)
+	err = c.Finish(ctx, uploadID, &fr)
 	return uploadID, err
 }
