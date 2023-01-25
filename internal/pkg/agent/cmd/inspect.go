@@ -144,6 +144,11 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return err
 	}
 
+	agentInfo, err := info.NewAgentInfoWithLog("error", false)
+	if err != nil {
+		return fmt.Errorf("could not load agent info: %w", err)
+	}
+
 	if opts.includeMonitoring {
 		// Load the requirements before trying to load the configuration. These should always load
 		// even if the configuration is wrong.
@@ -160,7 +165,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
-		components, binaryMapping, err := specs.PolicyToComponents(cfg, lvl)
+		components, binaryMapping, err := specs.PolicyToComponents(cfg, lvl, agentInfo)
 		if err != nil {
 			return fmt.Errorf("failed to get binary mappings: %w", err)
 		}
@@ -252,8 +257,13 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return fmt.Errorf("failed to get monitoring: %w", err)
 	}
 
+	agentInfo, err := info.NewAgentInfoWithLog("error", false)
+	if err != nil {
+		return fmt.Errorf("could not load agent info: %w", err)
+	}
+
 	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, monitorFn, lvl)
+	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
 	}
