@@ -16,6 +16,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -127,9 +128,11 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	prevProtocol := h.config.Fleet.Client.Protocol
 	prevPath := h.config.Fleet.Client.Path
 	prevHosts := h.config.Fleet.Client.Hosts
+	prevProxy := h.config.Fleet.Client.Transport.Proxy
 	h.config.Fleet.Client.Protocol = cfg.Fleet.Client.Protocol
 	h.config.Fleet.Client.Path = cfg.Fleet.Client.Path
 	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
+	h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
 
 	// rollback on failure
 	defer func() {
@@ -137,6 +140,7 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 			h.config.Fleet.Client.Protocol = prevProtocol
 			h.config.Fleet.Client.Path = prevPath
 			h.config.Fleet.Client.Hosts = prevHosts
+			h.config.Fleet.Client.Transport.Proxy = prevProxy
 		}
 	}()
 
@@ -199,6 +203,29 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 			return false
 		}
 	}
+
+	headersEqual := func(h1, h2 httpcommon.ProxyHeaders) bool {
+		if len(h1) != len(h2) {
+			return false
+		}
+
+		for k, v := range h1 {
+			h2v, found := h2[k]
+			if !found || v != h2v {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	// different proxy
+	if k1.Transport.Proxy.URL != k2.Transport.Proxy.URL ||
+		k1.Transport.Proxy.Disable != k2.Transport.Proxy.Disable ||
+		!headersEqual(k1.Transport.Proxy.Headers, k2.Transport.Proxy.Headers) {
+		return false
+	}
+
 	return true
 }
 
