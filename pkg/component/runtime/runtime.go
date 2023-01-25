@@ -60,7 +60,7 @@ func NewComponentRuntime(comp component.Component, logger *logger.Logger, monito
 	}
 	if comp.InputSpec != nil {
 		if comp.InputSpec.Spec.Command != nil {
-			return NewCommandRuntime(comp, logger, monitor)
+			return NewCommandRuntime(comp, monitor)
 		}
 		if comp.InputSpec.Spec.Service != nil {
 			return NewServiceRuntime(comp, logger)
@@ -69,7 +69,7 @@ func NewComponentRuntime(comp component.Component, logger *logger.Logger, monito
 	}
 	if comp.ShipperSpec != nil {
 		if comp.ShipperSpec.Spec.Command != nil {
-			return NewCommandRuntime(comp, logger, monitor)
+			return NewCommandRuntime(comp, monitor)
 		}
 		return nil, errors.New("components for shippers can only support command runtime")
 	}

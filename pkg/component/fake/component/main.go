@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -46,7 +47,7 @@ func main() {
 }
 
 func run() error {
-	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	logger := zerolog.New(os.Stderr).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 	ver := client.VersionInfo{
 		Name:    fake,
 		Version: "1.0",
@@ -347,7 +348,8 @@ type fakeInput struct {
 	state    client.UnitState
 	stateMsg string
 
-	canceller context.CancelFunc
+	canceller       context.CancelFunc
+	killerCanceller context.CancelFunc
 }
 
 func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *stateManager, unit *client.Unit, cfg *proto.UnitExpectedConfig) (*fakeInput, error) {
@@ -399,7 +401,7 @@ func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *
 		}
 	}()
 	i.canceller = cancel
-
+	i.parseConfig(cfg)
 	return i, nil
 }
 
@@ -429,6 +431,7 @@ func (f *fakeInput) Update(u *client.Unit) error {
 		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
 	}
 
+	f.parseConfig(config)
 	state, stateMsg, err := getStateFromConfig(config)
 	if err != nil {
 		return fmt.Errorf("unit config parsing error: %w", err)
@@ -438,6 +441,65 @@ func (f *fakeInput) Update(u *client.Unit) error {
 	f.logger.Debug().Str("state", f.state.String()).Str("message", f.stateMsg).Msg("updating unit state")
 	_ = u.UpdateState(f.state, f.stateMsg, nil)
 	return nil
+}
+
+func (f *fakeInput) parseConfig(config *proto.UnitExpectedConfig) {
+	// handle a case for killing the component when the pid of the component
+	// matches the current running PID
+	cfg := config.Source.AsMap()
+	killPIDRaw, kill := cfg["kill"]
+	if kill {
+		f.maybeKill(killPIDRaw)
+	}
+
+	// handle a case where random killing of the component is enabled
+	_, killOnInterval := cfg["kill_on_interval"]
+	f.logger.Trace().Bool("kill_on_interval", killOnInterval).Msg("kill_on_interval config set value")
+	if killOnInterval {
+		f.logger.Info().Msg("starting interval killer")
+		f.runKiller()
+	} else {
+		f.logger.Info().Msg("stopping interval killer")
+		f.stopKiller()
+	}
+}
+
+func (f *fakeInput) maybeKill(pidRaw interface{}) {
+	if killPID, ok := pidRaw.(string); ok {
+		if pid, err := strconv.Atoi(killPID); err == nil {
+			if pid == os.Getpid() {
+				f.logger.Warn().Msg("killing from config pid")
+				os.Exit(1)
+			}
+		}
+	}
+}
+
+func (f *fakeInput) runKiller() {
+	if f.killerCanceller != nil {
+		// already running
+		return
+	}
+	ctx, canceller := context.WithCancel(context.Background())
+	f.killerCanceller = canceller
+	go func() {
+		t := time.NewTimer(500 * time.Millisecond)
+		defer t.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			f.logger.Warn().Msg("killer performing kill")
+			os.Exit(1)
+		}
+	}()
+}
+
+func (f *fakeInput) stopKiller() {
+	if f.killerCanceller != nil {
+		f.killerCanceller()
+		f.killerCanceller = nil
+	}
 }
 
 type stateSetterAction struct {
