@@ -788,15 +788,17 @@ spec:
         # If you are not using this integration, then these volumes and the corresponding
         # mounts can be removed.
         - name: boot
-          mountPath: /boot
-          readOnly: true
+          hostPath:
+            path: /boot
         - name: sys-kernel-debug
-          mountPath: /sys/kernel/debug
+          hostPath:
+            path: /sys/kernel/debug
         - name: sys-fs-bpf
-          mountPath: /sys/fs/bpf
+          hostPath:
+            path: /sys/fs/bpf
         - name: sys-kernel-security
-          mountPath: /sys/kernel/security
-          readOnly: true
+          hostPath:
+            path: /sys/kernel/security
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
