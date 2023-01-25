@@ -3,6 +3,8 @@ inputs:
   - name: cloud_defend/control
     description: "Defend for containers"
     platforms: &platforms
+      - linux/amd64
+      - linux/arm64
       - container/amd64
       - container/arm64
     outputs: &outputs
