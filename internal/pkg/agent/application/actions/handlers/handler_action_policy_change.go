@@ -207,6 +207,7 @@ func fleetToReader(agentInfo *info.AgentInfo, cfg *configuration.Configuration) 
 		"fleet": cfg.Fleet,
 		"agent": map[string]interface{}{
 			"id":               agentInfo.AgentID(),
+			"headers":          agentInfo.Headers(),
 			"logging.level":    cfg.Settings.LoggingConfig.Level,
 			"monitoring.http":  cfg.Settings.MonitoringConfig.HTTP,
 			"monitoring.pprof": cfg.Settings.MonitoringConfig.Pprof,
