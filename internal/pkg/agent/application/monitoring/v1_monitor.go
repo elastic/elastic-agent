@@ -584,6 +584,67 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				},
 			},
 		},
+		// map[string]interface{}{
+		// 	idKey: "metrics-monitoring-agent",
+		// 	"data_stream": map[string]interface{}{
+		// 		"type":      "metrics",
+		// 		"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+		// 		"namespace": monitoringNamespace,
+		// 	},
+		// 	"metricsets": []interface{}{"json"},
+		// 	"path":       "/inputs/",
+		// 	"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.operatingSystem, b.config.C)},
+		// 	"namespace":  "agent",
+		// 	"period":     "10s",
+		// 	"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+		// 	"processors": []interface{}{
+		// 		map[string]interface{}{
+		// 			"add_fields": map[string]interface{}{
+		// 				"target": "data_stream",
+		// 				"fields": map[string]interface{}{
+		// 					"type":      "metrics",
+		// 					"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+		// 					"namespace": monitoringNamespace,
+		// 				},
+		// 			},
+		// 		},
+		// 		map[string]interface{}{
+		// 			"add_fields": map[string]interface{}{
+		// 				"target": "event",
+		// 				"fields": map[string]interface{}{
+		// 					"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+		// 				},
+		// 			},
+		// 		},
+		// 		map[string]interface{}{
+		// 			"add_fields": map[string]interface{}{
+		// 				"target": "elastic_agent",
+		// 				"fields": map[string]interface{}{
+		// 					"id":       b.agentInfo.AgentID(),
+		// 					"version":  b.agentInfo.Version(),
+		// 					"snapshot": b.agentInfo.Snapshot(),
+		// 					"process":  "elastic-agent",
+		// 				},
+		// 			},
+		// 		},
+		// 		map[string]interface{}{
+		// 			"add_fields": map[string]interface{}{
+		// 				"target": "agent",
+		// 				"fields": map[string]interface{}{
+		// 					"id": b.agentInfo.AgentID(),
+		// 				},
+		// 			},
+		// 		},
+		// 		map[string]interface{}{
+		// 			"drop_fields": map[string]interface{}{
+		// 				"fields": []interface{}{
+		// 					"http",
+		// 				},
+		// 				"ignore_missing": true,
+		// 			},
+		// 		},
+		// 	},
+		// },
 	}
 	for unit, binaryName := range componentIDToBinary {
 		if !isSupportedMetricsBinary(binaryName) {
@@ -705,6 +766,61 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				},
 			},
 		})
+
+		if strings.EqualFold(name, "filebeat") {
+			streams = append(streams, map[string]interface{}{
+				idKey: "metrics-monitoring-" + name + "-1",
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+					"namespace": monitoringNamespace,
+				},
+				"metricsets":    []interface{}{"json"},
+				"hosts":         endpoints,
+				"path":          "/inputs/",
+				"namespace":     "agent",
+				"json.is_array": true,
+				"period":        "10s",
+				"index":         fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+				"processors": []interface{}{
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "event",
+							"fields": map[string]interface{}{
+								"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+							},
+						},
+					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "elastic_agent",
+							"fields": map[string]interface{}{
+								"id":       b.agentInfo.AgentID(),
+								"version":  b.agentInfo.Version(),
+								"snapshot": b.agentInfo.Snapshot(),
+								"process":  name,
+							},
+						},
+					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "agent",
+							"fields": map[string]interface{}{
+								"id": b.agentInfo.AgentID(),
+							},
+						},
+					},
+					map[string]interface{}{
+						"drop_fields": map[string]interface{}{
+							"fields": []interface{}{
+								"http",
+							},
+							"ignore_missing": true,
+						},
+					},
+				},
+			})
+		}
 	}
 
 	inputs := []interface{}{
