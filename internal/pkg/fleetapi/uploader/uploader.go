@@ -207,13 +207,13 @@ func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buff
 	transitHash := sha256.New()
 	for chunk := 0; chunk < totalChunks; chunk++ {
 		var data bytes.Buffer
-		io.CopyN(&data, b, chunkSize) //nolint:errorcheck // copy chunkSize bytes to a buffer so we can get the checksum
+		io.CopyN(&data, b, chunkSize) //nolint:errcheck // copy chunkSize bytes to a buffer so we can get the checksum
 		hash := sha256.Sum256(data.Bytes())
 		err := c.Chunk(ctx, uploadID, chunk, hash[:], &data) // hash[:] uses the array as a slice
 		if err != nil {
 			return uploadID, err
 		}
-		transitHash.Write(hash[:]) //nolint:errorcheck // used to calculate transit hash, no need to check errors on this write
+		transitHash.Write(hash[:]) // used to calculate transit hash, no need to check errors on this write
 	}
 	var fr FinishRequest
 	fr.TransitHash.SHA256 = fmt.Sprintf("%x", transitHash.Sum(nil))
