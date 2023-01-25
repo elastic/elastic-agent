@@ -16,6 +16,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -202,6 +203,29 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 			return false
 		}
 	}
+
+	headersEqual := func(h1, h2 httpcommon.ProxyHeaders) bool {
+		if len(h1) != len(h2) {
+			return false
+		}
+
+		for k, v := range h1 {
+			h2v, found := h2[k]
+			if !found || v != h2v {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	// different proxy
+	if k1.Transport.Proxy.URL != k2.Transport.Proxy.URL ||
+		k1.Transport.Proxy.Disable != k2.Transport.Proxy.Disable ||
+		!headersEqual(k1.Transport.Proxy.Headers, k2.Transport.Proxy.Headers) {
+		return false
+	}
+
 	return true
 }
 
