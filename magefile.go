@@ -625,7 +625,7 @@ func (Cloud) Push() error {
 	if err != nil {
 		return fmt.Errorf("Failed pushing docker image: %w", err)
 	}
-	fmt.Println(">> Docker image pushed to remote registry successfully")
+	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
 	return nil
 }
