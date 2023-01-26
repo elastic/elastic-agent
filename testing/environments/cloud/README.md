@@ -1,8 +1,8 @@
 # Cloud-first testing
 
 It is possible for Elastic employees to create an Elastic Cloud deployment with a locally
-built APM Server binary and APM integration package (i.e. with modifications in the current
-working tree), by pushing images to an internal Docker repository. The images will be based on the SNAPSHOT images referenced in docker-compose.yml.
+built Elastic Agent, by pushing images to an internal Docker repository. The images will be 
+based on the SNAPSHOT images with version defined in `version/version.go`.
 
 Running `make` in this directory will build and push the images. You can then use Terraform
 to create the deployment with `EC_API_KEY=your_api_key make apply`.
