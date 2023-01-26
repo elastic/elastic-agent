@@ -395,10 +395,6 @@ func (c *enrollCmd) prepareFleetTLS() error {
 	}
 	if c.options.FleetServer.Cert == "" && c.options.FleetServer.CertKey == "" {
 		if c.options.FleetServer.Insecure {
-			// running insecure, force the binding to localhost (unless specified)
-			if c.options.FleetServer.Host == "" {
-				c.options.FleetServer.Host = defaultFleetServerInternalHost
-			}
 			c.options.URL = fmt.Sprintf("http://%s:%d", host, port)
 			c.options.Insecure = true
 			return nil
