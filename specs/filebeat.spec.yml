@@ -22,7 +22,7 @@ inputs:
       maximum_restarts_per_period: 1
       timeouts:
         restart: 1s
-      args: 
+      args:
         - "-E"
         - "setup.ilm.enabled=false"
         - "-E"
@@ -85,6 +85,12 @@ inputs:
     aliases:
       - log/docker
     description: "Docker logs"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
+  - name: entity-analytics
+    description: "Entity Analytics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
