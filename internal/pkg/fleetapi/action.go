@@ -414,7 +414,7 @@ func (a *ActionCancel) AckEvent() AckEvent {
 type ActionDiagnostics struct {
 	ActionID   string `json:"action_id"`
 	ActionType string `json:"type"`
-	FileID     string `json:"-"`
+	UploadID   string `json:"-"`
 	Err        error  `json:"-"`
 }
 
@@ -442,11 +442,11 @@ func (a *ActionDiagnostics) AckEvent() AckEvent {
 	if a.Err != nil {
 		event.Error = a.Err.Error()
 	}
-	if a.FileID != "" {
+	if a.UploadID != "" {
 		var data struct {
-			FileID string `json:"file_id"`
+			UploadID string `json:"file_id"`
 		}
-		data.FileID = a.FileID
+		data.UploadID = a.UploadID
 		p, _ := json.Marshal(data)
 		event.Data = p
 	}

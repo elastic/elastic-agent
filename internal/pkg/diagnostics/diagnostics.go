@@ -117,12 +117,17 @@ func pprofDiag(name string) func(context.Context) ([]byte, time.Time) {
 // ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics.
 // If any error is encountered when writing the contents of the archive it is returned.
 func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
+	ts := time.Now().UTC()
 	zw := zip.NewWriter(w)
 	defer zw.Close()
 	// Create directories in the zip archive before writing any files
 	for _, ad := range agentDiag {
 		if ad.ContentType == ContentTypeDirectory {
-			_, err := zw.Create(ad.Filename)
+			_, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     ad.Filename,
+				Method:   zip.Deflate,
+				Modified: ts,
+			})
 			if err != nil {
 				return err
 			}
@@ -155,23 +160,39 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 	}
 	// write each units diagnostics into its own directory
 	// layout becomes components/<component-id>/<unit-id>/<filename>
-	_, err := zw.Create("components/")
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "components/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
 	if err != nil {
 		return err
 	}
 	for dirName, units := range compDirs {
-		_, err = zw.Create(fmt.Sprintf("components/%s/", dirName))
+		_, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     fmt.Sprintf("components/%s/", dirName),
+			Method:   zip.Deflate,
+			Modified: ts,
+		})
 		if err != nil {
 			return err
 		}
 		for _, ud := range units {
 			unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
-			_, err = zw.Create(fmt.Sprintf("components/%s/%s/", dirName, unitDir))
+			_, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     fmt.Sprintf("components/%s/%s/", dirName, unitDir),
+				Method:   zip.Deflate,
+				Modified: ts,
+			})
 			if err != nil {
 				return err
 			}
 			if ud.Err != nil {
-				w, err := zw.Create(fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir))
+				w, err := zw.CreateHeader(&zip.FileHeader{
+					Name:     fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir),
+					Method:   zip.Deflate,
+					Modified: ts,
+				})
 				if err != nil {
 					return err
 				}

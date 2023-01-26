@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
@@ -45,6 +46,7 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionDiagnostics and received %T", a)
 	}
+	ts := time.Now().UTC()
 	defer ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
 
 	if err := h.client.Connect(ctx); err != nil {
@@ -84,9 +86,9 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	}
 
 	h.log.Debug("Sending diagnostics archive.")
-	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, &b)
+	uploadID, err := h.uploader.UploadDiagnostics(ctx, ts.Format("2006-01-02T15-04-05Z07-00"), &b) // RFC3339 format that uses - instead of : so it works on Windows
 	action.Err = err
-	action.FileID = uploadID
+	action.UploadID = uploadID
 	if err != nil {
 		return fmt.Errorf("unable to upload diagnostics: %w", err)
 	}
