@@ -416,14 +416,7 @@ func runFleetGateway(ctx context.Context, g gateway.FleetGateway) <-chan error {
 		}
 	}()
 	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case <-g.Errors():
-				// ignore errors here
-			}
-		}
+		<-done
 	}()
 	return errCh
 }
