@@ -191,7 +191,7 @@ func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buff
 		Source:   "agent",
 		File: FileData{
 			Size:      int64(size),
-			Name:      fmt.Sprintf("elastic-agent-diagnostics-%s-%s.zip", c.agentID, id),
+			Name:      fmt.Sprintf("elastic-agent-diagnostics-%s.zip", id),
 			Extension: "zip",
 			Mime:      "application/zip",
 		},
