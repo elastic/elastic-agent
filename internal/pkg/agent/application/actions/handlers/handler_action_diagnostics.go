@@ -11,11 +11,20 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+
+	"golang.org/x/time/rate"
 )
+
+// ErrRateLimit is the rate limit error that is returned if the handler is ran too often.
+// This may occur if the user sends multiple diagnostics actions to an agent in a short duration
+// or if the agent goes offline and retrieves multiple diagnostics actions.
+// In either case the 1st action will succeed and the others will ack with an the error.
+var ErrRateLimit = fmt.Errorf("rate limit exceeded")
 
 // Uploader is the interface used to upload a diagnostics bundle to fleet-server.
 type Uploader interface {
@@ -26,14 +35,16 @@ type Uploader interface {
 // When a Diagnostics action is received a full diagnostics bundle is taken and uploaded to fleet-server.
 type Diagnostics struct {
 	log      *logger.Logger
+	limiter  *rate.Limiter
 	client   client.Client
 	uploader Uploader
 }
 
 // NewDiagnostics returns a new Diagnostics handler.
-func NewDiagnostics(log *logger.Logger, uploader Uploader) *Diagnostics {
+func NewDiagnostics(log *logger.Logger, cfg config.Limit, uploader Uploader) *Diagnostics {
 	return &Diagnostics{
 		log:      log,
+		limiter:  rate.NewLimiter(rate.Every(cfg.Interval), cfg.Burst),
 		client:   client.New(),
 		uploader: uploader,
 	}
@@ -48,6 +59,11 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	}
 	ts := time.Now().UTC()
 	defer ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
+
+	if !h.limiter.Allow() {
+		action.Err = ErrRateLimit
+		return ErrRateLimit
+	}
 
 	if err := h.client.Connect(ctx); err != nil {
 		action.Err = err

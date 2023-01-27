@@ -20,7 +20,7 @@ type MonitoringConfig struct {
 	Pprof          *PprofConfig          `yaml:"pprof" config:"pprof"`
 	MonitorTraces  bool                  `yaml:"traces" config:"traces"`
 	APM            APMConfig             `yaml:"apm,omitempty" config:"apm,omitempty" json:"apm,omitempty"`
-	Uploader       Uploader              `yaml:"uploader,omitempty" json:"uploader,omitempty"`
+	Diagnostics    Diagnostics           `yaml:"diagnostics,omitempty" json:"diagnostics,omitempty"`
 }
 
 // MonitoringHTTPConfig is a config defining HTTP endpoint published by agent
@@ -58,9 +58,9 @@ func DefaultConfig() *MonitoringConfig {
 			Host:    "localhost",
 			Port:    defaultPort,
 		},
-		Namespace: defaultNamespace,
-		APM:       defaultAPMConfig(),
-		Uploader:  defaultUploader(),
+		Namespace:   defaultNamespace,
+		APM:         defaultAPMConfig(),
+		Diagnostics: defaultDiagnostics(),
 	}
 }
 
@@ -97,5 +97,31 @@ func defaultUploader() Uploader {
 		MaxRetries: 10,
 		InitDur:    time.Second,
 		MaxDur:     time.Minute * 10,
+	}
+}
+
+// Limit contains the configuration for rate-limiting operations
+type Limit struct {
+	Interval time.Duration `config:"interval"`
+	Burst    int           `config:"burst"`
+}
+
+func defaultLimit() Limit {
+	return Limit{
+		Interval: time.Minute,
+		Burst:    1,
+	}
+}
+
+// Diagnostics containts the configuration needed to configure the diagnostics handler.
+type Diagnostics struct {
+	Uploader Uploader `config:"uploader"`
+	Limit    Limit    `config:"limit"`
+}
+
+func defaultDiagnostics() Diagnostics {
+	return Diagnostics{
+		Uploader: defaultUploader(),
+		Limit:    defaultLimit(),
 	}
 }
