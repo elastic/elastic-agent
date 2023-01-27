@@ -113,7 +113,7 @@ func defaultLimit() Limit {
 	}
 }
 
-// Diagnostics containts the configuration needed to configure the diagnostics handler.
+// Diagnostics contains the configuration needed to configure the diagnostics handler.
 type Diagnostics struct {
 	Uploader Uploader `config:"uploader"`
 	Limit    Limit    `config:"limit"`
