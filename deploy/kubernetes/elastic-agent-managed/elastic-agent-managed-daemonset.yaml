@@ -64,6 +64,8 @@ spec:
                   fieldPath: metadata.name
           securityContext:
             runAsUser: 0
+            # Needed for 'Defend for containers' integration (cloud-defend)
+            # privileged: true
           resources:
             limits:
               memory: 500Mi
@@ -92,16 +94,17 @@ spec:
             - name: etc-mid
               mountPath: /etc/machine-id
               readOnly: true
-            - name: boot
-              mountPath: /boot
-              readOnly: true
-            - name: sys-kernel-debug
-              mountPath: /sys/kernel/debug
-            - name: sys-fs-bpf
-              mountPath: /sys/fs/bpf
-            - name: sys-kernel-security
-              mountPath: /sys/kernel/security
-              readOnly: true
+            # Needed for 'Defend for containers' integration (cloud-defend)
+            # - name: boot
+            #   mountPath: /boot
+            #   readOnly: true
+            # - name: sys-kernel-debug
+            #   mountPath: /sys/kernel/debug
+            # - name: sys-fs-bpf
+            #   mountPath: /sys/fs/bpf
+            # - name: sys-kernel-security
+            #   mountPath: /sys/kernel/security
+            #   readOnly: true
       volumes:
         - name: proc
           hostPath:
@@ -130,18 +133,16 @@ spec:
           hostPath:
             path: /etc/machine-id
             type: File
-        # The following volumes are needed for 'Defend for containers' integration (cloud-defend)
-        # If you are not using this integration, then these volumes and the corresponding
-        # mounts can be removed.
-        - name: boot
-          hostPath:
-            path: /boot
-        - name: sys-kernel-debug
-          hostPath:
-            path: /sys/kernel/debug
-        - name: sys-fs-bpf
-          hostPath:
-            path: /sys/fs/bpf
-        - name: sys-kernel-security
-          hostPath:
-            path: /sys/kernel/security
+        # Needed for 'Defend for containers' integration (cloud-defend)
+        # - name: boot
+        #   hostPath:
+        #     path: /boot
+        # - name: sys-kernel-debug
+        #   hostPath:
+        #     path: /sys/kernel/debug
+        # - name: sys-fs-bpf
+        #   hostPath:
+        #     path: /sys/fs/bpf
+        # - name: sys-kernel-security
+        #   hostPath:
+        #     path: /sys/kernel/security
