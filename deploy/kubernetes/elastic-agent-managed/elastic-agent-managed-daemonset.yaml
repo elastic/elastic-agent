@@ -65,7 +65,7 @@ spec:
           securityContext:
             runAsUser: 0
             # Needed for 'Defend for containers' integration (cloud-defend)
-            # privileged: true
+            #privileged: true
           resources:
             limits:
               memory: 500Mi
@@ -95,16 +95,16 @@ spec:
               mountPath: /etc/machine-id
               readOnly: true
             # Needed for 'Defend for containers' integration (cloud-defend)
-            # - name: boot
-            #   mountPath: /boot
-            #   readOnly: true
-            # - name: sys-kernel-debug
-            #   mountPath: /sys/kernel/debug
-            # - name: sys-fs-bpf
-            #   mountPath: /sys/fs/bpf
-            # - name: sys-kernel-security
-            #   mountPath: /sys/kernel/security
-            #   readOnly: true
+            #- name: boot
+            #  mountPath: /boot
+            #  readOnly: true
+            #- name: sys-kernel-debug
+            #  mountPath: /sys/kernel/debug
+            #- name: sys-fs-bpf
+            #  mountPath: /sys/fs/bpf
+            #- name: sys-kernel-security
+            #  mountPath: /sys/kernel/security
+            #  readOnly: true
       volumes:
         - name: proc
           hostPath:
@@ -134,15 +134,15 @@ spec:
             path: /etc/machine-id
             type: File
         # Needed for 'Defend for containers' integration (cloud-defend)
-        # - name: boot
-        #   hostPath:
-        #     path: /boot
-        # - name: sys-kernel-debug
-        #   hostPath:
-        #     path: /sys/kernel/debug
-        # - name: sys-fs-bpf
-        #   hostPath:
-        #     path: /sys/fs/bpf
-        # - name: sys-kernel-security
-        #   hostPath:
-        #     path: /sys/kernel/security
+        #- name: boot
+        #  hostPath:
+        #    path: /boot
+        #- name: sys-kernel-debug
+        #  hostPath:
+        #    path: /sys/kernel/debug
+        #- name: sys-fs-bpf
+        #  hostPath:
+        #    path: /sys/fs/bpf
+        #- name: sys-kernel-security
+        #  hostPath:
+        #    path: /sys/kernel/security
