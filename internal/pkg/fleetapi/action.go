@@ -444,7 +444,7 @@ func (a *ActionDiagnostics) AckEvent() AckEvent {
 	}
 	if a.UploadID != "" {
 		var data struct {
-			UploadID string `json:"file_id"`
+			UploadID string `json:"upload_id"`
 		}
 		data.UploadID = a.UploadID
 		p, _ := json.Marshal(data)
