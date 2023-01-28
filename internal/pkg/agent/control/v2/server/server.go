@@ -35,6 +35,7 @@ import (
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
+
 	logger     *logger.Logger
 	agentInfo  *info.AgentInfo
 	coord      *coordinator.Coordinator

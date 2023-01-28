@@ -221,7 +221,7 @@ func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.Diagnosti
 
 	// Should we support json too?
 	if fr.ContentType == "application/yaml" {
-		unmarshalled := map[string]interface{}{}
+		unmarshalled := map[interface{}]interface{}{}
 		err := yaml.Unmarshal(fr.Content, &unmarshalled)
 		if err != nil {
 			// Best effort, output a warning but still include the file
