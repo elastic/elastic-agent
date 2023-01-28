@@ -1025,6 +1025,7 @@ func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) 
 	}
 
 	pc := &struct {
+		Headers        map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
 		LogLevel       string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
 		MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
 	}{

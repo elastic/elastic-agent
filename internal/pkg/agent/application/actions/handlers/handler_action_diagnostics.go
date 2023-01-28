@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -115,7 +116,7 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 			Filename:    hook.Filename,
 			Description: hook.Description,
 			ContentType: hook.ContentType,
-			Content:     hook.Hook(),
+			Content:     hook.Hook(ctx),
 			Generated:   time.Now().UTC(),
 		})
 	}
@@ -129,10 +130,10 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 		diag := client.DiagnosticUnitResult{
 			ComponentID: r.Component.ID,
 			UnitID:      r.Unit.ID,
-			UnitType:    r.Unit.Type,
+			UnitType:    cproto.UnitType(r.Unit.Type),
 		}
 		if r.Err != nil {
-			diag.Error = r.Err.Error()
+			diag.Err = r.Err
 		} else {
 			results := make([]client.DiagnosticFileResult, 0, len(r.Results))
 			for _, res := range r.Results {
@@ -142,7 +143,7 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 					Description: res.Description,
 					ContentType: res.ContentType,
 					Content:     res.Content,
-					Generated:   res.Generated,
+					Generated:   res.Generated.AsTime(),
 				})
 			}
 			diag.Results = results

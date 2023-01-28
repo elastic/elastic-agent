@@ -477,6 +477,15 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 						},
 					},
 				},
+				map[string]interface{}{
+					// injecting component log source to stay aligned with command runtime logs
+					"add_fields": map[string]interface{}{
+						"target": "log",
+						"fields": map[string]interface{}{
+							"source": comp.ID,
+						},
+					},
+				},
 			},
 		})
 	}

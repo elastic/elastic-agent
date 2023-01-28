@@ -284,7 +284,7 @@ func redactKey(k string) bool {
 // zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
 func zipLogs(zw *zip.Writer, ts time.Time) error {
 	_, err := zw.CreateHeader(&zip.FileHeader{
-		Name:     "logs",
+		Name:     "logs/",
 		Method:   zip.Deflate,
 		Modified: ts,
 	})
