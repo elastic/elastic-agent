@@ -353,6 +353,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		&fleetapi.ActionDiagnostics{},
 		handlers.NewDiagnostics(
 			m.log,
+			m.coord,
 			m.cfg.Settings.MonitoringConfig.Diagnostics.Limit,
 			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),
 		),

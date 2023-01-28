@@ -8,8 +8,12 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime/pprof"
 	"strings"
@@ -17,8 +21,10 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -34,7 +40,7 @@ type Hook struct {
 	Filename    string
 	Description string
 	ContentType string
-	Hook        func(ctx context.Context) ([]byte, time.Time)
+	Hook        func(ctx context.Context) []byte
 }
 
 // Hooks is a set of diagnostic hooks.
@@ -48,13 +54,13 @@ func GlobalHooks() Hooks {
 			Filename:    "version.txt",
 			Description: "version information",
 			ContentType: "application/yaml",
-			Hook: func(_ context.Context) ([]byte, time.Time) {
+			Hook: func(_ context.Context) []byte {
 				v := release.Info()
 				o, err := yaml.Marshal(v)
 				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err)), time.Now().UTC()
+					return []byte(fmt.Sprintf("error: %q", err))
 				}
-				return o, time.Now().UTC()
+				return o
 			},
 		},
 		{
@@ -102,52 +108,38 @@ func GlobalHooks() Hooks {
 	}
 }
 
-func pprofDiag(name string) func(context.Context) ([]byte, time.Time) {
-	return func(_ context.Context) ([]byte, time.Time) {
+func pprofDiag(name string) func(context.Context) []byte {
+	return func(_ context.Context) []byte {
 		var w bytes.Buffer
 		err := pprof.Lookup(name).WriteTo(&w, 1)
 		if err != nil {
 			// error is returned as the content
-			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err)), time.Now().UTC()
+			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err))
 		}
-		return w.Bytes(), time.Now().UTC()
+		return w.Bytes()
 	}
 }
 
-// ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics.
+// ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics and local logs.
 // If any error is encountered when writing the contents of the archive it is returned.
 func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
 	ts := time.Now().UTC()
 	zw := zip.NewWriter(w)
 	defer zw.Close()
-	// Create directories in the zip archive before writing any files
-	for _, ad := range agentDiag {
-		if ad.ContentType == ContentTypeDirectory {
-			_, err := zw.CreateHeader(&zip.FileHeader{
-				Name:     ad.Filename,
-				Method:   zip.Deflate,
-				Modified: ts,
-			})
-			if err != nil {
-				return err
-			}
-		}
-	}
+
 	// Write agent diagnostics content
 	for _, ad := range agentDiag {
-		if ad.ContentType != ContentTypeDirectory {
-			zf, err := zw.CreateHeader(&zip.FileHeader{
-				Name:     ad.Filename,
-				Method:   zip.Deflate,
-				Modified: ad.Generated,
-			})
-			if err != nil {
-				return err
-			}
-			err = writeRedacted(errOut, zf, ad.Filename, ad)
-			if err != nil {
-				return err
-			}
+		zf, err := zw.CreateHeader(&zip.FileHeader{
+			Name:     ad.Filename,
+			Method:   zip.Deflate,
+			Modified: ad.Generated,
+		})
+		if err != nil {
+			return err
+		}
+		err = writeRedacted(errOut, zf, ad.Filename, ad)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -219,7 +211,9 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 			}
 		}
 	}
-	return nil
+
+	// Gather Logs:
+	return zipLogs(zw, ts)
 }
 
 func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.DiagnosticFileResult) error {
@@ -285,4 +279,121 @@ func redactKey(k string) bool {
 		strings.Contains(k, "password") ||
 		strings.Contains(k, "token") ||
 		strings.Contains(k, "key")
+}
+
+// zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
+func zipLogs(zw *zip.Writer, ts time.Time) error {
+	_, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := collectServiceComponentsLogs(zw); err != nil {
+		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
+	}
+
+	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
+	logPath := filepath.Join(paths.Home(), "logs") + string(filepath.Separator)
+	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+		if errors.Is(fErr, fs.ErrNotExist) {
+			return nil
+		}
+		if fErr != nil {
+			return fmt.Errorf("unable to walk log dir: %w", fErr)
+		}
+
+		// name is the relative dir/file name replacing any filepath seperators with /
+		// this will clean log names on windows machines and will nop on *nix
+		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
+		if name == "" {
+			return nil
+		}
+
+		if d.IsDir() {
+			_, err := zw.CreateHeader(&zip.FileHeader{
+				Name:     "logs" + name + "/",
+				Method:   zip.Deflate,
+				Modified: ts,
+			})
+			if err != nil {
+				return fmt.Errorf("unable to create log directory in archive: %w", err)
+			}
+			return nil
+		}
+
+		return saveLogs(name, path, zw)
+	})
+}
+
+func collectServiceComponentsLogs(zw *zip.Writer) error {
+	platform, err := component.LoadPlatformDetail()
+	if err != nil {
+		return fmt.Errorf("failed to gather system information: %w", err)
+	}
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
+	if err != nil {
+		return fmt.Errorf("failed to detect inputs and outputs: %w", err)
+	}
+	for _, spec := range specs.ServiceSpecs() {
+		if spec.Spec.Service.Log == nil || spec.Spec.Service.Log.Path == "" {
+			// no log path set in specification
+			continue
+		}
+
+		logPath := filepath.Dir(spec.Spec.Service.Log.Path) + string(filepath.Separator)
+		err = filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
+			if fErr != nil {
+				if errors.Is(fErr, fs.ErrNotExist) {
+					return nil
+				}
+
+				return fmt.Errorf("unable to walk log directory %q for service input %s: %w", logPath, spec.InputType, fErr)
+			}
+
+			name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
+			if name == "" {
+				return nil
+			}
+
+			if d.IsDir() {
+				return nil
+			}
+
+			return saveLogs("services/"+name, path, zw)
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func saveLogs(name string, logPath string, zw *zip.Writer) error {
+	ts := time.Now().UTC()
+	lf, err := os.Open(logPath)
+	if err != nil {
+		return fmt.Errorf("unable to open log file: %w", err)
+	}
+	defer lf.Close()
+	if li, err := lf.Stat(); err == nil {
+		ts = li.ModTime()
+	}
+	zf, err := zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/" + name,
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(zf, lf)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 
@@ -34,25 +35,25 @@ import (
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
-	logger      *logger.Logger
-	agentInfo   *info.AgentInfo
-	coord       *coordinator.Coordinator
-	listener    net.Listener
-	server      *grpc.Server
-	tracer      *apm.Tracer
-	grpcConfig  *configuration.GRPCConfig
-	diagHooksFn []func() diagnostics.Hooks
+	logger     *logger.Logger
+	agentInfo  *info.AgentInfo
+	coord      *coordinator.Coordinator
+	listener   net.Listener
+	server     *grpc.Server
+	tracer     *apm.Tracer
+	diagHooks  diagnostics.Hooks
+	grpcConfig *configuration.GRPCConfig
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, grpcConfig *configuration.GRPCConfig, diagHooksFn ...func() diagnostics.Hooks) *Server {
+func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig) *Server {
 	return &Server{
-		logger:      log,
-		agentInfo:   agentInfo,
-		coord:       coord,
-		tracer:      tracer,
-		grpcConfig:  grpcConfig,
-		diagHooksFn: diagHooksFn,
+		logger:     log,
+		agentInfo:  agentInfo,
+		coord:      coord,
+		tracer:     tracer,
+		diagHooks:  diagHooks,
+		grpcConfig: grpcConfig,
 	}
 }
 
@@ -187,24 +188,19 @@ func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*
 
 // DiagnosticAgent returns diagnostic information for this running Elastic Agent.
 func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentRequest) (*cproto.DiagnosticAgentResponse, error) {
-	diagHooks := make([]diagnostics.Hook, 0)
-	for _, fn := range s.diagHooksFn {
-		hooks := fn()
-		diagHooks = append(diagHooks, hooks...)
-	}
-	res := make([]*cproto.DiagnosticFileResult, 0, len(diagHooks))
-	for _, h := range diagHooks {
+	res := make([]*cproto.DiagnosticFileResult, 0, len(s.diagHooks))
+	for _, h := range s.diagHooks {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		r, ts := h.Hook(ctx)
+		r := h.Hook(ctx)
 		res = append(res, &cproto.DiagnosticFileResult{
 			Name:        h.Name,
 			Filename:    h.Filename,
 			Description: h.Description,
 			ContentType: h.ContentType,
 			Content:     r,
-			Generated:   timestamppb.New(ts),
+			Generated:   timestamppb.New(time.Now().UTC()),
 		})
 	}
 	if ctx.Err() != nil {

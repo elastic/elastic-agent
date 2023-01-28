@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
@@ -35,17 +36,17 @@ type Uploader interface {
 // When a Diagnostics action is received a full diagnostics bundle is taken and uploaded to fleet-server.
 type Diagnostics struct {
 	log      *logger.Logger
+	coord    *coordinator.Coordinator
 	limiter  *rate.Limiter
-	client   client.Client
 	uploader Uploader
 }
 
 // NewDiagnostics returns a new Diagnostics handler.
-func NewDiagnostics(log *logger.Logger, cfg config.Limit, uploader Uploader) *Diagnostics {
+func NewDiagnostics(log *logger.Logger, coord *coordinator.Coordinator, cfg config.Limit, uploader Uploader) *Diagnostics {
 	return &Diagnostics{
 		log:      log,
+		coord:    coord,
 		limiter:  rate.NewLimiter(rate.Every(cfg.Interval), cfg.Burst),
-		client:   client.New(),
 		uploader: uploader,
 	}
 }
@@ -65,24 +66,14 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 		return ErrRateLimit
 	}
 
-	if err := h.client.Connect(ctx); err != nil {
-		action.Err = err
-		return fmt.Errorf("failed to connect to control server: %w", err)
-	}
-
 	h.log.Debug("Gathering agent diagnostics.")
-	// Gather agent diagnostics
-	aDiag, err := h.client.DiagnosticAgent(ctx)
+	aDiag, err := h.runHooks(ctx)
 	if err != nil {
 		action.Err = err
 		return fmt.Errorf("unable to gather agent diagnostics: %w", err)
 	}
 	h.log.Debug("Gathering unit diagnostics.")
-	uDiag, err := h.client.DiagnosticUnits(ctx)
-	if err != nil {
-		action.Err = err
-		return fmt.Errorf("unable to gather unit diagnostics: %w", err)
-	}
+	uDiag := h.diagUnits(ctx)
 
 	var b bytes.Buffer
 	// create a buffer that any redaction error messages are written into as warnings.
@@ -95,7 +86,7 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 		}
 	}()
 	h.log.Debug("Assembling diagnostics archive.")
-	err = diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag) // TODO Do we want to pass a buffer/a reader around? or write the file to a temp dir and read (to avoid memory usage)? file usage may need more thought for containerized deployments
+	err = diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag)
 	if err != nil {
 		action.Err = err
 		return fmt.Errorf("error creating diagnostics bundle: %w", err)
@@ -110,4 +101,53 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	}
 	h.log.Debugf("Diagnostics action '%+v' complete.", a)
 	return nil
+}
+
+func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResult, error) {
+	hooks := append(h.coord.DiagnosticHooks(), diagnostics.GlobalHooks()...)
+	diags := make([]client.DiagnosticFileResult, 0, len(hooks))
+	for _, hook := range hooks {
+		if ctx.Err != nil {
+			return diags, ctx.Err()
+		}
+		diags = append(diags, client.DiagnosticFileResult{
+			Name:        hook.Name,
+			Filename:    hook.Filename,
+			Description: hook.Description,
+			ContentType: hook.ContentType,
+			Content:     hook.Hook(),
+			Generated:   time.Now().UTC(),
+		})
+	}
+	return diags, nil
+}
+
+func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResult {
+	uDiag := make([]client.DiagnosticUnitResult, 0)
+	rr := h.coord.PerformDiagnostics(ctx)
+	for _, r := range rr {
+		diag := client.DiagnosticUnitResult{
+			ComponentID: r.Component.ID,
+			UnitID:      r.Unit.ID,
+			UnitType:    r.Unit.Type,
+		}
+		if r.Err != nil {
+			diag.Error = r.Err.Error()
+		} else {
+			results := make([]client.DiagnosticFileResult, 0, len(r.Results))
+			for _, res := range r.Results {
+				results = append(results, client.DiagnosticFileResult{
+					Name:        res.Name,
+					Filename:    res.Filename,
+					Description: res.Description,
+					ContentType: res.ContentType,
+					Content:     res.Content,
+					Generated:   res.Generated,
+				})
+			}
+			diag.Results = results
+		}
+		uDiag = append(uDiag, diag)
+	}
+	return uDiag
 }
