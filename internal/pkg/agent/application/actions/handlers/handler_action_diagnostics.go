@@ -108,7 +108,7 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 	hooks := append(h.coord.DiagnosticHooks(), diagnostics.GlobalHooks()...)
 	diags := make([]client.DiagnosticFileResult, 0, len(hooks))
 	for _, hook := range hooks {
-		if ctx.Err != nil {
+		if ctx.Err() != nil {
 			return diags, ctx.Err()
 		}
 		diags = append(diags, client.DiagnosticFileResult{

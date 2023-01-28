@@ -241,30 +241,19 @@ func writeRedacted(errOut, w io.Writer, fullFilePath string, fr client.Diagnosti
 	return err
 }
 
-func redactMap(m map[string]interface{}) map[string]interface{} {
+func redactMap(m map[interface{}]interface{}) map[interface{}]interface{} {
 	for k, v := range m {
 		if v != nil && reflect.TypeOf(v).Kind() == reflect.Map {
-			v = redactMap(toMapStr(v))
+			v = redactMap(v.(map[interface{}]interface{}))
 		}
-		if redactKey(k) {
-			v = REDACTED
+		if s, ok := k.(string); ok {
+			if redactKey(s) {
+				v = REDACTED
+			}
+			m[k] = v
 		}
-		m[k] = v
 	}
 	return m
-}
-
-func toMapStr(v interface{}) map[string]interface{} {
-	mm := map[string]interface{}{}
-	m, ok := v.(map[interface{}]interface{})
-	if !ok {
-		return mm
-	}
-
-	for k, v := range m {
-		mm[k.(string)] = v
-	}
-	return mm
 }
 
 func redactKey(k string) bool {
