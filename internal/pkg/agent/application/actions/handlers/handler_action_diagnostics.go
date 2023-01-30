@@ -60,7 +60,10 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 		return fmt.Errorf("invalid type, expected ActionDiagnostics and received %T", a)
 	}
 	ts := time.Now().UTC()
-	defer ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
+	defer func() {
+		ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
+		ack.Commit(ctx)      //nolint:errcheck //no path for failing a commit
+	}()
 
 	if !h.limiter.Allow() {
 		action.Err = ErrRateLimit
