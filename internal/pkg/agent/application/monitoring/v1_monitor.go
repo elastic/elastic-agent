@@ -726,7 +726,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				"metricsets":    []interface{}{"json"},
 				"hosts":         endpoints,
 				"path":          "/inputs/",
-				"namespace":     "agent",
+				"namespace":     "filebeat_input",
 				"json.is_array": true,
 				"period":        "10s",
 				"index":         fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
@@ -949,6 +949,12 @@ func httpCopyRules() []interface{} {
 		map[string]interface{}{
 			"from": "http.agent.apm-server",
 			"to":   "apm-server",
+		},
+
+		// I should be able to see the filebeat input metrics
+		map[string]interface{}{
+			"from": "http.filebeat_input",
+			"to":   "elastic_agent.filebeat_input",
 		},
 	}
 
