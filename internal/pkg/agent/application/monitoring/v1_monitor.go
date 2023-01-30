@@ -759,6 +759,13 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 						},
 					},
 					map[string]interface{}{
+						"copy_fields": map[string]interface{}{
+							"fields":         httpCopyRules(),
+							"ignore_missing": true,
+							"fail_on_error":  false,
+						},
+					},
+					map[string]interface{}{
 						"drop_fields": map[string]interface{}{
 							"fields": []interface{}{
 								"http",
