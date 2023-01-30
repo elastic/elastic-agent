@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -324,6 +325,7 @@ func TestEnroll(t *testing.T) {
 			require.False(t, store.Called)
 		},
 	))
+
 }
 
 func TestValidateArgs(t *testing.T) {
@@ -370,6 +372,62 @@ func TestValidateArgs(t *testing.T) {
 	require.Contains(t, cleanedTags, "windows")
 	require.NotContains(t, cleanedTags, " ")
 	require.NotContains(t, cleanedTags, "")
+}
+
+func TestPrepareFleetTLS(t *testing.T) {
+	log, _ := logger.New("tst", false)
+	t.Run("fleet-server insecure", func(t *testing.T) {
+		store := &mockStore{}
+		cmd, err := newEnrollCmdWithStore(
+			log,
+			&enrollCmdOption{
+				FleetServer: enrollCmdFleetServerOption{
+					ConnStr:      "https://localhost:9200",
+					ServiceToken: "test-service-token",
+					PolicyID:     "test-fleet-policy",
+					Insecure:     true,
+				},
+			},
+			"",
+			store,
+		)
+		require.NoError(t, err)
+		err = cmd.prepareFleetTLS()
+		require.NoError(t, err)
+
+		assert.True(t, cmd.options.Insecure)
+		assert.Equal(t, "http://localhost:8220", cmd.options.URL)
+		assert.Equal(t, "localhost:8221", cmd.options.InternalURL)
+
+		assert.Equal(t, "", cmd.options.FleetServer.Host)
+	})
+	t.Run("fleet-server secure", func(t *testing.T) {
+		store := &mockStore{}
+		cmd, err := newEnrollCmdWithStore(
+			log,
+			&enrollCmdOption{
+				FleetServer: enrollCmdFleetServerOption{
+					ConnStr:      "https://localhost:9200",
+					ServiceToken: "test-service-token",
+					PolicyID:     "test-fleet-policy",
+				},
+			},
+			"",
+			store,
+		)
+		require.NoError(t, err)
+		err = cmd.prepareFleetTLS()
+		require.NoError(t, err)
+
+		assert.False(t, cmd.options.Insecure)
+		assert.NotEmpty(t, cmd.options.FleetServer.Cert)
+		assert.NotEmpty(t, cmd.options.FleetServer.CertKey)
+		assert.Equal(t, "https://localhost:8220", cmd.options.URL)
+		assert.NotEmpty(t, cmd.options.FleetServer.CAs)
+		assert.Equal(t, "localhost:8221", cmd.options.InternalURL)
+
+		assert.Equal(t, "", cmd.options.FleetServer.Host)
+	})
 }
 
 func withServer(
