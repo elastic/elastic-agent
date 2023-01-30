@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -18,7 +20,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -43,7 +44,7 @@ func (m *mockStore) Save(in io.Reader) error {
 	}
 
 	buf := new(bytes.Buffer)
-	io.Copy(buf, in) // nolint:errcheck //not required
+	io.Copy(buf, in) //nolint:errcheck // not required
 	m.Content = buf.Bytes()
 	return nil
 }
@@ -397,7 +398,6 @@ func TestPrepareFleetTLS(t *testing.T) {
 
 		assert.True(t, cmd.options.Insecure)
 		assert.Equal(t, "http://localhost:8220", cmd.options.URL)
-		assert.Equal(t, "localhost:8221", cmd.options.InternalURL)
 
 		assert.Equal(t, "", cmd.options.FleetServer.Host)
 	})
@@ -422,9 +422,10 @@ func TestPrepareFleetTLS(t *testing.T) {
 		assert.False(t, cmd.options.Insecure)
 		assert.NotEmpty(t, cmd.options.FleetServer.Cert)
 		assert.NotEmpty(t, cmd.options.FleetServer.CertKey)
-		assert.Equal(t, "https://localhost:8220", cmd.options.URL)
 		assert.NotEmpty(t, cmd.options.CAs)
-		assert.Equal(t, "localhost:8221", cmd.options.InternalURL)
+
+		hostname, _ := os.Hostname()
+		assert.Equal(t, fmt.Sprintf("https://%s:8220", hostname), cmd.options.URL)
 
 		assert.Equal(t, "", cmd.options.FleetServer.Host)
 	})
@@ -460,7 +461,7 @@ func withTLSServer(
 
 		port := listener.Addr().(*net.TCPAddr).Port
 
-		s := http.Server{
+		s := http.Server{ //nolint:gosec // test server config
 			Handler: m(t),
 			TLSConfig: &tls.Config{
 				Certificates: []tls.Certificate{serverCert},
@@ -469,7 +470,7 @@ func withTLSServer(
 		}
 
 		// Uses the X509KeyPair pair defined in the TLSConfig struct instead of file on disk.
-		go s.ServeTLS(listener, "", "") // nolint:errcheck //not required
+		go s.ServeTLS(listener, "", "") //nolint:errcheck // not required
 
 		test(t, ca.Crt(), "localhost:"+strconv.Itoa(port))
 	}
@@ -480,7 +481,7 @@ func bytesToTMPFile(b []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	f.Write(b) // nolint:errcheck //not required
+	f.Write(b) //nolint:errcheck // not required
 	if err := f.Close(); err != nil {
 		return "", err
 	}
