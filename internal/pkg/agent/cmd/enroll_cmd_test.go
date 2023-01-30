@@ -423,7 +423,7 @@ func TestPrepareFleetTLS(t *testing.T) {
 		assert.NotEmpty(t, cmd.options.FleetServer.Cert)
 		assert.NotEmpty(t, cmd.options.FleetServer.CertKey)
 		assert.Equal(t, "https://localhost:8220", cmd.options.URL)
-		assert.NotEmpty(t, cmd.options.FleetServer.CAs)
+		assert.NotEmpty(t, cmd.options.CAs)
 		assert.Equal(t, "localhost:8221", cmd.options.InternalURL)
 
 		assert.Equal(t, "", cmd.options.FleetServer.Host)
