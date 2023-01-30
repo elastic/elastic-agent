@@ -183,15 +183,15 @@ func (c *Client) Finish(ctx context.Context, id string, r *FinishRequest) error 
 // UploadDiagnostics is a wrapper to upload a diagnostics request identified by the passed action id contained in the buffer to fleet-server.
 //
 // A buffer is used instead of a reader as we need to know the file length before uploading.
-func (c *Client) UploadDiagnostics(ctx context.Context, id string, b *bytes.Buffer) (string, error) {
+func (c *Client) UploadDiagnostics(ctx context.Context, actionId string, timestamp string, b *bytes.Buffer) (string, error) {
 	size := b.Len()
 	upReq := NewUploadRequest{
-		ActionID: id,
+		ActionID: actionId,
 		AgentID:  c.agentID,
 		Source:   "agent",
 		File: FileData{
 			Size:      int64(size),
-			Name:      fmt.Sprintf("elastic-agent-diagnostics-%s.zip", id),
+			Name:      fmt.Sprintf("elastic-agent-diagnostics-%s.zip", timestamp),
 			Extension: "zip",
 			Mime:      "application/zip",
 		},

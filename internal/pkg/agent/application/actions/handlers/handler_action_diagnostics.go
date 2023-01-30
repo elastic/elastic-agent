@@ -30,7 +30,7 @@ var ErrRateLimit = fmt.Errorf("rate limit exceeded")
 
 // Uploader is the interface used to upload a diagnostics bundle to fleet-server.
 type Uploader interface {
-	UploadDiagnostics(context.Context, string, *bytes.Buffer) (string, error)
+	UploadDiagnostics(context.Context, string, string, *bytes.Buffer) (string, error)
 }
 
 // Diagnostics is the handler to process Diagnostics actions.
@@ -94,7 +94,7 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	}
 
 	h.log.Debug("Sending diagnostics archive.")
-	uploadID, err := h.uploader.UploadDiagnostics(ctx, ts.Format("2006-01-02T15-04-05Z07-00"), &b) // RFC3339 format that uses - instead of : so it works on Windows
+	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, ts.Format("2006-01-02T15-04-05Z07-00"), &b) // RFC3339 format that uses - instead of : so it works on Windows
 	action.Err = err
 	action.UploadID = uploadID
 	if err != nil {
