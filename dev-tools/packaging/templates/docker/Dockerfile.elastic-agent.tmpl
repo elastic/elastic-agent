@@ -23,7 +23,7 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-agent-shipper || true) && \
-    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/prodfiler || true) && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chown root:root {} \; && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
 {{- range $i, $modulesd := .ModulesDirs }}
