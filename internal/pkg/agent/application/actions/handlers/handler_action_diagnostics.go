@@ -54,14 +54,30 @@ func NewDiagnostics(log *logger.Logger, coord *coordinator.Coordinator, cfg conf
 	}
 }
 
-// Handle processes the passed Diagnostics action.
+// Handle processes the passed Diagnostics action asynchronously.
+//
+// The handler has a rate limiter to limit the number of diagnostics actions that are run at once.
 func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker) error {
 	h.log.Debugf("handlerDiagnostics: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionDiagnostics)
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionDiagnostics and received %T", a)
 	}
+	go h.collectDiag(ctx, action, ack)
+	return nil
+}
+
+// collectDiag will attempt to assemble a diagnostics bundle and upload it with the file upload APIs on fleet-server.
+//
+// The bundle is assembled on disk, however if it encounters any errors an in-memory-buffer is used.
+func (h *Diagnostics) collectDiag(ctx context.Context, action *fleeetapi.ActioNDiagnostics, ack acker.Acker) {
 	ts := time.Now().UTC()
+	defer func() {
+		if err := recover(); err != nil {
+			action.Err = err
+			h.log.Errorw("diagnostics handler paniced", "err", err)
+		}
+	}()
 	defer func() {
 		ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
 		ack.Commit(ctx)      //nolint:errcheck //no path for failing a commit
@@ -69,14 +85,14 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 
 	if !h.limiter.Allow() {
 		action.Err = ErrRateLimit
-		return ErrRateLimit
+		return
 	}
 
 	h.log.Debug("Gathering agent diagnostics.")
 	aDiag, err := h.runHooks(ctx)
 	if err != nil {
 		action.Err = err
-		return fmt.Errorf("unable to gather agent diagnostics: %w", err)
+		return
 	}
 	h.log.Debug("Gathering unit diagnostics.")
 	uDiag := h.diagUnits(ctx)
@@ -114,12 +130,12 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	action.Err = err
 	action.UploadID = uploadID
 	if err != nil {
-		return fmt.Errorf("unable to upload diagnostics: %w", err)
+		return
 	}
 	h.log.Debugf("Diagnostics action '%+v' complete.", a)
-	return nil
 }
 
+// runHooks runs the agent diagnostics hooks.
 func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResult, error) {
 	hooks := append(h.coord.DiagnosticHooks(), diagnostics.GlobalHooks()...)
 	diags := make([]client.DiagnosticFileResult, 0, len(hooks))
@@ -139,6 +155,7 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 	return diags, nil
 }
 
+// diagUnits gathers diagnostics from units.
 func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResult {
 	uDiag := make([]client.DiagnosticUnitResult, 0)
 	rr := h.coord.PerformDiagnostics(ctx)
@@ -187,7 +204,7 @@ func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []clie
 		os.Remove(name)
 		return nil, 0, err
 	}
-	f.Sync()
+	_ = f.Sync()
 
 	_, err = f.Seek(0, 0)
 	if err != nil {
