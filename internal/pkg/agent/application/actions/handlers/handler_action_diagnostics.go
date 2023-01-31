@@ -70,7 +70,7 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 // collectDiag will attempt to assemble a diagnostics bundle and upload it with the file upload APIs on fleet-server.
 //
 // The bundle is assembled on disk, however if it encounters any errors an in-memory-buffer is used.
-func (h *Diagnostics) collectDiag(ctx context.Context, action *fleeetapi.ActioNDiagnostics, ack acker.Acker) {
+func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActioNDiagnostics, ack acker.Acker) {
 	ts := time.Now().UTC()
 	defer func() {
 		if err := recover(); err != nil {
@@ -114,7 +114,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleeetapi.ActioND
 		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag)
 		if err != nil {
 			action.Err = err
-			return fmt.Errorf("error creating diagnostics bundle: %w", err)
+			return
 		}
 		r = &b
 		s = int64(b.Len())
@@ -132,7 +132,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleeetapi.ActioND
 	if err != nil {
 		return
 	}
-	h.log.Debugf("Diagnostics action '%+v' complete.", a)
+	h.log.Debugf("Diagnostics action '%+v' complete.", action)
 }
 
 // runHooks runs the agent diagnostics hooks.
