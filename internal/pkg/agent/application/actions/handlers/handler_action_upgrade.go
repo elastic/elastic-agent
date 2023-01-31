@@ -33,7 +33,10 @@ func NewUpgrade(log *logger.Logger, coord *coordinator.Coordinator) *Upgrade {
 	}
 }
 
-// Handle handles UPGRADE action.
+// Handle handles UPGRADE action.  Returns immediately and the actual
+// upgrade happens asynchronously.  This allows for downloads to
+// happen without blocking updates.  If a second UPGRADE action is
+// received before the first is completed, then an error is returned.
 func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker) error {
 	h.log.Debugf("handlerUpgrade: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionUpgrade)
