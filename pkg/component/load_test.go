@@ -85,6 +85,10 @@ func TestLoadSpec_Components(t *testing.T) {
 			Name: "Packetbeat",
 			Path: "packetbeat.spec.yml",
 		},
+		{
+			Name: "Universal Profiling Agent",
+			Path: "pf-host-agent.spec.yml",
+		},
 	}
 
 	for _, scenario := range scenarios {
