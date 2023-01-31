@@ -720,7 +720,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				idKey: "metrics-monitoring-" + name + "-1",
 				"data_stream": map[string]interface{}{
 					"type":      "metrics",
-					"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+					"dataset":   fmt.Sprintf("elastic_agent.%s", name),
 					"namespace": monitoringNamespace,
 				},
 				"metricsets":    []interface{}{"json"},
@@ -729,13 +729,13 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				"namespace":     "filebeat_input",
 				"json.is_array": true,
 				"period":        "10s",
-				"index":         fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
+				"index":         fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
 				"processors": []interface{}{
 					map[string]interface{}{
 						"add_fields": map[string]interface{}{
 							"target": "event",
 							"fields": map[string]interface{}{
-								"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
+								"dataset": fmt.Sprintf("elastic_agent.%s", name),
 							},
 						},
 					},
@@ -961,7 +961,7 @@ func httpCopyRules() []interface{} {
 		// I should be able to see the filebeat input metrics
 		map[string]interface{}{
 			"from": "http.filebeat_input",
-			"to":   "elastic_agent.filebeat_input",
+			"to":   "filebeat.filebeat_input",
 		},
 	}
 
