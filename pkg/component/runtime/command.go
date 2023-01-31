@@ -553,11 +553,11 @@ func newRateLimiter(restartMonitoringPeriod time.Duration, maxEventsPerPeriod in
 		return nil
 	}
 
-	freq := restartMonitoringPeriod.Seconds()
+	period := restartMonitoringPeriod.Seconds()
 	events := float64(maxEventsPerPeriod)
-	perSecond := events / freq
-	if perSecond > 0 {
-		bucketSize := rate.Limit(perSecond)
+	frequency := events / period
+	if frequency > 0 {
+		bucketSize := rate.Limit(frequency)
 		return rate.NewLimiter(bucketSize, maxEventsPerPeriod)
 	}
 
