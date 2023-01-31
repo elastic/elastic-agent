@@ -73,7 +73,8 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDiagnostics, ack acker.Acker) {
 	ts := time.Now().UTC()
 	defer func() {
-		if err := recover(); err != nil {
+		if r := recover(); r != nil {
+			err := fmt.Errorf("panic detected: %v", r)
 			action.Err = err
 			h.log.Errorw("diagnostics handler paniced", "err", err)
 		}
