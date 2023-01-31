@@ -123,6 +123,9 @@ func New(id string, c client.Sender, cfg config.Uploader) *Client {
 }
 
 // New sends a new file upload request to the fleet-server.
+//
+// Request may return a 400 if the specified file.size is too large.
+// Default max file size is 100mb
 func (c *Client) New(ctx context.Context, r *NewUploadRequest) (*NewUploadResponse, error) {
 	b, err := json.Marshal(r)
 	if err != nil {
@@ -181,16 +184,13 @@ func (c *Client) Finish(ctx context.Context, id string, r *FinishRequest) error 
 }
 
 // UploadDiagnostics is a wrapper to upload a diagnostics request identified by the passed action id contained in the buffer to fleet-server.
-//
-// A buffer is used instead of a reader as we need to know the file length before uploading.
-func (c *Client) UploadDiagnostics(ctx context.Context, actionId string, timestamp string, b *bytes.Buffer) (string, error) {
-	size := b.Len()
+func (c *Client) UploadDiagnostics(ctx context.Context, actionId string, timestamp string, size int64, r io.Reader) (string, error) {
 	upReq := NewUploadRequest{
 		ActionID: actionId,
 		AgentID:  c.agentID,
 		Source:   "agent",
 		File: FileData{
-			Size:      int64(size),
+			Size:      size,
 			Name:      fmt.Sprintf("elastic-agent-diagnostics-%s.zip", timestamp),
 			Extension: "zip",
 			Mime:      "application/zip",
@@ -207,7 +207,7 @@ func (c *Client) UploadDiagnostics(ctx context.Context, actionId string, timesta
 	transitHash := sha256.New()
 	for chunk := 0; chunk < totalChunks; chunk++ {
 		var data bytes.Buffer
-		io.CopyN(&data, b, chunkSize) //nolint:errcheck // copy chunkSize bytes to a buffer so we can get the checksum
+		io.CopyN(&data, r, chunkSize) //nolint:errcheck // copy chunkSize bytes to a buffer so we can get the checksum
 		hash := sha256.Sum256(data.Bytes())
 		err := c.Chunk(ctx, uploadID, chunk, hash[:], &data) // hash[:] uses the array as a slice
 		if err != nil {

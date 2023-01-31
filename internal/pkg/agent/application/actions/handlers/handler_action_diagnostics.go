@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -30,7 +32,7 @@ var ErrRateLimit = fmt.Errorf("rate limit exceeded")
 
 // Uploader is the interface used to upload a diagnostics bundle to fleet-server.
 type Uploader interface {
-	UploadDiagnostics(context.Context, string, string, *bytes.Buffer) (string, error)
+	UploadDiagnostics(context.Context, string, string, int64, io.Reader) (string, error)
 }
 
 // Diagnostics is the handler to process Diagnostics actions.
@@ -79,25 +81,36 @@ func (h *Diagnostics) Handle(ctx context.Context, a fleetapi.Action, ack acker.A
 	h.log.Debug("Gathering unit diagnostics.")
 	uDiag := h.diagUnits(ctx)
 
-	var b bytes.Buffer
-	// create a buffer that any redaction error messages are written into as warnings.
-	// if the buffer is not empty after the bundle is assembled then the message is written to the log
-	// zapio.Writer would be a better way to pass a writer to ZipArchive, but logp embeds the zap.Logger so we are unable to access it here.
-	var wBuf bytes.Buffer
-	defer func() {
-		if str := wBuf.String(); str != "" {
-			h.log.Warn(str)
-		}
-	}()
-	h.log.Debug("Assembling diagnostics archive.")
-	err = diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag)
+	var r io.Reader
+	// attempt to create the a temporary diagnostics file on disk in order to avoid loading a
+	// potentially large file in memory.
+	// if on-disk creation fails an in-memory buffer is used.
+	f, s, err := h.diagFile(aDiag, uDiag)
 	if err != nil {
-		action.Err = err
-		return fmt.Errorf("error creating diagnostics bundle: %w", err)
+		var b bytes.Buffer
+		h.log.Warnw("Diagnostics action unable to use tempoary file, using buffer instead.", "err", err)
+		var wBuf bytes.Buffer
+		defer func() {
+			if str := wBuf.String(); str != "" {
+				h.log.Warn(str)
+			}
+		}()
+		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag)
+		if err != nil {
+			action.Err = err
+			return fmt.Errorf("error creating diagnostics bundle: %w", err)
+		}
+		r = &b
+		s = int64(b.Len())
+	} else {
+		defer func() {
+			f.Close()
+			os.Remove(f.Name())
+		}()
+		r = f
 	}
-
 	h.log.Debug("Sending diagnostics archive.")
-	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, ts.Format("2006-01-02T15-04-05Z07-00"), &b) // RFC3339 format that uses - instead of : so it works on Windows
+	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, ts.Format("2006-01-02T15-04-05Z07-00"), s, r) // RFC3339 format that uses - instead of : so it works on Windows
 	action.Err = err
 	action.UploadID = uploadID
 	if err != nil {
@@ -154,4 +167,38 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 		uDiag = append(uDiag, diag)
 	}
 	return uDiag
+}
+
+// diagFile will write the diagnostics to a temporary file and return the file ready to be read
+func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []client.DiagnosticUnitResult) (*os.File, int64, error) {
+	f, err := os.CreateTemp("", "elastic-agent-diagnostics")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	name := f.Name()
+	var wBuf bytes.Buffer
+	defer func() {
+		if str := wBuf.String(); str != "" {
+			h.log.Warn(str)
+		}
+	}()
+	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag); err != nil {
+		os.Remove(name)
+		return nil, 0, err
+	}
+	f.Sync()
+
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		os.Remove(name)
+		return nil, 0, err
+	}
+
+	fi, err := f.Stat()
+	if err != nil {
+		os.Remove(name)
+		return nil, 0, err
+	}
+	return f, fi.Size(), nil
 }
