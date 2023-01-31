@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//nolint:errcheck,dupl // lots of casting in test cases
+//nolint:dupl // lots of casting in test cases
 package queue
 
 import (
@@ -35,6 +35,11 @@ func (m *mockAction) Type() string {
 func (m *mockAction) ID() string {
 	args := m.Called()
 	return args.String(0)
+}
+
+func (m *mockAction) AckEvent() fleetapi.AckEvent {
+	args := m.Called()
+	return args.Get(0).(fleetapi.AckEvent)
 }
 
 func (m *mockAction) StartTime() (time.Time, error) {

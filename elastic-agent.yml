@@ -55,6 +55,22 @@ inputs:
 #       port: 6791
 #       # Metrics buffer endpoint
 #       buffer.enabled: false
+#   # Configuration for the diagnostics action handler
+#   diagnostics:
+#       # Rate limit for the action handler. Does not affect diagnostics collected through the CLI.
+#       limit:
+#           # Rate limit interval.
+#           interval: 1m
+#           # Rate limit burst.
+#           burst: 1
+#       # Configuration for the file-upload client. Client may retry failed requests with an exponential backoff.
+#       uploader:
+#           # Max retries allowed when uploading a chunk.
+#           max_retries: 10
+#           # Initial duration of the backoff.
+#           init_dur: 1s
+#           # Max duration of the backoff.
+#           max_dur: 1m
 
 # # Allow fleet to reload its configuration locally on disk.
 # # Notes: Only specific process configuration will be reloaded.
