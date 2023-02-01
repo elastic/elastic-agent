@@ -35,5 +35,6 @@ func NewFromConfig(cfg *config.Config) (*Configuration, error) {
 
 // AgentInfo is a set of agent information.
 type AgentInfo struct {
-	ID string `json:"id" yaml:"id" config:"id"`
+	ID       string         `json:"id" yaml:"id" config:"id"`
+	Features *config.Config `json:"features" yaml:"features" config:"features"`
 }

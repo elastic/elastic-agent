@@ -6,11 +6,11 @@ package host
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"runtime"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -95,18 +95,20 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 }
 
 func getHostInfo() (map[string]interface{}, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
 	sysInfo, err := sysinfo.Host()
 	if err != nil {
 		return nil, err
 	}
+
 	info := sysInfo.Info()
+	name := info.Hostname
+	if features.FQDN() {
+		name = info.FQDN
+	}
+
 	return map[string]interface{}{
 		"id":           info.UniqueID,
-		"name":         hostname,
+		"name":         name,
 		"platform":     runtime.GOOS,
 		"architecture": info.Architecture,
 		"ip":           info.IPs,

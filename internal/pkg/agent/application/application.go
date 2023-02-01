@@ -7,9 +7,10 @@ package application
 import (
 	"fmt"
 
-	"go.elastic.co/apm"
-
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/features"
+
+	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -81,6 +82,10 @@ func New(
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if err := features.Parse(*cfg.Fleet.Info.Features); err != nil {
+		return nil, nil, fmt.Errorf("could not parse feature flag config: %w", err)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
