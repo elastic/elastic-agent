@@ -62,9 +62,6 @@ func exposeMetricsEndpoint(
 	statsHandler := statsHandler(ns("stats"))
 	r.Handle("/stats", createHandler(statsHandler))
 
-	inputsHandler := inputsHandler(ns("inputs"))
-	r.Handle("/inputs/", createHandler(inputsHandler))
-
 	if enableProcessStats {
 		r.Handle("/processes", createHandler(processesHandler(coord)))
 		r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
