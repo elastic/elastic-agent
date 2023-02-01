@@ -32,6 +32,7 @@ type persistentAgentInfo struct {
 	Headers        map[string]string                      `json:"headers" yaml:"headers" config:"headers"`
 	LogLevel       string                                 `json:"logging.level,omitempty" yaml:"logging.level,omitempty" config:"logging.level,omitempty"`
 	MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"monitoring.http,omitempty" yaml:"monitoring.http,omitempty" config:"monitoring.http,omitempty"`
+	Features       *config.Config                         `json:"features" yaml:"features" config:"features"`
 }
 
 type ioStore interface {
