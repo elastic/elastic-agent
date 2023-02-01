@@ -31,6 +31,7 @@ const (
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
+	runDirMod       = 0770
 )
 
 var (
@@ -150,6 +151,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
+	if err := copyRunDirectory(u.log, newHash); err != nil {
+		return nil, errors.New(err, "failed to copy run directory")
+	}
+
 	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
@@ -250,6 +255,25 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 	}
 
 	return nil
+}
+
+func copyRunDirectory(log *logger.Logger, newHash string) error {
+	newRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash), "run")
+	oldRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, release.ShortCommit()), "run")
+
+	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
+
+	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
+		return errors.New(err, "failed to create run directory")
+	}
+
+	err := copyDir(oldRunPath, newRunPath)
+	if os.IsNotExist(err) {
+		// nothing to copy, operation ok
+		log.Debugw("Run directory not present", "old_run_path", oldRunPath)
+		return nil
+	}
+	return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
 }
 
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.
