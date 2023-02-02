@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"go.elastic.co/apm"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -33,6 +34,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // ErrNotUpgradable error is returned when upgrade cannot be performed.
@@ -721,6 +723,16 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		if !ok {
 			return fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
 		}
+	}
+
+	featureFlags := struct {
+		features *config.Config `config:"features"`
+	}{}
+	if err := cfg.Unpack(&featureFlags); err != nil {
+		return fmt.Errorf("could not parse features config: %w", err)
+	}
+	if err := features.Parse(featureFlags.features); err != nil {
+		return fmt.Errorf("could not update feature flags config: %w", err)
 	}
 
 	if err := c.upgradeMgr.Reload(cfg); err != nil {

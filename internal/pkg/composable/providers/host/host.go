@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
 
@@ -102,6 +103,7 @@ func getHostInfo() (map[string]interface{}, error) {
 
 	info := sysInfo.Info()
 	name := info.Hostname
+	logp.L().Infof("fqdn enabled: %t", features.FQDN())
 	if features.FQDN() {
 		name = info.FQDN
 	}
