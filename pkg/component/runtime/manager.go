@@ -647,28 +647,26 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 
 	touched := make(map[string]bool)
 	for _, comp := range components {
-		touched[comp.ID] = true
-		existing, ok := m.current[comp.ID]
-		if ok {
+		touched[comp.ID] = false
+		if existing, ok := m.current[comp.ID]; ok {
 			// existing component; send runtime updated value
 			existing.currComp = comp
 			if err := existing.runtime.Update(comp); err != nil {
 				return fmt.Errorf("failed to update component %s: %w", comp.ID, err)
 			}
-		} else {
-			// new component; create its runtime
-			logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-			state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
-			if err != nil {
-				return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
-			}
-			m.current[comp.ID] = state
-			err = state.start()
-			if err != nil {
-				return fmt.Errorf("failed to start component %s: %w", comp.ID, err)
-			}
+			continue
 		}
+
+		// new component; create its runtime
+		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
+		if err != nil {
+			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
+		}
+		m.current[comp.ID] = state
+		touched[comp.ID] = true
 	}
+
 	for id, existing := range m.current {
 		// skip if already touched (meaning it still existing)
 		if _, done := touched[id]; done {
@@ -677,6 +675,19 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		// component was removed (time to clean it up)
 		_ = existing.stop(teardown)
 	}
+
+	// start all not started
+	for compID, state := range m.current {
+		if needStart, found := touched[compID]; !found || !needStart {
+			// skip not touched and already running
+			continue
+		}
+
+		if err = state.start(); err != nil {
+			return fmt.Errorf("failed to start component %s: %w", compID, err)
+		}
+	}
+
 	return nil
 }
 
