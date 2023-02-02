@@ -19,7 +19,7 @@ summary: Enhance agent monitoring config to support filebeat /inputs endpoint
 #description:
 
 # Affected component; a word indicating the component this changeset affects.
-component: filebeat
+component: monitoring
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
