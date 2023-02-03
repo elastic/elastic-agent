@@ -44,6 +44,9 @@ const (
 	maxCheckinMisses = 3
 	// diagnosticTimeout is the maximum amount of time to wait for a diagnostic response from a unit.
 	diagnosticTimeout = 20 * time.Second
+
+	// stopCheckRetryPeriod is a idle time between checks for component stopped state
+	stopCheckRetryPeriod = 200 * time.Millisecond
 )
 
 var (
@@ -646,8 +649,9 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 	}
 
 	touched := make(map[string]bool)
+	newComponents := make([]component.Component, 0, len(components))
 	for _, comp := range components {
-		touched[comp.ID] = false
+		touched[comp.ID] = true
 		if existing, ok := m.current[comp.ID]; ok {
 			// existing component; send runtime updated value
 			existing.currComp = comp
@@ -656,15 +660,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 			}
 			continue
 		}
-
-		// new component; create its runtime
-		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
-		if err != nil {
-			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
-		}
-		m.current[comp.ID] = state
-		touched[comp.ID] = true
+		newComponents = append(newComponents, comp)
 	}
 
 	for id, existing := range m.current {
@@ -674,23 +670,60 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		}
 		// component was removed (time to clean it up)
 		_ = existing.stop(teardown)
+		// stop is async, wait for operation to finish,
+		// otherwise new instance may be started and components
+		// may fight for resources (e.g ports, files, locks)
+		m.waitForStopped(existing)
 	}
 
 	// start all not started
-	for compID, state := range m.current {
-		if needStart, found := touched[compID]; !found || !needStart {
-			// skip not touched and already running
-			continue
+	for _, comp := range newComponents {
+		// new component; create its runtime
+		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
+		if err != nil {
+			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}
-
+		m.current[comp.ID] = state
 		if err = state.start(); err != nil {
-			return fmt.Errorf("failed to start component %s: %w", compID, err)
+			return fmt.Errorf("failed to start component %s: %w", comp.ID, err)
 		}
 	}
 
 	return nil
 }
 
+func (m *Manager) waitForStopped(comp *componentRuntimeState) {
+	if comp == nil {
+		return
+	}
+	compID := comp.currComp.ID
+	timeout := defaultStopTimeout
+	if comp.currComp.InputSpec != nil &&
+		comp.currComp.InputSpec.Spec.Service != nil &&
+		comp.currComp.InputSpec.Spec.Service.Operations.Uninstall != nil &&
+		comp.currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout > 0 {
+		// if component is a service and timeout is defined, use the one defined
+		timeout = comp.currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout
+	}
+
+	timeoutCh := time.After(timeout)
+	for {
+		if comp.latestState.State == client.UnitStateStopped {
+			return
+		}
+
+		if _, exists := m.current[compID]; !exists {
+			return
+		}
+
+		select {
+		case <-timeoutCh:
+			return
+		case <-time.After(stopCheckRetryPeriod):
+		}
+	}
+}
 func (m *Manager) shutdown() {
 	m.shuttingDown.Store(true)
 
