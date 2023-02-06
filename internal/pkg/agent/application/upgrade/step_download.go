@@ -6,10 +6,13 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 
 	"go.elastic.co/apm"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/composed"
@@ -52,6 +55,10 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 	fetcher, err := newDownloader(version, u.log, &settings)
 	if err != nil {
 		return "", errors.New(err, "initiating fetcher")
+	}
+
+	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
+		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
 	path, err := fetcher.Download(ctx, agentArtifact, version)
