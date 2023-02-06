@@ -118,7 +118,7 @@ targets:
     scmid: githubConfig
     kind: file
     spec:
-      content: 'FROM golang:{{ source "latestGoVersion" }}'
+      content: 'ARG GO_VERSION={{ source "latestGoVersion" }}'
       files:
         - Dockerfile
       matchpattern: 'ARG GO_VERSION=\d+.\d+.\d+'
