@@ -22,7 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string) (_ string, err error) {
+func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -59,7 +59,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, "failed upgrade of agent binary")
 	}
 
-	if err := verifier.Verify(agentArtifact, version); err != nil {
+	if err := verifier.Verify(agentArtifact, version, skipVerifyOverride, pgpBytes...); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
 

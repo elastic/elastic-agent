@@ -35,8 +35,8 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte, versio
 }
 
 // Verify checks the package from configured source.
-func (e *Verifier) Verify(a artifact.Artifact, version string) error {
-	return e.verifier.Verify(a, version)
+func (e *Verifier) Verify(a artifact.Artifact, version string, skipVerifyOverride bool, pgpBytes ...string) error {
+	return e.verifier.Verify(a, version, skipVerifyOverride, pgpBytes...)
 }
 
 func (e *Verifier) Reload(c *artifact.Config) error {

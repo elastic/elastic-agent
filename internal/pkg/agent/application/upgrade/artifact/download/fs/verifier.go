@@ -46,7 +46,11 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version string, skipVerifyOverride bool, pgpBytes ...string) error {
+	if skipVerifyOverride {
+		return nil
+	}
+
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")
@@ -63,7 +67,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string) error {
 		return err
 	}
 
-	if err = v.verifyAsc(fullPath); err != nil {
+	if err = v.verifyAsc(fullPath, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
 			os.Remove(fullPath + ".asc")
@@ -74,8 +78,19 @@ func (v *Verifier) Verify(a artifact.Artifact, version string) error {
 	return nil
 }
 
-func (v *Verifier) verifyAsc(fullPath string) error {
-	if len(v.pgpBytes) == 0 {
+func (v *Verifier) verifyAsc(fullPath string, pgpBytes ...string) error {
+	var pgpChecks [][]byte
+	if len(v.pgpBytes) > 0 {
+		pgpChecks = append(pgpChecks, v.pgpBytes)
+	}
+	for _, check := range pgpBytes {
+		if len(check) == 0 {
+			continue
+		}
+		pgpChecks = append(pgpChecks, []byte(check))
+	}
+
+	if len(pgpChecks) == 0 {
 		// no pgp available skip verification process
 		return nil
 	}
@@ -88,7 +103,16 @@ func (v *Verifier) verifyAsc(fullPath string) error {
 		return err
 	}
 
-	return download.VerifyGPGSignature(fullPath, ascBytes, v.pgpBytes)
+	for _, check := range pgpChecks {
+		err = download.VerifyGPGSignature(fullPath, ascBytes, check)
+		if err == nil {
+			// verify successful
+			return nil
+		}
+	}
+
+	// return last error
+	return err
 }
 
 func (v *Verifier) getPublicAsc(fullPath string) ([]byte, error) {

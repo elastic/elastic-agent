@@ -112,7 +112,7 @@ func (u *Upgrader) Upgradeable() bool {
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
@@ -123,7 +123,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	sourceURI = u.sourceURI(sourceURI)
-	archivePath, err := u.downloadArtifact(ctx, version, sourceURI)
+	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, skipVerifyOverride, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
