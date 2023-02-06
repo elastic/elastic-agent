@@ -57,7 +57,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, "initiating fetcher")
 	}
 
-	if err := os.MkdirAll(paths.Downloads(), 0755); err != nil {
+	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
