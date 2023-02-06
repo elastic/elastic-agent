@@ -768,6 +768,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"apm-server",
 				"endpoint-security",
 				"fleet-server",
+				"pf-host-agent",
 			}
 
 			ctx := context.Background()

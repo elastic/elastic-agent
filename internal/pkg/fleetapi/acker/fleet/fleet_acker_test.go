@@ -86,13 +86,13 @@ func TestAcker_Ack(t *testing.T) {
 		},
 		{
 			name:    "ack",
-			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "ack-test-action-id"}},
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "ack-test-action-id", ActionType: fleetapi.ActionTypeUnknown}},
 		},
 		{
 			name: "ackbatch",
 			actions: []fleetapi.Action{
-				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id1"},
-				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id2"},
+				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id1", ActionType: fleetapi.ActionTypeUnknown},
+				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id2", ActionType: fleetapi.ActionTypeUnknown},
 			},
 		},
 		{
@@ -153,7 +153,7 @@ func TestAcker_Ack(t *testing.T) {
 			assert.EqualValues(t, "ACKNOWLEDGED", req.Events[i].SubType)
 			assert.EqualValues(t, ac.ID(), req.Events[i].ActionID)
 			assert.EqualValues(t, agentInfo.AgentID(), req.Events[i].AgentID)
-			assert.EqualValues(t, fmt.Sprintf("Action '%s' of type '%s' acknowledged.", ac.ID(), ac.Type()), req.Events[i].Message)
+			assert.EqualValues(t, fmt.Sprintf("Action %q of type %q acknowledged.", ac.ID(), ac.Type()), req.Events[i].Message)
 			// Check if the fleet acker handles RetryableActions correctly using the UpgradeAction
 			if a, ok := ac.(*fleetapi.ActionUpgrade); ok {
 				if a.Err != nil {

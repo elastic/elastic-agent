@@ -293,7 +293,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	return nil
 }
 
-// AckUpgrade performs acknowledgement for upgrade.
+// AckUpgrade is the method used on startup to ack a previously successful upgrade action.
 func (c *Coordinator) AckUpgrade(ctx context.Context, acker acker.Acker) error {
 	return c.upgradeMgr.Ack(ctx, acker)
 }

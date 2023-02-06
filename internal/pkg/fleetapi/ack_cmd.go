@@ -28,6 +28,7 @@ type AckEvent struct {
 	AgentID   string          `json:"agent_id"`          // : 'agent1',
 	Message   string          `json:"message,omitempty"` // : 'hello2',
 	Payload   json.RawMessage `json:"payload,omitempty"` // : 'payload2',
+	Data      json.RawMessage `json:"data,omitempty"`    // : 'data',
 
 	ActionInputType string                 `json:"action_input_type,omitempty"` // copy of original action input_type
 	ActionData      json.RawMessage        `json:"action_data,omitempty"`       // copy of original action data

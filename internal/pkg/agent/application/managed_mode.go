@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/uploader"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
@@ -188,21 +189,8 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		policyChanger.AddSetter(ack)
 	}
 
-	// Proxy errors from the gateway to our own channel.
-	gatewayErrorsRunner := runner.Start(context.Background(), func(ctx context.Context) error {
-		for {
-			select {
-			case <-ctx.Done():
-				return nil
-			case err := <-gateway.Errors():
-				m.errCh <- err
-			}
-		}
-	})
-
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
-		defer gatewayErrorsRunner.Stop()
 		return gateway.Run(ctx)
 	})
 
@@ -345,6 +333,16 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		handlers.NewCancel(
 			m.log,
 			m.actionQueue,
+		),
+	)
+
+	m.dispatcher.MustRegister(
+		&fleetapi.ActionDiagnostics{},
+		handlers.NewDiagnostics(
+			m.log,
+			m.coord,
+			m.cfg.Settings.MonitoringConfig.Diagnostics.Limit,
+			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),
 		),
 	)
 

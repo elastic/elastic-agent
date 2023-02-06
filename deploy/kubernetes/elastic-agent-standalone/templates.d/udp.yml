@@ -1,4 +1,15 @@
 inputs:
+    - name: udp-udp
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.udp.generic.enabled} == true or ${kubernetes.hints.udp.enabled} == true
+          data_stream:
+            dataset: udp.generic
+            type: logs
+          host: localhost:8080
+          max_message_size: 10KiB
+      data_stream.namespace: default
     - name: filestream-udp
       type: filestream
       use_output: default
@@ -19,15 +30,4 @@ inputs:
             scanner:
                 symlinks: true
           tags: []
-      data_stream.namespace: default
-    - name: udp-udp
-      type: udp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.udp.generic.enabled} == true or ${kubernetes.hints.udp.enabled} == true
-          data_stream:
-            dataset: udp.generic
-            type: logs
-          host: localhost:8080
-          max_message_size: 10KiB
       data_stream.namespace: default

@@ -57,7 +57,7 @@ const (
 
 var (
 	errNoOuputPresent          = errors.New("outputs not part of the config")
-	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "cloud-defend", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
 	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
@@ -714,6 +714,69 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				},
 			},
 		})
+
+		if strings.EqualFold(name, "filebeat") {
+			fbDataStreamName := "filebeat_input"
+			streams = append(streams, map[string]interface{}{
+				idKey: "metrics-monitoring-" + name + "-1",
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   fmt.Sprintf("elastic_agent.%s", fbDataStreamName),
+					"namespace": monitoringNamespace,
+				},
+				"metricsets":    []interface{}{"json"},
+				"hosts":         endpoints,
+				"path":          "/inputs/",
+				"namespace":     fbDataStreamName,
+				"json.is_array": true,
+				"period":        "10s",
+				"index":         fmt.Sprintf("metrics-elastic_agent.%s-%s", fbDataStreamName, monitoringNamespace),
+				"processors": []interface{}{
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "event",
+							"fields": map[string]interface{}{
+								"dataset": fmt.Sprintf("elastic_agent.%s", fbDataStreamName),
+							},
+						},
+					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "elastic_agent",
+							"fields": map[string]interface{}{
+								"id":       b.agentInfo.AgentID(),
+								"version":  b.agentInfo.Version(),
+								"snapshot": b.agentInfo.Snapshot(),
+								"process":  name,
+							},
+						},
+					},
+					map[string]interface{}{
+						"add_fields": map[string]interface{}{
+							"target": "agent",
+							"fields": map[string]interface{}{
+								"id": b.agentInfo.AgentID(),
+							},
+						},
+					},
+					map[string]interface{}{
+						"copy_fields": map[string]interface{}{
+							"fields":         httpCopyRules(),
+							"ignore_missing": true,
+							"fail_on_error":  false,
+						},
+					},
+					map[string]interface{}{
+						"drop_fields": map[string]interface{}{
+							"fields": []interface{}{
+								"http",
+							},
+							"ignore_missing": true,
+						},
+					},
+				},
+			})
+		}
 	}
 
 	inputs := []interface{}{
@@ -894,6 +957,12 @@ func httpCopyRules() []interface{} {
 		map[string]interface{}{
 			"from": "http.agent.apm-server",
 			"to":   "apm-server",
+		},
+
+		// I should be able to see the filebeat input metrics
+		map[string]interface{}{
+			"from": "http.filebeat_input",
+			"to":   "filebeat_input",
 		},
 	}
 
