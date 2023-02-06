@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
@@ -25,15 +24,8 @@ type cfg struct {
 
 func Parse(c *config.Config) error {
 	if c == nil {
-		logp.L().Infof("fqdn features: is nil!")
 		return nil
 	}
-
-	ms, err := c.ToMapStr()
-	if err != nil {
-		return fmt.Errorf("fqdn feature: failed c.ToMap: %w", err)
-	}
-	logp.L().Infow("fqdn features", "feature_flags", ms)
 
 	parsedFlags := cfg{}
 	if err := c.Unpack(&parsedFlags); err != nil {
@@ -43,8 +35,6 @@ func Parse(c *config.Config) error {
 	mu.Lock()
 	defer mu.Unlock()
 	flags = parsedFlags.Agent.Features
-
-	logp.L().With("features", flags).Info("parsed feature flag config")
 
 	return nil
 }
