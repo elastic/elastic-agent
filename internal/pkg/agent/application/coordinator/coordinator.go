@@ -725,13 +725,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		}
 	}
 
-	featureFlags := struct {
-		features *config.Config `config:"features"`
-	}{}
-	if err := cfg.Unpack(&featureFlags); err != nil {
-		return fmt.Errorf("could not parse features config: %w", err)
-	}
-	if err := features.Parse(featureFlags.features); err != nil {
+	if err := features.Parse(cfg); err != nil {
 		return fmt.Errorf("could not update feature flags config: %w", err)
 	}
 

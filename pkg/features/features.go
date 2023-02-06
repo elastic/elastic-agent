@@ -9,36 +9,47 @@ import (
 )
 
 var (
-	featureFlags configs
-	mu           sync.Mutex
+	flags flagsCfg
+	mu    sync.Mutex
 )
 
-type configs struct {
-	FQDN struct {
-		Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
-	} `json:"fqdn" yaml:"fqdn" config:"fqdn"`
+type flagsCfg struct {
+	FQDN *config.Config `json:"fqdn" yaml:"fqdn" config:"fqdn"`
+}
+
+type cfg struct {
+	Agent struct {
+		Features flagsCfg `json:"features" yaml:"features" config:"features"`
+	} `json:"agent" yaml:"agent" config:"agent"`
 }
 
 func Parse(c *config.Config) error {
 	if c == nil {
+		logp.L().Infof("fqdn features: is nil!")
 		return nil
 	}
 
-	feats := configs{}
-	if err := c.Unpack(&feats); err != nil {
+	ms, err := c.ToMapStr()
+	if err != nil {
+		return fmt.Errorf("fqdn feature: failed c.ToMap: %w", err)
+	}
+	logp.L().Infow("fqdn features", "feature_flags", ms)
+
+	parsedFlags := cfg{}
+	if err := c.Unpack(&parsedFlags); err != nil {
 		return fmt.Errorf("could not umpack features config: %w", err)
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
-	featureFlags = feats
+	flags = parsedFlags.Agent.Features
 
-	logp.L().With("features", featureFlags).Info("parsed feature flag config")
+	logp.L().With("features", flags).Info("parsed feature flag config")
 
 	return nil
 }
 
 // FQDN reports if FQDN should be used instead of hostname for host.name.
 func FQDN() bool {
-	return featureFlags.FQDN.Enabled
+	return flags.FQDN.Enabled()
 }

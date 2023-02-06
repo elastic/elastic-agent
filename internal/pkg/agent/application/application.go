@@ -84,8 +84,8 @@ func New(
 		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	if err := features.Parse(*cfg.Fleet.Info.Features); err != nil {
-		return nil, nil, fmt.Errorf("could not parse feature flag config: %w", err)
+	if err := features.Parse(rawConfig); err != nil {
+		return nil, nil, fmt.Errorf("could not parse features config: %w", err)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
