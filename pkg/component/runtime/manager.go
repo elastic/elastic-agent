@@ -663,6 +663,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		newComponents = append(newComponents, comp)
 	}
 
+	var stoppedWg sync.WaitGroup
 	for id, existing := range m.current {
 		// skip if already touched (meaning it still existing)
 		if _, done := touched[id]; done {
@@ -673,8 +674,14 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		// stop is async, wait for operation to finish,
 		// otherwise new instance may be started and components
 		// may fight for resources (e.g ports, files, locks)
-		m.waitForStopped(existing)
+		stoppedWg.Add(1)
+		go func(state *componentRuntimeState) {
+			m.waitForStopped(state)
+			stoppedWg.Done()
+		}(existing)
 	}
+
+	stoppedWg.Wait()
 
 	// start all not started
 	for _, comp := range newComponents {
