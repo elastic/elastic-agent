@@ -144,6 +144,29 @@ kubectl apply -f elastic-agent-${ELASTIC_AGENT_MODE}-kubernetes.yaml
 kubectl -n kube-system get pods -l app=elastic-agent
 ```
 
+## Testing on Elastic Cloud
+
+Elastic employees can create an Elastic Cloud deployment with a locally
+built Elastic Agent, by pushing images to an internal Docker repository. The images will be 
+based on the SNAPSHOT images with the version defined in `version/version.go`.
+
+Running `mage cloud:image` in this directory or `make build_elastic_agent_docker_image` in `testing/environments/cloud` will build and push the images. 
+Running `mage cloud:push` in this directory or `make push_elastic_agent_docker_image` in `testing/environments/cloud` will publish built docker image to CI docker repository.
+
+Once docker images are published you can run `EC_API_KEY=your_api_key make apply` rom `testing/environments/cloud` directory to deploy them to Elastic Cloud. 
+To get `EC_API_KEY` follow [this guide](https://www.elastic.co/guide/en/cloud/current/ec-api-authentication.html)
+
+The custom images are tagged with the current version, commit and timestamp. The
+timestamp is included to force a new Docker image to be used, which enables pushing new
+binaries without recreating the deployment. Kibana only installs the integration
+package when it first starts up, so any changes to the package will be disregarded when
+updating an existing deployment.
+
+
+To specify custom images create your `docker_image.auto.tfvars` file similar to `docker_image.auto.tfvars.sample`. 
+
+Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.
+
 ## Updating dependencies/PRs
 Even though we prefer `mage` to our automation, we still have some
 rules implemented on our `Makefile` as well as CI will use the
