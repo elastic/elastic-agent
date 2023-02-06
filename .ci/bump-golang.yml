@@ -109,9 +109,9 @@ targets:
     scmid: githubConfig
     kind: file
     spec:
-      content: '{{ source "latestGoVersion" }}'
+      content: ':go-version: {{ source "latestGoVersion" }}'
       file: version/docs/version.asciidoc
-      matchpattern: '\d+.\d+.\d+'
+      matchpattern: ':go-version: \d+.\d+.\d+'
   update-dockerfiles:
     name: "Update from dockerfiles"
     sourceid: latestGoVersion
