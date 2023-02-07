@@ -211,7 +211,7 @@ func (s *ServiceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 			}
 		}
 
-		s.log.Debug("uninstall %s service", name)
+		s.log.Debugf("uninstall %s service", name)
 		err := s.uninstall(ctx)
 		if err != nil {
 			s.log.Errorf("failed %s service uninstall, err: %v", name, err)
