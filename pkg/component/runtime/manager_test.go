@@ -1866,13 +1866,13 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 				return
 			case state := <-sub0.Ch():
 				t.Logf("component fake-0 state changed: %+v", state)
-				signalState(subErrCh0, &state)
+				signalState(subErrCh0, &state, []client.UnitState{client.UnitStateHealthy})
 			case state := <-sub1.Ch():
 				t.Logf("component fake-1 state changed: %+v", state)
-				signalState(subErrCh1, &state)
+				signalState(subErrCh1, &state, []client.UnitState{client.UnitStateHealthy})
 			case state := <-sub2.Ch():
 				t.Logf("component fake-2 state changed: %+v", state)
-				signalState(subErrCh2, &state)
+				signalState(subErrCh2, &state, []client.UnitState{client.UnitStateHealthy})
 			}
 		}
 	}()
@@ -2344,6 +2344,219 @@ LOOP:
 	require.NoError(t, err)
 }
 
+func TestManager_FakeInput_OutputChange(t *testing.T) {
+	testPaths(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := m.WaitForReady(waitCtx); err != nil {
+		require.NoError(t, err)
+	}
+
+	binaryPath := testBinary(t, "component")
+	runtimeSpec := component.InputRuntimeSpec{
+		InputType:  "fake",
+		BinaryName: "",
+		BinaryPath: binaryPath,
+		Spec:       fakeInputSpec,
+	}
+	components := []component.Component{
+		{
+			ID:        "fake-0",
+			InputSpec: &runtimeSpec,
+			Units: []component.Unit{
+				{
+					ID:   "fake-input-0-0",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type":    "fake",
+						"state":   int(client.UnitStateHealthy),
+						"message": "Fake Healthy 0-0",
+					}),
+				},
+				{
+					ID:   "fake-input-0-1",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type":    "fake",
+						"state":   int(client.UnitStateHealthy),
+						"message": "Fake Healthy 0-1",
+					}),
+				},
+				{
+					ID:   "fake-input-0-2",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type":    "fake",
+						"state":   int(client.UnitStateHealthy),
+						"message": "Fake Healthy 0-1",
+					}),
+				},
+			},
+		},
+	}
+
+	components2 := []component.Component{
+		{
+			ID:        "fake-1",
+			InputSpec: &runtimeSpec,
+			Units: []component.Unit{
+				{
+					ID:   "fake-input-1-0",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type":    "fake",
+						"state":   int(client.UnitStateHealthy),
+						"message": "Fake Healthy 0-0",
+					}),
+				},
+				{
+					ID:   "fake-input-1-1",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type":    "fake",
+						"state":   int(client.UnitStateHealthy),
+						"message": "Fake Healthy 0-1",
+					}),
+				},
+				{
+					ID:   "fake-input-1-1",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]interface{}{
+						"type":    "fake",
+						"state":   int(client.UnitStateHealthy),
+						"message": "Fake Healthy 0-1",
+					}),
+				},
+			},
+		},
+	}
+
+	type progressionStep struct {
+		componentID string
+		state       ComponentState
+	}
+	stateProgression := make([]progressionStep, 0)
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	defer subCancel()
+	stateProgCh := make(chan progressionStep)
+	subErrCh0 := make(chan error)
+	subErrCh1 := make(chan error)
+	go func() {
+		sub0 := m.Subscribe(subCtx, "fake-0")
+		sub1 := m.Subscribe(subCtx, "fake-1")
+		for {
+			select {
+			case <-subCtx.Done():
+				close(stateProgCh)
+				return
+			case state := <-sub0.Ch():
+				t.Logf("component fake-0 state changed: %+v", state)
+				signalState(subErrCh0, &state, []client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
+				stateProgCh <- progressionStep{"fake-o", state}
+			case state := <-sub1.Ch():
+				t.Logf("component fake-1 state changed: %+v", state)
+				signalState(subErrCh1, &state, []client.UnitState{client.UnitStateHealthy})
+				stateProgCh <- progressionStep{"fake-o", state}
+			}
+		}
+	}()
+
+	go func() {
+		for step := range stateProgCh {
+			stateProgression = append(stateProgression, step)
+		}
+	}()
+
+	defer drainErrChan(errCh)
+	defer drainErrChan(subErrCh0)
+	defer drainErrChan(subErrCh1)
+
+	startTimer := time.NewTimer(100 * time.Millisecond)
+	defer startTimer.Stop()
+	select {
+	case <-startTimer.C:
+		err = m.Update(components)
+		require.NoError(t, err)
+	case err := <-errCh:
+		t.Fatalf("failed early: %s", err)
+	}
+
+	updateTimeout := 300 * time.Millisecond
+	if runtime.GOOS == windows {
+		// windows is slow, preventing flakyness
+		updateTimeout = 550 * time.Millisecond
+	}
+	updateTimer := time.NewTimer(updateTimeout)
+	defer updateTimer.Stop()
+	select {
+	case <-updateTimer.C:
+		err = m.Update(components2)
+		require.NoError(t, err)
+	case err := <-errCh:
+		t.Fatalf("failed early: %s", err)
+	}
+
+	count := 0
+	endTimer := time.NewTimer(30 * time.Second)
+	defer endTimer.Stop()
+LOOP:
+	for {
+		select {
+		case <-endTimer.C:
+			t.Fatalf("timed out after 30 seconds")
+		case err := <-errCh:
+			require.NoError(t, err)
+		case err := <-subErrCh0:
+			require.NoError(t, err)
+			count++
+			if count >= 2 {
+				break LOOP
+			}
+		case err := <-subErrCh1:
+			require.NoError(t, err)
+			count++
+			if count >= 2 {
+				break LOOP
+			}
+		}
+	}
+
+	subCancel()
+	cancel()
+
+	// check progresstion, require stop fake-0 before start fake-1
+	wasStopped := false
+	for _, step := range stateProgression {
+		if step.componentID == "fake-0" && step.state.State == client.UnitStateStopped {
+			wasStopped = true
+		}
+		if step.componentID == "fake-1" && step.state.State == client.UnitStateStarting {
+			require.True(t, wasStopped)
+			break
+		}
+	}
+
+	err = <-errCh
+	require.NoError(t, err)
+}
+
 func newDebugLogger(t *testing.T) *logger.Logger {
 	t.Helper()
 
@@ -2366,7 +2579,7 @@ func drainErrChan(ch chan error) {
 	}
 }
 
-func signalState(subErrCh chan error, state *ComponentState) {
+func signalState(subErrCh chan error, state *ComponentState, acceptableStates []client.UnitState) {
 	if state.State == client.UnitStateFailed {
 		subErrCh <- fmt.Errorf("component failed: %s", state.Message)
 	} else {
@@ -2375,7 +2588,7 @@ func signalState(subErrCh chan error, state *ComponentState) {
 		for key, unit := range state.Units {
 			if unit.State == client.UnitStateStarting {
 				// acceptable
-			} else if unit.State == client.UnitStateHealthy {
+			} else if isAcceptableState(unit.State, acceptableStates) {
 				healthy++
 			} else if issue == "" {
 				issue = fmt.Sprintf("unit %s in invalid state %v", key.UnitID, unit.State)
@@ -2388,6 +2601,15 @@ func signalState(subErrCh chan error, state *ComponentState) {
 			subErrCh <- nil
 		}
 	}
+}
+
+func isAcceptableState(state client.UnitState, acceptableStates []client.UnitState) bool {
+	for _, s := range acceptableStates {
+		if s == state {
+			return true
+		}
+	}
+	return false
 }
 
 func testPaths(t *testing.T) {
