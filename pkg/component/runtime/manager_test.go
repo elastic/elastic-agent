@@ -2498,7 +2498,12 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 		t.Fatalf("failed early: %s", err)
 	}
 
-	updateTimer := time.NewTimer(300 * time.Millisecond)
+	updateTimeout := 300 * time.Millisecond
+	if runtime.GOOS == windows {
+		// windows is slow, preventing flakyness
+		updateTimeout = 550 * time.Millisecond
+	}
+	updateTimer := time.NewTimer(updateTimeout)
 	defer updateTimer.Stop()
 	select {
 	case <-updateTimer.C:
