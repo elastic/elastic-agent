@@ -246,6 +246,9 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 	}
 
+	if c.state.overrideState != nil && c.state.overrideState.state == agentclient.Upgrading {
+		return fmt.Errorf("%s already in progress", c.state.overrideState.message)
+	}
 	// override the overall state to upgrading until the re-execution is complete
 	c.state.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, skipVerifyOverride, pgpBytes...)
