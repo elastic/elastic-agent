@@ -7,7 +7,6 @@ package fleet
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -404,13 +404,25 @@ func (e *emptyStateFetcher) State(_ bool) coordinator.State {
 }
 
 func runFleetGateway(ctx context.Context, g gateway.FleetGateway) <-chan error {
+	done := make(chan bool)
 	errCh := make(chan error, 1)
 	go func() {
 		err := g.Run(ctx)
+		close(done)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			errCh <- err
 		} else {
 			errCh <- nil
+		}
+	}()
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-g.Errors():
+				// ignore errors here
+			}
 		}
 	}()
 	return errCh

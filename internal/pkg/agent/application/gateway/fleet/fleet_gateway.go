@@ -73,6 +73,7 @@ type fleetGateway struct {
 	checkinFailCounter int
 	stateFetcher       coordinator.StateFetcher
 	stateStore         stateStore
+	errCh              chan error
 	actionCh           chan []fleetapi.Action
 }
 
@@ -118,6 +119,7 @@ func newFleetGatewayWithScheduler(
 		acker:        acker,
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
+		errCh:        make(chan error),
 		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
 }
@@ -167,6 +169,11 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 	}
 }
 
+// Errors returns the channel to watch for reported errors.
+func (f *fleetGateway) Errors() <-chan error {
+	return f.errCh
+}
+
 func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
 	bo.Reset()
 
@@ -198,8 +205,10 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 				)
 
 				f.log.Error(err)
+				f.errCh <- err
 				return nil, err
 			}
+			f.errCh <- err
 			continue
 		}
 
