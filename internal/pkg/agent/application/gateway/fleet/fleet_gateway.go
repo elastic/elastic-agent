@@ -218,6 +218,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		}
 
 		f.checkinFailCounter = 0
+		f.errCh <- nil
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}

@@ -100,10 +100,12 @@ type AgentStateInfo struct {
 
 // AgentState is the current state of the Elastic Agent.
 type AgentState struct {
-	Info       AgentStateInfo   `json:"info" yaml:"info"`
-	State      State            `json:"state" yaml:"state"`
-	Message    string           `json:"message" yaml:"message"`
-	Components []ComponentState `json:"components" yaml:"components"`
+	Info         AgentStateInfo   `json:"info" yaml:"info"`
+	State        State            `json:"state" yaml:"state"`
+	Message      string           `json:"message" yaml:"message"`
+	Components   []ComponentState `json:"components" yaml:"components"`
+	FleetState   State            `yaml:"fleet_state"`
+	FleetMessage string           `yaml:"fleet_message"`
 }
 
 // DiagnosticFileResult is a diagnostic file result.
@@ -226,8 +228,11 @@ func (c *client) State(ctx context.Context) (*AgentState, error) {
 			BuildTime: res.Info.BuildTime,
 			Snapshot:  res.Info.Snapshot,
 		},
-		State:      res.State,
-		Message:    res.Message,
+		State:        res.State,
+		Message:      res.Message,
+		FleetState:   res.FleetState,
+		FleetMessage: res.FleetMessage,
+
 		Components: make([]ComponentState, 0, len(res.Components)),
 	}
 	for _, comp := range res.Components {
