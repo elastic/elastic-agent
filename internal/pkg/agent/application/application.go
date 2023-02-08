@@ -83,6 +83,7 @@ func New(
 	var managed *managedConfigManager
 	var compModifiers []coordinator.ComponentsModifier
 	var composableManaged bool
+	var isManaged bool
 	if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
@@ -96,6 +97,7 @@ func New(
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
 	} else {
+		isManaged = true
 		var store storage.Store
 		store, cfg, err = mergeFleetConfig(rawConfig)
 		if err != nil {
@@ -127,7 +129,7 @@ func New(
 		return nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, compModifiers...)
+	coord := coordinator.New(log, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, isManaged, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

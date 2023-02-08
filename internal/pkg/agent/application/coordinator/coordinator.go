@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -148,10 +149,12 @@ type ComponentsModifier func(comps []component.Component, cfg map[string]interfa
 
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
-	State      agentclient.State                 `yaml:"state"`
-	Message    string                            `yaml:"message"`
-	Components []runtime.ComponentComponentState `yaml:"components"`
-	LogLevel   logp.Level                        `yaml:"log_level"`
+	State        agentclient.State                 `yaml:"state"`
+	Message      string                            `yaml:"message"`
+	FleetState   agentclient.State                 `yaml:"fleet_state"`
+	FleetMessage string                            `yaml:"fleet_message"`
+	Components   []runtime.ComponentComponentState `yaml:"components"`
+	LogLevel     logp.Level                        `yaml:"log_level"`
 }
 
 // StateFetcher provides an interface to fetch the current state of the coordinator.
@@ -190,7 +193,12 @@ type Coordinator struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+	var fleetState cproto.State
+	if !isManaged {
+		// default enum value is STARTING which is confusing for standalone
+		fleetState = agentclient.Stopped
+	}
 	return &Coordinator{
 		logger:     logger,
 		agentInfo:  agentInfo,
@@ -204,8 +212,9 @@ func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, 
 		caps:       caps,
 		modifiers:  modifiers,
 		state: coordinatorState{
-			state:    agentclient.Starting,
-			logLevel: logLevel,
+			state:      agentclient.Starting,
+			fleetState: fleetState,
+			logLevel:   logLevel,
 		},
 		monitorMgr: monitorMgr,
 	}
@@ -216,6 +225,10 @@ func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, 
 func (c *Coordinator) State(local bool) (s State) {
 	s.State = c.state.state
 	s.Message = c.state.message
+
+	s.FleetState = c.state.fleetState
+	s.FleetMessage = c.state.fleetMessage
+
 	s.Components = c.runtimeMgr.State()
 	s.LogLevel = c.state.logLevel
 	if c.state.overrideState != nil {
@@ -231,8 +244,8 @@ func (c *Coordinator) State(local bool) (s State) {
 			s.State = agentclient.Failed
 			s.Message = c.runtimeMgrErr.Error()
 		} else if local && c.configMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.configMgrErr.Error()
+			s.FleetState = agentclient.Failed
+			s.FleetMessage = c.configMgrErr.Error()
 		} else if c.actionsErr != nil {
 			s.State = agentclient.Failed
 			s.Message = c.actionsErr.Error()
@@ -401,6 +414,8 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				c.state.state = agentclient.Stopped
 				c.state.message = "Requested to be stopped"
+				c.state.fleetState = agentclient.Stopped
+				c.state.fleetMessage = "Requested to be stopped"
 				// do not restart
 				return err
 			}
@@ -592,6 +607,13 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		case runtimeErr := <-c.runtimeMgr.Errors():
 			c.runtimeMgrErr = runtimeErr
 		case configErr := <-c.configMgr.Errors():
+			if configErr == nil {
+				c.state.fleetState = agentclient.Healthy
+				c.state.fleetMessage = ""
+			} else {
+				c.state.fleetState = agentclient.Failed
+				c.state.fleetMessage = configErr.Error()
+			}
 			c.configMgrErr = configErr
 		case actionsErr := <-c.configMgr.ActionErrors():
 			c.actionsErr = actionsErr
@@ -779,6 +801,8 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 type coordinatorState struct {
 	state         agentclient.State
 	message       string
+	fleetState    agentclient.State
+	fleetMessage  string
 	overrideState *coordinatorOverrideState
 
 	config   *config.Config

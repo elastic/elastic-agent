@@ -96,6 +96,12 @@ func outputState(w io.Writer, state *client.AgentState) error {
 	} else {
 		fmt.Fprintf(w, "Message: %s\n", state.Message)
 	}
+	fmt.Fprintf(w, "Fleet State: %s\n", state.FleetState)
+	if state.FleetMessage == "" {
+		fmt.Fprint(w, "Fleet Message: (no message)\n")
+	} else {
+		fmt.Fprintf(w, "Fleet Message: %s\n", state.FleetMessage)
+	}
 	if len(state.Components) == 0 {
 		fmt.Fprint(w, "Components: (none)\n")
 	} else {
