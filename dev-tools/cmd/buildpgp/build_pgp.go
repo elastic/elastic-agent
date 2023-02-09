@@ -25,9 +25,7 @@ var (
 
 func init() {
 	flag.StringVar(&input, "in", "", "Source of input. \"-\" means reading from stdin")
-	if flag.Lookup("out") == nil {
-		flag.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
-	}
+	flag.StringVar(&output, "output", "-", "Output path. \"-\" means writing to stdout")
 	flag.StringVar(&license, "license", "Elastic", "License header for generated file.")
 }
 

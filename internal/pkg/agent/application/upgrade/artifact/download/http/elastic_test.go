@@ -122,7 +122,7 @@ func TestVerify(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testVerifier, err := NewVerifier(config, true, nil)
+			testVerifier, err := NewVerifier(log, config, true, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

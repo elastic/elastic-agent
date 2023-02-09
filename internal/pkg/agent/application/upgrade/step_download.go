@@ -103,12 +103,12 @@ func newVerifier(version string, log *logger.Logger, settings *artifact.Config) 
 		return nil, err
 	}
 
-	snapshotVerifier, err := snapshot.NewVerifier(settings, allowEmptyPgp, pgp, version)
+	snapshotVerifier, err := snapshot.NewVerifier(log, settings, allowEmptyPgp, pgp, version)
 	if err != nil {
 		return nil, err
 	}
 
-	remoteVerifier, err := http.NewVerifier(settings, allowEmptyPgp, pgp)
+	remoteVerifier, err := http.NewVerifier(log, settings, allowEmptyPgp, pgp)
 	if err != nil {
 		return nil, err
 	}

@@ -21,8 +21,8 @@ import (
 const (
 	flagSourceURI    = "source-uri"
 	flagSkipVerify   = "skip-verify"
-	flagPGPBytes     = "pgp-bytes"
-	flagPGPBytesPath = "pgp-bytes-path"
+	flagPGPBytes     = "pgp"
+	flagPGPBytesPath = "pgp-path"
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {

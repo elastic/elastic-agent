@@ -28,7 +28,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 
 	// try snapshot repo before official
 	if release.Snapshot() {
-		snapshotVerifier, err := snapshot.NewVerifier(config, allowEmptyPgp, pgp, "")
+		snapshotVerifier, err := snapshot.NewVerifier(log, config, allowEmptyPgp, pgp, "")
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -36,7 +36,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 		}
 	}
 
-	remoteVer, err := http.NewVerifier(config, allowEmptyPgp, pgp)
+	remoteVer, err := http.NewVerifier(log, config, allowEmptyPgp, pgp)
 	if err != nil {
 		return nil, err
 	}

@@ -31,11 +31,12 @@ type Verifier struct {
 	client        http.Client
 	pgpBytes      []byte
 	allowEmptyPgp bool
+	log           progressLogger
 }
 
 // NewVerifier create a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
+func NewVerifier(log progressLogger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
 	if len(pgp) == 0 && !allowEmptyPgp {
 		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
 	}
@@ -55,6 +56,7 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 		client:        *client,
 		allowEmptyPgp: allowEmptyPgp,
 		pgpBytes:      pgp,
+		log:           log,
 	}
 
 	return v, nil
@@ -82,6 +84,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 // location against a key stored on elastic.co website.
 func (v *Verifier) Verify(a artifact.Artifact, version string, skipVerifyOverride bool, pgpBytes ...string) error {
 	if skipVerifyOverride {
+		v.log.Infof("Skipping verification per flag")
 		return nil
 	}
 
@@ -113,8 +116,10 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, skipVerifyOverrid
 func (v *Verifier) verifyAsc(a artifact.Artifact, version string, pgpBytes ...string) error {
 	var pgpChecks [][]byte
 	if len(v.pgpBytes) > 0 {
+		v.log.Infof("Default PGP being appended")
 		pgpChecks = append(pgpChecks, v.pgpBytes)
 	}
+
 	for _, check := range pgpBytes {
 		if len(check) == 0 {
 			continue
@@ -124,8 +129,10 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, pgpBytes ...st
 
 	if len(pgpChecks) == 0 {
 		// no pgp available skip verification process
+		v.log.Infof("No checks defined")
 		return nil
 	}
+	v.log.Infof("Using %d PGP keys", len(pgpBytes))
 
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
@@ -150,13 +157,17 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version string, pgpBytes ...st
 		return errors.New(err, fmt.Sprintf("fetching asc file from %s", ascURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, ascURI))
 	}
 
-	for _, check := range pgpChecks {
+	for i, check := range pgpChecks {
 		err = download.VerifyGPGSignature(fullPath, ascBytes, check)
 		if err == nil {
 			// verify successful
+			v.log.Infof("Verification with PGP[%d] successful", i)
 			return nil
 		}
+		v.log.Warnf("Verification with PGP[%d] succfailed: %v", i, err)
 	}
+
+	v.log.Warnf("Verification failed")
 
 	// return last error
 	return err
