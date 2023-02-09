@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"go/format"
-	"io/ioutil"
 	"os"
 	"text/template"
 
@@ -83,8 +82,8 @@ func main() {
 	} else {
 		err := os.WriteFile(output, data, 0640)
 		if err != nil {
-		  fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
-		  os.Exit(1)
+			fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+			os.Exit(1)
 		}
 	}
 
