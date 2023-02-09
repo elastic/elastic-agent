@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	control "github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -23,6 +24,7 @@ const (
 	flagSkipVerify   = "skip-verify"
 	flagPGPBytes     = "pgp"
 	flagPGPBytesPath = "pgp-path"
+	flagPGPBytesURI  = "pgp-uri"
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -41,6 +43,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().StringP(flagSourceURI, "s", "", "Source URI to download the new version from")
 	cmd.Flags().BoolP(flagSkipVerify, "", false, "Skips package verification")
 	cmd.Flags().String(flagPGPBytes, "", "PGP to use for package verification")
+	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
 
 	return cmd
@@ -60,6 +63,7 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	skipVerification, _ := cmd.Flags().GetBool(flagSkipVerify)
 	var pgpChecks []string
 	if !skipVerification {
+		// get local PGP
 		pgpPath, _ := cmd.Flags().GetString(flagPGPBytesPath)
 		if len(pgpPath) > 0 {
 			content, err := ioutil.ReadFile(pgpPath)
@@ -67,13 +71,19 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 				return errors.New(err, "failed to read pgp file")
 			}
 			if len(content) > 0 {
-				pgpChecks = append(pgpChecks, string(content))
+				pgpChecks = append(pgpChecks, download.PgpSourceRawPrefix+string(content))
 			}
 		}
 
 		pgpBytes, _ := cmd.Flags().GetString(flagPGPBytes)
 		if len(pgpBytes) > 0 {
-			pgpChecks = append(pgpChecks, pgpBytes)
+			pgpChecks = append(pgpChecks, download.PgpSourceRawPrefix+pgpBytes)
+		}
+
+		pgpUri, _ := cmd.Flags().GetString(flagPGPBytesURI)
+		if len(pgpUri) > 0 {
+			// URI is parsed later with proper TLS and Proxy config within downloader
+			pgpChecks = append(pgpChecks, download.PgpSourceURIPrefix+pgpUri)
 		}
 	}
 
