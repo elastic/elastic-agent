@@ -173,7 +173,7 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 	}
 
 	corruptedHash := append([]byte{1, 2, 3, 4, 5, 6}, hashContent[6:]...)
-	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666) //nolint:gosec // no sweat, it's a test
+	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666)
 }
 
 func TestVerify(t *testing.T) {
@@ -237,11 +237,11 @@ func prepareTestCase(a artifact.Artifact, version string, cfg *artifact.Config) 
 	hash := sha512.Sum512(content)
 	hashContent := fmt.Sprintf("%x %s", hash, filename)
 
-	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), content, 0644); err != nil { //nolint:gosec // no sweat, it's a test
+	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), content, 0644); err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644) //nolint:gosec // no sweat, it's a test
+	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644)
 }
 
 func assertFileExists(t testing.TB, path string) {

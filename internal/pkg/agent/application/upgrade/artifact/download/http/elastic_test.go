@@ -149,7 +149,6 @@ func getTestCases() []testCase {
 	}
 }
 
-//nolint:gosec,G404 // this is just for unit tests secure random number is not needed
 func getRandomTestCases() []testCase {
 	tt := getTestCases()
 
