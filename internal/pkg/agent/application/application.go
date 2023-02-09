@@ -56,6 +56,15 @@ func New(
 	}
 	log.Info("Determined allowed capabilities")
 
+	defer func() {
+		err := recover()
+		if err != nil {
+			log.Errorf("Panic!!!! %v", err)
+			panic(err)
+		}
+
+	}()
+
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
