@@ -273,7 +273,11 @@ func copyRunDirectory(log *logger.Logger, newHash string) error {
 		log.Debugw("Run directory not present", "old_run_path", oldRunPath)
 		return nil
 	}
-	return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
+	if err != nil {
+		return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
+	}
+
+	return nil
 }
 
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.

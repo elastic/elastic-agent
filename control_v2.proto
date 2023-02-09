@@ -173,6 +173,10 @@ message StateResponse {
   string message = 3;
   // State of each component in Elastic Agent.
   repeated ComponentState components = 4;
+  // Fleet connectivity state of Elastic Agent.
+  State fleetState = 5;
+  // Fleet connectivity state message of Elastic Agent.
+  string fleetMessage = 6;
 }
 
 // DiagnosticFileResult is a file result from a diagnostic result.
