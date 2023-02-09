@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -33,6 +34,7 @@ var (
 )
 
 func TestFetchVerify(t *testing.T) {
+	log, _ := logger.New("", false)
 	timeout := 15 * time.Second
 	dropPath := filepath.Join("testdata", "drop")
 	installPath := filepath.Join("testdata", "install")
@@ -62,7 +64,7 @@ func TestFetchVerify(t *testing.T) {
 	assert.NoError(t, err)
 
 	downloader := NewDownloader(config)
-	verifier, err := NewVerifier(config, true, nil)
+	verifier, err := NewVerifier(log, config, true, nil)
 	assert.NoError(t, err)
 
 	// first download verify should fail:
@@ -175,6 +177,7 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 }
 
 func TestVerify(t *testing.T) {
+	log, _ := logger.New("", false)
 	targetDir, err := ioutil.TempDir(os.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +210,7 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testVerifier, err := NewVerifier(config, true, nil)
+	testVerifier, err := NewVerifier(log, config, true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

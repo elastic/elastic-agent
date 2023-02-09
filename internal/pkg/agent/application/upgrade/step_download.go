@@ -98,7 +98,7 @@ func newVerifier(version string, log *logger.Logger, settings *artifact.Config) 
 		return localremote.NewVerifier(log, settings, allowEmptyPgp, pgp)
 	}
 
-	fsVerifier, err := fs.NewVerifier(settings, allowEmptyPgp, pgp)
+	fsVerifier, err := fs.NewVerifier(log, settings, allowEmptyPgp, pgp)
 	if err != nil {
 		return nil, err
 	}

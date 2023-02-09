@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -26,11 +27,12 @@ type Verifier struct {
 	config        *artifact.Config
 	pgpBytes      []byte
 	allowEmptyPgp bool
+	log           *logger.Logger
 }
 
 // NewVerifier creates a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
+func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
 	if len(pgp) == 0 && !allowEmptyPgp {
 		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
 	}
@@ -39,6 +41,7 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 		config:        config,
 		allowEmptyPgp: allowEmptyPgp,
 		pgpBytes:      pgp,
+		log:           log,
 	}
 
 	return v, nil
@@ -48,6 +51,7 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 // location against a key stored on elastic.co website.
 func (v *Verifier) Verify(a artifact.Artifact, version string, skipVerifyOverride bool, pgpBytes ...string) error {
 	if skipVerifyOverride {
+		v.log.Infof("Skipping verification per flag")
 		return nil
 	}
 
@@ -81,6 +85,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, skipVerifyOverrid
 func (v *Verifier) verifyAsc(fullPath string, pgpBytes ...string) error {
 	var pgpChecks [][]byte
 	if len(v.pgpBytes) > 0 {
+		v.log.Infof("Default PGP being appended")
 		pgpChecks = append(pgpChecks, v.pgpBytes)
 	}
 	for _, check := range pgpBytes {
@@ -92,8 +97,10 @@ func (v *Verifier) verifyAsc(fullPath string, pgpBytes ...string) error {
 
 	if len(pgpChecks) == 0 {
 		// no pgp available skip verification process
+		v.log.Infof("No checks defined")
 		return nil
 	}
+	v.log.Infof("Using %d PGP keys", len(pgpBytes))
 
 	ascBytes, err := v.getPublicAsc(fullPath)
 	if err != nil && v.allowEmptyPgp {
@@ -103,13 +110,17 @@ func (v *Verifier) verifyAsc(fullPath string, pgpBytes ...string) error {
 		return err
 	}
 
-	for _, check := range pgpChecks {
+	for i, check := range pgpChecks {
 		err = download.VerifyGPGSignature(fullPath, ascBytes, check)
 		if err == nil {
 			// verify successful
+			v.log.Infof("Verification with PGP[%d] successful", i)
 			return nil
 		}
+		v.log.Warnf("Verification with PGP[%d] succfailed: %v", i, err)
 	}
+
+	v.log.Warnf("Verification failed")
 
 	// return last error
 	return err
