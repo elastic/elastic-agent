@@ -81,7 +81,7 @@ func main() {
 		os.Stdout.Write(data)
 		return
 	} else {
-		ioutil.WriteFile(output, data, 0640)
+		_ = ioutil.WriteFile(output, data, 0640)
 	}
 
 	return
@@ -94,7 +94,7 @@ func gen(path string, l string) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	tmplPgp.Execute(&buf, struct {
+	err = tmplPgp.Execute(&buf, struct {
 		Pack    string
 		Files   []string
 		License string
@@ -103,6 +103,9 @@ func gen(path string, l string) ([]byte, error) {
 		Files:   files,
 		License: l,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
