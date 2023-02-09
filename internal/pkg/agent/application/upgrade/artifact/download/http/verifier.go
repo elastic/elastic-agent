@@ -82,12 +82,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string, skipVerifyOverride bool, pgpBytes ...string) error {
-	if skipVerifyOverride {
-		v.log.Infof("Skipping verification per flag")
-		return nil
-	}
-
+func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...string) error {
 	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")

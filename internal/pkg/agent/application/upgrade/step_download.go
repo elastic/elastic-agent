@@ -47,11 +47,6 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 		"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 
-	verifier, err := newVerifier(version, u.log, &settings)
-	if err != nil {
-		return "", errors.New(err, "initiating verifier")
-	}
-
 	fetcher, err := newDownloader(version, u.log, &settings)
 	if err != nil {
 		return "", errors.New(err, "initiating fetcher")
@@ -66,7 +61,16 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, "failed upgrade of agent binary")
 	}
 
-	if err := verifier.Verify(agentArtifact, version, skipVerifyOverride, pgpBytes...); err != nil {
+	if skipVerifyOverride {
+		return path, nil
+	}
+
+	verifier, err := newVerifier(version, u.log, &settings)
+	if err != nil {
+		return "", errors.New(err, "initiating verifier")
+	}
+
+	if err := verifier.Verify(agentArtifact, version, pgpBytes...); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
 

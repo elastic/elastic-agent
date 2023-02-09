@@ -63,12 +63,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string, skipVerifyOverride bool, pgpBytes ...string) error {
-	if skipVerifyOverride {
-		v.log.Infof("Skipping verification per flag")
-		return nil
-	}
-
+func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")

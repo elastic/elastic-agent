@@ -70,7 +70,7 @@ func TestFetchVerify(t *testing.T) {
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(s, version, false)
+	err = verifier.Verify(s, version)
 	var checksumErr *download.ChecksumMismatchError
 	assert.ErrorAs(t, err, &checksumErr)
 
@@ -79,10 +79,6 @@ func TestFetchVerify(t *testing.T) {
 
 	_, err = os.Stat(hashTargetFilePath)
 	assert.True(t, os.IsNotExist(err))
-
-	// skip should pass though
-	err = verifier.Verify(s, version, true)
-	assert.True(t, err == nil, "skip verify failed")
 
 	// second one should pass
 	// download not skipped: package missing
@@ -97,7 +93,7 @@ func TestFetchVerify(t *testing.T) {
 	_, err = os.Stat(hashTargetFilePath)
 	assert.NoError(t, err)
 
-	err = verifier.Verify(s, version, false)
+	err = verifier.Verify(s, version)
 	assert.NoError(t, err)
 
 	// Enable GPG signature validation.
@@ -117,7 +113,7 @@ func TestFetchVerify(t *testing.T) {
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(s, version, false)
+		err = verifier.Verify(s, version)
 		require.Error(t, err)
 
 		// Don't delete these files when GPG validation failure.
@@ -130,7 +126,7 @@ func TestFetchVerify(t *testing.T) {
 		err = ioutil.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(s, version, false)
+		err = verifier.Verify(s, version)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
 
@@ -215,7 +211,7 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = testVerifier.Verify(beatSpec, version, false)
+	err = testVerifier.Verify(beatSpec, version)
 	require.NoError(t, err)
 
 	os.Remove(artifact)
