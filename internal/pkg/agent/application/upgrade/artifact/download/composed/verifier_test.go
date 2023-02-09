@@ -90,6 +90,5 @@ type CheckableVerifier interface {
 type verifyTestCase struct {
 	verifiers      []CheckableVerifier
 	checkFunc      func(verifiers []CheckableVerifier) bool
-	skipOverride   bool
 	expectedResult bool
 }
