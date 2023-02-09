@@ -81,7 +81,11 @@ func main() {
 		os.Stdout.Write(data)
 		return
 	} else {
-		_ = ioutil.WriteFile(output, data, 0640)
+		err := os.WriteFile(output, data, 0640)
+		if err != nil {
+		  fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
+		  os.Exit(1)
+		}
 	}
 
 	return
