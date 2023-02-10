@@ -1,12 +1,17 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package coordinator
 
 import (
 	"context"
+	"sync"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"sync"
 )
 
 // State provides the current state of the coordinator along with all the current states of components and units.
