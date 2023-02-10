@@ -144,6 +144,7 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 	}
 	info := sysInfo.Info()
 
+	logp.L().Infof("AgentInfo.ECSMetadata features fqdn: %t", features.FQDN())
 	var hostname string
 	if features.FQDN() {
 		hostname = info.FQDN
