@@ -725,6 +725,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		}
 	}
 
+	c.logger.Infof("coordinator.processConfig parsing feature flags fqdn")
 	if err := features.Parse(cfg); err != nil {
 		return fmt.Errorf("could not update feature flags config: %w", err)
 	}
