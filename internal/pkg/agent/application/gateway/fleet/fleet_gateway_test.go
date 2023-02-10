@@ -399,7 +399,7 @@ func (testAgentInfo) AgentID() string { return "agent-secret" }
 
 type emptyStateFetcher struct{}
 
-func (e *emptyStateFetcher) State(_ bool) coordinator.State {
+func (e *emptyStateFetcher) State() coordinator.State {
 	return coordinator.State{}
 }
 

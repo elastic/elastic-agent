@@ -192,7 +192,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
@@ -208,6 +208,15 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	control := server.New(l.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+
+	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in TESTING_MODE and
+	// the configuration will come in over the control protocol, so we set the config setting on the control protocol
+	// server so when the configuration comes in it gets passed to the coordinator
+	testingSetter, ok := configMgr.(server.TestModeConfigSetter)
+	if ok {
+		control.SetTestModeConfigSetter(testingSetter)
+	}
+
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err

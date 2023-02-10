@@ -24,7 +24,7 @@ type LivenessResponse struct {
 // Response code is 200 for a healthy agent, and 503 otherwise.
 // Response body is a JSON object that contains the agent ID, status, message, and the last status update time.
 func (c *Coordinator) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	s := c.State(true)
+	s := c.State()
 	lr := LivenessResponse{
 		ID:      c.agentInfo.AgentID(),
 		Status:  s.State.String(),

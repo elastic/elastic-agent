@@ -316,7 +316,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher.State(false)
+	state := f.stateFetcher.State()
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components)
