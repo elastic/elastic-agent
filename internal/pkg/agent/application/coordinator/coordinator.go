@@ -184,7 +184,7 @@ func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, 
 	if !isManaged {
 		// default enum value is STARTING which is confusing for standalone
 		fleetState = agentclient.Stopped
-		fleetMessage = "Not connected to Fleet"
+		fleetMessage = "Not enrolled into Fleet"
 	}
 	return &Coordinator{
 		logger:     logger,
