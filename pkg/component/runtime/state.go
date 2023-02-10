@@ -57,7 +57,8 @@ type ComponentState struct {
 	State   client.UnitState `yaml:"state"`
 	Message string           `yaml:"message"`
 
-	Units map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
+	Units    map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
+	Features proto.Features
 
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
@@ -159,6 +160,7 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 			}
 		}
 	}
+
 	return changed
 }
 

@@ -655,10 +655,10 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 	if err != nil {
 		return err
 	}
-
 	touched := make(map[string]bool)
 	newComponents := make([]component.Component, 0, len(components))
 	for _, comp := range components {
+
 		touched[comp.ID] = true
 		existing, ok := m.current[comp.ID]
 		if ok {

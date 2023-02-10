@@ -43,7 +43,7 @@ agent:
 			yaml: `
 agent:
   features:
-    fqdn:5`,
+    fqdn:`,
 			want: false,
 		},
 		{

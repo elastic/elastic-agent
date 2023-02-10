@@ -6,10 +6,11 @@ package info
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"strings"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 
@@ -137,17 +138,18 @@ func Metadata() (*ECSMeta, error) {
 
 // ECSMetadata returns an agent ECS compliant metadata.
 func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
 	sysInfo, err := sysinfo.Host()
 	if err != nil {
 		return nil, err
 	}
-
 	info := sysInfo.Info()
+
+	var hostname string
+	if features.FQDN() {
+		hostname = info.FQDN
+	} else {
+		hostname = info.Hostname
+	}
 
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
@@ -185,11 +187,6 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 
 // ECSMetadataFlatMap returns an agent ECS compliant metadata in a form of flattened map.
 func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
 	// TODO: remove these values when kibana migrates to ECS
 	meta := make(map[string]interface{})
 
@@ -197,8 +194,16 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	info := sysInfo.Info()
+
+	var hostname string
+	if features.FQDN() {
+		logp.L().Infof("AgentInfo.ECSMetadataFlatMap feature fqdn enabled: %t")
+		hostname = info.FQDN
+	} else {
+		logp.L().Infof("AgentInfo.ECSMetadataFlatMap feature fqdn enabled: %t")
+		hostname = info.Hostname
+	}
 
 	// Agent
 	meta[agentIDKey] = i.agentID

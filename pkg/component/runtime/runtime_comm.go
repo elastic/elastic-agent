@@ -11,17 +11,17 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gofrs/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	protobuf "google.golang.org/protobuf/proto"
-
-	"github.com/gofrs/uuid"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // Communicator provides an interface for a runtime to communicate with its running component.
@@ -132,10 +132,7 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 	return nil
 }
 
-func (c *runtimeComm) CheckinExpected(
-	expected *proto.CheckinExpected,
-	observed *proto.CheckinObserved,
-) {
+func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected, observed *proto.CheckinObserved) {
 	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
 		expected.AgentInfo = &proto.CheckinAgentInfo{
 			Id:       c.agentInfo.AgentID(),
@@ -145,6 +142,13 @@ func (c *runtimeComm) CheckinExpected(
 	} else {
 		expected.AgentInfo = nil
 	}
+
+	fs := features.ProtoFeatures()
+	expected.Features = &fs
+	c.logger.Infof("[%s] runtimeComm.CheckinExpected features fqdn: %t",
+		c.name, expected.Features.Fqdn.Enabled)
+	c.logger.Infof("[%s]runtimeComm.CheckinExpected features: %v",
+		c.name, expected.GetFeatures())
 
 	// we need to determine if the communicator is currently in the initial observed message path
 	// in the case that it is we send the expected state over a different channel
@@ -228,6 +232,10 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		case <-recvDone:
 			return
 		case expected := <-initExp:
+			c.logger.Infof("runtimeComm.checkin initExp: feature fqdn expected: %t",
+				expected.Features.Fqdn.Enabled)
+			c.logger.Infof("runtimeComm.checkin initExp: feature fqdn featureFlag: %t",
+				features.FQDN())
 			err := server.Send(expected)
 			if err != nil {
 				if reportableErr(err) {

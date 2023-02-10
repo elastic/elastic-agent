@@ -22,7 +22,7 @@ import (
 )
 
 // DefaultCheckInterval is the default timeout used to check if any host information has changed.
-const DefaultCheckInterval = 5 * time.Minute
+const DefaultCheckInterval = 30 * time.Second
 
 func init() {
 	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
@@ -103,7 +103,8 @@ func getHostInfo() (map[string]interface{}, error) {
 
 	info := sysInfo.Info()
 	name := info.Hostname
-	logp.L().Infof("fqdn enabled: %t", features.FQDN())
+	logp.L().Infof("providers.getHostInfo feature fqdn enabled: %t",
+		features.FQDN())
 	if features.FQDN() {
 		name = info.FQDN
 	}
