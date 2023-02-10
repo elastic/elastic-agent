@@ -143,7 +143,7 @@ func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected, observed 
 		expected.AgentInfo = nil
 	}
 
-	fs := features.ProtoFeatures()
+	fs := features.AsProto()
 	expected.Features = &fs
 	c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %t",
 		expected.Features.Fqdn.Enabled)

@@ -57,7 +57,7 @@ func FQDN() bool {
 	return flags.fqdn
 }
 
-func ProtoFeatures() proto.Features {
+func AsProto() proto.Features {
 	mu.Lock()
 	defer mu.Unlock()
 	return proto.Features{
