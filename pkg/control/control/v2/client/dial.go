@@ -2,27 +2,28 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build windows
-// +build windows
+//go:build !windows
+// +build !windows
 
 package client
 
 import (
 	"context"
 	"net"
+	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/control/control"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
 )
 
 func dialContext(ctx context.Context, grpcConfig *configuration.GRPCConfig) (*grpc.ClientConn, error) {
 	return grpc.DialContext(
 		ctx,
-		control.Address(),
+		strings.TrimPrefix(control.Address(), "unix://"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxMsgSize)),
@@ -30,5 +31,6 @@ func dialContext(ctx context.Context, grpcConfig *configuration.GRPCConfig) (*gr
 }
 
 func dialer(ctx context.Context, addr string) (net.Conn, error) {
-	return npipe.DialContext(addr)(ctx, "", "")
+	var d net.Dialer
+	return d.DialContext(ctx, "unix", addr)
 }

@@ -7,11 +7,12 @@ package server
 import (
 	"context"
 
+	"github.com/elastic/elastic-agent/pkg/control/control"
+	"github.com/elastic/elastic-agent/pkg/control/control/v1/proto"
+	v2proto "github.com/elastic/elastic-agent/pkg/control/control/v2/cproto"
+
 	"go.elastic.co/apm"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/proto"
-	v2proto "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )

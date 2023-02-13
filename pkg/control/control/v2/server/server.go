@@ -12,6 +12,11 @@ import (
 	"net"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control/control"
+	"github.com/elastic/elastic-agent/pkg/control/control/v1/proto"
+	v1server "github.com/elastic/elastic-agent/pkg/control/control/v1/server"
+	cproto2 "github.com/elastic/elastic-agent/pkg/control/control/v2/cproto"
+
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
@@ -21,10 +26,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/proto"
-	v1server "github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/server"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -40,7 +41,7 @@ type TestModeConfigSetter interface {
 
 // Server is the daemon side of the control protocol.
 type Server struct {
-	cproto.UnimplementedElasticAgentControlServer
+	cproto2.UnimplementedElasticAgentControlServer
 
 	logger     *logger.Logger
 	agentInfo  *info.AgentInfo
@@ -90,7 +91,7 @@ func (s *Server) Start() error {
 	} else {
 		s.server = grpc.NewServer(grpc.MaxRecvMsgSize(s.grpcConfig.MaxMsgSize))
 	}
-	cproto.RegisterElasticAgentControlServer(s.server, s)
+	cproto2.RegisterElasticAgentControlServer(s.server, s)
 
 	v1Wrapper := v1server.New(s.logger, s, s.tracer)
 	proto.RegisterElasticAgentControlServer(s.server, v1Wrapper)
@@ -117,8 +118,8 @@ func (s *Server) Stop() {
 }
 
 // Version returns the currently running version.
-func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionResponse, error) {
-	return &cproto.VersionResponse{
+func (s *Server) Version(_ context.Context, _ *cproto2.Empty) (*cproto2.VersionResponse, error) {
+	return &cproto2.VersionResponse{
 		Version:   release.Version(),
 		Commit:    release.Commit(),
 		BuildTime: release.BuildTime().Format(control.TimeFormat()),
@@ -127,13 +128,13 @@ func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionRes
 }
 
 // State returns the overall state of the agent.
-func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateResponse, error) {
+func (s *Server) State(_ context.Context, _ *cproto2.Empty) (*cproto2.StateResponse, error) {
 	state := s.coord.State()
 	return stateToProto(&state, s.agentInfo)
 }
 
 // StateWatch streams the current state of the Elastic Agent to the client.
-func (s *Server) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
+func (s *Server) StateWatch(_ *cproto2.Empty, srv cproto2.ElasticAgentControl_StateWatchServer) error {
 	ctx := srv.Context()
 	sub := s.coord.StateSubscribe(ctx)
 	for {
@@ -154,37 +155,37 @@ func (s *Server) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_Stat
 }
 
 // Restart performs re-exec.
-func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartResponse, error) {
+func (s *Server) Restart(_ context.Context, _ *cproto2.Empty) (*cproto2.RestartResponse, error) {
 	s.coord.ReExec(nil)
-	return &cproto.RestartResponse{
-		Status: cproto.ActionStatus_SUCCESS,
+	return &cproto2.RestartResponse{
+		Status: cproto2.ActionStatus_SUCCESS,
 	}, nil
 }
 
 // Upgrade performs the upgrade operation.
-func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
+func (s *Server) Upgrade(ctx context.Context, request *cproto2.UpgradeRequest) (*cproto2.UpgradeResponse, error) {
 	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil)
 	if err != nil {
-		return &cproto.UpgradeResponse{
-			Status: cproto.ActionStatus_FAILURE,
+		return &cproto2.UpgradeResponse{
+			Status: cproto2.ActionStatus_FAILURE,
 			Error:  err.Error(),
 		}, nil
 	}
-	return &cproto.UpgradeResponse{
-		Status:  cproto.ActionStatus_SUCCESS,
+	return &cproto2.UpgradeResponse{
+		Status:  cproto2.ActionStatus_SUCCESS,
 		Version: request.Version,
 	}, nil
 }
 
 // DiagnosticAgent returns diagnostic information for this running Elastic Agent.
-func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentRequest) (*cproto.DiagnosticAgentResponse, error) {
-	res := make([]*cproto.DiagnosticFileResult, 0, len(s.diagHooks))
+func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto2.DiagnosticAgentRequest) (*cproto2.DiagnosticAgentResponse, error) {
+	res := make([]*cproto2.DiagnosticFileResult, 0, len(s.diagHooks))
 	for _, h := range s.diagHooks {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 		r := h.Hook(ctx)
-		res = append(res, &cproto.DiagnosticFileResult{
+		res = append(res, &cproto2.DiagnosticFileResult{
 			Name:        h.Name,
 			Filename:    h.Filename,
 			Description: h.Description,
@@ -196,11 +197,11 @@ func (s *Server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentR
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	return &cproto.DiagnosticAgentResponse{Results: res}, nil
+	return &cproto2.DiagnosticAgentResponse{Results: res}, nil
 }
 
 // DiagnosticUnits returns diagnostic information for the specific units (or all units if non-provided).
-func (s *Server) DiagnosticUnits(req *cproto.DiagnosticUnitsRequest, srv cproto.ElasticAgentControl_DiagnosticUnitsServer) error {
+func (s *Server) DiagnosticUnits(req *cproto2.DiagnosticUnitsRequest, srv cproto2.ElasticAgentControl_DiagnosticUnitsServer) error {
 	reqs := make([]runtime.ComponentUnitDiagnosticRequest, 0, len(req.Units))
 	for _, u := range req.Units {
 		reqs = append(reqs, runtime.ComponentUnitDiagnosticRequest{
@@ -216,9 +217,9 @@ func (s *Server) DiagnosticUnits(req *cproto.DiagnosticUnitsRequest, srv cproto.
 
 	diag := s.coord.PerformDiagnostics(srv.Context(), reqs...)
 	for _, d := range diag {
-		r := &cproto.DiagnosticUnitResponse{
+		r := &cproto2.DiagnosticUnitResponse{
 			ComponentId: d.Component.ID,
-			UnitType:    cproto.UnitType(d.Unit.Type),
+			UnitType:    cproto2.UnitType(d.Unit.Type),
 			UnitId:      d.Unit.ID,
 			Error:       "",
 			Results:     nil,
@@ -226,9 +227,9 @@ func (s *Server) DiagnosticUnits(req *cproto.DiagnosticUnitsRequest, srv cproto.
 		if d.Err != nil {
 			r.Error = d.Err.Error()
 		} else {
-			results := make([]*cproto.DiagnosticFileResult, 0, len(d.Results))
+			results := make([]*cproto2.DiagnosticFileResult, 0, len(d.Results))
 			for _, fr := range d.Results {
-				results = append(results, &cproto.DiagnosticFileResult{
+				results = append(results, &cproto2.DiagnosticFileResult{
 					Name:        fr.Name,
 					Filename:    fr.Filename,
 					Description: fr.Description,
@@ -251,7 +252,7 @@ func (s *Server) DiagnosticUnits(req *cproto.DiagnosticUnitsRequest, srv cproto.
 // Configure configures the running Elastic Agent configuration.
 //
 // Only available in TESTING_MODE.
-func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*cproto.Empty, error) {
+func (s *Server) Configure(ctx context.Context, req *cproto2.ConfigureRequest) (*cproto2.Empty, error) {
 	if s.tmSetter == nil {
 		return nil, errors.New("TESTING_MODE is not enabled")
 	}
@@ -259,14 +260,14 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	return &cproto.Empty{}, nil
+	return &cproto2.Empty{}, nil
 }
 
-func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.StateResponse, error) {
+func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto2.StateResponse, error) {
 	var err error
-	components := make([]*cproto.ComponentState, 0, len(state.Components))
+	components := make([]*cproto2.ComponentState, 0, len(state.Components))
 	for _, comp := range state.Components {
-		units := make([]*cproto.ComponentUnitState, 0, len(comp.State.Units))
+		units := make([]*cproto2.ComponentUnitState, 0, len(comp.State.Units))
 		for key, unit := range comp.State.Units {
 			payload := []byte("")
 			if unit.Payload != nil {
@@ -275,29 +276,29 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 					return nil, fmt.Errorf("failed to marshal componend %s unit %s payload: %w", comp.Component.ID, key.UnitID, err)
 				}
 			}
-			units = append(units, &cproto.ComponentUnitState{
-				UnitType: cproto.UnitType(key.UnitType),
+			units = append(units, &cproto2.ComponentUnitState{
+				UnitType: cproto2.UnitType(key.UnitType),
 				UnitId:   key.UnitID,
-				State:    cproto.State(unit.State),
+				State:    cproto2.State(unit.State),
 				Message:  unit.Message,
 				Payload:  string(payload),
 			})
 		}
-		components = append(components, &cproto.ComponentState{
+		components = append(components, &cproto2.ComponentState{
 			Id:      comp.Component.ID,
 			Name:    comp.Component.Type(),
-			State:   cproto.State(comp.State.State),
+			State:   cproto2.State(comp.State.State),
 			Message: comp.State.Message,
 			Units:   units,
-			VersionInfo: &cproto.ComponentVersionInfo{
+			VersionInfo: &cproto2.ComponentVersionInfo{
 				Name:    comp.State.VersionInfo.Name,
 				Version: comp.State.VersionInfo.Version,
 				Meta:    comp.State.VersionInfo.Meta,
 			},
 		})
 	}
-	return &cproto.StateResponse{
-		Info: &cproto.StateAgentInfo{
+	return &cproto2.StateResponse{
+		Info: &cproto2.StateAgentInfo{
 			Id:        agentInfo.AgentID(),
 			Version:   release.Version(),
 			Commit:    release.Commit(),

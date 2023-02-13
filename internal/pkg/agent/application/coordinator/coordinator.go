@@ -9,6 +9,9 @@ import (
 	"errors"
 	"fmt"
 
+	agentclient "github.com/elastic/elastic-agent/pkg/control/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/control/v2/cproto"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"gopkg.in/yaml.v2"
@@ -23,8 +26,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"

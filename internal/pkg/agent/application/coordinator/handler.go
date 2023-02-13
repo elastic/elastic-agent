@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/control/v2/client"
 )
 
 // LivenessResponse is the response body for the liveness endpoint.
