@@ -145,8 +145,16 @@ func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected, observed 
 
 	fs := features.AsProto()
 	expected.Features = &fs
-	c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %t",
-		expected.Features.Fqdn.Enabled)
+	c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %t. Units: %d",
+		expected.Features.Fqdn.Enabled, len(expected.Units))
+	if len(expected.Units) >= 0 {
+		var uids []string
+		for _, u := range expected.Units {
+			uids = append(uids, u.GetId())
+		}
+		c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %t for: %s",
+			expected.Features.Fqdn.Enabled, strings.Join(uids, ", "))
+	}
 
 	// we need to determine if the communicator is currently in the initial observed message path
 	// in the case that it is we send the expected state over a different channel
