@@ -11,6 +11,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +22,11 @@ import (
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+)
+
+const (
+	PgpSourceRawPrefix = "pgp_raw:"
+	PgpSourceURIPrefix = "pgp_uri:"
 )
 
 // ChecksumMismatchError indicates the expected checksum for a file does not
@@ -55,7 +62,7 @@ type Verifier interface {
 	// *download.ChecksumMismatchError. And if the GPG signature is invalid then
 	// Verify returns a *download.InvalidSignatureError. Use errors.As() to
 	// check error types.
-	Verify(a artifact.Artifact, version string) error
+	Verify(a artifact.Artifact, version string, pgpBytes ...string) error
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum
@@ -155,4 +162,30 @@ func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) erro
 	}
 
 	return nil
+}
+
+func PgpBytesFromSource(source string, client http.Client) ([]byte, error) {
+	if strings.HasPrefix(source, PgpSourceRawPrefix) {
+		return []byte(strings.TrimPrefix(source, PgpSourceRawPrefix)), nil
+	}
+
+	if strings.HasPrefix(source, PgpSourceURIPrefix) {
+		return fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
+	}
+
+	return nil, errors.New("unknown pgp source")
+}
+
+func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
+	resp, err := client.Get(uri)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", uri, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, uri))
+	}
+
+	return ioutil.ReadAll(resp.Body)
 }
