@@ -12,10 +12,19 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	control "github.com/elastic/elastic-agent/internal/pkg/agent/control"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+)
+
+const (
+	flagSourceURI    = "source-uri"
+	flagSkipVerify   = "skip-verify"
+	flagPGPBytes     = "pgp"
+	flagPGPBytesPath = "pgp-path"
+	flagPGPBytesURI  = "pgp-uri"
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -31,14 +40,18 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringP("source-uri", "s", "", "Source URI to download the new version from")
+	cmd.Flags().StringP(flagSourceURI, "s", "", "Source URI to download the new version from")
+	cmd.Flags().BoolP(flagSkipVerify, "", false, "Skips package verification")
+	cmd.Flags().String(flagPGPBytes, "", "PGP to use for package verification")
+	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
+	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
 
 	return cmd
 }
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 	version := args[0]
-	sourceURI, _ := cmd.Flags().GetString("source-uri")
+	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
 
 	c := client.New()
 	err := c.Connect(context.Background())

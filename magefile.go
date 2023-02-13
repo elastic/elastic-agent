@@ -489,7 +489,7 @@ func BuildPGP() error {
 	out := filepath.Join("internal", "pkg", "release", "pgp.go")
 
 	fmt.Printf(">> BuildPGP from %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return RunGo("run", goF, "--in", in, "--output", out)
 }
 
 func configYML() error {

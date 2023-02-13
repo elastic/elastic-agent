@@ -25,6 +25,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
+const (
+	PgpSourceRawPrefix = "pgp_raw:"
+	PgpSourceURIPrefix = "pgp_uri:"
+)
+
 // ChecksumMismatchError indicates the expected checksum for a file does not
 // match the computed checksum.
 type ChecksumMismatchError struct {
@@ -58,7 +63,7 @@ type Verifier interface {
 	// *download.ChecksumMismatchError. And if the GPG signature is invalid then
 	// Verify returns a *download.InvalidSignatureError. Use errors.As() to
 	// check error types.
-	Verify(a artifact.Artifact, version string) error
+	Verify(a artifact.Artifact, version string, pgpBytes ...string) error
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum
