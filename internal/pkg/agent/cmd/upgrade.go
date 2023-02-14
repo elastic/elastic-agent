@@ -27,6 +27,8 @@ const (
 	flagPGPBytes     = "pgp"
 	flagPGPBytesPath = "pgp-path"
 	flagPGPBytesURI  = "pgp-uri"
+
+	remoteElasticPubKey = download.PgpSourceURIPrefix + "https://artifacts.elastic.co/GPG-KEY-elasticsearch"
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -91,6 +93,9 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 			// URI is parsed later with proper TLS and Proxy config within downloader
 			pgpChecks = append(pgpChecks, download.PgpSourceURIPrefix+pgpUri)
 		}
+
+		// add Elastic remote Public key as last option for fallback
+		pgpChecks = append(pgpChecks, remoteElasticPubKey)
 	}
 
 	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, pgpChecks...)
