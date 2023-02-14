@@ -195,7 +195,7 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 				continue
 			}
 			for _, fr := range ud.Results {
-				filePath := fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Name)
+				filePath := fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Filename)
 				w, err := zw.CreateHeader(&zip.FileHeader{
 					Name:     filePath,
 					Method:   zip.Deflate,
