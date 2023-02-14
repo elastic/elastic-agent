@@ -8,7 +8,9 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -82,6 +84,10 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 		pgpUri, _ := cmd.Flags().GetString(flagPGPBytesURI)
 		if len(pgpUri) > 0 {
+			if uriErr := checkValidUri(pgpUri); uriErr != nil {
+				return uriErr
+			}
+
 			// URI is parsed later with proper TLS and Proxy config within downloader
 			pgpChecks = append(pgpChecks, download.PgpSourceURIPrefix+pgpUri)
 		}
@@ -92,5 +98,18 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		return errors.New(err, "Failed trigger upgrade of daemon")
 	}
 	fmt.Fprintf(streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
+	return nil
+}
+
+func checkValidUri(rawURI string) error {
+	uri, err := url.Parse(rawURI)
+	if err != nil {
+		return err
+	}
+
+	if !strings.EqualFold(uri.Scheme, "https") {
+		return fmt.Errorf("failed to check URI %q: HTTPS is required", rawURI)
+	}
+
 	return nil
 }
