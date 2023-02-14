@@ -153,7 +153,7 @@ based on the SNAPSHOT images with the version defined in `version/version.go`.
 Running `mage cloud:image` in this directory or `make build_elastic_agent_docker_image` in `testing/environments/cloud` will build and push the images. 
 Running `mage cloud:push` in this directory or `make push_elastic_agent_docker_image` in `testing/environments/cloud` will publish built docker image to CI docker repository.
 
-Once docker images are published you can run `EC_API_KEY=your_api_key make apply` rom `testing/environments/cloud` directory to deploy them to Elastic Cloud. 
+Once docker images are published you can run `EC_API_KEY=your_api_key make apply` from `testing/environments/cloud` directory to deploy them to Elastic Cloud. 
 To get `EC_API_KEY` follow [this guide](https://www.elastic.co/guide/en/cloud/current/ec-api-authentication.html)
 
 The custom images are tagged with the current version, commit and timestamp. The
