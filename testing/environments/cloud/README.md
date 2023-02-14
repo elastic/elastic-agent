@@ -1,21 +1,22 @@
 # Cloud-first testing
 
-It is possible for Elastic employees to create an Elastic Cloud deployment with a locally
+Elastic employees can create an Elastic Cloud deployment with a locally
 built Elastic Agent, by pushing images to an internal Docker repository. The images will be 
-based on the SNAPSHOT images with version defined in `version/version.go`.
+based on the SNAPSHOT images with the version defined in `version/version.go`.
 
-Running `make` in this directory will build and push the images. You can then use Terraform
-to create the deployment with `EC_API_KEY=your_api_key make apply`.
+Prerequisite to running following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
+
+Running `mage cloud:image` in this directory or `make build_elastic_agent_docker_image` in `testing/environments/cloud` will build and push the images. 
+Running `mage cloud:push` in this directory or `make push_elastic_agent_docker_image` in `testing/environments/cloud` will publish built docker image to CI docker repository.
+
+Once docker images are published you can run `EC_API_KEY=your_api_key make apply` from `testing/environments/cloud` directory to deploy them to Elastic Cloud. 
 To get `EC_API_KEY` follow [this guide](https://www.elastic.co/guide/en/cloud/current/ec-api-authentication.html)
 
-The custom images are tagged with the current version, commit and a timestamp. The
+The custom images are tagged with the current version, commit and timestamp. The
 timestamp is included to force a new Docker image to be used, which enables pushing new
-binaries without recreating the deployment. Kibana only installs the integration
-package when it first starts up, so any changes to the package will be disregarded when
-updating an existing deployment.
+binaries without recreating the deployment.
 
 
 To specify custom images create your `docker_image.auto.tfvars` file similar to `docker_image.auto.tfvars.sample`. 
 
-Running `make deploy_local` will build Agent, tag docker image correctly, push it to repository and deploy to cloud.
-For main you want to run `EC_API_KEY={your_ec_api_key} SNAPSHOT=true make apply_local`.
+Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.

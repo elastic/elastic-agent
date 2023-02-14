@@ -150,6 +150,8 @@ Elastic employees can create an Elastic Cloud deployment with a locally
 built Elastic Agent, by pushing images to an internal Docker repository. The images will be 
 based on the SNAPSHOT images with the version defined in `version/version.go`.
 
+Prerequisite to running following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
+
 Running `mage cloud:image` in this directory or `make build_elastic_agent_docker_image` in `testing/environments/cloud` will build and push the images. 
 Running `mage cloud:push` in this directory or `make push_elastic_agent_docker_image` in `testing/environments/cloud` will publish built docker image to CI docker repository.
 
@@ -158,9 +160,7 @@ To get `EC_API_KEY` follow [this guide](https://www.elastic.co/guide/en/cloud/cu
 
 The custom images are tagged with the current version, commit and timestamp. The
 timestamp is included to force a new Docker image to be used, which enables pushing new
-binaries without recreating the deployment. Kibana only installs the integration
-package when it first starts up, so any changes to the package will be disregarded when
-updating an existing deployment.
+binaries without recreating the deployment.
 
 
 To specify custom images create your `docker_image.auto.tfvars` file similar to `docker_image.auto.tfvars.sample`. 
