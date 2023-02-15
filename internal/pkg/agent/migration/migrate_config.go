@@ -31,8 +31,8 @@ func MigrateToEncryptedConfig(l *logp.Logger, unencryptedConfigPath string, encr
 
 	unencStat, unencFileErr := os.Stat(unencryptedConfigPath)
 
-	l.Debugf("checking stat of enc config %s: %+v, err: %v", encryptedConfigPath, encStat, encFileErr)
-	l.Debugf("checking stat of unenc config %s: %+v, err: %v", unencryptedConfigPath, unencStat, unencFileErr)
+	l.Debugf("checking stat of enc config %q: %+v, err: %v", encryptedConfigPath, encStat, encFileErr)
+	l.Debugf("checking stat of unenc config %q: %+v, err: %v", unencryptedConfigPath, unencStat, unencFileErr)
 
 	isEncryptedConfigEmpty := errors.Is(encFileErr, fs.ErrNotExist) || encStat.Size() == 0
 	isUnencryptedConfigPresent := unencFileErr == nil && unencStat.Size() > 0
@@ -41,24 +41,24 @@ func MigrateToEncryptedConfig(l *logp.Logger, unencryptedConfigPath string, encr
 		return nil
 	}
 
-	l.Info("Initiating migration of %s to %s", unencryptedConfigPath, encryptedConfigPath)
+	l.Info("Initiating migration of %q to %q", unencryptedConfigPath, encryptedConfigPath)
 	legacyStore := storage.NewDiskStore(unencryptedConfigPath)
 	reader, err := legacyStore.Load()
 	if err != nil {
-		return errors.New(err, fmt.Sprintf("loading of unencrypted config from file %s failed", unencryptedConfigPath))
+		return errors.New(err, fmt.Sprintf("loading of unencrypted config from file %q failed", unencryptedConfigPath))
 	}
 	defer func() {
 		err = reader.Close()
 		if err != nil {
-			l.Errorf("Error closing unencrypted store reader for %s: %v", unencryptedConfigPath, err)
+			l.Errorf("Error closing unencrypted store reader for %q: %v", unencryptedConfigPath, err)
 		}
 	}()
 	store := storage.NewEncryptedDiskStore(encryptedConfigPath)
 	err = store.Save(reader)
 	if err != nil {
-		return errors.New(err, fmt.Sprintf("error writing encrypted config from file %s to file %s", unencryptedConfigPath, encryptedConfigPath))
+		return errors.New(err, fmt.Sprintf("error writing encrypted config from file %q to file %q", unencryptedConfigPath, encryptedConfigPath))
 	}
-	l.Info("Migration of %s to %s complete", unencryptedConfigPath, encryptedConfigPath)
+	l.Info("Migration of %q to %q complete", unencryptedConfigPath, encryptedConfigPath)
 
 	return nil
 }

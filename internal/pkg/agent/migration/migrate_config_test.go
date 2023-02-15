@@ -33,7 +33,6 @@ type configfile struct {
 }
 
 func TestMigrateToEncryptedConfig(t *testing.T) {
-
 	testcases := []struct {
 		name                     string
 		unencryptedConfig        configfile
@@ -104,7 +103,6 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			//setup begin
 			top := t.TempDir()
 			paths.SetTop(top)
@@ -153,14 +151,11 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 			for _, filename := range tc.expectedFiles {
 				assert.FileExistsf(t, path.Join(top, filename), "file %s should exist", filename)
 			}
-
 		})
 	}
-
 }
 
 func TestErrorMigrateToEncryptedConfig(t *testing.T) {
-
 	if runtime.GOOS == "windows" {
 		t.Skip("cannot reliably reproduce permission errors on windows")
 	}
@@ -198,10 +193,8 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			//setup begin
 			top := t.TempDir()
 			paths.SetTop(top)
@@ -248,7 +241,6 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 }
 
 func createAndPersistStore(t *testing.T, baseDir string, cf configfile, encrypted bool) storage.Storage {
-
 	var store storage.Storage
 
 	asbFilePath := path.Join(baseDir, cf.name)
