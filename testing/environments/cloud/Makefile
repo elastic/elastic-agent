@@ -1,8 +1,12 @@
 MAKEFILE_PATH:=$(abspath $(lastword ${MAKEFILE_LIST}))
 MAKEFILE_DIR:=$(dir ${MAKEFILE_PATH})
 REPO_ROOT:=$(abspath ${MAKEFILE_DIR}/../../../)
-ifeq (${SNAPSHOT}, true)
 SNAPSHOT_SUFFIX:=-SNAPSHOT
+ifeq (${SNAPSHOT}, false)
+SNAPSHOT_SUFFIX:=""
+endif
+ifeq (${SNAPSHOT}, 0)
+SNAPSHOT_SUFFIX:=""
 endif
 VERSION:=$(shell grep defaultBeatVersion ${REPO_ROOT}/version/version.go | cut -d\" -f2)${SNAPSHOT_SUFFIX}
 
@@ -41,6 +45,11 @@ docker_image.auto.tfvars: kibana_docker_image elastic_agent_docker_image
 .PHONY: apply
 apply:
 	@terraform apply -auto-approve
+
+
+.PHONY: snap
+snap:
+	@echo ${VERSION}
 
 .PHONY: destroy
 destroy:
