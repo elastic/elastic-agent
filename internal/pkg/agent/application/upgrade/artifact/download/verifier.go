@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -176,7 +177,24 @@ func PgpBytesFromSource(source string, client http.Client) ([]byte, error) {
 	return nil, errors.New("unknown pgp source")
 }
 
+func CheckValidDownloadUri(rawURI string) error {
+	uri, err := url.Parse(rawURI)
+	if err != nil {
+		return err
+	}
+
+	if !strings.EqualFold(uri.Scheme, "https") {
+		return fmt.Errorf("failed to check URI %q: HTTPS is required", rawURI)
+	}
+
+	return nil
+}
+
 func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
+	if err := CheckValidDownloadUri(uri); err != nil {
+		return nil, err
+	}
+
 	resp, err := client.Get(uri)
 	if err != nil {
 		return nil, err
