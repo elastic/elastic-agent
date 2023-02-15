@@ -571,10 +571,17 @@ func (Cloud) Image() {
 
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
-	os.Setenv(snapshotEnv, "true")
 	os.Setenv(devEnv, "true")
 
-	devtools.Snapshot = true
+	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
+		// only disable SNAPSHOT build when explicitely defined
+		os.Setenv(snapshotEnv, "false")
+		devtools.Snapshot = false
+	} else {
+		os.Setenv(snapshotEnv, "true")
+		devtools.Snapshot = true
+	}
+
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
 	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
