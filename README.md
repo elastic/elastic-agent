@@ -167,6 +167,8 @@ To specify custom images create your `docker_image.auto.tfvars` file similar to 
 
 Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.
 
+SNAPSHOT images are used by default. To use non-snapshot image specify `SNAPSHOT=false` explicitly.
+
 ## Updating dependencies/PRs
 Even though we prefer `mage` to our automation, we still have some
 rules implemented on our `Makefile` as well as CI will use the
