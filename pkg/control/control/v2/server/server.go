@@ -251,10 +251,10 @@ func (s *Server) DiagnosticUnits(req *cproto2.DiagnosticUnitsRequest, srv cproto
 
 // Configure configures the running Elastic Agent configuration.
 //
-// Only available in TESTING_MODE.
+// Only available in testing mode.
 func (s *Server) Configure(ctx context.Context, req *cproto2.ConfigureRequest) (*cproto2.Empty, error) {
 	if s.tmSetter == nil {
-		return nil, errors.New("TESTING_MODE is not enabled")
+		return nil, errors.New("testing mode is not enabled")
 	}
 	err := s.tmSetter.SetConfig(ctx, req.Config)
 	if err != nil {

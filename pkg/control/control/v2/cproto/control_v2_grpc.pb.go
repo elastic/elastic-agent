@@ -47,8 +47,8 @@ type ElasticAgentControlClient interface {
 	// Configure adjusts the running Elastic Agent configuration with the configuration
 	// provided over the RPC.
 	//
-	// This is only allowed if the Elastic Agent is spawned in TESTING_MODE. Calling this
-	// on any Elastic Agent that is not in TESTING_MODE will result in an error being
+	// This is only allowed if the Elastic Agent is spawned in testing mode. Calling this
+	// on any Elastic Agent that is not in testing mode will result in an error being
 	// returned and nothing occurring.
 	Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*Empty, error)
 }
@@ -203,8 +203,8 @@ type ElasticAgentControlServer interface {
 	// Configure adjusts the running Elastic Agent configuration with the configuration
 	// provided over the RPC.
 	//
-	// This is only allowed if the Elastic Agent is spawned in TESTING_MODE. Calling this
-	// on any Elastic Agent that is not in TESTING_MODE will result in an error being
+	// This is only allowed if the Elastic Agent is spawned in testing mode. Calling this
+	// on any Elastic Agent that is not in testing mode will result in an error being
 	// returned and nothing occurring.
 	Configure(context.Context, *ConfigureRequest) (*Empty, error)
 	mustEmbedUnimplementedElasticAgentControlServer()

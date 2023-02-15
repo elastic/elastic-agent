@@ -157,7 +157,7 @@ type Client interface {
 	DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitRequest) ([]DiagnosticUnitResult, error)
 	// Configure sends a new configuration to the Elastic Agent.
 	//
-	// Only works in the case that Elastic Agent is started with TESTING_MODE=on.
+	// Only works in the case that Elastic Agent is started in testing mode.
 	Configure(ctx context.Context, config string) error
 }
 
@@ -349,7 +349,7 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 
 // Configure sends a new configuration to the Elastic Agent.
 //
-// Only works in the case that Elastic Agent is started with TESTING_MODE=on.
+// Only works in the case that Elastic Agent is started in testing mode.
 func (c *client) Configure(ctx context.Context, config string) error {
 	_, err := c.client.Configure(ctx, &cproto.ConfigureRequest{Config: config})
 	return err

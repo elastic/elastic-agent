@@ -6,8 +6,6 @@ package application
 
 import (
 	"fmt"
-	"os"
-
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -36,6 +34,7 @@ func New(
 	agentInfo *info.AgentInfo,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
+	testingMode bool,
 	disableMonitoring bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, error) {
@@ -60,7 +59,7 @@ func New(
 	pathConfigFile := paths.ConfigFile()
 
 	var rawConfig *config.Config
-	if inTestingMode() {
+	if testingMode {
 		// testing mode doesn't read any configuration from the disk
 		rawConfig, err = config.NewConfigFrom("")
 		if err != nil {
@@ -98,8 +97,8 @@ func New(
 	var compModifiers []coordinator.ComponentsModifier
 	var composableManaged bool
 	var isManaged bool
-	if inTestingMode() {
-		log.Info("Elastic Agent has been started in TESTING_MODE configuration is managed through the control protocol")
+	if testingMode {
+		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
 
 		// testing mode uses a config manager that takes configuration from over the control protocol
 		configMgr = newTestingModeConfigManager(log)
@@ -205,12 +204,4 @@ func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.C
 	}
 
 	return store, cfg, nil
-}
-
-func inTestingMode() bool {
-	val, ok := os.LookupEnv("TESTING_MODE")
-	if !ok {
-		return false
-	}
-	return val == "on"
 }
