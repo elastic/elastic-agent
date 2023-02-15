@@ -677,7 +677,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 						if strings.Contains(err.Error(), "object not found") {
 							fmt.Printf("Downloading %s: unsupported on %s, skipping\n", binary, platform)
 						} else {
-							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
+							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed for %s on %s: %v", binary, platform, err))
 						}
 					}
 				}
