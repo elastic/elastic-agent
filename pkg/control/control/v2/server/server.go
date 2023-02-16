@@ -164,7 +164,7 @@ func (s *Server) Restart(_ context.Context, _ *cproto2.Empty) (*cproto2.RestartR
 
 // Upgrade performs the upgrade operation.
 func (s *Server) Upgrade(ctx context.Context, request *cproto2.UpgradeRequest) (*cproto2.UpgradeResponse, error) {
-	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil)
+	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil, request.SkipVerify, request.PgpBytes...)
 	if err != nil {
 		return &cproto2.UpgradeResponse{
 			Status: cproto2.ActionStatus_FAILURE,

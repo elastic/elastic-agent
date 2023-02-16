@@ -55,7 +55,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -233,7 +233,7 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 }
 
 // Upgrade runs the upgrade process.
-func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) error {
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) error {
 	// early check outside of upgrader before overridding the state
 	if !c.upgradeMgr.Upgradeable() {
 		return ErrNotUpgradable
@@ -251,7 +251,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// override the overall state to upgrading until the re-execution is complete
 	c.state.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, skipVerifyOverride, pgpBytes...)
 	if err != nil {
 		c.state.ClearOverrideState()
 		return err
