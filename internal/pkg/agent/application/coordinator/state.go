@@ -204,8 +204,8 @@ func (cs *coordinatorState) State() (s State) {
 			s.State = agentclient.Failed
 			s.Message = cs.runtimeMgrErr.Error()
 		} else if cs.configMgrErr != nil {
-			s.FleetState = agentclient.Failed
-			s.FleetMessage = cs.configMgrErr.Error()
+			s.State = agentclient.Failed
+			s.Message = cs.configMgrErr.Error()
 		} else if cs.actionsErr != nil {
 			s.State = agentclient.Failed
 			s.Message = cs.actionsErr.Error()
