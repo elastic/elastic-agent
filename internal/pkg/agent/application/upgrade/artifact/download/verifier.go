@@ -11,6 +11,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+<<<<<<< HEAD
+=======
+	"io/ioutil"
+	"net/http"
+	"net/url"
+>>>>>>> a6d0a9f0e1 (Support only HTTPS for remote upgrade PGP (#2268))
 	"os"
 	"path/filepath"
 	"strings"
@@ -156,3 +162,49 @@ func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) erro
 
 	return nil
 }
+<<<<<<< HEAD
+=======
+
+func PgpBytesFromSource(source string, client http.Client) ([]byte, error) {
+	if strings.HasPrefix(source, PgpSourceRawPrefix) {
+		return []byte(strings.TrimPrefix(source, PgpSourceRawPrefix)), nil
+	}
+
+	if strings.HasPrefix(source, PgpSourceURIPrefix) {
+		return fetchPgpFromURI(strings.TrimPrefix(source, PgpSourceURIPrefix), client)
+	}
+
+	return nil, errors.New("unknown pgp source")
+}
+
+func CheckValidDownloadUri(rawURI string) error {
+	uri, err := url.Parse(rawURI)
+	if err != nil {
+		return err
+	}
+
+	if !strings.EqualFold(uri.Scheme, "https") {
+		return fmt.Errorf("failed to check URI %q: HTTPS is required", rawURI)
+	}
+
+	return nil
+}
+
+func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
+	if err := CheckValidDownloadUri(uri); err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Get(uri)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", uri, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, uri))
+	}
+
+	return ioutil.ReadAll(resp.Body)
+}
+>>>>>>> a6d0a9f0e1 (Support only HTTPS for remote upgrade PGP (#2268))
