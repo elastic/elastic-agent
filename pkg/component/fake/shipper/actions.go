@@ -37,23 +37,24 @@ func (s *killAction) Execute(_ context.Context, _ map[string]interface{}) (map[s
 }
 
 func newRunningUnit(logger zerolog.Logger, manager *stateManager, unit *client.Unit) (runningUnit, error) {
-	_, logLevel, config := unit.Expected()
-	if config.Type == "" {
+	expected := unit.Expected()
+	if expected.Config.Type == "" {
 		return nil, fmt.Errorf("unit config type empty")
 	}
 	if unit.Type() == client.UnitTypeOutput {
-		switch config.Type {
+		switch expected.Config.Type {
 		case fakeActionOutput:
-			return newFakeActionOutputRuntime(logger, logLevel, unit, config)
+			return newFakeActionOutputRuntime(logger, expected.LogLevel, unit, expected.Config)
 		}
-		return nil, fmt.Errorf("unknown output unit config type: %s", config.Type)
+		return nil, fmt.Errorf("unknown output unit config type: %s", expected.Config.Type)
 	} else if unit.Type() == client.UnitTypeInput {
-		switch config.Type {
+		switch expected.Config.Type {
 		case fakeShipper:
-			return newFakeShipperInput(logger, logLevel, manager, unit, config)
+			return newFakeShipperInput(logger, expected.LogLevel, manager, unit, expected.Config)
 		}
-		return nil, fmt.Errorf("unknown input unit config type: %s", config.Type)
+		return nil, fmt.Errorf("unknown input unit config type: %s", expected.Config.Type)
 	}
+
 	return nil, fmt.Errorf("unknown unit type: %+v", unit.Type())
 }
 
@@ -91,7 +92,7 @@ func (r *recordEventAction) Execute(ctx context.Context, params map[string]inter
 			"content":   e.Content.AsMap(),
 		}).Msg("record_event action got subscribed event")
 		if !ok {
-			return nil, fmt.Errorf("never received event")
+			return nil, fmt.Errorf("never recieved event")
 		}
 		return map[string]interface{}{
 			"timestamp": e.Generated.String(),

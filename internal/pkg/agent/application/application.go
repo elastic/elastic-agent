@@ -86,7 +86,7 @@ func New(
 	}
 
 	log.Infof("application.New parsing feature flags fqdn")
-	if err := features.Parse(rawConfig); err != nil {
+	if _, err := features.Apply(rawConfig); err != nil {
 		return nil, nil, fmt.Errorf("could not parse features config: %w", err)
 	}
 

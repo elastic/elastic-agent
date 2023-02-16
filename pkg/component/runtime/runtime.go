@@ -114,9 +114,10 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 		currComp: comp,
 		runtime:  runtime,
 		latestState: ComponentState{
-			State:   client.UnitStateStarting,
-			Message: "Starting",
-			Units:   nil,
+			State:               client.UnitStateStarting,
+			Message:             "Starting",
+			Units:               nil,
+			expectedFeaturesIdx: 1,
 		},
 		actions: make(map[string]func(response *proto.ActionResponse)),
 	}

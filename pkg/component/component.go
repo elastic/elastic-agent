@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -94,6 +95,9 @@ type Component struct {
 	// Units that should be running inside this component.
 	Units []Unit `yaml:"units"`
 
+	// Features configuration the component should use.
+	Features *proto.Features `yaml:"features,omitempty"`
+
 	// Shipper references the component/unit that this component used as its output. (not set when ShipperSpec)
 	Shipper *ShipperReference `yaml:"shipper,omitempty"`
 }
@@ -148,6 +152,9 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	ll logp.Level,
 	headers HeadersProvider,
 ) ([]Component, map[string]string, error) {
+	// get feature flags from policy
+	featureFlags, err := features.Parse(policy)
+
 	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers)
 	if err != nil {
 		return nil, nil, err
@@ -277,6 +284,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 					Err:       err,
 					InputSpec: &inputSpec,
 					Units:     units,
+					Features:  featureFlags.AsProto(),
 				})
 				componentIdsInputMap[componentID] = inputSpec.BinaryName
 			}
@@ -314,6 +322,8 @@ func (r *RuntimeSpecs) PolicyToComponents(
 							Config:   cfg,
 							Err:      cfgErr,
 						})
+						component.Features = featureFlags.AsProto()
+
 						components[i] = component
 						break
 					}
@@ -333,6 +343,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 					ID:          shipperCompID,
 					ShipperSpec: &shipperSpec,
 					Units:       shipperUnits,
+					Features:    featureFlags.AsProto(),
 				})
 			}
 		}

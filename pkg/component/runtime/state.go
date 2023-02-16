@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
@@ -57,13 +58,17 @@ type ComponentState struct {
 	State   client.UnitState `yaml:"state"`
 	Message string           `yaml:"message"`
 
-	Units    map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
-	Features proto.Features
+	Units       map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
+	Features    *proto.Features
+	FeaturesIdx uint64
 
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
 	// internal
 	expectedUnits map[ComponentUnitKey]expectedUnitState
+
+	expectedFeatures    *proto.Features
+	expectedFeaturesIdx uint64
 }
 
 // expectedUnitState is the expected state of a unit.
@@ -80,6 +85,8 @@ func newComponentState(comp *component.Component) (s ComponentState) {
 	s.Message = startingMsg
 	s.Units = make(map[ComponentUnitKey]ComponentUnitState)
 	s.expectedUnits = make(map[ComponentUnitKey]expectedUnitState)
+	s.expectedFeaturesIdx = 1
+
 	s.syncComponent(comp)
 	return s
 }
@@ -95,6 +102,12 @@ func (s *ComponentState) Copy() (c ComponentState) {
 	for k, v := range s.expectedUnits {
 		c.expectedUnits[k] = v
 	}
+
+	c.Features = s.Features
+	c.FeaturesIdx = s.FeaturesIdx
+	c.expectedFeatures = s.expectedFeatures
+	c.expectedFeaturesIdx = s.expectedFeaturesIdx
+
 	return c
 }
 
@@ -161,6 +174,15 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		}
 	}
 
+	if !gproto.Equal(s.expectedFeatures, comp.Features) {
+		changed = true
+		s.expectedFeaturesIdx++
+		s.expectedFeatures = comp.Features
+	} else {
+		logp.L().Infof("component %q, no changes on feature flags: %v",
+			comp.ID, comp.Features)
+	}
+
 	return changed
 }
 
@@ -214,6 +236,12 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 			}
 		}
 	}
+
+	if !gproto.Equal(s.Features, comp.Features) {
+		changed = true
+		s.Features = comp.Features
+	}
+
 	return changed
 }
 
@@ -262,6 +290,7 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		}
 		s.Units[key] = existing
 	}
+
 	for key, unit := range s.Units {
 		_, ok := touched[key]
 		if !ok {
@@ -286,8 +315,10 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 				}
 			}
 		}
+
 		s.Units[key] = unit
 	}
+
 	if checkin.VersionInfo != nil {
 		if checkin.VersionInfo.Name != "" && s.VersionInfo.Name != checkin.VersionInfo.Name {
 			s.VersionInfo.Name = checkin.VersionInfo.Name
@@ -302,6 +333,13 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 			changed = true
 		}
 	}
+
+	if checkin.FeaturesIdx != s.FeaturesIdx {
+		s.Features = checkin.Features
+		s.FeaturesIdx = checkin.FeaturesIdx
+		changed = true
+	}
+
 	return changed
 }
 
@@ -317,13 +355,14 @@ func (s *ComponentState) unsettled() bool {
 			// unit missing
 			return true
 		}
-		if o.configStateIdx != e.configStateIdx || e.state != o.State {
+		if o.configStateIdx != e.configStateIdx ||
+			e.state != o.State {
 			// config or state mismatch
 			return true
 		}
 	}
 
-	return false
+	return s.FeaturesIdx != s.expectedFeaturesIdx
 }
 
 func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
@@ -355,7 +394,11 @@ func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
 		units = append(units, e)
 	}
 
-	return &proto.CheckinExpected{Units: units}
+	return &proto.CheckinExpected{
+		Units:       units,
+		Features:    s.expectedFeatures,
+		FeaturesIdx: s.expectedFeaturesIdx,
+	}
 }
 
 func (s *ComponentState) cleanupStopped() bool {

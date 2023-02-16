@@ -10,17 +10,36 @@ import (
 )
 
 var (
-	// flags flagsCfg
+	// current flagsCfg
 	mu sync.Mutex
 
-	flags fflags
+	current Flags
 )
 
-type fflags struct {
-	fqdn bool
+type Flags struct {
+	FQDN bool
 }
 
-func Parse(c *config.Config) error {
+// Parse receives a policy, parses and returns it.
+// policy can be a *config.Config, config.Config or anything config.NewConfigFrom
+// can work with.
+func Parse(policy any) (Flags, error) {
+	var c *config.Config
+	switch policy.(type) {
+	case *config.Config:
+		c = (policy).(*config.Config)
+	case config.Config:
+		aa := (policy).(config.Config)
+		c = &aa
+	default:
+		var err error
+		c, err = config.NewConfigFrom(policy)
+		if err != nil {
+			return Flags{}, fmt.Errorf("could not get a config from type %T: %w",
+				policy, err)
+		}
+	}
+
 	type cfg struct {
 		Agent struct {
 			Features struct {
@@ -30,37 +49,52 @@ func Parse(c *config.Config) error {
 	}
 
 	if c == nil {
-		logp.L().Infof("feature flags nil config, nothing to do: fqdn")
+		logp.L().Infof("feature current nil config, nothing to do: fqdn")
 
-		return nil
+		return Flags{}, nil
 	}
 
 	parsedFlags := cfg{}
 	if err := c.Unpack(&parsedFlags); err != nil {
-		return fmt.Errorf("could not umpack features config: %w", err)
+		return Flags{}, fmt.Errorf("could not umpack features config: %w", err)
 	}
 
-	logp.L().Infof("feature flags parsed: fqdn: %t",
+	logp.L().Infof("feature current parsed: fqdn: %t",
 		parsedFlags.Agent.Features.FQDN.Enabled())
+
+	return Flags{FQDN: parsedFlags.Agent.Features.FQDN.Enabled()}, nil
+}
+
+// Apply receives a policy,
+func Apply(c *config.Config) (Flags, error) {
+	var err error
 
 	mu.Lock()
 	defer mu.Unlock()
-	flags = fflags{fqdn: parsedFlags.Agent.Features.FQDN.Enabled()}
+	// Updating global state
+	current, err = Parse(c)
 
-	return nil
+	return current, err
 }
 
 // FQDN reports if FQDN should be used instead of hostname for host.name.
 func FQDN() bool {
 	mu.Lock()
 	defer mu.Unlock()
-	return flags.fqdn
+	return current.FQDN
 }
 
-func AsProto() proto.Features {
+func Get() Flags {
 	mu.Lock()
 	defer mu.Unlock()
-	return proto.Features{
+
+	return current
+}
+
+func (f Flags) AsProto() *proto.Features {
+	mu.Lock()
+	defer mu.Unlock()
+	return &proto.Features{
 		Fqdn: &proto.FQDNFeature{
-			Enabled: flags.fqdn}}
+			Enabled: f.FQDN}}
 }

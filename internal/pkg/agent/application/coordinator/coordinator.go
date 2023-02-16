@@ -11,11 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
 	"go.elastic.co/apm"
-
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -133,7 +129,7 @@ type ConfigManager interface {
 
 	// ActionErrors returns the error channel for actions.
 	// May return errors for fleet managed agents.
-	// Will always be empty for stand alone agents.
+	// Will always be empty for standalone agents.
 	ActionErrors() <-chan error
 
 	// Watch returns the chanel to watch for configuration changes.
@@ -726,7 +722,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 
 	c.logger.Infof("coordinator.processConfig parsing feature flags fqdn")
-	if err := features.Parse(cfg); err != nil {
+	if _, err := features.Apply(cfg); err != nil {
 		return fmt.Errorf("could not update feature flags config: %w", err)
 	}
 
@@ -826,12 +822,7 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
-	comps, err := c.specs.ToComponents(
-		cfg,
-		configInjector,
-		c.logLevel,
-		c.agentInfo,
-	)
+	comps, err := c.specs.ToComponents(cfg, configInjector, c.State().LogLevel, c.agentInfo)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to render components: %w", err)
 	}

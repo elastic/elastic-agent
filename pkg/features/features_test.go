@@ -63,9 +63,9 @@ agent:
 				t.Fatalf("could not parse config YAML: %v", err)
 			}
 
-			err = Parse(c)
+			_, err = Apply(c)
 			if err != nil {
-				t.Fatalf("Parse failed: %v", err)
+				t.Fatalf("Apply failed: %v", err)
 			}
 
 			got := FQDN()

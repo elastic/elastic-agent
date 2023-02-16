@@ -67,7 +67,7 @@ func (c *mockCommunicator) CheckinObserved() <-chan *proto.CheckinObserved {
 	return c.ch
 }
 
-const testPort = 6788
+const testPort = 7788
 
 func getAddress() string {
 	return fmt.Sprintf("127.0.0.1:%d", testPort)

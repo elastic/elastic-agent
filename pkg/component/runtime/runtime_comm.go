@@ -143,17 +143,17 @@ func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected, observed 
 		expected.AgentInfo = nil
 	}
 
-	fs := features.AsProto()
-	expected.Features = &fs
-	c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %t. Units: %d",
-		expected.Features.Fqdn.Enabled, len(expected.Units))
+	// fs := features.Get().AsProto()
+	// expected.Features = fs
+	c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %v. Units: %d",
+		expected.Features, len(expected.Units))
 	if len(expected.Units) >= 0 {
 		var uids []string
 		for _, u := range expected.Units {
 			uids = append(uids, u.GetId())
 		}
-		c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %t for: %s",
-			expected.Features.Fqdn.Enabled, strings.Join(uids, ", "))
+		c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %v for: %s",
+			expected.Features, strings.Join(uids, ", "))
 	}
 
 	// we need to determine if the communicator is currently in the initial observed message path
@@ -238,8 +238,8 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		case <-recvDone:
 			return
 		case expected := <-initExp:
-			c.logger.Infof("runtimeComm.checkin initExp: feature fqdn expected: %t",
-				expected.Features.Fqdn.Enabled)
+			c.logger.Infof("runtimeComm.checkin initExp: feature fqdn expected: %v",
+				expected.Features)
 			c.logger.Infof("runtimeComm.checkin initExp: feature fqdn featureFlag: %t",
 				features.FQDN())
 			err := server.Send(expected)
