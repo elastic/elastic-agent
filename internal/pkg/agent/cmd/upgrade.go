@@ -45,7 +45,43 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
 	defer c.Disconnect()
+<<<<<<< HEAD
 	version, err = c.Upgrade(context.Background(), version, sourceURI)
+=======
+
+	skipVerification, _ := cmd.Flags().GetBool(flagSkipVerify)
+	var pgpChecks []string
+	if !skipVerification {
+		// get local PGP
+		pgpPath, _ := cmd.Flags().GetString(flagPGPBytesPath)
+		if len(pgpPath) > 0 {
+			content, err := ioutil.ReadFile(pgpPath)
+			if err != nil {
+				return errors.New(err, "failed to read pgp file")
+			}
+			if len(content) > 0 {
+				pgpChecks = append(pgpChecks, download.PgpSourceRawPrefix+string(content))
+			}
+		}
+
+		pgpBytes, _ := cmd.Flags().GetString(flagPGPBytes)
+		if len(pgpBytes) > 0 {
+			pgpChecks = append(pgpChecks, download.PgpSourceRawPrefix+pgpBytes)
+		}
+
+		pgpUri, _ := cmd.Flags().GetString(flagPGPBytesURI)
+		if len(pgpUri) > 0 {
+			if uriErr := download.CheckValidDownloadUri(pgpUri); uriErr != nil {
+				return uriErr
+			}
+
+			// URI is parsed later with proper TLS and Proxy config within downloader
+			pgpChecks = append(pgpChecks, download.PgpSourceURIPrefix+pgpUri)
+		}
+	}
+
+	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, pgpChecks...)
+>>>>>>> a6d0a9f0e1 (Support only HTTPS for remote upgrade PGP (#2268))
 	if err != nil {
 		return errors.New(err, "Failed trigger upgrade of daemon")
 	}
