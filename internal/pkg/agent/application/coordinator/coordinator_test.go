@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	agentclient "github.com/elastic/elastic-agent/pkg/control/control/v2/client"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
@@ -223,7 +223,7 @@ func TestCoordinator_State_ConfigError_Managed(t *testing.T) {
 	cfgMgr.ReportError(ctx, errors.New("force error"))
 	assert.Eventually(t, func() bool {
 		state := coord.State()
-		return state.State == agentclient.Healthy && state.Message == "Healthy" && state.FleetState == agentclient.Failed && state.FleetMessage == "force error"
+		return state.State == agentclient.Healthy && state.Message == "Running" && state.FleetState == agentclient.Failed && state.FleetMessage == "force error"
 	}, 3*time.Second, 10*time.Millisecond)
 
 	// clear error
@@ -375,7 +375,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, true)
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -483,7 +483,7 @@ func (f *fakeUpgradeManager) Reload(_ *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	return func() error { return nil }, nil
 }
 

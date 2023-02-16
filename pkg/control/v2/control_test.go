@@ -8,8 +8,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/server"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 
 	"go.elastic.co/apm/apmtest"
 

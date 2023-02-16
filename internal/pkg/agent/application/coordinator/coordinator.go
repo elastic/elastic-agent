@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 
-	agentclient "github.com/elastic/elastic-agent/pkg/control/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/cproto"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 

@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control/control"
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 )

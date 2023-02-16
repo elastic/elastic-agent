@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/server"
+	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

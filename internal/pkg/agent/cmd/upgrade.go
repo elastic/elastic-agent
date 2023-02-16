@@ -10,8 +10,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/elastic/elastic-agent/pkg/control/control"
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/spf13/cobra"
 

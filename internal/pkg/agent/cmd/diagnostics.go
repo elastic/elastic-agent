@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/spf13/cobra"
 

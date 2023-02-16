@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	agentclient "github.com/elastic/elastic-agent/pkg/control/control/v2/client"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"

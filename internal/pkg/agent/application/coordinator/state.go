@@ -8,7 +8,7 @@ import (
 	"context"
 	"sync"
 
-	agentclient "github.com/elastic/elastic-agent/pkg/control/control/v2/client"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"

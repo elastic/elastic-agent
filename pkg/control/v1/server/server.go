@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/pkg/control/control"
-	"github.com/elastic/elastic-agent/pkg/control/control/v1/proto"
-	v2proto "github.com/elastic/elastic-agent/pkg/control/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
+	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"go.elastic.co/apm"
 

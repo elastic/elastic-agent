@@ -11,7 +11,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/elastic/elastic-agent/pkg/control/control"
+	"github.com/elastic/elastic-agent/pkg/control"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

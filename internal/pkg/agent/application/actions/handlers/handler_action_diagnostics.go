@@ -12,8 +12,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"

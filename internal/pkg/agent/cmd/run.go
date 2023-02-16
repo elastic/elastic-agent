@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/elastic/elastic-agent/pkg/control/control/v2/server"
+	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 

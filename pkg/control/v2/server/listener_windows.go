@@ -12,7 +12,7 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/control/control"
+	"github.com/elastic/elastic-agent/pkg/control"
 
 	"github.com/pkg/errors"
 
