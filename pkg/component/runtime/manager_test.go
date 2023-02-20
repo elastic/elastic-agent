@@ -398,8 +398,6 @@ func TestManager_FakeInput_Features(t *testing.T) {
 					// check if config sent on iteration 1 was set,
 					// then change something but the feature flags.
 					case 2:
-						t.Logf("case 2 asserting fetureflags")
-
 						assert.True(t, componentState.Features.Fqdn.Enabled)
 						comp.Units[0].LogLevel = client.UnitLogLevelInfo
 						comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
