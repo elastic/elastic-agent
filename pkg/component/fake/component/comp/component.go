@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent-libs/config"
 	"os"
 	"strconv"
 	"time"
@@ -74,26 +75,35 @@ func (s *StateManager) Added(unit *client.Unit) {
 }
 
 func (s *StateManager) Modified(unit *client.Unit) {
-	if unit.Type() == client.UnitTypeOutput {
+	unit := change.Unit
+	switch unit.Type() {
+	case client.UnitTypeOutput:
 		if s.output == nil {
 			_ = unit.UpdateState(client.UnitStateFailed, "Error: modified a non-existing output unit", nil)
 			return
 		}
-		err := s.output.Update(unit)
+		err := s.output.Update(unit, client.TriggeredNothing)
 		if err != nil {
 			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
 		}
 		return
 	}
 
-	existing, ok := s.inputs[unit.ID()]
-	if !ok {
-		_ = unit.UpdateState(client.UnitStateFailed, "Error: unknown unit", nil)
+	case client.UnitTypeInput:
+		existingInput, ok := s.inputs[unit.ID()]
+		if !ok {
+			_ = unit.UpdateState(
+				client.UnitStateFailed, "Error: unknown unit", nil)
+			return
+		}
+
+		err := existingInput.Update(unit, change.Triggers)
+		if err != nil {
+			_ = unit.UpdateState(
+				client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
+		}
+
 		return
-	}
-	err := existing.Update(unit)
-	if err != nil {
-		_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
 	}
 }
 
@@ -114,7 +124,7 @@ func (s *StateManager) Removed(unit *client.Unit) {
 
 type runningUnit interface {
 	Unit() *client.Unit
-	Update(u *client.Unit) error
+	Update(u *client.Unit, triggers client.Trigger) error
 }
 
 type sendEvent struct {
@@ -156,9 +166,9 @@ func (f *fakeShipperOutput) Unit() *client.Unit {
 	return f.unit
 }
 
-func (f *fakeShipperOutput) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+func (f *fakeShipperOutput) Update(u *client.Unit, triggers client.Trigger) error {
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this input to stop
 		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
@@ -347,9 +357,9 @@ func (f *fakeInput) Unit() *client.Unit {
 	return f.unit
 }
 
-func (f *fakeInput) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+func (f *fakeInput) Update(u *client.Unit, triggers client.Trigger) error {
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this input to stop
 		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
@@ -378,6 +388,12 @@ func (f *fakeInput) Update(u *client.Unit) error {
 	f.stateMsg = stateMsg
 	f.logger.Debug().Str("state", f.state.String()).Str("message", f.stateMsg).Msg("updating unit state")
 	_ = u.UpdateState(f.state, f.stateMsg, nil)
+
+	if triggers&client.TriggeredFeatureChange == client.TriggeredFeatureChange {
+		f.logger.Debug().Msgf("changing features to: %v", expected.Features)
+		f.features = expected.Features
+	}
+
 	return nil
 }
 

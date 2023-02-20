@@ -310,8 +310,8 @@ func TestManager_FakeInput_Features(t *testing.T) {
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
 		configuration.DefaultGRPCConfig())
-
 	require.NoError(t, err)
+
 	managerErrCh := make(chan error)
 	go func() {
 		err := m.Run(ctx)
@@ -358,8 +358,8 @@ func TestManager_FakeInput_Features(t *testing.T) {
 
 	go func() {
 		sub := m.Subscribe(subscriptionCtx, compID)
+		var healthIteration int
 		var configured bool
-
 		for {
 			select {
 			case <-subscriptionCtx.Done():
@@ -383,58 +383,64 @@ func TestManager_FakeInput_Features(t *testing.T) {
 					subscriptionErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 
 				case client.UnitStateHealthy:
-					// 1st pass: update feature flags
-					if !configured {
-						t.Logf("updating fetureflags")
-						configured = true
+					healthIteration++
+
+					switch healthIteration {
+					case 1: // yes, it's starting on 1
 						comp.Features = &proto.Features{
 							Fqdn: &proto.FQDNFeature{Enabled: true},
 						}
-						t.Log("before feature updated")
 						err := m.Update([]component.Component{comp})
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
 						}
-						t.Log("after feature updated")
-						break
+
+					// check if config sent on iteration 1 was set,
+					// then change something but the feature flags.
+					case 2:
+						t.Logf("case 2 asserting fetureflags")
+
+						assert.True(t, componentState.Features.Fqdn.Enabled)
+						comp.Units[0].LogLevel = client.UnitLogLevelInfo
+						comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
+							"type":    "fake",
+							"state":   int(client.UnitStateConfiguring),
+							"message": "Fake Healthy",
+						})
+
+						// Send change with no change in the features
+						err := m.Update([]component.Component{comp})
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
+						}
+
+					case 3:
+						assert.True(t, componentState.Features.Fqdn.Enabled)
+						doneCh <- struct{}{}
+						return
 					}
 
-					// new config applied, component health again
-
-					// I don't need the action, the stat has got the features, i can test directly on it...
-					assert.True(t, componentState.Features.Fqdn.Enabled)
-					t.Logf("got fqdn: %t. finishing test", componentState.Features.Fqdn.Enabled)
-					doneCh <- struct{}{}
-					return
-					// t.Log("before PerformAction")
-					// resp, err := m.PerformAction(
-					// 	context.Background(),
-					// 	comp,
-					// 	comp.Units[0],
-					// 	fakeComp.ActionRetrieveFeatures,
-					// 	nil)
-					// if err != nil {
-					// 	subscriptionErrCh <- fmt.Errorf("action %s failed: %w",
-					// 		fakeComp.ActionRetrieveFeatures, err)
-					// 	return
-					// }
-					// t.Log("after PerformAction")
-					//
-					// if v, ok := resp["features"]; ok {
-					// 	f, ok := v.(*proto.Features)
-					// 	if !ok {
-					// 		subscriptionErrCh <- fmt.Errorf("got %T from %s, want %T",
-					// 			v, fakeComp.ActionRetrieveFeatures, &proto.Features{})
-					// 		return // fatal failure
-					// 	}
-					//
-					// 	if f.Fqdn.Enabled != true {
-					// 		subscriptionErrCh <- fmt.Errorf("got FQDN false, want true")
-					// 		return
-					// 	}
-					// }
 				case client.UnitStateStarting:
 					// acceptable
+
+				case client.UnitStateConfiguring:
+					if !configured {
+						// set unit back to health, so the case 3 will run.
+						configured = true
+						comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
+							"type":    "fake",
+							"state":   int(client.UnitStateHealthy),
+							"message": "Fake Healthy",
+						})
+
+						err := m.Update([]component.Component{comp})
+						if err != nil {
+							t.Logf("case 2 error updating fetureflags: %v", err)
+
+							subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
+						}
+					}
+
 				default:
 					// unexpected state that should not have occurred
 					subscriptionErrCh <- fmt.Errorf("unit reported unexpected state: %v",
