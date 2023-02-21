@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	tools "github.com/elastic/elastic-agent/test/tools"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -23,23 +24,35 @@ var _ = BeforeSuite(func() {
 	Expect(clusterConfigPath).NotTo(BeZero(), "Please make sure --config is set correctly.")
 
 	clusterConfig, err := ReadConfig(clusterConfigPath)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("clusterConfig: %+v", clusterConfig)
+	Expect(err).NotTo(HaveOccurred())
+	_ = clusterConfig
 })
 
 var _ = Describe("Smoketests", func() {
 	Describe("Test config", func() {
 		It("has correct cluster data", func() {
 			fmt.Println("clusterConfig.ESConfig.Host: ", clusterConfig.ESConfig)
-			Expect(clusterConfig.ESConfig.User).To(ContainSubstring("elastic-cloud.com:443"))
+			Expect(clusterConfig.ESConfig.Host).To(ContainSubstring("elastic-cloud.com:443"))
 		})
 	})
 
-	Describe("Elastic Agent", func() {
-		It("can connect to ElasticSearch", func() {
-			// TODO: implement
+	Describe("Elastic Agent Install", func() {
+		BeforeAll(func() {
+			err := tools.DownloadElasticAgent("8.6.1")
+			Expect(err).NotTo(HaveOccurred())
 		})
+		It("install", func() {
+			// TODO validate elastic-agent is installed
+		})
+		It("enroll", func() {
+		})
+		It("Upgrade", func() {
+			// TODO validate elastic-agent is upgraded
+		})
+
+		AfterEach(func() {
+			// TODO uninstall elastic-agent
+		})
+
 	})
 })
