@@ -219,6 +219,12 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command: *command
+  - name: memcached/metrics
+    description: "Memcached metrics"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
   - name: nats/metrics
     description: "NATS metrics"
     platforms: *platforms
