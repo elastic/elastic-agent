@@ -50,3 +50,8 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     command: *command
+  - name: cloudbeat/vuln_mgmt_aws
+    description: "AWS Vulnerabilities management"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
