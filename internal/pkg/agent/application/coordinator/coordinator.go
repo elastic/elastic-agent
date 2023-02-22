@@ -720,7 +720,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		}
 	}
 
-	c.logger.Infof("coordinator.processConfig parsing feature flags fqdn")
+	c.logger.Infof("coordinator.processConfig features.Apply feature flags fqdn")
 	if _, err := features.Apply(cfg); err != nil {
 		return fmt.Errorf("could not update feature flags config: %w", err)
 	}
@@ -788,7 +788,7 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", comps).Debug("Updating running component model")
+	c.logger.With("components", comps).Info("Updating running component model")
 	err = c.runtimeMgr.Update(comps)
 	if err != nil {
 		return err

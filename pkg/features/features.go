@@ -28,6 +28,10 @@ type Flags struct {
 // policy can be a *config.Config, config.Config or anything config.NewConfigFrom
 // can work with.
 func Parse(policy any) (Flags, error) {
+	if policy == nil {
+		return Flags{}, nil
+	}
+
 	var c *config.Config
 	switch policy.(type) {
 	case *config.Config:
@@ -77,6 +81,9 @@ func Apply(c *config.Config) (Flags, error) {
 	defer mu.Unlock()
 	// Updating global state
 	current, err = Parse(c)
+
+	logp.L().Infof("features.Apply: fqdn: %t",
+		current.FQDN)
 
 	return current, err
 }

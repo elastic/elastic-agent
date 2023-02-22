@@ -16,6 +16,12 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
 
+const ActionRetrieveFeatures = "retrieve_features"
+
+type retrieveFeaturesAction struct {
+	input *fakeInput
+}
+
 type stateSetterAction struct {
 	input *fakeInput
 }
@@ -43,6 +49,19 @@ func (s *stateSetterAction) Execute(_ context.Context, params map[string]interfa
 	s.input.logger.Debug().Str("state", s.input.state.String()).Str("message", s.input.stateMsg).Msg("updating unit state")
 	_ = s.input.unit.UpdateState(s.input.state, s.input.stateMsg, nil)
 	return nil, nil
+}
+
+func (a *retrieveFeaturesAction) Name() string {
+	return ActionRetrieveFeatures
+}
+
+func (a *retrieveFeaturesAction) Execute(
+	_ context.Context,
+	_ map[string]interface{}) (map[string]interface{}, error) {
+
+	a.input.logger.Info().Msg("executing " + ActionRetrieveFeatures + " action")
+
+	return map[string]interface{}{"features": a.input.features}, nil
 }
 
 func (s *sendEventAction) Name() string {

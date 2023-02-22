@@ -18,7 +18,6 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 
@@ -29,7 +28,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
+	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -392,13 +393,33 @@ func TestManager_FakeInput_Features(t *testing.T) {
 						}
 						err := m.Update([]component.Component{comp})
 						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
+								healthIteration, err)
+							return
 						}
 
 					// check if config sent on iteration 1 was set,
 					// then change something but the feature flags.
 					case 2:
+						// check the agent's internal state
 						assert.True(t, componentState.Features.Fqdn.Enabled)
+
+						// check the component
+						res, err := m.PerformAction(
+							context.Background(),
+							comp,
+							comp.Units[0],
+							fakecmp.ActionRetrieveFeatures,
+							nil)
+						ff, err := features.Parse(map[string]any{"agent": res})
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to parse action %s response as features config: %w",
+								healthIteration, fakecmp.ActionRetrieveFeatures, err)
+							return
+						}
+						assert.True(t, ff.FQDN, "parsed feature: FQDN is false, want true")
+
+						// Change something, but feature flags
 						comp.Units[0].LogLevel = client.UnitLogLevelInfo
 						comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
 							"type":    "fake",
@@ -407,13 +428,41 @@ func TestManager_FakeInput_Features(t *testing.T) {
 						})
 
 						// Send change with no change in the features
-						err := m.Update([]component.Component{comp})
+						err = m.Update([]component.Component{comp})
 						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
+								healthIteration, err)
+							return
 						}
 
+					// check again and finish test
 					case 3:
+						// check the agent's internal state
 						assert.True(t, componentState.Features.Fqdn.Enabled)
+
+						// check the component
+						res, err := m.PerformAction(
+							context.Background(),
+							comp,
+							comp.Units[0],
+							fakecmp.ActionRetrieveFeatures,
+							nil)
+						ff, err := features.Parse(map[string]any{"agent": res})
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to parse action %s response as features config: %w",
+								healthIteration, fakecmp.ActionRetrieveFeatures, err)
+							return
+						}
+						assert.True(t, ff.FQDN)
+
+						// Change something, but feature flags
+						comp.Units[0].LogLevel = client.UnitLogLevelInfo
+						comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
+							"type":    "fake",
+							"state":   int(client.UnitStateConfiguring),
+							"message": "Fake Healthy",
+						})
+
 						doneCh <- struct{}{}
 						return
 					}
@@ -2848,7 +2897,8 @@ func testBinary(t *testing.T, name string) string {
 	t.Helper()
 
 	var err error
-	binaryPath := filepath.Join("..", "fake", name, name)
+	binaryPath := fakeBinaryPath(name)
+
 	binaryPath, err = filepath.Abs(binaryPath)
 	if err != nil {
 		t.Fatalf("failed abs %s: %s", binaryPath, err)

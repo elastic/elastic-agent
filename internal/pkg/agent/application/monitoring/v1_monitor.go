@@ -113,8 +113,13 @@ func (b *BeatsMonitor) MonitoringConfig(
 		return nil, nil
 	}
 
+	cfg := make(map[string]interface{})
+
 	monitoringOutputName := defaultOutputName
 	if agentCfg, found := policy[agentKey]; found {
+		// The agent section is required for feature flags
+		cfg[agentKey] = agentCfg
+
 		agentCfgMap, ok := agentCfg.(map[string]interface{})
 		if ok {
 			if monitoringCfg, found := agentCfgMap[monitoringKey]; found {
@@ -129,8 +134,6 @@ func (b *BeatsMonitor) MonitoringConfig(
 			}
 		}
 	}
-
-	cfg := make(map[string]interface{})
 
 	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil && !errors.Is(err, errNoOuputPresent) {
 		return nil, errors.New(err, "failed to inject monitoring output")

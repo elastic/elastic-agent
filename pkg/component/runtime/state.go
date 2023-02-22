@@ -334,7 +334,7 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		}
 	}
 
-	if checkin.FeaturesIdx != s.FeaturesIdx {
+	if s.FeaturesIdx != checkin.FeaturesIdx {
 		s.Features = checkin.Features
 		s.FeaturesIdx = checkin.FeaturesIdx
 		changed = true

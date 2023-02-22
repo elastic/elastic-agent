@@ -390,7 +390,9 @@ func (f *fakeInput) Update(u *client.Unit, triggers client.Trigger) error {
 	_ = u.UpdateState(f.state, f.stateMsg, nil)
 
 	if triggers&client.TriggeredFeatureChange == client.TriggeredFeatureChange {
-		f.logger.Debug().Msgf("changing features to: %v", expected.Features)
+		f.logger.Debug().
+			Interface("features", expected.Features).
+			Msg("updating features")
 		f.features = expected.Features
 	}
 
