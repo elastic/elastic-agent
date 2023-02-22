@@ -51,6 +51,8 @@ wait that amount of time before using the variables for the configuration.
 			opts.includeMonitoring, _ = c.Flags().GetBool("monitoring")
 			opts.variablesWait, _ = c.Flags().GetDuration("variables-wait")
 
+			opts.variables = opts.variables || c.Flags().Changed("variables-wait")
+
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
 			if err := inspectConfig(ctx, paths.ConfigFile(), opts, streams); err != nil {
@@ -61,8 +63,8 @@ wait that amount of time before using the variables for the configuration.
 	}
 
 	cmd.Flags().Bool("variables", false, "render configuration with variables substituted")
-	cmd.Flags().Bool("monitoring", false, "includes monitoring configuration")
-	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution")
+	cmd.Flags().Bool("monitoring", false, "includes monitoring configuration (implies --variables)")
+	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution (implies --variables)")
 
 	cmd.AddCommand(newInspectComponentsCommandWithArgs(s, streams))
 
@@ -131,14 +133,14 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return err
 	}
 
-	fullCfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
-	if err != nil {
-		return err
-	}
-
 	if !opts.variables && !opts.includeMonitoring {
+		fullCfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
+		if err != nil {
+			return err
+		}
 		return printConfig(fullCfg, l, streams)
 	}
+
 	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
 		return err
