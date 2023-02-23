@@ -328,7 +328,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		Insecure:             insecure,
 		UserProvidedMetadata: make(map[string]interface{}),
 		Staging:              staging,
-		FixPermissions:       fromInstall,
+		FixPermissions:       false,
 		ProxyURL:             proxyURL,
 		ProxyDisabled:        proxyDisabled,
 		ProxyHeaders:         mapFromEnvList(proxyHeaders),
