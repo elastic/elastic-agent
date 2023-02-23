@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -250,6 +251,7 @@ func TestActionDispatcher(t *testing.T) {
 		case <-time.After(200 * time.Microsecond):
 			// we're not expecting any reset,
 		}
+		assert.Eventuallyf(t, func() bool { return len(def.Calls) > 0 }, 100*time.Millisecond, 100*time.Microsecond, "mock handler for cancel actions has not been called")
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
 	})
