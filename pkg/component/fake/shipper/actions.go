@@ -92,7 +92,7 @@ func (r *recordEventAction) Execute(ctx context.Context, params map[string]inter
 			"content":   e.Content.AsMap(),
 		}).Msg("record_event action got subscribed event")
 		if !ok {
-			return nil, fmt.Errorf("never recieved event")
+			return nil, fmt.Errorf("never received event")
 		}
 		return map[string]interface{}{
 			"timestamp": e.Generated.String(),

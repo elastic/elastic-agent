@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
 
@@ -22,7 +21,7 @@ import (
 )
 
 // DefaultCheckInterval is the default timeout used to check if any host information has changed.
-const DefaultCheckInterval = 30 * time.Second
+const DefaultCheckInterval = 5 * time.Minute
 
 func init() {
 	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
@@ -103,8 +102,6 @@ func getHostInfo() (map[string]interface{}, error) {
 
 	info := sysInfo.Info()
 	name := info.Hostname
-	logp.L().Infof("providers.getHostInfo feature fqdn enabled: %t",
-		features.FQDN())
 	if features.FQDN() {
 		name = info.FQDN
 	}

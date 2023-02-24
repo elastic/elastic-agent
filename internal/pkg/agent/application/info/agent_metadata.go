@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
@@ -144,7 +143,6 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 	}
 	info := sysInfo.Info()
 
-	logp.L().Infof("AgentInfo.ECSMetadata features fqdn: %t", features.FQDN())
 	var hostname string
 	if features.FQDN() {
 		hostname = info.FQDN
@@ -199,10 +197,8 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 
 	var hostname string
 	if features.FQDN() {
-		logp.L().Infof("AgentInfo.ECSMetadataFlatMap feature fqdn enabled: %t")
 		hostname = info.FQDN
 	} else {
-		logp.L().Infof("AgentInfo.ECSMetadataFlatMap feature fqdn enabled: %t")
 		hostname = info.Hostname
 	}
 

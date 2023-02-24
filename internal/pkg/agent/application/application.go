@@ -58,7 +58,6 @@ func New(
 	}
 	log.Info("Determined allowed capabilities")
 
-	// here!!! perhaps we need to parse feature flags here
 	pathConfigFile := paths.ConfigFile()
 
 	var rawConfig *config.Config
@@ -85,7 +84,6 @@ func New(
 		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	log.Infof("application.New features.Apply feature flags fqdn")
 	if _, err := features.Apply(rawConfig); err != nil {
 		return nil, nil, fmt.Errorf("could not parse features config: %w", err)
 	}

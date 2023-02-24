@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // Communicator provides an interface for a runtime to communicate with its running component.
@@ -143,19 +142,6 @@ func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected, observed 
 		expected.AgentInfo = nil
 	}
 
-	// fs := features.Get().AsProto()
-	// expected.Features = fs
-	c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %v. Units: %d",
-		expected.Features, len(expected.Units))
-	if len(expected.Units) >= 0 {
-		var uids []string
-		for _, u := range expected.Units {
-			uids = append(uids, u.GetId())
-		}
-		c.logger.Infof("runtimeComm.CheckinExpected features fqdn: %v for: %s",
-			expected.Features, strings.Join(uids, ", "))
-	}
-
 	// we need to determine if the communicator is currently in the initial observed message path
 	// in the case that it is we send the expected state over a different channel
 	c.initCheckinObservedMx.Lock()
@@ -238,10 +224,6 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		case <-recvDone:
 			return
 		case expected := <-initExp:
-			c.logger.Infof("runtimeComm.checkin initExp: feature fqdn expected: %v",
-				expected.Features)
-			c.logger.Infof("runtimeComm.checkin initExp: feature fqdn featureFlag: %t",
-				features.FQDN())
 			err := server.Send(expected)
 			if err != nil {
 				if reportableErr(err) {

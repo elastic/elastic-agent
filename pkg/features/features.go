@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	// current flagsCfg
 	mu sync.Mutex
 
 	current Flags
@@ -26,9 +25,10 @@ type Flags struct {
 
 // Parse receives a policy, parses and returns it.
 // policy can be a *config.Config, config.Config or anything config.NewConfigFrom
-// can work with.
+// can work with. If policy is nil, Parse is a no-op.
 func Parse(policy any) (Flags, error) {
 	if policy == nil {
+		logp.L().Debug("feature flags policy is nil, nothing to do")
 		return Flags{}, nil
 	}
 
@@ -48,6 +48,11 @@ func Parse(policy any) (Flags, error) {
 		}
 	}
 
+	if c == nil {
+		logp.L().Debug("feature flags config is nil, nothing to do")
+		return Flags{}, nil
+	}
+
 	type cfg struct {
 		Agent struct {
 			Features struct {
@@ -56,34 +61,26 @@ func Parse(policy any) (Flags, error) {
 		} `json:"agent" yaml:"agent" config:"agent"`
 	}
 
-	if c == nil {
-		logp.L().Infof("feature current nil config, nothing to do: fqdn")
-
-		return Flags{}, nil
-	}
-
 	parsedFlags := cfg{}
 	if err := c.Unpack(&parsedFlags); err != nil {
 		return Flags{}, fmt.Errorf("could not umpack features config: %w", err)
 	}
 
-	logp.L().Infof("feature current parsed: fqdn: %t",
-		parsedFlags.Agent.Features.FQDN.Enabled())
-
 	return Flags{FQDN: parsedFlags.Agent.Features.FQDN.Enabled()}, nil
 }
 
-// Apply receives a policy,
+// Apply receives a config and applies it. If policy is nil, Apply is a no-op.
 func Apply(c *config.Config) (Flags, error) {
+	if c == nil {
+		logp.L().Debug("feature flags config is nil, nothing to do")
+		return Flags{}, nil
+	}
+
 	var err error
 
 	mu.Lock()
 	defer mu.Unlock()
-	// Updating global state
-	current, err = Parse(c)
-
-	logp.L().Infof("features.Apply: fqdn: %t",
-		current.FQDN)
+	current, err = Parse(c) // Updating global state
 
 	return current, err
 }
@@ -95,7 +92,8 @@ func FQDN() bool {
 	return current.FQDN
 }
 
-func Get() Flags {
+// Current returns the current config of the feature flags.
+func Current() Flags {
 	mu.Lock()
 	defer mu.Unlock()
 

@@ -12,7 +12,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
@@ -178,9 +177,6 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		changed = true
 		s.expectedFeaturesIdx++
 		s.expectedFeatures = comp.Features
-	} else {
-		logp.L().Infof("component %q, no changes on feature flags: %v",
-			comp.ID, comp.Features)
 	}
 
 	return changed
