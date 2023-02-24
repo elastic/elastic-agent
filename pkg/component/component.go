@@ -279,6 +279,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 						Err:      cfgErr,
 					})
 				}
+
 				components = append(components, Component{
 					ID:        componentID,
 					Err:       err,
