@@ -180,14 +180,14 @@ func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath strin
 		return nil
 	}
 
-	actionStore, err := NewActionStore(log, actionDiskStore)
+	actionStore, err := newActionStore(log, actionDiskStore)
 	if err != nil {
 		log.Errorf("failed to create action store %s: %v", actionStorePath, err)
 		return err
 	}
 
 	// no actions stored nothing to migrate
-	if len(actionStore.Actions()) == 0 {
+	if len(actionStore.actions()) == 0 {
 		log.Debugf("no actions stored in the action store %s, nothing to migrate", actionStorePath)
 		return nil
 	}
@@ -198,7 +198,7 @@ func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath strin
 	}
 
 	// set actions from the action store to the state store
-	stateStore.Add(actionStore.Actions()[0])
+	stateStore.Add(actionStore.actions()[0])
 
 	err = stateStore.Save()
 	if err != nil {
