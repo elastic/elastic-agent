@@ -373,6 +373,7 @@ func beatVersion() (string, error) {
 
 var (
 	beatDocBranchRegex = regexp.MustCompile(`(?m)doc-branch:\s*([^\s]+)\r?$`)
+	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
 	beatDocBranchValue string
 	beatDocBranchErr   error
 	beatDocBranchOnce  sync.Once
@@ -538,7 +539,12 @@ func parseGoVersion(data []byte) (string, error) {
 }
 
 func parseDocBranch(data []byte) (string, error) {
-	matches := beatDocBranchRegex.FindSubmatch(data)
+	matches := beatDocSiteBranchRegex.FindSubmatch(data)
+	if len(matches) == 2 {
+		return string(matches[1]), nil
+	}
+
+	matches = beatDocBranchRegex.FindSubmatch(data)
 	if len(matches) == 2 {
 		return string(matches[1]), nil
 	}
