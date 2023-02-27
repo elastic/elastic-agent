@@ -381,6 +381,10 @@ func (f *fakeShipperInput) Unit() *client.Unit {
 }
 
 func (f *fakeShipperInput) Update(u *client.Unit) error {
+	if u.Type() != client.UnitTypeOutput {
+		return nil // right now, it deals only with output
+	}
+
 	expected := u.Expected()
 	if expected.State == client.UnitStateStopped {
 		// agent is requesting this to stop
