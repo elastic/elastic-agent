@@ -19,6 +19,9 @@ type FleetGateway interface {
 	// Run runs the gateway.
 	Run(ctx context.Context) error
 
+	// Errors returns the channel to watch for reported errors.
+	Errors() <-chan error
+
 	// Actions returns the channel to watch for new actions from the fleet-server.
 	Actions() <-chan []fleetapi.Action
 

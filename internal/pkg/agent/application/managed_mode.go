@@ -189,8 +189,21 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		policyChanger.AddSetter(ack)
 	}
 
+	// Proxy errors from the gateway to our own channel.
+	gatewayErrorsRunner := runner.Start(context.Background(), func(ctx context.Context) error {
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case err := <-gateway.Errors():
+				m.errCh <- err
+			}
+		}
+	})
+
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
+		defer gatewayErrorsRunner.Stop()
 		return gateway.Run(ctx)
 	})
 

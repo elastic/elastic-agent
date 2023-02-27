@@ -7,12 +7,15 @@ package fs
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -24,21 +27,35 @@ const (
 // embedded into Elastic Agent.
 type Verifier struct {
 	config        *artifact.Config
+	client        http.Client
 	pgpBytes      []byte
 	allowEmptyPgp bool
+	log           *logger.Logger
 }
 
 // NewVerifier creates a verifier checking downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
+func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Verifier, error) {
 	if len(pgp) == 0 && !allowEmptyPgp {
 		return nil, errors.New("expecting PGP but retrieved none", errors.TypeSecurity)
 	}
 
+	client, err := config.HTTPTransportSettings.Client(
+		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return download.WithHeaders(rt, download.Headers)
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	v := &Verifier{
 		config:        config,
+		client:        *client,
 		allowEmptyPgp: allowEmptyPgp,
 		pgpBytes:      pgp,
+		log:           log,
 	}
 
 	return v, nil
@@ -46,7 +63,7 @@ func NewVerifier(config *artifact.Config, allowEmptyPgp bool, pgp []byte) (*Veri
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")
@@ -63,7 +80,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string) error {
 		return err
 	}
 
-	if err = v.verifyAsc(fullPath); err != nil {
+	if err = v.verifyAsc(fullPath, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
 			os.Remove(fullPath + ".asc")
@@ -74,11 +91,52 @@ func (v *Verifier) Verify(a artifact.Artifact, version string) error {
 	return nil
 }
 
-func (v *Verifier) verifyAsc(fullPath string) error {
-	if len(v.pgpBytes) == 0 {
+func (v *Verifier) Reload(c *artifact.Config) error {
+	// reload client
+	client, err := c.HTTPTransportSettings.Client(
+		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return download.WithHeaders(rt, download.Headers)
+		}),
+	)
+	if err != nil {
+		return errors.New(err, "http.verifier: failed to generate client out of config")
+	}
+
+	v.client = *client
+	v.config = c
+
+	return nil
+}
+
+func (v *Verifier) verifyAsc(fullPath string, pgpSources ...string) error {
+	var pgpBytes [][]byte
+	if len(v.pgpBytes) > 0 {
+		v.log.Infof("Default PGP being appended")
+		pgpBytes = append(pgpBytes, v.pgpBytes)
+	}
+
+	for _, check := range pgpSources {
+		if len(check) == 0 {
+			continue
+		}
+		raw, err := download.PgpBytesFromSource(check, v.client)
+		if err != nil {
+			return err
+		}
+		if len(raw) == 0 {
+			continue
+		}
+
+		pgpBytes = append(pgpBytes, raw)
+	}
+
+	if len(pgpBytes) == 0 {
 		// no pgp available skip verification process
+		v.log.Infof("No checks defined")
 		return nil
 	}
+	v.log.Infof("Using %d PGP keys", len(pgpBytes))
 
 	ascBytes, err := v.getPublicAsc(fullPath)
 	if err != nil && v.allowEmptyPgp {
@@ -88,7 +146,20 @@ func (v *Verifier) verifyAsc(fullPath string) error {
 		return err
 	}
 
-	return download.VerifyGPGSignature(fullPath, ascBytes, v.pgpBytes)
+	for i, check := range pgpBytes {
+		err = download.VerifyGPGSignature(fullPath, ascBytes, check)
+		if err == nil {
+			// verify successful
+			v.log.Infof("Verification with PGP[%d] successful", i)
+			return nil
+		}
+		v.log.Warnf("Verification with PGP[%d] succfailed: %v", i, err)
+	}
+
+	v.log.Warnf("Verification failed")
+
+	// return last error
+	return err
 }
 
 func (v *Verifier) getPublicAsc(fullPath string) ([]byte, error) {

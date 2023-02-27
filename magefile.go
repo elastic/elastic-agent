@@ -489,7 +489,7 @@ func BuildPGP() error {
 	out := filepath.Join("internal", "pkg", "release", "pgp.go")
 
 	fmt.Printf(">> BuildPGP from %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return RunGo("run", goF, "--in", in, "--output", out)
 }
 
 func configYML() error {
@@ -790,7 +790,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 						if strings.Contains(err.Error(), "object not found") {
 							fmt.Printf("Downloading %s: unsupported on %s, skipping\n", binary, platform)
 						} else {
-							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed: %v", err))
+							panic(fmt.Sprintf("fetchBinaryFromArtifactsApi failed for %s on %s: %v", binary, platform, err))
 						}
 					}
 				}

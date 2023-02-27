@@ -4,6 +4,7 @@ name: OpenTelemetry Export Trace
 on:
   workflow_run:
     workflows:
+      - bump-golang
       - golangci-lint
       - Elastic Agent workflow using Snyk
       - macos

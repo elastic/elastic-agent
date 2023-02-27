@@ -38,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/server"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -139,6 +140,20 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	err = secret.CreateAgentSecret()
 	if err != nil {
 		return fmt.Errorf("failed to read/write secrets: %w", err)
+	}
+
+	// Migrate .yml files if the corresponding .enc does not exist
+
+	// the encrypted config does not exist but the unencrypted file does
+	err = migration.MigrateToEncryptedConfig(l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
+	if err != nil {
+		return errors.New(err, "error migrating fleet config")
+	}
+
+	// the encrypted state does not exist but the unencrypted file does
+	err = migration.MigrateToEncryptedConfig(l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
+	if err != nil {
+		return errors.New(err, "error migrating agent state")
 	}
 
 	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)

@@ -158,9 +158,11 @@ func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateRespons
 			BuildTime: release.BuildTime().Format(control.TimeFormat()),
 			Snapshot:  release.Snapshot(),
 		},
-		State:      state.State,
-		Message:    state.Message,
-		Components: components,
+		State:        state.State,
+		Message:      state.Message,
+		Components:   components,
+		FleetState:   state.FleetState,
+		FleetMessage: state.FleetMessage,
 	}, nil
 }
 
@@ -174,7 +176,7 @@ func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartRes
 
 // Upgrade performs the upgrade operation.
 func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
-	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil)
+	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil, request.SkipVerify, request.PgpBytes...)
 	if err != nil {
 		return &cproto.UpgradeResponse{
 			Status: cproto.ActionStatus_FAILURE,
