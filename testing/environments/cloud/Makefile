@@ -35,8 +35,8 @@ USER_KIBANA_DOCKER_IMAGE=docker.elastic.co/observability-ci/${USER_NAME}-kibana
 ##############################################################################
 
 docker_image.auto.tfvars: kibana_docker_image elastic_agent_docker_image
-	@echo 'docker_image_override={"elasticsearch":"${ELASTICSEARCH_DOCKER_IMAGE}","kibana":"${CI_KIBANA_DOCKER_IMAGE}","apm":"${CI_ELASTIC_AGENT_DOCKER_IMAGE}"}' > $@
-	@echo 'docker_image_tag_override={"elasticsearch":"${VERSION}","kibana":"${VERSION}","apm":"${CUSTOM_IMAGE_TAG}"}' >> $@
+	@echo 'docker_image_override={"elasticsearch":"${ELASTICSEARCH_DOCKER_IMAGE}","kibana":"${CI_KIBANA_DOCKER_IMAGE}","agent":"${CI_ELASTIC_AGENT_DOCKER_IMAGE}"}' > $@
+	@echo 'docker_image_tag_override={"elasticsearch":"${VERSION}","kibana":"${VERSION}","agent":"${CUSTOM_IMAGE_TAG}"}' >> $@
 
 ##############################################################################
 # Terraform shortcut rules.
@@ -58,16 +58,16 @@ destroy:
 
 .PHONY: deploy_local
 deploy_local: build_elastic_agent_docker_image push_elastic_agent_docker_image
-	@echo 'docker_image_override={"elasticsearch":"${ELASTICSEARCH_DOCKER_IMAGE}","kibana":"${KIBANA_DOCKER_IMAGE}","apm":"${CI_ELASTIC_AGENT_DOCKER_IMAGE}"}' > docker_image.auto.tfvars
-	@echo 'docker_image_tag_override={"elasticsearch":"${VERSION}","kibana":"${VERSION}","apm":"${CUSTOM_IMAGE_TAG}"}' >> docker_image.auto.tfvars
+	@echo 'docker_image_override={"elasticsearch":"${ELASTICSEARCH_DOCKER_IMAGE}","kibana":"${KIBANA_DOCKER_IMAGE}","agent":"${CI_ELASTIC_AGENT_DOCKER_IMAGE}"}' > docker_image.auto.tfvars
+	@echo 'docker_image_tag_override={"elasticsearch":"${VERSION}","kibana":"${VERSION}","agent":"${CUSTOM_IMAGE_TAG}"}' >> docker_image.auto.tfvars
 	@terraform apply -auto-approve
 
 ##############################################################################
 # Targets for building and pushing custom Kibana and Elastic Agent images.
 ##############################################################################
 
-# kibana_docker_image builds the Cloud Kibana image with the local
-# APM integration package injected. The image will be based off the
+# kibana_docker_image builds the Cloud Kibana image.
+# The image will be based off the
 # stack version defined in ${REPO_ROOT}/.env, unless overridden.
 .PHONY: build_kibana_docker_image
 kibana_docker_image: build_kibana_docker_image
@@ -80,8 +80,8 @@ build_kibana_docker_image:
 		--platform linux/amd64 \
 		"${REPO_ROOT}/build/packages"
 
-# elastic_agent_docker_image builds the Cloud Elastic Agent image
-# with the local APM Server binary injected. The image will be based
+# build_elastic_agent_docker_image builds the Cloud Elastic Agent image.
+# The image will be based
 # off the version defined in version.go,
 # CUSTOM_IMAGE_TAG is appended to the version resulting in e.g:
 # 8.7.0-SNAPSHOT-doe-1673961915

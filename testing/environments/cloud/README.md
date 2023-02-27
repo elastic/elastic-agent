@@ -6,8 +6,8 @@ based on the SNAPSHOT images with the version defined in `version/version.go`.
 
 Prerequisite to running following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
 
-Running `mage cloud:image` in this directory or `make build_elastic_agent_docker_image` in `testing/environments/cloud` will build and push the images. 
-Running `mage cloud:push` in this directory or `make push_elastic_agent_docker_image` in `testing/environments/cloud` will publish built docker image to CI docker repository.
+Running `make build_elastic_agent_docker_image` in `testing/environments/cloud` will build and push the images. 
+Running `make push_elastic_agent_docker_image` in `testing/environments/cloud` will publish built docker image to CI docker repository.
 
 Once docker images are published you can run `EC_API_KEY=your_api_key make apply` from `testing/environments/cloud` directory to deploy them to Elastic Cloud. 
 To get `EC_API_KEY` follow [this guide](https://www.elastic.co/guide/en/cloud/current/ec-api-authentication.html)
@@ -21,4 +21,8 @@ To specify custom images create your `docker_image.auto.tfvars` file similar to 
 
 Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.
 
-SNAPSHOT images are used by default. To use non-snapshot image specify `SNAPSHOT=false` explicitely.
+You can also use `mage cloud:image` and `mage cloud:push` respectively from repo root directory. 
+You will need to modify `testing/environments/cloud/docker_image.auto.tfvars` manually in this case.
+To deploy your manual changes use `make apply` with `EC_API_KEY` instead of `make deploy_local` described above.
+
+SNAPSHOT images are used by default. To use non-snapshot image specify `SNAPSHOT=false` explicitly.

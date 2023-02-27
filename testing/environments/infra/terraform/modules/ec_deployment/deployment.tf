@@ -51,9 +51,9 @@ resource "ec_deployment" "deployment" {
     for_each = var.integrations_server ? [] : [1]
     content {
       dynamic "config" {
-        for_each = var.docker_image_tag_override["apm"] != "" ? [var.docker_image["apm"]] : []
+        for_each = var.docker_image_tag_override["agent"] != "" ? [var.docker_image["agent"]] : []
         content {
-          docker_image = "${config.value}:${var.docker_image_tag_override["apm"]}"
+          docker_image = "${config.value}:${var.docker_image_tag_override["agent"]}"
         }
       }
       topology {
@@ -67,9 +67,9 @@ resource "ec_deployment" "deployment" {
     for_each = var.integrations_server ? [1] : []
     content {
       dynamic "config" {
-        for_each = var.docker_image_tag_override["apm"] != "" ? [var.docker_image["apm"]] : []
+        for_each = var.docker_image_tag_override["agent"] != "" ? [var.docker_image["agent"]] : []
         content {
-          docker_image = "${config.value}:${var.docker_image_tag_override["apm"]}"
+          docker_image = "${config.value}:${var.docker_image_tag_override["agent"]}"
         }
       }
       topology {

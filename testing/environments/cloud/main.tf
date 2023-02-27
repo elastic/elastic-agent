@@ -34,6 +34,6 @@ module "ec_deployment" {
   docker_image_tag_override = {
     "elasticsearch" : coalesce(var.docker_image_tag_override["elasticsearch"], local.stack_version),
     "kibana" : coalesce(var.docker_image_tag_override["kibana"], local.stack_version),
-    "apm" : coalesce(var.docker_image_tag_override["apm"], local.stack_version)
+    "agent" : coalesce(var.docker_image_tag_override["agent"], local.stack_version)
   }
 }

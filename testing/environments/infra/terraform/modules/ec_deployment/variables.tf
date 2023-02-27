@@ -88,7 +88,7 @@ variable "docker_image_tag_override" {
   default = {
     "elasticsearch" : "",
     "kibana" : "",
-    "apm" : "",
+    "agent" : "",
   }
   description = "Optional docker image tag overrides, The full map needs to be specified"
   type        = map(string)
@@ -98,7 +98,7 @@ variable "docker_image" {
   default = {
     "elasticsearch" : "docker.elastic.co/cloud-release/elasticsearch-cloud-ess",
     "kibana" : "docker.elastic.co/cloud-release/kibana-cloud",
-    "apm" : "docker.elastic.co/cloud-release/elastic-agent-cloud",
+    "agent" : "docker.elastic.co/cloud-release/elastic-agent-cloud",
   }
   type        = map(string)
   description = "Optional docker image overrides. The full map needs to be specified"
