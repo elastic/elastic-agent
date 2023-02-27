@@ -61,16 +61,17 @@ func TestMain(m *testing.M) {
 
 func fakeBinaryPath(name string) string {
 	binaryPath := filepath.Join("..", "fake", name, name)
+
+	if runtime.GOOS == component.Windows {
+		binaryPath += exeExt
+	}
+
 	return binaryPath
 }
 
 func compileBinary(out string, packagePath string) {
 	var outBuff bytes.Buffer
 	var errBuff bytes.Buffer
-
-	if runtime.GOOS == component.Windows {
-		out += exeExt
-	}
 
 	cmd := exec.Command(
 		"go",
@@ -98,7 +99,22 @@ func compileBinary(out string, packagePath string) {
 			os.Exit(1)
 		}
 
-		fmt.Printf("failed compiling binary: %v", err)
+		fmt.Printf("failed compiling binary: %v\n", err)
 		os.Exit(1)
 	}
+
+	if runtime.GOOS != component.Windows {
+		err := os.Chown(out, os.Geteuid(), os.Getgid())
+		if err != nil {
+			fmt.Printf("failed chown %s: %s\n", out, err)
+			os.Exit(1)
+		}
+		err = os.Chmod(out, 0755)
+		if err != nil {
+			fmt.Printf("failed chmod %s: %s\n", out, err)
+			os.Exit(1)
+		}
+	}
+
+	return
 }

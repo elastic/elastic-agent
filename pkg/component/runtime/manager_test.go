@@ -2903,18 +2903,7 @@ func testBinary(t *testing.T, name string) string {
 	if err != nil {
 		t.Fatalf("failed abs %s: %s", binaryPath, err)
 	}
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	} else {
-		err = os.Chown(binaryPath, os.Geteuid(), os.Getgid())
-		if err != nil {
-			t.Fatalf("failed chown %s: %s", binaryPath, err)
-		}
-		err = os.Chmod(binaryPath, 0755)
-		if err != nil {
-			t.Fatalf("failed chmod %s: %s", binaryPath, err)
-		}
-	}
+
 	return binaryPath
 }
 
