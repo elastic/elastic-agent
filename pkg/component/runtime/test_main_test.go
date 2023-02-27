@@ -9,7 +9,10 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"testing"
+
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 var (
@@ -64,6 +67,10 @@ func fakeBinaryPath(name string) string {
 func compileBinary(out string, packagePath string) {
 	var outBuff bytes.Buffer
 	var errBuff bytes.Buffer
+
+	if runtime.GOOS == component.Windows {
+		out += exeExt
+	}
 
 	cmd := exec.Command(
 		"go",
