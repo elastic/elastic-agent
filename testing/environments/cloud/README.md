@@ -6,6 +6,9 @@ based on the SNAPSHOT images with the version defined in `version/version.go`.
 
 Prerequisite to running following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
 
+Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.
+
+For more advanced scenarios:
 Running `make build_elastic_agent_docker_image` in `testing/environments/cloud` will build and push the images. 
 Running `make push_elastic_agent_docker_image` in `testing/environments/cloud` will publish built docker image to CI docker repository.
 
@@ -16,13 +19,9 @@ The custom images are tagged with the current version, commit and timestamp. The
 timestamp is included to force a new Docker image to be used, which enables pushing new
 binaries without recreating the deployment.
 
-
 To specify custom images create your `docker_image.auto.tfvars` file similar to `docker_image.auto.tfvars.sample`. 
 
-Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.
-
 You can also use `mage cloud:image` and `mage cloud:push` respectively from repo root directory. 
-You will need to modify `testing/environments/cloud/docker_image.auto.tfvars` manually in this case.
-To deploy your manual changes use `make apply` with `EC_API_KEY` instead of `make deploy_local` described above.
+To deploy your changes use `make apply` (from `testing/environments/cloud`) with `EC_API_KEY` instead of `make deploy_local` described above.
 
 SNAPSHOT images are used by default. To use non-snapshot image specify `SNAPSHOT=false` explicitly.
