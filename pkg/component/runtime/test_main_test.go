@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,10 +21,10 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	fakeCompPackage := path.Join("..", "fake", "component", "cmd")
-	packagePath := path.Join("..", "fake", "shipper")
+	fakeShipperPackage := path.Join("..", "fake", "shipper")
 
-	compileBinary(fakeShipperBinPath, fakeCompPackage)
-	compileBinary(fakeShipperBinPath, packagePath)
+	compileBinary(fakeCompBinPath, fakeCompPackage)
+	compileBinary(fakeShipperBinPath, fakeShipperPackage)
 
 	exitCode := m.Run()
 
@@ -61,18 +62,31 @@ func fakeBinaryPath(name string) string {
 }
 
 func compileBinary(out string, packagePath string) {
+	var outBuff bytes.Buffer
+	var errBuff bytes.Buffer
+
 	cmd := exec.Command(
 		"go",
 		"build",
-		`-gcflags=all=-N -l`,
+		"-gcflags=all=-N -l",
 		"-o", out,
 		packagePath)
+	cmd.Stdout = &outBuff
+	cmd.Stderr = &errBuff
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			fmt.Printf("could not compile binary: %s: %v",
 				exitErr.String(),
 				string(exitErr.Stderr))
+			fmt.Println("the command run was:", cmd.String())
+
+			if outBuff.Len() > 0 {
+				fmt.Println("stdOut:", outBuff.String())
+			}
+			if errBuff.Len() > 0 {
+				fmt.Println("stdErr:", errBuff.String())
+			}
 
 			os.Exit(1)
 		}
