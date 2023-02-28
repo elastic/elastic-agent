@@ -1,0 +1,2 @@
+docker_image_override={"elasticsearch":"docker.elastic.co/cloud-release/elasticsearch-cloud-ess","kibana":"docker.elastic.co/cloud-release/kibana-cloud","agent":"docker.elastic.co/observability-ci/elastic-agent"}
+docker_image_tag_override={"elasticsearch":"8.6.0-f96862e0-SNAPSHOT","kibana":"8.6.0-f96862e0-SNAPSHOT","agent":"mysampletag"}
