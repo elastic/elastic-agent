@@ -15,7 +15,7 @@ create-cluster:
 
 .PHONY: run-tests
 run-tests:
-	ginkgo -- --config="$(CLUSTER_DIGEST_FILE)"
+	ginkgo -- --config="$(CURRENT_DIR)/$(CLUSTER_DIGEST_FILE)"
 
 .PHONY: destroy-cluster
 destroy-cluster:

@@ -18,7 +18,7 @@ func DownloadElasticAgent(version string) error {
 	}
 	fileName := fmt.Sprintf("elastic-agent-%s-darwin-x86_64.tar.gz", version)
 	agentTarPath := fmt.Sprintf("%s/%s", dirToInstall, fileName)
-	err = DownloadFile(fmt.Sprintf("%s/%s", agentTarPath, "elastic-agent-8.6.1-darwin-x86_64.tar.gz"),
+	err = DownloadFile(fmt.Sprintf(agentTarPath),
 		"https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.6.1-darwin-x86_64.tar.gz")
 
 	if err != nil {
