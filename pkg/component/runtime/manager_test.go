@@ -360,7 +360,7 @@ func TestManager_FakeInput_Features(t *testing.T) {
 	go func() {
 		sub := m.Subscribe(subscriptionCtx, compID)
 		var healthIteration int
-		var configured bool
+
 		for {
 			select {
 			case <-subscriptionCtx.Done():
@@ -471,21 +471,18 @@ func TestManager_FakeInput_Features(t *testing.T) {
 					// acceptable
 
 				case client.UnitStateConfiguring:
-					if !configured {
-						// set unit back to health, so the case 3 will run.
-						configured = true
-						comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
-							"type":    "fake",
-							"state":   int(client.UnitStateHealthy),
-							"message": "Fake Healthy",
-						})
+					// set unit back to health, so other cases will run.
+					comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
+						"type":    "fake",
+						"state":   int(client.UnitStateHealthy),
+						"message": "Fake Healthy",
+					})
 
-						err := m.Update([]component.Component{comp})
-						if err != nil {
-							t.Logf("case 2 error updating fetureflags: %v", err)
+					err := m.Update([]component.Component{comp})
+					if err != nil {
+						t.Logf("error updating component state to health: %v", err)
 
-							subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
-						}
+						subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
 					}
 
 				default:
