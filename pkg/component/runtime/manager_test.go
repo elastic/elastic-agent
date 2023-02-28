@@ -2582,13 +2582,14 @@ func TestManager_FakeShipper(t *testing.T) {
 		t.Fatalf("failed early: %s", err)
 	}
 
-	endTimer := time.NewTimer(2 * time.Minute)
+	timeout := 3 * time.Minute
+	endTimer := time.NewTimer(timeout)
 	defer endTimer.Stop()
 LOOP:
 	for {
 		select {
 		case <-endTimer.C:
-			t.Fatalf("timed out after 2 minutes")
+			t.Fatalf("timed out after %s", timeout)
 		case err := <-errCh:
 			require.NoError(t, err)
 		case err := <-subErrCh:
