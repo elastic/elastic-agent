@@ -100,10 +100,12 @@ type AgentStateInfo struct {
 
 // AgentState is the current state of the Elastic Agent.
 type AgentState struct {
-	Info       AgentStateInfo   `json:"info" yaml:"info"`
-	State      State            `json:"state" yaml:"state"`
-	Message    string           `json:"message" yaml:"message"`
-	Components []ComponentState `json:"components" yaml:"components"`
+	Info         AgentStateInfo   `json:"info" yaml:"info"`
+	State        State            `json:"state" yaml:"state"`
+	Message      string           `json:"message" yaml:"message"`
+	Components   []ComponentState `json:"components" yaml:"components"`
+	FleetState   State            `yaml:"fleet_state"`
+	FleetMessage string           `yaml:"fleet_message"`
 }
 
 // DiagnosticFileResult is a diagnostic file result.
@@ -145,7 +147,7 @@ type Client interface {
 	// Restart triggers restarting the current running daemon.
 	Restart(ctx context.Context) error
 	// Upgrade triggers upgrade of the current running daemon.
-	Upgrade(ctx context.Context, version string, sourceURI string) (string, error)
+	Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, pgpBytes ...string) (string, error)
 	// DiagnosticAgent gathers diagnostics information for the running Elastic Agent.
 	DiagnosticAgent(ctx context.Context) ([]DiagnosticFileResult, error)
 	// DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).
@@ -226,8 +228,11 @@ func (c *client) State(ctx context.Context) (*AgentState, error) {
 			BuildTime: res.Info.BuildTime,
 			Snapshot:  res.Info.Snapshot,
 		},
-		State:      res.State,
-		Message:    res.Message,
+		State:        res.State,
+		Message:      res.Message,
+		FleetState:   res.FleetState,
+		FleetMessage: res.FleetMessage,
+
 		Components: make([]ComponentState, 0, len(res.Components)),
 	}
 	for _, comp := range res.Components {
@@ -280,10 +285,12 @@ func (c *client) Restart(ctx context.Context) error {
 }
 
 // Upgrade triggers upgrade of the current running daemon.
-func (c *client) Upgrade(ctx context.Context, version string, sourceURI string) (string, error) {
+func (c *client) Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, pgpBytes ...string) (string, error) {
 	res, err := c.client.Upgrade(ctx, &cproto.UpgradeRequest{
-		Version:   version,
-		SourceURI: sourceURI,
+		Version:    version,
+		SourceURI:  sourceURI,
+		SkipVerify: skipVerify,
+		PgpBytes:   pgpBytes,
 	})
 	if err != nil {
 		return "", err

@@ -139,7 +139,7 @@ func watch(ctx context.Context, tilGrace time.Duration, log *logger.Logger) erro
 		return err
 	}
 
-	crashChecker, err := upgrade.NewCrashChecker(ctx, errChan, log)
+	crashChecker, err := upgrade.NewCrashChecker(ctx, crashChan, log)
 	if err != nil {
 		return err
 	}

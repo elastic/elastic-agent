@@ -26,8 +26,11 @@ import (
 // Max number of times an invalid API Key is checked
 const maxUnauthCounter int = 6
 
-// Const for decraded state or linter complains
-const degraded = "DEGRADED"
+// Consts for states at fleet checkin
+const fleetStateDegraded = "DEGRADED"
+const fleetStateOnline = "online"
+const fleetStateError = "error"
+const fleetStateStarting = "starting"
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
@@ -73,6 +76,7 @@ type fleetGateway struct {
 	checkinFailCounter int
 	stateFetcher       coordinator.StateFetcher
 	stateStore         stateStore
+	errCh              chan error
 	actionCh           chan []fleetapi.Action
 }
 
@@ -118,6 +122,7 @@ func newFleetGatewayWithScheduler(
 		acker:        acker,
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
+		errCh:        make(chan error),
 		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
 }
@@ -167,6 +172,11 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 	}
 }
 
+// Errors returns the channel to watch for reported errors.
+func (f *fleetGateway) Errors() <-chan error {
+	return f.errCh
+}
+
 func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
 	bo.Reset()
 
@@ -198,8 +208,10 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 				)
 
 				f.log.Error(err)
+				f.errCh <- err
 				return nil, err
 			}
+			f.errCh <- err
 			continue
 		}
 
@@ -209,6 +221,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		}
 
 		f.checkinFailCounter = 0
+		f.errCh <- nil
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}
@@ -231,7 +244,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 		case eaclient.UnitStateHealthy:
 			return "HEALTHY"
 		case eaclient.UnitStateDegraded:
-			return degraded
+			return fleetStateDegraded
 		case eaclient.UnitStateFailed:
 			return "FAILED"
 		case eaclient.UnitStateStopping:
@@ -368,9 +381,11 @@ func (f *fleetGateway) SetClient(c client.Sender) {
 func agentStateToString(state agentclient.State) string {
 	switch state {
 	case agentclient.Healthy:
-		return "online"
+		return fleetStateOnline
 	case agentclient.Failed:
-		return "error"
+		return fleetStateError
+	case agentclient.Starting:
+		return fleetStateStarting
 	}
-	return degraded
+	return fleetStateDegraded
 }

@@ -7,7 +7,6 @@ package fleet
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,9 +19,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
+	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
@@ -404,13 +406,25 @@ func (e *emptyStateFetcher) State(_ bool) coordinator.State {
 }
 
 func runFleetGateway(ctx context.Context, g gateway.FleetGateway) <-chan error {
+	done := make(chan bool)
 	errCh := make(chan error, 1)
 	go func() {
 		err := g.Run(ctx)
+		close(done)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			errCh <- err
 		} else {
 			errCh <- nil
+		}
+	}()
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-g.Errors():
+				// ignore errors here
+			}
 		}
 	}()
 	return errCh
@@ -430,4 +444,56 @@ func newStateStore(t *testing.T, log *logger.Logger) *store.StateStore {
 	})
 
 	return stateStore
+}
+
+func TestAgentStateToString(t *testing.T) {
+	testcases := []struct {
+		agentState         agentclient.State
+		expectedFleetState string
+	}{
+		{
+			agentState:         agentclient.Healthy,
+			expectedFleetState: fleetStateOnline,
+		},
+		{
+			agentState:         agentclient.Failed,
+			expectedFleetState: fleetStateError,
+		},
+		{
+			agentState:         agentclient.Starting,
+			expectedFleetState: fleetStateStarting,
+		},
+		// everything else maps to degraded
+		{
+			agentState:         agentclient.Configuring,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Degraded,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Stopping,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Stopped,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Upgrading,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Rollback,
+			expectedFleetState: fleetStateDegraded,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("%s -> %s", tc.agentState, tc.expectedFleetState), func(t *testing.T) {
+			actualFleetState := agentStateToString(tc.agentState)
+			assert.Equal(t, tc.expectedFleetState, actualFleetState)
+		})
+	}
 }
