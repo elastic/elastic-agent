@@ -108,7 +108,6 @@ spec:
             - name: var-lib
               mountPath: /hostfs/var/lib
               readOnly: true
-            # Needed for 'Defend for containers' integration (cloud-defend)
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
       volumes:
@@ -141,6 +140,8 @@ spec:
           hostPath:
             path: /var/lib
         # Needed for 'Defend for containers' integration (cloud-defend)
+        # If you are not using this integration, then these volumes and the corresponding
+        # mounts can be removed.
         - name: sys-kernel-debug
           hostPath:
             path: /sys/kernel/debug
