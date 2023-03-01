@@ -409,6 +409,12 @@ func TestManager_FakeInput_Features(t *testing.T) {
 							comp.Units[0],
 							fakecmp.ActionRetrieveFeatures,
 							nil)
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
+								healthIteration, fakecmp.ActionRetrieveFeatures, err)
+							return
+						}
+
 						ff, err := features.Parse(map[string]any{"agent": res})
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to parse action %s response as features config: %w",
@@ -442,6 +448,12 @@ func TestManager_FakeInput_Features(t *testing.T) {
 							comp.Units[0],
 							fakecmp.ActionRetrieveFeatures,
 							nil)
+						if err != nil {
+							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
+								healthIteration, fakecmp.ActionRetrieveFeatures, err)
+							return
+						}
+
 						ff, err := features.Parse(map[string]any{"agent": res})
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to parse action %s response as features config: %w",
