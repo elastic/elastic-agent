@@ -67,7 +67,7 @@ agent:
 				t.Fatalf("could not parse config YAML: %v", err)
 			}
 
-			_, err = Apply(c)
+			err = Apply(c)
 			if err != nil {
 				t.Fatalf("Apply failed: %v", err)
 			}

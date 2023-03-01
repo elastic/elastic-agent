@@ -391,6 +391,7 @@ func TestManager_FakeInput_Features(t *testing.T) {
 						comp.Features = &proto.Features{
 							Fqdn: &proto.FQDNFeature{Enabled: true},
 						}
+
 						err := m.Update([]component.Component{comp})
 						if err != nil {
 							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
@@ -454,14 +455,6 @@ func TestManager_FakeInput_Features(t *testing.T) {
 							return
 						}
 						assert.True(t, ff.FQDN)
-
-						// Change something, but feature flags
-						comp.Units[0].LogLevel = client.UnitLogLevelInfo
-						comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
-							"type":    "fake",
-							"state":   int(client.UnitStateConfiguring),
-							"message": "Fake Healthy",
-						})
 
 						doneCh <- struct{}{}
 						return

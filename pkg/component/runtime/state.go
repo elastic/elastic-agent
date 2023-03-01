@@ -173,7 +173,8 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		}
 	}
 
-	if !gproto.Equal(s.expectedFeatures, comp.Features) {
+	if s.expectedFeatures != nil &&
+		!gproto.Equal(s.expectedFeatures, comp.Features) {
 		changed = true
 		s.expectedFeaturesIdx++
 		s.expectedFeatures = comp.Features

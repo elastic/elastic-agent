@@ -26,10 +26,10 @@ type Flags struct {
 // Parse receives a policy, parses and returns it.
 // policy can be a *config.Config, config.Config or anything config.NewConfigFrom
 // can work with. If policy is nil, Parse is a no-op.
-func Parse(policy any) (Flags, error) {
+func Parse(policy any) (*Flags, error) {
 	if policy == nil {
 		logp.L().Debug("feature flags policy is nil, nothing to do")
-		return Flags{}, nil
+		return nil, nil
 	}
 
 	var c *config.Config
@@ -43,14 +43,14 @@ func Parse(policy any) (Flags, error) {
 		var err error
 		c, err = config.NewConfigFrom(policy)
 		if err != nil {
-			return Flags{}, fmt.Errorf("could not get a config from type %T: %w",
+			return nil, fmt.Errorf("could not get a config from type %T: %w",
 				policy, err)
 		}
 	}
 
 	if c == nil {
 		logp.L().Debug("feature flags config is nil, nothing to do")
-		return Flags{}, nil
+		return nil, nil
 	}
 
 	type cfg struct {
@@ -63,26 +63,30 @@ func Parse(policy any) (Flags, error) {
 
 	parsedFlags := cfg{}
 	if err := c.Unpack(&parsedFlags); err != nil {
-		return Flags{}, fmt.Errorf("could not umpack features config: %w", err)
+		return nil, fmt.Errorf("could not umpack features config: %w", err)
 	}
 
-	return Flags{FQDN: parsedFlags.Agent.Features.FQDN.Enabled()}, nil
+	return &Flags{FQDN: parsedFlags.Agent.Features.FQDN.Enabled()}, nil
 }
 
-// Apply receives a config and applies it. If policy is nil, Apply is a no-op.
-func Apply(c *config.Config) (Flags, error) {
+// Apply receives a config and applies it. If c is nil, Apply is a no-op.
+func Apply(c *config.Config) error {
 	if c == nil {
 		logp.L().Debug("feature flags config is nil, nothing to do")
-		return Flags{}, nil
+		return nil
 	}
 
 	var err error
 
 	mu.Lock()
 	defer mu.Unlock()
-	current, err = Parse(c) // Updating global state
+	parsed, err := Parse(c) // Updating global state
+	if err != nil {
+		return fmt.Errorf("could not apply feature flag config: %w", err)
+	}
 
-	return current, err
+	current = *parsed
+	return err
 }
 
 // FQDN reports if FQDN should be used instead of hostname for host.name.
@@ -100,7 +104,7 @@ func Current() Flags {
 	return current
 }
 
-func (f Flags) AsProto() *proto.Features {
+func (f *Flags) AsProto() *proto.Features {
 	mu.Lock()
 	defer mu.Unlock()
 	return &proto.Features{
