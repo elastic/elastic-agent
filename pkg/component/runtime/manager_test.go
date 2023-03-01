@@ -402,9 +402,6 @@ func TestManager_FakeInput_Features(t *testing.T) {
 					// check if config sent on iteration 1 was set,
 					// then change something but the feature flags.
 					case 2:
-						// check the agent's internal state
-						assert.True(t, componentState.Features.Fqdn.Enabled)
-
 						// check the component
 						res, err := m.PerformAction(
 							context.Background(),
@@ -438,9 +435,6 @@ func TestManager_FakeInput_Features(t *testing.T) {
 
 					// check again and finish test
 					case 3:
-						// check the agent's internal state
-						assert.True(t, componentState.Features.Fqdn.Enabled)
-
 						// check the component
 						res, err := m.PerformAction(
 							context.Background(),

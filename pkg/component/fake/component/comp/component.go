@@ -74,7 +74,7 @@ func (s *StateManager) Added(unit *client.Unit) {
 	s.inputs[unit.ID()] = r
 }
 
-func (s *StateManager) Modified(unit *client.Unit) {
+func (s *StateManager) Modified(change client.UnitChanged) {
 	unit := change.Unit
 	switch unit.Type() {
 	case client.UnitTypeOutput:
@@ -97,6 +97,13 @@ func (s *StateManager) Modified(unit *client.Unit) {
 			return
 		}
 
+		e := s.logger.Info().Interface("change.unit", *change.Unit)
+		if change.Features != nil {
+			e.Interface("change.features", *change.Features)
+		} else {
+			e.Str("change.features", "nil")
+		}
+		e.Msgf("existingInput.Update change: %#+v", change)
 		err := existingInput.Update(unit, change.Triggers)
 		if err != nil {
 			_ = unit.UpdateState(
@@ -390,10 +397,13 @@ func (f *fakeInput) Update(u *client.Unit, triggers client.Trigger) error {
 	_ = u.UpdateState(f.state, f.stateMsg, nil)
 
 	if triggers&client.TriggeredFeatureChange == client.TriggeredFeatureChange {
-		f.logger.Debug().
+		f.logger.Info().
 			Interface("features", expected.Features).
 			Msg("updating features")
-		f.features = expected.Features
+		f.features = &proto.Features{
+			Source: nil,
+			Fqdn:   &proto.FQDNFeature{Enabled: expected.Features.Fqdn.Enabled},
+		}
 	}
 
 	return nil
