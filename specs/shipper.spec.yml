@@ -18,4 +18,9 @@ shippers:
       - kafka
       - logstash
       - redis
-    command: {}
+    command:
+      args:
+        - "-E"
+        - "logging.level=info"
+        - "-E"
+        - "logging.to_stderr=true"
