@@ -165,9 +165,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 
 			actions := make([]fleetapi.Action, len(resp.Actions))
 			copy(actions, resp.Actions)
-			if len(actions) > 0 {
-				f.actionCh <- actions
-			}
+			f.actionCh <- actions
 		}
 	}
 }

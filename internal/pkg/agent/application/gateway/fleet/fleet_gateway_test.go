@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
@@ -125,7 +125,7 @@ func TestFleetGateway(t *testing.T) {
 		Backoff:  backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
 	}
 
-	t.Run("send no event and receive no action", withGateway(agentInfo, settings, func(
+	t.Run("send no event and receive empty list", withGateway(agentInfo, settings, func(
 		t *testing.T,
 		gateway gateway.FleetGateway,
 		client *testingClient,
@@ -152,7 +152,7 @@ func TestFleetGateway(t *testing.T) {
 		require.NoError(t, err)
 		select {
 		case actions := <-gateway.Actions():
-			t.Errorf("Expected no actions, got %v", actions)
+			assert.Empty(t, actions)
 		default:
 		}
 	}))
@@ -244,6 +244,7 @@ func TestFleetGateway(t *testing.T) {
 			var count int
 			for {
 				waitFn()
+				<-gateway.Actions()
 				count++
 				if count == 4 {
 					return
@@ -357,7 +358,7 @@ func TestRetriesOnFailures(t *testing.T) {
 			require.NoError(t, err)
 			select {
 			case actions := <-gateway.Actions():
-				t.Errorf("Expected no actions, got %v", actions)
+				assert.Empty(t, actions)
 			default:
 			}
 		}))
