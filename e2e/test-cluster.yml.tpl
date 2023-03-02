@@ -1,5 +1,5 @@
 ---
-cluster_name: "pavel-e2e-test"
+cluster_name: "{{ .ClusterName }}"
 template_name: "pavel-e2e-test"
 create_users: false
 grab_cluster_info: true
