@@ -1,0 +1,28 @@
+state: 2
+message: Running
+fleet_state: 6
+fleet_message: ""
+components:
+- component:
+    id: mock_component_1
+    units:
+    - id: mock_input_unit
+      type: 0
+      log_level: 2
+      config:
+        source: null
+        id: ""
+        type: ""
+        name: ""
+        revision: 0
+        meta: null
+        datastream: null
+        streams: []
+  state:
+    state: 2
+    message: ""
+    units: {}
+    version_info:
+      name: shiny mock component
+      version: latest, obvs :D
+log_level: info

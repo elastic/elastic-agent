@@ -1,0 +1,351 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+package coordinator_test
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	mock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/mocks"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+)
+
+// Refer to https://vektra.github.io/mockery/installation/ to check how to install mockery binary
+//go:generate mockery --all
+//go:generate mockery --dir ../../../capabilities/ --name Capability
+//go:generate mockery --dir ../../../core/composable/ --name FetchContextProvider
+
+var expectedDiagnosticHooks map[string]string = map[string]string{
+	"pre-config":      "pre-config.yaml",
+	"variables":       "variables.yaml",
+	"computed-config": "computed-config.yaml",
+	"components":      "components.yaml",
+	"state":           "state.yaml",
+}
+
+func TestCoordinatorDiagnosticHooks(t *testing.T) {
+
+	helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, component.RuntimeSpecs{}, false)
+
+	//FIXME I cannot customize what is returned in SubscriptionAll object since it's defined as a struct and all the
+	//constructors and fields are private -> the RuntimeManager interface definition should define an interface as
+	//return type on the coordinator side or the returned struct should be plain data object with all the fields
+	//accessible by anyone
+	subscriptionAll := new(runtime.SubscriptionAll)
+	helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
+	helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
+	helper.runtimeManager.EXPECT().State().Return([]runtime.ComponentComponentState{
+		{
+			Component: component.Component{
+				ID: "mock_component_1",
+				Units: []component.Unit{
+					{
+						ID:       "mock_input_unit",
+						Type:     client.UnitTypeInput,
+						LogLevel: client.UnitLogLevelInfo,
+						Config:   &proto.UnitExpectedConfig{
+							//TODO
+						},
+					},
+				},
+			},
+			State: runtime.ComponentState{
+				State: client.UnitStateHealthy,
+				VersionInfo: runtime.ComponentVersionInfo{
+					Name:    "shiny mock component",
+					Version: "latest, obvs :D",
+				},
+			},
+		},
+	})
+
+	sut := helper.coordinator
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+
+	coordinatorWg := new(sync.WaitGroup)
+	defer func() {
+		cancelFunc()
+		// wait till the coordinator exits to avoid a panic
+		// when logging after the test goroutine exited
+		coordinatorWg.Wait()
+	}()
+
+	coordinatorWg.Add(1)
+	go func() {
+		defer coordinatorWg.Done()
+		coordErr := sut.Run(ctx)
+		assert.ErrorIs(t, coordErr, context.Canceled, "Coordinator exited with unexpected error")
+	}()
+
+	//Provide vars
+	processors := transpiler.Processors{
+		{
+			"add_fields": map[string]interface{}{
+				"dynamic": "added",
+			},
+		},
+	}
+	fetchContextProvider := mocks.NewFetchContextProvider(t)
+	fetchContextProviders := mapstr.M{
+		"kubernetes_secrets": fetchContextProvider,
+	}
+	vars, err := transpiler.NewVarsWithProcessors(
+		"id",
+		map[string]interface{}{
+			"host": map[string]interface{}{"platform": "linux"},
+			"dynamic": map[string]interface{}{
+				"key1": "dynamic1",
+				"list": []string{
+					"array1",
+					"array2",
+				},
+				"dict": map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+				},
+			},
+		},
+		"dynamic",
+		processors,
+		fetchContextProviders)
+	require.NoError(t, err)
+	select {
+	case helper.varsChannel <- []*transpiler.Vars{vars}:
+		t.Log("Vars injected")
+	case <-time.NewTimer(100 * time.Millisecond).C:
+		t.Fatalf("Timeout writing vars")
+	}
+
+	// Inject initial configuration - after starting coordinator
+	configBytes, err := os.ReadFile("./testdata/simple_config/elastic-agent.yml")
+	require.NoError(t, err)
+
+	initialConf := config.MustNewConfigFrom(configBytes)
+
+	initialConfChange := mocks.NewConfigChange(t)
+	initialConfChange.EXPECT().Config().Return(initialConf)
+	initialConfChange.EXPECT().Ack().Return(nil).Times(1)
+
+	select {
+	case helper.configChangeChannel <- initialConfChange:
+		t.Log("Initial config injected")
+	case <-time.NewTimer(100 * time.Millisecond).C:
+		t.Fatalf("Timeout writing initial config")
+	}
+
+	assert.Eventually(t, func() bool { return sut.State(true).State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
+
+	t.Logf("Agent state: %s", sut.State(true).State)
+
+	diagHooks := sut.DiagnosticHooks()
+	t.Logf("Received diagnostics: %+v", diagHooks)
+	assert.NotEmpty(t, diagHooks)
+
+	hooksMap := map[string]diagnostics.Hook{}
+	for i, h := range diagHooks {
+		hooksMap[h.Name] = diagHooks[i]
+	}
+
+	for hookName, diagFileName := range expectedDiagnosticHooks {
+		contained := assert.Contains(t, hooksMap, hookName)
+		if contained {
+			hook := hooksMap[hookName]
+			assert.Equal(t, diagFileName, hook.Filename)
+			hookResult := hook.Hook(ctx)
+			stringHookResult := sanitizeHookResult(t, hook.Filename, hook.ContentType, hookResult)
+			// The output of hooks is VERY verbose even for simple configs but useful for debugging
+			t.Logf("Hook %s result: 👇\n--- #--- START ---#\n%s\n--- #--- END ---#", hook.Name, stringHookResult)
+			expectedbytes, err := os.ReadFile(fmt.Sprintf("./testdata/simple_config/expected/%s", hook.Filename))
+			if assert.NoError(t, err) {
+				assert.YAMLEqf(t, string(expectedbytes), stringHookResult, "Unexpected YAML content for file %s", hook.Filename)
+			}
+		}
+	}
+}
+
+func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBytes []byte) (retVal string) {
+	const agentPathPlaceholder string = "<AgentRunDir>"
+	const hostIDPlaceholder string = "<HostID>"
+	const hostKey = "host"
+	const pathKey = "path"
+
+	if contentType == "application/yaml" {
+		yamlContent := map[string]any{}
+		err := yaml.Unmarshal(rawBytes, yamlContent)
+		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
+
+		if fileName == "pre-config.yaml" || fileName == "computed-config.yaml" {
+			// get rid of runtime informations, since those depend on the machine where the test is executed, just assert that they exist
+			assert.Containsf(t, yamlContent, "runtime", "No runtime information found in YAML")
+			delete(yamlContent, "runtime")
+
+			//fix id and directories
+			if assert.Containsf(t, yamlContent, hostKey, "config yaml does not contain %s key", hostKey) {
+				hostValue := yamlContent[hostKey]
+				if assert.IsType(t, map[interface{}]interface{}{}, hostValue) {
+					hostMap := hostValue.(map[interface{}]interface{})
+					if assert.Contains(t, hostMap, "id", "host map does not contain id") {
+						t.Logf("Substituting host id %q with %q", hostMap["id"], hostIDPlaceholder)
+						hostMap["id"] = hostIDPlaceholder
+					}
+				}
+			}
+
+			if assert.Containsf(t, yamlContent, pathKey, "config yaml does not contain agent path map") {
+				pathValue := yamlContent[pathKey]
+				if assert.IsType(t, map[interface{}]interface{}{}, pathValue) {
+					pathMap := pathValue.(map[interface{}]interface{})
+					currentDir := pathMap["config"].(string)
+					for _, key := range []string{"config", "data", "home", "logs"} {
+						if assert.Containsf(t, pathMap, key, "path map is missing expected key %q", key) {
+							value := pathMap[key]
+							if assert.IsType(t, "", value) {
+								valueString := value.(string)
+								valueString = strings.Replace(valueString, currentDir, agentPathPlaceholder, 1)
+								pathMap[key] = filepath.ToSlash(valueString)
+							}
+						}
+					}
+				}
+			}
+
+		}
+		sanitizedBytes, err := yaml.Marshal(yamlContent)
+		assert.NoError(t, err)
+		return string(sanitizedBytes)
+	}
+
+	//substitute current running dir with a placeholder
+	testDir := path.Dir(os.Args[0])
+	t.Logf("Replacing test dir %s with %s", testDir, agentPathPlaceholder)
+	return strings.ReplaceAll(string(rawBytes), testDir, agentPathPlaceholder)
+}
+
+type coordinatorTestHelper struct {
+	coordinator *coordinator.Coordinator
+
+	runtimeManager      *mocks.RuntimeManager
+	runtimeErrorChannel chan error
+
+	configManager       *mocks.ConfigManager
+	configChangeChannel chan coordinator.ConfigChange
+	configErrorChannel  chan error
+	actionErrorChannel  chan error
+
+	varsManager      *mocks.VarsManager
+	varsChannel      chan []*transpiler.Vars
+	varsErrorChannel chan error
+
+	capability     *mocks.Capability
+	upgradeManager *mocks.UpgradeManager
+	reExecManager  *mocks.ReExecManager
+	monitorManager *mocks.MonitorManager
+}
+
+func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, isManaged bool) *coordinatorTestHelper {
+
+	helper := new(coordinatorTestHelper)
+
+	// Runtime manager basic wiring
+	mockRuntimeMgr := mocks.NewRuntimeManager(t)
+	runtimeErrChan := make(chan error)
+	mockRuntimeMgr.EXPECT().Errors().Return(runtimeErrChan)
+	mockRuntimeMgr.EXPECT().Run(mock.Anything).RunAndReturn(func(_ctx context.Context) error { <-_ctx.Done(); return _ctx.Err() }).Times(1)
+	helper.runtimeManager = mockRuntimeMgr
+	helper.runtimeErrorChannel = runtimeErrChan
+
+	// Config manager basic wiring
+	mockConfigMgr := mocks.NewConfigManager(t)
+	configErrChan := make(chan error)
+	mockConfigMgr.EXPECT().Errors().Return(configErrChan)
+	actionErrorChan := make(chan error)
+	mockConfigMgr.EXPECT().ActionErrors().Return(actionErrorChan)
+	configChangeChan := make(chan coordinator.ConfigChange)
+	mockConfigMgr.EXPECT().Watch().Return(configChangeChan)
+	mockConfigMgr.EXPECT().Run(mock.Anything).RunAndReturn(func(_ctx context.Context) error { <-_ctx.Done(); return _ctx.Err() }).Times(1)
+	helper.configManager = mockConfigMgr
+	helper.configErrorChannel = configErrChan
+	helper.actionErrorChannel = actionErrorChan
+	helper.configChangeChannel = configChangeChan
+
+	//Variables manager basic wiring
+	mockVarsMgr := mocks.NewVarsManager(t)
+	varsErrChan := make(chan error)
+	mockVarsMgr.EXPECT().Errors().Return(varsErrChan)
+	varsChan := make(chan []*transpiler.Vars)
+	mockVarsMgr.EXPECT().Watch().Return(varsChan)
+	mockVarsMgr.EXPECT().Run(mock.Anything).RunAndReturn(func(_ctx context.Context) error { <-_ctx.Done(); return _ctx.Err() }).Times(1)
+	helper.varsManager = mockVarsMgr
+	helper.varsChannel = varsChan
+	helper.varsErrorChannel = varsErrChan
+
+	//Capability basic wiring
+	mockCapability := mocks.NewCapability(t)
+	mockCapability.EXPECT().Apply(mock.AnythingOfType("*transpiler.AST")).RunAndReturn(func(in interface{}) (interface{}, error) { return in, nil })
+	helper.capability = mockCapability
+
+	// Upgrade manager
+	mockUpgradeMgr := mocks.NewUpgradeManager(t)
+	mockUpgradeMgr.EXPECT().Reload(mock.AnythingOfType("*config.Config")).Return(nil)
+	// mockUpgradeMgr.EXPECT().Upgradeable().Return(false)
+	helper.upgradeManager = mockUpgradeMgr
+
+	//ReExec manager
+	helper.reExecManager = mocks.NewReExecManager(t)
+
+	//Monitor manager
+	mockMonitorMgr := mocks.NewMonitorManager(t)
+	mockMonitorMgr.EXPECT().Reload(mock.AnythingOfType("*config.Config")).Return(nil)
+	mockMonitorMgr.EXPECT().Enabled().Return(false)
+	helper.monitorManager = mockMonitorMgr
+
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.ToStderr = true
+
+	log, err := logger.NewFromConfig("coordinator-test", loggerCfg, false)
+	require.NoError(t, err)
+
+	helper.coordinator = coordinator.New(
+		log,
+		logp.InfoLevel,
+		agentInfo,
+		specs,
+		helper.reExecManager,
+		helper.upgradeManager,
+		helper.runtimeManager,
+		helper.configManager,
+		helper.varsManager,
+		helper.capability,
+		helper.monitorManager,
+		isManaged,
+	)
+
+	return helper
+}
