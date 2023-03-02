@@ -2,7 +2,7 @@
 cluster_name: "{{ .ClusterName }}"
 template_name: "pavel-e2e-test"
 create_users: false
-grab_cluster_info: true
+grab_cluster_info: false
 create_ilm: false
 certificate_issuer: letsencrypt-staging
 slack_channel: "@U0396725PSN"
