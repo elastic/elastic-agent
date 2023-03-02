@@ -130,6 +130,17 @@ func (c *Client) GetAgentStatus() (string, error) {
 	return agent.Status, nil
 }
 
+func (c *Client) GetAgentVersion() (string, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "", nil
+	}
+
+	agent, err := c.GetAgentByHostnameFromList(hostname)
+	fmt.Println(agent.Status)
+	return agent.LocalMetadata.Elastic.Agent.Version, nil
+}
+
 func (c *Client) UnEnrollAgent() error {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -158,4 +169,29 @@ func (c *Client) GetAgentIDByHostname(hostname string) (string, error) {
 		"hostname": hostname,
 	}).Trace("Agent Id found")
 	return agent.ID, nil
+}
+
+func (c *Client) UpgradeAgent(version string) error {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	agentID, err := c.GetAgentIDByHostname(hostname)
+	if err != nil {
+		return err
+	}
+
+	reqBody := `{"version":"` + version + `"}`
+	statusCode, respBody, err := c.post(context.Background(), fmt.Sprintf("%s/agents/%s/upgrade", "api/fleet", agentID), []byte(reqBody))
+	if statusCode != 200 {
+		log.WithFields(log.Fields{
+			"body":           string(respBody),
+			"desiredVersion": version,
+			"error":          err,
+			"statusCode":     statusCode,
+		}).Error("Could not upgrade agent to version")
+
+		return err
+	}
+	return nil
 }

@@ -8,8 +8,8 @@ import (
 	"github.com/onsi/gomega/gexec"
 )
 
-func EnrollElasticAgent(fleetUrl string, enrollmentToken string) (*gexec.Session, error) {
-	command := exec.Command("elastic-agent-8.6.2-linux-arm64/elastic-agent",
+func EnrollElasticAgent(fleetUrl string, enrollmentToken string, version string) (*gexec.Session, error) {
+	command := exec.Command(fmt.Sprintf("elastic-agent-%s-linux-arm64/elastic-agent", version),
 		"install",
 		"--non-interactive",
 		fmt.Sprintf("--url=%s", fleetUrl),

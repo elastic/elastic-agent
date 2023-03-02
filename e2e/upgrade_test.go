@@ -33,21 +33,23 @@ var _ = BeforeSuite(func() {
 	c, err := tools.ReadConfig(clusterConfigPath)
 	Expect(err).NotTo(HaveOccurred())
 	clusterConfig = c
-	c2, err := tools.NewClient(&clusterConfig)
+	client, err = tools.NewClient(&clusterConfig)
 	Expect(err).NotTo(HaveOccurred())
-	client = c2
 })
 
 var _ = Describe("Smoketests", func() {
 
-	Describe("Elastic Agent Install", Ordered, func() {
+	Describe("Elastic Agent Install and Upgrade", Ordered, func() {
 		var enrollmentToken tools.EnrollmentAPIKey
+
+		// Setup: executed once before all specs withing this Describe block
 		BeforeAll(func() {
 			By("Downloading elastic agent")
 			Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
 			Expect(tools.UnpackTar(agentVersion)).To(Succeed())
 		})
-
+		// Setup: executed before each spec withing this Describe block
+		// I.e. we Create a new policy and token before each spec
 		BeforeEach(func() {
 			By("Create policy")
 			policy, err := client.CreatePolicy()
@@ -58,16 +60,25 @@ var _ = Describe("Smoketests", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("is online when enrolled", func() {
+		// Spec: The test case
+		It("is online after upgrade", func() {
 			By("Installing & enrolling EA")
-			session, err := tools.EnrollElasticAgent(clusterConfig.FleetConfig.Url, enrollmentToken.APIKey)
+			session, err := tools.EnrollElasticAgent(clusterConfig.FleetConfig.Url, enrollmentToken.APIKey, agentVersion)
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(session, 2*time.Minute).Should(gexec.Exit(0))
 
 			By("Wait for agent to be healthy(online)")
 			Eventually(client.GetAgentStatus).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(BeEquivalentTo("online"))
+
+			By("Upgrade elasic agent")
+			Expect(client.UpgradeAgent("8.6.1")).To(Succeed())
+
+			By("Wait for agent to be healthy(online)")
+			Eventually(client.GetAgentStatus).WithTimeout(5 * time.Minute).WithPolling(5 * time.Second).Should(BeEquivalentTo("online"))
+			Expect(client.GetAgentVersion()).To(Equal("8.6.1"))
 		})
 
+		// Tear down: executed after seach spec
 		AfterEach(func() {
 			By("Unenroll agent")
 			client.UnEnrollAgent()
