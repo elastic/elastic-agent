@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/mholt/archiver/v3"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -16,10 +18,9 @@ func DownloadElasticAgent(version string) error {
 	if err != nil {
 		return err
 	}
-	fileName := fmt.Sprintf("elastic-agent-%s-darwin-x86_64.tar.gz", version)
+	fileName := fmt.Sprintf("elastic-agent-%s-linux-arm64.tar", version)
 	agentTarPath := fmt.Sprintf("%s/%s", dirToInstall, fileName)
-	err = DownloadFile(fmt.Sprintf(agentTarPath),
-		"https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-8.6.1-darwin-x86_64.tar.gz")
+	err = DownloadFile(agentTarPath, fmt.Sprintf("https://artifacts.elastic.co/downloads/beats/elastic-agent/%s", fileName))
 
 	if err != nil {
 		return err
@@ -27,7 +28,6 @@ func DownloadElasticAgent(version string) error {
 	out, err := exec.Command("tar", "-xvf", agentTarPath).Output()
 	log.Info(out)
 
-	// TODO install elastic-agent with enrollment token
 	return err
 }
 
@@ -46,4 +46,9 @@ func DownloadFile(filepath string, url string) error {
 
 	_, err = io.Copy(out, resp.Body)
 	return err
+}
+
+func UnpackTar(version string) error {
+	//TODO too slow
+	return archiver.Unarchive(fmt.Sprintf("elastic-agent-%s-linux-arm64.tar", version), ".")
 }
