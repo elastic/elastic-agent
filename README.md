@@ -27,7 +27,7 @@ summary: Fix a panic caused by a race condition when installing the Elastic Agen
 pr: https://github.com/elastic/elastic-agent/pull/823
 ```
 
-## Packaging
+### Packaging
 
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
@@ -63,7 +63,7 @@ sudo elastic-agent install
 
 For basic use the agent binary can be run directly, with the `sudo elastic-agent run` command.
 
-#### Docker
+### Docker
 
 Running Elastic Agent in a docker container is a common use case. To build the Elastic Agent and create a docker image run the following command:
 
