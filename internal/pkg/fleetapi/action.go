@@ -83,6 +83,11 @@ type RetryableAction interface {
 	SetError(error)
 }
 
+type Signed struct {
+	Data      string `yaml:"data" json:"data" mapstructure:"data"`
+	Signature string `yaml:"signature" json:"signature" mapstructure:"signature"`
+}
+
 // FleetAction represents an action from fleet-server.
 // should copy the action definition in fleet-server/model/schema.json
 type FleetAction struct {
@@ -98,6 +103,7 @@ type FleetAction struct {
 	//Timestamp string // disabled, agent does not care when the document was created
 	//UserID string // disabled, agent does not care
 	//MinimumExecutionDuration int64 // disabled, used by fleet-server for scheduling
+	Signed *Signed `yaml:"signed,omitempty" json:"signed,omitempty"`
 }
 
 func newAckEvent(id, aType string) AckEvent {
@@ -464,6 +470,7 @@ type ActionApp struct {
 	Response    map[string]interface{} `json:"response,omitempty" mapstructure:"response,omitempty"`
 	StartedAt   string                 `json:"started_at,omitempty" mapstructure:"started_at,omitempty"`
 	CompletedAt string                 `json:"completed_at,omitempty" mapstructure:"completed_at,omitempty"`
+	Signed      *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 	Error       string                 `json:"error,omitempty" mapstructure:"error,omitempty"`
 }
 
@@ -542,12 +549,14 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 				ActionType: response.ActionType,
 			}
 		case ActionTypeInputAction:
+			// Only INPUT_ACTION type actions could possibly be signed as of March 1, 2022
 			action = &ActionApp{
 				ActionID:   response.ActionID,
 				ActionType: response.ActionType,
 				InputType:  response.InputType,
 				Timeout:    response.Timeout,
 				Data:       response.Data,
+				Signed:     response.Signed,
 			}
 		case ActionTypeUnenroll:
 			action = &ActionUnenroll{

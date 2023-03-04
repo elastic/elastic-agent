@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -190,6 +192,9 @@ type Coordinator struct {
 	modifiers []ComponentsModifier
 
 	state coordinatorState
+
+	mx         sync.RWMutex
+	protection protection.Config
 }
 
 // New creates a new coordinator.
@@ -261,6 +266,21 @@ func (c *Coordinator) State(local bool) (s State) {
 		}
 	}
 	return s
+}
+
+// Protection returns the current agent protection configuration
+// This is needed to be able to access the protection configuration for actions validation
+func (c *Coordinator) Protection() protection.Config {
+	c.mx.RLock()
+	defer c.mx.RUnlock()
+	return c.protection
+}
+
+// setProtection sets protection configuration
+func (c *Coordinator) setProtection(protectionConfig protection.Config) {
+	c.mx.Lock()
+	c.protection = protectionConfig
+	c.mx.Unlock()
 }
 
 // ReExec performs the re-execution.
@@ -669,8 +689,14 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	// perform and verify ast translation
 	m, err := cfg.ToMapStr()
 	if err != nil {
-		return fmt.Errorf("could not create the AST from the configuration: %w", err)
+		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
+
+	protectionConfig, err := protection.GetAgentProtectionConfig(m)
+	if err != nil && !errors.Is(err, protection.ErrNotFound) {
+		return fmt.Errorf("could not read the agent protection configuration: %w", err)
+	}
+
 	rawAst, err := transpiler.NewAST(m)
 	if err != nil {
 		return fmt.Errorf("could not create the AST from the configuration: %w", err)
@@ -699,6 +725,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 
 	c.state.config = cfg
 	c.state.ast = rawAst
+
+	c.setProtection(protectionConfig)
 
 	if c.state.vars != nil {
 		return c.process(ctx)
