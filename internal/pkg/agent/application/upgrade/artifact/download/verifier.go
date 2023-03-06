@@ -11,12 +11,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-<<<<<<< HEAD
-=======
 	"io/ioutil"
 	"net/http"
 	"net/url"
->>>>>>> a6d0a9f0e1 (Support only HTTPS for remote upgrade PGP (#2268))
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +23,11 @@ import (
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+)
+
+const (
+	PgpSourceRawPrefix = "pgp_raw:"
+	PgpSourceURIPrefix = "pgp_uri:"
 )
 
 // ChecksumMismatchError indicates the expected checksum for a file does not
@@ -61,7 +63,7 @@ type Verifier interface {
 	// *download.ChecksumMismatchError. And if the GPG signature is invalid then
 	// Verify returns a *download.InvalidSignatureError. Use errors.As() to
 	// check error types.
-	Verify(a artifact.Artifact, version string) error
+	Verify(a artifact.Artifact, version string, pgpBytes ...string) error
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum
@@ -162,8 +164,6 @@ func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) erro
 
 	return nil
 }
-<<<<<<< HEAD
-=======
 
 func PgpBytesFromSource(source string, client http.Client) ([]byte, error) {
 	if strings.HasPrefix(source, PgpSourceRawPrefix) {
@@ -207,4 +207,3 @@ func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
 
 	return ioutil.ReadAll(resp.Body)
 }
->>>>>>> a6d0a9f0e1 (Support only HTTPS for remote upgrade PGP (#2268))
