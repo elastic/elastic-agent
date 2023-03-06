@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -411,7 +412,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		c.state.message = "Waiting for initial configuration and composable variables"
 		err := c.runner(ctx)
 		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 				c.state.state = agentclient.Stopped
 				c.state.message = "Requested to be stopped"
 				c.state.fleetState = agentclient.Stopped
@@ -576,20 +577,43 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			runtimeErr := <-runtimeErrCh
-			c.runtimeMgrErr = runtimeErr
-			configErr := <-configErrCh
-			c.configMgrErr = configErr
-			varsErr := <-varsErrCh
-			c.varsMgrErr = varsErr
+			var runtimeErr error
+			var configErr error
+			var varsErr error
+			// in case other components are locked up, let us time out
+			timeoutChan := time.After(time.Second * 5)
+			for {
+				select {
+				case <-timeoutChan:
+					break
+				case err := <-runtimeErrCh:
+					runtimeErr = err
+					c.runtimeMgrErr = runtimeErr
+				case err := <-configErrCh:
+					configErr = err
+					c.configMgrErr = configErr
+				case err := <-varsErrCh:
+					varsErr = err
+					c.varsMgrErr = varsErr
+				}
+				if runtimeErr != nil && configErr != nil && varsErr != nil {
+					break
+				}
+			}
+			// try not to lose any errors
+			var combinedErr error
 			if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-				return runtimeErr
+				combinedErr = fmt.Errorf("error in runtime Manager: %w", runtimeErr)
 			}
 			if configErr != nil && !errors.Is(configErr, context.Canceled) {
-				return configErr
+				combinedErr = fmt.Errorf("%w error in config Manager: %w", combinedErr, configErr)
 			}
 			if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-				return varsErr
+				combinedErr = fmt.Errorf("%w error in vars Watcher: %w", combinedErr, varsErr)
+			}
+
+			if combinedErr != nil {
+				return combinedErr
 			}
 			return ctx.Err()
 		case <-runtimeRun:
