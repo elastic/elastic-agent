@@ -666,7 +666,7 @@ spec:
       #        mountPath: /etc/elastic-agent/inputs.d
       containers:
         - name: elastic-agent-standalone
-          image: docker.elastic.co/beats/elastic-agent:8.6.1
+          image: docker.elastic.co/beats/elastic-agent:8.6.2
           args: [
             "-c", "/etc/elastic-agent/agent.yml",
             "-e",

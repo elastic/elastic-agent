@@ -1,6 +1,6 @@
 ALL=elastic-agent-standalone elastic-agent-managed
-BEAT_VERSION=$(shell head -n 1 ../../version/docs/version.asciidoc | cut -c 17- )
-BRANCH_VERSION=$(shell sed -n '2p' ../../version/docs/version.asciidoc | cut -c 14- )
+BEAT_VERSION=$(shell grep '^:stack-version:' ../../version/docs/version.asciidoc | cut -c 17- )
+BRANCH_VERSION=$(shell grep '^:doc-branch:' ../../version/docs/version.asciidoc | cut -c 14- )
 
 #variables needed for ci-create-kubernetes-templates-pull-request
 ELASTIC_AGENT_REPO=kibana
