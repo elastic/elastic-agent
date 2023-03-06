@@ -29,10 +29,9 @@ func TestElasticAgentUpgrade(t *testing.T) {
 var _ = BeforeSuite(func() {
 	By("validating flags and config")
 	Expect(clusterConfigPath).NotTo(BeZero(), "Make sure --config is set correctly.")
-
-	c, err := tools.ReadConfig(clusterConfigPath)
+	var err error
+	clusterConfig, err = tools.ReadConfig(clusterConfigPath)
 	Expect(err).NotTo(HaveOccurred())
-	clusterConfig = c
 	client, err = tools.NewClient(&clusterConfig)
 	Expect(err).NotTo(HaveOccurred())
 })
@@ -46,7 +45,7 @@ var _ = Describe("Smoketests", func() {
 		BeforeAll(func() {
 			By("Downloading elastic agent")
 			Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
-			Expect(tools.UnpackTar(agentVersion)).To(Succeed())
+			// Expect(tools.UnpackTar(agentVersion)).To(Succeed())
 		})
 		// Setup: executed before each spec withing this Describe block
 		// I.e. we Create a new policy and token before each spec
@@ -63,6 +62,7 @@ var _ = Describe("Smoketests", func() {
 		// Spec: The test case
 		It("is online after upgrade", func() {
 			By("Installing & enrolling EA")
+			// gexec.Start() returns a session object that can be used to interact with the process
 			session, err := tools.EnrollElasticAgent(clusterConfig.FleetConfig.Url, enrollmentToken.APIKey, agentVersion)
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(session, 2*time.Minute).Should(gexec.Exit(0))

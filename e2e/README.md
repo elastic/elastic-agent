@@ -49,12 +49,12 @@ Once the tests are complete, the cluster is destroyed using the "destroy-cluster
 
 #### For a smoother debugging experience, we recommend using devContainer.
 
-###
-TODO:
+### TODO:
  * Version picker 
  * Cross platform elastic agent directory naming
- * Run on windows
+ * Run remote vms and windows
  * CI
+ * Fancy reporting(aggregate on the host runner) 
 
 
 

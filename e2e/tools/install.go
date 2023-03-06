@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/mholt/archiver/v3"
 
@@ -13,13 +14,13 @@ import (
 )
 
 func DownloadElasticAgent(version string) error {
-	log.Info("Installing Elastic Agent...")
 	dirToInstall, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	fileName := fmt.Sprintf("elastic-agent-%s-linux-arm64.tar", version)
-	agentTarPath := fmt.Sprintf("%s/%s", dirToInstall, fileName)
+	fileName := fmt.Sprintf("elastic-agent-%s-linux-arm64.tar.gz", version)
+	destFileName := fmt.Sprintf("%s%s", "elastic-agent", filepath.Ext(fileName))
+	agentTarPath := fmt.Sprintf("%s/%s", dirToInstall, destFileName)
 	err = DownloadFile(agentTarPath, fmt.Sprintf("https://artifacts.elastic.co/downloads/beats/elastic-agent/%s", fileName))
 
 	if err != nil {
@@ -32,6 +33,9 @@ func DownloadElasticAgent(version string) error {
 }
 
 func DownloadFile(filepath string, url string) error {
+	log.Info("Downloading Elastic Agent...")
+	log.Info(url)
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -45,6 +49,7 @@ func DownloadFile(filepath string, url string) error {
 	defer out.Close()
 
 	_, err = io.Copy(out, resp.Body)
+	log.Info("123123123")
 	return err
 }
 
