@@ -11,14 +11,14 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Periodically run the dispatcher from a timer.
+summary: Periodically check for scheduled actions.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: Add a timer in the goroutine that periodically calls Dispatch with
-  no actions in the managed agent. This will allow the dispatcher to handle
-  scheduled actions if the fleet-gateway has errors or does not return any
-  actions.
+description: Add a timer that will periodically run the action handling
+  mechanism that managed agents use to force it to run scheduled actions.
+  This will allow the agent to handle previously scheduled actions if theres is
+  no communication with fleet, or a checkin does not return any actions.
 
 # Affected component; a word indicating the component this changeset affects.
 component: managed-agent

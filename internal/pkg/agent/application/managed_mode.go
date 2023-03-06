@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -21,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
@@ -210,25 +212,27 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return gateway.Run(ctx)
 	})
 
-	// pass actions collected from gateway to dispatcher
-	go func() {
-		t := time.NewTimer(dispatchFlushInterval)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C: // periodically call the dispatcher to handle scheduled actions.
-				m.dispatcher.Dispatch(ctx, actionAcker)
-				t.Reset(dispatchFlushInterval)
-			case actions := <-gateway.Actions():
-				m.dispatcher.Dispatch(ctx, actionAcker, actions...)
-				t.Reset(dispatchFlushInterval)
-			}
-		}
-	}()
+	go runDispatcher(ctx, m.dispatcher, gateway, actionAcker, dispatchFlushInterval)
 
 	<-ctx.Done()
 	return gatewayRunner.Err()
+}
+
+// runDispatcher passes actions collected from gateway to dispatcher or calls Dispatch with no actions every flushInterval.
+func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, fleetGateway gateway.FleetGateway, actionAcker acker.Acker, flushInterval time.Duration) {
+	t := time.NewTimer(flushInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C: // periodically call the dispatcher to handle scheduled actions.
+			actionDispatcher.Dispatch(ctx, actionAcker)
+			t.Reset(flushInterval)
+		case actions := <-fleetGateway.Actions():
+			actionDispatcher.Dispatch(ctx, actionAcker, actions...)
+			t.Reset(flushInterval)
+		}
+	}
 }
 
 // ActionErrors returns the error channel for actions.
