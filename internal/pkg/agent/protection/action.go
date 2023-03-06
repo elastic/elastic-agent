@@ -41,11 +41,13 @@ func ValidateAction(a fleetapi.ActionApp, signatureValidationKey []byte, agentID
 
 	data, err := base64.StdEncoding.DecodeString(a.Signed.Data)
 	if err != nil {
+		//nolint:errorlint // WAD: unfortunately two errors wrapping is only available in Go 1.20
 		return a, fmt.Errorf("%w: %v", ErrInvalidSignedDataValue, err)
 	}
 
 	signature, err := base64.StdEncoding.DecodeString(a.Signed.Signature)
 	if err != nil {
+		//nolint:errorlint // WAD: unfortunately two errors wrapping is only available in Go 1.20
 		return a, fmt.Errorf("%w: %v", ErrInvalidSignatureValue, err)
 	}
 

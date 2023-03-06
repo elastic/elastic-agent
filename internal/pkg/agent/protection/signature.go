@@ -22,6 +22,7 @@ var (
 func ValidateSignature(data, signature, signatureValidationKey []byte) error {
 	pk, err := x509.ParsePKIXPublicKey(signatureValidationKey)
 	if err != nil {
+		//nolint:errorlint // WAD: unfortunately two errors wrapping is only available in Go 1.20
 		return fmt.Errorf("%w: %v", ErrInvalidSignatureValidationKey, err)
 	}
 
