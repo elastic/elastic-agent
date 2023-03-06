@@ -33,7 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// dispatchFlushInterval is the min time between calls to dispatcher.Dispatch
+// dispatchFlushInterval is the max time between calls to dispatcher.Dispatch
 const dispatchFlushInterval = time.Minute * 5
 
 type managedConfigManager struct {
