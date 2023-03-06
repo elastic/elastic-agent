@@ -7,6 +7,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -45,9 +46,6 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
 	defer c.Disconnect()
-<<<<<<< HEAD
-	version, err = c.Upgrade(context.Background(), version, sourceURI)
-=======
 
 	skipVerification, _ := cmd.Flags().GetBool(flagSkipVerify)
 	var pgpChecks []string
@@ -81,7 +79,6 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	}
 
 	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, pgpChecks...)
->>>>>>> a6d0a9f0e1 (Support only HTTPS for remote upgrade PGP (#2268))
 	if err != nil {
 		return errors.New(err, "Failed trigger upgrade of daemon")
 	}

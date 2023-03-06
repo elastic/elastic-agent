@@ -11,12 +11,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-<<<<<<< HEAD
-=======
 	"io/ioutil"
 	"net/http"
 	"net/url"
->>>>>>> a6d0a9f0e1 (Support only HTTPS for remote upgrade PGP (#2268))
 	"os"
 	"path/filepath"
 	"strings"
@@ -162,8 +159,6 @@ func VerifyGPGSignature(file string, asciiArmorSignature, publicKey []byte) erro
 
 	return nil
 }
-<<<<<<< HEAD
-=======
 
 func PgpBytesFromSource(source string, client http.Client) ([]byte, error) {
 	if strings.HasPrefix(source, PgpSourceRawPrefix) {
@@ -207,4 +202,3 @@ func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
 
 	return ioutil.ReadAll(resp.Body)
 }
->>>>>>> a6d0a9f0e1 (Support only HTTPS for remote upgrade PGP (#2268))
