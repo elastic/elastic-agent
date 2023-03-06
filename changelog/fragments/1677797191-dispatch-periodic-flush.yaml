@@ -11,16 +11,17 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: gateway sends empty action lists to channel
+summary: Periodically run the dispatcher from a timer.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: The fleet-gateway will send an empty action list to the
-  actions channel if a checkin returns no actions. This allows other
-  components such as the dispatcher to run at a regular interval.
+description: Add a timer in the goroutine that periodically calls Dispatch with
+  no actions in the managed agent. This will allow the dispatcher to handle
+  scheduled actions if the fleet-gateway has errors or does not return any
+  actions.
 
 # Affected component; a word indicating the component this changeset affects.
-component: fleet-gateway
+component: managed-agent
 
 # PR number; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.

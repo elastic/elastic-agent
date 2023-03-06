@@ -33,6 +33,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// dispatchFlushInterval is the min time between calls to dispatcher.Dispatch
+const dispatchFlushInterval = time.Minute * 5
+
 type managedConfigManager struct {
 	log         *logger.Logger
 	agentInfo   *info.AgentInfo
@@ -209,12 +212,17 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 
 	// pass actions collected from gateway to dispatcher
 	go func() {
+		t := time.NewTimer(dispatchFlushInterval)
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case <-t.C: // periodically call the dispatcher to handle scheduled actions.
+				m.dispatcher.Dispatch(ctx, actionAcker)
+				t.Reset(dispatchFlushInterval)
 			case actions := <-gateway.Actions():
 				m.dispatcher.Dispatch(ctx, actionAcker, actions...)
+				t.Reset(dispatchFlushInterval)
 			}
 		}
 	}()
