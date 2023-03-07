@@ -245,10 +245,9 @@ func newClient(
 }
 
 // sortClients sort the clients according to the following priority:
-//   - never used
-//   - without errors, last used first when more than one does not have errors
-//   - last errored.
-//
+//  - never used
+//  - without errors, last used first when more than one does not have errors
+//  - last errored.
 // It also removes the last error after retryOnBadConnTimeout has elapsed.
 func (c *Client) sortClients() {
 	now := time.Now().UTC()

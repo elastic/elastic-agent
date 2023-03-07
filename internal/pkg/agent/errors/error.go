@@ -2,9 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// Package errors provides a small api to manage hierarchy of errors.
-//
 //nolint:errorlint,errcheck // Postpone the change here until we refactor error handling.
+// Package errors provides a small api to manage hierarchy of errors.
 package errors
 
 import (

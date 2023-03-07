@@ -41,10 +41,9 @@ type AckEvent struct {
 // AckRequest consists of multiple actions acked to fleet ui.
 // POST /agents/{agentId}/acks
 // Authorization: ApiKey {AgentAccessApiKey}
-//
-//	{
-//	  "action_ids": ["id1"]
-//	}
+// {
+//   "action_ids": ["id1"]
+// }
 type AckRequest struct {
 	Events []AckEvent `json:"events"`
 }
@@ -62,14 +61,13 @@ type AckResponseItem struct {
 
 // AckResponse is the response send back from the server.
 // 200
-//
-//	{
-//		 "action": "acks"
-//	  "items": [
-//		    {"status": 200},
-//		    {"status": 404},
-//	  ]
-//	}
+// {
+// 	 "action": "acks"
+//   "items": [
+//	    {"status": 200},
+//	    {"status": 404},
+//   ]
+// }
 type AckResponse struct {
 	Action string            `json:"action"`
 	Errors bool              `json:"errors,omitempty"` // indicates that some of the events in the ack request failed
