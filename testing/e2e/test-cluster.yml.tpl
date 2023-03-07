@@ -38,5 +38,3 @@ apm:
 k8s:
   enabled: false
 
-certmanager:
-  enabled: false
