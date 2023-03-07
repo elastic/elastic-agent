@@ -38,6 +38,10 @@ var ErrNotUpgradable = errors.New(
 	"cannot be upgraded; must be installed with install sub-command and " +
 		"running under control of the systems supervisor")
 
+// ErrUpgradeInProgress error is returned if two or more upgrades are
+// attempted at the same time.
+var ErrUpgradeInProgress = errors.New("upgrade already in progress")
+
 // ReExecManager provides an interface to perform re-execution of the entire agent.
 type ReExecManager interface {
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
@@ -247,7 +251,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	}
 
 	if c.state.overrideState != nil && c.state.overrideState.state == agentclient.Upgrading {
-		return fmt.Errorf("%s already in progress", c.state.overrideState.message)
+		return ErrUpgradeInProgress
 	}
 	// override the overall state to upgrading until the re-execution is complete
 	c.state.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
