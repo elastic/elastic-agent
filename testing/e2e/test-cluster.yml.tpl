@@ -20,7 +20,6 @@ elasticsearch:
   enabled: true
   version: "{{ .StackVersion }}"
   type: tf
-  mem: 2
 
 kibana:
   version: "{{ .StackVersion }}"
