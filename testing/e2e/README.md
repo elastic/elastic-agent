@@ -54,7 +54,4 @@ Once the tests are complete, the cluster is destroyed using the "destroy-cluster
  * Cross platform elastic agent directory naming
  * Run remote vms and windows
  * CI
- * Fancy reporting(aggregate on the host runner) 
-
-
-
+ * Advanced reporting(aggregate on the host runner) 

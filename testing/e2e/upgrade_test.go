@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tools "github.com/elastic/elastic-agent/e2e/tools"
+	tools "github.com/elastic/elastic-agent/testing/e2e/tools"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -45,7 +45,7 @@ var _ = Describe("Smoketests", func() {
 		BeforeAll(func() {
 			By("Downloading elastic agent")
 			Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
-			// Expect(tools.UnpackTar(agentVersion)).To(Succeed())
+			Expect(tools.UnpackTar(agentVersion)).To(Succeed())
 		})
 		// Setup: executed before each spec withing this Describe block
 		// I.e. we Create a new policy and token before each spec

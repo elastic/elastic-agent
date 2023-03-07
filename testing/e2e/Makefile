@@ -1,4 +1,4 @@
-STACK_VERSION ?= 8.6.1
+STACK_VERSION ?= 8.6.0
 CURRENT_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CLUSTER_DIGEST_FILE := cluster-digest.yml
 
