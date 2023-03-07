@@ -38,5 +38,6 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, _ acker.Acker) 
 		return fmt.Errorf("invalid type, expected ActionUpgrade and received %T", a)
 	}
 
-	return h.coord.Upgrade(ctx, action.Version, action.SourceURI, action)
+	// always perform PGP checks
+	return h.coord.Upgrade(ctx, action.Version, action.SourceURI, action, false)
 }
