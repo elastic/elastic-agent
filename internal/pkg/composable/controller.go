@@ -173,7 +173,7 @@ func (c *controller) Run(ctx context.Context) error {
 					}
 				}()
 
-				close(c.ch)
+				//close(c.ch)
 				wg.Wait()
 				return ctx.Err()
 			case <-notify:

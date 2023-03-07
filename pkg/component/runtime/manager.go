@@ -139,7 +139,7 @@ func NewManager(logger, baseLogger *logger.Logger, listenAddr string, agentInfo 
 func (m *Manager) Run(ctx context.Context) error {
 	lis, err := net.Listen("tcp", m.listenAddr)
 	if err != nil {
-		return err
+		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
 	}
 	m.netMx.Lock()
 	m.listener = lis

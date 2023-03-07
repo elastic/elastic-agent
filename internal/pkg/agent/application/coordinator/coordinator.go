@@ -193,6 +193,9 @@ type Coordinator struct {
 	state coordinatorState
 }
 
+// ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
+var ErrFatalCoordinator = fmt.Errorf("fatal error in coordinator")
+
 // New creates a new coordinator.
 func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
@@ -412,7 +415,8 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		c.state.message = "Waiting for initial configuration and composable variables"
 		err := c.runner(ctx)
 		if err != nil {
-			if !(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrFatalCoordinator) {
+				c.logger.Errorf("coordinator cancelled, will not be restarted")
 				c.state.state = agentclient.Stopped
 				c.state.message = "Requested to be stopped"
 				c.state.fleetState = agentclient.Stopped
@@ -603,19 +607,21 @@ func (c *Coordinator) runner(ctx context.Context) error {
 			// try not to lose any errors
 			var combinedErr error
 			if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-				combinedErr = fmt.Errorf("error in runtime Manager: %w", runtimeErr)
+				combinedErr = fmt.Errorf(" runtime Manager: %w", runtimeErr)
 			}
 			if configErr != nil && !errors.Is(configErr, context.Canceled) {
-				combinedErr = fmt.Errorf("%w error in config Manager: %w", combinedErr, configErr)
+				combinedErr = fmt.Errorf("%w config Manager: %w", combinedErr, configErr)
 			}
 			if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-				combinedErr = fmt.Errorf("%w error in vars Watcher: %w", combinedErr, varsErr)
+				combinedErr = fmt.Errorf("%w vars Watcher: %w", combinedErr, varsErr)
 			}
 
 			if combinedErr != nil {
-				return combinedErr
+				return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) // errors.Is() won't work if we pass through the combined errors with %w
 			}
+			// if there's no component errors, continue to pass along the context error
 			return ctx.Err()
+
 		case <-runtimeRun:
 			if ctx.Err() == nil {
 				cancel()
