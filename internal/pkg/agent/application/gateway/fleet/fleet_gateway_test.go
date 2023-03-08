@@ -20,8 +20,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
+	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
@@ -442,4 +444,56 @@ func newStateStore(t *testing.T, log *logger.Logger) *store.StateStore {
 	})
 
 	return stateStore
+}
+
+func TestAgentStateToString(t *testing.T) {
+	testcases := []struct {
+		agentState         agentclient.State
+		expectedFleetState string
+	}{
+		{
+			agentState:         agentclient.Healthy,
+			expectedFleetState: fleetStateOnline,
+		},
+		{
+			agentState:         agentclient.Failed,
+			expectedFleetState: fleetStateError,
+		},
+		{
+			agentState:         agentclient.Starting,
+			expectedFleetState: fleetStateStarting,
+		},
+		// everything else maps to degraded
+		{
+			agentState:         agentclient.Configuring,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Degraded,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Stopping,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Stopped,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Upgrading,
+			expectedFleetState: fleetStateDegraded,
+		},
+		{
+			agentState:         agentclient.Rollback,
+			expectedFleetState: fleetStateDegraded,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("%s -> %s", tc.agentState, tc.expectedFleetState), func(t *testing.T) {
+			actualFleetState := agentStateToString(tc.agentState)
+			assert.Equal(t, tc.expectedFleetState, actualFleetState)
+		})
+	}
 }
