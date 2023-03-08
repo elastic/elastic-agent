@@ -20,10 +20,11 @@ import (
 // After running Upgrade agent should download its own version specified by action
 // from repository specified by fleet.
 type Upgrade struct {
-	log          *logger.Logger
-	coord        *coordinator.Coordinator
-	actions      []fleetapi.Action
-	actionsMutex sync.Mutex
+	log        *logger.Logger
+	coord      *coordinator.Coordinator
+	bkgActions []fleetapi.Action
+	bkgCancel  context.CancelFunc
+	bkgMutex   sync.Mutex
 }
 
 // NewUpgrade creates a new Upgrade handler.
@@ -45,37 +46,79 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionUpgrade and received %T", a)
 	}
+
+	asyncCtx, runAsync := h.getAsyncContext(ctx, a, ack)
+	if !runAsync {
+		return nil
+	}
 	go func() {
 		h.log.Infof("starting upgrade to version %s in background", action.Version)
-		h.addAction(a)
-		if err := h.coord.Upgrade(ctx, action.Version, action.SourceURI, action, false); err != nil {
-			if errors.Is(err, coordinator.ErrUpgradeInProgress) {
-				return
-			}
+		if err := h.coord.Upgrade(asyncCtx, action.Version, action.SourceURI, action, false); err != nil {
 
 			h.log.Errorf("upgrade to version %s failed: %v", action.Version, err)
-			h.ackActions(ctx, ack)
+			// If context is cancelled in getAsyncContext, the actions are acked there
+			if !errors.Is(asyncCtx.Err(), context.Canceled) {
+				h.bkgMutex.Lock()
+				h.ackActions(asyncCtx, ack)
+				h.bkgMutex.Unlock()
+			}
 		}
 	}()
 	return nil
 }
 
-func (h *Upgrade) addAction(action fleetapi.Action) {
-	h.actionsMutex.Lock()
-	defer h.actionsMutex.Unlock()
-	h.actions = append(h.actions, action)
-}
-
+// ackActions Acks all the actions in bkgActions, and deletes entries from bkgActions.
+// User is responsible for obtaining and releasing bkgMutex lock
 func (h *Upgrade) ackActions(ctx context.Context, ack acker.Acker) {
-	h.actionsMutex.Lock()
-	defer h.actionsMutex.Unlock()
-	for _, a := range h.actions {
+	for _, a := range h.bkgActions {
 		if err := ack.Ack(ctx, a); err != nil {
 			h.log.Errorf("ack of failed upgrade failed: %v", err)
 		}
 	}
-	h.actions = nil
+	h.bkgActions = nil
 	if err := ack.Commit(ctx); err != nil {
 		h.log.Errorf("commit of ack for failed upgrade failed: %v", err)
 	}
+}
+
+// getAsyncContext returns a cancelContext and whether or not to run the upgrade
+func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, ack acker.Acker) (context.Context, bool) {
+	h.bkgMutex.Lock()
+	defer h.bkgMutex.Unlock()
+	// If no existing actions, run this one
+	if len(h.bkgActions) == 0 {
+		h.bkgActions = append(h.bkgActions, action)
+		c, cancel := context.WithCancel(ctx)
+		h.bkgCancel = cancel
+		return c, true
+	}
+	// If upgrade to same version, save action to ack when first upgrade completes
+	upgradeAction, ok := action.(*fleetapi.ActionUpgrade)
+	if !ok {
+		h.log.Errorf("invalid type, expected ActionUpgrade and received %T", action)
+		return nil, false
+	}
+	// only need to check first action since all actions must be upgrades to same version
+	bkgAction, ok := h.bkgActions[0].(*fleetapi.ActionUpgrade)
+	if !ok {
+		h.log.Errorf("invalid type, expected ActionUpgrade and received %T", action)
+		return nil, false
+	}
+	if upgradeAction.Version == bkgAction.Version {
+		h.log.Infof("Duplicate upgrade to version %s received", bkgAction.Version)
+		h.bkgActions = append(h.bkgActions, action)
+		return nil, false
+	}
+
+	// Versions must be different, cancel the first upgrade and run the new one
+	h.log.Infof("Canceling upgrade to version %s received", bkgAction.Version)
+	h.bkgCancel()
+
+	// Ack here because we have the lock, and we need to clear out the saved actions
+	h.ackActions(ctx, ack)
+
+	h.bkgActions = append(h.bkgActions, action)
+	c, cancel := context.WithCancel(ctx)
+	h.bkgCancel = cancel
+	return c, true
 }
