@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -399,8 +399,8 @@ func (testAgentInfo) AgentID() string { return "agent-secret" }
 
 type emptyStateFetcher struct{}
 
-func (e *emptyStateFetcher) State() coordinator.State {
-	return coordinator.State{}
+func (e *emptyStateFetcher) State() state.State {
+	return state.State{}
 }
 
 func runFleetGateway(ctx context.Context, g gateway.FleetGateway) <-chan error {

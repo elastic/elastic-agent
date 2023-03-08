@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -172,7 +173,7 @@ type Coordinator struct {
 	caps      capabilities.Capability
 	modifiers []ComponentsModifier
 
-	state  coordinatorState
+	state  *state.CoordinatorState
 	config *config.Config
 	ast    *transpiler.AST
 	vars   []*transpiler.Vars
@@ -201,17 +202,12 @@ func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, 
 		varsMgr:    varsMgr,
 		caps:       caps,
 		modifiers:  modifiers,
-		state: coordinatorState{
-			state:        agentclient.Starting,
-			fleetState:   fleetState,
-			fleetMessage: fleetMessage,
-			logLevel:     logLevel,
-		},
+		state:      state.NewCoordinatorState(agentclient.Starting, "Starting", fleetState, fleetMessage, logLevel),
 	}
 }
 
 // State returns the current state for the coordinator.
-func (c *Coordinator) State() State {
+func (c *Coordinator) State() state.State {
 	return c.state.State()
 }
 
@@ -221,7 +217,7 @@ func (c *Coordinator) State() State {
 // results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Coordinator to block.
-func (c *Coordinator) StateSubscribe(ctx context.Context) *StateSubscription {
+func (c *Coordinator) StateSubscribe(ctx context.Context) *state.StateSubscription {
 	return c.state.Subscribe(ctx)
 }
 
@@ -364,18 +360,16 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	}()
 
 	for {
-		c.state.UpdateState(stateSetterState(stateSetter{}, agentclient.Starting, "Waiting for initial configuration and composable variables"))
+		c.state.UpdateState(state.WithState(agentclient.Starting, "Waiting for initial configuration and composable variables"))
 		err := c.runner(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				ss := stateSetterState(stateSetter{}, agentclient.Stopped, "Requested to be stopped")
-				ss = stateSetterFleetState(ss, agentclient.Stopped, "Requested to be stopped")
-				c.state.UpdateState(ss)
+				c.state.UpdateState(state.WithState(agentclient.Stopped, "Requested to be stopped"), state.WithFleetState(agentclient.Stopped, "Requested to be stopped"))
 				// do not restart
 				return err
 			}
 		}
-		c.state.UpdateState(stateSetterState(stateSetter{}, agentclient.Failed, fmt.Sprintf("Coordinator failed and will be restarted: %s", err)))
+		c.state.UpdateState(state.WithState(agentclient.Failed, fmt.Sprintf("Coordinator failed and will be restarted: %s", err)))
 		c.logger.Errorf("coordinator failed and will be restarted: %s", err)
 	}
 }
@@ -560,9 +554,9 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		case configErr := <-c.configMgr.Errors():
 			if c.isManaged {
 				if configErr == nil {
-					c.state.UpdateState(stateSetterFleetState(stateSetter{}, agentclient.Healthy, "Connected"))
+					c.state.UpdateState(state.WithFleetState(agentclient.Healthy, "Connected"))
 				} else {
-					c.state.UpdateState(stateSetterFleetState(stateSetter{}, agentclient.Failed, configErr.Error()))
+					c.state.UpdateState(state.WithFleetState(agentclient.Failed, configErr.Error()))
 				}
 			} else {
 				// not managed gets sets as an overall error for the agent
@@ -575,13 +569,13 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		case change := <-configWatcher.Watch():
 			if ctx.Err() == nil {
 				if err := c.processConfig(ctx, change.Config()); err != nil {
-					c.state.UpdateState(stateSetterState(stateSetter{}, agentclient.Failed, err.Error()))
+					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
 					c.logger.Errorf("%s", err)
 					change.Fail(err)
 				} else {
 					if err := change.Ack(); err != nil {
 						err = fmt.Errorf("failed to ack configuration change: %w", err)
-						c.state.UpdateState(stateSetterState(stateSetter{}, agentclient.Failed, err.Error()))
+						c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
 						c.logger.Errorf("%s", err)
 					}
 				}
@@ -589,14 +583,14 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		case vars := <-varsWatcher.Watch():
 			if ctx.Err() == nil {
 				if err := c.processVars(ctx, vars); err != nil {
-					c.state.UpdateState(stateSetterState(stateSetter{}, agentclient.Failed, err.Error()))
+					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
 					c.logger.Errorf("%s", err)
 				}
 			}
 		case ll := <-c.logLevelCh:
 			if ctx.Err() == nil {
 				if err := c.processLogLevel(ctx, ll); err != nil {
-					c.state.UpdateState(stateSetterState(stateSetter{}, agentclient.Failed, err.Error()))
+					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
 					c.logger.Errorf("%s", err)
 				}
 			}
@@ -678,7 +672,7 @@ func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) (err e
 	}()
 
 	c.logLevel = ll
-	c.state.UpdateState(stateSetterLogLevel(stateSetter{}, ll))
+	c.state.UpdateState(state.WithLogLevel(ll))
 
 	if c.ast != nil && c.vars != nil {
 		return c.process(ctx)
@@ -704,7 +698,7 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	c.state.UpdateState(stateSetterState(stateSetter{}, agentclient.Healthy, "Running"))
+	c.state.UpdateState(state.WithState(agentclient.Healthy, "Running"))
 	return nil
 }
 

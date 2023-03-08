@@ -2,11 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package coordinator
+package state
 
 import (
 	"context"
 	"sync"
+	"time"
 
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
@@ -31,7 +32,7 @@ type StateFetcher interface {
 	State() State
 }
 
-type coordinatorState struct {
+type CoordinatorState struct {
 	mx            sync.RWMutex
 	state         agentclient.State
 	message       string
@@ -66,8 +67,26 @@ type stateSetter struct {
 	logLevel     *logp.Level
 }
 
+type stateSetterOpt func(ss *stateSetter)
+
+// NewCoordinatorState creates the coordinator state manager.
+func NewCoordinatorState(state agentclient.State, msg string, fleetState agentclient.State, fleetMsg string, logLevel logp.Level) *CoordinatorState {
+	return &CoordinatorState{
+		state:        state,
+		message:      msg,
+		fleetState:   fleetState,
+		fleetMessage: fleetMsg,
+		logLevel:     logLevel,
+	}
+}
+
 // UpdateState updates the state triggering a change notification to subscribers.
-func (cs *coordinatorState) UpdateState(setter stateSetter) {
+func (cs *CoordinatorState) UpdateState(setters ...stateSetterOpt) {
+	var setter stateSetter
+	for _, ss := range setters {
+		ss(&setter)
+	}
+
 	cs.mx.Lock()
 	if setter.state != nil {
 		cs.state = *setter.state
@@ -89,7 +108,7 @@ func (cs *coordinatorState) UpdateState(setter stateSetter) {
 }
 
 // SetRuntimeManagerError updates the error state for the runtime manager.
-func (cs *coordinatorState) SetRuntimeManagerError(err error) {
+func (cs *CoordinatorState) SetRuntimeManagerError(err error) {
 	cs.mgrMx.Lock()
 	cs.runtimeMgrErr = err
 	cs.mgrMx.Unlock()
@@ -97,7 +116,7 @@ func (cs *coordinatorState) SetRuntimeManagerError(err error) {
 }
 
 // SetConfigManagerError updates the error state for the config manager.
-func (cs *coordinatorState) SetConfigManagerError(err error) {
+func (cs *CoordinatorState) SetConfigManagerError(err error) {
 	cs.mgrMx.Lock()
 	cs.configMgrErr = err
 	cs.mgrMx.Unlock()
@@ -105,7 +124,7 @@ func (cs *coordinatorState) SetConfigManagerError(err error) {
 }
 
 // SetConfigManagerActionsError updates the error state for the config manager actions errors.
-func (cs *coordinatorState) SetConfigManagerActionsError(err error) {
+func (cs *CoordinatorState) SetConfigManagerActionsError(err error) {
 	cs.mgrMx.Lock()
 	cs.actionsErr = err
 	cs.mgrMx.Unlock()
@@ -113,7 +132,7 @@ func (cs *coordinatorState) SetConfigManagerActionsError(err error) {
 }
 
 // SetVarsManagerError updates the error state for the variables manager.
-func (cs *coordinatorState) SetVarsManagerError(err error) {
+func (cs *CoordinatorState) SetVarsManagerError(err error) {
 	cs.mgrMx.Lock()
 	cs.varsMgrErr = err
 	cs.mgrMx.Unlock()
@@ -121,7 +140,7 @@ func (cs *coordinatorState) SetVarsManagerError(err error) {
 }
 
 // SetOverrideState sets the override state triggering a change notification to subscribers.
-func (cs *coordinatorState) SetOverrideState(state agentclient.State, message string) {
+func (cs *CoordinatorState) SetOverrideState(state agentclient.State, message string) {
 	cs.mx.Lock()
 	cs.overrideState = &coordinatorOverrideState{
 		state:   state,
@@ -132,7 +151,7 @@ func (cs *coordinatorState) SetOverrideState(state agentclient.State, message st
 }
 
 // ClearOverrideState clears the override state triggering a change notification to subscribers.
-func (cs *coordinatorState) ClearOverrideState() {
+func (cs *CoordinatorState) ClearOverrideState() {
 	cs.mx.Lock()
 	cs.overrideState = nil
 	cs.mx.Unlock()
@@ -140,7 +159,7 @@ func (cs *coordinatorState) ClearOverrideState() {
 }
 
 // UpdateComponentState updates the component state triggering a change notification to subscribers.
-func (cs *coordinatorState) UpdateComponentState(state runtime.ComponentComponentState) {
+func (cs *CoordinatorState) UpdateComponentState(state runtime.ComponentComponentState) {
 	cs.compStatesMx.Lock()
 	found := false
 	for i, other := range cs.compStates {
@@ -172,7 +191,7 @@ func (cs *coordinatorState) UpdateComponentState(state runtime.ComponentComponen
 }
 
 // State returns the current state for the coordinator.
-func (cs *coordinatorState) State() (s State) {
+func (cs *CoordinatorState) State() (s State) {
 	cs.mx.RLock()
 	s.State = cs.state
 	s.Message = cs.message
@@ -229,7 +248,7 @@ func (cs *coordinatorState) State() (s State) {
 // results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Coordinator to block.
-func (cs *coordinatorState) Subscribe(ctx context.Context) *StateSubscription {
+func (cs *CoordinatorState) Subscribe(ctx context.Context) *StateSubscription {
 	sub := newStateSubscription(ctx, cs)
 
 	// send initial state
@@ -264,29 +283,38 @@ func (cs *coordinatorState) Subscribe(ctx context.Context) *StateSubscription {
 	return sub
 }
 
-func (cs *coordinatorState) changed() {
+func (cs *CoordinatorState) changed() {
 	cs.sendState(cs.State())
 }
 
-func (cs *coordinatorState) sendState(state State) {
+func (cs *CoordinatorState) sendState(state State) {
 	cs.subMx.RLock()
 	defer cs.subMx.RUnlock()
-	for _, sub := range cs.subscribe {
+
+	send := func(sub *StateSubscription) {
+		t := time.NewTimer(time.Second)
+		defer t.Stop()
 		select {
 		case <-sub.ctx.Done():
 		case sub.ch <- state:
+		case <-t.C:
+			// subscriber didn't read from the channel after 1 second; so we unblock
 		}
+	}
+
+	for _, sub := range cs.subscribe {
+		send(sub)
 	}
 }
 
 // StateSubscription provides a channel for notifications of state changes.
 type StateSubscription struct {
 	ctx context.Context
-	cs  *coordinatorState
+	cs  *CoordinatorState
 	ch  chan State
 }
 
-func newStateSubscription(ctx context.Context, cs *coordinatorState) *StateSubscription {
+func newStateSubscription(ctx context.Context, cs *CoordinatorState) *StateSubscription {
 	return &StateSubscription{
 		ctx: ctx,
 		cs:  cs,
@@ -299,21 +327,27 @@ func (s *StateSubscription) Ch() <-chan State {
 	return s.ch
 }
 
-func stateSetterState(ss stateSetter, state agentclient.State, message string) stateSetter {
-	ss.state = &state
-	ss.message = &message
-	return ss
+// WithState changes the overall state of the coordinator.
+func WithState(state agentclient.State, message string) stateSetterOpt {
+	return func(ss *stateSetter) {
+		ss.state = &state
+		ss.message = &message
+	}
 }
 
-func stateSetterFleetState(ss stateSetter, state agentclient.State, message string) stateSetter {
-	ss.fleetState = &state
-	ss.fleetMessage = &message
-	return ss
+// WithFleetState changes the fleet state of the coordinator.
+func WithFleetState(state agentclient.State, message string) stateSetterOpt {
+	return func(ss *stateSetter) {
+		ss.fleetState = &state
+		ss.fleetMessage = &message
+	}
 }
 
-func stateSetterLogLevel(ss stateSetter, logLevel logp.Level) stateSetter {
-	ss.logLevel = &logLevel
-	return ss
+// WithLogLevel changes the log level state of the coordinator.
+func WithLogLevel(logLevel logp.Level) stateSetterOpt {
+	return func(ss *stateSetter) {
+		ss.logLevel = &logLevel
+	}
 }
 
 func hasState(components []runtime.ComponentComponentState, state client.UnitState) bool {

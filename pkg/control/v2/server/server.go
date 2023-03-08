@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"net"
 	"time"
 
@@ -263,7 +264,7 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 	return &cproto.Empty{}, nil
 }
 
-func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.StateResponse, error) {
+func stateToProto(state *state.State, agentInfo *info.AgentInfo) (*cproto.StateResponse, error) {
 	var err error
 	components := make([]*cproto.ComponentState, 0, len(state.Components))
 	for _, comp := range state.Components {
