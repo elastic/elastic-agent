@@ -161,6 +161,9 @@ type StateFetcher interface {
 	State(bool) State
 }
 
+// CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to recieve a "clean" shutdown from other components
+const CoordinatorShutdownTimeout = time.Second * 5
+
 // Coordinator manages the entire state of the Elastic Agent.
 //
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
@@ -582,10 +585,21 @@ func (c *Coordinator) runner(ctx context.Context) error {
 			var configErr error
 			var varsErr error
 			// in case other components are locked up, let us time out
-			timeoutChan := time.After(time.Second * 5)
+			timeoutChan := time.After(CoordinatorShutdownTimeout)
 			for {
 				select {
 				case <-timeoutChan:
+					var timeouts string
+					if runtimeErr == nil {
+						timeouts = "no response from runtime component"
+					}
+					if configErr == nil {
+						timeouts = fmt.Sprintf("%s; no response from configWatcher component", timeouts)
+					}
+					if varsErr == nil {
+						timeouts = fmt.Sprintf("%s; no response from varsWatcher component", timeouts)
+					}
+					c.logger.Debugf("timeout while waiting for other components to shut down: %s", timeouts)
 					break
 				case err := <-runtimeErrCh:
 					runtimeErr = err
