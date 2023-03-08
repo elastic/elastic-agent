@@ -161,7 +161,7 @@ type StateFetcher interface {
 	State(bool) State
 }
 
-// CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to recieve a "clean" shutdown from other components
+// CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
 const CoordinatorShutdownTimeout = time.Second * 5
 
 // Coordinator manages the entire state of the Elastic Agent.
@@ -194,7 +194,7 @@ type Coordinator struct {
 }
 
 // ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
-var ErrFatalCoordinator = fmt.Errorf("fatal error in coordinator")
+var ErrFatalCoordinator = errors.New("fatal error in coordinator")
 
 // New creates a new coordinator.
 func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
