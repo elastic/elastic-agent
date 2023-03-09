@@ -10,11 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -55,7 +53,7 @@ type ShipperReference struct {
 	// ComponentID is the ID of the component that this component is connected to.
 	ComponentID string `yaml:"component_id"`
 
-	// UnitID is the ID of the unit inside of the component that this component is connected to.
+	// UnitID is the ID of the unit inside the component that this component is connected to.
 	UnitID string `yaml:"unit_id"`
 }
 
@@ -110,8 +108,14 @@ func (c *Component) Type() string {
 	return ""
 }
 
-// ToComponents returns the components that should be running based on the policy and the current runtime specification.
-func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInjector GenerateMonitoringCfgFn, ll logp.Level, headers HeadersProvider) ([]Component, error) {
+// ToComponents returns the components that should be running based on the policy and
+// the current runtime specification.
+func (r *RuntimeSpecs) ToComponents(
+	policy map[string]interface{},
+	monitoringInjector GenerateMonitoringCfgFn,
+	ll logp.Level,
+	headers HeadersProvider,
+) ([]Component, error) {
 	components, binaryMapping, err := r.PolicyToComponents(policy, ll, headers)
 	if err != nil {
 		return nil, err
@@ -137,9 +141,13 @@ func (r *RuntimeSpecs) ToComponents(policy map[string]interface{}, monitoringInj
 	return components, nil
 }
 
-// PolicyToComponents takes the policy and generated a component model along with providing a mapping between component
-// and the running binary.
-func (r *RuntimeSpecs) PolicyToComponents(policy map[string]interface{}, ll logp.Level, headers HeadersProvider) ([]Component, map[string]string, error) {
+// PolicyToComponents takes the policy and generated a component model along with providing
+// a mapping between component and the running binary.
+func (r *RuntimeSpecs) PolicyToComponents(
+	policy map[string]interface{},
+	ll logp.Level,
+	headers HeadersProvider,
+) ([]Component, map[string]string, error) {
 	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers)
 	if err != nil {
 		return nil, nil, err

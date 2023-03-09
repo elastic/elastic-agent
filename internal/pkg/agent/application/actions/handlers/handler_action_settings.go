@@ -39,7 +39,7 @@ func NewSettings(
 
 // Handle handles SETTINGS action.
 func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
-	h.log.Debugf("handlerUpgrade: action '%+v' received", a)
+	h.log.Debugf("handlerSettings: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionSettings)
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionSettings and received %T", a)

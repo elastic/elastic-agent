@@ -184,7 +184,7 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 	}
 
 	headers := map[string][]string{
-		key: []string{prefix + r.EnrollAPIKey},
+		key: {prefix + r.EnrollAPIKey},
 	}
 
 	b, err := json.Marshal(r)
