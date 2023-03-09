@@ -10,17 +10,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
-
-	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
 	"github.com/hashicorp/go-multierror"
 	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -31,6 +27,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -147,22 +145,6 @@ type VarsManager interface {
 // ComponentsModifier is a function that takes the computed components model and modifies it before
 // passing it into the components runtime manager.
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
-
-// State provides the current state of the coordinator along with all the current states of components and units.
-type State struct {
-	State        agentclient.State                 `yaml:"state"`
-	Message      string                            `yaml:"message"`
-	FleetState   agentclient.State                 `yaml:"fleet_state"`
-	FleetMessage string                            `yaml:"fleet_message"`
-	Components   []runtime.ComponentComponentState `yaml:"components"`
-	LogLevel     logp.Level                        `yaml:"log_level"`
-}
-
-// StateFetcher provides an interface to fetch the current state of the coordinator.
-type StateFetcher interface {
-	// State returns the current state of the coordinator.
-	State(bool) State
-}
 
 // CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
 const CoordinatorShutdownTimeout = time.Second * 5
@@ -804,24 +786,6 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 	}
 	// if there's no component errors, continue to pass along the context error
 	return ctx.Err()
-}
-
-type coordinatorState struct {
-	state         agentclient.State
-	message       string
-	fleetState    agentclient.State
-	fleetMessage  string
-	overrideState *coordinatorOverrideState
-
-	config   *config.Config
-	ast      *transpiler.AST
-	vars     []*transpiler.Vars
-	logLevel logp.Level
-}
-
-type coordinatorOverrideState struct {
-	state   agentclient.State
-	message string
 }
 
 type coordinatorComponentLog struct {
