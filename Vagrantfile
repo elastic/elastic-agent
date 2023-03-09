@@ -132,7 +132,7 @@ Vagrant.configure("2") do |config|
     config.vm.define "dev" do |nodeconfig|
       nodeconfig.vm.box = "ubuntu/jammy64"
 
-      nodeconfig.vm.hostname = "elastic-agent-dev"
+      nodeconfig.vm.hostname = "elastic-agent-dev.elastic.dev.internal"
 
       nodeconfig.vm.network "private_network",
         hostname: true,
