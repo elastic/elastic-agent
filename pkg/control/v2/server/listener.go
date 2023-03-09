@@ -14,7 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
+	"github.com/elastic/elastic-agent/pkg/control"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
