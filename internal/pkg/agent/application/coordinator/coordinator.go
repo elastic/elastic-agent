@@ -581,57 +581,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			var runtimeErr error
-			var configErr error
-			var varsErr error
-			// in case other components are locked up, let us time out
-			timeoutChan := time.After(CoordinatorShutdownTimeout)
-			for {
-				select {
-				case <-timeoutChan:
-					var timeouts string
-					if runtimeErr == nil {
-						timeouts = "no response from runtime component"
-					}
-					if configErr == nil {
-						timeouts = fmt.Sprintf("%s; no response from configWatcher component", timeouts)
-					}
-					if varsErr == nil {
-						timeouts = fmt.Sprintf("%s; no response from varsWatcher component", timeouts)
-					}
-					c.logger.Debugf("timeout while waiting for other components to shut down: %s", timeouts)
-					break
-				case err := <-runtimeErrCh:
-					runtimeErr = err
-					c.runtimeMgrErr = runtimeErr
-				case err := <-configErrCh:
-					configErr = err
-					c.configMgrErr = configErr
-				case err := <-varsErrCh:
-					varsErr = err
-					c.varsMgrErr = varsErr
-				}
-				if runtimeErr != nil && configErr != nil && varsErr != nil {
-					break
-				}
-			}
-			// try not to lose any errors
-			var combinedErr error
-			if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-				combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
-			}
-			if configErr != nil && !errors.Is(configErr, context.Canceled) {
-				combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
-			}
-			if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-				combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
-			}
-			if combinedErr != nil {
-				return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
-			}
-			// if there's no component errors, continue to pass along the context error
-			return ctx.Err()
-
+			return c.handleCoordinatorDone(ctx, varsErrCh, runtimeErrCh, configErrCh)
 		case <-runtimeRun:
 			if ctx.Err() == nil {
 				cancel()
@@ -836,6 +786,61 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 	}
 
 	return cfg, comps, nil
+}
+
+func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runtimeErrCh, configErrCh chan error) error {
+	var runtimeErr error
+	var configErr error
+	var varsErr error
+	// in case other components are locked up, let us time out
+	timeoutWait := time.NewTimer(CoordinatorShutdownTimeout)
+
+	for {
+		select {
+		case <-timeoutWait.C:
+			var timeouts []string
+			if runtimeErr == nil {
+				timeouts = []string{"no response from runtime component"}
+			}
+			if configErr == nil {
+				timeouts = append(timeouts, "no response from configWatcher component")
+			}
+			if varsErr == nil {
+				timeouts = append(timeouts, "no response from varsWatcher component")
+			}
+			c.logger.Debugf("timeout while waiting for other components to shut down: %v", timeouts)
+			break
+		case err := <-runtimeErrCh:
+			runtimeErr = err
+			c.runtimeMgrErr = runtimeErr
+		case err := <-configErrCh:
+			configErr = err
+			c.configMgrErr = configErr
+		case err := <-varsErrCh:
+			varsErr = err
+			c.varsMgrErr = varsErr
+		}
+		if runtimeErr != nil && configErr != nil && varsErr != nil {
+			timeoutWait.Stop()
+			break
+		}
+	}
+	// try not to lose any errors
+	var combinedErr error
+	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
+	}
+	if configErr != nil && !errors.Is(configErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
+	}
+	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
+	}
+	if combinedErr != nil {
+		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
+	}
+	// if there's no component errors, continue to pass along the context error
+	return ctx.Err()
 }
 
 type coordinatorState struct {
