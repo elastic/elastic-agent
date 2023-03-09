@@ -241,12 +241,24 @@ message DiagnosticUnitsResponse {
   repeated DiagnosticUnitResponse units = 2;
 }
 
+// ConfigureRequest sends a new configuration for the running Elastic Agent to use.
+message ConfigureRequest {
+  // Config to use.
+  string config = 1;
+}
+
 service ElasticAgentControl {
   // Fetches the currently running version of the Elastic Agent.
   rpc Version(Empty) returns (VersionResponse);
 
   // Fetches the currently states of the Elastic Agent.
   rpc State(Empty) returns (StateResponse);
+
+  // Streams the current state of the Elastic Agent to the client.
+  //
+  // Client will continue to get updated StateResponse when any state
+  // of the Elastic Agent has changed.
+  rpc StateWatch(Empty) returns (stream StateResponse);
 
   // Restart restarts the current running Elastic Agent.
   rpc Restart(Empty) returns (RestartResponse);
@@ -259,4 +271,12 @@ service ElasticAgentControl {
 
   // Gather diagnostic information for the running units.
   rpc DiagnosticUnits(DiagnosticUnitsRequest) returns (stream DiagnosticUnitResponse);
+
+  // Configure adjusts the running Elastic Agent configuration with the configuration
+  // provided over the RPC.
+  //
+  // This is only allowed if the Elastic Agent is spawned in TESTING_MODE. Calling this
+  // on any Elastic Agent that is not in TESTING_MODE will result in an error being
+  // returned and nothing occurring.
+  rpc Configure(ConfigureRequest) returns (Empty);
 }

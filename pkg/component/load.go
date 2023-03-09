@@ -189,6 +189,66 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 	}, nil
 }
 
+// NewRuntimeSpecs creates a RuntimeSpecs from already loaded input and shipper runtime specifications.
+func NewRuntimeSpecs(platform PlatformDetail, inputSpecs []InputRuntimeSpec, shipperSpecs []ShipperRuntimeSpec) (RuntimeSpecs, error) {
+	var inputTypes []string
+	inputSpecsMap := make(map[string]InputRuntimeSpec)
+	inputAliases := make(map[string]string)
+	shipperSpecsMap := make(map[string]ShipperRuntimeSpec)
+	shipperOutputs := make(map[string][]string)
+	for _, inputSpec := range inputSpecs {
+		if !containsStr(inputTypes, inputSpec.Spec.Name) {
+			inputTypes = append(inputTypes, inputSpec.Spec.Name)
+		}
+		if !containsStr(inputSpec.Spec.Platforms, platform.String()) {
+			// input spec doesn't support this platform
+			continue
+		}
+		if existing, exists := inputSpecsMap[inputSpec.Spec.Name]; exists {
+			return RuntimeSpecs{}, fmt.Errorf("input '%s' already exists in spec '%s'", inputSpec.Spec.Name, existing.BinaryName)
+		}
+		if existing, exists := inputAliases[inputSpec.Spec.Name]; exists {
+			return RuntimeSpecs{}, fmt.Errorf("input '%s' collides with an alias from another input '%s'", inputSpec.Spec.Name, existing)
+		}
+		for _, alias := range inputSpec.Spec.Aliases {
+			if existing, exists := shipperSpecsMap[alias]; exists {
+				return RuntimeSpecs{}, fmt.Errorf("input alias '%s' collides with an already defined input in spec '%s'", alias, existing.BinaryName)
+			}
+			if existing, exists := inputAliases[alias]; exists {
+				return RuntimeSpecs{}, fmt.Errorf("input alias '%s' collides with an already defined input alias for input '%s'", alias, existing)
+			}
+		}
+		inputSpecsMap[inputSpec.Spec.Name] = inputSpec
+		for _, alias := range inputSpec.Spec.Aliases {
+			inputAliases[alias] = inputSpec.Spec.Name
+		}
+	}
+	for _, shipperSpec := range shipperSpecs {
+		// map the native outputs that the shipper supports
+		for _, output := range shipperSpec.Spec.Outputs {
+			shippers, _ := shipperOutputs[output]
+			shippers = append(shippers, shipperSpec.Spec.Name)
+			shipperOutputs[output] = shippers
+		}
+		if !containsStr(shipperSpec.Spec.Platforms, platform.String()) {
+			// input spec doesn't support this platform (but shipper is still mapped into shipperOutputs)
+			continue
+		}
+		if existing, exists := shipperSpecsMap[shipperSpec.Spec.Name]; exists {
+			return RuntimeSpecs{}, fmt.Errorf("shipper '%s' already exists in spec '%s'", shipperSpec.Spec.Name, existing.BinaryName)
+		}
+		shipperSpecsMap[shipperSpec.Spec.Name] = shipperSpec
+	}
+	return RuntimeSpecs{
+		platform:       platform,
+		inputTypes:     inputTypes,
+		inputSpecs:     inputSpecsMap,
+		aliasMapping:   inputAliases,
+		shipperSpecs:   shipperSpecsMap,
+		shipperOutputs: shipperOutputs,
+	}, nil
+}
+
 // Inputs returns the list of supported inputs for this platform.
 func (r *RuntimeSpecs) Inputs() []string {
 	inputs := make([]string, 0, len(r.inputSpecs))

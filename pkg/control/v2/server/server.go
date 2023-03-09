@@ -7,11 +7,16 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"net"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
+	v1server "github.com/elastic/elastic-agent/pkg/control/v1/server"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
@@ -22,15 +27,18 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/proto"
-	v1server "github.com/elastic/elastic-agent/internal/pkg/agent/control/v1/server"
-	cproto "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+// TestModeConfigSetter is used only for testing mode.
+type TestModeConfigSetter interface {
+	// SetConfig sets the configuration.
+	SetConfig(ctx context.Context, cfg string) error
+}
 
 // Server is the daemon side of the control protocol.
 type Server struct {
@@ -44,6 +52,8 @@ type Server struct {
 	tracer     *apm.Tracer
 	diagHooks  diagnostics.Hooks
 	grpcConfig *configuration.GRPCConfig
+
+	tmSetter TestModeConfigSetter
 }
 
 // New creates a new control protocol server.
@@ -56,6 +66,11 @@ func New(log *logger.Logger, agentInfo *info.AgentInfo, coord *coordinator.Coord
 		diagHooks:  diagHooks,
 		grpcConfig: grpcConfig,
 	}
+}
+
+// SetTestModeConfigSetter sets the test mode configuration setter.
+func (s *Server) SetTestModeConfigSetter(setter TestModeConfigSetter) {
+	s.tmSetter = setter
 }
 
 // Start starts the GRPC endpoint and accepts new connections.
@@ -115,55 +130,29 @@ func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionRes
 
 // State returns the overall state of the agent.
 func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateResponse, error) {
-	var err error
+	state := s.coord.State()
+	return stateToProto(&state, s.agentInfo)
+}
 
-	state := s.coord.State(true)
-	components := make([]*cproto.ComponentState, 0, len(state.Components))
-	for _, comp := range state.Components {
-		units := make([]*cproto.ComponentUnitState, 0, len(comp.State.Units))
-		for key, unit := range comp.State.Units {
-			payload := []byte("")
-			if unit.Payload != nil {
-				payload, err = json.Marshal(unit.Payload)
-				if err != nil {
-					return nil, fmt.Errorf("failed to marshal componend %s unit %s payload: %w", comp.Component.ID, key.UnitID, err)
-				}
+// StateWatch streams the current state of the Elastic Agent to the client.
+func (s *Server) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
+	ctx := srv.Context()
+	sub := s.coord.StateSubscribe(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case state := <-sub.Ch():
+			resp, err := stateToProto(&state, s.agentInfo)
+			if err != nil {
+				return err
 			}
-			units = append(units, &cproto.ComponentUnitState{
-				UnitType: cproto.UnitType(key.UnitType),
-				UnitId:   key.UnitID,
-				State:    cproto.State(unit.State),
-				Message:  unit.Message,
-				Payload:  string(payload),
-			})
+			err = srv.Send(resp)
+			if err != nil {
+				return err
+			}
 		}
-		components = append(components, &cproto.ComponentState{
-			Id:      comp.Component.ID,
-			Name:    comp.Component.Type(),
-			State:   cproto.State(comp.State.State),
-			Message: comp.State.Message,
-			Units:   units,
-			VersionInfo: &cproto.ComponentVersionInfo{
-				Name:    comp.State.VersionInfo.Name,
-				Version: comp.State.VersionInfo.Version,
-				Meta:    comp.State.VersionInfo.Meta,
-			},
-		})
 	}
-	return &cproto.StateResponse{
-		Info: &cproto.StateAgentInfo{
-			Id:        s.agentInfo.AgentID(),
-			Version:   release.Version(),
-			Commit:    release.Commit(),
-			BuildTime: release.BuildTime().Format(control.TimeFormat()),
-			Snapshot:  release.Snapshot(),
-		},
-		State:        state.State,
-		Message:      state.Message,
-		Components:   components,
-		FleetState:   state.FleetState,
-		FleetMessage: state.FleetMessage,
-	}, nil
 }
 
 // Restart performs re-exec.
@@ -259,4 +248,66 @@ func (s *Server) DiagnosticUnits(req *cproto.DiagnosticUnitsRequest, srv cproto.
 	}
 
 	return nil
+}
+
+// Configure configures the running Elastic Agent configuration.
+//
+// Only available in testing mode.
+func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*cproto.Empty, error) {
+	if s.tmSetter == nil {
+		return nil, errors.New("testing mode is not enabled")
+	}
+	err := s.tmSetter.SetConfig(ctx, req.Config)
+	if err != nil {
+		return nil, err
+	}
+	return &cproto.Empty{}, nil
+}
+
+func stateToProto(state *state.State, agentInfo *info.AgentInfo) (*cproto.StateResponse, error) {
+	var err error
+	components := make([]*cproto.ComponentState, 0, len(state.Components))
+	for _, comp := range state.Components {
+		units := make([]*cproto.ComponentUnitState, 0, len(comp.State.Units))
+		for key, unit := range comp.State.Units {
+			payload := []byte("")
+			if unit.Payload != nil {
+				payload, err = json.Marshal(unit.Payload)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal componend %s unit %s payload: %w", comp.Component.ID, key.UnitID, err)
+				}
+			}
+			units = append(units, &cproto.ComponentUnitState{
+				UnitType: cproto.UnitType(key.UnitType),
+				UnitId:   key.UnitID,
+				State:    cproto.State(unit.State),
+				Message:  unit.Message,
+				Payload:  string(payload),
+			})
+		}
+		components = append(components, &cproto.ComponentState{
+			Id:      comp.Component.ID,
+			Name:    comp.Component.Type(),
+			State:   cproto.State(comp.State.State),
+			Message: comp.State.Message,
+			Units:   units,
+			VersionInfo: &cproto.ComponentVersionInfo{
+				Name:    comp.State.VersionInfo.Name,
+				Version: comp.State.VersionInfo.Version,
+				Meta:    comp.State.VersionInfo.Meta,
+			},
+		})
+	}
+	return &cproto.StateResponse{
+		Info: &cproto.StateAgentInfo{
+			Id:        agentInfo.AgentID(),
+			Version:   release.Version(),
+			Commit:    release.Commit(),
+			BuildTime: release.BuildTime().Format(control.TimeFormat()),
+			Snapshot:  release.Snapshot(),
+		},
+		State:      state.State,
+		Message:    state.Message,
+		Components: components,
+	}, nil
 }

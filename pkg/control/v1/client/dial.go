@@ -12,7 +12,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
+	"github.com/elastic/elastic-agent/pkg/control"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

@@ -31,6 +31,11 @@ type ElasticAgentControlClient interface {
 	Version(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VersionResponse, error)
 	// Fetches the currently states of the Elastic Agent.
 	State(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StateResponse, error)
+	// Streams the current state of the Elastic Agent to the client.
+	//
+	// Client will continue to get updated StateResponse when any state
+	// of the Elastic Agent has changed.
+	StateWatch(ctx context.Context, in *Empty, opts ...grpc.CallOption) (ElasticAgentControl_StateWatchClient, error)
 	// Restart restarts the current running Elastic Agent.
 	Restart(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RestartResponse, error)
 	// Upgrade starts the upgrade process of Elastic Agent.
@@ -39,6 +44,13 @@ type ElasticAgentControlClient interface {
 	DiagnosticAgent(ctx context.Context, in *DiagnosticAgentRequest, opts ...grpc.CallOption) (*DiagnosticAgentResponse, error)
 	// Gather diagnostic information for the running units.
 	DiagnosticUnits(ctx context.Context, in *DiagnosticUnitsRequest, opts ...grpc.CallOption) (ElasticAgentControl_DiagnosticUnitsClient, error)
+	// Configure adjusts the running Elastic Agent configuration with the configuration
+	// provided over the RPC.
+	//
+	// This is only allowed if the Elastic Agent is spawned in TESTING_MODE. Calling this
+	// on any Elastic Agent that is not in TESTING_MODE will result in an error being
+	// returned and nothing occurring.
+	Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type elasticAgentControlClient struct {
@@ -65,6 +77,38 @@ func (c *elasticAgentControlClient) State(ctx context.Context, in *Empty, opts .
 		return nil, err
 	}
 	return out, nil
+}
+
+func (c *elasticAgentControlClient) StateWatch(ctx context.Context, in *Empty, opts ...grpc.CallOption) (ElasticAgentControl_StateWatchClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ElasticAgentControl_ServiceDesc.Streams[0], "/cproto.ElasticAgentControl/StateWatch", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &elasticAgentControlStateWatchClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ElasticAgentControl_StateWatchClient interface {
+	Recv() (*StateResponse, error)
+	grpc.ClientStream
+}
+
+type elasticAgentControlStateWatchClient struct {
+	grpc.ClientStream
+}
+
+func (x *elasticAgentControlStateWatchClient) Recv() (*StateResponse, error) {
+	m := new(StateResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (c *elasticAgentControlClient) Restart(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RestartResponse, error) {
@@ -95,7 +139,7 @@ func (c *elasticAgentControlClient) DiagnosticAgent(ctx context.Context, in *Dia
 }
 
 func (c *elasticAgentControlClient) DiagnosticUnits(ctx context.Context, in *DiagnosticUnitsRequest, opts ...grpc.CallOption) (ElasticAgentControl_DiagnosticUnitsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &ElasticAgentControl_ServiceDesc.Streams[0], "/cproto.ElasticAgentControl/DiagnosticUnits", opts...)
+	stream, err := c.cc.NewStream(ctx, &ElasticAgentControl_ServiceDesc.Streams[1], "/cproto.ElasticAgentControl/DiagnosticUnits", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +170,15 @@ func (x *elasticAgentControlDiagnosticUnitsClient) Recv() (*DiagnosticUnitRespon
 	return m, nil
 }
 
+func (c *elasticAgentControlClient) Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cproto.ElasticAgentControl/Configure", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ElasticAgentControlServer is the server API for ElasticAgentControl service.
 // All implementations must embed UnimplementedElasticAgentControlServer
 // for forward compatibility
@@ -134,6 +187,11 @@ type ElasticAgentControlServer interface {
 	Version(context.Context, *Empty) (*VersionResponse, error)
 	// Fetches the currently states of the Elastic Agent.
 	State(context.Context, *Empty) (*StateResponse, error)
+	// Streams the current state of the Elastic Agent to the client.
+	//
+	// Client will continue to get updated StateResponse when any state
+	// of the Elastic Agent has changed.
+	StateWatch(*Empty, ElasticAgentControl_StateWatchServer) error
 	// Restart restarts the current running Elastic Agent.
 	Restart(context.Context, *Empty) (*RestartResponse, error)
 	// Upgrade starts the upgrade process of Elastic Agent.
@@ -142,6 +200,13 @@ type ElasticAgentControlServer interface {
 	DiagnosticAgent(context.Context, *DiagnosticAgentRequest) (*DiagnosticAgentResponse, error)
 	// Gather diagnostic information for the running units.
 	DiagnosticUnits(*DiagnosticUnitsRequest, ElasticAgentControl_DiagnosticUnitsServer) error
+	// Configure adjusts the running Elastic Agent configuration with the configuration
+	// provided over the RPC.
+	//
+	// This is only allowed if the Elastic Agent is spawned in TESTING_MODE. Calling this
+	// on any Elastic Agent that is not in TESTING_MODE will result in an error being
+	// returned and nothing occurring.
+	Configure(context.Context, *ConfigureRequest) (*Empty, error)
 	mustEmbedUnimplementedElasticAgentControlServer()
 }
 
@@ -155,6 +220,9 @@ func (UnimplementedElasticAgentControlServer) Version(context.Context, *Empty) (
 func (UnimplementedElasticAgentControlServer) State(context.Context, *Empty) (*StateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method State not implemented")
 }
+func (UnimplementedElasticAgentControlServer) StateWatch(*Empty, ElasticAgentControl_StateWatchServer) error {
+	return status.Errorf(codes.Unimplemented, "method StateWatch not implemented")
+}
 func (UnimplementedElasticAgentControlServer) Restart(context.Context, *Empty) (*RestartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Restart not implemented")
 }
@@ -166,6 +234,9 @@ func (UnimplementedElasticAgentControlServer) DiagnosticAgent(context.Context, *
 }
 func (UnimplementedElasticAgentControlServer) DiagnosticUnits(*DiagnosticUnitsRequest, ElasticAgentControl_DiagnosticUnitsServer) error {
 	return status.Errorf(codes.Unimplemented, "method DiagnosticUnits not implemented")
+}
+func (UnimplementedElasticAgentControlServer) Configure(context.Context, *ConfigureRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Configure not implemented")
 }
 func (UnimplementedElasticAgentControlServer) mustEmbedUnimplementedElasticAgentControlServer() {}
 
@@ -214,6 +285,27 @@ func _ElasticAgentControl_State_Handler(srv interface{}, ctx context.Context, de
 		return srv.(ElasticAgentControlServer).State(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _ElasticAgentControl_StateWatch_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ElasticAgentControlServer).StateWatch(m, &elasticAgentControlStateWatchServer{stream})
+}
+
+type ElasticAgentControl_StateWatchServer interface {
+	Send(*StateResponse) error
+	grpc.ServerStream
+}
+
+type elasticAgentControlStateWatchServer struct {
+	grpc.ServerStream
+}
+
+func (x *elasticAgentControlStateWatchServer) Send(m *StateResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _ElasticAgentControl_Restart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -291,6 +383,24 @@ func (x *elasticAgentControlDiagnosticUnitsServer) Send(m *DiagnosticUnitRespons
 	return x.ServerStream.SendMsg(m)
 }
 
+func _ElasticAgentControl_Configure_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfigureRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ElasticAgentControlServer).Configure(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cproto.ElasticAgentControl/Configure",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ElasticAgentControlServer).Configure(ctx, req.(*ConfigureRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ElasticAgentControl_ServiceDesc is the grpc.ServiceDesc for ElasticAgentControl service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -318,8 +428,17 @@ var ElasticAgentControl_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "DiagnosticAgent",
 			Handler:    _ElasticAgentControl_DiagnosticAgent_Handler,
 		},
+		{
+			MethodName: "Configure",
+			Handler:    _ElasticAgentControl_Configure_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StateWatch",
+			Handler:       _ElasticAgentControl_StateWatch_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "DiagnosticUnits",
 			Handler:       _ElasticAgentControl_DiagnosticUnits_Handler,

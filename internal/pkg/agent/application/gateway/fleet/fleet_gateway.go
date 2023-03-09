@@ -8,11 +8,12 @@ import (
 	"context"
 	"time"
 
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -74,7 +75,7 @@ type fleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	stateFetcher       coordinator.StateFetcher
+	stateFetcher       state.StateFetcher
 	stateStore         stateStore
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
@@ -86,7 +87,7 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
-	stateFetcher coordinator.StateFetcher,
+	stateFetcher state.StateFetcher,
 	stateStore stateStore,
 ) (gateway.FleetGateway, error) {
 
@@ -110,7 +111,7 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
-	stateFetcher coordinator.StateFetcher,
+	stateFetcher state.StateFetcher,
 	stateStore stateStore,
 ) (gateway.FleetGateway, error) {
 	return &fleetGateway{
@@ -319,7 +320,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher.State(false)
+	state := f.stateFetcher.State()
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components)
