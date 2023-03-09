@@ -13,9 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	cproto "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 )
 
 // UnitType is the type of the unit
@@ -144,6 +145,8 @@ type Client interface {
 	Version(ctx context.Context) (Version, error)
 	// State returns the current state of the running agent.
 	State(ctx context.Context) (*AgentState, error)
+	// StateWatch watches the current state of the running agent.
+	StateWatch(ctx context.Context) (ClientStateWatch, error)
 	// Restart triggers restarting the current running daemon.
 	Restart(ctx context.Context) error
 	// Upgrade triggers upgrade of the current running daemon.
@@ -152,6 +155,16 @@ type Client interface {
 	DiagnosticAgent(ctx context.Context) ([]DiagnosticFileResult, error)
 	// DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).
 	DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitRequest) ([]DiagnosticUnitResult, error)
+	// Configure sends a new configuration to the Elastic Agent.
+	//
+	// Only works in the case that Elastic Agent is started in testing mode.
+	Configure(ctx context.Context, config string) error
+}
+
+// ClientStateWatch allows the state of the running Elastic Agent to be watched.
+type ClientStateWatch interface {
+	// Recv receives the next agent state.
+	Recv() (*AgentState, error)
 }
 
 // client manages the state and communication to the Elastic Agent.
@@ -220,56 +233,16 @@ func (c *client) State(ctx context.Context) (*AgentState, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &AgentState{
-		Info: AgentStateInfo{
-			ID:        res.Info.Id,
-			Version:   res.Info.Version,
-			Commit:    res.Info.Commit,
-			BuildTime: res.Info.BuildTime,
-			Snapshot:  res.Info.Snapshot,
-		},
-		State:        res.State,
-		Message:      res.Message,
-		FleetState:   res.FleetState,
-		FleetMessage: res.FleetMessage,
+	return toState(res)
+}
 
-		Components: make([]ComponentState, 0, len(res.Components)),
+// StateWatch watches the current state of the running agent.
+func (c *client) StateWatch(ctx context.Context) (ClientStateWatch, error) {
+	cli, err := c.client.StateWatch(ctx, &cproto.Empty{})
+	if err != nil {
+		return nil, err
 	}
-	for _, comp := range res.Components {
-		units := make([]ComponentUnitState, 0, len(comp.Units))
-		for _, unit := range comp.Units {
-			var payload map[string]interface{}
-			if unit.Payload != "" {
-				err := json.Unmarshal([]byte(unit.Payload), &payload)
-				if err != nil {
-					return nil, err
-				}
-			}
-			units = append(units, ComponentUnitState{
-				UnitID:   unit.UnitId,
-				UnitType: unit.UnitType,
-				State:    unit.State,
-				Message:  unit.Message,
-				Payload:  payload,
-			})
-		}
-		cs := ComponentState{
-			ID:      comp.Id,
-			Name:    comp.Name,
-			State:   comp.State,
-			Message: comp.Message,
-			Units:   units,
-		}
-		if comp.VersionInfo != nil {
-			cs.VersionInfo = ComponentVersionInfo{
-				Name:    comp.VersionInfo.Name,
-				Version: comp.VersionInfo.Version,
-				Meta:    comp.VersionInfo.Meta,
-			}
-		}
-		s.Components = append(s.Components, cs)
-	}
-	return s, nil
+	return &stateWatcher{cli}, nil
 }
 
 // Restart triggers restarting the current running daemon.
@@ -374,4 +347,78 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 	}
 
 	return results, nil
+}
+
+// Configure sends a new configuration to the Elastic Agent.
+//
+// Only works in the case that Elastic Agent is started in testing mode.
+func (c *client) Configure(ctx context.Context, config string) error {
+	_, err := c.client.Configure(ctx, &cproto.ConfigureRequest{Config: config})
+	return err
+}
+
+type stateWatcher struct {
+	client cproto.ElasticAgentControl_StateWatchClient
+}
+
+// Recv receives the next agent state.
+func (sw *stateWatcher) Recv() (*AgentState, error) {
+	resp, err := sw.client.Recv()
+	if err != nil {
+		return nil, err
+	}
+	return toState(resp)
+}
+
+func toState(res *cproto.StateResponse) (*AgentState, error) {
+	s := &AgentState{
+		Info: AgentStateInfo{
+			ID:        res.Info.Id,
+			Version:   res.Info.Version,
+			Commit:    res.Info.Commit,
+			BuildTime: res.Info.BuildTime,
+			Snapshot:  res.Info.Snapshot,
+		},
+		State:        res.State,
+		Message:      res.Message,
+		FleetState:   res.FleetState,
+		FleetMessage: res.FleetMessage,
+
+		Components: make([]ComponentState, 0, len(res.Components)),
+	}
+	for _, comp := range res.Components {
+		units := make([]ComponentUnitState, 0, len(comp.Units))
+		for _, unit := range comp.Units {
+			var payload map[string]interface{}
+			if unit.Payload != "" {
+				err := json.Unmarshal([]byte(unit.Payload), &payload)
+				if err != nil {
+					return nil, err
+				}
+			}
+			units = append(units, ComponentUnitState{
+				UnitID:   unit.UnitId,
+				UnitType: unit.UnitType,
+				State:    unit.State,
+				Message:  unit.Message,
+				Payload:  payload,
+			})
+		}
+		cs := ComponentState{
+			ID:      comp.Id,
+			Name:    comp.Name,
+			State:   comp.State,
+			Message: comp.Message,
+			Units:   units,
+		}
+		if comp.VersionInfo != nil {
+			cs.VersionInfo = ComponentVersionInfo{
+				Name:    comp.VersionInfo.Name,
+				Version: comp.VersionInfo.Version,
+				Meta:    comp.VersionInfo.Meta,
+			}
+		}
+		s.Components = append(s.Components, cs)
+	}
+	return s, nil
 }
