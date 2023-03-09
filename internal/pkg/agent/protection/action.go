@@ -60,28 +60,27 @@ func ValidateAction(a fleetapi.ActionApp, signatureValidationKey []byte, agentID
 	}
 
 	// Deserialize signed action data if it's a valid JSON
-	if json.Valid(data) {
-		var fa fleetActionWithAgents
-		err = json.Unmarshal(data, &fa)
-		if err != nil {
-			return a, err
-		}
-
-		// Check if the action id is matching with the signed action id
-		if a.ActionID != fa.ActionID {
-			return a, ErrNonMatchingActionID
-		}
-
-		// Check if the signed action agents ids contain the agent id passed
-		if !contains(fa.Agents, agentID) {
-			return a, ErrNonMatchingAgentID
-		}
-
-		// Copy fields from signed fleet action document
-		a.InputType = fa.InputType
-		a.Timeout = fa.Timeout
-		a.Data = fa.Data
+	var fa fleetActionWithAgents
+	err = json.Unmarshal(data, &fa)
+	if err != nil {
+		//nolint:errorlint // WAD: unfortunately two errors wrapping is only available in Go 1.20
+		return a, fmt.Errorf("%w: %v", ErrInvalidSignedDataValue, err)
 	}
+
+	// Check if the action id is matching with the signed action id
+	if a.ActionID != fa.ActionID {
+		return a, ErrNonMatchingActionID
+	}
+
+	// Check if the signed action agents ids contain the agent id passed
+	if !contains(fa.Agents, agentID) {
+		return a, ErrNonMatchingAgentID
+	}
+
+	// Copy fields from signed fleet action document
+	a.InputType = fa.InputType
+	a.Timeout = fa.Timeout
+	a.Data = fa.Data
 
 	return a, nil
 }

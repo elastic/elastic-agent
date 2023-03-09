@@ -40,6 +40,12 @@ func TestOverlay(t *testing.T) {
 			want: nil,
 		},
 		{
+			name:    "src valid protection, overlay nil",
+			src:     validProtection,
+			overlay: nil,
+			want:    validProtection,
+		},
+		{
 			name: "overlay overwrite",
 			src: map[string]interface{}{
 				"id": "4d7d84e0-b46d-11ed-ba3a-57052bcc4355",

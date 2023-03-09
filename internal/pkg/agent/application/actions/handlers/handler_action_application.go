@@ -29,15 +29,17 @@ var errActionTimeoutInvalid = errors.New("action timeout is invalid")
 
 // AppAction is a handler for application actions.
 type AppAction struct {
-	log   *logger.Logger
-	coord *coordinator.Coordinator
+	log     *logger.Logger
+	coord   *coordinator.Coordinator
+	agentID string
 }
 
 // NewAppAction creates a new AppAction handler.
-func NewAppAction(log *logger.Logger, coord *coordinator.Coordinator) *AppAction {
+func NewAppAction(log *logger.Logger, coord *coordinator.Coordinator, agentID string) *AppAction {
 	return &AppAction{
-		log:   log,
-		coord: coord,
+		log:     log,
+		coord:   coord,
+		agentID: agentID,
 	}
 }
 
@@ -50,12 +52,13 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 	}
 
 	// Validate action
-	validated, err := protection.ValidateAction(*action, h.coord.Protection().SignatureValidationKey, "")
+	h.log.Debugf("handlerAppAction: validate action '%+v', for agentID %s", a, h.agentID)
+	validated, err := protection.ValidateAction(*action, h.coord.Protection().SignatureValidationKey, h.agentID)
 	if err != nil {
 		action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
 		action.CompletedAt = action.StartedAt
-		h.log.Errorf("handlerAppAction: action '%v' failed validation: %v", action.InputType, err) // error details are logged
-		action.Error = fmt.Sprintf("action failed validation: %s", action.InputType)               // generic error message for the action response
+		h.log.Errorf("handlerAppAction: action '%+v' failed validation: %v", action, err) // error details are logged
+		action.Error = fmt.Sprintf("action failed validation: %s", action.InputType)      // generic error message for the action response
 		return acker.Ack(ctx, action)
 	}
 	action = &validated

@@ -549,7 +549,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 				ActionType: response.ActionType,
 			}
 		case ActionTypeInputAction:
-			// Only INPUT_ACTION type actions could possibly be signed as of March 1, 2022
+			// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
 			action = &ActionApp{
 				ActionID:   response.ActionID,
 				ActionType: response.ActionType,

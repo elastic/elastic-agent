@@ -19,11 +19,8 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-type AgentProtection struct {
-}
-
 // ValidatePolicySignature validates policy document signature, overlays with signed configuration
-// returns the policy with signed data overlaying the original policy, the matching signatureValidationKey
+// returns the policy (with signed data overlaying the original policy), the matching signatureValidationKey
 // The signatureValidationKey parameter can be empty, in that case try to read the key from the policy.protected.signing_key
 // and validate the signature with that key.
 // This would guarantee that the signature validation key returned from the function is the valid key as well.
@@ -35,62 +32,65 @@ type AgentProtection struct {
 func ValidatePolicySignature(log *logger.Logger, policy map[string]interface{}, signatureValidationKey []byte) (map[string]interface{}, []byte, error) {
 	var err error
 
-	const logPrefix = "Validate policy signature:"
+	log = log.With("context", "Validate policy signature")
 
-	log.Infof("%v passed signature validation key length: %v", logPrefix, len(signatureValidationKey))
+	log.Debugf("Passed signature validation key length: %v", len(signatureValidationKey))
 
 	// Try to get the signature validation key from the policy itself if there is no previously known signature validation key
 	if len(signatureValidationKey) == 0 {
 		signatureValidationKey, err = getPolicySignatureValidationKey(policy)
-		log.Infof("%v policy signature validation key length: %v, err: %v", logPrefix, len(signatureValidationKey), err)
+		log.Debugf("Policy signature validation key length: %v, err: %v", len(signatureValidationKey), err)
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return nil, nil, err
+		}
+		if len(signatureValidationKey) == 0 {
+			log.Debug("Signature validation key is not present, skip validation")
+			return policy, signatureValidationKey, nil
 		}
 	}
 
 	// Validate the signature
-	if len(signatureValidationKey) != 0 {
-		// Read protected data and signature from the policy
-		data, signature, err := getPolicySignedDataAndSignature(policy)
-		log.Infof("%v policy data length: %v, signature length: %v, err: %v", logPrefix, len(data), len(signature), err)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Validate signed data
-		err = ValidateSignature(data, signature, signatureValidationKey)
-		log.Infof("%v policy signature validation result: %v", logPrefix, err)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Unmarshal signed layer of the policy
-		var signedLayer map[string]interface{}
-		if json.Valid(data) {
-			err = json.Unmarshal(data, &signedLayer)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			// Check if the signed layer has the same id as the policy
-			if err := isPolicyMatching(policy, signedLayer); err != nil {
-				return nil, nil, err
-			}
-
-			// Overlay signed layer onto the policy
-			policy = overlayPolicy(policy, signedLayer)
-
-			// Read the key from the policy after it was overlayed with signed data
-			// Coding for the key that could potentially change in the future
-			svk, err := getPolicySignatureValidationKey(policy)
-			if err != nil && !errors.Is(err, ErrNotFound) {
-				return nil, nil, err
-			}
-			signatureValidationKey = svk
-		}
-	} else {
-		log.Infof("%v signature validation key is not present, continue", logPrefix)
+	// Read protected data and signature from the policy
+	data, signature, err := getPolicySignedDataAndSignature(policy)
+	log.Debugf("Policy data length: %v, signature length: %v, err: %v", len(data), len(signature), err)
+	if err != nil {
+		return nil, nil, err
 	}
+
+	// Validate signed data
+	err = ValidateSignature(data, signature, signatureValidationKey)
+	log.Debugf("Policy signature validation result: %v", err)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(data) == 0 {
+		log.Debug("Signed data is empty, skip policy overlay")
+		return policy, signatureValidationKey, nil
+	}
+
+	// Unmarshal signed layer of the policy
+	var signedLayer map[string]interface{}
+	err = json.Unmarshal(data, &signedLayer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Check if the signed layer has the same id as the policy
+	if err := isPolicyMatching(policy, signedLayer); err != nil {
+		return nil, nil, err
+	}
+
+	// Overlay signed layer onto the policy
+	policy = overlayPolicy(policy, signedLayer)
+
+	// Read the key from the policy after it was overlayed with signed data
+	// Coding for the key that could potentially change in the future
+	svk, err := getPolicySignatureValidationKey(policy)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return nil, nil, err
+	}
+	signatureValidationKey = svk
 
 	return policy, signatureValidationKey, nil
 }

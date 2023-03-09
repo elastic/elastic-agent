@@ -131,7 +131,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 			state.action = &fleetapi.ActionPolicyChange{
 				ActionID:   sr.Action.ID,
 				ActionType: sr.Action.Type,
-				Policy:     conv.FixMap(sr.Action.Policy), // Fix Policy, in order to make it consistent with the policy received from the fleet gateway as nested map[string]interface{}
+				Policy:     conv.YAMLMapToJSONMap(sr.Action.Policy), // Fix Policy, in order to make it consistent with the policy received from the fleet gateway as nested map[string]interface{}
 			}
 		}
 	}

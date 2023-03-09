@@ -6,9 +6,10 @@ package conv
 
 import "fmt"
 
-// FixMap changes the map[interface{}]interface{} to map[string]interface{} recursively
+// YAMLMapToJSONMap changes the nested map[interface{}]interface{} to map[string]interface{} recursively
+
 // This is needed to convert YAML deserializer result into a JSON compatible result
-func FixMap(m map[string]interface{}) map[string]interface{} {
+func YAMLMapToJSONMap(m map[string]interface{}) map[string]interface{} {
 	return fixVal(m).(map[string]interface{})
 }
 

@@ -18,15 +18,26 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-func signAction(action map[string]interface{}, pk *ecdsa.PrivateKey) (map[string]interface{}, error) {
-	payload, err := json.Marshal(action)
-	if err != nil {
-		return nil, err
-	}
-
+func signPayload(payload []byte, pk *ecdsa.PrivateKey) ([]byte, error) {
 	hash := sha256.Sum256(payload)
 
-	sig, err := ecdsa.SignASN1(rand.Reader, pk, hash[:])
+	return ecdsa.SignASN1(rand.Reader, pk, hash[:])
+}
+
+func signAction(action map[string]interface{}, emptyData bool, pk *ecdsa.PrivateKey) (map[string]interface{}, error) {
+	var (
+		payload []byte
+		err     error
+	)
+
+	if !emptyData {
+		payload, err = json.Marshal(action)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	sig, err := signPayload(payload, pk)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +60,23 @@ func signActionJSON(actionJSON []byte, pk *ecdsa.PrivateKey) ([]byte, error) {
 		return nil, err
 	}
 
-	signed, err := signAction(action, pk)
+	signed, err := signAction(action, false, pk)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(signed)
+}
+
+func signActionEmptyDataJSON(actionJSON []byte, pk *ecdsa.PrivateKey) ([]byte, error) {
+	var action map[string]interface{}
+
+	err := json.Unmarshal(actionJSON, &action)
+	if err != nil {
+		return nil, err
+	}
+
+	signed, err := signAction(action, true, pk)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +181,18 @@ func TestValidateAction(t *testing.T) {
 
 	unsignedAction := getTestAction(t, []byte(testAction), nil)
 	signedAction := getTestAction(t, []byte(testAction), pk)
-	_ = signedAction
+
+	// Action that has valid empty data signed
+	signedActionEmptyDataJSON, err := signActionEmptyDataJSON([]byte(testAction), pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var signedActionEmptyData fleetapi.ActionApp
+	err = json.Unmarshal(signedActionEmptyDataJSON, &signedActionEmptyData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
 		name       string
 		action     fleetapi.ActionApp
@@ -192,7 +230,7 @@ func TestValidateAction(t *testing.T) {
 			agentID:    testAgentID,
 		},
 		{
-			name: "signed action empty data",
+			name: "signed action corrupted/empty data",
 			action: func() fleetapi.ActionApp {
 				ac := signedAction
 				ac.Signed = &fleetapi.Signed{
@@ -202,6 +240,11 @@ func TestValidateAction(t *testing.T) {
 				return ac
 			}(),
 			wantErr: ErrInvalidSignature,
+		},
+		{
+			name:    "signed empty data action",
+			action:  signedActionEmptyData,
+			wantErr: ErrInvalidSignedDataValue,
 		},
 		{
 			name: "signed action empty signature",
