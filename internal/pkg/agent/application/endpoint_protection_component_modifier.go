@@ -11,7 +11,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
-// ProtectionComponentModifier copies "agent.protection" properties to the top level "protection" for the endpoint input
+// EndpointProtectionComponentModifier copies "agent.protection" properties to the top level "protection" for the endpoint input
 // Endpoint uses uninstall_token_hash in order to verify uninstall command token
 // and signing_key in order validate the action signature.
 // Example:
@@ -26,7 +26,7 @@ import (
 //	    "revision": 1,
 //	    "type": "endpoint"
 //	}
-func ProtectionComponentModifier() coordinator.ComponentsModifier {
+func EndpointProtectionComponentModifier() coordinator.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		const protectionKey = "protection"
 		for i, comp := range comps {

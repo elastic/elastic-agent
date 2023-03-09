@@ -17,8 +17,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestProtectionComponentModifier(t *testing.T) {
-	compModifier := ProtectionComponentModifier()
+func TestEndpointProtectionComponentModifier(t *testing.T) {
+	compModifier := EndpointProtectionComponentModifier()
 
 	tests := []struct {
 		name      string
