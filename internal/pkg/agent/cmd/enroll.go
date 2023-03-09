@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -320,6 +321,13 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	ctx := handleSignal(context.Background())
 
+	// On MacOS, enrolling during installation won't work as expected if we are triggering the FixPermissions() func.
+	// Forcing to set fixPermissions to false in case the agent is running on Mac
+	var fixPermissions bool = fromInstall
+	if runtime.GOOS == "darwin" {
+		fixPermissions = false
+	}
+
 	options := enrollCmdOption{
 		EnrollAPIKey:         enrollmentToken,
 		URL:                  url,
@@ -328,7 +336,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		Insecure:             insecure,
 		UserProvidedMetadata: make(map[string]interface{}),
 		Staging:              staging,
-		FixPermissions:       false,
+		FixPermissions:       fixPermissions,
 		ProxyURL:             proxyURL,
 		ProxyDisabled:        proxyDisabled,
 		ProxyHeaders:         mapFromEnvList(proxyHeaders),
