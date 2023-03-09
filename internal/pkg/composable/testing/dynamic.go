@@ -81,9 +81,8 @@ func (t *DynamicComm) Previous(id string) (DynamicState, bool) {
 	return prev, ok
 }
 
-// PreviousIDs returns the previous set mapping ID.
-//
 //nolint:prealloc,goimports,nolintlint // false positive
+// PreviousIDs returns the previous set mapping ID.
 func (t *DynamicComm) PreviousIDs() []string {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -102,9 +101,8 @@ func (t *DynamicComm) Current(id string) (DynamicState, bool) {
 	return curr, ok
 }
 
-// CurrentIDs returns the current set mapping ID.
-//
 //nolint:prealloc,goimports,nolintlint // false positive
+// CurrentIDs returns the current set mapping ID.
 func (t *DynamicComm) CurrentIDs() []string {
 	t.lock.Lock()
 	defer t.lock.Unlock()

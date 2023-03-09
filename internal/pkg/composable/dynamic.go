@@ -44,9 +44,8 @@ func (r *providerRegistry) MustAddDynamicProvider(name string, builder DynamicPr
 	}
 }
 
-// AddDynamicProvider adds a new DynamicProviderBuilder
-//
 //nolint:dupl,goimports,nolintlint // false positive
+// AddDynamicProvider adds a new DynamicProviderBuilder
 func (r *providerRegistry) AddDynamicProvider(providerName string, builder DynamicProviderBuilder) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()

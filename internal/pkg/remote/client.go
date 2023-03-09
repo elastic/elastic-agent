@@ -256,7 +256,6 @@ func newClient(
 //   - never used
 //   - without errors, last used first when more than one does not have errors
 //   - last errored.
-//
 // It also removes the last error after retryOnBadConnTimeout has elapsed.
 func (c *Client) sortClients() []*requestClient {
 	c.clientLock.Lock()

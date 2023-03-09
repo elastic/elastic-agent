@@ -40,6 +40,7 @@ var gotestHelperMode = os.Getenv(envGoTestHelper) == "1"
 //
 //	  // sample test
 //	}
+//
 func TestGoTest_CaptureOutput(t *testing.T) {
 	errNonZero := "go test returned a non-zero value"
 	makeArgs := func(test string) GoTestArgs {
