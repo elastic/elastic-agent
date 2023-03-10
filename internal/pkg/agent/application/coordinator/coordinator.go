@@ -787,7 +787,7 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", comps).Info("Updating running component model")
+	c.logger.With("components", comps).Debug("Updating running component model")
 	err = c.runtimeMgr.Update(comps)
 	if err != nil {
 		return err

@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
@@ -28,7 +27,6 @@ type Flags struct {
 // can work with. If policy is nil, Parse is a no-op.
 func Parse(policy any) (*Flags, error) {
 	if policy == nil {
-		logp.L().Debug("feature flags policy is nil, nothing to do")
 		return nil, nil
 	}
 
@@ -49,7 +47,6 @@ func Parse(policy any) (*Flags, error) {
 	}
 
 	if c == nil {
-		logp.L().Debug("feature flags config is nil, nothing to do")
 		return nil, nil
 	}
 
@@ -72,7 +69,6 @@ func Parse(policy any) (*Flags, error) {
 // Apply receives a config and applies it. If c is nil, Apply is a no-op.
 func Apply(c *config.Config) error {
 	if c == nil {
-		logp.L().Debug("feature flags config is nil, nothing to do")
 		return nil
 	}
 
