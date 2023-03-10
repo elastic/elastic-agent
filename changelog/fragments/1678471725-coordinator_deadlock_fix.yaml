@@ -16,7 +16,7 @@ summary: Fix several possible deadlocks on shutdown.
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: fix deadlock during shutdown in coordinator
+description: Fix a deadlock when the agent tries to bind to a port that is already in use. Do not wait for providers to shutdown before exiting.
 
 # Affected component; a word indicating the component this changeset affects.
 component: coordinator
