@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:forbidigo // it's ok to use fmt.Print* in a TestMain
 package runtime
 
 import (
