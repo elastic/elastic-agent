@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"net"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v1/proto"

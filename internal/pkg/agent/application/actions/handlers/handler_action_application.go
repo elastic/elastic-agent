@@ -7,8 +7,9 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
