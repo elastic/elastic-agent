@@ -1,0 +1,15 @@
+components:
+  - id: mock_component_1
+    units:
+    - id: mock_input_unit
+      type: 0
+      log_level: 2
+      config:
+        source: null
+        id: ""
+        type: ""
+        name: ""
+        revision: 0
+        meta: null
+        datastream: null
+        streams: []

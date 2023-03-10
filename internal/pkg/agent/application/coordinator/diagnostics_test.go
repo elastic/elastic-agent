@@ -50,11 +50,12 @@ import (
 //go:generate mockery --dir ../../../core/composable/ --name FetchContextProvider
 
 var /*const*/ expectedDiagnosticHooks map[string]string = map[string]string{
-	"pre-config":      "pre-config.yaml",
-	"variables":       "variables.yaml",
-	"computed-config": "computed-config.yaml",
-	"components":      "components.yaml",
-	"state":           "state.yaml",
+	"pre-config":          "pre-config.yaml",
+	"variables":           "variables.yaml",
+	"computed-config":     "computed-config.yaml",
+	"components-expected": "components_expected.yaml",
+	"components-actual":   "components_actual.yaml",
+	"state":               "state.yaml",
 }
 
 var /*const*/ linuxPlatformDetail component.PlatformDetail = component.PlatformDetail{
@@ -145,6 +146,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 	mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
 
 	assert.Eventually(t, func() bool { return sut.State().State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
+	assert.Eventually(t, func() bool { return len(initialConfChange.Calls) > 1 /*both Config and Ack have been called)*/ }, 1*time.Second, 50*time.Millisecond)
 	t.Logf("Agent state: %s", sut.State().State)
 
 	// Runtime component state
@@ -220,7 +222,7 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 	const pathKey = "path"
 
 	if contentType == "application/yaml" {
-		yamlContent := map[string]any{}
+		yamlContent := map[any]any{}
 		err := yaml.Unmarshal(rawBytes, yamlContent)
 		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
 
