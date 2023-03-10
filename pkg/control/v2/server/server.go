@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"net"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
@@ -167,6 +168,7 @@ func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartRes
 func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
 	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil, request.SkipVerify, request.PgpBytes...)
 	if err != nil {
+		//nolint:nilerr // ignore the error, return a failure upgrade response
 		return &cproto.UpgradeResponse{
 			Status: cproto.ActionStatus_FAILURE,
 			Error:  err.Error(),
