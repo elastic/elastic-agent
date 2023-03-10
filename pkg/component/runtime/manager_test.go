@@ -2091,6 +2091,7 @@ func TestManager_FakeShipper(t *testing.T) {
 		5. Send `send_event` action to the component fake input (GRPC client); returns once sent.
 		6. Wait for `record_event` action to return from the shipper input (GRPC server).
 	*/
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/2301")
 
 	testPaths(t)
 
@@ -2508,7 +2509,7 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 	}
 
 	updateTimeout := 300 * time.Millisecond
-	if runtime.GOOS == windows {
+	if runtime.GOOS == component.Windows {
 		// windows is slow, preventing flakyness
 		updateTimeout = 550 * time.Millisecond
 	}
