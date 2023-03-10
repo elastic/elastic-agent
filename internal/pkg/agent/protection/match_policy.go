@@ -4,7 +4,10 @@
 
 package protection
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	ErrMissingPolicyID     = errors.New("missing policy id")
@@ -38,12 +41,12 @@ var (
 func isPolicyMatching(policy map[string]interface{}, signedLayer map[string]interface{}) error {
 	policyID, err := getPolicyID(policy)
 	if err != nil {
-		return err
+		return fmt.Errorf("policy: %w", err)
 	}
 
 	signedPolicyID, err := getPolicyID(signedLayer)
 	if err != nil {
-		return err
+		return fmt.Errorf("signed data: %w", err)
 	}
 
 	if policyID != signedPolicyID {
