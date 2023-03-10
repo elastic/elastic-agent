@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
+
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
-	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
 )

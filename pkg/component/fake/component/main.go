@@ -13,6 +13,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
+
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -29,10 +31,10 @@ func main() {
 func run() error {
 	logger := zerolog.New(os.Stderr).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 	ver := client.VersionInfo{
-		Name:    Fake,
+		Name:    comp.Fake,
 		Version: "1.0",
 		Meta: map[string]string{
-			"input": Fake,
+			"input": comp.Fake,
 		},
 	}
 	c, _, err := client.NewV2FromReader(os.Stdin, ver)
@@ -60,7 +62,7 @@ func run() error {
 		return fmt.Errorf("failed to start GRPC client: %w", err)
 	}
 
-	s := NewStateManager(logger)
+	s := comp.NewStateManager(logger)
 	for {
 		select {
 		case <-ctx.Done():
