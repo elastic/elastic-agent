@@ -120,6 +120,4 @@ func compileBinary(out string, packagePath string) {
 			os.Exit(1)
 		}
 	}
-
-	return
 }
