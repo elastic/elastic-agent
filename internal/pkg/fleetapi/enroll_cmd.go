@@ -78,6 +78,7 @@ func (p EnrollType) MarshalJSON() ([]byte, error) {
 //
 // Example:
 // POST /api/fleet/agents/enroll
+//
 //	{
 //		"type": "PERMANENT",
 //	  "metadata": {
@@ -116,6 +117,7 @@ func (e *EnrollRequest) Validate() error {
 // EnrollResponse is the data received after enrolling an Agent into fleet.
 //
 // Example:
+//
 //	{
 //	  "action": "created",
 //	  "item": {
