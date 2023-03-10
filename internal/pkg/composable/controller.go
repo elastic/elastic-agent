@@ -282,7 +282,10 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 	}
 	c.mapping = mapping
 
-	go func() { c.signal <- true }()
+	select {
+	case c.signal <- true:
+	default:
+	}
 	return nil
 }
 
@@ -344,7 +347,10 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		processors: processors,
 	}
 
-	go func() { c.signal <- true }()
+	select {
+	case c.signal <- true:
+	default:
+	}
 	return nil
 }
 
@@ -357,7 +363,10 @@ func (c *dynamicProviderState) Remove(id string) {
 		// existed; remove and signal
 		delete(c.mappings, id)
 
-		go func() { c.signal <- true }()
+		select {
+		case c.signal <- true:
+		default:
+		}
 	}
 }
 
