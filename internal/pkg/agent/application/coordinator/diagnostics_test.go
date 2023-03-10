@@ -27,21 +27,28 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/mocks"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // Refer to https://vektra.github.io/mockery/installation/ to check how to install mockery binary
-//go:generate mockery --all
+//go:generate mockery --name ComponentsModifier
+//go:generate mockery --name ConfigChange
+//go:generate mockery --name RuntimeManager
+//go:generate mockery --name ConfigManager
+//go:generate mockery --name VarsManager
+//go:generate mockery --name UpgradeManager
+//go:generate mockery --name ReExecManager
+//go:generate mockery --name MonitorManager
 //go:generate mockery --dir ../../../capabilities/ --name Capability
 //go:generate mockery --dir ../../../core/composable/ --name FetchContextProvider
 
-var expectedDiagnosticHooks map[string]string = map[string]string{
+var /*const*/ expectedDiagnosticHooks map[string]string = map[string]string{
 	"pre-config":      "pre-config.yaml",
 	"variables":       "variables.yaml",
 	"computed-config": "computed-config.yaml",
@@ -49,46 +56,30 @@ var expectedDiagnosticHooks map[string]string = map[string]string{
 	"state":           "state.yaml",
 }
 
+var /*const*/ linuxPlatformDetail component.PlatformDetail = component.PlatformDetail{
+	Platform: component.Platform{
+		OS:   "linux",
+		Arch: "amd64",
+		GOOS: "linux",
+	},
+	Family: "",
+	Major:  "22",
+	Minor:  "4",
+}
+
 func TestCoordinatorDiagnosticHooks(t *testing.T) {
+	specs, err := component.LoadRuntimeSpecs("../../../../../specs", linuxPlatformDetail, component.SkipBinaryCheck())
+	require.NoError(t, err)
 
-	helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, component.RuntimeSpecs{}, false)
-
-	//FIXME I cannot customize what is returned in SubscriptionAll object since it's defined as a struct and all the
-	//constructors and fields are private -> the RuntimeManager interface definition should define an interface as
-	//return type on the coordinator side or the returned struct should be plain data object with all the fields
-	//accessible by anyone
-	subscriptionAll := new(runtime.SubscriptionAll)
-	helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
-	helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
-	helper.runtimeManager.EXPECT().State().Return([]runtime.ComponentComponentState{
-		{
-			Component: component.Component{
-				ID: "mock_component_1",
-				Units: []component.Unit{
-					{
-						ID:       "mock_input_unit",
-						Type:     client.UnitTypeInput,
-						LogLevel: client.UnitLogLevelInfo,
-						Config:   &proto.UnitExpectedConfig{
-							//TODO
-						},
-					},
-				},
-			},
-			State: runtime.ComponentState{
-				State: client.UnitStateHealthy,
-				VersionInfo: runtime.ComponentVersionInfo{
-					Name:    "shiny mock component",
-					Version: "latest, obvs :D",
-				},
-			},
-		},
-	})
-
-	sut := helper.coordinator
+	helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, specs, false)
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
+	componentsUpdateChannel := make(chan runtime.ComponentComponentState)
+	subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, nil, componentsUpdateChannel)
+	helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
+	helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
 
+	sut := helper.coordinator
 	coordinatorWg := new(sync.WaitGroup)
 	defer func() {
 		cancelFunc()
@@ -136,12 +127,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 		processors,
 		fetchContextProviders)
 	require.NoError(t, err)
-	select {
-	case helper.varsChannel <- []*transpiler.Vars{vars}:
-		t.Log("Vars injected")
-	case <-time.NewTimer(100 * time.Millisecond).C:
-		t.Fatalf("Timeout writing vars")
-	}
+	mustWriteToChannelBeforeTimeout(t, []*transpiler.Vars{vars}, helper.varsChannel, 100*time.Millisecond)
 
 	// Inject initial configuration - after starting coordinator
 	configBytes, err := os.ReadFile("./testdata/simple_config/elastic-agent.yml")
@@ -152,17 +138,33 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 	initialConfChange := mocks.NewConfigChange(t)
 	initialConfChange.EXPECT().Config().Return(initialConf)
 	initialConfChange.EXPECT().Ack().Return(nil).Times(1)
+	mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
 
-	select {
-	case helper.configChangeChannel <- initialConfChange:
-		t.Log("Initial config injected")
-	case <-time.NewTimer(100 * time.Millisecond).C:
-		t.Fatalf("Timeout writing initial config")
+	assert.Eventually(t, func() bool { return sut.State().State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
+	t.Logf("Agent state: %s", sut.State().State)
+
+	// Runtime component state
+	componentState := runtime.ComponentComponentState{
+		Component: component.Component{
+			ID: "mock_component_1",
+			Units: []component.Unit{
+				{
+					ID:       "mock_input_unit",
+					Type:     client.UnitTypeInput,
+					LogLevel: client.UnitLogLevelInfo,
+					Config:   &proto.UnitExpectedConfig{},
+				},
+			},
+		},
+		State: runtime.ComponentState{
+			State: client.UnitStateHealthy,
+			VersionInfo: runtime.ComponentVersionInfo{
+				Name:    "shiny mock component",
+				Version: "latest, obvs :D",
+			},
+		},
 	}
-
-	assert.Eventually(t, func() bool { return sut.State(true).State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
-
-	t.Logf("Agent state: %s", sut.State(true).State)
+	mustWriteToChannelBeforeTimeout(t, componentState, componentsUpdateChannel, 100*time.Millisecond)
 
 	diagHooks := sut.DiagnosticHooks()
 	t.Logf("Received diagnostics: %+v", diagHooks)
@@ -270,7 +272,6 @@ type coordinatorTestHelper struct {
 }
 
 func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, isManaged bool) *coordinatorTestHelper {
-
 	helper := new(coordinatorTestHelper)
 
 	// Runtime manager basic wiring
@@ -348,4 +349,18 @@ func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs com
 	)
 
 	return helper
+}
+
+func mustWriteToChannelBeforeTimeout[V any](t *testing.T, value V, channel chan V, timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+
+	select {
+	case channel <- value:
+		if !timer.Stop() {
+			<-timer.C
+		}
+		t.Logf("%T written", value)
+	case <-timer.C:
+		t.Fatalf("Timeout writing %T", value)
+	}
 }

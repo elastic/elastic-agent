@@ -1,1351 +1,1436 @@
-        components:
-        - id: logfile-default
-          error: input not supported
-          input_spec:
-            input_type: ""
-            binary_name: ""
-            binary_path: ""
-            spec:
-              name: ""
-              description: ""
-              platforms: []
-              outputs: []
-              shippers: []
-              runtime:
-                preventions: []
-          units:
-          - id: logfile-default-logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
-            type: 0
-            log_level: 2
-            config:
-              source:
+components:
+- id: log-default
+  input_spec:
+    binary_name: filebeat
+    binary_path: ../../../../../specs/filebeat
+    input_type: log
+    spec:
+      aliases:
+      - logfile
+      - event/file
+      command:
+        args:
+        - -E
+        - setup.ilm.enabled=false
+        - -E
+        - setup.template.enabled=false
+        - -E
+        - management.enabled=true
+        - -E
+        - management.restart_on_output_change=true
+        - -E
+        - logging.level=info
+        - -E
+        - logging.to_stderr=true
+        - -E
+        - gc_percent=${FILEBEAT_GOGC:100}
+        - -E
+        - filebeat.config.modules.enabled=false
+        log:
+          ignore_keys: []
+          level_key: log.level
+          message_key: message
+          time_format: 2006-01-02T15:04:05.000Z0700
+          time_key: '@timestamp'
+        maximum_restarts_per_period: 1
+        restart_monitoring_period: 5s
+        timeouts:
+          checkin: 30s
+          restart: 1s
+          stop: 30s
+      description: Logfile
+      name: log
+      outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+      runtime:
+        preventions: []
+      shippers:
+      - shipper
+  units:
+  - config:
+      datastream:
+        dataset: ""
+        namespace: default
+        source:
+          fields:
+            namespace:
+              kind:
+                stringvalue: default
+        type: ""
+      id: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
+      meta:
+        package:
+          name: system
+          source:
+            fields:
+              name:
+                kind:
+                  stringvalue: system
+              version:
+                kind:
+                  stringvalue: 1.24.3
+          version: 1.24.3
+        source:
+          fields:
+            package:
+              kind:
+                structvalue:
+                  fields:
+                    name:
+                      kind:
+                        stringvalue: system
+                    version:
+                      kind:
+                        stringvalue: 1.24.3
+      name: system-1
+      revision: 1
+      source:
+        fields:
+          data_stream:
+            kind:
+              structvalue:
                 fields:
-                  data_stream:
+                  namespace:
+                    kind:
+                      stringvalue: default
+          id:
+            kind:
+              stringvalue: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
+          meta:
+            kind:
+              structvalue:
+                fields:
+                  package:
                     kind:
                       structvalue:
                         fields:
-                          namespace:
+                          name:
                             kind:
-                              stringvalue: default
-                  id:
-                    kind:
-                      stringvalue: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
-                  meta:
-                    kind:
-                      structvalue:
-                        fields:
-                          package:
+                              stringvalue: system
+                          version:
                             kind:
-                              structvalue:
-                                fields:
-                                  name:
-                                    kind:
-                                      stringvalue: system
-                                  version:
-                                    kind:
-                                      stringvalue: 1.24.3
-                  name:
-                    kind:
-                      stringvalue: system-1
-                  original_id:
-                    kind:
-                      stringvalue: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                  package_policy_id:
-                    kind:
-                      stringvalue: d38b6b0b-cc52-4a61-b897-1b236982ac42
-                  policy:
-                    kind:
-                      structvalue:
-                        fields:
-                          revision:
-                            kind:
-                              numbervalue: 5
+                              stringvalue: 1.24.3
+          name:
+            kind:
+              stringvalue: system-1
+          original_id:
+            kind:
+              stringvalue: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+          package_policy_id:
+            kind:
+              stringvalue: d38b6b0b-cc52-4a61-b897-1b236982ac42
+          policy:
+            kind:
+              structvalue:
+                fields:
                   revision:
                     kind:
-                      numbervalue: 1
-                  streams:
-                    kind:
-                      listvalue:
-                        values:
-                        - kind:
+                      numbervalue: 5
+          revision:
+            kind:
+              numbervalue: 1
+          streams:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.auth
-                                        type:
-                                          kind:
-                                            stringvalue: logs
-                                exclude_files:
+                                    stringvalue: system.auth
+                                type:
                                   kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: .gz$
-                                id:
-                                  kind:
-                                    stringvalue: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                ignore_older:
-                                  kind:
-                                    stringvalue: 72h
-                                multiline:
-                                  kind:
-                                    structvalue:
-                                      fields:
-                                        match:
-                                          kind:
-                                            stringvalue: after
-                                        pattern:
-                                          kind:
-                                            stringvalue: ^\s
-                                paths:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: /var/log/auth.log*
-                                      - kind:
-                                          stringvalue: /var/log/secure*
-                                processors:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          structvalue:
-                                            fields:
-                                              add_locale:
-                                                kind:
-                                                  nullvalue: 0
-                                tags:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: system-auth
-                        - kind:
+                                    stringvalue: logs
+                        exclude_files:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: .gz$
+                        id:
+                          kind:
+                            stringvalue: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        ignore_older:
+                          kind:
+                            stringvalue: 72h
+                        multiline:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                match:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.syslog
-                                        type:
-                                          kind:
-                                            stringvalue: logs
-                                exclude_files:
+                                    stringvalue: after
+                                pattern:
                                   kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: .gz$
-                                id:
+                                    stringvalue: ^\s
+                        paths:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: /var/log/auth.log*
+                              - kind:
+                                  stringvalue: /var/log/secure*
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_locale:
+                                        kind:
+                                          nullvalue: 0
+                        tags:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: system-auth
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
                                   kind:
-                                    stringvalue: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                ignore_older:
+                                    stringvalue: system.syslog
+                                type:
                                   kind:
-                                    stringvalue: 72h
-                                multiline:
+                                    stringvalue: logs
+                        exclude_files:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: .gz$
+                        id:
+                          kind:
+                            stringvalue: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        ignore_older:
+                          kind:
+                            stringvalue: 72h
+                        multiline:
+                          kind:
+                            structvalue:
+                              fields:
+                                match:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        match:
-                                          kind:
-                                            stringvalue: after
-                                        pattern:
-                                          kind:
-                                            stringvalue: ^\s
-                                paths:
+                                    stringvalue: after
+                                pattern:
                                   kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: /var/log/messages*
-                                      - kind:
-                                          stringvalue: /var/log/syslog*
-                                processors:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          structvalue:
-                                            fields:
-                                              add_locale:
-                                                kind:
-                                                  nullvalue: 0
-                  type:
-                    kind:
-                      stringvalue: logfile
-              id: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
-              type: logfile
-              name: system-1
-              revision: 1
-              meta:
-                source:
+                                    stringvalue: ^\s
+                        paths:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: /var/log/messages*
+                              - kind:
+                                  stringvalue: /var/log/syslog*
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_locale:
+                                        kind:
+                                          nullvalue: 0
+          type:
+            kind:
+              stringvalue: log
+      streams:
+      - datastream:
+          dataset: system.auth
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.auth
+              type:
+                kind:
+                  stringvalue: logs
+          type: logs
+        id: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    package:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            name:
-                              kind:
-                                stringvalue: system
-                            version:
-                              kind:
-                                stringvalue: 1.24.3
-                package:
-                  source:
-                    fields:
-                      name:
-                        kind:
-                          stringvalue: system
-                      version:
-                        kind:
-                          stringvalue: 1.24.3
-                  name: system
-                  version: 1.24.3
-              datastream:
-                source:
+                        stringvalue: system.auth
+                    type:
+                      kind:
+                        stringvalue: logs
+            exclude_files:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: .gz$
+            id:
+              kind:
+                stringvalue: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            ignore_older:
+              kind:
+                stringvalue: 72h
+            multiline:
+              kind:
+                structvalue:
                   fields:
-                    namespace:
+                    match:
                       kind:
-                        stringvalue: default
-                dataset: ""
-                type: ""
-                namespace: default
-              streams:
-              - source:
+                        stringvalue: after
+                    pattern:
+                      kind:
+                        stringvalue: ^\s
+            paths:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: /var/log/auth.log*
+                  - kind:
+                      stringvalue: /var/log/secure*
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_locale:
+                            kind:
+                              nullvalue: 0
+            tags:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: system-auth
+      - datastream:
+          dataset: system.syslog
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.syslog
+              type:
+                kind:
+                  stringvalue: logs
+          type: logs
+        id: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.auth
-                            type:
-                              kind:
-                                stringvalue: logs
-                    exclude_files:
+                        stringvalue: system.syslog
+                    type:
                       kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: .gz$
-                    id:
-                      kind:
-                        stringvalue: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    ignore_older:
-                      kind:
-                        stringvalue: 72h
-                    multiline:
-                      kind:
-                        structvalue:
-                          fields:
-                            match:
-                              kind:
-                                stringvalue: after
-                            pattern:
-                              kind:
-                                stringvalue: ^\s
-                    paths:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: /var/log/auth.log*
-                          - kind:
-                              stringvalue: /var/log/secure*
-                    processors:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              structvalue:
-                                fields:
-                                  add_locale:
-                                    kind:
-                                      nullvalue: 0
-                    tags:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: system-auth
-                id: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.auth
-                      type:
-                        kind:
-                          stringvalue: logs
-                  dataset: system.auth
-                  type: logs
-                  namespace: ""
-              - source:
+                        stringvalue: logs
+            exclude_files:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: .gz$
+            id:
+              kind:
+                stringvalue: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            ignore_older:
+              kind:
+                stringvalue: 72h
+            multiline:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    match:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.syslog
-                            type:
-                              kind:
-                                stringvalue: logs
-                    exclude_files:
+                        stringvalue: after
+                    pattern:
                       kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: .gz$
-                    id:
+                        stringvalue: ^\s
+            paths:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: /var/log/messages*
+                  - kind:
+                      stringvalue: /var/log/syslog*
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_locale:
+                            kind:
+                              nullvalue: 0
+      type: log
+    id: log-default-logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
+    log_level: 2
+    type: 0
+  - config:
+      datastream: null
+      id: ""
+      meta: null
+      name: ""
+      revision: 0
+      source:
+        fields:
+          hosts:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    stringvalue: https://your.elasticsearch.host:443
+          type:
+            kind:
+              stringvalue: elasticsearch
+      streams: []
+      type: elasticsearch
+    id: log-default
+    log_level: 2
+    type: 1
+- id: system/metrics-default
+  input_spec:
+    binary_name: metricbeat
+    binary_path: ../../../../../specs/metricbeat
+    input_type: system/metrics
+    spec:
+      command:
+        args:
+        - -E
+        - setup.ilm.enabled=false
+        - -E
+        - setup.template.enabled=false
+        - -E
+        - management.enabled=true
+        - -E
+        - management.restart_on_output_change=true
+        - -E
+        - logging.level=info
+        - -E
+        - logging.to_stderr=true
+        - -E
+        - gc_percent=${METRICBEAT_GOGC:100}
+        - -E
+        - metricbeat.config.modules.enabled=false
+        log:
+          ignore_keys: []
+          level_key: log.level
+          message_key: message
+          time_format: 2006-01-02T15:04:05.000Z0700
+          time_key: '@timestamp'
+        maximum_restarts_per_period: 1
+        restart_monitoring_period: 5s
+        timeouts:
+          checkin: 30s
+          restart: 1s
+          stop: 30s
+      description: System metrics
+      name: system/metrics
+      outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+      runtime:
+        preventions: []
+      shippers:
+      - shipper
+  units:
+  - config:
+      datastream:
+        dataset: ""
+        namespace: default
+        source:
+          fields:
+            namespace:
+              kind:
+                stringvalue: default
+        type: ""
+      id: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
+      meta:
+        package:
+          name: system
+          source:
+            fields:
+              name:
+                kind:
+                  stringvalue: system
+              version:
+                kind:
+                  stringvalue: 1.24.3
+          version: 1.24.3
+        source:
+          fields:
+            package:
+              kind:
+                structvalue:
+                  fields:
+                    name:
                       kind:
-                        stringvalue: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    ignore_older:
+                        stringvalue: system
+                    version:
                       kind:
-                        stringvalue: 72h
-                    multiline:
-                      kind:
-                        structvalue:
-                          fields:
-                            match:
-                              kind:
-                                stringvalue: after
-                            pattern:
-                              kind:
-                                stringvalue: ^\s
-                    paths:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: /var/log/messages*
-                          - kind:
-                              stringvalue: /var/log/syslog*
-                    processors:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              structvalue:
-                                fields:
-                                  add_locale:
-                                    kind:
-                                      nullvalue: 0
-                id: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.syslog
-                      type:
-                        kind:
-                          stringvalue: logs
-                  dataset: system.syslog
-                  type: logs
-                  namespace: ""
-          - id: logfile-default
-            type: 1
-            log_level: 2
-            config:
-              source:
+                        stringvalue: 1.24.3
+      name: system-1
+      revision: 1
+      source:
+        fields:
+          data_stream:
+            kind:
+              structvalue:
                 fields:
-                  hosts:
+                  namespace:
                     kind:
-                      listvalue:
-                        values:
-                        - kind:
-                            stringvalue: https://your.elasticsearch.host:443
-                  type:
-                    kind:
-                      stringvalue: elasticsearch
-              id: ""
-              type: elasticsearch
-              name: ""
-              revision: 0
-              meta: null
-              datastream: null
-              streams: []
-        - id: system/metrics-default
-          error: input not supported
-          input_spec:
-            input_type: ""
-            binary_name: ""
-            binary_path: ""
-            spec:
-              name: ""
-              description: ""
-              platforms: []
-              outputs: []
-              shippers: []
-              runtime:
-                preventions: []
-          units:
-          - id: system/metrics-default-system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
-            type: 0
-            log_level: 2
-            config:
-              source:
+                      stringvalue: default
+          id:
+            kind:
+              stringvalue: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
+          meta:
+            kind:
+              structvalue:
                 fields:
-                  data_stream:
+                  package:
                     kind:
                       structvalue:
                         fields:
-                          namespace:
+                          name:
                             kind:
-                              stringvalue: default
-                  id:
-                    kind:
-                      stringvalue: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
-                  meta:
-                    kind:
-                      structvalue:
-                        fields:
-                          package:
+                              stringvalue: system
+                          version:
                             kind:
-                              structvalue:
-                                fields:
-                                  name:
-                                    kind:
-                                      stringvalue: system
-                                  version:
-                                    kind:
-                                      stringvalue: 1.24.3
-                  name:
-                    kind:
-                      stringvalue: system-1
-                  original_id:
-                    kind:
-                      stringvalue: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                  package_policy_id:
-                    kind:
-                      stringvalue: d38b6b0b-cc52-4a61-b897-1b236982ac42
-                  policy:
-                    kind:
-                      structvalue:
-                        fields:
-                          revision:
-                            kind:
-                              numbervalue: 5
+                              stringvalue: 1.24.3
+          name:
+            kind:
+              stringvalue: system-1
+          original_id:
+            kind:
+              stringvalue: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+          package_policy_id:
+            kind:
+              stringvalue: d38b6b0b-cc52-4a61-b897-1b236982ac42
+          policy:
+            kind:
+              structvalue:
+                fields:
                   revision:
                     kind:
-                      numbervalue: 1
-                  streams:
-                    kind:
-                      listvalue:
-                        values:
-                        - kind:
+                      numbervalue: 5
+          revision:
+            kind:
+              numbervalue: 1
+          streams:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    structvalue:
+                      fields:
+                        cpu.metrics:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: percentages
+                              - kind:
+                                  stringvalue: normalized_percentages
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                cpu.metrics:
+                                dataset:
                                   kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: percentages
-                                      - kind:
-                                          stringvalue: normalized_percentages
-                                data_stream:
+                                    stringvalue: system.cpu
+                                type:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.cpu
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
-                                  kind:
-                                    stringvalue: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: cpu
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                        - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: cpu
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.diskio
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                diskio.include_devices:
+                                    stringvalue: system.diskio
+                                type:
                                   kind:
-                                    nullvalue: 0
-                                id:
-                                  kind:
-                                    stringvalue: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: diskio
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                        - kind:
+                                    stringvalue: metrics
+                        diskio.include_devices:
+                          kind:
+                            nullvalue: 0
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: diskio
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.filesystem
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.filesystem
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: filesystem
-                                period:
-                                  kind:
-                                    stringvalue: 1m
-                                processors:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: filesystem
+                        period:
+                          kind:
+                            stringvalue: 1m
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_event:
+                                        kind:
                                           structvalue:
                                             fields:
-                                              drop_event:
+                                              when:
                                                 kind:
                                                   structvalue:
                                                     fields:
-                                                      when:
+                                                      regexp:
                                                         kind:
                                                           structvalue:
                                                             fields:
-                                                              regexp:
+                                                              system.filesystem.mount_point:
                                                                 kind:
-                                                                  structvalue:
-                                                                    fields:
-                                                                      system.filesystem.mount_point:
-                                                                        kind:
-                                                                          stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
-                        - kind:
+                                                                  stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.fsstat
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.fsstat
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: fsstat
-                                period:
-                                  kind:
-                                    stringvalue: 1m
-                                processors:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: fsstat
+                        period:
+                          kind:
+                            stringvalue: 1m
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_event:
+                                        kind:
                                           structvalue:
                                             fields:
-                                              drop_event:
+                                              when:
                                                 kind:
                                                   structvalue:
                                                     fields:
-                                                      when:
+                                                      regexp:
                                                         kind:
                                                           structvalue:
                                                             fields:
-                                                              regexp:
+                                                              system.fsstat.mount_point:
                                                                 kind:
-                                                                  structvalue:
-                                                                    fields:
-                                                                      system.fsstat.mount_point:
-                                                                        kind:
-                                                                          stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
-                        - kind:
+                                                                  stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.load
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.load
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: load
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                        - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: load
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.memory
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.memory
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: memory
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                        - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: memory
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.network
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.network
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: network
-                                network.interfaces:
-                                  kind:
-                                    nullvalue: 0
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                        - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: network
+                        network.interfaces:
+                          kind:
+                            nullvalue: 0
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.process
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.process
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: process
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                                process.cgroups.enabled:
-                                  kind:
-                                    boolvalue: false
-                                process.cmdline.cache.enabled:
-                                  kind:
-                                    boolvalue: true
-                                process.include_cpu_ticks:
-                                  kind:
-                                    boolvalue: false
-                                process.include_top_n.by_cpu:
-                                  kind:
-                                    numbervalue: 5
-                                process.include_top_n.by_memory:
-                                  kind:
-                                    numbervalue: 5
-                                processes:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: .*
-                        - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: process
+                        period:
+                          kind:
+                            stringvalue: 10s
+                        process.cgroups.enabled:
+                          kind:
+                            boolvalue: false
+                        process.cmdline.cache.enabled:
+                          kind:
+                            boolvalue: true
+                        process.include_cpu_ticks:
+                          kind:
+                            boolvalue: false
+                        process.include_top_n.by_cpu:
+                          kind:
+                            numbervalue: 5
+                        process.include_top_n.by_memory:
+                          kind:
+                            numbervalue: 5
+                        processes:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: .*
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.process.summary
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.process.summary
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: process_summary
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                        - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: process_summary
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.socket_summary
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.socket_summary
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: socket_summary
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                        - kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: socket_summary
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
                             structvalue:
                               fields:
-                                data_stream:
+                                dataset:
                                   kind:
-                                    structvalue:
-                                      fields:
-                                        dataset:
-                                          kind:
-                                            stringvalue: system.uptime
-                                        type:
-                                          kind:
-                                            stringvalue: metrics
-                                id:
+                                    stringvalue: system.uptime
+                                type:
                                   kind:
-                                    stringvalue: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                                metricsets:
-                                  kind:
-                                    listvalue:
-                                      values:
-                                      - kind:
-                                          stringvalue: uptime
-                                period:
-                                  kind:
-                                    stringvalue: 10s
-                  type:
-                    kind:
-                      stringvalue: system/metrics
-              id: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
-              type: system/metrics
-              name: system-1
-              revision: 1
-              meta:
-                source:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: uptime
+                        period:
+                          kind:
+                            stringvalue: 10s
+          type:
+            kind:
+              stringvalue: system/metrics
+      streams:
+      - datastream:
+          dataset: system.cpu
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.cpu
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            cpu.metrics:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: percentages
+                  - kind:
+                      stringvalue: normalized_percentages
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    package:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            name:
-                              kind:
-                                stringvalue: system
-                            version:
-                              kind:
-                                stringvalue: 1.24.3
-                package:
-                  source:
-                    fields:
-                      name:
-                        kind:
-                          stringvalue: system
-                      version:
-                        kind:
-                          stringvalue: 1.24.3
-                  name: system
-                  version: 1.24.3
-              datastream:
-                source:
+                        stringvalue: system.cpu
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: cpu
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.diskio
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.diskio
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    namespace:
+                    dataset:
                       kind:
-                        stringvalue: default
-                dataset: ""
-                type: ""
-                namespace: default
-              streams:
-              - source:
+                        stringvalue: system.diskio
+                    type:
+                      kind:
+                        stringvalue: metrics
+            diskio.include_devices:
+              kind:
+                nullvalue: 0
+            id:
+              kind:
+                stringvalue: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: diskio
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.filesystem
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.filesystem
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    cpu.metrics:
+                    dataset:
                       kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: percentages
-                          - kind:
-                              stringvalue: normalized_percentages
-                    data_stream:
+                        stringvalue: system.filesystem
+                    type:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.cpu
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
-                      kind:
-                        stringvalue: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: cpu
-                    period:
-                      kind:
-                        stringvalue: 10s
-                id: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.cpu
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.cpu
-                  type: metrics
-                  namespace: ""
-              - source:
-                  fields:
-                    data_stream:
-                      kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.diskio
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    diskio.include_devices:
-                      kind:
-                        nullvalue: 0
-                    id:
-                      kind:
-                        stringvalue: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: diskio
-                    period:
-                      kind:
-                        stringvalue: 10s
-                id: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.diskio
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.diskio
-                  type: metrics
-                  namespace: ""
-              - source:
-                  fields:
-                    data_stream:
-                      kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.filesystem
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
-                      kind:
-                        stringvalue: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: filesystem
-                    period:
-                      kind:
-                        stringvalue: 1m
-                    processors:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: filesystem
+            period:
+              kind:
+                stringvalue: 1m
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_event:
+                            kind:
                               structvalue:
                                 fields:
-                                  drop_event:
+                                  when:
                                     kind:
                                       structvalue:
                                         fields:
-                                          when:
+                                          regexp:
                                             kind:
                                               structvalue:
                                                 fields:
-                                                  regexp:
+                                                  system.filesystem.mount_point:
                                                     kind:
-                                                      structvalue:
-                                                        fields:
-                                                          system.filesystem.mount_point:
-                                                            kind:
-                                                              stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
-                id: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.filesystem
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.filesystem
-                  type: metrics
-                  namespace: ""
-              - source:
+                                                      stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+      - datastream:
+          dataset: system.fsstat
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.fsstat
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.fsstat
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
+                        stringvalue: system.fsstat
+                    type:
                       kind:
-                        stringvalue: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: fsstat
-                    period:
-                      kind:
-                        stringvalue: 1m
-                    processors:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: fsstat
+            period:
+              kind:
+                stringvalue: 1m
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_event:
+                            kind:
                               structvalue:
                                 fields:
-                                  drop_event:
+                                  when:
                                     kind:
                                       structvalue:
                                         fields:
-                                          when:
+                                          regexp:
                                             kind:
                                               structvalue:
                                                 fields:
-                                                  regexp:
+                                                  system.fsstat.mount_point:
                                                     kind:
-                                                      structvalue:
-                                                        fields:
-                                                          system.fsstat.mount_point:
-                                                            kind:
-                                                              stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
-                id: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.fsstat
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.fsstat
-                  type: metrics
-                  namespace: ""
-              - source:
+                                                      stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+      - datastream:
+          dataset: system.load
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.load
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.load
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
+                        stringvalue: system.load
+                    type:
                       kind:
-                        stringvalue: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: load
-                    period:
-                      kind:
-                        stringvalue: 10s
-                id: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.load
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.load
-                  type: metrics
-                  namespace: ""
-              - source:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: load
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.memory
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.memory
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.memory
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
+                        stringvalue: system.memory
+                    type:
                       kind:
-                        stringvalue: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: memory
-                    period:
-                      kind:
-                        stringvalue: 10s
-                id: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.memory
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.memory
-                  type: metrics
-                  namespace: ""
-              - source:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: memory
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.network
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.network
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.network
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
+                        stringvalue: system.network
+                    type:
                       kind:
-                        stringvalue: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: network
-                    network.interfaces:
-                      kind:
-                        nullvalue: 0
-                    period:
-                      kind:
-                        stringvalue: 10s
-                id: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.network
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.network
-                  type: metrics
-                  namespace: ""
-              - source:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: network
+            network.interfaces:
+              kind:
+                nullvalue: 0
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.process
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.process
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.process
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
+                        stringvalue: system.process
+                    type:
                       kind:
-                        stringvalue: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: process
-                    period:
-                      kind:
-                        stringvalue: 10s
-                    process.cgroups.enabled:
-                      kind:
-                        boolvalue: false
-                    process.cmdline.cache.enabled:
-                      kind:
-                        boolvalue: true
-                    process.include_cpu_ticks:
-                      kind:
-                        boolvalue: false
-                    process.include_top_n.by_cpu:
-                      kind:
-                        numbervalue: 5
-                    process.include_top_n.by_memory:
-                      kind:
-                        numbervalue: 5
-                    processes:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: .*
-                id: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.process
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.process
-                  type: metrics
-                  namespace: ""
-              - source:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: process
+            period:
+              kind:
+                stringvalue: 10s
+            process.cgroups.enabled:
+              kind:
+                boolvalue: false
+            process.cmdline.cache.enabled:
+              kind:
+                boolvalue: true
+            process.include_cpu_ticks:
+              kind:
+                boolvalue: false
+            process.include_top_n.by_cpu:
+              kind:
+                numbervalue: 5
+            process.include_top_n.by_memory:
+              kind:
+                numbervalue: 5
+            processes:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: .*
+      - datastream:
+          dataset: system.process.summary
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.process.summary
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.process.summary
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
+                        stringvalue: system.process.summary
+                    type:
                       kind:
-                        stringvalue: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: process_summary
-                    period:
-                      kind:
-                        stringvalue: 10s
-                id: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.process.summary
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.process.summary
-                  type: metrics
-                  namespace: ""
-              - source:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: process_summary
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.socket_summary
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.socket_summary
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.socket_summary
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
+                        stringvalue: system.socket_summary
+                    type:
                       kind:
-                        stringvalue: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: socket_summary
-                    period:
-                      kind:
-                        stringvalue: 10s
-                id: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.socket_summary
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.socket_summary
-                  type: metrics
-                  namespace: ""
-              - source:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: socket_summary
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.uptime
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.uptime
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
                   fields:
-                    data_stream:
+                    dataset:
                       kind:
-                        structvalue:
-                          fields:
-                            dataset:
-                              kind:
-                                stringvalue: system.uptime
-                            type:
-                              kind:
-                                stringvalue: metrics
-                    id:
+                        stringvalue: system.uptime
+                    type:
                       kind:
-                        stringvalue: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                    metricsets:
-                      kind:
-                        listvalue:
-                          values:
-                          - kind:
-                              stringvalue: uptime
-                    period:
-                      kind:
-                        stringvalue: 10s
-                id: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
-                datastream:
-                  source:
-                    fields:
-                      dataset:
-                        kind:
-                          stringvalue: system.uptime
-                      type:
-                        kind:
-                          stringvalue: metrics
-                  dataset: system.uptime
-                  type: metrics
-                  namespace: ""
-          - id: system/metrics-default
-            type: 1
-            log_level: 2
-            config:
-              source:
-                fields:
-                  hosts:
-                    kind:
-                      listvalue:
-                        values:
-                        - kind:
-                            stringvalue: https://your.elasticsearch.host:443
-                  type:
-                    kind:
-                      stringvalue: elasticsearch
-              id: ""
-              type: elasticsearch
-              name: ""
-              revision: 0
-              meta: null
-              datastream: null
-              streams: []
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: uptime
+            period:
+              kind:
+                stringvalue: 10s
+      type: system/metrics
+    id: system/metrics-default-system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
+    log_level: 2
+    type: 0
+  - config:
+      datastream: null
+      id: ""
+      meta: null
+      name: ""
+      revision: 0
+      source:
+        fields:
+          hosts:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    stringvalue: https://your.elasticsearch.host:443
+          type:
+            kind:
+              stringvalue: elasticsearch
+      streams: []
+      type: elasticsearch
+    id: system/metrics-default
+    log_level: 2
+    type: 1

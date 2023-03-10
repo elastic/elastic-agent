@@ -61,7 +61,7 @@ inputs:
     - /var/log/syslog*
     processors:
     - add_locale: null
-  type: logfile
+  type: log
 - data_stream:
     namespace: default
   id: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
