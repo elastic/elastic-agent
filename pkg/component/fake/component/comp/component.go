@@ -98,8 +98,8 @@ func (s *StateManager) Modified(change client.UnitChanged) {
 		}
 
 		e := s.logger.Info().Interface("change.unit", *change.Unit)
-		if change.Features != nil {
-			e.Interface("change.features", *change.Features)
+		if change.Unit.Expected().Features != nil {
+			e.Interface("change.features", *change.Unit.Expected().Features)
 		} else {
 			e.Str("change.features", "nil")
 		}
