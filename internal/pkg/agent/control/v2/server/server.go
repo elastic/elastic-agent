@@ -28,10 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"github.com/elastic/elastic-agent/pkg/control"
-	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
-	v1server "github.com/elastic/elastic-agent/pkg/control/v1/server"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 

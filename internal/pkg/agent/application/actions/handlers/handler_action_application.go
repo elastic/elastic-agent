@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
