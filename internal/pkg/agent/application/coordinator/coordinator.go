@@ -8,25 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-<<<<<<< HEAD
-
-	"github.com/elastic/elastic-agent-libs/logp"
-
-	"gopkg.in/yaml.v2"
-
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-=======
->>>>>>> 4745a62690 (Code cleanup (#2361))
 
 	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"

@@ -11,17 +11,6 @@ import (
 	"net"
 	"time"
 
-<<<<<<< HEAD:internal/pkg/agent/control/v2/server/server.go
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
-=======
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
-
-	"github.com/elastic/elastic-agent/pkg/control"
-	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
-	v1server "github.com/elastic/elastic-agent/pkg/control/v1/server"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
->>>>>>> 4745a62690 (Code cleanup (#2361)):pkg/control/v2/server/server.go
-
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
@@ -38,6 +27,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
+	v1server "github.com/elastic/elastic-agent/pkg/control/v1/server"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
