@@ -77,7 +77,7 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
 		}
 
-		state := coord.State(false)
+		state := coord.State()
 
 		for _, c := range state.Components {
 			if matchesCloudProcessID(&c.Component, componentID) {

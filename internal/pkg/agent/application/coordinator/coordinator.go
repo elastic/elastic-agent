@@ -9,27 +9,24 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-
+	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-
-	"go.elastic.co/apm"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
-	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -68,7 +65,7 @@ type MonitorManager interface {
 	// Reload reloads the configuration for the upgrade manager.
 	Reload(rawConfig *config.Config) error
 
-	// InjectMonitoring injects monitoring configuration into resolved ast tree.
+	// MonitoringConfig injects monitoring configuration into resolved ast tree.
 	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string) (map[string]interface{}, error)
 }
 
@@ -147,129 +144,82 @@ type VarsManager interface {
 // passing it into the components runtime manager.
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
 
-// State provides the current state of the coordinator along with all the current states of components and units.
-type State struct {
-	State        agentclient.State                 `yaml:"state"`
-	Message      string                            `yaml:"message"`
-	FleetState   agentclient.State                 `yaml:"fleet_state"`
-	FleetMessage string                            `yaml:"fleet_message"`
-	Components   []runtime.ComponentComponentState `yaml:"components"`
-	LogLevel     logp.Level                        `yaml:"log_level"`
-}
-
-// StateFetcher provides an interface to fetch the current state of the coordinator.
-type StateFetcher interface {
-	// State returns the current state of the coordinator.
-	State(bool) State
-}
-
 // Coordinator manages the entire state of the Elastic Agent.
 //
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
 type Coordinator struct {
 	logger    *logger.Logger
 	agentInfo *info.AgentInfo
+	isManaged bool
 
 	specs component.RuntimeSpecs
 
 	logLevelCh chan logp.Level
+	logLevel   logp.Level
 
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
 
-	runtimeMgr    RuntimeManager
-	runtimeMgrErr error
-	configMgr     ConfigManager
-	configMgrErr  error
-	actionsErr    error
-	varsMgr       VarsManager
-	varsMgrErr    error
+	runtimeMgr RuntimeManager
+	configMgr  ConfigManager
+	varsMgr    VarsManager
 
 	caps      capabilities.Capability
 	modifiers []ComponentsModifier
 
-	state coordinatorState
+	state  *state.CoordinatorState
+	config *config.Config
+	ast    *transpiler.AST
+	vars   []*transpiler.Vars
 }
 
 // New creates a new coordinator.
 func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
+	var fleetMessage string
 	if !isManaged {
 		// default enum value is STARTING which is confusing for standalone
 		fleetState = agentclient.Stopped
+		fleetMessage = "Not enrolled into Fleet"
 	}
 	return &Coordinator{
 		logger:     logger,
 		agentInfo:  agentInfo,
+		isManaged:  isManaged,
 		specs:      specs,
 		logLevelCh: make(chan logp.Level),
 		reexecMgr:  reexecMgr,
 		upgradeMgr: upgradeMgr,
+		monitorMgr: monitorMgr,
 		runtimeMgr: runtimeMgr,
 		configMgr:  configMgr,
 		varsMgr:    varsMgr,
 		caps:       caps,
 		modifiers:  modifiers,
-		state: coordinatorState{
-			state:      agentclient.Starting,
-			fleetState: fleetState,
-			logLevel:   logLevel,
-		},
-		monitorMgr: monitorMgr,
+		state:      state.NewCoordinatorState(agentclient.Starting, "Starting", fleetState, fleetMessage, logLevel),
 	}
 }
 
 // State returns the current state for the coordinator.
-// local indicates if local configMgr errors should be reported as part of the state.
-func (c *Coordinator) State(local bool) (s State) {
-	s.State = c.state.state
-	s.Message = c.state.message
+func (c *Coordinator) State() state.State {
+	return c.state.State()
+}
 
-	s.FleetState = c.state.fleetState
-	s.FleetMessage = c.state.fleetMessage
-
-	s.Components = c.runtimeMgr.State()
-	s.LogLevel = c.state.logLevel
-	if c.state.overrideState != nil {
-		// state has been overridden due to an action that is occurring
-		s.State = c.state.overrideState.state
-		s.Message = c.state.overrideState.message
-	} else if s.State == agentclient.Healthy {
-		// if any of the managers are reporting an error then something is wrong
-		// or
-		// coordinator overall is reported is healthy; in the case any component or unit is not healthy then we report
-		// as degraded because we are not fully healthy
-		if c.runtimeMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.runtimeMgrErr.Error()
-		} else if local && c.configMgrErr != nil {
-			s.FleetState = agentclient.Failed
-			s.FleetMessage = c.configMgrErr.Error()
-		} else if c.actionsErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.actionsErr.Error()
-		} else if c.varsMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.varsMgrErr.Error()
-		} else if hasState(s.Components, client.UnitStateFailed) {
-			s.State = agentclient.Degraded
-			s.Message = "1 or more components/units in a failed state"
-		} else if hasState(s.Components, client.UnitStateDegraded) {
-			s.State = agentclient.Degraded
-			s.Message = "1 or more components/units in a degraded state"
-		}
-	}
-	return s
+// StateSubscribe subscribes to changes in the coordinator state.
+//
+// This provides the current state at the time of first subscription. Cancelling the context
+// results in the subscription being unsubscribed.
+//
+// Note: Not reading from a subscription channel will cause the Coordinator to block.
+func (c *Coordinator) StateSubscribe(ctx context.Context) *state.StateSubscription {
+	return c.state.Subscribe(ctx)
 }
 
 // ReExec performs the re-execution.
 func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string) {
 	// override the overall state to stopping until the re-execution is complete
-	c.state.overrideState = &coordinatorOverrideState{
-		state:   agentclient.Stopping,
-		message: "Re-executing",
-	}
+	c.state.SetOverrideState(agentclient.Stopping, "Re-executing")
 	c.reexecMgr.ReExec(callback, argOverrides...)
 }
 
@@ -291,13 +241,10 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	}
 
 	// override the overall state to upgrading until the re-execution is complete
-	c.state.overrideState = &coordinatorOverrideState{
-		state:   agentclient.Upgrading,
-		message: fmt.Sprintf("Upgrading to version %s", version),
-	}
+	c.state.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, skipVerifyOverride, pgpBytes...)
 	if err != nil {
-		c.state.overrideState = nil
+		c.state.ClearOverrideState()
 		return err
 	}
 	if cb != nil {
@@ -340,7 +287,7 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
 //
 // In the case that either of the above managers fail, they will all be restarted unless the context was explicitly cancelled or timed out.
 func (c *Coordinator) Run(ctx context.Context) error {
-	// log all changes in the state of the runtime
+	// log all changes in the state of the runtime and update the coordinator state
 	go func() {
 		state := make(map[string]runtime.ComponentState)
 
@@ -402,26 +349,22 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				if s.State.State == client.UnitStateStopped {
 					delete(state, s.Component.ID)
 				}
+				c.state.UpdateComponentState(s)
 			}
 		}
 	}()
 
 	for {
-		c.state.state = agentclient.Starting
-		c.state.message = "Waiting for initial configuration and composable variables"
+		c.state.UpdateState(state.WithState(agentclient.Starting, "Waiting for initial configuration and composable variables"))
 		err := c.runner(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				c.state.state = agentclient.Stopped
-				c.state.message = "Requested to be stopped"
-				c.state.fleetState = agentclient.Stopped
-				c.state.fleetMessage = "Requested to be stopped"
+				c.state.UpdateState(state.WithState(agentclient.Stopped, "Requested to be stopped"), state.WithFleetState(agentclient.Stopped, "Requested to be stopped"))
 				// do not restart
 				return err
 			}
 		}
-		c.state.state = agentclient.Failed
-		c.state.message = fmt.Sprintf("Coordinator failed and will be restarted: %s", err)
+		c.state.UpdateState(state.WithState(agentclient.Failed, fmt.Sprintf("Coordinator failed and will be restarted: %s", err)))
 		c.logger.Errorf("coordinator failed and will be restarted: %s", err)
 	}
 }
@@ -436,10 +379,10 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current pre-configuration of the running Elastic Agent before variable substitution",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.state.ast == nil {
+				if c.ast == nil {
 					return []byte("error: failed no configuration by the coordinator")
 				}
-				cfg, err := c.state.ast.Map()
+				cfg, err := c.ast.Map()
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -456,11 +399,11 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current variable contexts of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.state.vars == nil {
+				if c.vars == nil {
 					return []byte("error: failed no variables by the coordinator")
 				}
-				vars := make([]map[string]interface{}, 0, len(c.state.vars))
-				for _, v := range c.state.vars {
+				vars := make([]map[string]interface{}, 0, len(c.vars))
+				for _, v := range c.vars {
 					m, err := v.Map()
 					if err != nil {
 						return []byte(fmt.Sprintf("error: %q", err))
@@ -484,7 +427,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current computed configuration of the running Elastic Agent after variable substitution",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.state.ast == nil || c.state.vars == nil {
+				if c.ast == nil || c.vars == nil {
 					return []byte("error: failed no configuration or variables received by the coordinator")
 				}
 				cfg, _, err := c.compute()
@@ -504,7 +447,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.state.ast == nil || c.state.vars == nil {
+				if c.ast == nil || c.vars == nil {
 					return []byte("error: failed no configuration or variables received by the coordinator")
 				}
 				_, comps, err := c.compute()
@@ -528,7 +471,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current state of running components by the Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				s := c.State(true)
+				s := c.State()
 				o, err := yaml.Marshal(s)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -577,11 +520,8 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			runtimeErr := <-runtimeErrCh
-			c.runtimeMgrErr = runtimeErr
 			configErr := <-configErrCh
-			c.configMgrErr = configErr
 			varsErr := <-varsErrCh
-			c.varsMgrErr = varsErr
 			if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
 				return runtimeErr
 			}
@@ -605,32 +545,32 @@ func (c *Coordinator) runner(ctx context.Context) error {
 				cancel()
 			}
 		case runtimeErr := <-c.runtimeMgr.Errors():
-			c.runtimeMgrErr = runtimeErr
+			c.state.SetRuntimeManagerError(runtimeErr)
 		case configErr := <-c.configMgr.Errors():
-			if configErr == nil {
-				c.state.fleetState = agentclient.Healthy
-				c.state.fleetMessage = ""
+			if c.isManaged {
+				if configErr == nil {
+					c.state.UpdateState(state.WithFleetState(agentclient.Healthy, "Connected"))
+				} else {
+					c.state.UpdateState(state.WithFleetState(agentclient.Failed, configErr.Error()))
+				}
 			} else {
-				c.state.fleetState = agentclient.Failed
-				c.state.fleetMessage = configErr.Error()
+				// not managed gets sets as an overall error for the agent
+				c.state.SetConfigManagerError(configErr)
 			}
-			c.configMgrErr = configErr
 		case actionsErr := <-c.configMgr.ActionErrors():
-			c.actionsErr = actionsErr
+			c.state.SetConfigManagerActionsError(actionsErr)
 		case varsErr := <-c.varsMgr.Errors():
-			c.varsMgrErr = varsErr
+			c.state.SetVarsManagerError(varsErr)
 		case change := <-configWatcher.Watch():
 			if ctx.Err() == nil {
 				if err := c.processConfig(ctx, change.Config()); err != nil {
-					c.state.state = agentclient.Failed
-					c.state.message = err.Error()
+					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
 					c.logger.Errorf("%s", err)
 					change.Fail(err)
 				} else {
 					if err := change.Ack(); err != nil {
 						err = fmt.Errorf("failed to ack configuration change: %w", err)
-						c.state.state = agentclient.Failed
-						c.state.message = err.Error()
+						c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
 						c.logger.Errorf("%s", err)
 					}
 				}
@@ -638,16 +578,14 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		case vars := <-varsWatcher.Watch():
 			if ctx.Err() == nil {
 				if err := c.processVars(ctx, vars); err != nil {
-					c.state.state = agentclient.Failed
-					c.state.message = err.Error()
+					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
 					c.logger.Errorf("%s", err)
 				}
 			}
 		case ll := <-c.logLevelCh:
 			if ctx.Err() == nil {
 				if err := c.processLogLevel(ctx, ll); err != nil {
-					c.state.state = agentclient.Failed
-					c.state.message = err.Error()
+					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
 					c.logger.Errorf("%s", err)
 				}
 			}
@@ -697,10 +635,10 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		return fmt.Errorf("failed to reload upgrade manager configuration: %w", err)
 	}
 
-	c.state.config = cfg
-	c.state.ast = rawAst
+	c.config = cfg
+	c.ast = rawAst
 
-	if c.state.vars != nil {
+	if c.vars != nil {
 		return c.process(ctx)
 	}
 	return nil
@@ -713,9 +651,9 @@ func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) 
 		span.End()
 	}()
 
-	c.state.vars = vars
+	c.vars = vars
 
-	if c.state.ast != nil {
+	if c.ast != nil {
 		return c.process(ctx)
 	}
 	return nil
@@ -728,9 +666,10 @@ func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) (err e
 		span.End()
 	}()
 
-	c.state.logLevel = ll
+	c.logLevel = ll
+	c.state.UpdateState(state.WithLogLevel(ll))
 
-	if c.state.ast != nil && c.state.vars != nil {
+	if c.ast != nil && c.vars != nil {
 		return c.process(ctx)
 	}
 	return nil
@@ -754,16 +693,15 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	c.state.state = agentclient.Healthy
-	c.state.message = "Running"
+	c.state.UpdateState(state.WithState(agentclient.Healthy, "Running"))
 	return nil
 }
 
 func (c *Coordinator) compute() (map[string]interface{}, []component.Component, error) {
-	ast := c.state.ast.Clone()
+	ast := c.ast.Clone()
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, c.state.vars)
+		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
 		if err != nil {
 			return nil, nil, fmt.Errorf("rendering inputs failed: %w", err)
 		}
@@ -783,7 +721,7 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
-	comps, err := c.specs.ToComponents(cfg, configInjector, c.state.logLevel, c.agentInfo)
+	comps, err := c.specs.ToComponents(cfg, configInjector, c.logLevel, c.agentInfo)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to render components: %w", err)
 	}
@@ -798,24 +736,6 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 	return cfg, comps, nil
 }
 
-type coordinatorState struct {
-	state         agentclient.State
-	message       string
-	fleetState    agentclient.State
-	fleetMessage  string
-	overrideState *coordinatorOverrideState
-
-	config   *config.Config
-	ast      *transpiler.AST
-	vars     []*transpiler.Vars
-	logLevel logp.Level
-}
-
-type coordinatorOverrideState struct {
-	state   agentclient.State
-	message string
-}
-
 type coordinatorComponentLog struct {
 	ID       string `json:"id"`
 	State    string `json:"state"`
@@ -827,20 +747,6 @@ type coordinatorUnitLog struct {
 	Type     string `json:"type"`
 	State    string `json:"state"`
 	OldState string `json:"old_state,omitempty"`
-}
-
-func hasState(components []runtime.ComponentComponentState, state client.UnitState) bool {
-	for _, comp := range components {
-		if comp.State.State == state {
-			return true
-		}
-		for _, unit := range comp.State.Units {
-			if unit.State == state {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args ...interface{}) {

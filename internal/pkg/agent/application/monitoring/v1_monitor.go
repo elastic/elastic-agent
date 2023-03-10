@@ -104,7 +104,11 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 }
 
 // MonitoringConfig adds monitoring inputs to a configuration based on retrieved list of components to run.
-func (b *BeatsMonitor) MonitoringConfig(policy map[string]interface{}, components []component.Component, componentIDToBinary map[string]string) (map[string]interface{}, error) {
+func (b *BeatsMonitor) MonitoringConfig(
+	policy map[string]interface{},
+	components []component.Component,
+	componentIDToBinary map[string]string,
+) (map[string]interface{}, error) {
 	if !b.Enabled() {
 		return nil, nil
 	}

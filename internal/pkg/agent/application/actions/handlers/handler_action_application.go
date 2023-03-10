@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -48,7 +50,7 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 		return fmt.Errorf("invalid type, expected ActionApp and received %T", a)
 	}
 
-	state := h.coord.State(false)
+	state := h.coord.State()
 	comp, unit, ok := findUnitFromInputType(state, action.InputType)
 	if !ok {
 		// If the matching action is not found ack the action with the error for action result document
@@ -151,7 +153,7 @@ func readMapString(m map[string]interface{}, key string, def string) string {
 	return def
 }
 
-func findUnitFromInputType(state coordinator.State, inputType string) (component.Component, component.Unit, bool) {
+func findUnitFromInputType(state state.State, inputType string) (component.Component, component.Unit, bool) {
 	for _, comp := range state.Components {
 		for _, unit := range comp.Component.Units {
 			if unit.Type == client.UnitTypeInput && unit.Config != nil && unit.Config.Type == inputType {
