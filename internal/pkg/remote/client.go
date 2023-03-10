@@ -299,5 +299,5 @@ func (r requestClient) newRequest(method string, path string, params url.Values,
 	path = strings.TrimPrefix(path, "/")
 	newPath := strings.Join([]string{r.host, path, "?", params.Encode()}, "")
 
-	return http.NewRequest(method, newPath, body)
+	return http.NewRequestWithContext(context.TODO(), method, newPath, body)
 }
