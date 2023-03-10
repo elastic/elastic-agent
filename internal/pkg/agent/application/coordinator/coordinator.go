@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+
 	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
@@ -67,7 +68,7 @@ type MonitorManager interface {
 	// Reload reloads the configuration for the upgrade manager.
 	Reload(rawConfig *config.Config) error
 
-	// InjectMonitoring injects monitoring configuration into resolved ast tree.
+	// MonitoringConfig injects monitoring configuration into resolved ast tree.
 	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string) (map[string]interface{}, error)
 }
 

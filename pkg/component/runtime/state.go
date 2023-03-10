@@ -109,6 +109,7 @@ func (s *ComponentState) syncComponent(comp *component.Component) bool {
 func (s *ComponentState) syncExpected(comp *component.Component) bool {
 	changed := false
 	touched := make(map[ComponentUnitKey]bool)
+
 	for _, unit := range comp.Units {
 		key := ComponentUnitKey{
 			UnitType: unit.Type,
@@ -134,6 +135,7 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 			existing.configStateIdx = 1
 			changed = true
 		}
+
 		if !errors.Is(existing.err, unit.Err) {
 			existing.err = unit.Err
 			if existing.err != nil {
@@ -141,8 +143,10 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 			}
 			changed = true
 		}
+
 		s.expectedUnits[key] = existing
 	}
+
 	for key, unit := range s.expectedUnits {
 		_, ok := touched[key]
 		if !ok {
@@ -304,6 +308,7 @@ func (s *ComponentState) unsettled() bool {
 		// mismatch on unit count
 		return true
 	}
+
 	for ek, e := range s.expectedUnits {
 		o, ok := s.Units[ek]
 		if !ok {
@@ -315,11 +320,13 @@ func (s *ComponentState) unsettled() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
 	units := make([]*proto.UnitExpected, 0, len(s.expectedUnits))
+
 	for k, u := range s.expectedUnits {
 		e := &proto.UnitExpected{
 			Id:             k.UnitID,
@@ -345,6 +352,7 @@ func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
 		}
 		units = append(units, e)
 	}
+
 	return &proto.CheckinExpected{Units: units}
 }
 
