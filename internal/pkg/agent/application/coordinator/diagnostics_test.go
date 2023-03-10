@@ -68,7 +68,11 @@ var /*const*/ linuxPlatformDetail component.PlatformDetail = component.PlatformD
 }
 
 func TestCoordinatorDiagnosticHooks(t *testing.T) {
-	specs, err := component.LoadRuntimeSpecs("../../../../../specs", linuxPlatformDetail, component.SkipBinaryCheck())
+	specs, err := component.LoadRuntimeSpecs(
+		filepath.Join("..", "..", "..", "..", "..", "specs"),
+		linuxPlatformDetail,
+		component.SkipBinaryCheck(),
+	)
 	require.NoError(t, err)
 
 	helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, specs, false)
