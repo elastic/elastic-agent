@@ -54,7 +54,11 @@ type ComponentRuntime interface {
 }
 
 // NewComponentRuntime creates the proper runtime based on the input specification for the component.
-func NewComponentRuntime(comp component.Component, logger *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
+func NewComponentRuntime(
+	comp component.Component,
+	logger *logger.Logger,
+	monitor MonitoringManager,
+) (ComponentRuntime, error) {
 	if comp.Err != nil {
 		return NewFailedRuntime(comp)
 	}
