@@ -104,7 +104,7 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, a
 		h.log.Errorf("invalid type, expected ActionUpgrade and received %T", action)
 		return nil, false
 	}
-	if upgradeAction.Version == bkgAction.Version {
+	if (upgradeAction.Version == bkgAction.Version) && (upgradeAction.SourceURI == bkgAction.SourceURI) {
 		h.log.Infof("Duplicate upgrade to version %s received", bkgAction.Version)
 		h.bkgActions = append(h.bkgActions, action)
 		return nil, false
