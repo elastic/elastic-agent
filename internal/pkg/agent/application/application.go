@@ -74,7 +74,15 @@ func New(
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
 	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
-	runtime, err := runtime.NewManager(log, baseLogger, cfg.Settings.GRPC.String(), agentInfo, tracer, monitor, cfg.Settings.GRPC)
+	runtime, err := runtime.NewManager(
+		log,
+		baseLogger,
+		cfg.Settings.GRPC.String(),
+		agentInfo,
+		tracer,
+		monitor,
+		cfg.Settings.GRPC,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}

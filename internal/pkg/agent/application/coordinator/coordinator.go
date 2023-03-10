@@ -9,18 +9,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-
+	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-
-	"go.elastic.co/apm"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
@@ -28,6 +21,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -68,7 +64,7 @@ type MonitorManager interface {
 	// Reload reloads the configuration for the upgrade manager.
 	Reload(rawConfig *config.Config) error
 
-	// InjectMonitoring injects monitoring configuration into resolved ast tree.
+	// MonitoringConfig injects monitoring configuration into resolved ast tree.
 	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string) (map[string]interface{}, error)
 }
 

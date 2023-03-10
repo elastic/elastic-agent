@@ -11,8 +11,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
-
 	"go.elastic.co/apm"
 	"go.elastic.co/apm/module/apmgrpc"
 	"google.golang.org/grpc"
@@ -29,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -178,6 +177,7 @@ func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartRes
 func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
 	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil, request.SkipVerify, request.PgpBytes...)
 	if err != nil {
+		//nolint:nilerr // ignore the error, return a failure upgrade response
 		return &cproto.UpgradeResponse{
 			Status: cproto.ActionStatus_FAILURE,
 			Error:  err.Error(),
