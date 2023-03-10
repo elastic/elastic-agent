@@ -154,6 +154,9 @@ func (r *RuntimeSpecs) PolicyToComponents(
 ) ([]Component, map[string]string, error) {
 	// get feature flags from policy
 	featureFlags, err := features.Parse(policy)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
+	}
 
 	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers)
 	if err != nil {
