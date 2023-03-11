@@ -321,8 +321,10 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	ctx := handleSignal(context.Background())
 
-	// On MacOS, enrolling during installation won't work as expected if we are triggering the FixPermissions() func.
-	// Forcing to set fixPermissions to false in case the agent is running on Mac
+// On MacOS Ventura and above, fixing the permissions on enrollment during installation fails with the error:
+//  Error: failed to fix permissions: chown /Library/Elastic/Agent/data/elastic-agent-c13f91/elastic-agent.app: operation not permitted
+// This is because we are fixing permissions twice, once during installation and again during the enrollment step.
+// When we are enrolling as part of installation on MacOS, skip the second attempt to fix permissions.
 	var fixPermissions bool = fromInstall
 	if runtime.GOOS == "darwin" {
 		fixPermissions = false
