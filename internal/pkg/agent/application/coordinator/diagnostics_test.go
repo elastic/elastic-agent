@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -241,6 +242,13 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 					}
 				}
 			}
+		} else if fileName == "components.yaml" {
+			rawComponents, ok := yamlContent["components"].([]any)
+
+			if assert.True(t, ok, "unexpected component format in file %s", fileName) {
+				sort.Sort(SortByID(rawComponents))
+				yamlContent["components"] = rawComponents
+			}
 
 		}
 		sanitizedBytes, err := yaml.Marshal(yamlContent)
@@ -252,6 +260,17 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 	testDir := path.Dir(os.Args[0])
 	t.Logf("Replacing test dir %s with %s", testDir, agentPathPlaceholder)
 	return strings.ReplaceAll(string(rawBytes), testDir, agentPathPlaceholder)
+}
+
+type SortByID []any
+
+func (a SortByID) Len() int      { return len(a) }
+func (a SortByID) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SortByID) Less(i, j int) bool {
+	// ugly but ids are mandatory and they must be a string, panic otherwise
+	iID := a[i].(map[any]any)["id"].(string)
+	jID := a[j].(map[any]any)["id"].(string)
+	return iID < jID
 }
 
 type coordinatorTestHelper struct {
