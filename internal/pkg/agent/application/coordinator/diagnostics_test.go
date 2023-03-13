@@ -247,6 +247,11 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 
 			if assert.True(t, ok, "unexpected component format in file %s", fileName) {
 				sort.Sort(SortByID(rawComponents))
+				// fix the paths to forward slash for each
+				for _, comp := range rawComponents {
+					compInputSpec := comp.(map[any]any)["input_spec"].(map[any]any)
+					compInputSpec["binary_path"] = filepath.ToSlash(compInputSpec["binary_path"].(string))
+				}
 				yamlContent["components"] = rawComponents
 			}
 
