@@ -11,7 +11,7 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Fix permission issue on MacOS when enrolling is part of the installation
+summary: Fix permission issue on MacOS Ventura and above when enrolling as part of the installation.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
