@@ -20,7 +20,6 @@ elasticsearch:
   enabled: true
   version: "{{ .StackVersion }}"
   type: tf
-  mem: 2
 
 kibana:
   version: "{{ .StackVersion }}"
@@ -39,5 +38,3 @@ apm:
 k8s:
   enabled: false
 
-certmanager:
-  enabled: false
