@@ -1,6 +1,6 @@
 ---
 cluster_name: "{{ .ClusterName }}"
-template_name: "pavel-e2e-test"
+template_name: "elastic-agent-e2e"
 create_users: false
 grab_cluster_info: false
 create_ilm: false

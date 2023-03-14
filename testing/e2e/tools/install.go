@@ -18,16 +18,15 @@ func DownloadElasticAgent(version string) error {
 	if err != nil {
 		return err
 	}
-	fileName := fmt.Sprintf("elastic-agent-%s-linux-arm64.tar.gz", version)
-	destFileName := fmt.Sprintf("%s%s", "elastic-agent", filepath.Ext(fileName))
+
+	fileName, destFileName := tarName(version)
 	agentTarPath := fmt.Sprintf("%s/%s", dirToInstall, destFileName)
 	err = DownloadFile(agentTarPath, fmt.Sprintf("https://artifacts.elastic.co/downloads/beats/elastic-agent/%s", fileName))
 
 	if err != nil {
 		return err
 	}
-	out, err := exec.Command("tar", "-xvf", agentTarPath).Output()
-	log.Info(out)
+	_, err = exec.Command("tar", "-xvf", agentTarPath).Output()
 
 	return err
 }
@@ -49,11 +48,17 @@ func DownloadFile(filepath string, url string) error {
 	defer out.Close()
 
 	_, err = io.Copy(out, resp.Body)
-	log.Info("123123123")
 	return err
 }
 
 func UnpackTar(version string) error {
-	//TODO too slow
-	return archiver.Unarchive(fmt.Sprintf("elastic-agent-%s-linux-arm64.tar", version), ".")
+	// TODO: slow in containers
+	_, fileName := tarName(version)
+	return archiver.Unarchive(fileName, ".")
+}
+
+func tarName(version string) (string, string) {
+	fileName := fmt.Sprintf("elastic-agent-%s-linux-arm64.tar.gz", version)
+	destFileName := fmt.Sprintf("%s%s", "elastic-agent", filepath.Ext(fileName))
+	return fileName, destFileName
 }

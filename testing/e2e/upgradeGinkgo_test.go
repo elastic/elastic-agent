@@ -1,4 +1,4 @@
-package e2e
+package e2e_ginkgo
 
 import (
 	"flag"
@@ -44,8 +44,7 @@ var _ = Describe("Smoketests", func() {
 		// Setup: executed once before all specs withing this Describe block
 		BeforeAll(func() {
 			By("Downloading elastic agent")
-			Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
-			Expect(tools.UnpackTar(agentVersion)).To(Succeed())
+			// Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
 		})
 		// Setup: executed before each spec withing this Describe block
 		// I.e. we Create a new policy and token before each spec

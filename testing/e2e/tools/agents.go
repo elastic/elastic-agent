@@ -127,13 +127,13 @@ func (c *Client) GetAgentStatus() (string, error) {
 
 	agent, err := c.GetAgentByHostnameFromList(hostname)
 	fmt.Println(agent.Status)
-	return agent.Status, nil
+	return agent.Status, err
 }
 
 func (c *Client) GetAgentVersion() (string, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	agent, err := c.GetAgentByHostnameFromList(hostname)
