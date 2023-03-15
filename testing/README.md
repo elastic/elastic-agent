@@ -53,7 +53,7 @@ Next, the script runs a series of tests, which include:
 * Verifying that the agent is healthy
 * Un-enrolling/uninstalling the agent
 
-4. `make -C test destroy-cluster`
+4. `make destroy-cluster`
 Destroy the cluster
 
 ### Using devContainer
