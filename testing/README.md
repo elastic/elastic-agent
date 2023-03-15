@@ -7,6 +7,10 @@
 
 ### Try it locally
 
+0. Setup vault
+Export the environment variable `VAULT_TOKEN` or have the `~/.vault-token` file created.
+For further details about how to configure Vault check [the Vault documentation](https://github.com/elastic/infra/tree/master/docs/vault)
+
 1. Install and configure [oblt-cli](https://studious-disco-k66oojq.pages.github.io)
 
 2. Create a cluster for e2e tests:

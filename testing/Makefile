@@ -1,4 +1,4 @@
-STACK_VERSION ?= 8.6.0
+STACK_VERSION ?= 8.6.1
 CURRENT_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CLUSTER_DIGEST_FILE := cluster-digest.yml
 CLUSTER_NAME := e2e-elasic-agent-$(shell date +%s)
@@ -28,7 +28,6 @@ run-tests:
 	AGENT_VERSION=8.6.0 ginkgo -- --config="$(CURRENT_DIR)/$(CLUSTER_DIGEST_FILE)"
 
 .PHONY: destroy-cluster
-destroy-cluster:
-	CLUSTER_NAME := $(shell cat $(CURRENT_DIR)/cluster-info.json | jq -r '.ClusterName')
-	oblt-cli cluster destroy --force --cluster-name $(CLUSTER_NAME)
+destroy-cluster:	
+	oblt-cli cluster destroy --force --cluster-name $(shell cat $(CURRENT_DIR)/cluster-info.json | jq -r '.ClusterName')
 	

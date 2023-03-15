@@ -1,5 +1,5 @@
-//go:build linux
-// +build linux
+//go:build darwin
+// +build darwin
 
 package tools
 
@@ -61,7 +61,7 @@ func UnpackTar(version string) error {
 }
 
 func tarName(version string) (string, string) {
-	fileName := fmt.Sprintf("elastic-agent-%s-linux-arm64.tar.gz", version)
+	fileName := fmt.Sprintf("elastic-agent-%s-darwin-aarch64.tar.gz", version)
 	destFileName := fmt.Sprintf("%s%s", "elastic-agent", filepath.Ext(fileName))
 	return fileName, destFileName
 }

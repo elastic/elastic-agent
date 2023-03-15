@@ -41,7 +41,7 @@ var _ = Describe("Smoketests", func() {
 	Describe("Elastic Agent Install and Upgrade", Ordered, func() {
 		var enrollmentToken tools.EnrollmentAPIKey
 
-		// Setup: executed once before all specs withing this Describe block
+		// Setup: executed once before all specs within this Describe block
 		BeforeAll(func() {
 			By("Downloading elastic agent")
 			// Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
@@ -69,7 +69,7 @@ var _ = Describe("Smoketests", func() {
 			By("Wait for agent to be healthy(online)")
 			Eventually(client.GetAgentStatus).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(BeEquivalentTo("online"))
 
-			By("Upgrade elasic agent")
+			By("Upgrade elastic agent")
 			Expect(client.UpgradeAgent("8.6.1")).To(Succeed())
 
 			By("Wait for agent to be healthy(online)")
@@ -77,9 +77,9 @@ var _ = Describe("Smoketests", func() {
 			Expect(client.GetAgentVersion()).To(Equal("8.6.1"))
 		})
 
-		// Tear down: executed after seach spec
+		// Tear down: executed after search spec
 		AfterEach(func() {
-			By("Unenroll agent")
+			By("Un-enroll agent")
 			client.UnEnrollAgent()
 			Eventually(client.GetAgentStatus).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(BeEquivalentTo(""))
 

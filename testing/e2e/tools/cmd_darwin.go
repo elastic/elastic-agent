@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 package tools
 
 import (
@@ -9,7 +12,7 @@ import (
 )
 
 func EnrollElasticAgent(fleetUrl string, enrollmentToken string, version string) (*gexec.Session, error) {
-	command := exec.Command(fmt.Sprintf("elastic-agent-%s-linux-arm64/elastic-agent", version),
+	command := exec.Command(fmt.Sprintf("elastic-agent-%s-darwin-aarch64/elastic-agent", version),
 		"install",
 		"--non-interactive",
 		fmt.Sprintf("--url=%s", fleetUrl),
