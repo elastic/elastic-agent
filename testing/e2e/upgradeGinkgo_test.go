@@ -1,9 +1,6 @@
 package e2e_ginkgo
 
 import (
-	"flag"
-	"os"
-	"testing"
 	"time"
 
 	tools "github.com/elastic/elastic-agent/testing/e2e/tools"
@@ -11,30 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 )
-
-var clusterConfigPath string
-var clusterConfig tools.ClusterConfig
-var client *tools.Client
-var agentVersion = os.Getenv("AGENT_VERSION")
-
-func init() {
-	flag.StringVar(&clusterConfigPath, "config", "./cluster-digest.yml", "Path to cluster config")
-}
-
-func TestElasticAgentUpgrade(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Basic Suite")
-}
-
-var _ = BeforeSuite(func() {
-	By("validating flags and config")
-	Expect(clusterConfigPath).NotTo(BeZero(), "Make sure --config is set correctly.")
-	var err error
-	clusterConfig, err = tools.ReadConfig(clusterConfigPath)
-	Expect(err).NotTo(HaveOccurred())
-	client, err = tools.NewClient(&clusterConfig)
-	Expect(err).NotTo(HaveOccurred())
-})
 
 var _ = Describe("Smoketests", func() {
 
@@ -44,7 +17,7 @@ var _ = Describe("Smoketests", func() {
 		// Setup: executed once before all specs within this Describe block
 		BeforeAll(func() {
 			By("Downloading elastic agent")
-			// Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
+			Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
 		})
 		// Setup: executed before each spec withing this Describe block
 		// I.e. we Create a new policy and token before each spec
