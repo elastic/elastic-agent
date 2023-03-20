@@ -388,7 +388,7 @@ func (f *fakeShipperInput) Update(u *client.Unit) error {
 		go func() {
 			if f.srv != nil {
 				f.srv.Stop()
-				f.wg.Wait()
+				_ = f.wg.Wait()
 				f.srv = nil
 			}
 			f.logger.Debug().Str("state", client.UnitStateStopped.String()).Str("message", stoppedMsg).Msg("updating unit state")
