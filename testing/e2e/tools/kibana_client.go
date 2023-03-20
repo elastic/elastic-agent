@@ -10,7 +10,7 @@ import (
 
 	"github.com/Jeffail/gabs/v2"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
+	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
 	"go.elastic.co/apm"
 )
@@ -41,14 +41,6 @@ func (c *Client) post(ctx context.Context, resourcePath string, body []byte, hea
 	return c.sendRequest(ctx, http.MethodPost, resourcePath, body, headers...)
 }
 
-func (c *Client) put(ctx context.Context, resourcePath string, body []byte, headers ...HTTPHeader) (int, []byte, error) {
-	return c.sendRequest(ctx, http.MethodPut, resourcePath, body, headers...)
-}
-
-func (c *Client) delete(ctx context.Context, resourcePath string, headers ...HTTPHeader) (int, []byte, error) {
-	return c.sendRequest(ctx, http.MethodDelete, resourcePath, nil, headers...)
-}
-
 func (c *Client) sendRequest(ctx context.Context, method, resourcePath string, body []byte, headers ...HTTPHeader) (int, []byte, error) {
 	span, _ := apm.StartSpanOptions(ctx, "Sending HTTP request", "http.request."+method, apm.SpanOptions{
 		Parent: apm.SpanFromContext(ctx).TraceContext(),
@@ -71,7 +63,7 @@ func (c *Client) sendRequest(ctx context.Context, method, resourcePath string, b
 
 	u := base.ResolveReference(rel)
 
-	jsonParsed, _ := gabs.ParseJSON([]byte(body))
+	jsonParsed, _ := gabs.ParseJSON(body)
 
 	log.WithFields(log.Fields{
 		"method":  method,
@@ -80,7 +72,7 @@ func (c *Client) sendRequest(ctx context.Context, method, resourcePath string, b
 		"headers": headers,
 	}).Trace("Kibana API Query")
 
-	req, err := http.NewRequest(method, u.String(), reqBody)
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), reqBody)
 	if err != nil {
 		return 0, nil, errors.Wrapf(err, "could not create %v request to Kibana API resource: %s", method, resourcePath)
 	}

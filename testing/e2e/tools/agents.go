@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
+	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
 )
 
@@ -122,11 +122,10 @@ func (c *Client) ListAgents() ([]Agent, error) {
 func (c *Client) GetAgentStatus() (string, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	agent, err := c.GetAgentByHostnameFromList(hostname)
-	fmt.Println(agent.Status)
 	return agent.Status, err
 }
 
@@ -137,8 +136,7 @@ func (c *Client) GetAgentVersion() (string, error) {
 	}
 
 	agent, err := c.GetAgentByHostnameFromList(hostname)
-	fmt.Println(agent.Status)
-	return agent.LocalMetadata.Elastic.Agent.Version, nil
+	return agent.LocalMetadata.Elastic.Agent.Version, err
 }
 
 func (c *Client) UnEnrollAgent() error {

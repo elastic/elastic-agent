@@ -5,9 +5,10 @@ import (
 	"os"
 	"testing"
 
-	tools "github.com/elastic/elastic-agent/testing/e2e/tools"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	tools "github.com/elastic/elastic-agent/testing/e2e/tools"
 )
 
 var clusterConfigPath string

@@ -3,10 +3,11 @@ package e2e_ginkgo
 import (
 	"time"
 
-	tools "github.com/elastic/elastic-agent/testing/e2e/tools"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
+
+	tools "github.com/elastic/elastic-agent/testing/e2e/tools"
 )
 
 var _ = Describe("Smoketests", func() {
@@ -50,7 +51,7 @@ var _ = Describe("Smoketests", func() {
 		// Tear down: executed after search spec
 		AfterEach(func() {
 			By("Un-enroll agent")
-			client.UnEnrollAgent()
+			Expect(client.UnEnrollAgent()).To(Succeed())
 			Eventually(client.GetAgentStatus).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(BeEquivalentTo(""))
 
 			By("Uninstall elastic agent")

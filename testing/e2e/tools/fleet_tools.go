@@ -7,7 +7,7 @@ import (
 
 	"github.com/Jeffail/gabs/v2"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
+	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
 )
 
@@ -55,7 +55,7 @@ func (c *Client) CreatePolicy() (Policy, error) {
 	}
 
 	if statusCode != 200 {
-		return Policy{}, fmt.Errorf("Could not create Fleet's policy, unhandled server error (%d)", statusCode)
+		return Policy{}, fmt.Errorf("could not create Fleet's policy, unhandled server error (%d)", statusCode)
 	}
 
 	if err != nil {
@@ -82,7 +82,7 @@ func (c *Client) CreateEnrollmentAPIKey(policy Policy) (EnrollmentAPIKey, error)
 		jsonParsed, err := gabs.ParseJSON(respBody)
 		log.WithFields(log.Fields{
 			"body":       jsonParsed,
-			"reqBody":    string(reqBody),
+			"reqBody":    reqBody,
 			"error":      err,
 			"statusCode": statusCode,
 		}).Error("Could not create enrollment api key")

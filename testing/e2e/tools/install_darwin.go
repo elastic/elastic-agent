@@ -24,7 +24,7 @@ func DownloadElasticAgent(version string) error {
 
 	fileName, destFileName := tarName(version)
 	agentTarPath := fmt.Sprintf("%s/%s", dirToInstall, destFileName)
-	err = DownloadFile(agentTarPath, fmt.Sprintf("https://artifacts.elastic.co/downloads/beats/elastic-agent/%s", fileName))
+	err = downloadFile(agentTarPath, fmt.Sprintf("https://artifacts.elastic.co/downloads/beats/elastic-agent/%s", fileName))
 
 	if err != nil {
 		return err
@@ -34,11 +34,11 @@ func DownloadElasticAgent(version string) error {
 	return err
 }
 
-func DownloadFile(filepath string, url string) error {
+func downloadFile(filepath string, url string) error {
 	log.Info("Downloading Elastic Agent...")
 	log.Info(url)
 
-	resp, err := http.Get(url)
+	resp, err := http.Get(url) //nolint:gosec,noctx //TODO: exclude from binary, no user input
 	if err != nil {
 		return err
 	}
