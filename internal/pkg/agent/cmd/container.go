@@ -43,6 +43,8 @@ const (
 	defaultRequestRetrySleep = "1s"                             // sleep 1 sec between retries for HTTP requests
 	defaultMaxRequestRetries = "30"                             // maximum number of retries for HTTP requests
 	defaultStateDirectory    = "/usr/share/elastic-agent/state" // directory that will hold the state data
+
+	logsPathPerms = 0775
 )
 
 var (
@@ -150,7 +152,7 @@ func logContainerCmd(streams *cli.IOStreams) error {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
-		if err := os.MkdirAll(logsPath, 0755); err != nil {
+		if err := os.MkdirAll(logsPath, logsPathPerms); err != nil {
 			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 		logPath := filepath.Join(logsPath, "elastic-agent-startup.log")
@@ -262,7 +264,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr, isContainer)
+		return run(logToStderr, false, isContainer)
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -327,7 +329,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr, isContainer)
+	return run(logToStderr, false, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -795,14 +797,14 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	if logsPath != "" {
 		paths.SetLogs(logsPath)
 		// ensure that the logs directory exists
-		if err := os.MkdirAll(filepath.Join(logsPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(logsPath), logsPathPerms); err != nil {
 			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 	}
 
 	// ensure that the internal logger directory exists
 	loggerPath := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
-	if err := os.MkdirAll(loggerPath, 0755); err != nil {
+	if err := os.MkdirAll(loggerPath, logsPathPerms); err != nil {
 		return fmt.Errorf("preparing internal log path(%s) failed: %w", loggerPath, err)
 	}
 

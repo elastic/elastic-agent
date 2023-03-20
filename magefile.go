@@ -50,10 +50,15 @@ const (
 	snapshotEnv       = "SNAPSHOT"
 	devEnv            = "DEV"
 	externalArtifacts = "EXTERNAL"
+	platformsEnv      = "PLATFORMS"
+	packagesEnv       = "PACKAGES"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	specSuffix        = ".spec.yml"
 	checksumFilename  = "checksum.yml"
+	commitLen         = 7
+
+	cloudImageTmpl = "docker.elastic.co/observability-ci/elastic-agent:%s"
 )
 
 // Aliases for commands required by master makefile
@@ -95,6 +100,9 @@ type Demo mg.Namespace
 
 // Dev runs package and build for dev purposes.
 type Dev mg.Namespace
+
+// Cloud produces or pushes cloud image for cloud testing.
+type Cloud mg.Namespace
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -452,16 +460,16 @@ func Config() {
 func ControlProto() error {
 	if err := sh.RunV(
 		"protoc",
-		"--go_out=internal/pkg/agent/control/v2/cproto", "--go_opt=paths=source_relative",
-		"--go-grpc_out=internal/pkg/agent/control/v2/cproto", "--go-grpc_opt=paths=source_relative",
+		"--go_out=pkg/control/v2/cproto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=pkg/control/v2/cproto", "--go-grpc_opt=paths=source_relative",
 		"control_v2.proto"); err != nil {
 		return err
 	}
 
 	return sh.RunV(
 		"protoc",
-		"--go_out=internal/pkg/agent/control/v1/proto", "--go_opt=paths=source_relative",
-		"--go-grpc_out=internal/pkg/agent/control/v1/proto", "--go-grpc_opt=paths=source_relative",
+		"--go_out=pkg/control/v1/proto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=pkg/control/v1/proto", "--go-grpc_opt=paths=source_relative",
 		"control_v1.proto")
 }
 
@@ -545,6 +553,111 @@ func (Demo) NoEnroll() error {
 		"FLEET_ENROLL": "0",
 	}
 	return runAgent(env)
+}
+
+// Image builds a cloud image
+func (Cloud) Image() {
+	platforms := os.Getenv(platformsEnv)
+	defer os.Setenv(platformsEnv, platforms)
+
+	packages := os.Getenv(packagesEnv)
+	defer os.Setenv(packagesEnv, packages)
+
+	snapshot := os.Getenv(snapshotEnv)
+	defer os.Setenv(snapshotEnv, snapshot)
+
+	dev := os.Getenv(devEnv)
+	defer os.Setenv(devEnv, dev)
+
+	os.Setenv(platformsEnv, "linux/amd64")
+	os.Setenv(packagesEnv, "docker")
+	os.Setenv(devEnv, "true")
+
+	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
+		// only disable SNAPSHOT build when explicitely defined
+		os.Setenv(snapshotEnv, "false")
+		devtools.Snapshot = false
+	} else {
+		os.Setenv(snapshotEnv, "true")
+		devtools.Snapshot = true
+	}
+
+	devtools.DevBuild = true
+	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
+	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
+
+	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
+		devtools.ExternalBuild = true
+	}
+
+	Package()
+}
+
+// Push builds a cloud image tags it correctly and pushes to remote image repo.
+// Previous login to elastic registry is required!
+func (Cloud) Push() error {
+	snapshot := os.Getenv(snapshotEnv)
+	defer os.Setenv(snapshotEnv, snapshot)
+
+	os.Setenv(snapshotEnv, "true")
+
+	version := getVersion()
+	var tag string
+	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
+		tag = envTag
+	} else {
+		commit := dockerCommitHash()
+		time := time.Now().Unix()
+
+		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
+	}
+
+	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
+	var targetCloudImageName string
+	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
+		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, tag)
+	} else {
+		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, tag)
+	}
+
+	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
+	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	if err != nil {
+		return fmt.Errorf("Failed setting a docker image tag: %w", err)
+	}
+	fmt.Println(">> Docker image tag updated successfully")
+
+	fmt.Println(">> Pushing a docker image to remote registry")
+	err = sh.RunV("docker", "image", "push", targetCloudImageName)
+	if err != nil {
+		return fmt.Errorf("Failed pushing docker image: %w", err)
+	}
+	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
+
+	return nil
+}
+
+func dockerCommitHash() string {
+	commit, err := devtools.CommitHash()
+	if err == nil && len(commit) > commitLen {
+		return commit[:commitLen]
+	}
+
+	return ""
+}
+
+func getVersion() string {
+	version, found := os.LookupEnv("BEAT_VERSION")
+	if !found {
+		version = release.Version()
+	}
+	if !strings.Contains(version, "SNAPSHOT") {
+		if _, ok := os.LookupEnv(snapshotEnv); ok {
+			version += "-SNAPSHOT"
+		}
+	}
+
+	return version
 }
 
 func runAgent(env map[string]string) error {
@@ -964,12 +1077,11 @@ func dockerBuild(tag string) error {
 }
 
 func dockerTag() string {
-	const commitLen = 7
 	tagBase := "elastic-agent"
 
-	commit, err := devtools.CommitHash()
-	if err == nil && len(commit) > commitLen {
-		return fmt.Sprintf("%s-%s", tagBase, commit[:commitLen])
+	commit := dockerCommitHash()
+	if len(commit) > 0 {
+		return fmt.Sprintf("%s-%s", tagBase, commit)
 	}
 
 	return tagBase

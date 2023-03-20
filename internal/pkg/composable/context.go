@@ -24,8 +24,9 @@ func (r *providerRegistry) MustAddContextProvider(name string, builder ContextPr
 	}
 }
 
-//nolint:dupl,goimports,nolintlint // false positive
 // AddContextProvider adds a new ContextProviderBuilder
+//
+//nolint:dupl,goimports,nolintlint // false positive
 func (r *providerRegistry) AddContextProvider(name string, builder ContextProviderBuilder) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
