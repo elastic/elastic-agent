@@ -146,7 +146,6 @@ type VarsManager interface {
 // passing it into the components runtime manager.
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
 
-<<<<<<< HEAD
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
 	State        agentclient.State                 `yaml:"state"`
@@ -162,10 +161,9 @@ type StateFetcher interface {
 	// State returns the current state of the coordinator.
 	State(bool) State
 }
-=======
+
 // CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
 const CoordinatorShutdownTimeout = time.Second * 5
->>>>>>> fffe40a85d (Fix deadlocks in agent startup process (#2352))
 
 // Coordinator manages the entire state of the Elastic Agent.
 //
@@ -427,7 +425,6 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				return err
 			}
 			if errors.Is(err, ErrFatalCoordinator) {
-				c.state.UpdateState(state.WithState(agentclient.Failed, "Fatal coordinator error"), state.WithFleetState(agentclient.Stopped, "Fatal coordinator error"))
 				return err
 			}
 		}
@@ -587,26 +584,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-<<<<<<< HEAD
-			runtimeErr := <-runtimeErrCh
-			c.runtimeMgrErr = runtimeErr
-			configErr := <-configErrCh
-			c.configMgrErr = configErr
-			varsErr := <-varsErrCh
-			c.varsMgrErr = varsErr
-			if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-				return runtimeErr
-			}
-			if configErr != nil && !errors.Is(configErr, context.Canceled) {
-				return configErr
-			}
-			if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-				return varsErr
-			}
-			return ctx.Err()
-=======
 			return c.handleCoordinatorDone(ctx, varsErrCh, runtimeErrCh, configErrCh)
->>>>>>> fffe40a85d (Fix deadlocks in agent startup process (#2352))
 		case <-runtimeRun:
 			if ctx.Err() == nil {
 				cancel()
@@ -813,7 +791,6 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 	return cfg, comps, nil
 }
 
-<<<<<<< HEAD
 type coordinatorState struct {
 	state         agentclient.State
 	message       string
@@ -830,7 +807,8 @@ type coordinatorState struct {
 type coordinatorOverrideState struct {
 	state   agentclient.State
 	message string
-=======
+}
+
 func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runtimeErrCh, configErrCh chan error) error {
 	var runtimeErr error
 	var configErr error
@@ -881,7 +859,6 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 	}
 	// if there's no component errors, continue to pass along the context error
 	return ctx.Err()
->>>>>>> fffe40a85d (Fix deadlocks in agent startup process (#2352))
 }
 
 type coordinatorComponentLog struct {
