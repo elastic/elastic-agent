@@ -38,7 +38,7 @@ func DownloadFile(filepath string, url string) error {
 	log.Info("Downloading Elastic Agent...")
 	log.Info(url)
 
-	resp, err := http.Get(url)
+	resp, err := http.Get(url) //nolint:gosec,noctx //TODO: exclude from binary, no user input
 	if err != nil {
 		return err
 	}

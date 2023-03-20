@@ -15,7 +15,7 @@ import (
 )
 
 func EnrollElasticAgent(fleetUrl string, enrollmentToken string, version string) (*gexec.Session, error) {
-	command := exec.Command(fmt.Sprintf("elastic-agent-%s-linux-arm64/elastic-agent", version),
+	command := exec.Command(fmt.Sprintf("elastic-agent-%s-linux-arm64/elastic-agent", version), //nolint:gosec //TODO: exclude from binary
 		"install",
 		"--non-interactive",
 		fmt.Sprintf("--url=%s", fleetUrl),
@@ -32,15 +32,15 @@ func InstallElasticAgentStandalone(esConfig *ESConfig, version string) error {
 	tmpl := template.New("ea-template")
 	tmpl, err = tmpl.Parse(string(dat))
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	tmpl.Execute(os.Stdout, struct {
+	err = tmpl.Execute(os.Stdout, struct {
 		Es ESConfig
 		Id string
 	}{*esConfig, uuid.New().String()})
 
-	return nil
+	return err
 }
 
 func UninstallAgent() (*gexec.Session, error) {
