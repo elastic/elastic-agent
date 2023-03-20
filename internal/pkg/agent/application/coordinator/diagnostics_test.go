@@ -22,7 +22,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -69,6 +68,21 @@ var /*const*/ linuxPlatformDetail component.PlatformDetail = component.PlatformD
 	Minor:  "4",
 }
 
+type MockedUnit struct {
+	ID       string              `yaml:"id"`
+	LogLevel client.UnitLogLevel `yaml:"log_level"`
+	Type     client.UnitType     `yaml:"type"`
+	Config   map[string]any      `yaml:"config"`
+}
+
+// MockedComponentsUnits is a simple structure to unmarshal the values
+// returned by the mocked Runtime Manager as components and units being run
+type MockedComponentsUnits struct {
+	ID    string       `yaml:"id"`
+	CType string       `yaml:"type"`
+	Units []MockedUnit `yaml:"units"`
+}
+
 func TestCoordinatorDiagnosticHooks(t *testing.T) {
 
 	type testCase struct {
@@ -76,36 +90,75 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 		runtimeSpecsPath        string
 		platform                component.PlatformDetail
 		configFilePath          string
-		componentsState         runtime.ComponentComponentState
+		componentsUnitsFilePath string
+		componentsState         func(*testing.T, *component.RuntimeSpecs, string) []runtime.ComponentComponentState
 		varsProvider            func(*testing.T) []*transpiler.Vars
 		expectedDiagnosticsPath string
 	}
 
 	testcases := []testCase{
 		{
-			name:             "Default Fleet Policy",
-			runtimeSpecsPath: filepath.Join("..", "..", "..", "..", "..", "specs"),
-			platform:         linuxPlatformDetail,
-			configFilePath:   filepath.Join(".", "testdata", "simple_config", "elastic-agent.yml"),
-			componentsState: runtime.ComponentComponentState{
-				Component: component.Component{
-					ID: "mock_component_1",
-					Units: []component.Unit{
-						{
-							ID:       "mock_input_unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: client.UnitLogLevelInfo,
-							Config:   &proto.UnitExpectedConfig{},
+			name:                    "Default Fleet Policy",
+			runtimeSpecsPath:        filepath.Join("..", "..", "..", "..", "..", "specs"),
+			platform:                linuxPlatformDetail,
+			configFilePath:          filepath.Join(".", "testdata", "simple_config", "elastic-agent.yml"),
+			componentsUnitsFilePath: filepath.Join(".", "testdata", "simple_config", "mocked_components_units.yaml"),
+			componentsState: func(t *testing.T, specs *component.RuntimeSpecs, componentsUnitsFilePath string) []runtime.ComponentComponentState {
+
+				componentsBytes, err := os.ReadFile(componentsUnitsFilePath)
+				require.NoError(t, err)
+				mockedComponents := make([]MockedComponentsUnits, 0, 5)
+				yaml.Unmarshal(componentsBytes, &mockedComponents)
+
+				componentStates := make([]runtime.ComponentComponentState, 0, len(mockedComponents))
+
+				for _, comp := range mockedComponents {
+
+					// create all the units for the component
+					units := make([]component.Unit, 0, len(comp.Units))
+					unitsStates := map[runtime.ComponentUnitKey]runtime.ComponentUnitState{}
+					for _, mockedUnit := range comp.Units {
+						// FIXME: when trying to create the proto struct values from map, we panic trying to create the "source" attribute
+						// unitEC, err := component.ExpectedConfig(mockedUnit.Config)
+						// require.NoErrorf(t, err, "Error parsing unit expected config for component %q unit %q", comp.ID, mockedUnit.ID)
+						units = append(units, component.Unit{
+							ID:       mockedUnit.ID,
+							Type:     mockedUnit.Type,
+							LogLevel: mockedUnit.LogLevel,
+							// Config:   unitEC,
+						})
+						// FIXME this composite key is ok for Marshaling but then Unmarshaling into a generic map[any]any returns error,
+						// hence we cannot properly sanitize hook output - A custom unmarshaler would probably solve this
+						// unitStateKey := runtime.ComponentUnitKey{UnitType: mockedUnit.Type, UnitID: mockedUnit.ID}
+						// unitsStates[unitStateKey] = runtime.ComponentUnitState{
+						// 	State:   client.UnitStateHealthy,
+						// 	Message: "Healthy",
+						// }
+					}
+
+					//create the component itself
+					spec, err := specs.GetInput(comp.CType)
+					require.NoErrorf(t, err, "unknown spec for component with id %q and type %q", comp.ID, comp.CType)
+
+					componentState := runtime.ComponentComponentState{
+						Component: component.Component{
+							ID:        comp.ID,
+							InputSpec: &spec,
+							Units:     units,
 						},
-					},
-				},
-				State: runtime.ComponentState{
-					State: client.UnitStateHealthy,
-					VersionInfo: runtime.ComponentVersionInfo{
-						Name:    "shiny mock component",
-						Version: "latest, obvs :D",
-					},
-				},
+						State: runtime.ComponentState{
+							State: client.UnitStateHealthy,
+							VersionInfo: runtime.ComponentVersionInfo{
+								Name:    fmt.Sprintf("Mock %s", comp.CType),
+								Version: "1.2.3",
+							},
+							Units: unitsStates,
+						},
+					}
+
+					componentStates = append(componentStates, componentState)
+				}
+				return componentStates
 			},
 			varsProvider: func(t *testing.T) []*transpiler.Vars {
 				//Provide vars
@@ -197,8 +250,11 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			t.Logf("Agent state: %s", sut.State().State)
 
 			// Send runtime component state
-			mustWriteToChannelBeforeTimeout(t, tt.componentsState, componentsUpdateChannel, 100*time.Millisecond)
-			
+			componentStates := tt.componentsState(t, &specs, tt.componentsUnitsFilePath)
+			for _, componentState := range componentStates {
+				mustWriteToChannelBeforeTimeout(t, componentState, componentsUpdateChannel, 100*time.Millisecond)
+			}
+
 			// FIXME there's no way to know if the coordinator processed the runtime component states, wait and hope for the best
 			time.Sleep(50 * time.Millisecond)
 
@@ -252,7 +308,7 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 
 	if contentType == "application/yaml" {
 		yamlContent := map[any]any{}
-		err := yaml.Unmarshal(rawBytes, yamlContent)
+		err := yaml.Unmarshal(rawBytes, &yamlContent)
 		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
 
 		if fileName == "pre-config.yaml" || fileName == "computed-config.yaml" {
@@ -289,7 +345,7 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 					}
 				}
 			}
-		} else if fileName == "components.yaml" {
+		} else if fileName == "components_expected.yaml" {
 			rawComponents, ok := yamlContent["components"].([]any)
 
 			if assert.True(t, ok, "unexpected component format in file %s", fileName) {

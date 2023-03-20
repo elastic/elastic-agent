@@ -502,15 +502,14 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
 				components := c.State().Components
-				componentConfigs := make([]component.Component, len(components))
-				for i := 0; i < len(components); i++ {
-					componentConfigs[i] = components[i].Component
-				}
-				o, _ := yaml.Marshal(struct {
-					Components []component.Component `yaml:"components"`
+				o, err := yaml.Marshal(struct {
+					Components []runtime.ComponentComponentState `yaml:"components"`
 				}{
-					Components: componentConfigs,
+					Components: components,
 				})
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
 				return o
 			},
 		},
