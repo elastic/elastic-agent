@@ -70,135 +70,164 @@ var /*const*/ linuxPlatformDetail component.PlatformDetail = component.PlatformD
 }
 
 func TestCoordinatorDiagnosticHooks(t *testing.T) {
-	specs, err := component.LoadRuntimeSpecs(
-		filepath.Join("..", "..", "..", "..", "..", "specs"),
-		linuxPlatformDetail,
-		component.SkipBinaryCheck(),
-	)
-	require.NoError(t, err)
 
-	helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, specs, false)
+	type testCase struct {
+		name                    string
+		runtimeSpecsPath        string
+		platform                component.PlatformDetail
+		configFilePath          string
+		componentsState         runtime.ComponentComponentState
+		varsProvider            func(*testing.T) []*transpiler.Vars
+		expectedDiagnosticsPath string
+	}
 
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	componentsUpdateChannel := make(chan runtime.ComponentComponentState)
-	subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, nil, componentsUpdateChannel)
-	helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
-	helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
-
-	sut := helper.coordinator
-	coordinatorWg := new(sync.WaitGroup)
-	defer func() {
-		cancelFunc()
-		// wait till the coordinator exits to avoid a panic
-		// when logging after the test goroutine exited
-		coordinatorWg.Wait()
-	}()
-
-	coordinatorWg.Add(1)
-	go func() {
-		defer coordinatorWg.Done()
-		coordErr := sut.Run(ctx)
-		assert.ErrorIs(t, coordErr, context.Canceled, "Coordinator exited with unexpected error")
-	}()
-
-	processors := transpiler.Processors{
+	testcases := []testCase{
 		{
-			"add_fields": map[string]interface{}{
-				"dynamic": "added",
-			},
-		},
-	}
-	fetchContextProvider := mocks.NewFetchContextProvider(t)
-	fetchContextProviders := mapstr.M{
-		"kubernetes_secrets": fetchContextProvider,
-	}
-	vars, err := transpiler.NewVarsWithProcessors(
-		"id",
-		map[string]interface{}{
-			"host": map[string]interface{}{"platform": "linux"},
-			"dynamic": map[string]interface{}{
-				"key1": "dynamic1",
-				"list": []string{
-					"array1",
-					"array2",
+			name:             "Default Fleet Policy",
+			runtimeSpecsPath: filepath.Join("..", "..", "..", "..", "..", "specs"),
+			platform:         linuxPlatformDetail,
+			configFilePath:   filepath.Join(".", "testdata", "simple_config", "elastic-agent.yml"),
+			componentsState: runtime.ComponentComponentState{
+				Component: component.Component{
+					ID: "mock_component_1",
+					Units: []component.Unit{
+						{
+							ID:       "mock_input_unit",
+							Type:     client.UnitTypeInput,
+							LogLevel: client.UnitLogLevelInfo,
+							Config:   &proto.UnitExpectedConfig{},
+						},
+					},
 				},
-				"dict": map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
-			},
-		},
-		"dynamic",
-		processors,
-		fetchContextProviders)
-	require.NoError(t, err)
-	mustWriteToChannelBeforeTimeout(t, []*transpiler.Vars{vars}, helper.varsChannel, 100*time.Millisecond)
-
-	// Inject initial configuration - after starting coordinator
-	configBytes, err := os.ReadFile(path.Join(".", "testdata", "simple_config", "elastic-agent.yml"))
-	require.NoError(t, err)
-
-	initialConf := config.MustNewConfigFrom(configBytes)
-
-	initialConfChange := mocks.NewConfigChange(t)
-	initialConfChange.EXPECT().Config().Return(initialConf)
-	initialConfChange.EXPECT().Ack().Return(nil).Times(1)
-	mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
-
-	assert.Eventually(t, func() bool { return sut.State().State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
-	assert.Eventually(t, func() bool { return len(initialConfChange.Calls) > 1 /*both Config and Ack have been called)*/ }, 1*time.Second, 50*time.Millisecond)
-	t.Logf("Agent state: %s", sut.State().State)
-
-	// Runtime component state
-	componentState := runtime.ComponentComponentState{
-		Component: component.Component{
-			ID: "mock_component_1",
-			Units: []component.Unit{
-				{
-					ID:       "mock_input_unit",
-					Type:     client.UnitTypeInput,
-					LogLevel: client.UnitLogLevelInfo,
-					Config:   &proto.UnitExpectedConfig{},
+				State: runtime.ComponentState{
+					State: client.UnitStateHealthy,
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:    "shiny mock component",
+						Version: "latest, obvs :D",
+					},
 				},
 			},
-		},
-		State: runtime.ComponentState{
-			State: client.UnitStateHealthy,
-			VersionInfo: runtime.ComponentVersionInfo{
-				Name:    "shiny mock component",
-				Version: "latest, obvs :D",
+			varsProvider: func(t *testing.T) []*transpiler.Vars {
+				//Provide vars
+				processors := transpiler.Processors{
+					{
+						"add_fields": map[string]interface{}{
+							"dynamic": "added",
+						},
+					},
+				}
+				fetchContextProvider := mocks.NewFetchContextProvider(t)
+				fetchContextProviders := mapstr.M{
+					"kubernetes_secrets": fetchContextProvider,
+				}
+				vars, err := transpiler.NewVarsWithProcessors(
+					"id",
+					map[string]interface{}{
+						"host": map[string]interface{}{"platform": "linux"},
+						"dynamic": map[string]interface{}{
+							"key1": "dynamic1",
+							"list": []string{
+								"array1",
+								"array2",
+							},
+							"dict": map[string]string{
+								"key1": "value1",
+								"key2": "value2",
+							},
+						},
+					},
+					"dynamic",
+					processors,
+					fetchContextProviders)
+				require.NoError(t, err)
+				return []*transpiler.Vars{vars}
 			},
+			expectedDiagnosticsPath: filepath.Join(".", "testdata", "simple_config", "expected"),
 		},
 	}
-	mustWriteToChannelBeforeTimeout(t, componentState, componentsUpdateChannel, 100*time.Millisecond)
 
-	// FIXME there's no way to know if the coordinator processed the runtime component states, wait and hope for the best
-	time.Sleep(50 * time.Millisecond)
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			specs, err := component.LoadRuntimeSpecs(
+				tt.runtimeSpecsPath,
+				tt.platform,
+				component.SkipBinaryCheck(),
+			)
+			require.NoError(t, err)
 
-	diagHooks := sut.DiagnosticHooks()
-	t.Logf("Received diagnostics: %+v", diagHooks)
-	assert.NotEmpty(t, diagHooks)
+			helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, specs, false)
 
-	hooksMap := map[string]diagnostics.Hook{}
-	for i, h := range diagHooks {
-		hooksMap[h.Name] = diagHooks[i]
-	}
+			ctx, cancelFunc := context.WithCancel(context.Background())
+			componentsUpdateChannel := make(chan runtime.ComponentComponentState)
+			subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, nil, componentsUpdateChannel)
+			helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
+			helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
 
-	for hookName, diagFileName := range expectedDiagnosticHooks {
-		if !assert.Contains(t, hooksMap, hookName) {
-			continue // this iteration failed, no reason to do further tests, moving forward
-		}
+			sut := helper.coordinator
+			coordinatorWg := new(sync.WaitGroup)
+			defer func() {
+				cancelFunc()
+				// wait till the coordinator exits to avoid a panic
+				// when logging after the test goroutine exited
+				coordinatorWg.Wait()
+			}()
 
-		hook := hooksMap[hookName]
-		assert.Equal(t, diagFileName, hook.Filename)
-		hookResult := hook.Hook(ctx)
-		stringHookResult := sanitizeHookResult(t, hook.Filename, hook.ContentType, hookResult)
-		// The output of hooks is VERY verbose even for simple configs but useful for debugging
-		t.Logf("Hook %s result: 👇\n--- #--- START ---#\n%s\n--- #--- END ---#", hook.Name, stringHookResult)
-		expectedbytes, err := os.ReadFile(fmt.Sprintf("./testdata/simple_config/expected/%s", hook.Filename))
-		if assert.NoError(t, err) {
-			assert.YAMLEqf(t, string(expectedbytes), stringHookResult, "Unexpected YAML content for file %s", hook.Filename)
-		}
+			coordinatorWg.Add(1)
+			go func() {
+				defer coordinatorWg.Done()
+				coordErr := sut.Run(ctx)
+				assert.ErrorIs(t, coordErr, context.Canceled, "Coordinator exited with unexpected error")
+			}()
+
+			mustWriteToChannelBeforeTimeout(t, tt.varsProvider(t), helper.varsChannel, 100*time.Millisecond)
+
+			// Inject initial configuration - after starting coordinator
+			configBytes, err := os.ReadFile("./testdata/simple_config/elastic-agent.yml")
+			require.NoError(t, err)
+
+			initialConf := config.MustNewConfigFrom(configBytes)
+
+			initialConfChange := mocks.NewConfigChange(t)
+			initialConfChange.EXPECT().Config().Return(initialConf)
+			initialConfChange.EXPECT().Ack().Return(nil).Times(1)
+			mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
+
+			assert.Eventually(t, func() bool { return sut.State().State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
+			assert.Eventually(t, func() bool { return len(initialConfChange.Calls) > 1 /*both Config and Ack have been called)*/ }, 1*time.Second, 50*time.Millisecond)
+			t.Logf("Agent state: %s", sut.State().State)
+
+			// Send runtime component state
+			mustWriteToChannelBeforeTimeout(t, tt.componentsState, componentsUpdateChannel, 100*time.Millisecond)
+			
+			// FIXME there's no way to know if the coordinator processed the runtime component states, wait and hope for the best
+			time.Sleep(50 * time.Millisecond)
+
+			diagHooks := sut.DiagnosticHooks()
+			t.Logf("Received diagnostics: %+v", diagHooks)
+			assert.NotEmpty(t, diagHooks)
+
+			hooksMap := map[string]diagnostics.Hook{}
+			for i, h := range diagHooks {
+				hooksMap[h.Name] = diagHooks[i]
+			}
+
+			for hookName, diagFileName := range expectedDiagnosticHooks {
+				if !assert.Contains(t, hooksMap, hookName) {
+					continue // this iteration failed, no reason to do further tests, moving forward
+				}
+
+				hook := hooksMap[hookName]
+				assert.Equal(t, diagFileName, hook.Filename)
+				hookResult := hook.Hook(ctx)
+				stringHookResult := sanitizeHookResult(t, hook.Filename, hook.ContentType, hookResult)
+				// The output of hooks is VERY verbose even for simple configs but useful for debugging
+				t.Logf("Hook %s result: 👇\n--- #--- START ---#\n%s\n--- #--- END ---#", hook.Name, stringHookResult)
+				expectedbytes, err := os.ReadFile(fmt.Sprintf("./testdata/simple_config/expected/%s", hook.Filename))
+				if assert.NoError(t, err) {
+					assert.YAMLEqf(t, string(expectedbytes), stringHookResult, "Unexpected YAML content for file %s", hook.Filename)
+				}
+			}
+		})
 	}
 }
 
