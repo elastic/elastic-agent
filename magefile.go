@@ -320,14 +320,14 @@ func (Test) All() {
 
 // Unit runs all the unit tests.
 func (Test) Unit(ctx context.Context) error {
-	mg.Deps(Prepare.Env)
+	mg.Deps(Prepare.Env, Build.TestBinaries)
 	params := devtools.DefaultGoTestUnitArgs()
 	return devtools.GoTest(ctx, params)
 }
 
 // Coverage takes the coverages report from running all the tests and display the results in the browser.
 func (Test) Coverage() error {
-	mg.Deps(Prepare.Env)
+	mg.Deps(Prepare.Env, Build.TestBinaries)
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 

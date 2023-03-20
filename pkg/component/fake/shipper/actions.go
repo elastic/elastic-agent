@@ -54,7 +54,6 @@ func newRunningUnit(logger zerolog.Logger, manager *stateManager, unit *client.U
 		}
 		return nil, fmt.Errorf("unknown input unit config type: %s", expected.Config.Type)
 	}
-
 	return nil, fmt.Errorf("unknown unit type: %+v", unit.Type())
 }
 

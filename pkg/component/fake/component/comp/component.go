@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/config"
 	"os"
 	"strconv"
 	"time"
@@ -87,7 +86,6 @@ func (s *StateManager) Modified(change client.UnitChanged) {
 			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
 		}
 		return
-	}
 
 	case client.UnitTypeInput:
 		existingInput, ok := s.inputs[unit.ID()]
@@ -187,16 +185,17 @@ func (f *fakeShipperOutput) Update(u *client.Unit, triggers client.Trigger) erro
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != fakeShipper {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != fakeShipper {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 
 	f.stop()
-	f.cfg = config
-	f.start(u, config)
+	f.cfg = expected.Config
+	f.start(u, expected.Config)
 
 	return nil
 }
@@ -298,6 +297,8 @@ type fakeInput struct {
 	state    client.UnitState
 	stateMsg string
 
+	features *proto.Features
+
 	canceller       context.CancelFunc
 	killerCanceller context.CancelFunc
 }
@@ -325,6 +326,8 @@ func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *
 	unit.RegisterAction(&sendEventAction{i})
 	logger.Trace().Msg("registering kill action for unit")
 	unit.RegisterAction(&killAction{i.logger})
+	logger.Trace().Msg("registering " + ActionRetrieveFeatures + " action for unit")
+	unit.RegisterAction(&retrieveFeaturesAction{i})
 
 	logger.Debug().
 		Str("state", i.state.String()).
@@ -369,32 +372,43 @@ func (f *fakeInput) Update(u *client.Unit, triggers client.Trigger) error {
 	expected := u.Expected()
 	if expected.State == client.UnitStateStopped {
 		// agent is requesting this input to stop
-		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
+		f.logger.Debug().
+			Str("state", client.UnitStateStopping.String()).
+			Str("message", stoppingMsg).
+			Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
 		f.canceller()
 		go func() {
 			<-time.After(1 * time.Second)
-			f.logger.Debug().Str("state", client.UnitStateStopped.String()).Str("message", stoppedMsg).Msg("updating unit state")
+			f.logger.Debug().
+				Str("state", client.UnitStateStopped.String()).
+				Str("message", stoppedMsg).
+				Msg("updating unit state")
 			_ = u.UpdateState(client.UnitStateStopped, stoppedMsg, nil)
 		}()
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != Fake {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != Fake {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 
-	f.parseConfig(config)
-	state, stateMsg, err := getStateFromConfig(config)
+	f.parseConfig(expected.Config)
+	state, stateMsg, err := getStateFromConfig(expected.Config)
 	if err != nil {
 		return fmt.Errorf("unit config parsing error: %w", err)
 	}
+
 	f.state = state
 	f.stateMsg = stateMsg
-	f.logger.Debug().Str("state", f.state.String()).Str("message", f.stateMsg).Msg("updating unit state")
+	f.logger.Debug().
+		Str("state", f.state.String()).
+		Str("message", f.stateMsg).
+		Msg("updating unit state")
 	_ = u.UpdateState(f.state, f.stateMsg, nil)
 
 	if triggers&client.TriggeredFeatureChange == client.TriggeredFeatureChange {
