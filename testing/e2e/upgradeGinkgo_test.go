@@ -19,9 +19,9 @@ var _ = Describe("Smoketests", func() {
 			By("Downloading elastic agent")
 			Expect(tools.DownloadElasticAgent(agentVersion)).To(Succeed())
 		})
-		// Setup: executed before each spec withing this Describe block
-		// I.e. we Create a new policy and token before each spec
-		BeforeEach(func() {
+
+		// Spec: The test case
+		It("fleet managed: is online after upgrade", func() {
 			By("Create policy")
 			policy, err := client.CreatePolicy()
 			Expect(err).NotTo(HaveOccurred())
@@ -29,10 +29,7 @@ var _ = Describe("Smoketests", func() {
 			By("Create enrollment token")
 			enrollmentToken, err = client.CreateEnrollmentAPIKey(policy)
 			Expect(err).NotTo(HaveOccurred())
-		})
 
-		// Spec: The test case
-		It("is online after upgrade", func() {
 			By("Installing & enrolling EA")
 			// gexec.Start() returns a session object that can be used to interact with the process
 			session, err := tools.EnrollElasticAgent(clusterConfig.FleetConfig.Url, enrollmentToken.APIKey, agentVersion)

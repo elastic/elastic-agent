@@ -5,8 +5,11 @@ package tools
 
 import (
 	"fmt"
+	"html/template"
+	"os"
 	"os/exec"
 
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega/gexec"
 )
@@ -19,6 +22,25 @@ func EnrollElasticAgent(fleetUrl string, enrollmentToken string, version string)
 		fmt.Sprintf("--enrollment-token=%s", enrollmentToken))
 
 	return gexec.Start(command, GinkgoWriter, GinkgoWriter)
+}
+
+func InstallElasticAgentStandalone(esConfig *ESConfig, version string) error {
+	dat, err := os.ReadFile("elastic-agent.yml.tpl")
+	if err != nil {
+		panic(err)
+	}
+	tmpl := template.New("ea-template")
+	tmpl, err = tmpl.Parse(string(dat))
+	if err != nil {
+		panic(err)
+	}
+
+	tmpl.Execute(os.Stdout, struct {
+		Es ESConfig
+		Id string
+	}{*esConfig, uuid.New().String()})
+
+	return nil
 }
 
 func UninstallAgent() (*gexec.Session, error) {

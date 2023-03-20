@@ -1,4 +1,6 @@
 cluster-digest.yml
 cluster-info.json
 e2e_testing
-e2e/elastic-agent-*
+e2e/elastic-agent-*/
+!elastic-agent.yml.tpl
+e2e/*.gz
