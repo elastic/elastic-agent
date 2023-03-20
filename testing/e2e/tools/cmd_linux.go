@@ -47,6 +47,6 @@ func UninstallAgent() (*gexec.Session, error) {
 	command := exec.Command("elastic-agent",
 		"uninstall",
 		"-f")
-	return gexec.Start(command, .ginkgoGinkgoWriter, ginkgo.GinkgoWriter)
+	return gexec.Start(command, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
 
 }
