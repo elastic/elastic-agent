@@ -10,6 +10,7 @@ import (
 	"os/exec"
 
 	"github.com/google/uuid"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega/gexec"
 )
 
@@ -20,7 +21,7 @@ func EnrollElasticAgent(fleetUrl string, enrollmentToken string, version string)
 		fmt.Sprintf("--url=%s", fleetUrl),
 		fmt.Sprintf("--enrollment-token=%s", enrollmentToken))
 
-	return gexec.Start(command, GinkgoWriter, GinkgoWriter)
+	return gexec.Start(command, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
 }
 
 func InstallElasticAgentStandalone(esConfig *ESConfig, version string) error {
@@ -46,6 +47,6 @@ func UninstallAgent() (*gexec.Session, error) {
 	command := exec.Command("elastic-agent",
 		"uninstall",
 		"-f")
-	return gexec.Start(command, GinkgoWriter, GinkgoWriter)
+	return gexec.Start(command, .ginkgoGinkgoWriter, ginkgo.GinkgoWriter)
 
 }
