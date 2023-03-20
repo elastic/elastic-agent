@@ -68,16 +68,16 @@ if [ $ERRORSFOUND -eq 0 ]; then
     STATUS=0
   else
     #echo "Erros Found! Please advise logs"
-    echo "Test4 - FAIL"
+    echo "Test4 - Conditional PASS"
     STATUS=1
   fi    
 
 
 if [ $STATUS -eq 0 ]; then
-    echo "Test - PASS"
+    echo "Overall Test - PASS"
 elif [ $STATUS -eq 1 ]; then
-    echo "Test - Conditional PASS"
+    echo "Overall Test - Conditional PASS"
 else 
-    echo "Test - FAIL"
+    echo "Overall Test - FAIL"
 fi    
 
