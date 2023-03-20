@@ -90,22 +90,13 @@ func (s *StateManager) Modified(change client.UnitChanged) {
 	case client.UnitTypeInput:
 		existingInput, ok := s.inputs[unit.ID()]
 		if !ok {
-			_ = unit.UpdateState(
-				client.UnitStateFailed, "Error: unknown unit", nil)
+			_ = unit.UpdateState(client.UnitStateFailed, "Error: unknown unit", nil)
 			return
 		}
 
-		e := s.logger.Info().Interface("change.unit", *change.Unit)
-		if change.Unit.Expected().Features != nil {
-			e.Interface("change.features", *change.Unit.Expected().Features)
-		} else {
-			e.Str("change.features", "nil")
-		}
-		e.Msgf("existingInput.Update change: %#+v", change)
 		err := existingInput.Update(unit, change.Triggers)
 		if err != nil {
-			_ = unit.UpdateState(
-				client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
+			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
 		}
 
 		return
