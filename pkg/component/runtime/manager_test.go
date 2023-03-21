@@ -386,7 +386,6 @@ func TestManager_FakeInput_Features(t *testing.T) {
 
 				case client.UnitStateHealthy:
 					healthIteration++
-
 					switch healthIteration {
 					case 1: // yes, it's starting on 1
 						comp.Features = &proto.Features{
@@ -400,78 +399,48 @@ func TestManager_FakeInput_Features(t *testing.T) {
 							return
 						}
 
-					// check if config sent on iteration 1 was set,
-					// then change something but the feature flags.
+					// check if config sent on iteration 1 was set
 					case 2:
-						// check the component
-						res, err := m.PerformAction(
-							context.Background(),
-							comp,
-							comp.Units[0],
-							fakecmp.ActionRetrieveFeatures,
-							nil)
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
-								healthIteration, fakecmp.ActionRetrieveFeatures, err)
-							return
-						}
+						// In the previous iteration, the (fake) component has received a CheckinExpected
+						// message to enable the feature flag for FQDN.  In this iteration we are about to
+						// retrieve the feature flags information from the same component via the retrieve_features
+						// action. Within the component, which is running as a separate process, actions
+						// and CheckinExpected messages are processed concurrently.  We need some way to wait
+						// a reasonably short amount of time for the CheckinExpected message to be applied by the
+						// component (thus setting the FQDN feature flag to true) before we as the same component
+						// for feature flags information.  We accomplish this via assert.Eventually.
+						assert.Eventuallyf(t, func() bool {
+							// check the component
+							res, err := m.PerformAction(
+								context.Background(),
+								comp,
+								comp.Units[0],
+								fakecmp.ActionRetrieveFeatures,
+								nil)
+							if err != nil {
+								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
+									healthIteration, fakecmp.ActionRetrieveFeatures, err)
+								return false
+							}
 
-						ff, err := features.Parse(map[string]any{"agent": res})
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to parse action %s response as features config: %w",
-								healthIteration, fakecmp.ActionRetrieveFeatures, err)
-							return
-						}
-						assert.True(t, ff.FQDN, "parsed feature: FQDN is false, want true")
+							ff, err := features.Parse(map[string]any{"agent": res})
+							if err != nil {
+								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to parse action %s response as features config: %w",
+									healthIteration, fakecmp.ActionRetrieveFeatures, err)
+								return false
+							}
 
-						// Change something, but feature flags
-						comp.Units[0].LogLevel = client.UnitLogLevelInfo
-						comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
-							"type":    "fake",
-							"state":   int(client.UnitStateConfiguring),
-							"message": "Fake Healthy",
-						})
-
-						// Send change with no change in the features
-						err = m.Update([]component.Component{comp})
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
-								healthIteration, err)
-							return
-						}
-
-					// check again and finish test
-					case 3:
-						// check the component
-						res, err := m.PerformAction(
-							context.Background(),
-							comp,
-							comp.Units[0],
-							fakecmp.ActionRetrieveFeatures,
-							nil)
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
-								healthIteration, fakecmp.ActionRetrieveFeatures, err)
-							return
-						}
-
-						ff, err := features.Parse(map[string]any{"agent": res})
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to parse action %s response as features config: %w",
-								healthIteration, fakecmp.ActionRetrieveFeatures, err)
-							return
-						}
-						assert.True(t, ff.FQDN)
+							return ff.FQDN
+						}, 1*time.Second, 100*time.Millisecond, "failed to assert that FQDN feature flag was enabled by component")
 
 						doneCh <- struct{}{}
-						return
 					}
 
 				case client.UnitStateStarting:
 					// acceptable
 
 				case client.UnitStateConfiguring:
-					// set unit back to health, so other cases will run.
+					// set unit back to healthy, so other cases will run.
 					comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
 						"type":    "fake",
 						"state":   int(client.UnitStateHealthy),
