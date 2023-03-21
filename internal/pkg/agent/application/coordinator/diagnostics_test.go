@@ -108,7 +108,8 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 				componentsBytes, err := os.ReadFile(componentsUnitsFilePath)
 				require.NoError(t, err)
 				mockedComponents := make([]MockedComponentsUnits, 0, 5)
-				yaml.Unmarshal(componentsBytes, &mockedComponents)
+				err = yaml.Unmarshal(componentsBytes, &mockedComponents)
+				require.NoError(t, err)
 
 				componentStates := make([]runtime.ComponentComponentState, 0, len(mockedComponents))
 
@@ -119,13 +120,12 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 					unitsStates := map[runtime.ComponentUnitKey]runtime.ComponentUnitState{}
 					for _, mockedUnit := range comp.Units {
 						// FIXME: when trying to create the proto struct values from map, we panic trying to create the "source" attribute
-						// unitEC, err := component.ExpectedConfig(mockedUnit.Config)
-						// require.NoErrorf(t, err, "Error parsing unit expected config for component %q unit %q", comp.ID, mockedUnit.ID)
+						require.NoErrorf(t, err, "Error parsing unit expected config for component %q unit %q", comp.ID, mockedUnit.ID)
 						units = append(units, component.Unit{
 							ID:       mockedUnit.ID,
 							Type:     mockedUnit.Type,
 							LogLevel: mockedUnit.LogLevel,
-							// Config:   unitEC,
+							// Config:   mockedUnit.Config,
 						})
 						// FIXME this composite key is ok for Marshaling but then Unmarshaling into a generic map[any]any returns error,
 						// hence we cannot properly sanitize hook output - A custom unmarshaler would probably solve this
@@ -277,7 +277,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 				hookResult := hook.Hook(ctx)
 				stringHookResult := sanitizeHookResult(t, hook.Filename, hook.ContentType, hookResult)
 				// The output of hooks is VERY verbose even for simple configs but useful for debugging
-				t.Logf("Hook %s result: 👇\n--- #--- START ---#\n%s\n--- #--- END ---#", hook.Name, stringHookResult)
+				t.Logf("\n--- #--- File %[1]s START ---#\n%[2]s\n--- #--- File %[1]s END ---#", hook.Filename, stringHookResult)
 				expectedbytes, err := os.ReadFile(fmt.Sprintf("./testdata/simple_config/expected/%s", hook.Filename))
 				if assert.NoError(t, err) {
 					assert.YAMLEqf(t, string(expectedbytes), stringHookResult, "Unexpected YAML content for file %s", hook.Filename)
@@ -306,68 +306,96 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 	const hostKey = "host"
 	const pathKey = "path"
 
-	if contentType == "application/yaml" {
+	if contentType != "application/yaml" {
+		//substitute current running dir with a placeholder
+		testDir := path.Dir(os.Args[0])
+		t.Logf("Replacing test dir %s with %s", testDir, agentPathPlaceholder)
+		return strings.ReplaceAll(string(rawBytes), testDir, agentPathPlaceholder)
+	}
+
+	switch fileName {
+	case "pre-config.yaml", "computed-config.yaml":
 		yamlContent := map[any]any{}
 		err := yaml.Unmarshal(rawBytes, &yamlContent)
 		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
 
-		if fileName == "pre-config.yaml" || fileName == "computed-config.yaml" {
-			// get rid of runtime informations, since those depend on the machine where the test is executed, just assert that they exist
-			assert.Containsf(t, yamlContent, "runtime", "No runtime information found in YAML")
-			delete(yamlContent, "runtime")
+		// get rid of runtime informations, since those depend on the machine where the test is executed, just assert that they exist
+		assert.Containsf(t, yamlContent, "runtime", "No runtime information found in YAML")
+		delete(yamlContent, "runtime")
 
-			// fix id and directories
-			if assert.Containsf(t, yamlContent, hostKey, "config yaml does not contain %s key", hostKey) {
-				hostValue := yamlContent[hostKey]
-				if assert.IsType(t, map[interface{}]interface{}{}, hostValue) {
-					hostMap := hostValue.(map[interface{}]interface{})
-					if assert.Contains(t, hostMap, "id", "host map does not contain id") {
-						t.Logf("Substituting host id %q with %q", hostMap["id"], hostIDPlaceholder)
-						hostMap["id"] = hostIDPlaceholder
-					}
+		// fix id and directories
+		if assert.Containsf(t, yamlContent, hostKey, "config yaml does not contain %s key", hostKey) {
+			hostValue := yamlContent[hostKey]
+			if assert.IsType(t, map[interface{}]interface{}{}, hostValue) {
+				hostMap := hostValue.(map[interface{}]interface{})
+				if assert.Contains(t, hostMap, "id", "host map does not contain id") {
+					t.Logf("Substituting host id %q with %q", hostMap["id"], hostIDPlaceholder)
+					hostMap["id"] = hostIDPlaceholder
 				}
 			}
+		}
 
-			if assert.Containsf(t, yamlContent, pathKey, "config yaml does not contain agent path map") {
-				pathValue := yamlContent[pathKey]
-				if assert.IsType(t, map[interface{}]interface{}{}, pathValue) {
-					pathMap := pathValue.(map[interface{}]interface{})
-					currentDir := pathMap["config"].(string)
-					for _, key := range []string{"config", "data", "home", "logs"} {
-						if assert.Containsf(t, pathMap, key, "path map is missing expected key %q", key) {
-							value := pathMap[key]
-							if assert.IsType(t, "", value) {
-								valueString := value.(string)
-								valueString = strings.Replace(valueString, currentDir, agentPathPlaceholder, 1)
-								pathMap[key] = filepath.ToSlash(valueString)
-							}
+		if assert.Containsf(t, yamlContent, pathKey, "config yaml does not contain agent path map") {
+			pathValue := yamlContent[pathKey]
+			if assert.IsType(t, map[interface{}]interface{}{}, pathValue) {
+				pathMap := pathValue.(map[interface{}]interface{})
+				currentDir := pathMap["config"].(string)
+				for _, key := range []string{"config", "data", "home", "logs"} {
+					if assert.Containsf(t, pathMap, key, "path map is missing expected key %q", key) {
+						value := pathMap[key]
+						if assert.IsType(t, "", value) {
+							valueString := value.(string)
+							valueString = strings.Replace(valueString, currentDir, agentPathPlaceholder, 1)
+							pathMap[key] = filepath.ToSlash(valueString)
 						}
 					}
 				}
 			}
-		} else if fileName == "components_expected.yaml" {
-			rawComponents, ok := yamlContent["components"].([]any)
+		}
+		sanitizedBytes, err := yaml.Marshal(yamlContent)
+		assert.NoError(t, err)
+		return string(sanitizedBytes)
 
-			if assert.True(t, ok, "unexpected component format in file %s", fileName) {
-				sort.Sort(SortByID(rawComponents))
-				// fix the paths to forward slash for each
-				for _, comp := range rawComponents {
-					compInputSpec := comp.(map[any]any)["input_spec"].(map[any]any)
-					compInputSpec["binary_path"] = filepath.ToSlash(compInputSpec["binary_path"].(string))
-				}
-				yamlContent["components"] = rawComponents
+	case "components_expected.yaml":
+		yamlContent := map[any]any{}
+		err := yaml.Unmarshal(rawBytes, &yamlContent)
+		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
+
+		rawComponents, ok := yamlContent["components"].([]any)
+
+		if assert.True(t, ok, "unexpected component format in file %s", fileName) {
+			sort.Sort(SortByID(rawComponents))
+			// fix the paths to forward slash for each
+			for _, comp := range rawComponents {
+				compInputSpec := comp.(map[any]any)["input_spec"].(map[any]any)
+				compInputSpec["binary_path"] = filepath.ToSlash(compInputSpec["binary_path"].(string))
 			}
+			yamlContent["components"] = rawComponents
+		}
+		sanitizedBytes, err := yaml.Marshal(yamlContent)
+		assert.NoError(t, err)
+		return string(sanitizedBytes)
 
+	case "components_actual.yaml":
+		yamlContent := map[any]any{}
+		err := yaml.Unmarshal(rawBytes, &yamlContent)
+		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
+
+		rawComponents, ok := yamlContent["components"].([]any)
+		if assert.True(t, ok, "unexpected component format in file %s", fileName) {
+			// fix the paths to forward slash for each
+			for _, comp := range rawComponents {
+				compInputSpec := comp.(map[any]any)["component"].(map[any]any)["input_spec"].(map[any]any)
+				compInputSpec["binary_path"] = filepath.ToSlash(compInputSpec["binary_path"].(string))
+			}
+			yamlContent["components"] = rawComponents
 		}
 		sanitizedBytes, err := yaml.Marshal(yamlContent)
 		assert.NoError(t, err)
 		return string(sanitizedBytes)
 	}
 
-	// substitute current running dir with a placeholder
-	testDir := path.Dir(os.Args[0])
-	t.Logf("Replacing test dir %s with %s", testDir, agentPathPlaceholder)
-	return strings.ReplaceAll(string(rawBytes), testDir, agentPathPlaceholder)
+	return string(rawBytes)
 }
 
 // SortByID makes an array of map[any]any sortable by the "id" property
