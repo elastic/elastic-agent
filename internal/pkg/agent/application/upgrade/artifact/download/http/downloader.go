@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	packagePermissions = 0660
+	packagePermissions = 0o660
 
 	// downloadProgressIntervalPercentage defines how often to report the current download progress when percentage
 	// of time has passed in the overall interval for the complete download to complete. 5% is a good default, as
@@ -51,6 +51,7 @@ type Downloader struct {
 func NewDownloader(log progressLogger, config *artifact.Config) (*Downloader, error) {
 	client, err := config.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
 	)
 	if err != nil {
 		return nil, err
@@ -173,7 +174,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 
 	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
-		if err := os.MkdirAll(destinationDir, 0755); err != nil {
+		if err := os.MkdirAll(destinationDir, 0o755); err != nil {
 			return "", err
 		}
 	}

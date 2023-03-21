@@ -33,12 +33,14 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-var (
-	// ErrNotUpgradable error is returned when upgrade cannot be performed.
-	ErrNotUpgradable = errors.New(
-		"cannot be upgraded; must be installed with install sub-command and " +
-			"running under control of the systems supervisor")
-)
+// ErrNotUpgradable error is returned when upgrade cannot be performed.
+var ErrNotUpgradable = errors.New(
+	"cannot be upgraded; must be installed with install sub-command and " +
+		"running under control of the systems supervisor")
+
+// ErrUpgradeInProgress error is returned if two or more upgrades are
+// attempted at the same time.
+var ErrUpgradeInProgress = errors.New("upgrade already in progress")
 
 // ReExecManager provides an interface to perform re-execution of the entire agent.
 type ReExecManager interface {
@@ -119,8 +121,7 @@ type ConfigChange interface {
 }
 
 // ErrorReporter provides an interface for any manager that is handled by the coordinator to report errors.
-type ErrorReporter interface {
-}
+type ErrorReporter interface{}
 
 // ConfigManager provides an interface to run and watch for configuration changes.
 type ConfigManager interface {
@@ -247,6 +248,22 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}); errors.Is(err, capabilities.ErrBlocked) {
 			return ErrNotUpgradable
 		}
+	}
+
+	// A previous upgrade may be cancelled and needs some time to
+	// run the callback to clear the state
+	var err error
+	for i := 0; i < 5; i++ {
+		s := c.state.State()
+		if s.State != agentclient.Upgrading {
+			err = nil
+			break
+		}
+		err = ErrUpgradeInProgress
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		return err
 	}
 
 	// override the overall state to upgrading until the re-execution is complete
