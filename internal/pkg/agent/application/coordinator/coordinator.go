@@ -8,6 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/hashicorp/go-multierror"
 
 	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
@@ -159,6 +162,9 @@ type StateFetcher interface {
 	State(bool) State
 }
 
+// CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
+const CoordinatorShutdownTimeout = time.Second * 5
+
 // Coordinator manages the entire state of the Elastic Agent.
 //
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
@@ -187,6 +193,9 @@ type Coordinator struct {
 
 	state coordinatorState
 }
+
+// ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
+var ErrFatalCoordinator = errors.New("fatal error in coordinator")
 
 // New creates a new coordinator.
 func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
@@ -415,6 +424,9 @@ func (c *Coordinator) Run(ctx context.Context) error {
 				// do not restart
 				return err
 			}
+			if errors.Is(err, ErrFatalCoordinator) {
+				return err
+			}
 		}
 		c.state.state = agentclient.Failed
 		c.state.message = fmt.Sprintf("Coordinator failed and will be restarted: %s", err)
@@ -572,22 +584,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			runtimeErr := <-runtimeErrCh
-			c.runtimeMgrErr = runtimeErr
-			configErr := <-configErrCh
-			c.configMgrErr = configErr
-			varsErr := <-varsErrCh
-			c.varsMgrErr = varsErr
-			if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-				return runtimeErr
-			}
-			if configErr != nil && !errors.Is(configErr, context.Canceled) {
-				return configErr
-			}
-			if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-				return varsErr
-			}
-			return ctx.Err()
+			return c.handleCoordinatorDone(ctx, varsErrCh, runtimeErrCh, configErrCh)
 		case <-runtimeRun:
 			if ctx.Err() == nil {
 				cancel()
@@ -810,6 +807,58 @@ type coordinatorState struct {
 type coordinatorOverrideState struct {
 	state   agentclient.State
 	message string
+}
+
+func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runtimeErrCh, configErrCh chan error) error {
+	var runtimeErr error
+	var configErr error
+	var varsErr error
+	// in case other components are locked up, let us time out
+	timeoutWait := time.NewTimer(CoordinatorShutdownTimeout)
+
+	for {
+		select {
+		case <-timeoutWait.C:
+			var timeouts []string
+			if runtimeErr == nil {
+				timeouts = []string{"no response from runtime component"}
+			}
+			if configErr == nil {
+				timeouts = append(timeouts, "no response from configWatcher component")
+			}
+			if varsErr == nil {
+				timeouts = append(timeouts, "no response from varsWatcher component")
+			}
+			c.logger.Debugf("timeout while waiting for other components to shut down: %v", timeouts)
+			break
+		case err := <-runtimeErrCh:
+			runtimeErr = err
+		case err := <-configErrCh:
+			configErr = err
+		case err := <-varsErrCh:
+			varsErr = err
+		}
+		if runtimeErr != nil && configErr != nil && varsErr != nil {
+			timeoutWait.Stop()
+			break
+		}
+	}
+	// try not to lose any errors
+	var combinedErr error
+	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
+	}
+	if configErr != nil && !errors.Is(configErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
+	}
+	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
+	}
+	if combinedErr != nil {
+		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
+	}
+	// if there's no component errors, continue to pass along the context error
+	return ctx.Err()
 }
 
 type coordinatorComponentLog struct {
