@@ -141,8 +141,8 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	info := sysInfo.Info()
 
+	info := sysInfo.Info()
 	hostname := info.FQDNAwareHostname(features.FQDN())
 
 	return &ECSMeta{
@@ -188,8 +188,8 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	info := sysInfo.Info()
 
+	info := sysInfo.Info()
 	hostname := sysInfo.Info().FQDNAwareHostname(features.FQDN())
 
 	// Agent

@@ -11,10 +11,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gofrs/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	protobuf "google.golang.org/protobuf/proto"
+
+	"github.com/gofrs/uuid"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
