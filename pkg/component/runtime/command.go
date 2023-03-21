@@ -144,11 +144,12 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 			c.syncLogLevels()
 
 			sendExpected := c.state.syncExpected(&newComp)
-			changed := c.state.syncUnits(&newComp)
 			if sendExpected || c.state.unsettled() {
 				comm.CheckinExpected(c.state.toCheckinExpected(), nil)
 			}
-			if changed {
+
+			unitsChanged := c.state.syncUnits(&newComp)
+			if unitsChanged {
 				c.sendObserved()
 			}
 		case checkin := <-comm.CheckinObserved():
