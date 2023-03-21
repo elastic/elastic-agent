@@ -171,6 +171,9 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 	}
 	mustWriteToChannelBeforeTimeout(t, componentState, componentsUpdateChannel, 100*time.Millisecond)
 
+	// FIXME there's no way to know if the coordinator processed the runtime component states, wait and hope for the best
+	time.Sleep(50 * time.Millisecond)
+
 	diagHooks := sut.DiagnosticHooks()
 	t.Logf("Received diagnostics: %+v", diagHooks)
 	assert.NotEmpty(t, diagHooks)
