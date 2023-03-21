@@ -100,11 +100,7 @@ func getHostInfo() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	info := sysInfo.Info()
-	name := info.Hostname
-	if features.FQDN() {
-		name = info.FQDN
-	}
+	name := sysInfo.Info().FQDNAwareHostname(features.FQDN())
 
 	return map[string]interface{}{
 		"id":           info.UniqueID,

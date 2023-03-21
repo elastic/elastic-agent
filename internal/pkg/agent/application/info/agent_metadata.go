@@ -143,12 +143,7 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 	}
 	info := sysInfo.Info()
 
-	var hostname string
-	if features.FQDN() {
-		hostname = info.FQDN
-	} else {
-		hostname = info.Hostname
-	}
+	hostname := info.FQDNAwareHostname(features.FQDN())
 
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
@@ -195,12 +190,7 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 	}
 	info := sysInfo.Info()
 
-	var hostname string
-	if features.FQDN() {
-		hostname = info.FQDN
-	} else {
-		hostname = info.Hostname
-	}
+	hostname := sysInfo.Info().FQDNAwareHostname(features.FQDN())
 
 	// Agent
 	meta[agentIDKey] = i.agentID

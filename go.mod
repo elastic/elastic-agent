@@ -161,3 +161,5 @@ replace (
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
+
+replace github.com/elastic/go-sysinfo => github.com/ycombinator/go-sysinfo v0.0.0-20230321190835-88ac7c4fc28b
