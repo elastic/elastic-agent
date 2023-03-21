@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/sysinfo/types"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
 
@@ -100,7 +101,8 @@ func getHostInfo() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	name := sysInfo.Info().FQDNAwareHostname(features.FQDN())
+	info := types.HostInfo(sysInfo.Info())
+	name := info.FQDNAwareHostname(features.FQDN())
 
 	return map[string]interface{}{
 		"id":           info.UniqueID,

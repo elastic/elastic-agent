@@ -9,9 +9,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/elastic/elastic-agent-libs/sysinfo/types"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
-	"github.com/elastic/go-sysinfo/types"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -142,7 +142,7 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 		return nil, err
 	}
 
-	info := sysInfo.Info()
+	info := types.HostInfo(sysInfo.Info())
 	hostname := info.FQDNAwareHostname(features.FQDN())
 
 	return &ECSMeta{
@@ -189,8 +189,8 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	info := sysInfo.Info()
-	hostname := sysInfo.Info().FQDNAwareHostname(features.FQDN())
+	info := types.HostInfo(sysInfo.Info())
+	hostname := info.FQDNAwareHostname(features.FQDN())
 
 	// Agent
 	meta[agentIDKey] = i.agentID
