@@ -240,14 +240,17 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	p := filepath.Join("pkg", "component", "fake")
+	wd, _ := os.Getwd()
+	p := filepath.Join(wd, "pkg", "component", "fake")
 	for _, name := range []string{"component", "shipper"} {
 		binary := name
 		if runtime.GOOS == "windows" {
 			binary += ".exe"
 		}
-		outputName := filepath.Join(p, name, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join("github.com/elastic/elastic-agent", p, name, "..."))
+
+		fakeDir := filepath.Join(p, name)
+		outputName := filepath.Join(fakeDir, binary)
+		err := RunGo("build", "-o", outputName, filepath.Join(fakeDir))
 		if err != nil {
 			return err
 		}
