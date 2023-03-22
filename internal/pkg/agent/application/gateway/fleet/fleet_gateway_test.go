@@ -23,7 +23,6 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
@@ -70,7 +69,7 @@ func newTestingClient() *testingClient {
 	return &testingClient{received: make(chan struct{}, 1)}
 }
 
-type withGatewayFunc func(*testing.T, gateway.FleetGateway, *testingClient, *scheduler.Stepper)
+type withGatewayFunc func(*testing.T, *fleetGateway, *testingClient, *scheduler.Stepper)
 
 func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
@@ -128,7 +127,7 @@ func TestFleetGateway(t *testing.T) {
 
 	t.Run("send no event and receive no action", withGateway(agentInfo, settings, func(
 		t *testing.T,
-		gateway gateway.FleetGateway,
+		gateway *fleetGateway,
 		client *testingClient,
 		scheduler *scheduler.Stepper,
 	) {
@@ -160,7 +159,7 @@ func TestFleetGateway(t *testing.T) {
 
 	t.Run("Successfully connects and receives a series of actions", withGateway(agentInfo, settings, func(
 		t *testing.T,
-		gateway gateway.FleetGateway,
+		gateway *fleetGateway,
 		client *testingClient,
 		scheduler *scheduler.Stepper,
 	) {
@@ -321,7 +320,7 @@ func TestRetriesOnFailures(t *testing.T) {
 	t.Run("When the gateway fails to communicate with the checkin API we will retry",
 		withGateway(agentInfo, settings, func(
 			t *testing.T,
-			gateway gateway.FleetGateway,
+			gateway *fleetGateway,
 			client *testingClient,
 			scheduler *scheduler.Stepper,
 		) {
@@ -369,7 +368,7 @@ func TestRetriesOnFailures(t *testing.T) {
 			Backoff:  backoffSettings{Init: 10 * time.Minute, Max: 20 * time.Minute},
 		}, func(
 			t *testing.T,
-			gateway gateway.FleetGateway,
+			gateway *fleetGateway,
 			client *testingClient,
 			scheduler *scheduler.Stepper,
 		) {
@@ -406,7 +405,7 @@ func (e *emptyStateFetcher) State() state.State {
 	return state.State{}
 }
 
-func runFleetGateway(ctx context.Context, g gateway.FleetGateway) <-chan error {
+func runFleetGateway(ctx context.Context, g *fleetGateway) <-chan error {
 	done := make(chan bool)
 	errCh := make(chan error, 1)
 	go func() {

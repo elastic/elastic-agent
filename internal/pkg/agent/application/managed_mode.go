@@ -13,7 +13,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -176,6 +175,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	}
 
+	// FIXME this should not be instantiated directly but injected as interface FleetGateway
 	gateway, err := fleetgateway.New(
 		m.log,
 		m.agentInfo,
@@ -219,7 +219,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 }
 
 // runDispatcher passes actions collected from gateway to dispatcher or calls Dispatch with no actions every flushInterval.
-func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, fleetGateway gateway.FleetGateway, actionAcker acker.Acker, flushInterval time.Duration) {
+func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, fleetGateway FleetGateway, actionAcker acker.Acker, flushInterval time.Duration) {
 	t := time.NewTimer(flushInterval)
 	for {
 		select {

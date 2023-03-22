@@ -12,7 +12,6 @@ import (
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
@@ -89,7 +88,7 @@ func New(
 	acker acker.Acker,
 	stateFetcher state.StateFetcher,
 	stateStore stateStore,
-) (gateway.FleetGateway, error) {
+) (*fleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
@@ -113,7 +112,7 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateFetcher state.StateFetcher,
 	stateStore stateStore,
-) (gateway.FleetGateway, error) {
+) (*fleetGateway, error) {
 	return &fleetGateway{
 		log:          log,
 		client:       client,
