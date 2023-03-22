@@ -11,8 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/mholt/archiver/v3"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -52,12 +50,6 @@ func downloadFile(filepath string, url string) error {
 
 	_, err = io.Copy(out, resp.Body)
 	return err
-}
-
-func UnpackTar(version string) error {
-	// TODO: slow in containers
-	_, fileName := tarName(version)
-	return archiver.Unarchive(fileName, ".")
 }
 
 func tarName(version string) (string, string) {
