@@ -100,7 +100,6 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 		assert.ErrorIs(t, coordErr, context.Canceled, "Coordinator exited with unexpected error")
 	}()
 
-	//Provide vars
 	processors := transpiler.Processors{
 		{
 			"add_fields": map[string]interface{}{
@@ -135,7 +134,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 	mustWriteToChannelBeforeTimeout(t, []*transpiler.Vars{vars}, helper.varsChannel, 100*time.Millisecond)
 
 	// Inject initial configuration - after starting coordinator
-	configBytes, err := os.ReadFile("./testdata/simple_config/elastic-agent.yml")
+	configBytes, err := os.ReadFile(path.Join(".", "testdata", "simple_config", "elastic-agent.yml"))
 	require.NoError(t, err)
 
 	initialConf := config.MustNewConfigFrom(configBytes)
@@ -184,22 +183,36 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 	}
 
 	for hookName, diagFileName := range expectedDiagnosticHooks {
-		contained := assert.Contains(t, hooksMap, hookName)
-		if contained {
-			hook := hooksMap[hookName]
-			assert.Equal(t, diagFileName, hook.Filename)
-			hookResult := hook.Hook(ctx)
-			stringHookResult := sanitizeHookResult(t, hook.Filename, hook.ContentType, hookResult)
-			// The output of hooks is VERY verbose even for simple configs but useful for debugging
-			t.Logf("Hook %s result: 👇\n--- #--- START ---#\n%s\n--- #--- END ---#", hook.Name, stringHookResult)
-			expectedbytes, err := os.ReadFile(fmt.Sprintf("./testdata/simple_config/expected/%s", hook.Filename))
-			if assert.NoError(t, err) {
-				assert.YAMLEqf(t, string(expectedbytes), stringHookResult, "Unexpected YAML content for file %s", hook.Filename)
-			}
+		if !assert.Contains(t, hooksMap, hookName) {
+			continue // this iteration failed, no reason to do further tests, moving forward
+		}
+
+		hook := hooksMap[hookName]
+		assert.Equal(t, diagFileName, hook.Filename)
+		hookResult := hook.Hook(ctx)
+		stringHookResult := sanitizeHookResult(t, hook.Filename, hook.ContentType, hookResult)
+		// The output of hooks is VERY verbose even for simple configs but useful for debugging
+		t.Logf("Hook %s result: 👇\n--- #--- START ---#\n%s\n--- #--- END ---#", hook.Name, stringHookResult)
+		expectedbytes, err := os.ReadFile(fmt.Sprintf("./testdata/simple_config/expected/%s", hook.Filename))
+		if assert.NoError(t, err) {
+			assert.YAMLEqf(t, string(expectedbytes), stringHookResult, "Unexpected YAML content for file %s", hook.Filename)
 		}
 	}
 }
 
+// sanitizeHookResult will try to get rid of all the specific part of hooks output that may vary from one run to another
+// on different machines. The sanitized result is then compared against the expected outputs (and this content should be the same
+// no matter the OS, version, path separator etc.)
+// More specifically:
+//
+// for yaml content type:
+//   - we remove the runtime informations (we just check that they are present)
+//   - we replace the cwd where the test is running with the "<AgentRunDir>" placeholder
+//   - we replace the hostId with the "<HostID>" placeholder
+//   - we transform all paths to forward slash separated using filepath.ToSlash (sorry Windows 😅)
+//
+// for non-yaml content type:
+//   - we replace the cwd where the test is running with the "<AgentRunDir>" placeholder (it's a best effort thing)
 func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBytes []byte) (retVal string) {
 	const agentPathPlaceholder string = "<AgentRunDir>"
 	const hostIDPlaceholder string = "<HostID>"
@@ -216,7 +229,7 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 			assert.Containsf(t, yamlContent, "runtime", "No runtime information found in YAML")
 			delete(yamlContent, "runtime")
 
-			//fix id and directories
+			// fix id and directories
 			if assert.Containsf(t, yamlContent, hostKey, "config yaml does not contain %s key", hostKey) {
 				hostValue := yamlContent[hostKey]
 				if assert.IsType(t, map[interface{}]interface{}{}, hostValue) {
@@ -264,18 +277,22 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 		return string(sanitizedBytes)
 	}
 
-	//substitute current running dir with a placeholder
+	// substitute current running dir with a placeholder
 	testDir := path.Dir(os.Args[0])
 	t.Logf("Replacing test dir %s with %s", testDir, agentPathPlaceholder)
 	return strings.ReplaceAll(string(rawBytes), testDir, agentPathPlaceholder)
 }
 
+// SortByID makes an array of map[any]any sortable by the "id" property
+// It's used to stabilize the order in which some items in a YAML array
+// appear in a diagnostic hook output.
+// If we cannot cast the elements to maps or if the "id" property is not
+// a string, this will panic (should never happen for our outputs)
 type SortByID []any
 
 func (a SortByID) Len() int      { return len(a) }
 func (a SortByID) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a SortByID) Less(i, j int) bool {
-	// ugly but ids are mandatory and they must be a string, panic otherwise
 	iID := a[i].(map[any]any)["id"].(string)
 	jID := a[j].(map[any]any)["id"].(string)
 	return iID < jID
@@ -303,6 +320,8 @@ type coordinatorTestHelper struct {
 }
 
 func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, isManaged bool) *coordinatorTestHelper {
+	t.Helper()
+
 	helper := new(coordinatorTestHelper)
 
 	// Runtime manager basic wiring
