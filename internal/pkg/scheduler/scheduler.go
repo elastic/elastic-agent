@@ -9,13 +9,6 @@ import (
 	"time"
 )
 
-// Scheduler simple interface that encapsulate the scheduling logic, this is useful if you want to
-// test asynchronous code in a synchronous way.
-type Scheduler interface {
-	WaitTick() <-chan time.Time
-	Stop()
-}
-
 // Stepper is a scheduler where each Tick is manually triggered, this is useful in scenario
 // when you want to test the behavior of asynchronous code in a synchronous way.
 type Stepper struct {

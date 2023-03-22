@@ -68,7 +68,7 @@ type stateStore interface {
 type fleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
-	scheduler          scheduler.Scheduler
+	scheduler          Scheduler
 	settings           *fleetGatewaySettings
 	agentInfo          agentInfo
 	acker              acker.Acker
@@ -108,7 +108,7 @@ func newFleetGatewayWithScheduler(
 	settings *fleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
-	scheduler scheduler.Scheduler,
+	scheduler Scheduler,
 	acker acker.Acker,
 	stateFetcher state.StateFetcher,
 	stateStore stateStore,

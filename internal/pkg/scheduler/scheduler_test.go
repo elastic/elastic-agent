@@ -16,8 +16,12 @@ type e struct {
 	at    time.Time
 }
 
+type schedulertest interface {
+	WaitTick() <-chan time.Time
+}
+
 type tickRecorder struct {
-	scheduler Scheduler
+	scheduler schedulertest
 	count     int
 	done      chan struct{}
 	recorder  chan e
@@ -45,7 +49,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("PeriodicJitter scheduler", testPeriodicJitter)
 }
 
-func newTickRecorder(scheduler Scheduler) *tickRecorder {
+func newTickRecorder[S schedulertest](scheduler S) *tickRecorder {
 	return &tickRecorder{
 		scheduler: scheduler,
 		done:      make(chan struct{}),
