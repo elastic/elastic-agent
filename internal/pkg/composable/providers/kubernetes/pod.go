@@ -390,20 +390,14 @@ func generateContainerData(
 
 				if config.Hints.Enabled() { // This is "hints based autodiscovery flow"
 					if !managed {
-						if ann, ok := k8sMapping["annotations"]; ok {
-							annotations, _ := ann.(mapstr.M)
-							hints := utils.GenerateHints(annotations, "", config.Prefix)
-							if len(hints) > 0 {
-								logger.Debugf("Extracted hints are :%v", hints)
-								hintsMapping := GenerateHintsMapping(hints, k8sMapping, logger, c.ID)
-								logger.Debugf("Generated hints mappings are :%v", hintsMapping)
-								_ = comm.AddOrUpdate(
-									eventID,
-									PodPriority,
-									map[string]interface{}{"hints": hintsMapping},
-									processors,
-								)
-							}
+						hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+						if len(hintsMapping) > 0 {
+							_ = comm.AddOrUpdate(
+								eventID,
+								PodPriority,
+								map[string]interface{}{"hints": hintsMapping},
+								processors,
+							)
 						}
 					}
 				} else { // This is the "template-based autodiscovery" flow
@@ -414,20 +408,14 @@ func generateContainerData(
 			k8sMapping["container"] = containerMeta
 			if config.Hints.Enabled() { // This is "hints based autodiscovery flow"
 				if !managed {
-					if ann, ok := k8sMapping["annotations"]; ok {
-						annotations, _ := ann.(mapstr.M)
-						hints := utils.GenerateHints(annotations, "", config.Prefix)
-						if len(hints) > 0 {
-							logger.Debugf("Extracted hints are :%v", hints)
-							hintsMapping := GenerateHintsMapping(hints, k8sMapping, logger, c.ID)
-							logger.Debugf("Generated hints mappings are :%v", hintsMapping)
-							_ = comm.AddOrUpdate(
-								eventID,
-								PodPriority,
-								map[string]interface{}{"hints": hintsMapping},
-								processors,
-							)
-						}
+					hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+					if len(hintsMapping) > 0 {
+						_ = comm.AddOrUpdate(
+							eventID,
+							PodPriority,
+							map[string]interface{}{"hints": hintsMapping},
+							processors,
+						)
 					}
 				}
 			} else { // This is the "template-based autodiscovery" flow
@@ -435,4 +423,18 @@ func generateContainerData(
 			}
 		}
 	}
+}
+
+func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) mapstr.M {
+	hintsMapping := mapstr.M{}
+	if ann, ok := k8sMapping["annotations"]; ok {
+		annotations, _ := ann.(mapstr.M)
+		hints := utils.GenerateHints(annotations, "", prefix)
+		if len(hints) > 0 {
+			logger.Debugf("Extracted hints are :%v", hints)
+			hintsMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
+			logger.Debugf("Generated hints mappings are :%v", hintsMapping)
+		}
+	}
+	return hintsMapping
 }
