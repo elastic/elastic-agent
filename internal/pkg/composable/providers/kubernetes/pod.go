@@ -412,7 +412,27 @@ func generateContainerData(
 			}
 		} else {
 			k8sMapping["container"] = containerMeta
-			_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+			if config.Hints.Enabled() { // This is "hints based autodiscovery flow"
+				if !managed {
+					if ann, ok := k8sMapping["annotations"]; ok {
+						annotations, _ := ann.(mapstr.M)
+						hints := utils.GenerateHints(annotations, "", config.Prefix)
+						if len(hints) > 0 {
+							logger.Debugf("Extracted hints are :%v", hints)
+							hintsMapping := GenerateHintsMapping(hints, k8sMapping, logger, c.ID)
+							logger.Debugf("Generated hints mappings are :%v", hintsMapping)
+							_ = comm.AddOrUpdate(
+								eventID,
+								PodPriority,
+								map[string]interface{}{"hints": hintsMapping},
+								processors,
+							)
+						}
+					}
+				}
+			} else { // This is the "template-based autodiscovery" flow
+				_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+			}
 		}
 	}
 }
