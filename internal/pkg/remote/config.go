@@ -45,8 +45,8 @@ func (p *Protocol) Unpack(from string) error {
 // DefaultClientConfig creates default configuration for client.
 func DefaultClientConfig() Config {
 	transport := httpcommon.DefaultHTTPTransportSettings()
-	// Default timeout 10 minutes, expecting Fleet Server to control the long poll with default timeout of 5 minutes
-	transport.Timeout = 10 * time.Minute
+	// Default timeout 35 minutes, expecting Fleet Server to control the long poll with default timeout of 30 minutes
+	transport.Timeout = 35 * time.Minute
 
 	return Config{
 		Protocol:  ProtocolHTTP,

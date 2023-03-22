@@ -17,6 +17,11 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 )
 
+func TestDefaultConfig(t *testing.T) {
+	c := DefaultClientConfig()
+	assert.Equal(t, 35*time.Minute, c.Transport.Timeout)
+}
+
 func TestPackUnpack(t *testing.T) {
 	c := Config{
 		Protocol: Protocol("https"),
