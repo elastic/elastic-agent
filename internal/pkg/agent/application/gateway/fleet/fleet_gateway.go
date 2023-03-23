@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/help"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -194,7 +195,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
 					"retry_after_ns", bo.NextWait())
 			} else {
-				f.log.Errorw("Cannot checkin in with fleet-server, retrying",
+				f.log.Errorw("Cannot checkin in with fleet-server, retrying. "+help.GetTroubleshootMessage(),
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
 					"retry_after_ns", bo.NextWait())
 			}
