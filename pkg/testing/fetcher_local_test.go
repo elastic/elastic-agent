@@ -2,8 +2,8 @@ package testing
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -12,31 +12,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLocalFetcher_Fetch(t *testing.T) {
-	td := t.TempDir()
-	src := filepath.Join(td, "source")
-	dst := filepath.Join(td, "destination")
-
-	w, err := os.Create(src)
-	require.NoError(t, err)
-	w.Write([]byte("testing"))
-	w.Close()
-
-	f := LocalFetcher("8.7.0", src)
-	require.NoError(t, f.Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "8.7.0", dst))
-
-	content, err := ioutil.ReadFile(dst)
-	require.NoError(t, err)
-
-	assert.Equal(t, []byte("testing"), content)
+func TestLocalFetcher_Name(t *testing.T) {
+	f := LocalFetcher(t.TempDir())
+	require.Equal(t, "local", f.Name())
 }
 
-func TestLocalFetcher_Fetch_VersionMismatch(t *testing.T) {
+func TestLocalFetcher_IgnoresSnapshot(t *testing.T) {
 	td := t.TempDir()
-	src := filepath.Join(td, "source")
-	dst := filepath.Join(td, "destination")
 
-	f := LocalFetcher("8.7.0", src)
-	err := f.Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "8.6.0", dst)
-	assert.ErrorIs(t, err, ErrVersionMismatch)
+	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
+	require.NoError(t, err)
+
+	snapshotPath := fmt.Sprintf("elastic-agent-8.7.0-SNAPSHOT-%s", suffix)
+	notSnapshotPath := fmt.Sprintf("elastic-agent-8.7.0-%s", suffix)
+	require.NoError(t, ioutil.WriteFile(filepath.Join(td, snapshotPath), []byte("snapshot contents"), 0644))
+	require.NoError(t, ioutil.WriteFile(filepath.Join(td, notSnapshotPath), []byte("not snapshot contents"), 0644))
+
+	f := LocalFetcher(td)
+
+	tmp := t.TempDir()
+	res, err := f.Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "8.7.0")
+	require.NoError(t, err)
+
+	err = res.Fetch(context.Background(), t, tmp)
+	require.NoError(t, err)
+	content, err := ioutil.ReadFile(filepath.Join(tmp, res.Name()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []byte("not snapshot contents"), content)
+}
+
+func TestLocalFetcher_SnapshotFirst(t *testing.T) {
+	td := t.TempDir()
+
+	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
+	require.NoError(t, err)
+
+	snapshotPath := fmt.Sprintf("elastic-agent-8.7.0-SNAPSHOT-%s", suffix)
+	notSnapshotPath := fmt.Sprintf("elastic-agent-8.7.0-%s", suffix)
+	require.NoError(t, ioutil.WriteFile(filepath.Join(td, snapshotPath), []byte("snapshot contents"), 0644))
+	require.NoError(t, ioutil.WriteFile(filepath.Join(td, notSnapshotPath), []byte("not snapshot contents"), 0644))
+
+	f := LocalFetcher(td, WithLocalSnapshotOnly())
+
+	tmp := t.TempDir()
+	res, err := f.Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "8.7.0")
+	require.NoError(t, err)
+
+	err = res.Fetch(context.Background(), t, tmp)
+	require.NoError(t, err)
+	content, err := ioutil.ReadFile(filepath.Join(tmp, res.Name()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []byte("snapshot contents"), content)
 }

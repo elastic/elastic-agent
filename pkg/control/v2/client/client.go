@@ -167,31 +167,50 @@ type ClientStateWatch interface {
 	Recv() (*AgentState, error)
 }
 
+// Option is an option to adjust how the client operates.
+type Option func(c *client)
+
+// WithAddress adjust the connection address for the client.
+func WithAddress(address string) Option {
+	return func(c *client) {
+		c.address = address
+	}
+}
+
+// WithMaxMsgSize adjures the GRPC connection maximum message size.
+func WithMaxMsgSize(maxMsgSize int) Option {
+	return func(c *client) {
+		c.maxMsgSize = maxMsgSize
+	}
+}
+
 // client manages the state and communication to the Elastic Agent.
 type client struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
 	client     cproto.ElasticAgentControlClient
-	grpcConfig *configuration.GRPCConfig
+	address    string
+	maxMsgSize int
 }
 
-// New creates a client connection to Elastic Agent. It uses default grpc configuration for client initialization.
-func New() Client {
-	return NewWithConfig(configuration.DefaultGRPCConfig())
-}
-
-// NewWithConfig creates a client connection to Elastic Agent.
-func NewWithConfig(grpcConfig *configuration.GRPCConfig) Client {
-	return &client{
-		grpcConfig: grpcConfig,
+// New creates a client connection to Elastic Agent.
+func New(opts ...Option) Client {
+	cfg := configuration.DefaultGRPCConfig()
+	c := &client{
+		address:    control.Address(),
+		maxMsgSize: cfg.MaxMsgSize,
 	}
+	for _, o := range opts {
+		o(c)
+	}
+	return c
 }
 
 // Connect connects to the running Elastic Agent.
 func (c *client) Connect(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	conn, err := dialContext(ctx, c.grpcConfig)
+	conn, err := dialContext(ctx, c.address, c.maxMsgSize)
 	if err != nil {
 		return err
 	}
