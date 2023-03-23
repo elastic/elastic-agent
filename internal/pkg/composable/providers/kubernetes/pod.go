@@ -155,7 +155,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 	data := generatePodData(pod, p.metagen, namespaceAnnotations)
 	data.mapping["scope"] = p.scope
 
-	if p.config.Hints.Enabled() { // This is "hints based autodiscovery flow"
+	if p.config.Hints.Enabled { // This is "hints based autodiscovery flow"
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
 				annotations, _ := ann.(mapstr.M)
@@ -388,10 +388,20 @@ func generateContainerData(
 				_, _ = containerMeta.Put("port_name", port.Name)
 				k8sMapping["container"] = containerMeta
 
-				if config.Hints.Enabled() { // This is "hints based autodiscovery flow"
+				if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 					if !managed {
 						hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 						if len(hintsMapping) > 0 {
+							_ = comm.AddOrUpdate(
+								eventID,
+								PodPriority,
+								map[string]interface{}{"hints": hintsMapping},
+								processors,
+							)
+						} else if config.Hints.DefaultContainerLogs {
+							// in case of no package detected in the hints fallback to the generic log collection
+							_, _ = hintsMapping.Put("generic_logs.container_logs.enabled", true)
+							_, _ = hintsMapping.Put("container_id", c.ID)
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
@@ -406,10 +416,20 @@ func generateContainerData(
 			}
 		} else {
 			k8sMapping["container"] = containerMeta
-			if config.Hints.Enabled() { // This is "hints based autodiscovery flow"
+			if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 				if !managed {
 					hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 					if len(hintsMapping) > 0 {
+						_ = comm.AddOrUpdate(
+							eventID,
+							PodPriority,
+							map[string]interface{}{"hints": hintsMapping},
+							processors,
+						)
+					} else if config.Hints.DefaultContainerLogs {
+						// in case of no package detected in the hints fallback to the generic log collection
+						_, _ = hintsMapping.Put("generic_logs.container_logs.enabled", true)
+						_, _ = hintsMapping.Put("container_id", c.ID)
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
