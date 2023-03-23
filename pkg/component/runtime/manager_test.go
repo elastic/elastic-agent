@@ -64,8 +64,17 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		"localhost:0",
+		ai,
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		configuration.DefaultGRPCConfig(),
+	)
 	require.NoError(t, err)
+
 	errCh := make(chan error)
 	go func() {
 		err := m.Run(ctx)

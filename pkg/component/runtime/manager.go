@@ -110,7 +110,15 @@ type Manager struct {
 }
 
 // NewManager creates a new manager.
-func NewManager(logger, baseLogger *logger.Logger, listenAddr string, agentInfo *info.AgentInfo, tracer *apm.Tracer, monitor MonitoringManager, grpcConfig *configuration.GRPCConfig) (*Manager, error) {
+func NewManager(
+	logger,
+	baseLogger *logger.Logger,
+	listenAddr string,
+	agentInfo *info.AgentInfo,
+	tracer *apm.Tracer,
+	monitor MonitoringManager,
+	grpcConfig *configuration.GRPCConfig,
+) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
 		return nil, err
@@ -139,7 +147,7 @@ func NewManager(logger, baseLogger *logger.Logger, listenAddr string, agentInfo 
 func (m *Manager) Run(ctx context.Context) error {
 	lis, err := net.Listen("tcp", m.listenAddr)
 	if err != nil {
-		return err
+		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
 	}
 	m.netMx.Lock()
 	m.listener = lis
@@ -441,7 +449,7 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 
 // Subscribe to changes in a component.
 //
-// Allows a component without that ID to exists. Once a component starts matching that ID then changes will start to
+// Allows a component without that ID to exist. Once a component starts matching that ID then changes will start to
 // be provided over the channel. Cancelling the context results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Manager to block.
@@ -497,7 +505,7 @@ func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscripti
 func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
 	sub := newSubscriptionAll(ctx, m)
 
-	// add latest states
+	// add the latest states
 	m.mx.RLock()
 	latest := make([]ComponentComponentState, 0, len(m.current))
 	for _, comp := range m.current {
@@ -549,7 +557,7 @@ func (m *Manager) Checkin(_ proto.ElasticAgent_CheckinServer) error {
 func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	initCheckinChan := make(chan *proto.CheckinObserved)
 	go func() {
-		// go func will not be leaked, because when the main function
+		// this goroutine will not be leaked, because when the main function
 		// returns it will close the connection. that will cause this
 		// function to return.
 		observed, err := server.Recv()

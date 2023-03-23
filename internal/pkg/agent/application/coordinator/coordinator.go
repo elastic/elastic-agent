@@ -8,39 +8,39 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+	"time"
 
-	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
-	"github.com/elastic/elastic-agent-libs/logp"
-
-	"gopkg.in/yaml.v2"
-
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/hashicorp/go-multierror"
 
 	"go.elastic.co/apm"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-var (
-	// ErrNotUpgradable error is returned when upgrade cannot be performed.
-	ErrNotUpgradable = errors.New(
-		"cannot be upgraded; must be installed with install sub-command and " +
-			"running under control of the systems supervisor")
-)
+// ErrNotUpgradable error is returned when upgrade cannot be performed.
+var ErrNotUpgradable = errors.New(
+	"cannot be upgraded; must be installed with install sub-command and " +
+		"running under control of the systems supervisor")
+
+// ErrUpgradeInProgress error is returned if two or more upgrades are
+// attempted at the same time.
+var ErrUpgradeInProgress = errors.New("upgrade already in progress")
 
 // ReExecManager provides an interface to perform re-execution of the entire agent.
 type ReExecManager interface {
@@ -70,7 +70,7 @@ type MonitorManager interface {
 	// Reload reloads the configuration for the upgrade manager.
 	Reload(rawConfig *config.Config) error
 
-	// InjectMonitoring injects monitoring configuration into resolved ast tree.
+	// MonitoringConfig injects monitoring configuration into resolved ast tree.
 	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string) (map[string]interface{}, error)
 }
 
@@ -121,8 +121,7 @@ type ConfigChange interface {
 }
 
 // ErrorReporter provides an interface for any manager that is handled by the coordinator to report errors.
-type ErrorReporter interface {
-}
+type ErrorReporter interface{}
 
 // ConfigManager provides an interface to run and watch for configuration changes.
 type ConfigManager interface {
@@ -148,6 +147,9 @@ type VarsManager interface {
 // ComponentsModifier is a function that takes the computed components model and modifies it before
 // passing it into the components runtime manager.
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
+
+// CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
+const CoordinatorShutdownTimeout = time.Second * 5
 
 // Coordinator manages the entire state of the Elastic Agent.
 //
@@ -178,6 +180,9 @@ type Coordinator struct {
 	ast    *transpiler.AST
 	vars   []*transpiler.Vars
 }
+
+// ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
+var ErrFatalCoordinator = errors.New("fatal error in coordinator")
 
 // New creates a new coordinator.
 func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
@@ -243,6 +248,22 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}); errors.Is(err, capabilities.ErrBlocked) {
 			return ErrNotUpgradable
 		}
+	}
+
+	// A previous upgrade may be cancelled and needs some time to
+	// run the callback to clear the state
+	var err error
+	for i := 0; i < 5; i++ {
+		s := c.state.State()
+		if s.State != agentclient.Upgrading {
+			err = nil
+			break
+		}
+		err = ErrUpgradeInProgress
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		return err
 	}
 
 	// override the overall state to upgrading until the re-execution is complete
@@ -366,6 +387,10 @@ func (c *Coordinator) Run(ctx context.Context) error {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				c.state.UpdateState(state.WithState(agentclient.Stopped, "Requested to be stopped"), state.WithFleetState(agentclient.Stopped, "Requested to be stopped"))
 				// do not restart
+				return err
+			}
+			if errors.Is(err, ErrFatalCoordinator) {
+				c.state.UpdateState(state.WithState(agentclient.Failed, "Fatal coordinator error"), state.WithFleetState(agentclient.Stopped, "Fatal coordinator error"))
 				return err
 			}
 		}
@@ -524,19 +549,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			runtimeErr := <-runtimeErrCh
-			configErr := <-configErrCh
-			varsErr := <-varsErrCh
-			if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-				return runtimeErr
-			}
-			if configErr != nil && !errors.Is(configErr, context.Canceled) {
-				return configErr
-			}
-			if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-				return varsErr
-			}
-			return ctx.Err()
+			return c.handleCoordinatorDone(ctx, varsErrCh, runtimeErrCh, configErrCh)
 		case <-runtimeRun:
 			if ctx.Err() == nil {
 				cancel()
@@ -739,6 +752,58 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 	}
 
 	return cfg, comps, nil
+}
+
+func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runtimeErrCh, configErrCh chan error) error {
+	var runtimeErr error
+	var configErr error
+	var varsErr error
+	// in case other components are locked up, let us time out
+	timeoutWait := time.NewTimer(CoordinatorShutdownTimeout)
+
+	for {
+		select {
+		case <-timeoutWait.C:
+			var timeouts []string
+			if runtimeErr == nil {
+				timeouts = []string{"no response from runtime component"}
+			}
+			if configErr == nil {
+				timeouts = append(timeouts, "no response from configWatcher component")
+			}
+			if varsErr == nil {
+				timeouts = append(timeouts, "no response from varsWatcher component")
+			}
+			c.logger.Debugf("timeout while waiting for other components to shut down: %v", timeouts)
+			break
+		case err := <-runtimeErrCh:
+			runtimeErr = err
+		case err := <-configErrCh:
+			configErr = err
+		case err := <-varsErrCh:
+			varsErr = err
+		}
+		if runtimeErr != nil && configErr != nil && varsErr != nil {
+			timeoutWait.Stop()
+			break
+		}
+	}
+	// try not to lose any errors
+	var combinedErr error
+	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
+	}
+	if configErr != nil && !errors.Is(configErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
+	}
+	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
+		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
+	}
+	if combinedErr != nil {
+		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
+	}
+	// if there's no component errors, continue to pass along the context error
+	return ctx.Err()
 }
 
 type coordinatorComponentLog struct {

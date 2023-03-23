@@ -11,18 +11,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-
-	protobuf "google.golang.org/protobuf/proto"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-
-	"github.com/gofrs/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	protobuf "google.golang.org/protobuf/proto"
 
+	"github.com/gofrs/uuid"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
