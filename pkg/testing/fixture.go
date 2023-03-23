@@ -4,11 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/control"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/core/process"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -19,6 +14,12 @@ import (
 	"time"
 
 	"github.com/otiai10/copy"
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // Fixture handles the setup and management of the Elastic Agent.
@@ -178,7 +179,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	proc, err := process.Start(
 		binary,
 		process.WithContext(ctx),
-		process.WithArgs([]string{"--testing-mode"}),
+		process.WithArgs([]string{"run", "-e", "--disable-encrypted-store", "--testing-mode"}),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
 	if err != nil {
 		return fmt.Errorf("failed to spawn elastic-agent: %w", err)
@@ -477,16 +478,29 @@ func attachOutErr(stdOut *logWatcher, stdErr *logWatcher) process.CmdOption {
 	}
 }
 
-func watchState(ctx context.Context, c client.Client, connectTimeout time.Duration) (chan *client.AgentState, chan error) {
+func watchState(ctx context.Context, c client.Client, timeout time.Duration) (chan *client.AgentState, chan error) {
 	stateCh := make(chan *client.AgentState)
 	errCh := make(chan error)
 	go func() {
-		// perform connect in loop to ensure that connection is made
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		err := c.Connect(ctx)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		defer c.Disconnect()
+
+		// StateWatch will return an error if the client is not fully connected
+		// we retry this in a loop based on the timeout to ensure that we can
+		// get a valid StateWatch connection
 		started := time.Now()
+		var sub client.ClientStateWatch
 		for {
-			err := c.Connect(ctx)
+			sub, err = c.StateWatch(ctx)
 			if err != nil {
-				if time.Now().Sub(started) > connectTimeout {
+				if time.Now().Sub(started) > timeout {
 					// failed to connected in timeout range
 					errCh <- err
 					return
@@ -497,18 +511,8 @@ func watchState(ctx context.Context, c client.Client, connectTimeout time.Durati
 				break
 			}
 		}
-		defer c.Disconnect()
 
-		sub, err := c.StateWatch(ctx)
-		if err != nil {
-			errCh <- err
-			return
-		}
 		for {
-			if ctx.Err() != nil {
-				errCh <- ctx.Err()
-				return
-			}
 			recv, err := sub.Recv()
 			if err != nil {
 				errCh <- err

@@ -62,6 +62,12 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Use:   "run",
 		Short: "Start the elastic-agent.",
 		Run: func(cmd *cobra.Command, _ []string) {
+			// done very early so the encrypted store is never used
+			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
+			if disableEncryptedStore {
+				storage.DisableEncryptionDarwin()
+			}
+
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
 			if err := run(nil, testingMode); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
@@ -73,6 +79,12 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			}
 		},
 	}
+
+	// --disable-encrypted-store only has meaning on Mac OS, and it disables the encrypted disk store
+	// feature of the Elastic Agent. On Mac OS root privileges are required to perform the disk
+	// store encryption, by setting this flag it disables that feature and allows the Elastic Agent to
+	// run as non-root.
+	cmd.Flags().Bool("disable-encrypted-store", false, "Disable the encrypted disk storage (Only useful on Mac OS)")
 
 	// --testing-mode is a hidden flag that spawns the Elastic Agent in testing mode
 	// it is hidden because we really don't want users to execute Elastic Agent to run
