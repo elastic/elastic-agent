@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/help"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // Max number of times an invalid API Key is checked
@@ -66,8 +65,20 @@ type stateStore interface {
 	Actions() []fleetapi.Action
 }
 
+type loggerIF interface {
+	Debug(args ...interface{})
+	Debugf(format string, args ...interface{})
+	Info(args ...interface{})
+	Infof(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Warnw(msg string, keysAndValues ...interface{})
+	Error(args ...interface{})
+	Errorf(format string, args ...interface{})
+	Errorw(msg string, keysAndValues ...interface{})
+}
+
 type fleetGateway struct {
-	log                *logger.Logger
+	log                loggerIF
 	client             client.Sender
 	scheduler          Scheduler
 	settings           *fleetGatewaySettings
@@ -83,7 +94,7 @@ type fleetGateway struct {
 
 // New creates a new fleet gateway
 func New(
-	log *logger.Logger,
+	log loggerIF,
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
@@ -105,7 +116,7 @@ func New(
 }
 
 func newFleetGatewayWithScheduler(
-	log *logger.Logger,
+	log loggerIF,
 	settings *fleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	"io"
 	"io/ioutil"
@@ -19,14 +20,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/help"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -82,6 +84,31 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 
 		gateway, err := newFleetGatewayWithScheduler(
 			log,
+			settings,
+			agentInfo,
+			client,
+			scheduler,
+			noop.New(),
+			&emptyStateFetcher{},
+			stateStore,
+		)
+
+		require.NoError(t, err)
+
+		fn(t, gateway, client, scheduler)
+	}
+}
+func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
+	return func(t *testing.T) {
+		scheduler := scheduler.NewStepper()
+		client := newTestingClient()
+
+		log, _ := logger.New("fleet_gateway", false)
+
+		stateStore := newStateStore(t, log)
+
+		gateway, err := newFleetGatewayWithScheduler(
+			logIF,
 			settings,
 			agentInfo,
 			client,
@@ -393,6 +420,56 @@ func TestRetriesOnFailures(t *testing.T) {
 			err := <-errCh
 			require.NoError(t, err)
 		}))
+
+	t.Run("The error logs contain link to troubleshooting",
+		withGatewayAndLog(
+			agentInfo,
+			newTestLogger(t),
+			&fleetGatewaySettings{
+				Duration: 0 * time.Second,
+				Backoff: backoffSettings{
+					Init: 1 * time.Millisecond,
+					Max:  1 * time.Millisecond,
+				},
+			},
+			func(
+				t *testing.T,
+				fg *fleetGateway,
+				tc *testingClient,
+				s *scheduler.Stepper,
+			) {
+				ctx, cancel := context.WithCancel(context.Background())
+				var errCh <-chan error
+				func() {
+					defer cancel()
+
+					fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+						return wrapStrToResp(http.StatusInternalServerError, "Fleet checkin went wrong"), nil
+					}
+					waitChan := tc.Answer(fail)
+
+					errCh = runFleetGateway(ctx, fg)
+
+					// Initial tick is done out of bound so we can block on channels.
+					s.Next()
+
+					// we wait until we fail at least 3 times to write an error log (the first 2 times it's just a warning)
+					for i := 0; i < 3; i++ {
+						<-waitChan
+					}
+				}()
+
+				assert.Eventually(t, func() bool {
+					for _, lm := range fg.log.(*testlogger).logs {
+						if lm.lvl == ERROR && strings.Contains(lm.msg, help.GetTroubleshootMessage()) {
+							return true
+						}
+					}
+					return false
+				}, 100*time.Millisecond, 10*time.Millisecond)
+				err := <-errCh
+				require.NoError(t, err)
+			}))
 }
 
 type testAgentInfo struct{}
