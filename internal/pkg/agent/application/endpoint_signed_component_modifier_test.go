@@ -17,8 +17,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestEndpointProtectionComponentModifier(t *testing.T) {
-	compModifier := EndpointProtectionComponentModifier()
+func TestEndpointSignedComponentModifier(t *testing.T) {
+	compModifier := EndpointSignedComponentModifier()
 
 	tests := []struct {
 		name      string
@@ -82,12 +82,9 @@ func TestEndpointProtectionComponentModifier(t *testing.T) {
 				},
 			},
 			cfg: map[string]interface{}{
-				"agent": map[string]interface{}{
-					"protection": map[string]interface{}{
-						"enabled":              true,
-						"signing_key":          "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqrEVMJBfAiW7Mz9ZHegwlB7n4deTASUa5LlJlDfuz0hxo/7WPc7gkVB5H8LgnObPfihgzML7rLsHPreWZTB10A==",
-						"uninstall_token_hash": "DAQcDQgAEqrEVMJBfAiW7Mz9ZHegwlB",
-					},
+				"signed": map[string]interface{}{
+					"data":      "eyJpZCI6ImFhZWM4OTYwLWJiYjAtMTFlZC1hYzBkLTVmNjI0YTQxZjM4OCIsImFnZW50Ijp7InByb3RlY3Rpb24iOnsiZW5hYmxlZCI6dHJ1ZSwidW5pbnN0YWxsX3Rva2VuX2hhc2giOiIiLCJzaWduaW5nX2tleSI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRW1tckhDSTdtZ2tuZUJlYVJkc2VkQXZBU2l0UHRLbnpPdUlzeHZJRWdGTkFLVlg3MWpRTTVmalo1eUdsSDB0TmJuR2JrU2pVM0VEVUZsOWllQ1J0ME5nPT0ifX19",
+					"signature": "MEUCIQCWoScyJW0dejHFxXBTEcSCOZiBHRVMjuJRPwFCwOdA1QIgKrtKUBzkvVeljRtJyMXfD8zIvWjrMzqhSkgjNESPW5E=",
 				},
 			},
 			wantComps: []component.Component{
@@ -103,7 +100,7 @@ func TestEndpointProtectionComponentModifier(t *testing.T) {
 							Config: &proto.UnitExpectedConfig{
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"protection":{"enabled":true, "signing_key":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqrEVMJBfAiW7Mz9ZHegwlB7n4deTASUa5LlJlDfuz0hxo/7WPc7gkVB5H8LgnObPfihgzML7rLsHPreWZTB10A==", "uninstall_token_hash":"DAQcDQgAEqrEVMJBfAiW7Mz9ZHegwlB"}}`))
+									err := source.UnmarshalJSON([]byte(`{"signed":{"data":"eyJpZCI6ImFhZWM4OTYwLWJiYjAtMTFlZC1hYzBkLTVmNjI0YTQxZjM4OCIsImFnZW50Ijp7InByb3RlY3Rpb24iOnsiZW5hYmxlZCI6dHJ1ZSwidW5pbnN0YWxsX3Rva2VuX2hhc2giOiIiLCJzaWduaW5nX2tleSI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRW1tckhDSTdtZ2tuZUJlYVJkc2VkQXZBU2l0UHRLbnpPdUlzeHZJRWdGTkFLVlg3MWpRTTVmalo1eUdsSDB0TmJuR2JrU2pVM0VEVUZsOWllQ1J0ME5nPT0ifX19", "signature":"MEUCIQCWoScyJW0dejHFxXBTEcSCOZiBHRVMjuJRPwFCwOdA1QIgKrtKUBzkvVeljRtJyMXfD8zIvWjrMzqhSkgjNESPW5E="}}`))
 									if err != nil {
 										t.Fatal(err)
 									}
