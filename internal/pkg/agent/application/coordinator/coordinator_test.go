@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -311,6 +312,79 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 
 	err = <-coordCh
 	require.NoError(t, err)
+}
+
+func TestCoordinatorWithErrors(t *testing.T) {
+	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
+
+	close(runtime)
+	close(varWatcher)
+	cfgErrStr := "configWatcher error"
+	config <- errors.New(cfgErrStr)
+
+	// All the multierror stuff breaks errors.Is
+	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
+
+}
+
+func TestCoordinatorShutdownClosedChannels(t *testing.T) {
+
+	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
+
+	close(runtime)
+	close(varWatcher)
+	close(config)
+
+	waitAndTestError(t, func(err error) bool { return errors.Is(err, context.Canceled) }, handlerChan)
+
+}
+
+func TestCoordinatorShutdownTimeout(t *testing.T) {
+	CoordinatorShutdownTimeout = time.Millisecond
+	handlerChan, _, _, _ := setupAndWaitCoordinatorDone()
+	waitAndTestError(t, func(err error) bool { return errors.Is(err, context.Canceled) }, handlerChan)
+}
+
+func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan error) {
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*4)
+	defer waitCancel()
+	for {
+		select {
+		case <-waitCtx.Done():
+			t.Fatalf("handleCoordinatorDone timed out while waiting for shutdown")
+		case gotErr := <-handlerErr:
+			if handlerErr != nil {
+				if check(gotErr) {
+					t.Logf("got correct error")
+					return
+				} else {
+					t.Fatalf("got incorrect error: %s", gotErr)
+				}
+			}
+		}
+
+	}
+}
+
+func setupAndWaitCoordinatorDone() (chan error, chan error, chan error, chan error) {
+	logp.DevelopmentSetup()
+	runtime := make(chan error)
+	varWatcher := make(chan error)
+	config := make(chan error)
+
+	testCord := Coordinator{logger: logp.L()}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// emulate shutdown
+	cancel()
+
+	handlerChan := make(chan error)
+	go func() {
+		handlerErr := testCord.handleCoordinatorDone(ctx, varWatcher, runtime, config)
+		handlerChan <- handlerErr
+	}()
+
+	return handlerChan, runtime, varWatcher, config
 }
 
 func TestCoordinator_ReExec(t *testing.T) {

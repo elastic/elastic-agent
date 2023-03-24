@@ -149,7 +149,7 @@ type VarsManager interface {
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
 
 // CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
-const CoordinatorShutdownTimeout = time.Second * 5
+var CoordinatorShutdownTimeout = time.Second * 5
 
 // Coordinator manages the entire state of the Elastic Agent.
 //
@@ -765,8 +765,22 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 	var varsErr error
 	// in case other components are locked up, let us time out
 	timeoutWait := time.NewTimer(CoordinatorShutdownTimeout)
+	defer timeoutWait.Stop()
+	doneWait := false
+	var returnedRuntime, returnedConfig, returnedVars bool
+	/*
+		Wait for all subcomponents to gently shut down.
+		Logic:
+		If all three subcomponent channels return an error, or close,
+		Assume shutdown is complete.
+		If there's a non-nil error, return it as an ErrFatalCoordinator,
+		If there's no errors from the channels, pass on the underlying context error
+	*/
 
 	for {
+		if doneWait { // we have a timeout, or all channels have returned
+			break
+		}
 		select {
 		case <-timeoutWait.C:
 			var timeouts []string
@@ -780,31 +794,39 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 				timeouts = append(timeouts, "no response from varsWatcher component")
 			}
 			c.logger.Debugf("timeout while waiting for other components to shut down: %v", timeouts)
-			break
+			doneWait = true
 		case err := <-runtimeErrCh:
 			runtimeErr = err
+			returnedRuntime = true
 		case err := <-configErrCh:
+			returnedConfig = true
 			configErr = err
 		case err := <-varsErrCh:
+			returnedVars = true
 			varsErr = err
 		}
-		if runtimeErr != nil && configErr != nil && varsErr != nil {
-			timeoutWait.Stop()
-			break
+		if returnedRuntime && returnedConfig && returnedVars {
+			c.logger.Debugf("all error channels have returned in handleCoordinatorDone")
+			doneWait = true
 		}
+
 	}
 	// try not to lose any errors
 	var combinedErr error
 	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
+		c.logger.Debugf("runtime component error is non-nil during shutdown: %s", runtimeErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
 	}
 	if configErr != nil && !errors.Is(configErr, context.Canceled) {
+		c.logger.Debugf("config manager error is non-nil during shutdown: %s", configErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
+		c.logger.Debugf("varsWatcher component error is non-nil during shutdown: %s", varsErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
 	}
 	if combinedErr != nil {
+		c.logger.Debugf("combinedErr is non-nil: %s", combinedErr)
 		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
 	}
 	// if there's no component errors, continue to pass along the context error
