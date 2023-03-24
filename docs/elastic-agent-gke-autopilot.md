@@ -147,9 +147,9 @@ containers:
 # The basic authentication password used to connect to Elasticsearch
 - name: ES_PASSWORD
   value: "changeme"
-# The Elasticsearch host to communicate with
+# The Kibana host to communicate with
 - name: ES_HOST
-  value: "https://<url>.kb.us-central1.gcp.cloud.es.io:9243"
+  value: "https://<url>:<port>"
 - name: NODE_NAME
 ```
 
@@ -179,11 +179,12 @@ serviceaccount/elastic-agent-standalone created
 
 > Kube-state Metrics needs to be installed in the same namespace as Elastic Agent
 
+Install through helm from [here](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-state-metrics)
+
 ```bash
-git clone git@github.com:kubernetes/kube-state-metrics.git
-cd kube-state-metrics/examples/standard
-sed -i -e 's/namespace: kube-system/namespace: elastic-agent/' *.yaml
-kubectl apply -f .
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install [RELEASE_NAME] prometheus-community/kube-state-metrics --namespace <namespace>
 ```
 
 In some cases you need to wait the auto-scheduler to scale up your cluster in order kube-state metrics to install successfully
