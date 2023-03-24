@@ -367,7 +367,6 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 }
 
 func setupAndWaitCoordinatorDone() (chan error, chan error, chan error, chan error) {
-	logp.DevelopmentSetup()
 	runtime := make(chan error)
 	varWatcher := make(chan error)
 	config := make(chan error)
