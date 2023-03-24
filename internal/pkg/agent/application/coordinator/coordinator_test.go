@@ -369,6 +369,18 @@ func TestCoordinatorShutdownErrorWithoutClose(t *testing.T) {
 	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
 }
 
+func TestCoordinatorShutdownErrorCloseTimeout(t *testing.T) {
+	CoordinatorShutdownTimeout = time.Second
+	handlerChan, _, varWatcher, config := setupAndWaitCoordinatorDone()
+	// return an error on one chanel, close another, let another time out
+	cfgErrStr := "config watcher error"
+	config <- errors.New(cfgErrStr)
+
+	close(varWatcher)
+
+	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
+}
+
 func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan error) {
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*4)
 	defer waitCancel()
