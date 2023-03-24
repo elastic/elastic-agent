@@ -1,7 +1,6 @@
 FROM golang:1.18.10
 
-RUN go install github.com/onsi/ginkgo/ginkgo@latest \
-  && go install -v github.com/ramya-rao-a/go-outline@v0.0.0-20210608161538-9736a4bde949 \
+RUN go install -v github.com/ramya-rao-a/go-outline@v0.0.0-20210608161538-9736a4bde949 \
   && go install -v golang.org/x/tools/gopls@latest
 
 CMD ["/bin/bash"]

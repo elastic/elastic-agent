@@ -6,23 +6,31 @@ package tools
 import (
 	"fmt"
 	"os/exec"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega/gexec"
+	"testing"
 )
 
-func EnrollElasticAgent(fleetUrl string, enrollmentToken string, version string) (*gexec.Session, error) {
-	command := exec.Command(fmt.Sprintf("elastic-agent-%s-darwin-aarch64/elastic-agent", version), //nolint:gosec //TODO: exclude from binary
+func EnrollElasticAgent(t *testing.T, fleetUrl string, enrollmentToken string, version string) error {
+	cmd := exec.Command(fmt.Sprintf("elastic-agent-%s-darwin-aarch64/elastic-agent", version), //nolint:gosec //TODO: exclude from binary
 		"install", "--non-interactive", fmt.Sprintf("--url=%s", fleetUrl), fmt.Sprintf("--enrollment-token=%s", enrollmentToken))
 
-	return gexec.Start(command, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
+	out, err := cmd.CombinedOutput()
 
+	if err != nil {
+		t.Errorf(string(out))
+	}
+
+	return err
 }
 
-func UninstallAgent() (*gexec.Session, error) {
-	command := exec.Command("elastic-agent",
+func UninstallAgent(t *testing.T) error {
+	cmd := exec.Command("elastic-agent",
 		"uninstall",
 		"-f")
-	return gexec.Start(command, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
+	out, err := cmd.CombinedOutput()
 
+	if err != nil {
+		t.Errorf(string(out))
+	}
+
+	return err
 }

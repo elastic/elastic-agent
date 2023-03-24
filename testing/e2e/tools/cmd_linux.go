@@ -1,3 +1,4 @@
+// go:build linux
 //go:build linux
 // +build linux
 
@@ -8,20 +9,24 @@ import (
 	"html/template"
 	"os"
 	"os/exec"
+	"testing"
 
 	"github.com/google/uuid"
-	ginkgo "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega/gexec"
 )
 
-func EnrollElasticAgent(fleetUrl string, enrollmentToken string, version string) (*gexec.Session, error) {
-	command := exec.Command(fmt.Sprintf("elastic-agent-%s-linux-arm64/elastic-agent", version), //nolint:gosec //TODO: exclude from binary
-		"install",
-		"--non-interactive",
-		fmt.Sprintf("--url=%s", fleetUrl),
-		fmt.Sprintf("--enrollment-token=%s", enrollmentToken))
+func EnrollElasticAgent(t *testing.T, fleetUrl string, enrollmentToken string, version string) error {
+	t.Log("Enrolling elastic agent ...")
+	cmd := exec.Command(fmt.Sprintf("elastic-agent-%s-linux-arm64/elastic-agent", version), //nolint:gosec //TODO: exclude from binary
+		"install", "--non-interactive", fmt.Sprintf("--url=%s", fleetUrl), fmt.Sprintf("--enrollment-token=%s", enrollmentToken))
 
-	return gexec.Start(command, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
+	out, err := cmd.CombinedOutput()
+
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(string(out))
+
+	return err
 }
 
 func InstallElasticAgentStandalone(esConfig *ESConfig, version string) error {
@@ -43,10 +48,15 @@ func InstallElasticAgentStandalone(esConfig *ESConfig, version string) error {
 	return err
 }
 
-func UninstallAgent() (*gexec.Session, error) {
-	command := exec.Command("elastic-agent",
+func UninstallAgent(t *testing.T) error {
+	cmd := exec.Command("elastic-agent",
 		"uninstall",
 		"-f")
-	return gexec.Start(command, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
+	out, err := cmd.CombinedOutput()
 
+	if err != nil {
+		t.Errorf(string(out))
+	}
+
+	return err
 }
