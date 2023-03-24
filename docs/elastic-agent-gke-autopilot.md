@@ -85,7 +85,7 @@ CURRENT   NAME                                                                  
 
 Kubernetes observability is supported through both Elastic Agent installation scenarios ([managed](https://www.elastic.co/guide/en/fleet/current/install-fleet-managed-elastic-agent.html) and [standalone](https://www.elastic.co/guide/en/fleet/current/install-standalone-elastic-agent.html)).
 
-The Kubenretes Integration is an additional package to be installed in your Elastic Cloud and will enhance user experience for Kubenrtes Observability by installing aditonal assets in our Elastic stack.
+The Kubernetes Integration is an additional package to be installed in your Elastic Cloud and will enhance user experience for Kubernetes Observability by installing additional assets in our Elastic stack.
 
 - Add [Kubernetes Integration](https://docs.elastic.co/integrations/kubernetes)
   
