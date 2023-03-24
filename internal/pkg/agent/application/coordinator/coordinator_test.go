@@ -328,7 +328,7 @@ func TestCoordinatorWithErrors(t *testing.T) {
 }
 
 func TestCoordinatorShutdownClosedChannels(t *testing.T) {
-
+	CoordinatorShutdownTimeout = time.Second * 5
 	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
 
 	close(runtime)
@@ -343,6 +343,30 @@ func TestCoordinatorShutdownTimeout(t *testing.T) {
 	CoordinatorShutdownTimeout = time.Millisecond
 	handlerChan, _, _, _ := setupAndWaitCoordinatorDone()
 	waitAndTestError(t, func(err error) bool { return errors.Is(err, context.Canceled) }, handlerChan)
+}
+
+func TestCoordinatorShutdownErrorWithClose(t *testing.T) {
+	CoordinatorShutdownTimeout = time.Second * 5
+	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
+	// return an error, then close the channel
+	cfgErrStr := "config watcher error"
+	config <- errors.New(cfgErrStr)
+	close(config)
+
+	close(runtime)
+	close(varWatcher)
+
+	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
+}
+
+func TestCoordinatorShutdownErrorWithoutClose(t *testing.T) {
+	CoordinatorShutdownTimeout = time.Millisecond
+	handlerChan, _, _, config := setupAndWaitCoordinatorDone()
+
+	cfgErrStr := "config watcher error"
+	config <- errors.New(cfgErrStr)
+
+	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
 }
 
 func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan error) {
@@ -541,7 +565,7 @@ type fakeReExecManager struct {
 
 func (f *fakeReExecManager) ReExec(callback reexec.ShutdownCallbackFn, _ ...string) {
 	if callback != nil {
-		callback()
+		_ = callback()
 	}
 }
 

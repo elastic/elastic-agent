@@ -795,15 +795,21 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 			}
 			c.logger.Debugf("timeout while waiting for other components to shut down: %v", timeouts)
 			doneWait = true
-		case err := <-runtimeErrCh:
-			runtimeErr = err
+		case err, ok := <-runtimeErrCh:
+			if ok {
+				runtimeErr = err
+			}
 			returnedRuntime = true
-		case err := <-configErrCh:
+		case err, ok := <-configErrCh:
+			if ok {
+				configErr = err
+			}
 			returnedConfig = true
-			configErr = err
-		case err := <-varsErrCh:
+		case err, ok := <-varsErrCh:
+			if ok {
+				varsErr = err
+			}
 			returnedVars = true
-			varsErr = err
 		}
 		if returnedRuntime && returnedConfig && returnedVars {
 			c.logger.Debugf("all error channels have returned in handleCoordinatorDone")
@@ -814,19 +820,18 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 	// try not to lose any errors
 	var combinedErr error
 	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-		c.logger.Debugf("runtime component error is non-nil during shutdown: %s", runtimeErr)
+		c.logger.Debugf("runtime component shut down with error: %s", runtimeErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
 	}
 	if configErr != nil && !errors.Is(configErr, context.Canceled) {
-		c.logger.Debugf("config manager error is non-nil during shutdown: %s", configErr)
+		c.logger.Debugf("config manager shut down with error: %s", configErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-		c.logger.Debugf("varsWatcher component error is non-nil during shutdown: %s", varsErr)
+		c.logger.Debugf("varsWatcher shut down with error: %s", varsErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
 	}
 	if combinedErr != nil {
-		c.logger.Debugf("combinedErr is non-nil: %s", combinedErr)
 		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
 	}
 	// if there's no component errors, continue to pass along the context error
