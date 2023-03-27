@@ -419,6 +419,9 @@ components:
     id: log-default
     log_level: 2
     type: 1
+  features:
+    fqdn:
+      enabled: false
 - id: system/metrics-default
   input_spec:
     binary_name: metricbeat
