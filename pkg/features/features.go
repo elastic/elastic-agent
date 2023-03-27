@@ -13,13 +13,28 @@ import (
 )
 
 var (
-	mu sync.Mutex
-
-	current Flags
+	current = Flags{}
 )
 
 type Flags struct {
-	FQDN bool
+	mu sync.RWMutex
+
+	fqdn bool
+}
+
+func (f *Flags) FQDN() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.fqdn
+}
+
+// SetFQDN sets the value of the FQDN flag in Flags.
+func (f *Flags) SetFQDN(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.fqdn = newValue
 }
 
 // Parse receives a policy, parses and returns it.
@@ -63,7 +78,10 @@ func Parse(policy any) (*Flags, error) {
 		return nil, fmt.Errorf("could not umpack features config: %w", err)
 	}
 
-	return &Flags{FQDN: parsedFlags.Agent.Features.FQDN.Enabled()}, nil
+	flags := new(Flags)
+	flags.SetFQDN(parsedFlags.Agent.Features.FQDN.Enabled())
+
+	return flags, nil
 }
 
 // Apply receives a config and applies it. If c is nil, Apply is a no-op.
@@ -74,8 +92,6 @@ func Apply(c *config.Config) error {
 
 	var err error
 
-	mu.Lock()
-	defer mu.Unlock()
 	parsed, err := Parse(c) // Updating global state
 	if err != nil {
 		return fmt.Errorf("could not apply feature flag config: %w", err)
@@ -87,23 +103,13 @@ func Apply(c *config.Config) error {
 
 // FQDN reports if FQDN should be used instead of hostname for host.name.
 func FQDN() bool {
-	mu.Lock()
-	defer mu.Unlock()
-	return current.FQDN
-}
-
-// Current returns the current config of the feature flags.
-func Current() Flags {
-	mu.Lock()
-	defer mu.Unlock()
-
-	return current
+	return current.FQDN()
 }
 
 func (f *Flags) AsProto() *proto.Features {
-	mu.Lock()
-	defer mu.Unlock()
 	return &proto.Features{
 		Fqdn: &proto.FQDNFeature{
-			Enabled: f.FQDN}}
+			Enabled: f.FQDN(),
+		},
+	}
 }

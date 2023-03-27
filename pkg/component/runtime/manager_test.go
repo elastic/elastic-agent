@@ -430,7 +430,7 @@ func TestManager_FakeInput_Features(t *testing.T) {
 								return false
 							}
 
-							return ff.FQDN
+							return ff.FQDN()
 						}, 1*time.Second, 100*time.Millisecond, "failed to assert that FQDN feature flag was enabled by component")
 
 						doneCh <- struct{}{}
