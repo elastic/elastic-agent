@@ -26,12 +26,6 @@ type State struct {
 	LogLevel     logp.Level                        `yaml:"log_level"`
 }
 
-// StateFetcher provides an interface to fetch the current state of the coordinator.
-type StateFetcher interface {
-	// State returns the current state of the coordinator.
-	State() State
-}
-
 type CoordinatorState struct {
 	mx            sync.RWMutex
 	state         agentclient.State

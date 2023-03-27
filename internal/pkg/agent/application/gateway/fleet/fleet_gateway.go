@@ -11,7 +11,6 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
@@ -86,7 +85,7 @@ type fleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	stateFetcher       state.StateFetcher
+	stateFetcher       StateFetcher
 	stateStore         stateStore
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
@@ -98,7 +97,7 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
-	stateFetcher state.StateFetcher,
+	stateFetcher StateFetcher,
 	stateStore stateStore,
 ) (*fleetGateway, error) {
 
@@ -122,7 +121,7 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	scheduler Scheduler,
 	acker acker.Acker,
-	stateFetcher state.StateFetcher,
+	stateFetcher StateFetcher,
 	stateStore stateStore,
 ) (*fleetGateway, error) {
 	return &fleetGateway{
