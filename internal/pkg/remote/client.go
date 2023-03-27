@@ -39,13 +39,13 @@ type requestClient struct {
 	lastErrOcc time.Time
 }
 
-func (c *requestClient) SetLastError(err error) {
-	c.lastUsed = time.Now().UTC()
-	c.lastErr = err
+func (r *requestClient) SetLastError(err error) {
+	r.lastUsed = time.Now().UTC()
+	r.lastErr = err
 	if err != nil {
-		c.lastErrOcc = c.lastUsed
+		r.lastErrOcc = r.lastUsed
 	} else {
-		c.lastErrOcc = time.Time{}
+		r.lastErrOcc = time.Time{}
 	}
 }
 

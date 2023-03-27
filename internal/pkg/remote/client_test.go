@@ -194,8 +194,8 @@ func TestHTTPClient(t *testing.T) {
 				{host: "http://must.fail-3.co/"},
 			}}
 
-		resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
-		assert.Contains(t, err.Error(), "http://must.fail-3.co/") // error contains last host
+		resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil) //nolint:bodyclose // wad
+		assert.Contains(t, err.Error(), "http://must.fail-3.co/")                   // error contains last host
 		assert.Nil(t, resp)
 	})
 
