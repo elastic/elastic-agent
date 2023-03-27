@@ -2548,7 +2548,7 @@ func TestManager_FakeShipper(t *testing.T) {
 		t.Fatalf("failed early: %s", err)
 	}
 
-	timeout := 3 * time.Minute
+	timeout := 2 * time.Minute
 	endTimer := time.NewTimer(timeout)
 	defer endTimer.Stop()
 LOOP:
