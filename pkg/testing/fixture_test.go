@@ -1,11 +1,18 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package testing
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/stretchr/testify/require"
 
@@ -31,7 +38,6 @@ var fakeComponent = UsableComponent{
 					"linux/amd64",
 					"linux/arm64",
 					"windows/amd64",
-					"windows/arm64",
 				},
 				Shippers: []string{
 					"fake-shipper",
@@ -60,7 +66,6 @@ var fakeShipper = UsableComponent{
 					"linux/amd64",
 					"linux/arm64",
 					"windows/amd64",
-					"windows/arm64",
 				},
 				Outputs: []string{
 					"fake-action-output",
@@ -74,28 +79,44 @@ var fakeShipper = UsableComponent{
 var simpleConfig = `
 outputs:
   default:
-    type: elasticsearch
-    hosts: [localhost:9200]
+    type: fake-action-output
+    fake-shipper: {}
 inputs:
-  - id: filestream
-    type: filestream
-    streams:
-    - id: syslog
-      paths: /var/log/syslog
+  - id: fake
+    type: fake
+    state: 2
+    message: Healthy
 `
 
 func TestFixture_Prepare(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	f, err := NewFixture(t, "8.8.0", WithLogOutput())
+	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), "elastic-agent-control"))
+	_ = path
+
+	l := LocalFetcher("../../build/distributions")
+	f, err := NewFixture(t, "8.8.0", WithFetcher(l), WithLogOutput())
 	require.NoError(t, err)
-	err = f.Prepare(ctx, fakeComponent, fakeShipper, UsableComponent{Name: "filebeat"})
+	err = f.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
 
 	err = f.Run(ctx, State{
 		Configure:  simpleConfig,
 		AgentState: NewClientState(client.Healthy),
+		Components: map[string]ComponentState{
+			"fake-default": {
+				State: NewClientState(client.Healthy),
+				Units: map[ComponentUnitKey]ComponentUnitState{
+					ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
+						State: NewClientState(client.Healthy),
+					},
+					ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: NewClientState(client.Healthy),
+					},
+				},
+			},
+		},
 	})
 	require.NoError(t, err)
 }

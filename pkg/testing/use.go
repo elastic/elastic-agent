@@ -1,19 +1,24 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package testing
 
 import (
 	"fmt"
+
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 // UsableComponent defines a component that the fixture will set up and use.
 //
 // There is two different ways for defining a usable component.
-//   1. Provide a `Name` only.
-//      - This will instruct the fixture to keep this component from the fetched Elastic Agent. If the component
-//        does not exist in the fetched Elastic Agent then `Prepare` of the fixture will fail.
-//   2. Provide a `Name`, `BinaryPath`, and `Spec` or `SpecPath`.
-//      - This will instruct the fixture to copy the binary of the component and write the defined specification
-//        into the Elastic Agent components directory.
+//  1. Provide a `Name` only.
+//     - This will instruct the fixture to keep this component from the fetched Elastic Agent. If the component
+//     does not exist in the fetched Elastic Agent then `Prepare` of the fixture will fail.
+//  2. Provide a `Name`, `BinaryPath`, and `Spec` or `SpecPath`.
+//     - This will instruct the fixture to copy the binary of the component and write the defined specification
+//     into the Elastic Agent components directory.
 type UsableComponent struct {
 	// Name is the name of the component to either initialize or keep from the components directory. See the
 	// description above about the different ways to define a usable component.

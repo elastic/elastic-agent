@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package testing
 
 import (
@@ -77,7 +81,7 @@ func WithAllowErrors() fixtureOpt {
 }
 
 // WithConnectTimeout adjusts the timeout for connecting to the spawned Elastic Agent control protocol.
-// By default, the timeout is 1 second.
+// By default, the timeout is 5 seconds.
 func WithConnectTimeout(timeout time.Duration) fixtureOpt {
 	return func(f *Fixture) {
 		f.connectTimout = timeout
@@ -102,7 +106,7 @@ func NewFixture(t *testing.T, version string, opts ...fixtureOpt) (*Fixture, err
 		fetcher:         ArtifactFetcher(),
 		operatingSystem: runtime.GOOS,
 		architecture:    runtime.GOARCH,
-		connectTimout:   time.Second,
+		connectTimout:   5 * time.Second,
 	}
 	for _, o := range opts {
 		o(f)
@@ -125,29 +129,38 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	if f.workDir != "" {
 		// already prepared
-		return nil
+		return fmt.Errorf("already been prepared")
 	}
-	content, err := f.fetch(ctx)
+	src, err := f.fetch(ctx)
+	if err != nil {
+		return err
+	}
+	filename := filepath.Base(src)
+	name, ext, err := splitFileType(filename)
 	if err != nil {
 		return err
 	}
 	workDir := f.t.TempDir()
-	f.t.Logf("Copying %s into temp directory %s", filepath.Base(content), workDir)
-	err = copy.Copy(content, workDir, copy.Options{
-		OnSymlink: func(_ string) copy.SymlinkAction {
-			return copy.Shallow
-		},
-		Sync: true,
-	})
+	finalDir := filepath.Join(workDir, name)
+	f.t.Logf("Extracting artifact %s to %s", filename, finalDir)
+	switch ext {
+	case ".tar.gz":
+		err := untar(src, workDir)
+		if err != nil {
+			return fmt.Errorf("failed to untar %s: %w", src, err)
+		}
+	case ".zip":
+		err := unzip(src, workDir)
+		if err != nil {
+			return fmt.Errorf("failed to unzip %s: %w", src, err)
+		}
+	}
+	f.t.Logf("Completed extraction of artifact %s to %s", filename, finalDir)
+	err = f.prepareComponents(finalDir, components...)
 	if err != nil {
 		return err
 	}
-	f.t.Logf("Completed copying %s into temp directory %s", filepath.Base(content), workDir)
-	err = f.prepareComponents(workDir, components...)
-	if err != nil {
-		return err
-	}
-	f.workDir = workDir
+	f.workDir = finalDir
 	return nil
 }
 
@@ -176,6 +189,11 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	stdOut := newLogWatcher(logProxy)
 	stdErr := newLogWatcher(logProxy)
 
+	cAddr, err := control.AddressFromPath(f.operatingSystem, f.workDir)
+	if err != nil {
+		return fmt.Errorf("failed to get control protcol address: %w", err)
+	}
+
 	proc, err := process.Start(
 		binary,
 		process.WithContext(ctx),
@@ -189,9 +207,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 		<-proc.Wait()
 	}
 
-	cAddr := control.AddressFromPath(f.operatingSystem, f.workDir)
 	c := client.New(client.WithAddress(cAddr))
-
 	stateCh, stateErrCh := watchState(ctx, c, f.connectTimout)
 	stopping := false
 	for {
@@ -201,9 +217,6 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 			return ctx.Err()
 		case ps := <-proc.Wait():
 			if stopping {
-				if ps.ExitCode() != 0 {
-					return fmt.Errorf("elastic-agent exited unclean with exit code: %d", ps.ExitCode())
-				}
 				return nil
 			}
 			return fmt.Errorf("elastic-agent exited unexpectantly with exit code: %d", ps.ExitCode())
@@ -220,9 +233,11 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
 			}
 		case err := <-stateErrCh:
-			// connection to elastic-agent failed
-			killProc()
-			return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
+			if !stopping {
+				// connection to elastic-agent failed
+				killProc()
+				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
+			}
 		case state := <-stateCh:
 			cfg, cont, err := sm.next(state)
 			if err != nil {
@@ -236,10 +251,10 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 					_ = proc.Stop()
 				}
 			} else if cfg != "" {
-				err := c.Configure(ctx, cfg)
+				err := performConfigure(ctx, c, cfg, 3*time.Second)
 				if err != nil {
 					killProc()
-					return fmt.Errorf("state management failed update configuration: %w", err)
+					return err
 				}
 			}
 		}
@@ -522,4 +537,14 @@ func watchState(ctx context.Context, c client.Client, timeout time.Duration) (ch
 		}
 	}()
 	return stateCh, errCh
+}
+
+func performConfigure(ctx context.Context, c client.Client, cfg string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	err := c.Configure(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("state management failed update configuration: %w", err)
+	}
+	return nil
 }

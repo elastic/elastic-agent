@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package testing
 
 import (
@@ -7,12 +11,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/hashicorp/go-multierror"
 )
 
 var (
@@ -77,36 +82,33 @@ type fetcherCache struct {
 // fetch either uses the cache result or performs a new fetch if the content is missing.
 func (c *fetcherCache) fetch(ctx context.Context, l Logger, res FetcherResult) (string, error) {
 	name := res.Name()
-	dir, ext, err := splitFileType(name)
-	if err != nil {
-		return "", nil
-	}
 	src := filepath.Join(c.dir, name)
-	path := filepath.Join(c.dir, dir)
-	_, err = os.Stat(path)
+	_, err := os.Stat(src)
 	if err == nil || os.IsExist(err) {
 		l.Logf("Using existing artifact %s", name)
-		return path, nil
+		return src, nil
 	}
 	err = res.Fetch(ctx, l, c.dir)
 	if err != nil {
 		return "", err
 	}
-	l.Logf("Extracting artifact %s", name)
-	switch ext {
-	case ".tar.gz":
-		err := untar(src)
-		if err != nil {
-			return "", fmt.Errorf("failed to untar %s: %w", src, err)
+	/*
+		l.Logf("Extracting artifact %s", name)
+		switch ext {
+		case ".tar.gz":
+			err := untar(src)
+			if err != nil {
+				return "", fmt.Errorf("failed to untar %s: %w", src, err)
+			}
+		case ".zip":
+			err := unzip(src)
+			if err != nil {
+				return "", fmt.Errorf("failed to unzip %s: %w", src, err)
+			}
 		}
-	case ".zip":
-		err := unzip(src)
-		if err != nil {
-			return "", fmt.Errorf("failed to unzip %s: %w", src, err)
-		}
-	}
-	l.Logf("Completed extraction of artifact %s", name)
-	return path, nil
+		l.Logf("Completed extraction of artifact %s", name)
+	*/
+	return src, nil
 }
 
 func splitFileType(name string) (string, string, error) {
@@ -120,7 +122,7 @@ func splitFileType(name string) (string, string, error) {
 }
 
 // untar takes a .tar.gz and extracts its content
-func untar(archivePath string) error {
+func untar(archivePath string, extractDir string) error {
 	r, err := os.Open(archivePath)
 	if err != nil {
 		return err
@@ -133,7 +135,6 @@ func untar(archivePath string) error {
 	}
 
 	tr := tar.NewReader(zr)
-	extractDir := filepath.Dir(archivePath)
 
 	for {
 		f, err := tr.Next()
@@ -186,14 +187,12 @@ func untar(archivePath string) error {
 }
 
 // unzip takes a .zip and extracts its content
-func unzip(archivePath string) error {
+func unzip(archivePath string, extractDir string) error {
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
-
-	extractDir := filepath.Dir(archivePath)
 
 	unpackFile := func(f *zip.File) (err error) {
 		rc, err := f.Open()
