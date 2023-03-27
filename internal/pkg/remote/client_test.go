@@ -58,8 +58,8 @@ func TestPortDefaults(t *testing.T) {
 			c, err := NewWithConfig(l, cfg, nil)
 			require.NoError(t, err)
 
-			c.sortClients()
-			r, err := c.clients[0].newRequest(http.MethodGet, "/", nil, strings.NewReader(""))
+			clients := c.sortClients()
+			r, err := clients[0].newRequest(http.MethodGet, "/", nil, strings.NewReader(""))
 			require.NoError(t, err)
 
 			if tc.ExpectedPort > 0 {
@@ -299,9 +299,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, one, client.clients[0])
+		assert.Equal(t, one, clients[0])
 	})
 
 	t.Run("Picks second requester when first has error", func(t *testing.T) {
@@ -314,9 +314,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, two, client.clients[0])
+		assert.Equal(t, two, clients[0])
 	})
 
 	t.Run("Picks second requester when first has been used", func(t *testing.T) {
@@ -327,9 +327,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, two, client.clients[0])
+		assert.Equal(t, two, clients[0])
 	})
 
 	t.Run("Picks second requester when it's the oldest", func(t *testing.T) {
@@ -345,9 +345,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two, three)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, two, client.clients[0])
+		assert.Equal(t, two, clients[0])
 	})
 
 	t.Run("Picks third requester when second has error and first is last used", func(t *testing.T) {
@@ -364,9 +364,9 @@ func TestSortClients(t *testing.T) {
 		}
 		client := &Client{clients: []*requestClient{one, two, three}}
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, three, client.clients[0])
+		assert.Equal(t, three, clients[0])
 	})
 
 	t.Run("Picks second requester when its oldest and all have old errors", func(t *testing.T) {
@@ -388,9 +388,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two, three)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, two, client.clients[0])
+		assert.Equal(t, two, clients[0])
 	})
 }
 
