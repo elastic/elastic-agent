@@ -373,7 +373,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionApp{},
-		handlers.NewAppAction(m.log, m.coord),
+		handlers.NewAppAction(m.log, m.coord, m.agentInfo.AgentID()),
 	)
 
 	m.dispatcher.MustRegister(
