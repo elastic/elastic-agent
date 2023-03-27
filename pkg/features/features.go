@@ -97,7 +97,7 @@ func Apply(c *config.Config) error {
 		return fmt.Errorf("could not apply feature flag config: %w", err)
 	}
 
-	current = *parsed
+	current.SetFQDN(parsed.FQDN())
 	return err
 }
 
