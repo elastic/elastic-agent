@@ -163,7 +163,7 @@ type StateFetcher interface {
 }
 
 // CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
-const CoordinatorShutdownTimeout = time.Second * 5
+var CoordinatorShutdownTimeout = time.Second * 5
 
 // Coordinator manages the entire state of the Elastic Agent.
 //
@@ -815,8 +815,22 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 	var varsErr error
 	// in case other components are locked up, let us time out
 	timeoutWait := time.NewTimer(CoordinatorShutdownTimeout)
+	defer timeoutWait.Stop()
+	doneWait := false
+	var returnedRuntime, returnedConfig, returnedVars bool
+	/*
+		Wait for all subcomponents to gently shut down.
+		Logic:
+		If all three subcomponent channels return an error, or close,
+		Assume shutdown is complete.
+		If there's a non-nil error, return it as an ErrFatalCoordinator,
+		If there's no errors from the channels, pass on the underlying context error
+	*/
 
 	for {
+		if doneWait { // we have a timeout, or all channels have returned
+			break
+		}
 		select {
 		case <-timeoutWait.C:
 			var timeouts []string
@@ -830,28 +844,41 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 				timeouts = append(timeouts, "no response from varsWatcher component")
 			}
 			c.logger.Debugf("timeout while waiting for other components to shut down: %v", timeouts)
-			break
-		case err := <-runtimeErrCh:
-			runtimeErr = err
-		case err := <-configErrCh:
-			configErr = err
-		case err := <-varsErrCh:
-			varsErr = err
+			doneWait = true
+		case err, ok := <-runtimeErrCh:
+			if ok {
+				runtimeErr = err
+			}
+			returnedRuntime = true
+		case err, ok := <-configErrCh:
+			if ok {
+				configErr = err
+			}
+			returnedConfig = true
+		case err, ok := <-varsErrCh:
+			if ok {
+				varsErr = err
+			}
+			returnedVars = true
 		}
-		if runtimeErr != nil && configErr != nil && varsErr != nil {
-			timeoutWait.Stop()
-			break
+		if returnedRuntime && returnedConfig && returnedVars {
+			c.logger.Debugf("all error channels have returned in handleCoordinatorDone")
+			doneWait = true
 		}
+
 	}
 	// try not to lose any errors
 	var combinedErr error
 	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
+		c.logger.Debugf("runtime component shut down with error: %s", runtimeErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
 	}
 	if configErr != nil && !errors.Is(configErr, context.Canceled) {
+		c.logger.Debugf("config manager shut down with error: %s", configErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
+		c.logger.Debugf("varsWatcher shut down with error: %s", varsErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
 	}
 	if combinedErr != nil {
