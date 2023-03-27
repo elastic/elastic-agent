@@ -2355,6 +2355,7 @@ LOOP:
 }
 
 func TestManager_FakeInput_OutputChange(t *testing.T) {
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/2403")
 	testPaths(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
