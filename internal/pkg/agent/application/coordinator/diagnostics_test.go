@@ -52,8 +52,8 @@ var /*const*/ expectedDiagnosticHooks map[string]string = map[string]string{
 	"pre-config":          "pre-config.yaml",
 	"variables":           "variables.yaml",
 	"computed-config":     "computed-config.yaml",
-	"components-expected": "components_expected.yaml",
-	"components-actual":   "components_actual.yaml",
+	"components-expected": "components-expected.yaml",
+	"components-actual":   "components-actual.yaml",
 	"state":               "state.yaml",
 }
 
@@ -356,7 +356,7 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 		assert.NoError(t, err)
 		return string(sanitizedBytes)
 
-	case "components_expected.yaml":
+	case "components-expected.yaml", "components-actual.yaml":
 		yamlContent := map[any]any{}
 		err := yaml.Unmarshal(rawBytes, &yamlContent)
 		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
@@ -368,24 +368,6 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 			// fix the paths to forward slash for each
 			for _, comp := range rawComponents {
 				compInputSpec := comp.(map[any]any)["input_spec"].(map[any]any)
-				compInputSpec["binary_path"] = filepath.ToSlash(compInputSpec["binary_path"].(string))
-			}
-			yamlContent["components"] = rawComponents
-		}
-		sanitizedBytes, err := yaml.Marshal(yamlContent)
-		assert.NoError(t, err)
-		return string(sanitizedBytes)
-
-	case "components_actual.yaml":
-		yamlContent := map[any]any{}
-		err := yaml.Unmarshal(rawBytes, &yamlContent)
-		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
-
-		rawComponents, ok := yamlContent["components"].([]any)
-		if assert.True(t, ok, "unexpected component format in file %s", fileName) {
-			// fix the paths to forward slash for each
-			for _, comp := range rawComponents {
-				compInputSpec := comp.(map[any]any)["component"].(map[any]any)["input_spec"].(map[any]any)
 				compInputSpec["binary_path"] = filepath.ToSlash(compInputSpec["binary_path"].(string))
 			}
 			yamlContent["components"] = rawComponents

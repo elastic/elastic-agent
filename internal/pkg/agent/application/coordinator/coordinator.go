@@ -473,7 +473,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 		},
 		{
 			Name:        "components-expected",
-			Filename:    "components_expected.yaml",
+			Filename:    "components-expected.yaml",
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
@@ -497,15 +497,20 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 		},
 		{
 			Name:        "components-actual",
-			Filename:    "components_actual.yaml",
+			Filename:    "components-actual.yaml",
 			Description: "actual components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
 				components := c.State().Components
+
+				componentConfigs := make([]component.Component, len(components))
+				for i := 0; i < len(components); i++ {
+					componentConfigs[i] = components[i].Component
+				}
 				o, err := yaml.Marshal(struct {
-					Components []runtime.ComponentComponentState `yaml:"components"`
+					Components []component.Component `yaml:"components"`
 				}{
-					Components: components,
+					Components: componentConfigs,
 				})
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
