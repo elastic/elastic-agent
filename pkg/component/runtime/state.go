@@ -58,8 +58,8 @@ type ComponentState struct {
 	Message string           `yaml:"message"`
 
 	Units       map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
-	Features    *proto.Features
-	FeaturesIdx uint64
+	Features    *proto.Features                         `yaml:"features"`
+	FeaturesIdx uint64                                  `yaml:"features_idx"`
 
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
