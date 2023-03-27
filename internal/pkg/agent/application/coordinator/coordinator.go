@@ -824,7 +824,12 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
-	comps, err := c.specs.ToComponents(cfg, configInjector, c.State().LogLevel, c.agentInfo)
+	comps, err := c.specs.ToComponents(
+		cfg,
+		configInjector,
+		c.State().LogLevel,
+		c.agentInfo,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to render components: %w", err)
 	}
