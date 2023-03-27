@@ -422,6 +422,7 @@ components:
   features:
     fqdn:
       enabled: false
+    source: null
 - id: system/metrics-default
   input_spec:
     binary_name: metricbeat
