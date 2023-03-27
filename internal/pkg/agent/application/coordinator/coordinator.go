@@ -11,6 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
+	"go.elastic.co/apm"
+	"gopkg.in/yaml.v2"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
@@ -29,7 +34,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
-	"go.elastic.co/apm"
 )
 
 // ErrNotUpgradable error is returned when upgrade cannot be performed.
