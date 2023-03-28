@@ -4,7 +4,7 @@
 
 NAMESPACE=kube-system
 LEADER=$(kubectl get leases -n ${NAMESPACE} | grep elastic | awk '{print $2}' | awk -F- '{print $NF}')
-LEADERAGENT="elastic-agent-${LEADER}"
+LEADERAGENT=${2-"elastic-agent-${LEADER}"}
 
 # Check if all agents are running
 RUNNINGAGENTS=$(kubectl get pods -n ${NAMESPACE} | grep elastic-agent | grep -iv Running | wc -l)
