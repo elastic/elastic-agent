@@ -40,7 +40,7 @@ type contextProvider struct {
 
 // Run runs the environment context provider.
 func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
-	current, err := c.fetcher(c.logger)
+	current, err := c.fetcher()
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		case <-t.C:
 		}
 
-		updated, err := c.fetcher(c.logger)
+		updated, err := c.fetcher()
 		if err != nil {
 			c.logger.Warnf("Failed fetching latest host information: %s", err)
 			continue
@@ -80,7 +80,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{
 		logger:  log,
-		fetcher: getHostInfo,
+		fetcher: getHostInfo(log),
 	}
 	if c != nil {
 		err := c.Unpack(p)
@@ -94,29 +94,31 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 	return p, nil
 }
 
-func getHostInfo(log *logger.Logger) (map[string]interface{}, error) {
-	sysInfo, err := sysinfo.Host()
-	if err != nil {
-		return nil, err
-	}
-
-	info := sysInfo.Info()
-	name := info.Hostname
-	if features.FQDN() {
-		fqdn, err := sysinfo.FQDN()
+func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
+	return func() (map[string]interface{}, error) {
+		sysInfo, err := sysinfo.Host()
 		if err != nil {
-			log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), name)
-		} else {
-			name = fqdn
+			return nil, err
 		}
-	}
 
-	return map[string]interface{}{
-		"id":           info.UniqueID,
-		"name":         name,
-		"platform":     runtime.GOOS,
-		"architecture": info.Architecture,
-		"ip":           info.IPs,
-		"mac":          info.MACs,
-	}, nil
+		info := sysInfo.Info()
+		name := info.Hostname
+		if features.FQDN() {
+			fqdn, err := sysInfo.FQDN()
+			if err != nil {
+				log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), name)
+			} else {
+				name = fqdn
+			}
+		}
+
+		return map[string]interface{}{
+			"id":           info.UniqueID,
+			"name":         name,
+			"platform":     runtime.GOOS,
+			"architecture": info.Architecture,
+			"ip":           info.IPs,
+			"mac":          info.MACs,
+		}, nil
+	}
 }
