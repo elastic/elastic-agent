@@ -20,6 +20,7 @@ import (
 func dialContext(ctx context.Context, address string, maxMsgSize int) (*grpc.ClientConn, error) {
 	return grpc.DialContext(
 		ctx,
+		address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
