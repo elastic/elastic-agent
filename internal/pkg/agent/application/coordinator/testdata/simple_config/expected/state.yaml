@@ -44,5 +44,7 @@ components:
         name: Mock http/metrics
         version: 1.2.3
 log_level: info
-features: null
-features_idx: 0
+features:
+  fqdn:
+    enabled: true
+features_idx: 17
