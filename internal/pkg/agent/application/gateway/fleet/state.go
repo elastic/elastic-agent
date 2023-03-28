@@ -12,9 +12,6 @@ import (
 
 // StateFetcher provides an interface to fetch the current state of the coordinator.
 type StateFetcher interface {
-	// State returns the current state of the coordinator.
-	State() state.State
-
 	// StateSubscribe subscribes to changes in the coordinator state.
 	//
 	// This provides the current state at the time of first subscription. Cancelling the context

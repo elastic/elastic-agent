@@ -179,21 +179,21 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 			//checkinStartTime := time.Now()
 
 			// get current state
-			state := f.stateFetcher.State()
-			// stateUpdateCh := f.stateFetcher.StateSubscribe(ctx).Ch()
-			// state := <-stateUpdateCh
+			stateUpdateCh := f.stateFetcher.StateSubscribe(ctx).Ch()
+			state := <-stateUpdateCh
 
 			//use a discarder not to stop the coordinator
-			// go func() {
-			// 	for {
-			// 		select {
-			// 		case <-ctx.Done():
-			// 			return
-			// 		case <-stateUpdateCh:
-			// 			// nothing to do, just consume and move on
-			// 		}
-			// 	}
-			// }()
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-stateUpdateCh:
+						f.log.Warnf("Discarded updated state %+v because another checkin is in progress")
+						// nothing to do, just consume and move on
+					}
+				}
+			}()
 
 			// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
 			// the function will retry to communicate with fleet-server with an exponential delay and some
@@ -220,6 +220,7 @@ func (f *fleetGateway) Errors() <-chan error {
 	return f.errCh
 }
 
+// Asynchronous version of doExecute()
 func (f *fleetGateway) doExecuteAsync(ctx context.Context, bo backoff.Backoff, state state.State) <-chan checkinResult {
 	resChan := make(chan checkinResult)
 	go func() {

@@ -8,10 +8,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"strings"
 
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
@@ -36,6 +37,7 @@ import (
 
 // Refer to https://vektra.github.io/mockery/installation/ to check how to install mockery binary
 //go:generate mockery --name StateFetcher
+//go:generate mockery --keeptree --output . --outpkg fleet --dir ../../coordinator/state --name StateUpdateSource
 
 type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)
 
@@ -76,7 +78,16 @@ func newTestingClient() *testingClient {
 
 func emptyStateFetcher(t *testing.T) *MockStateFetcher {
 	mockFetcher := NewMockStateFetcher(t)
-	mockFetcher.EXPECT().State().Return(state.State{})
+	mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
+		ch := make(chan state.State)
+		stateUpdateSrc := NewStateUpdateSource(t)
+		stateUpdateSrc.EXPECT().Ch().Return(ch)
+		// execute a goroutine to send the state ONCE on the channel
+		go func() {
+			ch <- state.State{}
+		}()
+		return stateUpdateSrc
+	})
 	return mockFetcher
 }
 
@@ -342,6 +353,79 @@ func TestFleetGateway(t *testing.T) {
 		cancel()
 		err = <-errCh
 		require.NoError(t, err)
+	})
+
+	t.Run("Test the long poll checkin still consumes states", func(t *testing.T) {
+		longPollClient := newTestingClient()
+		answerCh := longPollClient.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			time.Sleep(500 * time.Millisecond)
+			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+			return resp, nil
+		})
+		ctx, cancel := context.WithCancel(context.Background())
+
+		log, _ := logger.New("tst", false)
+		stateStore := newStateStore(t, log)
+
+		scheduler := scheduler.NewStepper()
+		mockLogger := newTestLogger(t)
+
+		mockFetcher := NewMockStateFetcher(t)
+
+		var statesSent int
+
+		mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
+			ch := make(chan state.State)
+			stateUpdateSrc := NewStateUpdateSource(t)
+			stateUpdateSrc.EXPECT().Ch().Return(ch)
+
+			// execute a goroutine to send the state a few times
+			statesSent = 0
+			go func() {
+				defer close(ch)
+				for {
+					select {
+					case ch <- state.State{}:
+						statesSent++
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+
+			return stateUpdateSrc
+		})
+
+		gateway, err := newFleetGatewayWithScheduler(
+			mockLogger,
+			DefaultFleetGatewaySettings(),
+			agentInfo,
+			longPollClient,
+			scheduler,
+			noop.New(),
+			mockFetcher,
+			stateStore,
+		)
+		require.NoError(t, err)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		scheduler.Next()
+
+		// Make sure that all API calls to the checkin API are successful, the following will happen:
+		// block on the first call.
+		<-answerCh
+		go func() {
+			// drain the channel
+			for range answerCh {
+			}
+		}()
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
+
+		assert.Greater(t, statesSent, 1) // at this point we have sent waaaay more than one, let's keep it easy for slower systems
 	})
 
 }

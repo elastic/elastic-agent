@@ -45,7 +45,7 @@ type CoordinatorState struct {
 	varsMgrErr    error
 
 	subMx     sync.RWMutex
-	subscribe []*StateSubscription
+	subscribe []*stateSubscription
 }
 
 type coordinatorOverrideState struct {
@@ -290,7 +290,7 @@ func (cs *CoordinatorState) sendState(state State) {
 	cs.subMx.RLock()
 	defer cs.subMx.RUnlock()
 
-	send := func(sub *StateSubscription) {
+	send := func(sub *stateSubscription) {
 		t := time.NewTimer(time.Second)
 		defer t.Stop()
 		select {
@@ -306,15 +306,15 @@ func (cs *CoordinatorState) sendState(state State) {
 	}
 }
 
-// StateSubscription provides a channel for notifications of state changes.
-type StateSubscription struct {
+// stateSubscription provides a channel for notifications of state changes.
+type stateSubscription struct {
 	ctx context.Context
 	cs  *CoordinatorState
 	ch  chan State
 }
 
-func newStateSubscription(ctx context.Context, cs *CoordinatorState) *StateSubscription {
-	return &StateSubscription{
+func newStateSubscription(ctx context.Context, cs *CoordinatorState) *stateSubscription {
+	return &stateSubscription{
 		ctx: ctx,
 		cs:  cs,
 		ch:  make(chan State),
@@ -322,7 +322,7 @@ func newStateSubscription(ctx context.Context, cs *CoordinatorState) *StateSubsc
 }
 
 // Ch provides the channel to get state changes.
-func (s *StateSubscription) Ch() <-chan State {
+func (s *stateSubscription) Ch() <-chan State {
 	return s.ch
 }
 
