@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"io"
@@ -159,7 +158,7 @@ func wrapStrToResp(code int, body string) *http.Response {
 		Proto:         "HTTP/1.1",
 		ProtoMajor:    1,
 		ProtoMinor:    1,
-		Body:          ioutil.NopCloser(bytes.NewBufferString(body)),
+		Body:          io.NopCloser(bytes.NewBufferString(body)),
 		ContentLength: int64(len(body)),
 		Header:        make(http.Header),
 	}
@@ -595,7 +594,7 @@ func runFleetGateway(ctx context.Context, g *fleetGateway) <-chan error {
 }
 
 func newStateStore(t *testing.T, log *logger.Logger) *store.StateStore {
-	dir, err := ioutil.TempDir("", "fleet-gateway-unit-test")
+	dir, err := os.MkdirTemp("", "fleet-gateway-unit-test")
 	require.NoError(t, err)
 
 	filename := filepath.Join(dir, "state.enc")
