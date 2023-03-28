@@ -278,7 +278,8 @@ data:
             hosts:
               - 'localhost:10249'
             period: 10s
-      - name: kubernetes-1
+      - name: kubernetes-4
+         id: C07CC023-84F5-4623-962C-5F82E9DF7866
         type: kubernetes/metrics
         data_stream:
           namespace: default
