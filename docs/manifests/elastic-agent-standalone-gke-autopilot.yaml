@@ -24,7 +24,8 @@ data:
         username: '${ES_USERNAME}'
         password: '${ES_PASSWORD}'
     inputs:
-      - name: kubernetes-1
+      - name: kubernetes-0
+         id: C07CC023-84F5-4623-962C-5F82E9DF7841
         type: kubernetes/metrics
         data_stream:
           namespace: default
