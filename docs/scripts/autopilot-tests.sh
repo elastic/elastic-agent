@@ -2,7 +2,7 @@
 # Script that asserts the integration of Elastic Agent+Kubernetes Integration with Elastic Stack. 
 ## Tested with Agent version > 8.6.0
 
-NAMESPACE=kube-system
+NAMESPACE=${1:-"kube-system"}
 LEADER=$(kubectl get leases -n ${NAMESPACE} | grep elastic | awk '{print $2}' | awk -F- '{print $NF}')
 LEADERAGENT=${2-"elastic-agent-${LEADER}"}
 
