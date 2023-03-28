@@ -264,7 +264,8 @@ data:
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.certificate_authorities:
               - /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-      - name: kubernetes-1
+      - name: kubernetes-3
+         id: C07CC023-84F5-4623-962C-5F82E9DF7877
         type: kubernetes/metrics
         data_stream:
           namespace: default
