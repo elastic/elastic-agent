@@ -245,7 +245,8 @@ data:
             period: 10s
             condition: '${kubernetes_leaderelection.leader} == true'
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      - name: kubernetes-1
+      - name: kubernetes-2
+         id: C07CC023-84F5-4623-962C-5F82E9DF7888
         type: kubernetes/metrics
         data_stream:
           namespace: default
