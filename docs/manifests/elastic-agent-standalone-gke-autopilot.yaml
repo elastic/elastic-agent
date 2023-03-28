@@ -293,7 +293,8 @@ data:
             add_metadata: true
             skip_older: true
             condition: '${kubernetes_leaderelection.leader} == true'
-      - name: kubernetes-1
+      - name: kubernetes-5
+         id: C07CC023-84F5-4623-962C-5F82E9DF7855
         type: filestream
         data_stream:
           namespace: default
