@@ -17,7 +17,7 @@ require (
 	github.com/elastic/elastic-agent-libs v0.3.6
 	github.com/elastic/elastic-agent-system-metrics v0.4.6-0.20230308003052-ba171438211e
 	github.com/elastic/go-licenser v0.4.0
-	github.com/elastic/go-sysinfo v1.9.1-0.20230215152520-f544eca983fb
+	github.com/elastic/go-sysinfo v1.9.1-0.20230328042007-6dcfe88b8359
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid v4.2.0+incompatible
