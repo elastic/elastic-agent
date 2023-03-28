@@ -262,14 +262,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 }
 
 func (f *Fixture) fetch(ctx context.Context) (string, error) {
-	fetchCacheMx.Lock()
-	defer fetchCacheMx.Unlock()
-
-	if fetchCache == nil {
-		fetchCache = make(map[string]fetcherCache)
-	}
-
-	cache, _ := fetchCache[f.fetcher.Name()]
+	cache := f.getFetcherCache()
 	cache.mx.Lock()
 	defer cache.mx.Unlock()
 
@@ -292,8 +285,24 @@ func (f *Fixture) fetch(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fetchCache[f.fetcher.Name()] = cache
 	return path, nil
+}
+
+func (f *Fixture) getFetcherCache() *fetcherCache {
+	fetchCacheMx.Lock()
+	defer fetchCacheMx.Unlock()
+
+	if fetchCache == nil {
+		fetchCache = make(map[string]*fetcherCache)
+	}
+
+	cache, ok := fetchCache[f.fetcher.Name()]
+	if !ok {
+		cache = &fetcherCache{}
+		fetchCache[f.fetcher.Name()] = cache
+	}
+
+	return cache
 }
 
 func (f *Fixture) prepareComponents(workDir string, components ...UsableComponent) error {
@@ -515,7 +524,7 @@ func watchState(ctx context.Context, c client.Client, timeout time.Duration) (ch
 		for {
 			sub, err = c.StateWatch(ctx)
 			if err != nil {
-				if time.Now().Sub(started) > timeout {
+				if time.Since(started) > timeout {
 					// failed to connected in timeout range
 					errCh <- err
 					return

@@ -70,7 +70,7 @@ type Fetcher interface {
 
 // fetchCache is global to all tests, reducing the time required to fetch the needed artifacts
 // to only be need at the start of the first test.
-var fetchCache map[string]fetcherCache
+var fetchCache map[string]*fetcherCache
 var fetchCacheMx sync.Mutex
 
 // fetcherCache provides a caching mechanism for only fetching what has not already been fetched.
@@ -92,22 +92,6 @@ func (c *fetcherCache) fetch(ctx context.Context, l Logger, res FetcherResult) (
 	if err != nil {
 		return "", err
 	}
-	/*
-		l.Logf("Extracting artifact %s", name)
-		switch ext {
-		case ".tar.gz":
-			err := untar(src)
-			if err != nil {
-				return "", fmt.Errorf("failed to untar %s: %w", src, err)
-			}
-		case ".zip":
-			err := unzip(src)
-			if err != nil {
-				return "", fmt.Errorf("failed to unzip %s: %w", src, err)
-			}
-		}
-		l.Logf("Completed extraction of artifact %s", name)
-	*/
 	return src, nil
 }
 
