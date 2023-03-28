@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/sysinfo/types"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
 
@@ -41,7 +40,7 @@ type contextProvider struct {
 
 // Run runs the environment context provider.
 func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
-	current, err := c.fetcher()
+	current, err := c.fetcher(c.logger)
 	if err != nil {
 		return err
 	}
@@ -60,7 +59,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		case <-t.C:
 		}
 
-		updated, err := c.fetcher()
+		updated, err := c.fetcher(c.logger)
 		if err != nil {
 			c.logger.Warnf("Failed fetching latest host information: %s", err)
 			continue
@@ -95,14 +94,22 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 	return p, nil
 }
 
-func getHostInfo() (map[string]interface{}, error) {
+func getHostInfo(log *logger.Logger) (map[string]interface{}, error) {
 	sysInfo, err := sysinfo.Host()
 	if err != nil {
 		return nil, err
 	}
 
-	info := types.HostInfo(sysInfo.Info())
-	name := info.FQDNAwareHostname(features.FQDN())
+	info := sysInfo.Info()
+	name := info.Hostname
+	if features.FQDN() {
+		fqdn, err := sysinfo.FQDN()
+		if err != nil {
+			log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), name)
+		} else {
+			name = fqdn
+		}
+	}
 
 	return map[string]interface{}{
 		"id":           info.UniqueID,

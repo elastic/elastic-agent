@@ -9,12 +9,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/sysinfo/types"
-	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/go-sysinfo"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/features"
+
+	"github.com/elastic/go-sysinfo"
+	"github.com/elastic/go-sysinfo/types"
 )
 
 // ECSMeta is a collection of agent related metadata in ECS compliant object form.
@@ -142,8 +142,16 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 		return nil, err
 	}
 
-	info := types.HostInfo(sysInfo.Info())
-	hostname := info.FQDNAwareHostname(features.FQDN())
+	info := sysInfo.Info()
+	hostname := info.Hostname
+	if features.FQDN() {
+		fqdn, err := sysinfo.FQDN()
+		if err != nil {
+			i.log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
+		} else {
+			hostname = fqdn
+		}
+	}
 
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
@@ -189,8 +197,16 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	info := types.HostInfo(sysInfo.Info())
-	hostname := info.FQDNAwareHostname(features.FQDN())
+	info := sysInfo.Info()
+	hostname := info.Hostname
+	if features.FQDN() {
+		fqdn, err := sysinfo.FQDN()
+		if err != nil {
+			i.log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
+		} else {
+			hostname = fqdn
+		}
+	}
 
 	// Agent
 	meta[agentIDKey] = i.agentID

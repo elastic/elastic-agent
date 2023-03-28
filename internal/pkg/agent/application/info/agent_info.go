@@ -5,6 +5,7 @@
 package info
 
 import (
+	"fmt"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -14,6 +15,7 @@ type AgentInfo struct {
 	agentID  string
 	logLevel string
 	headers  map[string]string
+	log      *logger.Logger
 }
 
 // NewAgentInfoWithLog creates a new agent information.
@@ -28,10 +30,16 @@ func NewAgentInfoWithLog(level string, createAgentID bool) (*AgentInfo, error) {
 		return nil, err
 	}
 
+	log, err := logger.New("agent_info", false)
+	if err != nil {
+		return nil, fmt.Errorf("unable to instantiate agent_info logger: %w", err)
+	}
+
 	return &AgentInfo{
 		agentID:  agentInfo.ID,
 		logLevel: agentInfo.LogLevel,
 		headers:  agentInfo.Headers,
+		log:      log,
 	}, nil
 }
 
