@@ -8,7 +8,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package mocks
+package coordinator
 
 import mock "github.com/stretchr/testify/mock"
 

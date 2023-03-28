@@ -11,6 +11,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
@@ -177,10 +178,27 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 			f.log.Debug("FleetGateway calling Checkin API")
 			//checkinStartTime := time.Now()
 
+			// get current state
+			state := f.stateFetcher.State()
+			// stateUpdateCh := f.stateFetcher.StateSubscribe(ctx).Ch()
+			// state := <-stateUpdateCh
+
+			//use a discarder not to stop the coordinator
+			// go func() {
+			// 	for {
+			// 		select {
+			// 		case <-ctx.Done():
+			// 			return
+			// 		case <-stateUpdateCh:
+			// 			// nothing to do, just consume and move on
+			// 		}
+			// 	}
+			// }()
+
 			// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
 			// the function will retry to communicate with fleet-server with an exponential delay and some
 			// jitter to help better distribute the load from a fleet of agents.
-			resCheckinChan := f.doExecuteAsync(ctx, backoff)
+			resCheckinChan := f.doExecuteAsync(ctx, backoff, state)
 
 			checkinResult := <-resCheckinChan
 
@@ -202,24 +220,24 @@ func (f *fleetGateway) Errors() <-chan error {
 	return f.errCh
 }
 
-func (f *fleetGateway) doExecuteAsync(ctx context.Context, bo backoff.Backoff) <-chan checkinResult {
+func (f *fleetGateway) doExecuteAsync(ctx context.Context, bo backoff.Backoff, state state.State) <-chan checkinResult {
 	resChan := make(chan checkinResult)
 	go func() {
 		defer close(resChan)
-		resp, err := f.doExecute(ctx, bo)
+		resp, err := f.doExecute(ctx, bo, state)
 		resChan <- checkinResult{response: resp, err: err}
 	}()
 	return resChan
 }
 
-func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {
+func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff, state state.State) (*fleetapi.CheckinResponse, error) {
 	bo.Reset()
 
 	// Guard if the context is stopped by a out of bound call,
 	// this mean we are rebooting to change the log level or the system is shutting us down.
 	for ctx.Err() == nil {
 		f.log.Debugf("Checking started")
-		resp, took, err := f.execute(ctx)
+		resp, took, err := f.execute(ctx, state)
 		if err != nil {
 			f.checkinFailCounter++
 
@@ -341,7 +359,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 	return checkinComponents
 }
 
-func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
+func (f *fleetGateway) execute(ctx context.Context, state state.State) (*fleetapi.CheckinResponse, time.Duration, error) {
 	ecsMeta, err := info.Metadata(f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
@@ -352,9 +370,6 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	if ackToken != "" {
 		f.log.Debugf("using previously saved ack token: %v", ackToken)
 	}
-
-	// get current state
-	state := f.stateFetcher.State()
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components)

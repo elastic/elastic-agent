@@ -14,20 +14,12 @@ import (
 type StateFetcher interface {
 	// State returns the current state of the coordinator.
 	State() state.State
-}
 
-// StateUpdateSource represents an object providing state updates through a channel
-type StateUpdateSource interface {
-	Ch() <-chan state.State
+	// StateSubscribe subscribes to changes in the coordinator state.
+	//
+	// This provides the current state at the time of first subscription. Cancelling the context
+	// results in the subscription being unsubscribed.
+	//
+	// Note: Not reading from a subscription channel will cause the Coordinator to block.
+	StateSubscribe(ctx context.Context) state.StateUpdateSource
 }
-
-// StateSubscribe subscribes to changes in the coordinator state.
-//
-// This provides the current state at the time of first subscription. Cancelling the context
-// results in the subscription being unsubscribed.
-//
-// Note: Not reading from a subscription channel will cause the Coordinator to block.
-type StatePublisher interface {
-	StateSubscribe(ctx context.Context) StateUpdateSource
-}
-

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package coordinator_test
+package coordinator
 
 import (
 	"context"
@@ -26,8 +26,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/mocks"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -47,8 +45,8 @@ import (
 //go:generate mockery --name UpgradeManager
 //go:generate mockery --name ReExecManager
 //go:generate mockery --name MonitorManager
-//go:generate mockery --dir ../../../capabilities/ --name Capability
-//go:generate mockery --dir ../../../core/composable/ --name FetchContextProvider
+//go:generate mockery --keeptree --outpkg coordinator --output . --dir ../../../capabilities/ --name Capability
+//go:generate mockery --keeptree --outpkg coordinator --output . --dir ../../../core/composable/ --name FetchContextProvider
 
 var /*const*/ expectedDiagnosticHooks map[string]string = map[string]string{
 	"pre-config":          "pre-config.yaml",
@@ -175,7 +173,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 						},
 					},
 				}
-				fetchContextProvider := mocks.NewFetchContextProvider(t)
+				fetchContextProvider := NewFetchContextProvider(t)
 				fetchContextProviders := mapstr.M{
 					"kubernetes_secrets": fetchContextProvider,
 				}
@@ -246,10 +244,10 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 
 			initialConf := config.MustNewConfigFrom(configBytes)
 
-			initialConfChange := mocks.NewConfigChange(t)
+			initialConfChange := NewMockConfigChange(t)
 			initialConfChange.EXPECT().Config().Return(initialConf)
 			initialConfChange.EXPECT().Ack().Return(nil).Times(1)
-			mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
+			mustWriteToChannelBeforeTimeout[ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
 
 			assert.Eventually(t, func() bool { return sut.State().State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
 			assert.Eventually(t, func() bool { return len(initialConfChange.Calls) > 1 /*both Config and Ack have been called)*/ }, 1*time.Second, 50*time.Millisecond)
@@ -402,24 +400,24 @@ func (a SortByID) Less(i, j int) bool {
 }
 
 type coordinatorTestHelper struct {
-	coordinator *coordinator.Coordinator
+	coordinator *Coordinator
 
-	runtimeManager      *mocks.RuntimeManager
+	runtimeManager      *MockRuntimeManager
 	runtimeErrorChannel chan error
 
-	configManager       *mocks.ConfigManager
-	configChangeChannel chan coordinator.ConfigChange
+	configManager       *MockConfigManager
+	configChangeChannel chan ConfigChange
 	configErrorChannel  chan error
 	actionErrorChannel  chan error
 
-	varsManager      *mocks.VarsManager
+	varsManager      *MockVarsManager
 	varsChannel      chan []*transpiler.Vars
 	varsErrorChannel chan error
 
-	capability     *mocks.Capability
-	upgradeManager *mocks.UpgradeManager
-	reExecManager  *mocks.ReExecManager
-	monitorManager *mocks.MonitorManager
+	capability     *Capability
+	upgradeManager *MockUpgradeManager
+	reExecManager  *MockReExecManager
+	monitorManager *MockMonitorManager
 }
 
 func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, isManaged bool) *coordinatorTestHelper {
@@ -428,7 +426,7 @@ func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs com
 	helper := new(coordinatorTestHelper)
 
 	// Runtime manager basic wiring
-	mockRuntimeMgr := mocks.NewRuntimeManager(t)
+	mockRuntimeMgr := NewMockRuntimeManager(t)
 	runtimeErrChan := make(chan error)
 	mockRuntimeMgr.EXPECT().Errors().Return(runtimeErrChan)
 	mockRuntimeMgr.EXPECT().Run(mock.Anything).RunAndReturn(func(_ctx context.Context) error { <-_ctx.Done(); return _ctx.Err() }).Times(1)
@@ -436,12 +434,12 @@ func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs com
 	helper.runtimeErrorChannel = runtimeErrChan
 
 	// Config manager basic wiring
-	mockConfigMgr := mocks.NewConfigManager(t)
+	mockConfigMgr := NewMockConfigManager(t)
 	configErrChan := make(chan error)
 	mockConfigMgr.EXPECT().Errors().Return(configErrChan)
 	actionErrorChan := make(chan error)
 	mockConfigMgr.EXPECT().ActionErrors().Return(actionErrorChan)
-	configChangeChan := make(chan coordinator.ConfigChange)
+	configChangeChan := make(chan ConfigChange)
 	mockConfigMgr.EXPECT().Watch().Return(configChangeChan)
 	mockConfigMgr.EXPECT().Run(mock.Anything).RunAndReturn(func(_ctx context.Context) error { <-_ctx.Done(); return _ctx.Err() }).Times(1)
 	helper.configManager = mockConfigMgr
@@ -450,7 +448,7 @@ func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs com
 	helper.configChangeChannel = configChangeChan
 
 	//Variables manager basic wiring
-	mockVarsMgr := mocks.NewVarsManager(t)
+	mockVarsMgr := NewMockVarsManager(t)
 	varsErrChan := make(chan error)
 	mockVarsMgr.EXPECT().Errors().Return(varsErrChan)
 	varsChan := make(chan []*transpiler.Vars)
@@ -461,21 +459,21 @@ func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs com
 	helper.varsErrorChannel = varsErrChan
 
 	//Capability basic wiring
-	mockCapability := mocks.NewCapability(t)
+	mockCapability := NewCapability(t)
 	mockCapability.EXPECT().Apply(mock.AnythingOfType("*transpiler.AST")).RunAndReturn(func(in interface{}) (interface{}, error) { return in, nil })
 	helper.capability = mockCapability
 
 	// Upgrade manager
-	mockUpgradeMgr := mocks.NewUpgradeManager(t)
+	mockUpgradeMgr := NewMockUpgradeManager(t)
 	mockUpgradeMgr.EXPECT().Reload(mock.AnythingOfType("*config.Config")).Return(nil)
 	// mockUpgradeMgr.EXPECT().Upgradeable().Return(false)
 	helper.upgradeManager = mockUpgradeMgr
 
 	//ReExec manager
-	helper.reExecManager = mocks.NewReExecManager(t)
+	helper.reExecManager = NewMockReExecManager(t)
 
 	//Monitor manager
-	mockMonitorMgr := mocks.NewMonitorManager(t)
+	mockMonitorMgr := NewMockMonitorManager(t)
 	mockMonitorMgr.EXPECT().Reload(mock.AnythingOfType("*config.Config")).Return(nil)
 	mockMonitorMgr.EXPECT().Enabled().Return(false)
 	helper.monitorManager = mockMonitorMgr
@@ -486,7 +484,7 @@ func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs com
 	log, err := logger.NewFromConfig("coordinator-test", loggerCfg, false)
 	require.NoError(t, err)
 
-	helper.coordinator = coordinator.New(
+	helper.coordinator = New(
 		log,
 		logp.InfoLevel,
 		agentInfo,

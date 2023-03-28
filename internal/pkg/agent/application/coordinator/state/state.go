@@ -236,13 +236,18 @@ func (cs *CoordinatorState) State() (s State) {
 	return s
 }
 
+// StateUpdateSource represents an object providing state updates through a channel
+type StateUpdateSource interface {
+	Ch() <-chan State
+}
+
 // Subscribe subscribes to changes in the coordinator state.
 //
 // This provides the current state at the time of first subscription. Cancelling the context
 // results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Coordinator to block.
-func (cs *CoordinatorState) Subscribe(ctx context.Context) *StateSubscription {
+func (cs *CoordinatorState) Subscribe(ctx context.Context) StateUpdateSource {
 	sub := newStateSubscription(ctx, cs)
 
 	// send initial state

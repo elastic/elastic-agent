@@ -1,7 +1,7 @@
-inpackage: False
-testonly: False
+inpackage: True
+testonly: True
 with-expecter: True
-keeptree: True
+keeptree: False
 case: underscore
 note: |
   Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one

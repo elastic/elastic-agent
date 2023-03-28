@@ -34,6 +34,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// Refer to https://vektra.github.io/mockery/installation/ to check how to install mockery binary
+//go:generate mockery --name StateFetcher
+
 type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)
 
 type testingClient struct {
@@ -71,6 +74,12 @@ func newTestingClient() *testingClient {
 	return &testingClient{received: make(chan struct{}, 1)}
 }
 
+func emptyStateFetcher(t *testing.T) *MockStateFetcher {
+	mockFetcher := NewMockStateFetcher(t)
+	mockFetcher.EXPECT().State().Return(state.State{})
+	return mockFetcher
+}
+
 type withGatewayFunc func(*testing.T, *fleetGateway, *testingClient, *scheduler.Stepper)
 
 func withGateway(agentInfo agentInfo, settings FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
@@ -89,7 +98,7 @@ func withGateway(agentInfo agentInfo, settings FleetGatewaySettings, fn withGate
 			client,
 			scheduler,
 			noop.New(),
-			&emptyStateFetcher{},
+			emptyStateFetcher(t),
 			stateStore,
 		)
 
@@ -114,7 +123,7 @@ func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings FleetGatewa
 			client,
 			scheduler,
 			noop.New(),
-			&emptyStateFetcher{},
+			emptyStateFetcher(t),
 			stateStore,
 		)
 
@@ -253,7 +262,7 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			&emptyStateFetcher{},
+			emptyStateFetcher(t),
 			stateStore,
 		)
 		require.NoError(t, err)
@@ -305,7 +314,7 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			&emptyStateFetcher{},
+			emptyStateFetcher(t),
 			stateStore,
 		)
 		require.NoError(t, err)
@@ -475,12 +484,6 @@ func TestRetriesOnFailures(t *testing.T) {
 type testAgentInfo struct{}
 
 func (testAgentInfo) AgentID() string { return "agent-secret" }
-
-type emptyStateFetcher struct{}
-
-func (e *emptyStateFetcher) State() state.State {
-	return state.State{}
-}
 
 func runFleetGateway(ctx context.Context, g *fleetGateway) <-chan error {
 	done := make(chan bool)
