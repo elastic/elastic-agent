@@ -185,6 +185,7 @@ func downloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath 
 	if err != nil {
 		return err
 	}
+	defer w.Close()
 
 	var reader io.Reader
 	var size int
@@ -204,7 +205,11 @@ func downloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath 
 
 	_, err = io.Copy(w, reader)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write file %s: %w", packageFile, err)
+	}
+	err = w.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync file %s: %w", packageFile, err)
 	}
 
 	l.Logf("Completed downloading artifact from %s", downloadPath)

@@ -7,7 +7,7 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -78,14 +78,27 @@ func (r *localFetcherResult) Name() string {
 // Fetch performs the actual fetch into the provided directory.
 func (r *localFetcherResult) Fetch(_ context.Context, _ Logger, dir string) error {
 	fullPath := filepath.Join(r.src, r.path)
-	src, err := ioutil.ReadFile(fullPath)
+
+	reader, err := os.Open(fullPath)
 	if err != nil {
-		return fmt.Errorf("failed to read file %s: %w", fullPath, err)
+		return fmt.Errorf("failed to open file %s: %w", fullPath, err)
 	}
+	defer reader.Close()
+
 	path := filepath.Join(dir, r.path)
-	err = ioutil.WriteFile(path, src, 0755)
+	w, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", path, err)
+	}
+	defer w.Close()
+
+	_, err = io.Copy(w, reader)
 	if err != nil {
 		return fmt.Errorf("failed to write file %s: %w", path, err)
+	}
+	err = w.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync file %s: %w", path, err)
 	}
 	return nil
 }
