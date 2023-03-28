@@ -86,6 +86,7 @@ data:
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
       - name: kubernetes-1
+         id: C07CC023-84F5-4623-962C-5F82E9DF7899
         type: kubernetes/metrics
         data_stream:
           namespace: default
