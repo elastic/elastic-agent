@@ -31,20 +31,24 @@ const fleetStateOnline = "online"
 const fleetStateError = "error"
 const fleetStateStarting = "starting"
 
-// Default Configuration for the Fleet Gateway.
-var defaultGatewaySettings = &fleetGatewaySettings{
-	Duration: 1 * time.Second,        // time between successful calls
-	Jitter:   500 * time.Millisecond, // used as a jitter for duration
-	Backoff: backoffSettings{ // time after a failed call
-		Init: 60 * time.Second,
-		Max:  10 * time.Minute,
-	},
-}
-
-type fleetGatewaySettings struct {
+type FleetGatewaySettings struct {
+	Debounce time.Duration   `config:"checkin_debounce"`
 	Duration time.Duration   `config:"checkin_frequency"`
 	Jitter   time.Duration   `config:"jitter"`
 	Backoff  backoffSettings `config:"backoff"`
+}
+
+// Returns default Configuration for the Fleet Gateway.
+func DefaultFleetGatewaySettings() FleetGatewaySettings {
+	return FleetGatewaySettings{
+		Debounce: 5 * time.Minute,        // time the agent has to wait before cancelling an ongoing checkin and start a new one
+		Duration: 5 * time.Minute,        // time between successful calls
+		Jitter:   500 * time.Millisecond, // used as a jitter for duration
+		Backoff: backoffSettings{ // time after a failed call
+			Init: 60 * time.Second,
+			Max:  10 * time.Minute,
+		},
+	}
 }
 
 type backoffSettings struct {
@@ -76,11 +80,16 @@ type loggerIF interface {
 	Errorw(msg string, keysAndValues ...interface{})
 }
 
+type checkinResult struct {
+	response *fleetapi.CheckinResponse
+	err      error
+}
+
 type fleetGateway struct {
 	log                loggerIF
 	client             client.Sender
 	scheduler          Scheduler
-	settings           *fleetGatewaySettings
+	settings           FleetGatewaySettings
 	agentInfo          agentInfo
 	acker              acker.Acker
 	unauthCounter      int
@@ -94,6 +103,7 @@ type fleetGateway struct {
 // New creates a new fleet gateway
 func New(
 	log loggerIF,
+	settings FleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
@@ -101,10 +111,10 @@ func New(
 	stateStore stateStore,
 ) (*fleetGateway, error) {
 
-	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
+	scheduler := scheduler.NewPeriodicJitter(settings.Duration, settings.Jitter)
 	return newFleetGatewayWithScheduler(
 		log,
-		defaultGatewaySettings,
+		settings,
 		agentInfo,
 		client,
 		scheduler,
@@ -116,7 +126,7 @@ func New(
 
 func newFleetGatewayWithScheduler(
 	log loggerIF,
-	settings *fleetGatewaySettings,
+	settings FleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
 	scheduler Scheduler,
@@ -165,17 +175,21 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 			return ctx.Err()
 		case <-f.scheduler.WaitTick():
 			f.log.Debug("FleetGateway calling Checkin API")
+			//checkinStartTime := time.Now()
 
-			// Execute the checkin call and for any errors returned by the fleet-server API
+			// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
 			// the function will retry to communicate with fleet-server with an exponential delay and some
 			// jitter to help better distribute the load from a fleet of agents.
-			resp, err := f.doExecute(ctx, backoff)
-			if err != nil {
+			resCheckinChan := f.doExecuteAsync(ctx, backoff)
+
+			checkinResult := <-resCheckinChan
+
+			if checkinResult.err != nil {
 				continue
 			}
 
-			actions := make([]fleetapi.Action, len(resp.Actions))
-			copy(actions, resp.Actions)
+			actions := make([]fleetapi.Action, len(checkinResult.response.Actions))
+			copy(actions, checkinResult.response.Actions)
 			if len(actions) > 0 {
 				f.actionCh <- actions
 			}
@@ -186,6 +200,16 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 // Errors returns the channel to watch for reported errors.
 func (f *fleetGateway) Errors() <-chan error {
 	return f.errCh
+}
+
+func (f *fleetGateway) doExecuteAsync(ctx context.Context, bo backoff.Backoff) <-chan checkinResult {
+	resChan := make(chan checkinResult)
+	go func() {
+		defer close(resChan)
+		resp, err := f.doExecute(ctx, bo)
+		resChan <- checkinResult{response: resp, err: err}
+	}()
+	return resChan
 }
 
 func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*fleetapi.CheckinResponse, error) {

@@ -73,7 +73,7 @@ func newTestingClient() *testingClient {
 
 type withGatewayFunc func(*testing.T, *fleetGateway, *testingClient, *scheduler.Stepper)
 
-func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
+func withGateway(agentInfo agentInfo, settings FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
@@ -98,7 +98,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 		fn(t, gateway, client, scheduler)
 	}
 }
-func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
+func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
@@ -147,7 +147,7 @@ func wrapStrToResp(code int, body string) *http.Response {
 
 func TestFleetGateway(t *testing.T) {
 	agentInfo := &testAgentInfo{}
-	settings := &fleetGatewaySettings{
+	settings := FleetGatewaySettings{
 		Duration: 5 * time.Second,
 		Backoff:  backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
 	}
@@ -297,7 +297,7 @@ func TestFleetGateway(t *testing.T) {
 
 		gateway, err := newFleetGatewayWithScheduler(
 			log,
-			&fleetGatewaySettings{
+			FleetGatewaySettings{
 				Duration: d,
 				Backoff:  backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
 			},
@@ -339,7 +339,7 @@ func TestFleetGateway(t *testing.T) {
 
 func TestRetriesOnFailures(t *testing.T) {
 	agentInfo := &testAgentInfo{}
-	settings := &fleetGatewaySettings{
+	settings := FleetGatewaySettings{
 		Duration: 5 * time.Second,
 		Backoff:  backoffSettings{Init: 100 * time.Millisecond, Max: 5 * time.Second},
 	}
@@ -390,7 +390,7 @@ func TestRetriesOnFailures(t *testing.T) {
 		}))
 
 	t.Run("The retry loop is interruptible",
-		withGateway(agentInfo, &fleetGatewaySettings{
+		withGateway(agentInfo, FleetGatewaySettings{
 			Duration: 0 * time.Second,
 			Backoff:  backoffSettings{Init: 10 * time.Minute, Max: 20 * time.Minute},
 		}, func(
@@ -425,7 +425,7 @@ func TestRetriesOnFailures(t *testing.T) {
 		withGatewayAndLog(
 			agentInfo,
 			newTestLogger(t),
-			&fleetGatewaySettings{
+			FleetGatewaySettings{
 				Duration: 0 * time.Second,
 				Backoff: backoffSettings{
 					Init: 1 * time.Millisecond,
