@@ -86,6 +86,10 @@ func TestLoadSpec_Components(t *testing.T) {
 			Path: "packetbeat.spec.yml",
 		},
 		{
+			Name: "Universal Profiling Collector",
+			Path: "pf-elastic-collector.spec.yml",
+		},
+		{
 			Name: "Universal Profiling Symbolizer",
 			Path: "pf-elastic-symbolizer.spec.yml",
 		},
