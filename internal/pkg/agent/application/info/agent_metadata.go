@@ -145,7 +145,7 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 	info := sysInfo.Info()
 	hostname := info.Hostname
 	if features.FQDN() {
-		fqdn, err := sysinfo.FQDN()
+		fqdn, err := sysInfo.FQDN()
 		if err != nil {
 			i.log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
 		} else {
@@ -200,7 +200,7 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 	info := sysInfo.Info()
 	hostname := info.Hostname
 	if features.FQDN() {
-		fqdn, err := sysinfo.FQDN()
+		fqdn, err := sysInfo.FQDN()
 		if err != nil {
 			i.log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
 		} else {
