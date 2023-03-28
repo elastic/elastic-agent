@@ -2,25 +2,26 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package testing
+//go:build integration
+
+package integration
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
-var fakeComponent = UsableComponent{
+var fakeComponent = atesting.UsableComponent{
 	Name:       "fake",
 	BinaryPath: mustAbs(filepath.Join("..", "component", "fake", "component", osExt("component"))),
 	Spec: &component.Spec{
@@ -48,7 +49,7 @@ var fakeComponent = UsableComponent{
 	},
 }
 
-var fakeShipper = UsableComponent{
+var fakeShipper = atesting.UsableComponent{
 	Name:       "fake-shipper",
 	BinaryPath: mustAbs(filepath.Join("..", "component", "fake", "shipper", osExt("shipper"))),
 	Spec: &component.Spec{
@@ -88,37 +89,49 @@ inputs:
     message: Healthy
 `
 
-func TestFixture_Prepare(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+type FakeComponentIntegrationTestSuite struct {
+	suite.Suite
+	f *atesting.Fixture
+}
+
+func (s *FakeComponentIntegrationTestSuite) SetupSuite() {
+	l := atesting.LocalFetcher("../../build/distributions")
+	f, err := atesting.NewFixture(s.T(), "8.8.0", atesting.WithFetcher(l), atesting.WithLogOutput())
+	s.Require().NoError(err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	s.Require().NoError(err)
+	s.f = f
+}
+
+func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	path := fmt.Sprintf("unix://%s.sock", filepath.Join(paths.TempDir(), "elastic-agent-control"))
-	_ = path
-
-	l := LocalFetcher("../../build/distributions")
-	f, err := NewFixture(t, "8.8.0", WithFetcher(l), WithLogOutput())
-	require.NoError(t, err)
-	err = f.Prepare(ctx, fakeComponent, fakeShipper)
-	require.NoError(t, err)
-
-	err = f.Run(ctx, State{
+	err := s.f.Run(ctx, atesting.State{
 		Configure:  simpleConfig,
-		AgentState: NewClientState(client.Healthy),
-		Components: map[string]ComponentState{
+		AgentState: atesting.NewClientState(client.Healthy),
+		Components: map[string]atesting.ComponentState{
 			"fake-default": {
-				State: NewClientState(client.Healthy),
-				Units: map[ComponentUnitKey]ComponentUnitState{
-					ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
-						State: NewClientState(client.Healthy),
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
+						State: atesting.NewClientState(client.Healthy),
 					},
-					ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
-						State: NewClientState(client.Healthy),
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: atesting.NewClientState(client.Healthy),
 					},
 				},
 			},
 		},
 	})
-	require.NoError(t, err)
+	s.Require().NoError(err)
+}
+
+func TestFakeComponentIntegrationTestSuite(t *testing.T) {
+	suite.Run(t, new(FakeComponentIntegrationTestSuite))
 }
 
 func mustAbs(path string) string {

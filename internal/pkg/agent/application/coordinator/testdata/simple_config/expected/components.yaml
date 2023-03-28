@@ -27,7 +27,6 @@ components:
         - -E
         - filebeat.config.modules.enabled=false
         log:
-          ignore_keys: []
           level_key: log.level
           message_key: message
           time_format: 2006-01-02T15:04:05.000Z0700
@@ -53,8 +52,6 @@ components:
       - windows/amd64
       - container/amd64
       - container/arm64
-      runtime:
-        preventions: []
       shippers:
       - shipper
   units:
@@ -447,7 +444,6 @@ components:
         - -E
         - metricbeat.config.modules.enabled=false
         log:
-          ignore_keys: []
           level_key: log.level
           message_key: message
           time_format: 2006-01-02T15:04:05.000Z0700
@@ -473,8 +469,6 @@ components:
       - windows/amd64
       - container/amd64
       - container/arm64
-      runtime:
-        preventions: []
       shippers:
       - shipper
   units:
