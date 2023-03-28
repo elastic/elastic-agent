@@ -18,6 +18,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -130,6 +131,84 @@ func TestHTTPClient(t *testing.T) {
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, successResp, string(body))
+		},
+	))
+
+	// This test for the bug that was introduced in agent 8.6 where the long polling checkin request was blocking the second request for acks
+	//
+	// There are two requests being issued in the test in the following sequence:
+	// 1. The first request starts.
+	// 2. The second request starts only after the first request handler is started execution.
+	// 3. The second request should complete, while the first request is still in progress.
+	// 4. The first request handler is signaled to complete only after the second request completes.
+	//
+	// This test timed out before the fix https://github.com/elastic/elastic-agent/pull/2406
+	//
+	// ➜  go test -timeout 30s -run "^\QTestHTTPClient\E$/^\QTwo_requests\E$" github.com/elastic/elastic-agent/internal/pkg/remote
+	// panic: test timed out after 30s
+	// running tests:
+	// 	TestHTTPClient (30s)
+	// 	TestHTTPClient/Two_requests (30s)
+	//
+	// The test passes after the fix https://github.com/elastic/elastic-agent/pull/2406
+	var wgInReq, wgSecondReq sync.WaitGroup
+	t.Run("Two requests blocking test", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/longpoll", func(w http.ResponseWriter, r *http.Request) {
+				// Signal that the long poll request handle is called
+				// The second request is waiting on this to test that the second request doesn't block
+				wgInReq.Done()
+
+				// Wait until the second request is done
+				wgSecondReq.Wait()
+
+				// This will block this request until the second request completes
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, successResp)
+			})
+			mux.HandleFunc("/second", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, successResp)
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			cfg := config.MustNewConfigFrom(map[string]interface{}{
+				"host": host,
+			})
+
+			client, err := NewWithRawConfig(nil, cfg, nil)
+			require.NoError(t, err)
+
+			issueRequest := func(ctx context.Context, path string) error {
+				resp, err := client.Send(ctx, http.MethodGet, path, nil, nil, nil)
+				if err != nil {
+					return err
+				}
+				defer resp.Body.Close()
+				return nil
+			}
+
+			wgInReq.Add(1)
+			wgSecondReq.Add(1)
+
+			// Issue long poll request
+			g, ctx := errgroup.WithContext(ctx)
+			g.Go(func() error {
+				return issueRequest(ctx, "/longpoll")
+			})
+
+			// The second request should not block waiting on the first request to complete
+			g.Go(func() error {
+				// Wait until the first request handler is hit
+				wgInReq.Wait()
+				err := issueRequest(ctx, "/second")
+				wgSecondReq.Done()
+				return err
+			})
+
+			err = g.Wait()
+			require.NoError(t, err)
 		},
 	))
 
