@@ -7,6 +7,7 @@ package coordinator_test
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"os"
 	"path"
 	"path/filepath"
@@ -153,6 +154,10 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 								Version: "1.2.3",
 							},
 							Units: unitsStates,
+							Features: &proto.Features{
+								Fqdn: &proto.FQDNFeature{Enabled: true},
+							},
+							FeaturesIdx: 17,
 						},
 					}
 
