@@ -6,6 +6,7 @@ package info
 
 import (
 	"fmt"
+
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
