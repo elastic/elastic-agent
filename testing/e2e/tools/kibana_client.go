@@ -63,7 +63,11 @@ func (c *Client) sendRequest(ctx context.Context, method, resourcePath string, b
 
 	u := base.ResolveReference(rel)
 
-	jsonParsed, _ := gabs.ParseJSON(body)
+	jsonParsed, err := gabs.ParseJSON(body)
+
+	if err != nil {
+		return 0, nil, errors.Wrapf(err, "could not parse response of %v request to Kibana API resource: %s", method, resourcePath)
+	}
 
 	log.WithFields(log.Fields{
 		"method":  method,

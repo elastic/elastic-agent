@@ -31,7 +31,7 @@ The `create-cluster` target creates 2 files:
 * `cluster-digest.yml` - a sensitive YAML containing all required endpoints and credentials to be passed to tests in the next step.
 
 3. Run tests:
-It's now always easy to run the tests locally because we can already have an elastic-agent installed on our machine. 
+It's not always easy to run the tests locally because we can already have an elastic-agent installed on our machine. 
 Proposal: Let's use devContainers for better experience(for development and troubleshooting).
 
 Install `Remote Development` extension for VSCode. 
