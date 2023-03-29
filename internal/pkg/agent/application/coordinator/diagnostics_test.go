@@ -22,7 +22,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -50,11 +49,12 @@ import (
 //go:generate mockery --dir ../../../core/composable/ --name FetchContextProvider
 
 var /*const*/ expectedDiagnosticHooks map[string]string = map[string]string{
-	"pre-config":      "pre-config.yaml",
-	"variables":       "variables.yaml",
-	"computed-config": "computed-config.yaml",
-	"components":      "components.yaml",
-	"state":           "state.yaml",
+	"pre-config":          "pre-config.yaml",
+	"variables":           "variables.yaml",
+	"computed-config":     "computed-config.yaml",
+	"components-expected": "components-expected.yaml",
+	"components-actual":   "components-actual.yaml",
+	"state":               "state.yaml",
 }
 
 var /*const*/ linuxPlatformDetail component.PlatformDetail = component.PlatformDetail{
@@ -68,136 +68,223 @@ var /*const*/ linuxPlatformDetail component.PlatformDetail = component.PlatformD
 	Minor:  "4",
 }
 
+type MockedUnit struct {
+	ID       string              `yaml:"id"`
+	LogLevel client.UnitLogLevel `yaml:"log_level"`
+	Type     client.UnitType     `yaml:"type"`
+	Config   map[string]any      `yaml:"config"`
+}
+
+// MockedComponentsUnits is a simple structure to unmarshal the values
+// returned by the mocked Runtime Manager as components and units being run
+type MockedComponentsUnits struct {
+	ID    string       `yaml:"id"`
+	CType string       `yaml:"type"`
+	Units []MockedUnit `yaml:"units"`
+}
+
 func TestCoordinatorDiagnosticHooks(t *testing.T) {
-	specs, err := component.LoadRuntimeSpecs(
-		filepath.Join("..", "..", "..", "..", "..", "specs"),
-		linuxPlatformDetail,
-		component.SkipBinaryCheck(),
-	)
-	require.NoError(t, err)
 
-	helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, specs, false)
-
-	// Runtime component state
-	componentState := runtime.ComponentComponentState{
-		Component: component.Component{
-			ID: "mock_component_1",
-			Units: []component.Unit{
-				{
-					ID:       "mock_input_unit",
-					Type:     client.UnitTypeInput,
-					LogLevel: client.UnitLogLevelInfo,
-					Config:   &proto.UnitExpectedConfig{},
-				},
-			},
-		},
-		State: runtime.ComponentState{
-			State: client.UnitStateHealthy,
-			VersionInfo: runtime.ComponentVersionInfo{
-				Name:    "shiny mock component",
-				Version: "latest, obvs :D",
-			},
-		},
+	type testCase struct {
+		name                    string
+		runtimeSpecsPath        string
+		platform                component.PlatformDetail
+		configFilePath          string
+		componentsUnitsFilePath string
+		componentsState         func(*testing.T, *component.RuntimeSpecs, string) []runtime.ComponentComponentState
+		varsProvider            func(*testing.T) []*transpiler.Vars
+		expectedDiagnosticsPath string
 	}
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	componentsUpdateChannel := make(chan runtime.ComponentComponentState)
-	subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, nil, componentsUpdateChannel)
-	helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
-	helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
-	helper.runtimeManager.EXPECT().State().Return([]runtime.ComponentComponentState{componentState})
 
-	sut := helper.coordinator
-	coordinatorWg := new(sync.WaitGroup)
-	defer func() {
-		cancelFunc()
-		// wait till the coordinator exits to avoid a panic
-		// when logging after the test goroutine exited
-		coordinatorWg.Wait()
-	}()
-
-	coordinatorWg.Add(1)
-	go func() {
-		defer coordinatorWg.Done()
-		coordErr := sut.Run(ctx)
-		assert.ErrorIs(t, coordErr, context.Canceled, "Coordinator exited with unexpected error")
-	}()
-
-	processors := transpiler.Processors{
+	testcases := []testCase{
 		{
-			"add_fields": map[string]interface{}{
-				"dynamic": "added",
+			name:                    "Default Fleet Policy",
+			runtimeSpecsPath:        filepath.Join("..", "..", "..", "..", "..", "specs"),
+			platform:                linuxPlatformDetail,
+			configFilePath:          filepath.Join(".", "testdata", "simple_config", "elastic-agent.yml"),
+			componentsUnitsFilePath: filepath.Join(".", "testdata", "simple_config", "mocked_components_units.yaml"),
+			componentsState: func(t *testing.T, specs *component.RuntimeSpecs, componentsUnitsFilePath string) []runtime.ComponentComponentState {
+
+				componentsBytes, err := os.ReadFile(componentsUnitsFilePath)
+				require.NoError(t, err)
+				mockedComponents := make([]MockedComponentsUnits, 0, 5)
+				err = yaml.Unmarshal(componentsBytes, &mockedComponents)
+				require.NoError(t, err)
+
+				componentStates := make([]runtime.ComponentComponentState, 0, len(mockedComponents))
+
+				for _, comp := range mockedComponents {
+
+					// create all the units for the component
+					units := make([]component.Unit, 0, len(comp.Units))
+					unitsStates := map[runtime.ComponentUnitKey]runtime.ComponentUnitState{}
+					for _, mockedUnit := range comp.Units {
+						// FIXME: when trying to create the proto struct values from map, we panic trying to create the "source" attribute
+						require.NoErrorf(t, err, "Error parsing unit expected config for component %q unit %q", comp.ID, mockedUnit.ID)
+						units = append(units, component.Unit{
+							ID:       mockedUnit.ID,
+							Type:     mockedUnit.Type,
+							LogLevel: mockedUnit.LogLevel,
+							// Config:   mockedUnit.Config,
+						})
+						// FIXME this composite key is ok for Marshaling but then Unmarshaling into a generic map[any]any returns error,
+						// hence we cannot properly sanitize hook output - A custom unmarshaler would probably solve this
+						// unitStateKey := runtime.ComponentUnitKey{UnitType: mockedUnit.Type, UnitID: mockedUnit.ID}
+						// unitsStates[unitStateKey] = runtime.ComponentUnitState{
+						// 	State:   client.UnitStateHealthy,
+						// 	Message: "Healthy",
+						// }
+					}
+
+					//create the component itself
+					spec, err := specs.GetInput(comp.CType)
+					require.NoErrorf(t, err, "unknown spec for component with id %q and type %q", comp.ID, comp.CType)
+
+					componentState := runtime.ComponentComponentState{
+						Component: component.Component{
+							ID:        comp.ID,
+							InputSpec: &spec,
+							Units:     units,
+						},
+						State: runtime.ComponentState{
+							State: client.UnitStateHealthy,
+							VersionInfo: runtime.ComponentVersionInfo{
+								Name:    fmt.Sprintf("Mock %s", comp.CType),
+								Version: "1.2.3",
+							},
+							Units: unitsStates,
+						},
+					}
+
+					componentStates = append(componentStates, componentState)
+				}
+				return componentStates
 			},
+			varsProvider: func(t *testing.T) []*transpiler.Vars {
+				//Provide vars
+				processors := transpiler.Processors{
+					{
+						"add_fields": map[string]interface{}{
+							"dynamic": "added",
+						},
+					},
+				}
+				fetchContextProvider := mocks.NewFetchContextProvider(t)
+				fetchContextProviders := mapstr.M{
+					"kubernetes_secrets": fetchContextProvider,
+				}
+				vars, err := transpiler.NewVarsWithProcessors(
+					"id",
+					map[string]interface{}{
+						"host": map[string]interface{}{"platform": "linux"},
+						"dynamic": map[string]interface{}{
+							"key1": "dynamic1",
+							"list": []string{
+								"array1",
+								"array2",
+							},
+							"dict": map[string]string{
+								"key1": "value1",
+								"key2": "value2",
+							},
+						},
+					},
+					"dynamic",
+					processors,
+					fetchContextProviders)
+				require.NoError(t, err)
+				return []*transpiler.Vars{vars}
+			},
+			expectedDiagnosticsPath: filepath.Join(".", "testdata", "simple_config", "expected"),
 		},
 	}
-	fetchContextProvider := mocks.NewFetchContextProvider(t)
-	fetchContextProviders := mapstr.M{
-		"kubernetes_secrets": fetchContextProvider,
-	}
-	vars, err := transpiler.NewVarsWithProcessors(
-		"id",
-		map[string]interface{}{
-			"host": map[string]interface{}{"platform": "linux"},
-			"dynamic": map[string]interface{}{
-				"key1": "dynamic1",
-				"list": []string{
-					"array1",
-					"array2",
-				},
-				"dict": map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
-			},
-		},
-		"dynamic",
-		processors,
-		fetchContextProviders)
-	require.NoError(t, err)
-	mustWriteToChannelBeforeTimeout(t, []*transpiler.Vars{vars}, helper.varsChannel, 100*time.Millisecond)
 
-	// Inject initial configuration - after starting coordinator
-	configBytes, err := os.ReadFile(path.Join(".", "testdata", "simple_config", "elastic-agent.yml"))
-	require.NoError(t, err)
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			specs, err := component.LoadRuntimeSpecs(
+				tt.runtimeSpecsPath,
+				tt.platform,
+				component.SkipBinaryCheck(),
+			)
+			require.NoError(t, err)
 
-	initialConf := config.MustNewConfigFrom(configBytes)
+			helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, specs, false)
 
-	initialConfChange := mocks.NewConfigChange(t)
-	initialConfChange.EXPECT().Config().Return(initialConf)
-	initialConfChange.EXPECT().Ack().Return(nil).Times(1)
-	mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
+			ctx, cancelFunc := context.WithCancel(context.Background())
+			componentsUpdateChannel := make(chan runtime.ComponentComponentState)
+			subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, nil, componentsUpdateChannel)
+			helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
+			helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
+			helper.runtimeManager.EXPECT().State().Return(tt.componentsState(t, &specs, tt.componentsUnitsFilePath))
 
-	assert.Eventually(t, func() bool { return sut.State(true).State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
-	t.Logf("Agent state: %s", sut.State(true).State)
+			sut := helper.coordinator
+			coordinatorWg := new(sync.WaitGroup)
+			defer func() {
+				cancelFunc()
+				// wait till the coordinator exits to avoid a panic
+				// when logging after the test goroutine exited
+				coordinatorWg.Wait()
+			}()
 
-	mustWriteToChannelBeforeTimeout(t, componentState, componentsUpdateChannel, 100*time.Millisecond)
+			coordinatorWg.Add(1)
+			go func() {
+				defer coordinatorWg.Done()
+				coordErr := sut.Run(ctx)
+				assert.ErrorIs(t, coordErr, context.Canceled, "Coordinator exited with unexpected error")
+			}()
 
-	// FIXME there's no way to know if the coordinator processed the runtime component states, wait and hope for the best
-	time.Sleep(50 * time.Millisecond)
+			mustWriteToChannelBeforeTimeout(t, tt.varsProvider(t), helper.varsChannel, 100*time.Millisecond)
 
-	diagHooks := sut.DiagnosticHooks()
-	t.Logf("Received diagnostics: %+v", diagHooks)
-	assert.NotEmpty(t, diagHooks)
+			// Inject initial configuration - after starting coordinator
+			configBytes, err := os.ReadFile("./testdata/simple_config/elastic-agent.yml")
+			require.NoError(t, err)
 
-	hooksMap := map[string]diagnostics.Hook{}
-	for i, h := range diagHooks {
-		hooksMap[h.Name] = diagHooks[i]
-	}
+			initialConf := config.MustNewConfigFrom(configBytes)
 
-	for hookName, diagFileName := range expectedDiagnosticHooks {
-		if !assert.Contains(t, hooksMap, hookName) {
-			continue // this iteration failed, no reason to do further tests, moving forward
-		}
+			initialConfChange := mocks.NewConfigChange(t)
+			initialConfChange.EXPECT().Config().Return(initialConf)
+			initialConfChange.EXPECT().Ack().Return(nil).Times(1)
+			mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
 
-		hook := hooksMap[hookName]
-		assert.Equal(t, diagFileName, hook.Filename)
-		hookResult := hook.Hook(ctx)
-		stringHookResult := sanitizeHookResult(t, hook.Filename, hook.ContentType, hookResult)
-		// The output of hooks is VERY verbose even for simple configs but useful for debugging
-		t.Logf("Hook %s result: 👇\n--- #--- START ---#\n%s\n--- #--- END ---#", hook.Name, stringHookResult)
-		expectedbytes, err := os.ReadFile(fmt.Sprintf("./testdata/simple_config/expected/%s", hook.Filename))
-		if assert.NoError(t, err) {
-			assert.YAMLEqf(t, string(expectedbytes), stringHookResult, "Unexpected YAML content for file %s", hook.Filename)
-		}
+			assert.Eventually(t, func() bool { return sut.State(true).State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
+			assert.Eventually(t, func() bool { return len(initialConfChange.Calls) > 1 /*both Config and Ack have been called)*/ }, 1*time.Second, 50*time.Millisecond)
+			t.Logf("Agent state: %s", sut.State(true).State)
+
+			// Send runtime component state
+			componentStates := tt.componentsState(t, &specs, tt.componentsUnitsFilePath)
+			for _, componentState := range componentStates {
+				mustWriteToChannelBeforeTimeout(t, componentState, componentsUpdateChannel, 100*time.Millisecond)
+			}
+
+			// FIXME there's no way to know if the coordinator processed the runtime component states, wait and hope for the best
+			time.Sleep(50 * time.Millisecond)
+
+			diagHooks := sut.DiagnosticHooks()
+			t.Logf("Received diagnostics: %+v", diagHooks)
+			assert.NotEmpty(t, diagHooks)
+
+			hooksMap := map[string]diagnostics.Hook{}
+			for i, h := range diagHooks {
+				hooksMap[h.Name] = diagHooks[i]
+			}
+
+			for hookName, diagFileName := range expectedDiagnosticHooks {
+				if !assert.Contains(t, hooksMap, hookName) {
+					continue // this iteration failed, no reason to do further tests, moving forward
+				}
+
+				hook := hooksMap[hookName]
+				assert.Equal(t, diagFileName, hook.Filename)
+				hookResult := hook.Hook(ctx)
+				stringHookResult := sanitizeHookResult(t, hook.Filename, hook.ContentType, hookResult)
+				// The output of hooks is VERY verbose even for simple configs but useful for debugging
+				t.Logf("\n--- #--- File %[1]s START ---#\n%[2]s\n--- #--- File %[1]s END ---#", hook.Filename, stringHookResult)
+				expectedbytes, err := os.ReadFile(fmt.Sprintf("./testdata/simple_config/expected/%s", hook.Filename))
+				if assert.NoError(t, err) {
+					assert.YAMLEqf(t, string(expectedbytes), stringHookResult, "Unexpected YAML content for file %s", hook.Filename)
+				}
+			}
+		})
 	}
 }
 
@@ -220,68 +307,78 @@ func sanitizeHookResult(t *testing.T, fileName string, contentType string, rawBy
 	const hostKey = "host"
 	const pathKey = "path"
 
-	if contentType == "application/yaml" {
-		yamlContent := map[string]any{}
-		err := yaml.Unmarshal(rawBytes, yamlContent)
+	if contentType != "application/yaml" {
+		//substitute current running dir with a placeholder
+		testDir := path.Dir(os.Args[0])
+		t.Logf("Replacing test dir %s with %s", testDir, agentPathPlaceholder)
+		return strings.ReplaceAll(string(rawBytes), testDir, agentPathPlaceholder)
+	}
+
+	switch fileName {
+	case "pre-config.yaml", "computed-config.yaml":
+		yamlContent := map[any]any{}
+		err := yaml.Unmarshal(rawBytes, &yamlContent)
 		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
 
-		if fileName == "pre-config.yaml" || fileName == "computed-config.yaml" {
-			// get rid of runtime informations, since those depend on the machine where the test is executed, just assert that they exist
-			assert.Containsf(t, yamlContent, "runtime", "No runtime information found in YAML")
-			delete(yamlContent, "runtime")
+		// get rid of runtime informations, since those depend on the machine where the test is executed, just assert that they exist
+		assert.Containsf(t, yamlContent, "runtime", "No runtime information found in YAML")
+		delete(yamlContent, "runtime")
 
-			// fix id and directories
-			if assert.Containsf(t, yamlContent, hostKey, "config yaml does not contain %s key", hostKey) {
-				hostValue := yamlContent[hostKey]
-				if assert.IsType(t, map[interface{}]interface{}{}, hostValue) {
-					hostMap := hostValue.(map[interface{}]interface{})
-					if assert.Contains(t, hostMap, "id", "host map does not contain id") {
-						t.Logf("Substituting host id %q with %q", hostMap["id"], hostIDPlaceholder)
-						hostMap["id"] = hostIDPlaceholder
-					}
+		// fix id and directories
+		if assert.Containsf(t, yamlContent, hostKey, "config yaml does not contain %s key", hostKey) {
+			hostValue := yamlContent[hostKey]
+			if assert.IsType(t, map[interface{}]interface{}{}, hostValue) {
+				hostMap := hostValue.(map[interface{}]interface{})
+				if assert.Contains(t, hostMap, "id", "host map does not contain id") {
+					t.Logf("Substituting host id %q with %q", hostMap["id"], hostIDPlaceholder)
+					hostMap["id"] = hostIDPlaceholder
 				}
 			}
+		}
 
-			if assert.Containsf(t, yamlContent, pathKey, "config yaml does not contain agent path map") {
-				pathValue := yamlContent[pathKey]
-				if assert.IsType(t, map[interface{}]interface{}{}, pathValue) {
-					pathMap := pathValue.(map[interface{}]interface{})
-					currentDir := pathMap["config"].(string)
-					for _, key := range []string{"config", "data", "home", "logs"} {
-						if assert.Containsf(t, pathMap, key, "path map is missing expected key %q", key) {
-							value := pathMap[key]
-							if assert.IsType(t, "", value) {
-								valueString := value.(string)
-								valueString = strings.Replace(valueString, currentDir, agentPathPlaceholder, 1)
-								pathMap[key] = filepath.ToSlash(valueString)
-							}
+		if assert.Containsf(t, yamlContent, pathKey, "config yaml does not contain agent path map") {
+			pathValue := yamlContent[pathKey]
+			if assert.IsType(t, map[interface{}]interface{}{}, pathValue) {
+				pathMap := pathValue.(map[interface{}]interface{})
+				currentDir := pathMap["config"].(string)
+				for _, key := range []string{"config", "data", "home", "logs"} {
+					if assert.Containsf(t, pathMap, key, "path map is missing expected key %q", key) {
+						value := pathMap[key]
+						if assert.IsType(t, "", value) {
+							valueString := value.(string)
+							valueString = strings.Replace(valueString, currentDir, agentPathPlaceholder, 1)
+							pathMap[key] = filepath.ToSlash(valueString)
 						}
 					}
 				}
 			}
-		} else if fileName == "components.yaml" {
-			rawComponents, ok := yamlContent["components"].([]any)
+		}
+		sanitizedBytes, err := yaml.Marshal(yamlContent)
+		assert.NoError(t, err)
+		return string(sanitizedBytes)
 
-			if assert.True(t, ok, "unexpected component format in file %s", fileName) {
-				sort.Sort(SortByID(rawComponents))
-				// fix the paths to forward slash for each
-				for _, comp := range rawComponents {
-					compInputSpec := comp.(map[any]any)["input_spec"].(map[any]any)
-					compInputSpec["binary_path"] = filepath.ToSlash(compInputSpec["binary_path"].(string))
-				}
-				yamlContent["components"] = rawComponents
+	case "components-expected.yaml", "components-actual.yaml":
+		yamlContent := map[any]any{}
+		err := yaml.Unmarshal(rawBytes, &yamlContent)
+		assert.NoErrorf(t, err, "file %s is invalid YAML", fileName)
+
+		rawComponents, ok := yamlContent["components"].([]any)
+
+		if assert.True(t, ok, "unexpected component format in file %s", fileName) {
+			sort.Sort(SortByID(rawComponents))
+			// fix the paths to forward slash for each
+			for _, comp := range rawComponents {
+				compInputSpec := comp.(map[any]any)["input_spec"].(map[any]any)
+				compInputSpec["binary_path"] = filepath.ToSlash(compInputSpec["binary_path"].(string))
 			}
-
+			yamlContent["components"] = rawComponents
 		}
 		sanitizedBytes, err := yaml.Marshal(yamlContent)
 		assert.NoError(t, err)
 		return string(sanitizedBytes)
 	}
 
-	// substitute current running dir with a placeholder
-	testDir := path.Dir(os.Args[0])
-	t.Logf("Replacing test dir %s with %s", testDir, agentPathPlaceholder)
-	return strings.ReplaceAll(string(rawBytes), testDir, agentPathPlaceholder)
+	return string(rawBytes)
 }
 
 // SortByID makes an array of map[any]any sortable by the "id" property
