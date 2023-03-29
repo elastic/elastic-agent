@@ -1,4 +1,7 @@
-package e2e_testify
+//go:build e2e
+// +build e2e
+
+package e2e
 
 import (
 	"os"
@@ -36,11 +39,6 @@ func (suite *UpgradeElasticAgent) SetupSuite() {
 
 	err = tools.DownloadElasticAgent(suite.agentVersion)
 	require.Nil(suite.T(), err, "Could not download Elastic Agent")
-}
-
-// before each test
-func (suite *UpgradeElasticAgent) SetupTest() {
-	suite.T().Log("SetupTest!")
 }
 
 func (suite *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
