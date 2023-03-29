@@ -15,6 +15,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/conv"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -94,6 +95,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	// persisted and we return an empty store.
 	reader, err := store.Load()
 	if err != nil {
+		//nolint:nilerr // wad
 		return &StateStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
@@ -129,7 +131,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 			state.action = &fleetapi.ActionPolicyChange{
 				ActionID:   sr.Action.ID,
 				ActionType: sr.Action.Type,
-				Policy:     sr.Action.Policy,
+				Policy:     conv.YAMLMapToJSONMap(sr.Action.Policy), // Fix Policy, in order to make it consistent with the policy received from the fleet gateway as nested map[string]interface{}
 			}
 		}
 	}

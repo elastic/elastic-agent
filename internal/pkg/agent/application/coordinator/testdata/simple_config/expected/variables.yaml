@@ -1,0 +1,11 @@
+variables:
+- dynamic:
+    dict:
+      key1: value1
+      key2: value2
+    key1: dynamic1
+    list:
+    - array1
+    - array2
+  host:
+    platform: linux

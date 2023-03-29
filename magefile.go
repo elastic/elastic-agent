@@ -240,14 +240,17 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	p := filepath.Join("pkg", "component", "fake")
+	wd, _ := os.Getwd()
+	p := filepath.Join(wd, "pkg", "component", "fake")
 	for _, name := range []string{"component", "shipper"} {
 		binary := name
 		if runtime.GOOS == "windows" {
 			binary += ".exe"
 		}
-		outputName := filepath.Join(p, name, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join("github.com/elastic/elastic-agent", p, name, "..."))
+
+		fakeDir := filepath.Join(p, name)
+		outputName := filepath.Join(fakeDir, binary)
+		err := RunGo("build", "-o", outputName, filepath.Join(fakeDir))
 		if err != nil {
 			return err
 		}
@@ -460,16 +463,16 @@ func Config() {
 func ControlProto() error {
 	if err := sh.RunV(
 		"protoc",
-		"--go_out=internal/pkg/agent/control/v2/cproto", "--go_opt=paths=source_relative",
-		"--go-grpc_out=internal/pkg/agent/control/v2/cproto", "--go-grpc_opt=paths=source_relative",
+		"--go_out=pkg/control/v2/cproto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=pkg/control/v2/cproto", "--go-grpc_opt=paths=source_relative",
 		"control_v2.proto"); err != nil {
 		return err
 	}
 
 	return sh.RunV(
 		"protoc",
-		"--go_out=internal/pkg/agent/control/v1/proto", "--go_opt=paths=source_relative",
-		"--go-grpc_out=internal/pkg/agent/control/v1/proto", "--go-grpc_opt=paths=source_relative",
+		"--go_out=pkg/control/v1/proto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=pkg/control/v1/proto", "--go-grpc_opt=paths=source_relative",
 		"control_v1.proto")
 }
 
@@ -775,6 +778,8 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"apm-server",
 				"endpoint-security",
 				"fleet-server",
+				"pf-elastic-collector",
+				"pf-elastic-symbolizer",
 				"pf-host-agent",
 			}
 

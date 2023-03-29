@@ -1,0 +1,12 @@
+version: 2
+inputs:
+  - name: pf-elastic-symbolizer
+    description: "Universal Profiling Symbolizer"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    outputs:
+      - elasticsearch
+    command:
+      args:
+        - "-elastic"

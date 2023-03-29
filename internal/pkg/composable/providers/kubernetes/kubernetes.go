@@ -57,7 +57,7 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 
 // Run runs the kubernetes context provider.
 func (p *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
-	if p.config.Hints.Enabled() {
+	if p.config.Hints.Enabled {
 		betalogger := logp.NewLogger("cfgwarn")
 		betalogger.Warnf("BETA: Hints' feature is beta.")
 	}

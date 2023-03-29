@@ -19,10 +19,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 )

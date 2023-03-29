@@ -155,7 +155,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 	data := generatePodData(pod, p.metagen, namespaceAnnotations)
 	data.mapping["scope"] = p.scope
 
-	if p.config.Hints.Enabled() { // This is "hints based autodiscovery flow"
+	if p.config.Hints.Enabled { // This is "hints based autodiscovery flow"
 		if !p.managed {
 			if ann, ok := data.mapping["annotations"]; ok {
 				annotations, _ := ann.(mapstr.M)
@@ -388,22 +388,26 @@ func generateContainerData(
 				_, _ = containerMeta.Put("port_name", port.Name)
 				k8sMapping["container"] = containerMeta
 
-				if config.Hints.Enabled() { // This is "hints based autodiscovery flow"
+				if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 					if !managed {
-						if ann, ok := k8sMapping["annotations"]; ok {
-							annotations, _ := ann.(mapstr.M)
-							hints := utils.GenerateHints(annotations, "", config.Prefix)
-							if len(hints) > 0 {
-								logger.Debugf("Extracted hints are :%v", hints)
-								hintsMapping := GenerateHintsMapping(hints, k8sMapping, logger, c.ID)
-								logger.Debugf("Generated hints mappings are :%v", hintsMapping)
-								_ = comm.AddOrUpdate(
-									eventID,
-									PodPriority,
-									map[string]interface{}{"hints": hintsMapping},
-									processors,
-								)
-							}
+						hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+						if len(hintsMapping) > 0 {
+							_ = comm.AddOrUpdate(
+								eventID,
+								PodPriority,
+								map[string]interface{}{"hints": hintsMapping},
+								processors,
+							)
+						} else if config.Hints.DefaultContainerLogs {
+							// in case of no package detected in the hints fallback to the generic log collection
+							_, _ = hintsMapping.Put("generic_logs.container_logs.enabled", true)
+							_, _ = hintsMapping.Put("container_id", c.ID)
+							_ = comm.AddOrUpdate(
+								eventID,
+								PodPriority,
+								map[string]interface{}{"hints": hintsMapping},
+								processors,
+							)
 						}
 					}
 				} else { // This is the "template-based autodiscovery" flow
@@ -412,7 +416,45 @@ func generateContainerData(
 			}
 		} else {
 			k8sMapping["container"] = containerMeta
-			_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+			if config.Hints.Enabled { // This is "hints based autodiscovery flow"
+				if !managed {
+					hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+					if len(hintsMapping) > 0 {
+						_ = comm.AddOrUpdate(
+							eventID,
+							PodPriority,
+							map[string]interface{}{"hints": hintsMapping},
+							processors,
+						)
+					} else if config.Hints.DefaultContainerLogs {
+						// in case of no package detected in the hints fallback to the generic log collection
+						_, _ = hintsMapping.Put("generic_logs.container_logs.enabled", true)
+						_, _ = hintsMapping.Put("container_id", c.ID)
+						_ = comm.AddOrUpdate(
+							eventID,
+							PodPriority,
+							map[string]interface{}{"hints": hintsMapping},
+							processors,
+						)
+					}
+				}
+			} else { // This is the "template-based autodiscovery" flow
+				_ = comm.AddOrUpdate(eventID, ContainerPriority, k8sMapping, processors)
+			}
 		}
 	}
+}
+
+func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) mapstr.M {
+	hintsMapping := mapstr.M{}
+	if ann, ok := k8sMapping["annotations"]; ok {
+		annotations, _ := ann.(mapstr.M)
+		hints := utils.GenerateHints(annotations, "", prefix)
+		if len(hints) > 0 {
+			logger.Debugf("Extracted hints are :%v", hints)
+			hintsMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
+			logger.Debugf("Generated hints mappings are :%v", hintsMapping)
+		}
+	}
+	return hintsMapping
 }

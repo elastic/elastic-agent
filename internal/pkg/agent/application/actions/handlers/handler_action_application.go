@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -28,15 +31,17 @@ var errActionTimeoutInvalid = errors.New("action timeout is invalid")
 
 // AppAction is a handler for application actions.
 type AppAction struct {
-	log   *logger.Logger
-	coord *coordinator.Coordinator
+	log     *logger.Logger
+	coord   *coordinator.Coordinator
+	agentID string
 }
 
 // NewAppAction creates a new AppAction handler.
-func NewAppAction(log *logger.Logger, coord *coordinator.Coordinator) *AppAction {
+func NewAppAction(log *logger.Logger, coord *coordinator.Coordinator, agentID string) *AppAction {
 	return &AppAction{
-		log:   log,
-		coord: coord,
+		log:     log,
+		coord:   coord,
+		agentID: agentID,
 	}
 }
 
@@ -48,7 +53,19 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 		return fmt.Errorf("invalid type, expected ActionApp and received %T", a)
 	}
 
-	state := h.coord.State(false)
+	// Validate action
+	h.log.Debugf("handlerAppAction: validate action '%+v', for agentID %s", a, h.agentID)
+	validated, err := protection.ValidateAction(*action, h.coord.Protection().SignatureValidationKey, h.agentID)
+	if err != nil {
+		action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
+		action.CompletedAt = action.StartedAt
+		h.log.Errorf("handlerAppAction: action '%+v' failed validation: %v", action, err) // error details are logged
+		action.Error = fmt.Sprintf("action failed validation: %s", action.InputType)      // generic error message for the action response
+		return acker.Ack(ctx, action)
+	}
+	action = &validated
+
+	state := h.coord.State()
 	comp, unit, ok := findUnitFromInputType(state, action.InputType)
 	if !ok {
 		// If the matching action is not found ack the action with the error for action result document
@@ -58,6 +75,7 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 		return acker.Ack(ctx, action)
 	}
 
+	// Deserialize the action into map[string]interface{} for dispatching over to the apps
 	params, err := action.MarshalMap()
 	if err != nil {
 		return err
@@ -151,7 +169,7 @@ func readMapString(m map[string]interface{}, key string, def string) string {
 	return def
 }
 
-func findUnitFromInputType(state coordinator.State, inputType string) (component.Component, component.Unit, bool) {
+func findUnitFromInputType(state state.State, inputType string) (component.Component, component.Unit, bool) {
 	for _, comp := range state.Components {
 		for _, unit := range comp.Component.Units {
 			if unit.Type == client.UnitTypeInput && unit.Config != nil && unit.Config.Type == inputType {

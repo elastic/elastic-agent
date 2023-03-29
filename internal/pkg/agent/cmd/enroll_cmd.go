@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
@@ -26,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"

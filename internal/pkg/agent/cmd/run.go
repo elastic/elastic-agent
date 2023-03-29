@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/server"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/spf13/cobra"
@@ -36,7 +38,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/server"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -57,11 +58,12 @@ const (
 type cfgOverrider func(cfg *configuration.Configuration)
 
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Start the elastic-agent.",
-		Run: func(_ *cobra.Command, _ []string) {
-			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
+		Run: func(cmd *cobra.Command, _ []string) {
+			testingMode, _ := cmd.Flags().GetBool("testing-mode")
+			if err := run(nil, testingMode); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
 				// TODO: remove it. os.Exit will be called on main and if it's called
@@ -71,9 +73,17 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			}
 		},
 	}
+
+	// --testing-mode is a hidden flag that spawns the Elastic Agent in testing mode
+	// it is hidden because we really don't want users to execute Elastic Agent to run
+	// this way, only the integration testing framework runs the Elastic Agent in this mode
+	cmd.Flags().Bool("testing-mode", false, "Run with testing mode enabled")
+	_ = cmd.Flags().MarkHidden("testing-mode")
+
+	return cmd
 }
 
-func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
+func run(override cfgOverrider, testingMode bool, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -207,7 +217,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
@@ -223,6 +233,15 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	control := server.New(l.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+
+	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
+	// the configuration will come in over the control protocol, so we set the config setting on the control protocol
+	// server so when the configuration comes in it gets passed to the coordinator
+	testingSetter, ok := configMgr.(server.TestModeConfigSetter)
+	if ok {
+		control.SetTestModeConfigSetter(testingSetter)
+	}
+
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err
