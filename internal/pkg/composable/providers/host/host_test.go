@@ -25,7 +25,8 @@ func TestContextProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	// first call will have idx of 0
-	starting, err := getHostInfo(log)
+	fetcher := getHostInfo(log)
+	starting, err := fetcher()
 	starting["idx"] = 0
 	require.NoError(t, err)
 
@@ -73,7 +74,7 @@ func TestContextProvider(t *testing.T) {
 	cancel()
 
 	// next should have been set idx to 1
-	next, err := getHostInfo(log)
+	next, err := fetcher()
 	require.NoError(t, err)
 	next["idx"] = 1
 	next, err = ctesting.CloneMap(next)
@@ -83,8 +84,9 @@ func TestContextProvider(t *testing.T) {
 
 func returnHostMapping(log *logger.Logger) infoFetcher {
 	i := -1
+	fetcher := getHostInfo(log)
 	return func() (map[string]interface{}, error) {
-		host, err := getHostInfo(log)
+		host, err := fetcher()
 		if err != nil {
 			return nil, err
 		}
