@@ -86,10 +86,19 @@ type checkinResult struct {
 	err      error
 }
 
+type needNewCheckinError struct {
+	newState state.State
+}
+
+func (*needNewCheckinError) Error() string {
+	return "new checkin needed due to updated state"
+}
+
 type fleetGateway struct {
 	log                loggerIF
 	client             client.Sender
 	scheduler          Scheduler
+	clock              clock
 	settings           FleetGatewaySettings
 	agentInfo          agentInfo
 	acker              acker.Acker
@@ -113,24 +122,27 @@ func New(
 ) (*fleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(settings.Duration, settings.Jitter)
-	return newFleetGatewayWithScheduler(
+	clock := new(stdlibClock)
+	return newFleetGatewayWithSchedulerAndClock(
 		log,
 		settings,
 		agentInfo,
 		client,
 		scheduler,
+		clock,
 		acker,
 		stateFetcher,
 		stateStore,
 	)
 }
 
-func newFleetGatewayWithScheduler(
+func newFleetGatewayWithSchedulerAndClock(
 	log loggerIF,
 	settings FleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
 	scheduler Scheduler,
+	clock clock,
 	acker acker.Acker,
 	stateFetcher StateFetcher,
 	stateStore stateStore,
@@ -141,6 +153,7 @@ func newFleetGatewayWithScheduler(
 		settings:     settings,
 		agentInfo:    agentInfo,
 		scheduler:    scheduler,
+		clock:        clock,
 		acker:        acker,
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
@@ -168,6 +181,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 	}()
 
 	f.log.Info("Fleet gateway started")
+mainLoop:
 	for {
 		select {
 		case <-ctx.Done():
@@ -176,43 +190,88 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 			return ctx.Err()
 		case <-f.scheduler.WaitTick():
 			f.log.Debug("FleetGateway calling Checkin API")
-			//checkinStartTime := time.Now()
-
 			// get current state
-			stateUpdateCh := f.stateFetcher.StateSubscribe(ctx).Ch()
+			stateUpdateSubCtx, cancelStateUpdateSub := context.WithCancel(ctx)
+			stateUpdateCh := f.stateFetcher.StateSubscribe(stateUpdateSubCtx).Ch()
+			defer func() {
+				cancelStateUpdateSub()
+			}()
 			state := <-stateUpdateCh
 
-			//use a discarder not to stop the coordinator
-			go func() {
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-stateUpdateCh:
-						f.log.Warnf("Discarded updated state %+v because another checkin is in progress")
-						// nothing to do, just consume and move on
-					}
+			var checkinResponse *fleetapi.CheckinResponse
+
+			for checkinResponse == nil {
+				if ctx.Err() != nil {
+					continue mainLoop
 				}
-			}()
 
-			// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
-			// the function will retry to communicate with fleet-server with an exponential delay and some
-			// jitter to help better distribute the load from a fleet of agents.
-			resCheckinChan := f.doExecuteAsync(ctx, backoff, state)
+				checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff)
 
-			checkinResult := <-resCheckinChan
+				if checkinResult.err != nil {
+					var relaunchCheckinErr *needNewCheckinError
+					if errors.As(checkinResult.err, &relaunchCheckinErr) {
+						// checkin was cancelled because we have an updated state to send to fleet
+						state = relaunchCheckinErr.newState
+					}
 
-			if checkinResult.err != nil {
-				continue
+					continue
+				}
+
+				// if we got here the checkin has been completed
+				checkinResponse = checkinResult.response
 			}
 
-			actions := make([]fleetapi.Action, len(checkinResult.response.Actions))
-			copy(actions, checkinResult.response.Actions)
+			actions := make([]fleetapi.Action, len(checkinResponse.Actions))
+			copy(actions, checkinResponse.Actions)
 			if len(actions) > 0 {
 				f.actionCh <- actions
 			}
 		}
 	}
+}
+
+func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state state.State, stateUpdates <-chan state.State, backoff backoff.Backoff) checkinResult {
+	checkinCtx, cancelCheckin := context.WithCancel(ctx)
+	defer cancelCheckin()
+	checkinStartTime := f.clock.Now()
+	// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
+	// the function will retry to communicate with fleet-server with an exponential delay and some
+	// jitter to help better distribute the load from a fleet of agents.
+	resCheckinChan := f.doExecuteAsync(checkinCtx, backoff, state)
+	defer func() {
+		for range resCheckinChan {
+			// make sure we drain the result channel
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return checkinResult{err: ctx.Err()}
+		case checkinResult := <-resCheckinChan:
+			return checkinResult
+		case newState := <-stateUpdates:
+			checkinElapsedTime := f.clock.Now().Sub(checkinStartTime)
+			if checkinElapsedTime < f.settings.Debounce {
+				f.log.Warnf(
+					"Updated state %+v dropped because elapsed time %s is smaller than debounce time %s",
+					newState,
+					checkinElapsedTime,
+					f.settings.Debounce,
+				)
+				continue
+			}
+			f.log.Infof(
+				"Received updated state %+v after debounce. Cancelling previous checking and starting a new one.",
+				newState,
+				checkinElapsedTime,
+				f.settings.Debounce,
+			)
+			// cancelCheckin()
+			// wait for the checkin to actually cancel
+			return checkinResult{err: &needNewCheckinError{newState: newState}}
+		}
+	}
+
 }
 
 // Errors returns the channel to watch for reported errors.
@@ -240,6 +299,14 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff, state 
 		f.log.Debugf("Checking started")
 		resp, took, err := f.execute(ctx, state)
 		if err != nil {
+
+			if errors.Is(err, context.Canceled) {
+				// the checkin was explicitly canceled
+				f.log.Warnw("Ongoing checkin with fleet-server has been explicitly canceled, won't be retried",
+					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter)
+				return resp, err
+			}
+
 			f.checkinFailCounter++
 
 			// Report the first two failures at warn level as they may be recoverable with retries.

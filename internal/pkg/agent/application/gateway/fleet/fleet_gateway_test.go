@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -30,24 +31,34 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/help"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // Refer to https://vektra.github.io/mockery/installation/ to check how to install mockery binary
 //go:generate mockery --name StateFetcher
+//go:generate mockery --name clock
 //go:generate mockery --keeptree --output . --outpkg fleet --dir ../../coordinator/state --name StateUpdateSource
 
-type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)
+type clientCallbackFunc func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error)
+
+type testingClientInvocation struct {
+	headers http.Header
+	body    []byte
+	resp    *http.Response
+	err     error
+}
 
 type testingClient struct {
 	sync.Mutex
+	t        *testing.T
 	callback clientCallbackFunc
-	received chan struct{}
+	received chan testingClientInvocation
 }
 
 func (t *testingClient) Send(
-	_ context.Context,
+	ctx context.Context,
 	_ string,
 	_ string,
 	_ url.Values,
@@ -56,23 +67,39 @@ func (t *testingClient) Send(
 ) (*http.Response, error) {
 	t.Lock()
 	defer t.Unlock()
-	defer func() { t.received <- struct{}{} }()
-	return t.callback(headers, body)
+
+	var byteBuf bytes.Buffer
+
+	if _, copyerr := io.Copy(&byteBuf, body); copyerr != nil {
+		t.t.Errorf("Error reading request body: %v", copyerr)
+	}
+	bodyBytes := byteBuf.Bytes()
+
+	resp, err := t.callback(ctx, headers, bytes.NewReader(bodyBytes))
+	defer func() {
+		t.received <- testingClientInvocation{
+			headers: headers,
+			body:    bodyBytes,
+			resp:    resp,
+			err:     err,
+		}
+	}()
+	return resp, err
 }
 
 func (t *testingClient) URI() string {
 	return "http://localhost"
 }
 
-func (t *testingClient) Answer(fn clientCallbackFunc) <-chan struct{} {
+func (t *testingClient) Answer(fn clientCallbackFunc) <-chan testingClientInvocation {
 	t.Lock()
 	defer t.Unlock()
 	t.callback = fn
 	return t.received
 }
 
-func newTestingClient() *testingClient {
-	return &testingClient{received: make(chan struct{}, 1)}
+func newTestingClient(t *testing.T) *testingClient {
+	return &testingClient{t: t, received: make(chan testingClientInvocation, 1)}
 }
 
 func emptyStateFetcher(t *testing.T) *MockStateFetcher {
@@ -95,18 +122,19 @@ type withGatewayFunc func(*testing.T, *fleetGateway, *testingClient, *scheduler.
 func withGateway(agentInfo agentInfo, settings FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
-		client := newTestingClient()
+		client := newTestingClient(t)
 
 		log, _ := logger.New("fleet_gateway", false)
 
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
+		gateway, err := newFleetGatewayWithSchedulerAndClock(
 			log,
 			settings,
 			agentInfo,
 			client,
 			scheduler,
+			new(stdlibClock),
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -120,18 +148,19 @@ func withGateway(agentInfo agentInfo, settings FleetGatewaySettings, fn withGate
 func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
-		client := newTestingClient()
+		client := newTestingClient(t)
 
 		log, _ := logger.New("fleet_gateway", false)
 
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
+		gateway, err := newFleetGatewayWithSchedulerAndClock(
 			logIF,
 			settings,
 			agentInfo,
 			client,
 			scheduler,
+			new(stdlibClock),
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -143,7 +172,7 @@ func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings FleetGatewa
 	}
 }
 
-func ackSeq(channels ...<-chan struct{}) func() {
+func ackSeq(channels ...<-chan testingClientInvocation) func() {
 	return func() {
 		for _, c := range channels {
 			<-c
@@ -164,6 +193,20 @@ func wrapStrToResp(code int, body string) *http.Response {
 	}
 }
 
+func mustWriteToChannelBeforeTimeout[V any](t *testing.T, value V, channel chan V, timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+
+	select {
+	case channel <- value:
+		if !timer.Stop() {
+			<-timer.C
+		}
+		t.Logf("%T written", value)
+	case <-timer.C:
+		t.Errorf("Timeout writing %T", value)
+	}
+}
+
 func TestFleetGateway(t *testing.T) {
 	agentInfo := &testAgentInfo{}
 	settings := FleetGatewaySettings{
@@ -181,7 +224,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
 			}),
@@ -213,7 +256,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				// TODO: assert no events
 				resp := wrapStrToResp(http.StatusOK, `
 	{
@@ -242,7 +285,7 @@ func TestFleetGateway(t *testing.T) {
 
 		scheduler.Next()
 		waitFn()
-
+		time.Sleep(50 * time.Millisecond)
 		cancel()
 		err := <-errCh
 		require.NoError(t, err)
@@ -257,7 +300,7 @@ func TestFleetGateway(t *testing.T) {
 	// Test the normal time based execution.
 	t.Run("Periodically communicates with Fleet", func(t *testing.T) {
 		scheduler := scheduler.NewPeriodic(150 * time.Millisecond)
-		client := newTestingClient()
+		client := newTestingClient(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -265,12 +308,13 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
+		gateway, err := newFleetGatewayWithSchedulerAndClock(
 			log,
 			settings,
 			agentInfo,
 			client,
 			scheduler,
+			new(stdlibClock),
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -278,7 +322,7 @@ func TestFleetGateway(t *testing.T) {
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
 			}),
@@ -307,14 +351,14 @@ func TestFleetGateway(t *testing.T) {
 		// If we cannot interrupt we will timeout.
 		d := 20 * time.Minute
 		scheduler := scheduler.NewPeriodic(d)
-		client := newTestingClient()
+		client := newTestingClient(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
 
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
+		gateway, err := newFleetGatewayWithSchedulerAndClock(
 			log,
 			FleetGatewaySettings{
 				Duration: d,
@@ -323,13 +367,14 @@ func TestFleetGateway(t *testing.T) {
 			agentInfo,
 			client,
 			scheduler,
+			new(stdlibClock),
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
 		)
 		require.NoError(t, err)
 
-		ch2 := client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+		ch2 := client.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 			return resp, nil
 		})
@@ -355,8 +400,8 @@ func TestFleetGateway(t *testing.T) {
 	})
 
 	t.Run("Test the long poll checkin still consumes states", func(t *testing.T) {
-		longPollClient := newTestingClient()
-		answerCh := longPollClient.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+		longPollClient := newTestingClient(t)
+		answerCh := longPollClient.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 			time.Sleep(500 * time.Millisecond)
 			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 			return resp, nil
@@ -395,12 +440,13 @@ func TestFleetGateway(t *testing.T) {
 			return stateUpdateSrc
 		})
 
-		gateway, err := newFleetGatewayWithScheduler(
+		gateway, err := newFleetGatewayWithSchedulerAndClock(
 			mockLogger,
 			DefaultFleetGatewaySettings(),
 			agentInfo,
 			longPollClient,
 			scheduler,
+			new(stdlibClock),
 			noop.New(),
 			mockFetcher,
 			stateStore,
@@ -414,19 +460,163 @@ func TestFleetGateway(t *testing.T) {
 		// Make sure that all API calls to the checkin API are successful, the following will happen:
 		// block on the first call.
 		<-answerCh
+
+		cancel()
+
 		go func() {
 			// drain the channel
 			for range answerCh {
 			}
 		}()
 
-		cancel()
 		err = <-errCh
 		require.NoError(t, err)
 
 		assert.Greater(t, statesSent, 1) // at this point we have sent waaaay more than one, let's keep it easy for slower systems
 	})
 
+	t.Run("Long poll checkin drops state updates coming earlier than configured debounce", func(t *testing.T) {
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		longPollClient := newTestingClient(t)
+
+		// completeCheckinCh := make(chan struct{}, 1)
+
+		clientInvocationChannel := longPollClient.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+			select {
+			// case <-completeCheckinCh:
+			case <-time.After(1 * time.Second):
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				return resp, nil
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		})
+
+		reportedAgentStatuses := make([]testingClientInvocation, 0, 2)
+
+		// fleet test client invocation consumer
+		go func() {
+			for {
+				select {
+				case tci := <-clientInvocationChannel:
+					reportedAgentStatuses = append(reportedAgentStatuses, tci)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		log, _ := logger.New("tst", false)
+		stateStore := newStateStore(t, log)
+
+		scheduler := scheduler.NewStepper()
+		mockLogger := newTestLogger(t)
+
+		mockClock := newMockClock(t)
+		now := time.Now()
+		t.Logf("Setting the clock to %v", now)
+		mockClock.EXPECT().Now().Return(now).Once()
+
+		mockFetcher := NewMockStateFetcher(t)
+
+		stateCh := make(chan state.State)
+		mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
+			stateUpdateSrc := NewStateUpdateSource(t)
+			stateUpdateSrc.EXPECT().Ch().Return(stateCh)
+			go func() {
+				<-ctx.Done()
+			}()
+			return stateUpdateSrc
+		})
+
+		// pass the initial status
+
+		agentStartingState := state.State{
+			State:        agentclient.Starting,
+			Message:      "Agent is starting",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		go mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
+
+		settings := DefaultFleetGatewaySettings()
+		settings.Debounce = 5 * time.Second
+
+		gateway, err := newFleetGatewayWithSchedulerAndClock(
+			mockLogger,
+			settings,
+			agentInfo,
+			longPollClient,
+			scheduler,
+			mockClock,
+			noop.New(),
+			mockFetcher,
+			stateStore,
+		)
+		require.NoError(t, err)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		scheduler.Next()
+
+		// move the clock forward 10ms
+		now = now.Add(10 * time.Millisecond)
+		t.Logf("Setting the clock to %v", now)
+		mockClock.EXPECT().Now().Return(now).Once()
+
+		// inject new state
+		agentRunningState := state.State{
+			State:        agentclient.Healthy,
+			Message:      "Agent is healthy",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		go mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
+
+		assert.Eventually(t, func() bool { return len(reportedAgentStatuses) > 0 }, 30*time.Second, 50*time.Millisecond)
+		assert.Len(t, reportedAgentStatuses, 1) // we should have only 1 reported state
+
+		// move the clock forward 5 seconds (we move beyond the debounce)
+		now = now.Add(5 * time.Second)
+		t.Logf("Setting the clock to %v", now)
+		mockClock.EXPECT().Now().Return(now).Twice()
+
+		//inject another new state
+		agentUnhealthyState := state.State{
+			State:        agentclient.Degraded,
+			Message:      "Agent is degraded",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		go mustWriteToChannelBeforeTimeout(t, agentUnhealthyState, stateCh, 50*time.Millisecond)
+
+		// Make sure that all API calls to the checkin API are successful, the following will happen:
+		// block on the first (canceled) and block on second call.
+		// completeCheckinCh <- struct{}{}
+		// <-clientInvocationChannel
+
+		// completeCheckinCh <- struct{}{}
+		// <-clientInvocationChannel
+
+		assert.Eventually(t, func() bool { return len(reportedAgentStatuses) > 1 }, 30*time.Second, 50*time.Millisecond)
+		assert.Len(t, reportedAgentStatuses, 2) // we should have only 2 reported states (the canceled one and the completed one with the new state)
+		// assert.Contains(t, reportedAgentStatuses, agentStartingState)
+		assert.NotContains(t, reportedAgentStatuses, agentRunningState)
+
+		cancel()
+
+		err = <-errCh
+		require.NoError(t, err)
+	})
 }
 
 func TestRetriesOnFailures(t *testing.T) {
@@ -446,7 +636,7 @@ func TestRetriesOnFailures(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			fail := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
 			}
 			clientWaitFn := client.Answer(fail)
@@ -463,7 +653,7 @@ func TestRetriesOnFailures(t *testing.T) {
 
 			// API recover
 			waitFn := ackSeq(
-				client.Answer(func(_ http.Header, body io.Reader) (*http.Response, error) {
+				client.Answer(func(ctx context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
 					resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 					return resp, nil
 				}),
@@ -494,7 +684,7 @@ func TestRetriesOnFailures(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			fail := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
 			}
 			waitChan := client.Answer(fail)
@@ -535,7 +725,7 @@ func TestRetriesOnFailures(t *testing.T) {
 				func() {
 					defer cancel()
 
-					fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+					fail := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 						return wrapStrToResp(http.StatusInternalServerError, "Fleet checkin went wrong"), nil
 					}
 					waitChan := tc.Answer(fail)
