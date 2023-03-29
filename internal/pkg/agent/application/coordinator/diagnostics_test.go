@@ -7,7 +7,6 @@ package coordinator_test
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
