@@ -1363,11 +1363,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.2.16
+Version: v0.3.5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.2.16/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.3.5/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3630,11 +3630,11 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 --------------------------------------------------------------------------------
 Dependency : github.com/mitchellh/hashstructure
-Version: v0.0.0-20170116052023-ab25296c0f51
+Version: v1.1.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/mitchellh/hashstructure@v0.0.0-20170116052023-ab25296c0f51/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mitchellh/hashstructure@v1.1.0/LICENSE:
 
 The MIT License (MIT)
 
@@ -4299,11 +4299,11 @@ Contents of probable licence file $GOMODCACHE/github.com/spf13/cobra@v1.3.0/LICE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/stretchr/testify
-Version: v1.7.0
+Version: v1.8.2
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/stretchr/testify@v1.7.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/stretchr/testify@v1.8.2/LICENSE:
 
 MIT License
 
@@ -14253,11 +14253,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/stretchr/objx
-Version: v0.2.0
+Version: v0.5.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/stretchr/objx@v0.2.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/stretchr/objx@v0.5.0/LICENSE:
 
 The MIT License
 
