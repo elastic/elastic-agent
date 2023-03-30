@@ -34,7 +34,7 @@ List here all the items you have verified BEFORE sending this PR. Please DO NOT 
 - [ ] I have made corresponding change to the default configuration files
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] I have added an entry in `./changelog/fragments` using the [changelog tool](https://github.com/elastic/elastic-agent#changelog)
-- [ ] I have added and integration test or an e2E test
+- [ ] I have added an integration test or an E2E test
 
 ## Author's Checklist
 
