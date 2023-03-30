@@ -235,7 +235,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			mustWriteToChannelBeforeTimeout(t, tt.varsProvider(t), helper.varsChannel, 100*time.Millisecond)
 
 			// Inject initial configuration - after starting coordinator
-			configBytes, err := os.ReadFile("./testdata/simple_config/elastic-agent.yml")
+			configBytes, err := os.ReadFile(tt.configFilePath)
 			require.NoError(t, err)
 
 			initialConf := config.MustNewConfigFrom(configBytes)
