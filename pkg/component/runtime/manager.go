@@ -644,7 +644,7 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 
 // update updates the current state of the running components.
 //
-// This returns as soon as possible, work is performed in the background to
+// This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(components []component.Component, teardown bool) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
@@ -660,7 +660,8 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 	newComponents := make([]component.Component, 0, len(components))
 	for _, comp := range components {
 		touched[comp.ID] = true
-		if existing, ok := m.current[comp.ID]; ok {
+		existing, ok := m.current[comp.ID]
+		if ok {
 			// existing component; send runtime updated value
 			existing.currComp = comp
 			if err := existing.runtime.Update(comp); err != nil {
