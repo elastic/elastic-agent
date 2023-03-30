@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -20,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -179,6 +181,9 @@ type Coordinator struct {
 	config *config.Config
 	ast    *transpiler.AST
 	vars   []*transpiler.Vars
+
+	mx         sync.RWMutex
+	protection protection.Config
 }
 
 // ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
@@ -224,6 +229,21 @@ func (c *Coordinator) State() state.State {
 // Note: Not reading from a subscription channel will cause the Coordinator to block.
 func (c *Coordinator) StateSubscribe(ctx context.Context) *state.StateSubscription {
 	return c.state.Subscribe(ctx)
+}
+
+// Protection returns the current agent protection configuration
+// This is needed to be able to access the protection configuration for actions validation
+func (c *Coordinator) Protection() protection.Config {
+	c.mx.RLock()
+	defer c.mx.RUnlock()
+	return c.protection
+}
+
+// setProtection sets protection configuration
+func (c *Coordinator) setProtection(protectionConfig protection.Config) {
+	c.mx.Lock()
+	c.protection = protectionConfig
+	c.mx.Unlock()
 }
 
 // ReExec performs the re-execution.
@@ -472,8 +492,8 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 		{
-			Name:        "components",
-			Filename:    "components.yaml",
+			Name:        "components-expected",
+			Filename:    "components-expected.yaml",
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
@@ -496,13 +516,65 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 		{
+			Name:        "components-actual",
+			Filename:    "components-actual.yaml",
+			Description: "actual components model of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				components := c.State().Components
+
+				componentConfigs := make([]component.Component, len(components))
+				for i := 0; i < len(components); i++ {
+					componentConfigs[i] = components[i].Component
+				}
+				o, err := yaml.Marshal(struct {
+					Components []component.Component `yaml:"components"`
+				}{
+					Components: componentConfigs,
+				})
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
+		{
 			Name:        "state",
 			Filename:    "state.yaml",
 			Description: "current state of running components by the Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
+				type StateComponentOutput struct {
+					ID    string                 `yaml:"id"`
+					State runtime.ComponentState `yaml:"state"`
+				}
+				type StateHookOutput struct {
+					State        agentclient.State      `yaml:"state"`
+					Message      string                 `yaml:"message"`
+					FleetState   agentclient.State      `yaml:"fleet_state"`
+					FleetMessage string                 `yaml:"fleet_message"`
+					LogLevel     logp.Level             `yaml:"log_level"`
+					Components   []StateComponentOutput `yaml:"components"`
+				}
+
 				s := c.State()
-				o, err := yaml.Marshal(s)
+				n := len(s.Components)
+				compStates := make([]StateComponentOutput, n)
+				for i := 0; i < n; i++ {
+					compStates[i] = StateComponentOutput{
+						ID:    s.Components[i].Component.ID,
+						State: s.Components[i].State,
+					}
+				}
+				output := StateHookOutput{
+					State:        s.State,
+					Message:      s.Message,
+					FleetState:   s.FleetState,
+					FleetMessage: s.FleetMessage,
+					LogLevel:     s.LogLevel,
+					Components:   compStates,
+				}
+				o, err := yaml.Marshal(output)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -625,8 +697,14 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	// perform and verify ast translation
 	m, err := cfg.ToMapStr()
 	if err != nil {
-		return fmt.Errorf("could not create the AST from the configuration: %w", err)
+		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
+
+	protectionConfig, err := protection.GetAgentProtectionConfig(m)
+	if err != nil && !errors.Is(err, protection.ErrNotFound) {
+		return fmt.Errorf("could not read the agent protection configuration: %w", err)
+	}
+
 	rawAst, err := transpiler.NewAST(m)
 	if err != nil {
 		return fmt.Errorf("could not create the AST from the configuration: %w", err)
@@ -655,6 +733,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 
 	c.config = cfg
 	c.ast = rawAst
+
+	c.setProtection(protectionConfig)
 
 	if c.vars != nil {
 		return c.process(ctx)

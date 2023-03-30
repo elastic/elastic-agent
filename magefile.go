@@ -778,6 +778,8 @@ func packageAgent(platforms []string, packagingFn func()) {
 				"apm-server",
 				"endpoint-security",
 				"fleet-server",
+				"pf-elastic-collector",
+				"pf-elastic-symbolizer",
 				"pf-host-agent",
 			}
 

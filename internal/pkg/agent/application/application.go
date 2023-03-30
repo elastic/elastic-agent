@@ -141,7 +141,9 @@ func New(
 
 			composableManaged = true
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
-				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo))
+				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
+				EndpointSignedComponentModifier(),
+			)
 
 			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
 			if err != nil {
