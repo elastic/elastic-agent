@@ -54,6 +54,10 @@ components:
       - container/arm64
       shippers:
       - shipper
+  features:
+    fqdn:
+      enabled: false
+    source: null
   units:
   - config:
       datastream:
@@ -419,10 +423,6 @@ components:
     id: log-default
     log_level: 2
     type: 1
-  features:
-    fqdn:
-      enabled: false
-    source: null
 - id: system/metrics-default
   input_spec:
     binary_name: metricbeat
@@ -475,6 +475,10 @@ components:
       - container/arm64
       shippers:
       - shipper
+  features:
+    fqdn:
+      enabled: false
+    source: null
   units:
   - config:
       datastream:
