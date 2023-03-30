@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-// AddressFromPath returns the connection address for an Elastic Agent running on the defined platform, and it's
+// AddressFromPath returns the connection address for an Elastic Agent running on the defined platform, and its
 // executing directory.
 func AddressFromPath(platform string, path string) (string, error) {
 	// elastic-agent will always derive the path to the socket using an absolute path

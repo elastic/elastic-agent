@@ -219,7 +219,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 			if stopping {
 				return nil
 			}
-			return fmt.Errorf("elastic-agent exited unexpectantly with exit code: %d", ps.ExitCode())
+			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
 		case err := <-stdOut.Watch():
 			if !f.allowErrs {
 				// no errors allowed
