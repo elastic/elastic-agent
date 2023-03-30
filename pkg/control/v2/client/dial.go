@@ -12,21 +12,17 @@ import (
 	"net"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/control"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 )
 
-func dialContext(ctx context.Context, grpcConfig *configuration.GRPCConfig) (*grpc.ClientConn, error) {
+func dialContext(ctx context.Context, address string, maxMsgSize int) (*grpc.ClientConn, error) {
 	return grpc.DialContext(
 		ctx,
-		strings.TrimPrefix(control.Address(), "unix://"),
+		strings.TrimPrefix(address, "unix://"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxMsgSize)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 	)
 }
 
