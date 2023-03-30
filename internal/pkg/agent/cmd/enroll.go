@@ -43,7 +43,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 
 	// used by install command
 	cmd.Flags().BoolP("from-install", "", false, "Set by install command to signal this was executed from install")
-	cmd.Flags().MarkHidden("from-install") // nolint:errcheck //not required
+	cmd.Flags().MarkHidden("from-install") //nolint:errcheck //not required
 
 	return cmd
 }
@@ -107,7 +107,6 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	if fPassphrase != "" && !filepath.IsAbs(fPassphrase) {
 		return errors.New("--fleet-server-cert-key-passphrase-file must be provided as an absolute path", errors.M("path", fPassphrase), errors.TypeConfig)
 	}
-	return nil
 	return nil
 }
 
