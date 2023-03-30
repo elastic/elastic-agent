@@ -792,7 +792,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			endpoints := []interface{}{prefixedEndpoint(endpointPath(comp.ID, b.operatingSystem))}
 			name := "shipper" // in other beats this is the binary name, but we can hard-code it here.
 			// note: this doesn't fetch anything from the /state endpoint, as it doesn't report much beyond name/version,
-			// the equivelent of the beat /state metrics end up in /shipper
+			// the equivalent of the beat /state metrics end up in /shipper
 			shipperHTTPStreams = append(shipperHTTPStreams, map[string]interface{}{
 				idKey: "metrics-monitoring-shipper",
 				"data_stream": map[string]interface{}{
