@@ -5,11 +5,14 @@
 package features
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 var (
@@ -17,9 +20,19 @@ var (
 )
 
 type Flags struct {
-	mu sync.RWMutex
+	mu     sync.RWMutex
+	source *structpb.Struct
+	fqdn   bool
+}
 
-	fqdn bool
+type cfg struct {
+	Agent struct {
+		Features struct {
+			FQDN struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"fqdn" yaml:"fqdn" config:"fqdn"`
+		} `json:"features" yaml:"features" config:"features"`
+	} `json:"agent" yaml:"agent" config:"agent"`
 }
 
 func (f *Flags) FQDN() bool {
@@ -29,12 +42,43 @@ func (f *Flags) FQDN() bool {
 	return f.fqdn
 }
 
-// SetFQDN sets the value of the FQDN flag in Flags.
-func (f *Flags) SetFQDN(newValue bool) {
+func (f *Flags) AsProto() *proto.Features {
+	return &proto.Features{
+		Fqdn: &proto.FQDNFeature{
+			Enabled: f.FQDN(),
+		},
+		Source: f.source,
+	}
+}
+
+// setFQDN sets the value of the FQDN flag in Flags.
+func (f *Flags) setFQDN(newValue bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	f.fqdn = newValue
+}
+
+// setSource sets the source from he given cfg.
+func (f *Flags) setSource(c cfg) error {
+	// Use JSON marshalling-unmarshalling to convert cfg to mapstr
+	data, err := json.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("could not convert feature flags configuration to JSON: %w", err)
+	}
+
+	var s map[string]interface{}
+	if err := json.Unmarshal(data, &s); err != nil {
+		return fmt.Errorf("could not convert feature flags JSON to mapstr: %w", err)
+	}
+
+	source, err := structpb.NewStruct(s)
+	if err != nil {
+		return fmt.Errorf("unable to create source from feature flags configuration: %w", err)
+	}
+
+	f.source = source
+	return nil
 }
 
 // Parse receives a policy, parses and returns it.
@@ -65,21 +109,16 @@ func Parse(policy any) (*Flags, error) {
 		return nil, nil
 	}
 
-	type cfg struct {
-		Agent struct {
-			Features struct {
-				FQDN *config.Config `json:"fqdn" yaml:"fqdn" config:"fqdn"`
-			} `json:"features" yaml:"features" config:"features"`
-		} `json:"agent" yaml:"agent" config:"agent"`
-	}
-
 	parsedFlags := cfg{}
 	if err := c.Unpack(&parsedFlags); err != nil {
 		return nil, fmt.Errorf("could not umpack features config: %w", err)
 	}
 
 	flags := new(Flags)
-	flags.SetFQDN(parsedFlags.Agent.Features.FQDN.Enabled())
+	flags.setFQDN(parsedFlags.Agent.Features.FQDN.Enabled)
+	if err := flags.setSource(parsedFlags); err != nil {
+		return nil, fmt.Errorf("error creating feature flags source: %w", err)
+	}
 
 	return flags, nil
 }
@@ -97,19 +136,11 @@ func Apply(c *config.Config) error {
 		return fmt.Errorf("could not apply feature flag config: %w", err)
 	}
 
-	current.SetFQDN(parsed.FQDN())
+	current.setFQDN(parsed.FQDN())
 	return err
 }
 
 // FQDN reports if FQDN should be used instead of hostname for host.name.
 func FQDN() bool {
 	return current.FQDN()
-}
-
-func (f *Flags) AsProto() *proto.Features {
-	return &proto.Features{
-		Fqdn: &proto.FQDNFeature{
-			Enabled: f.FQDN(),
-		},
-	}
 }
