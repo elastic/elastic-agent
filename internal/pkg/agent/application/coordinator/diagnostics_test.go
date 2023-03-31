@@ -158,7 +158,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 							Features: &proto.Features{
 								Fqdn: &proto.FQDNFeature{Enabled: true},
 							},
-							FeaturesIdx: 17,
+							FeaturesIdx: 1,
 						},
 					}
 

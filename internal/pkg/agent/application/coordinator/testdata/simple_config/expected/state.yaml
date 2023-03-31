@@ -15,7 +15,7 @@ components:
         fqdn:
           enabled: true
         source: null
-      features_idx: 17
+      features_idx: 1
   - id: log-default
     state:
       message: ""
@@ -28,7 +28,7 @@ components:
         fqdn:
           enabled: true
         source: null
-      features_idx: 17
+      features_idx: 1
   - id: filestream-monitoring
     state:
       message: ""
@@ -41,7 +41,7 @@ components:
         fqdn:
           enabled: true
         source: null
-      features_idx: 17
+      features_idx: 1
   - id: beat/metrics-monitoring
     state:
       message: ""
@@ -54,7 +54,7 @@ components:
         fqdn:
           enabled: true
         source: null
-      features_idx: 17
+      features_idx: 1
   - id: http/metrics-monitoring
     state:
       message: ""
@@ -67,5 +67,5 @@ components:
         fqdn:
           enabled: true
         source: null
-      features_idx: 17
+      features_idx: 1
 log_level: info

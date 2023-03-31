@@ -56,7 +56,7 @@ components:
       - shipper
   features:
     fqdn:
-      enabled: false
+      enabled: true
     source: null
   units:
   - config:
@@ -477,7 +477,7 @@ components:
       - shipper
   features:
     fqdn:
-      enabled: false
+      enabled: true
     source: null
   units:
   - config:
