@@ -417,6 +417,7 @@ func defaultLogLevel(cfg *configuration.Configuration) string {
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
+		//nolint:nilerr // ignore the error, this is expected
 		// no enrollment file exists or failed to stat it; nothing to do
 		return cfg, nil
 	}
