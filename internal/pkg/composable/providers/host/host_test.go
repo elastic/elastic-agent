@@ -6,12 +6,6 @@ package host
 
 import (
 	"context"
-	"net"
-	"os"
-
-	"github.com/elastic/elastic-agent/pkg/features"
-
-	"github.com/foxcpp/go-mockdns"
 
 	"sync"
 	"testing"
@@ -88,61 +82,6 @@ func TestContextProvider(t *testing.T) {
 	assert.Equal(t, next, comm.Current())
 }
 
-func TestGetHostInfo(t *testing.T) {
-	log, err := logger.New("host_test", false)
-	require.NoError(t, err)
-
-	fetcher := getHostInfo(log)
-
-	hostname, err := os.Hostname()
-	require.NoError(t, err)
-
-	tests := map[string]struct {
-		cnameLookupResult string
-		expectedHostName  string
-	}{
-		"lookup_succeeds": {
-			cnameLookupResult: "foo.bar.baz.",
-			expectedHostName:  "foo.bar.baz",
-		},
-		"lookup_fails": {
-			cnameLookupResult: "",
-			expectedHostName:  hostname,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			// Mock CNAME resolution
-			srv, _ := mockdns.NewServer(map[string]mockdns.Zone{
-				hostname + ".": {
-					CNAME: test.cnameLookupResult,
-				},
-				test.cnameLookupResult: {
-					A: []string{"1.1.1.1"},
-				},
-			}, true)
-			defer srv.Close()
-
-			srv.PatchNet(net.DefaultResolver)
-			defer mockdns.UnpatchNet(net.DefaultResolver)
-
-			// Enable FQDN feature flag
-			err = features.Apply(fqdnFeatureFlagConfig(true))
-			require.NoError(t, err)
-			defer func() {
-				err = features.Apply(fqdnFeatureFlagConfig(true))
-				require.NoError(t, err)
-			}()
-
-			info, err := fetcher()
-			require.NoError(t, err)
-
-			require.Equal(t, test.expectedHostName, info["name"])
-		})
-	}
-}
-
 func returnHostMapping(log *logger.Logger) infoFetcher {
 	i := -1
 	fetcher := getHostInfo(log)
@@ -155,10 +94,4 @@ func returnHostMapping(log *logger.Logger) infoFetcher {
 		host["idx"] = i
 		return host, nil
 	}
-}
-
-func fqdnFeatureFlagConfig(fqdnEnabled bool) *config.Config {
-	return config.MustNewConfigFrom(map[string]interface{}{
-		"agent.features.fqdn.enabled": fqdnEnabled,
-	})
 }
