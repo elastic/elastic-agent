@@ -121,7 +121,7 @@ func TestGetHostInfo(t *testing.T) {
 				test.cnameLookupResult: {
 					A: []string{"1.1.1.1"},
 				},
-			}, false)
+			}, true)
 			defer srv.Close()
 
 			srv.PatchNet(net.DefaultResolver)
