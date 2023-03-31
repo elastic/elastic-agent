@@ -301,7 +301,6 @@ func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *
 		return nil, err
 	}
 
-	// TODO: add the feature flags when creating the fake input
 	i := &fakeInput{
 		logger:   logger,
 		manager:  manager,
