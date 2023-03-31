@@ -42,7 +42,7 @@ func TestExternalConfigLoading(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":    "elasticsearch",
 						"hosts":   []interface{}{"127.0.0.1:9201"},
-						"api-key": "my-secret-key",
+						"api_key": "my-secret-key",
 					},
 				},
 				"agent": map[string]interface{}{
@@ -67,7 +67,7 @@ func TestExternalConfigLoading(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":    "elasticsearch",
 						"hosts":   []interface{}{"127.0.0.1:9201"},
-						"api-key": "my-secret-key",
+						"api_key": "my-secret-key",
 					},
 				},
 				"inputs": []interface{}{
@@ -125,7 +125,7 @@ func TestExternalConfigLoading(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":    "elasticsearch",
 						"hosts":   []interface{}{"127.0.0.1:9201"},
-						"api-key": "my-secret-key",
+						"api_key": "my-secret-key",
 					},
 				},
 				"inputs": []interface{}{
