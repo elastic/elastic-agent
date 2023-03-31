@@ -332,8 +332,14 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	}
 
 	if s.FeaturesIdx != checkin.FeaturesIdx {
-		s.Features = checkin.Features
 		s.FeaturesIdx = checkin.FeaturesIdx
+		if checkin.Features != nil {
+			s.Features = &proto.Features{
+				Fqdn: &proto.FQDNFeature{
+					Enabled: checkin.Features.Fqdn.Enabled,
+				},
+			}
+		}
 		changed = true
 	}
 
