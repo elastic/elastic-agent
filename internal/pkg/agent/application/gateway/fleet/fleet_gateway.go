@@ -8,6 +8,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/gofrs/uuid"
+
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -181,7 +183,6 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 	}()
 
 	f.log.Info("Fleet gateway started")
-mainLoop:
 	for {
 		select {
 		case <-ctx.Done():
@@ -190,58 +191,70 @@ mainLoop:
 			return ctx.Err()
 		case <-f.scheduler.WaitTick():
 			f.log.Debug("FleetGateway calling Checkin API")
-			// get current state
-			stateUpdateSubCtx, cancelStateUpdateSub := context.WithCancel(ctx)
-			stateUpdateCh := f.stateFetcher.StateSubscribe(stateUpdateSubCtx).Ch()
-			defer func() {
-				cancelStateUpdateSub()
-			}()
-			state := <-stateUpdateCh
+			func() {
+				// get current state
+				stateUpdateSubCtx, cancelStateUpdateSub := context.WithCancel(ctx)
+				stateUpdateCh := f.stateFetcher.StateSubscribe(stateUpdateSubCtx).Ch()
+				defer func() {
+					cancelStateUpdateSub()
+				}()
+				state := <-stateUpdateCh
 
-			var checkinResponse *fleetapi.CheckinResponse
+				var checkinResponse *fleetapi.CheckinResponse
 
-			for checkinResponse == nil {
-				if ctx.Err() != nil {
-					continue mainLoop
-				}
-
-				checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff)
-
-				if checkinResult.err != nil {
-					var relaunchCheckinErr *needNewCheckinError
-					if errors.As(checkinResult.err, &relaunchCheckinErr) {
-						// checkin was cancelled because we have an updated state to send to fleet
-						state = relaunchCheckinErr.newState
+				for checkinResponse == nil {
+					if ctx.Err() != nil {
+						return
 					}
 
-					continue
+					checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff)
+
+					if checkinResult.err != nil {
+						var relaunchCheckinErr *needNewCheckinError
+						if errors.As(checkinResult.err, &relaunchCheckinErr) {
+							// checkin was cancelled because we have an updated state to send to fleet
+							state = relaunchCheckinErr.newState
+						}
+
+						continue
+					}
+
+					// if we got here the checkin has been completed
+					checkinResponse = checkinResult.response
 				}
 
-				// if we got here the checkin has been completed
-				checkinResponse = checkinResult.response
-			}
+				actions := make([]fleetapi.Action, len(checkinResponse.Actions))
+				copy(actions, checkinResponse.Actions)
+				if len(actions) > 0 {
+					f.actionCh <- actions
+				}
+			}()
 
-			actions := make([]fleetapi.Action, len(checkinResponse.Actions))
-			copy(actions, checkinResponse.Actions)
-			if len(actions) > 0 {
-				f.actionCh <- actions
-			}
 		}
 	}
 }
 
 func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state state.State, stateUpdates <-chan state.State, backoff backoff.Backoff) checkinResult {
+	checkinID, _ := uuid.NewV4()
 	checkinCtx, cancelCheckin := context.WithCancel(ctx)
-	defer cancelCheckin()
+	checkinCtx = context.WithValue(checkinCtx, "checkinID", checkinID.String())
+	f.log.Debugf("starting checkin %s", checkinID.String())
+	defer func() {
+		f.log.Debugf("cancelling checkin %s", checkinID.String())
+		cancelCheckin()
+		f.log.Debugf("canceled checkin %s", checkinID.String())
+	}()
 	checkinStartTime := f.clock.Now()
 	// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
 	// the function will retry to communicate with fleet-server with an exponential delay and some
 	// jitter to help better distribute the load from a fleet of agents.
 	resCheckinChan := f.doExecuteAsync(checkinCtx, backoff, state)
 	defer func() {
-		for range resCheckinChan {
-			// make sure we drain the result channel
-		}
+		f.log.Debugf("before draining checkin result channel for checkin %s", checkinID.String())
+		// for range resCheckinChan {
+		// 	// make sure we drain the result channel
+		// }
+		f.log.Debugf("after draining checkin result channel for checkin %s", checkinID.String())
 	}()
 	for {
 		select {
@@ -266,8 +279,6 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state stat
 				checkinElapsedTime,
 				f.settings.Debounce,
 			)
-			// cancelCheckin()
-			// wait for the checkin to actually cancel
 			return checkinResult{err: &needNewCheckinError{newState: newState}}
 		}
 	}

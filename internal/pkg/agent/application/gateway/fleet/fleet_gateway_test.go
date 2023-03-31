@@ -7,6 +7,7 @@ package fleet
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -65,8 +66,6 @@ func (t *testingClient) Send(
 	headers http.Header,
 	body io.Reader,
 ) (*http.Response, error) {
-	t.Lock()
-	defer t.Unlock()
 
 	var byteBuf bytes.Buffer
 
@@ -75,7 +74,15 @@ func (t *testingClient) Send(
 	}
 	bodyBytes := byteBuf.Bytes()
 
-	resp, err := t.callback(ctx, headers, bytes.NewReader(bodyBytes))
+	// Don't hold the mutex unnecessarily: take the callback and unlock
+	var cb clientCallbackFunc
+	func() {
+		t.Lock()
+		defer t.Unlock()
+		cb = t.callback
+	}()
+
+	resp, err := cb(ctx, headers, bytes.NewReader(bodyBytes))
 	defer func() {
 		t.received <- testingClientInvocation{
 			headers: headers,
@@ -194,6 +201,7 @@ func wrapStrToResp(code int, body string) *http.Response {
 }
 
 func mustWriteToChannelBeforeTimeout[V any](t *testing.T, value V, channel chan V, timeout time.Duration) {
+	t.Helper()
 	timer := time.NewTimer(timeout)
 
 	select {
@@ -203,7 +211,7 @@ func mustWriteToChannelBeforeTimeout[V any](t *testing.T, value V, channel chan 
 		}
 		t.Logf("%T written", value)
 	case <-timer.C:
-		t.Errorf("Timeout writing %T", value)
+		t.Fatalf("Timeout writing %T", value)
 	}
 }
 
@@ -477,23 +485,26 @@ func TestFleetGateway(t *testing.T) {
 
 	t.Run("Long poll checkin drops state updates coming earlier than configured debounce", func(t *testing.T) {
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		longPollClient := newTestingClient(t)
 
-		// completeCheckinCh := make(chan struct{}, 1)
+		completeCheckinCh := make(chan struct{})
 
 		clientInvocationChannel := longPollClient.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+			t.Logf("test client using context %v", ctx.Value("checkinID"))
 			select {
-			// case <-completeCheckinCh:
-			case <-time.After(1 * time.Second):
-				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
-				return resp, nil
 			case <-ctx.Done():
+				t.Logf("context %v cancelled", ctx.Value("checkinID"))
 				return nil, ctx.Err()
+
+			case <-completeCheckinCh:
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				t.Logf("checkin with context %v completed", ctx.Value("checkinID"))
+				return resp, nil
 			}
 		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		reportedAgentStatuses := make([]testingClientInvocation, 0, 2)
 
@@ -532,18 +543,6 @@ func TestFleetGateway(t *testing.T) {
 			return stateUpdateSrc
 		})
 
-		// pass the initial status
-
-		agentStartingState := state.State{
-			State:        agentclient.Starting,
-			Message:      "Agent is starting",
-			FleetState:   agentclient.Healthy,
-			FleetMessage: "Fleet is healthy",
-			Components:   []runtime.ComponentComponentState{},
-			LogLevel:     logp.InfoLevel,
-		}
-		go mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
-
 		settings := DefaultFleetGatewaySettings()
 		settings.Debounce = 5 * time.Second
 
@@ -562,7 +561,19 @@ func TestFleetGateway(t *testing.T) {
 
 		errCh := runFleetGateway(ctx, gateway)
 
+		// make the fleet gateway start a checkin
 		scheduler.Next()
+
+		// provide an initial state through the subscription
+		agentStartingState := state.State{
+			State:        agentclient.Starting,
+			Message:      "Agent is starting",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
 
 		// move the clock forward 10ms
 		now = now.Add(10 * time.Millisecond)
@@ -578,10 +589,8 @@ func TestFleetGateway(t *testing.T) {
 			Components:   []runtime.ComponentComponentState{},
 			LogLevel:     logp.InfoLevel,
 		}
-		go mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
-
-		assert.Eventually(t, func() bool { return len(reportedAgentStatuses) > 0 }, 30*time.Second, 50*time.Millisecond)
-		assert.Len(t, reportedAgentStatuses, 1) // we should have only 1 reported state
+		// push the new state through the subscription (too soon, this will be dropped)
+		mustWriteToChannelBeforeTimeout(t, agentRunningState, stateCh, 50*time.Millisecond)
 
 		// move the clock forward 5 seconds (we move beyond the debounce)
 		now = now.Add(5 * time.Second)
@@ -597,23 +606,41 @@ func TestFleetGateway(t *testing.T) {
 			Components:   []runtime.ComponentComponentState{},
 			LogLevel:     logp.InfoLevel,
 		}
-		go mustWriteToChannelBeforeTimeout(t, agentUnhealthyState, stateCh, 50*time.Millisecond)
+		// push the state through the subscription
+		mustWriteToChannelBeforeTimeout(t, agentUnhealthyState, stateCh, 50*time.Millisecond)
 
 		// Make sure that all API calls to the checkin API are successful, the following will happen:
 		// block on the first (canceled) and block on second call.
-		// completeCheckinCh <- struct{}{}
-		// <-clientInvocationChannel
 
-		// completeCheckinCh <- struct{}{}
-		// <-clientInvocationChannel
+		/// give some time to cancel the current checkin after the state update
+		assert.Eventually(t, func() bool { return len(reportedAgentStatuses) > 0 }, 10*time.Second, 50*time.Millisecond)
 
-		assert.Eventually(t, func() bool { return len(reportedAgentStatuses) > 1 }, 30*time.Second, 50*time.Millisecond)
-		assert.Len(t, reportedAgentStatuses, 2) // we should have only 2 reported states (the canceled one and the completed one with the new state)
-		// assert.Contains(t, reportedAgentStatuses, agentStartingState)
-		assert.NotContains(t, reportedAgentStatuses, agentRunningState)
+		// allow the test client to complete the checkin (only one since the initial one has been cancelled)
+		completeCheckinCh <- struct{}{}
 
+		assert.Eventually(t, func() bool { return len(reportedAgentStatuses) > 1 }, 10*time.Second, 50*time.Millisecond)
+		if assert.Len(t, reportedAgentStatuses, 2) { // we should have only 2 reported states (the canceled one and the completed one with the new state)
+			// assert that the first state was the starting one and it was cancelled
+			firstActualState := map[string]any{}
+			err = json.Unmarshal(reportedAgentStatuses[0].body, &firstActualState)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "starting" /*agentStartingState.State*/, firstActualState["status"])
+			}
+			assert.ErrorIs(t, reportedAgentStatuses[0].err, context.Canceled)
+			assert.Nil(t, reportedAgentStatuses[0].resp)
+
+			// assert that the second state was the degraded one and it was completed
+			secondActualState := map[string]any{}
+			err = json.Unmarshal(reportedAgentStatuses[1].body, &secondActualState)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "DEGRADED" /*agentUnhealthyState.State*/, secondActualState["status"])
+			}
+			assert.NoError(t, reportedAgentStatuses[1].err)
+			assert.NotNil(t, reportedAgentStatuses[1].resp)
+		}
+
+		// wrap it up: stop the fleet gateway and check for errors
 		cancel()
-
 		err = <-errCh
 		require.NoError(t, err)
 	})
