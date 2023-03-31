@@ -235,6 +235,7 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 	}
 
 	if !gproto.Equal(s.Features, comp.Features) {
+		s.Features = comp.Features
 		changed = true
 	}
 
