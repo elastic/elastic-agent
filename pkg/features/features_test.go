@@ -40,7 +40,7 @@ agent:
 agent:
   features:
     fqdn: {}`,
-			want: true,
+			want: false,
 		},
 		{
 			name: "FQDN empty",
