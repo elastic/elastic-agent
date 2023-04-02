@@ -5,8 +5,6 @@
 package info
 
 import (
-	"fmt"
-
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -31,10 +29,7 @@ func NewAgentInfoWithLog(level string, createAgentID bool) (*AgentInfo, error) {
 		return nil, err
 	}
 
-	log, err := logger.New("agent_info", false)
-	if err != nil {
-		return nil, fmt.Errorf("unable to instantiate agent_info logger: %w", err)
-	}
+	log := logger.NewWithoutConfig("agent_info")
 
 	return &AgentInfo{
 		agentID:  agentInfo.ID,
