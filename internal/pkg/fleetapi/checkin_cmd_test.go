@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -267,6 +268,52 @@ func TestCheckin(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, 0, len(r.Actions))
+		},
+	))
+
+	t.Run("CheckinCmd is interruptible", withServerWithAuthClient(
+		func(t *testing.T) *http.ServeMux {
+			raw := `{"actions": []}`
+			mux := http.NewServeMux()
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
+			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
+				type Request struct {
+					Metadata *info.ECSMeta `json:"local_metadata"`
+				}
+
+				var req *Request
+
+				content, err := ioutil.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(content, &req))
+				assert.Nil(t, req.Metadata)
+				// simulate a (relatively) long poll
+				time.Sleep(100 * time.Millisecond)
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, raw)
+			}, withAPIKey))
+			return mux
+		}, withAPIKey,
+		func(t *testing.T, client client.Sender) {
+			cmd := NewCheckinCmd(agentInfo, client)
+			request := CheckinRequest{}
+
+			checkinCmdCtx, cancelCheckin := context.WithCancel(ctx)
+			var r *CheckinResponse
+			var err error
+
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				r, _, err = cmd.Execute(checkinCmdCtx, &request)
+			}()
+			// give time to start the checkin cmd before cancelling
+			time.Sleep(10 * time.Millisecond)
+			cancelCheckin()
+			wg.Wait()
+			assert.ErrorIs(t, err, context.Canceled)
+			assert.Nil(t, r)
 		},
 	))
 }
