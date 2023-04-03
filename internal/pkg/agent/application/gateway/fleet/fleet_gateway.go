@@ -240,22 +240,15 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state stat
 	checkinCtx = context.WithValue(checkinCtx, "checkinID", checkinID.String())
 	f.log.Debugf("starting checkin %s", checkinID.String())
 	defer func() {
-		f.log.Debugf("cancelling checkin %s", checkinID.String())
+		// make sure we don't leak contexts whatever happens
 		cancelCheckin()
-		f.log.Debugf("canceled checkin %s", checkinID.String())
 	}()
 	checkinStartTime := f.clock.Now()
 	// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
 	// the function will retry to communicate with fleet-server with an exponential delay and some
 	// jitter to help better distribute the load from a fleet of agents.
 	resCheckinChan := f.doExecuteAsync(checkinCtx, backoff, state)
-	defer func() {
-		f.log.Debugf("before draining checkin result channel for checkin %s", checkinID.String())
-		// for range resCheckinChan {
-		// 	// make sure we drain the result channel
-		// }
-		f.log.Debugf("after draining checkin result channel for checkin %s", checkinID.String())
-	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -279,6 +272,11 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state stat
 				checkinElapsedTime,
 				f.settings.Debounce,
 			)
+			f.log.Debugf("cancelling checkin %s", checkinID.String())
+			cancelCheckin()
+			f.log.Debugf("cancelled checkin %s", checkinID.String())
+			cancelledCheckinRes := <-resCheckinChan
+			f.log.Debugf("reaped answer for cancelled checkin %s %+v", cancelledCheckinRes)
 			return checkinResult{err: &needNewCheckinError{newState: newState}}
 		}
 	}
