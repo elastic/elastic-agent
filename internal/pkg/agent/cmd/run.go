@@ -60,20 +60,8 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return &cobra.Command{
 		Use:   "run",
 		Short: "Start the elastic-agent.",
-<<<<<<< HEAD
-		Run: func(_ *cobra.Command, _ []string) {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
-=======
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			// done very early so the encrypted store is never used
-			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
-			if disableEncryptedStore {
-				storage.DisableEncryptionDarwin()
-			}
-
-			testingMode, _ := cmd.Flags().GetBool("testing-mode")
-			if err := run(nil, testingMode); err != nil && !errors.Is(err, context.Canceled) {
->>>>>>> caa70e3a2d (Avoid exiting with os.Exit (#2434))
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
 				return err
