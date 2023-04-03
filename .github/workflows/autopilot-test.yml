@@ -1,0 +1,73 @@
+---
+name: Autopilot test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare_context:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gke-versions.outputs.matrix }}
+    steps:
+      - name: Get Autopilot versions
+        id: gke-versions
+        run: |
+          GKE_VERSIONS=$(gcloud container get-server-config --format "json(channels)" --zone us-central1 | jq -r -c '.channels[]|select(.channel=="STABLE").validVersions[0:2]')
+          echo "matrix=${GKE_VERSIONS}" >> $GITHUB_OUTPUT
+
+  test:
+    runs-on: ubuntu-latest
+    needs:
+      - prepare_context
+    strategy:
+      fail-fast: false
+      matrix:
+        version: "${{ fromJson(needs.prepare_context.outputs.matrix) }}"
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      ZONE: us-central1
+      PROJECT_ID: elastic-observability
+      # TODO automatic update of the Elastic Stack version
+      STACK_VERSION: "8.7.0"
+      GKE_VESION: ${{ matrix.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Git
+        uses: elastic/apm-pipeline-library/.github/actions/setup-git@current
+      - name: Get GitHub token
+        uses: elastic/apm-pipeline-library/.github/actions/github-token@current
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+      # TODO add GCP credentials
+      - name: Create cluster
+        uses: elastic/apm-pipeline-library/.github/actions/oblt-cli@current
+        with:
+          command: |
+            oblt-cli cluster create custom --template autopilot --parameters '{"StackVersion":"${{ env.STACK_VERSION }}","AutopilotVersion":"${{ env.GKE_VESION }}"}' --wait 30 --output-file ${PWD}/cluster_info.json
+          token: ${{ env.GITHUB_TOKEN }}
+      - name: Set cluster name
+        run: |
+          CLUSTER_NAME=$(jq -r .ClusterName $PWD/cluster_info.json)
+          echo "CLUSTER_NAME=${CLUSTER_NAME}" >> $GITHUB_ENV
+      - name: Get cluster credentials
+        run: |
+          gcloud container clusters get-credentials "${CLUSTER_NAME}" --zone "${ZONE}" --project "${PROJECT_ID}"
+      - name: Run tests
+        run: |
+          ./docs/scripts/autopilot-tests.sh "${CLUSTER_NAME}-default" "autopilot-integration"
+      - name: Destroy cluster
+        uses: elastic/apm-pipeline-library/.github/actions/oblt-cli@current
+        if: always()
+        with:
+          command: |
+            oblt-cli cluster destroy --cluster-name "${{ env.CLUSTER_NAME }}" --force
+          token: ${{ env.GITHUB_TOKEN }}
