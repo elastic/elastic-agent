@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"testing"
 	"time"
@@ -574,6 +575,11 @@ func TestFleetGateway(t *testing.T) {
 			LogLevel:     logp.InfoLevel,
 		}
 		mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
+
+		if goruntime.GOOS == "windows" {
+			// give some time for the checkin to block in the test client
+			time.Sleep(10 * time.Millisecond)
+		}
 
 		// move the clock forward 10ms
 		now = now.Add(10 * time.Millisecond)
