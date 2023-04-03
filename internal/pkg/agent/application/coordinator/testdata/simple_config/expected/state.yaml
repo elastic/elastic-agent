@@ -11,10 +11,6 @@ components:
       version_info:
         name: Mock system/metrics
         version: 1.2.3
-      features:
-        fqdn:
-          enabled: true
-        source: null
       features_idx: 1
   - id: log-default
     state:
@@ -24,10 +20,6 @@ components:
       version_info:
         name: Mock log
         version: 1.2.3
-      features:
-        fqdn:
-          enabled: true
-        source: null
       features_idx: 1
   - id: filestream-monitoring
     state:
@@ -37,10 +29,6 @@ components:
       version_info:
         name: Mock filestream
         version: 1.2.3
-      features:
-        fqdn:
-          enabled: true
-        source: null
       features_idx: 1
   - id: beat/metrics-monitoring
     state:
@@ -50,10 +38,6 @@ components:
       version_info:
         name: Mock beat/metrics
         version: 1.2.3
-      features:
-        fqdn:
-          enabled: true
-        source: null
       features_idx: 1
   - id: http/metrics-monitoring
     state:
@@ -63,9 +47,5 @@ components:
       version_info:
         name: Mock http/metrics
         version: 1.2.3
-      features:
-        fqdn:
-          enabled: true
-        source: null
       features_idx: 1
 log_level: info
