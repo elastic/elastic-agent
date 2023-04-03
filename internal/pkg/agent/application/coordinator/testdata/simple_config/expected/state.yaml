@@ -1,7 +1,7 @@
 state: 2
 message: Running
 fleet_state: 6
-fleet_message: "Not enrolled into Fleet"
+fleet_message: ""
 components:
 - component:
     id: mock_component_1

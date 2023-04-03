@@ -28,12 +28,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/mocks"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/control/v2/cproto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -78,11 +78,33 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 
 	helper := newCoordinatorTestHelper(t, &info.AgentInfo{}, specs, false)
 
+	// Runtime component state
+	componentState := runtime.ComponentComponentState{
+		Component: component.Component{
+			ID: "mock_component_1",
+			Units: []component.Unit{
+				{
+					ID:       "mock_input_unit",
+					Type:     client.UnitTypeInput,
+					LogLevel: client.UnitLogLevelInfo,
+					Config:   &proto.UnitExpectedConfig{},
+				},
+			},
+		},
+		State: runtime.ComponentState{
+			State: client.UnitStateHealthy,
+			VersionInfo: runtime.ComponentVersionInfo{
+				Name:    "shiny mock component",
+				Version: "latest, obvs :D",
+			},
+		},
+	}
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	componentsUpdateChannel := make(chan runtime.ComponentComponentState)
 	subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, nil, componentsUpdateChannel)
 	helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
 	helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
+	helper.runtimeManager.EXPECT().State().Return([]runtime.ComponentComponentState{componentState})
 
 	sut := helper.coordinator
 	coordinatorWg := new(sync.WaitGroup)
@@ -144,30 +166,9 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 	initialConfChange.EXPECT().Ack().Return(nil).Times(1)
 	mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
 
-	assert.Eventually(t, func() bool { return sut.State().State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
-	t.Logf("Agent state: %s", sut.State().State)
+	assert.Eventually(t, func() bool { return sut.State(true).State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
+	t.Logf("Agent state: %s", sut.State(true).State)
 
-	// Runtime component state
-	componentState := runtime.ComponentComponentState{
-		Component: component.Component{
-			ID: "mock_component_1",
-			Units: []component.Unit{
-				{
-					ID:       "mock_input_unit",
-					Type:     client.UnitTypeInput,
-					LogLevel: client.UnitLogLevelInfo,
-					Config:   &proto.UnitExpectedConfig{},
-				},
-			},
-		},
-		State: runtime.ComponentState{
-			State: client.UnitStateHealthy,
-			VersionInfo: runtime.ComponentVersionInfo{
-				Name:    "shiny mock component",
-				Version: "latest, obvs :D",
-			},
-		},
-	}
 	mustWriteToChannelBeforeTimeout(t, componentState, componentsUpdateChannel, 100*time.Millisecond)
 
 	// FIXME there's no way to know if the coordinator processed the runtime component states, wait and hope for the best
