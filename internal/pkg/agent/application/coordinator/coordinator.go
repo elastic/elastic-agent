@@ -507,8 +507,8 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 		{
-			Name:        "components",
-			Filename:    "components.yaml",
+			Name:        "components-expected",
+			Filename:    "components-expected.yaml",
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
@@ -531,13 +531,65 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 		{
+			Name:        "components-actual",
+			Filename:    "components-actual.yaml",
+			Description: "actual components model of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				components := c.State(true).Components
+
+				componentConfigs := make([]component.Component, len(components))
+				for i := 0; i < len(components); i++ {
+					componentConfigs[i] = components[i].Component
+				}
+				o, err := yaml.Marshal(struct {
+					Components []component.Component `yaml:"components"`
+				}{
+					Components: componentConfigs,
+				})
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
+		{
 			Name:        "state",
 			Filename:    "state.yaml",
 			Description: "current state of running components by the Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
+				type StateComponentOutput struct {
+					ID    string                 `yaml:"id"`
+					State runtime.ComponentState `yaml:"state"`
+				}
+				type StateHookOutput struct {
+					State        agentclient.State      `yaml:"state"`
+					Message      string                 `yaml:"message"`
+					FleetState   agentclient.State      `yaml:"fleet_state"`
+					FleetMessage string                 `yaml:"fleet_message"`
+					LogLevel     logp.Level             `yaml:"log_level"`
+					Components   []StateComponentOutput `yaml:"components"`
+				}
+
 				s := c.State(true)
-				o, err := yaml.Marshal(s)
+				n := len(s.Components)
+				compStates := make([]StateComponentOutput, n)
+				for i := 0; i < n; i++ {
+					compStates[i] = StateComponentOutput{
+						ID:    s.Components[i].Component.ID,
+						State: s.Components[i].State,
+					}
+				}
+				output := StateHookOutput{
+					State:        s.State,
+					Message:      s.Message,
+					FleetState:   s.FleetState,
+					FleetMessage: s.FleetMessage,
+					LogLevel:     s.LogLevel,
+					Components:   compStates,
+				}
+				o, err := yaml.Marshal(output)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
