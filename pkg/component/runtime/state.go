@@ -57,9 +57,12 @@ type ComponentState struct {
 	State   client.UnitState `yaml:"state"`
 	Message string           `yaml:"message"`
 
-	Units       map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
-	Features    *proto.Features                         `yaml:"-"`
-	FeaturesIdx uint64                                  `yaml:"features_idx"`
+	Units map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
+
+	// We don't serialize the Features field as YAML so it doesn't show up
+	// in the diagnostics-generated state.yaml file, keeping it concise.
+	Features    *proto.Features `yaml:"-"`
+	FeaturesIdx uint64          `yaml:"features_idx"`
 
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
