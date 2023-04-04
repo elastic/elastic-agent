@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juju/fslock"
+	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -79,11 +79,12 @@ func Test_CopyFile(t *testing.T) {
 				_ = os.RemoveAll(filepath.Dir(tc.To))
 			}()
 
-			var fl *fslock.Lock
+			var fl *flock.Flock
 			if tc.KeepOpen {
 				// this uses syscalls to create inter-process lock
-				fl = fslock.New(tc.From)
-				require.NoError(t, fl.Lock())
+				fl = flock.New(tc.From)
+				_, err := fl.TryLock()
+				require.NoError(t,err)
 			}
 
 			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr)
