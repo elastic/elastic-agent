@@ -32,40 +32,40 @@ func Test_CopyFile(t *testing.T) {
 	}{
 		{
 			"Existing, no onerr",
-			filepath.Join(".","test","case1","README.md"),
-			filepath.Join(".","test","case1","copy","README.md"),
+			filepath.Join(".", "test", "case1", "README.md"),
+			filepath.Join(".", "test", "case1", "copy", "README.md"),
 			false,
 			false,
 			false,
 		},
 		{
 			"Existing but open",
-			filepath.Join(".","test","case2","README.md"),
-			filepath.Join(".","test","case2","copy","README.md"),
+			filepath.Join(".", "test", "case2", "README.md"),
+			filepath.Join(".", "test", "case2", "copy", "README.md"),
 			false,
 			true,
 			runtime.GOOS == "windows", // this fails only on,
 		},
 		{
 			"Existing but open, ignore errors",
-			filepath.Join(".","test","case3","README.md"),
-			filepath.Join(".","test","case3","copy","README.md"),
+			filepath.Join(".", "test", "case3", "README.md"),
+			filepath.Join(".", "test", "case3", "copy", "README.md"),
 			true,
 			true,
 			false,
 		},
 		{
 			"Not existing, accept errors",
-			filepath.Join(".","test","case4","README.md"),
-			filepath.Join(".","test","case4","copy","README.md"),
+			filepath.Join(".", "test", "case4", "README.md"),
+			filepath.Join(".", "test", "case4", "copy", "README.md"),
 			false,
 			false,
 			true,
 		},
 		{
 			"Not existing, ignore errors",
-			filepath.Join(".","test","case4","README.md"),
-			filepath.Join(".","test","case4","copy","README.md"),
+			filepath.Join(".", "test", "case4", "README.md"),
+			filepath.Join(".", "test", "case4", "copy", "README.md"),
 			true,
 			false,
 			false,
@@ -84,13 +84,13 @@ func Test_CopyFile(t *testing.T) {
 				// this uses syscalls to create inter-process lock
 				fl = flock.New(tc.From)
 				_, err := fl.TryLock()
-				require.NoError(t,err)
+				require.NoError(t, err)
 			}
 
 			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr)
 			require.Equal(t, tc.ExpectedErr, err != nil)
-			if fl!=nil{
-				require.NoError(t,fl.Unlock())
+			if fl != nil {
+				require.NoError(t, fl.Unlock())
 			}
 		})
 	}
