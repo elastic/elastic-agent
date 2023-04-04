@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -153,6 +155,10 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 								Version: "1.2.3",
 							},
 							Units: unitsStates,
+							Features: &proto.Features{
+								Fqdn: &proto.FQDNFeature{Enabled: true},
+							},
+							FeaturesIdx: 1,
 						},
 					}
 
