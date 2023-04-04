@@ -146,7 +146,6 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 
 	info := sysInfo.Info()
 	hostname := info.Hostname
-	l.Debugf("in ECSMetadata, hostname = %s", hostname)
 	if features.FQDN() {
 		fqdn, err := sysInfo.FQDN()
 		if err != nil {
@@ -202,7 +201,6 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 
 	info := sysInfo.Info()
 	hostname := info.Hostname
-	l.Debugf("in ECSMetadataFlatMap, hostname = %s", hostname)
 	if features.FQDN() {
 		fqdn, err := sysInfo.FQDN()
 		if err != nil {
