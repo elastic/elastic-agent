@@ -3902,12 +3902,12 @@ Contents of probable licence file $GOMODCACHE/github.com/oklog/ulid@v1.3.1/LICEN
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/otiai10/copy
-Version: v1.2.0
+Dependency : github.com/michalpristas/copy
+Version: v1.9.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/otiai10/copy@v1.2.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/michalpristas/copy@v1.9.1/LICENSE:
 
 The MIT License (MIT)
 
@@ -13667,11 +13667,11 @@ Contents of probable licence file $GOMODCACHE/github.com/opencontainers/image-sp
 
 --------------------------------------------------------------------------------
 Dependency : github.com/otiai10/mint
-Version: v1.3.1
+Version: v1.4.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/otiai10/mint@v1.3.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/otiai10/mint@v1.4.1/LICENSE:
 
 Copyright 2017 otiai10 (Hiromu OCHIAI)
 

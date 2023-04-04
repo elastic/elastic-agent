@@ -98,7 +98,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jcchavezs/porto v0.1.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
-	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b // indirect
 	github.com/karrick/godirwalk v1.15.8 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/markbates/pkger v0.17.0 // indirect
