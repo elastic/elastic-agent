@@ -32,7 +32,7 @@ jobs:
       - name: Get Autopilot versions
         id: gke-versions
         run: |
-          GKE_VERSIONS=$(gcloud container get-server-config --format "json(channels)" --zone us-central1 | jq -r -c '.channels[]|select(.channel=="STABLE").validVersions[0:2]')
+          GKE_VERSIONS=$(gcloud container get-server-config --format "json(channels)" --zone us-central1 | jq -r -c '.channels[]|select(.channel=="REGULAR").validVersions[0:2]')
           echo "matrix=${GKE_VERSIONS}" >> $GITHUB_OUTPUT
 
   test:
