@@ -7,6 +7,7 @@
 ### Try it locally
 
 0. Setup vault
+`oblt-cli` stores cluster secrets in vault. 
 Export the environment variable `VAULT_TOKEN` or have the `~/.vault-token` file created.
 For further details about how to configure Vault check [the Vault documentation](https://github.com/elastic/infra/tree/master/docs/vault)
 
@@ -20,7 +21,7 @@ In the `testing` directory:
 GITHUB_TOKEN=... SLACK_CHANNEL=... make create-cluster
 ```
 
-Don't forget to specify a `GITHUB_TOKEN` with configured SSO and the `SLACK_CHANNEL` - the slack channel identifier to send messages about cluster state. 
+Specify a `GITHUB_TOKEN` with configured SSO and the `SLACK_CHANNEL` - the slack channel identifier to send messages about cluster state. 
 
 It uses [oblt-cli](https://studious-disco-k66oojq.pages.github.io) to spin up an ephemeral cluster with ES, Kibana, APM and fleet.
 
