@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/juju/fslock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -20,6 +21,7 @@ import (
 )
 
 func Test_CopyFile(t *testing.T) {
+	l, _ := logger.New("test", false)
 	tt := []struct {
 		Name        string
 		From        string
@@ -30,40 +32,40 @@ func Test_CopyFile(t *testing.T) {
 	}{
 		{
 			"Existing, no onerr",
-			"test/case1/README.md",
-			"test/case1/copy/README.md",
+			filepath.Join(".","test","case1","README.md"),
+			filepath.Join(".","test","case1","copy","README.md"),
 			false,
 			false,
 			false,
 		},
 		{
 			"Existing but open",
-			"test/case2/README.md",
-			"test/case2/copy/README.md",
+			filepath.Join(".","test","case2","README.md"),
+			filepath.Join(".","test","case2","copy","README.md"),
 			false,
 			true,
 			runtime.GOOS == "windows", // this fails only on,
 		},
 		{
 			"Existing but open, ignore errors",
-			"test/case3/README.md",
-			"test/case3/copy/README.md",
+			filepath.Join(".","test","case3","README.md"),
+			filepath.Join(".","test","case3","copy","README.md"),
 			true,
 			true,
 			false,
 		},
 		{
 			"Not existing, accept errors",
-			"test/case4/README.md",
-			"test/case4/copy/README.md",
+			filepath.Join(".","test","case4","README.md"),
+			filepath.Join(".","test","case4","copy","README.md"),
 			false,
 			false,
 			true,
 		},
 		{
 			"Not existing, ignore errors",
-			"test/case5/README.md",
-			"test/case5/copy/README.md",
+			filepath.Join(".","test","case4","README.md"),
+			filepath.Join(".","test","case4","copy","README.md"),
 			true,
 			false,
 			false,
@@ -77,16 +79,18 @@ func Test_CopyFile(t *testing.T) {
 				_ = os.RemoveAll(filepath.Dir(tc.To))
 			}()
 
+			var fl *fslock.Lock
 			if tc.KeepOpen {
-				f, err := os.Open(tc.From)
-				require.NoError(t, err)
-
-				defer f.Close()
+				// this uses syscalls to create inter-process lock
+				fl = fslock.New(tc.From)
+				require.NoError(t, fl.Lock())
 			}
 
-			l, _ := logger.New("test", false)
 			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr)
 			require.Equal(t, tc.ExpectedErr, err != nil)
+			if fl!=nil{
+				require.NoError(t,fl.Unlock())
+			}
 		})
 	}
 }
