@@ -13,6 +13,22 @@ jobs:
     outputs:
       matrix: ${{ steps.gke-versions.outputs.matrix }}
     steps:
+      - name: 'Get service account'
+        uses: hashicorp/vault-action@v2.5.0
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          method: approle
+          secrets: |
+            secret/observability-team/ci/elastic-observability-account-auth credentials | SERVICE_ACCOUNT ;
+
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ env.SERVICE_ACCOUNT }}'
+
       - name: Get Autopilot versions
         id: gke-versions
         run: |
@@ -39,35 +55,55 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
       - name: Setup Git
         uses: elastic/apm-pipeline-library/.github/actions/setup-git@current
+
       - name: Get GitHub token
         uses: elastic/apm-pipeline-library/.github/actions/github-token@current
         with:
           url: ${{ secrets.VAULT_ADDR }}
           roleId: ${{ secrets.VAULT_ROLE_ID }}
           secretId: ${{ secrets.VAULT_SECRET_ID }}
-      # TODO add GCP credentials
+
+      - name: 'Get service account'
+        uses: hashicorp/vault-action@v2.5.0
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          method: approle
+          secrets: |
+            secret/observability-team/ci/elastic-observability-account-auth credentials | SERVICE_ACCOUNT ;
+
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ env.SERVICE_ACCOUNT }}'
+
       - name: Create cluster
         uses: elastic/apm-pipeline-library/.github/actions/oblt-cli@current
         with:
-          command: |
-            oblt-cli cluster create custom --template autopilot --parameters '{"StackVersion":"${{ env.STACK_VERSION }}","AutopilotVersion":"${{ env.GKE_VESION }}"}' --wait 30 --output-file ${PWD}/cluster_info.json
+          command: cluster create custom --template autopilot --parameters '{"StackVersion":"${{ env.STACK_VERSION }}","AutopilotVersion":"${{ env.GKE_VESION }}"}' --wait 30 --output-file ${PWD}/cluster_info.json
           token: ${{ env.GITHUB_TOKEN }}
+
       - name: Set cluster name
         run: |
           CLUSTER_NAME=$(jq -r .ClusterName $PWD/cluster_info.json)
           echo "CLUSTER_NAME=${CLUSTER_NAME}" >> $GITHUB_ENV
+
       - name: Get cluster credentials
         run: |
           gcloud container clusters get-credentials "${CLUSTER_NAME}" --zone "${ZONE}" --project "${PROJECT_ID}"
+
       - name: Run tests
         run: |
           ./docs/scripts/autopilot-tests.sh "${CLUSTER_NAME}-default" "autopilot-integration"
+
       - name: Destroy cluster
         uses: elastic/apm-pipeline-library/.github/actions/oblt-cli@current
         if: always()
         with:
-          command: |
-            oblt-cli cluster destroy --cluster-name "${{ env.CLUSTER_NAME }}" --force
+          command: cluster destroy --cluster-name "${{ env.CLUSTER_NAME }}" --force
           token: ${{ env.GITHUB_TOKEN }}
