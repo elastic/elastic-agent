@@ -8,7 +8,7 @@ FROM {{ .buildFrom }} AS home
 
 COPY beat {{ $beatHome }}
 
-RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/logs {{ $beatHome }}/state && \
+RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/logs && \
     chown -R root:root {{ $beatHome }} && \
     find {{ $beatHome }} -type d -exec chmod 0755 {} \; && \
     find {{ $beatHome }} -type f -exec chmod 0644 {} \; && \
@@ -23,6 +23,8 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-agent-shipper || true) && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chown root:root {} \; && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \

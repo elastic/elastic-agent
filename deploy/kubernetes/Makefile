@@ -75,6 +75,7 @@ else
 		--title "Update kubernetes templates for elastic-agent" \
 		--body "Automated by ${BUILD_URL}" \
 		--label automation \
+		--label release_note:skip \
 		--base main \
 		--head $(ELASTIC_AGENT_BRANCH) \
 		--reviewer elastic/obs-cloudnative-monitoring

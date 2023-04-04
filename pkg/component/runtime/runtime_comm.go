@@ -132,7 +132,10 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 	return nil
 }
 
-func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected, observed *proto.CheckinObserved) {
+func (c *runtimeComm) CheckinExpected(
+	expected *proto.CheckinExpected,
+	observed *proto.CheckinObserved,
+) {
 	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
 		expected.AgentInfo = &proto.CheckinAgentInfo{
 			Id:       c.agentInfo.AgentID(),

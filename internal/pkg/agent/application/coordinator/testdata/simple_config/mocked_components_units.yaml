@@ -1,0 +1,4228 @@
+- id: system/metrics-default
+  type: system/metrics
+  units:
+  - config:
+      datastream:
+        dataset: ""
+        namespace: default
+        source:
+          fields:
+            namespace:
+              kind:
+                stringvalue: default
+        type: ""
+      id: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+      meta:
+        package:
+          name: system
+          source:
+            fields:
+              name:
+                kind:
+                  stringvalue: system
+              version:
+                kind:
+                  stringvalue: 1.24.3
+          version: 1.24.3
+        source:
+          fields:
+            package:
+              kind:
+                structvalue:
+                  fields:
+                    name:
+                      kind:
+                        stringvalue: system
+                    version:
+                      kind:
+                        stringvalue: 1.24.3
+      name: system-1
+      revision: 1
+      source:
+        fields:
+          data_stream:
+            kind:
+              structvalue:
+                fields:
+                  namespace:
+                    kind:
+                      stringvalue: default
+          id:
+            kind:
+              stringvalue: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+          meta:
+            kind:
+              structvalue:
+                fields:
+                  package:
+                    kind:
+                      structvalue:
+                        fields:
+                          name:
+                            kind:
+                              stringvalue: system
+                          version:
+                            kind:
+                              stringvalue: 1.24.3
+          name:
+            kind:
+              stringvalue: system-1
+          package_policy_id:
+            kind:
+              stringvalue: d38b6b0b-cc52-4a61-b897-1b236982ac42
+          policy:
+            kind:
+              structvalue:
+                fields:
+                  revision:
+                    kind:
+                      numbervalue: 5
+          revision:
+            kind:
+              numbervalue: 1
+          streams:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    structvalue:
+                      fields:
+                        cpu.metrics:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: percentages
+                              - kind:
+                                  stringvalue: normalized_percentages
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.cpu
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: cpu
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.diskio
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        diskio.include_devices:
+                          kind:
+                            nullvalue: 0
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: diskio
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.filesystem
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: filesystem
+                        period:
+                          kind:
+                            stringvalue: 1m
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_event:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              when:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      regexp:
+                                                        kind:
+                                                          structvalue:
+                                                            fields:
+                                                              system.filesystem.mount_point:
+                                                                kind:
+                                                                  stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.fsstat
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: fsstat
+                        period:
+                          kind:
+                            stringvalue: 1m
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_event:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              when:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      regexp:
+                                                        kind:
+                                                          structvalue:
+                                                            fields:
+                                                              system.fsstat.mount_point:
+                                                                kind:
+                                                                  stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.load
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: load
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.memory
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: memory
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.network
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: network
+                        network.interfaces:
+                          kind:
+                            nullvalue: 0
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.process
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: process
+                        period:
+                          kind:
+                            stringvalue: 10s
+                        process.cgroups.enabled:
+                          kind:
+                            boolvalue: false
+                        process.cmdline.cache.enabled:
+                          kind:
+                            boolvalue: true
+                        process.include_cpu_ticks:
+                          kind:
+                            boolvalue: false
+                        process.include_top_n.by_cpu:
+                          kind:
+                            numbervalue: 5
+                        process.include_top_n.by_memory:
+                          kind:
+                            numbervalue: 5
+                        processes:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: .*
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.process.summary
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: process_summary
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.socket_summary
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: socket_summary
+                        period:
+                          kind:
+                            stringvalue: 10s
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.uptime
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        id:
+                          kind:
+                            stringvalue: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: uptime
+                        period:
+                          kind:
+                            stringvalue: 10s
+          type:
+            kind:
+              stringvalue: system/metrics
+      streams:
+      - datastream:
+          dataset: system.cpu
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.cpu
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            cpu.metrics:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: percentages
+                  - kind:
+                      stringvalue: normalized_percentages
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.cpu
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: cpu
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.diskio
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.diskio
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.diskio
+                    type:
+                      kind:
+                        stringvalue: metrics
+            diskio.include_devices:
+              kind:
+                nullvalue: 0
+            id:
+              kind:
+                stringvalue: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: diskio
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.filesystem
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.filesystem
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.filesystem
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: filesystem
+            period:
+              kind:
+                stringvalue: 1m
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_event:
+                            kind:
+                              structvalue:
+                                fields:
+                                  when:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          regexp:
+                                            kind:
+                                              structvalue:
+                                                fields:
+                                                  system.filesystem.mount_point:
+                                                    kind:
+                                                      stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+      - datastream:
+          dataset: system.fsstat
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.fsstat
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.fsstat
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: fsstat
+            period:
+              kind:
+                stringvalue: 1m
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_event:
+                            kind:
+                              structvalue:
+                                fields:
+                                  when:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          regexp:
+                                            kind:
+                                              structvalue:
+                                                fields:
+                                                  system.fsstat.mount_point:
+                                                    kind:
+                                                      stringvalue: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+      - datastream:
+          dataset: system.load
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.load
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.load
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: load
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.memory
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.memory
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.memory
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: memory
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.network
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.network
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.network
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: network
+            network.interfaces:
+              kind:
+                nullvalue: 0
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.process
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.process
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.process
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: process
+            period:
+              kind:
+                stringvalue: 10s
+            process.cgroups.enabled:
+              kind:
+                boolvalue: false
+            process.cmdline.cache.enabled:
+              kind:
+                boolvalue: true
+            process.include_cpu_ticks:
+              kind:
+                boolvalue: false
+            process.include_top_n.by_cpu:
+              kind:
+                numbervalue: 5
+            process.include_top_n.by_memory:
+              kind:
+                numbervalue: 5
+            processes:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: .*
+      - datastream:
+          dataset: system.process.summary
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.process.summary
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.process.summary
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: process_summary
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.socket_summary
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.socket_summary
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.socket_summary
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: socket_summary
+            period:
+              kind:
+                stringvalue: 10s
+      - datastream:
+          dataset: system.uptime
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.uptime
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.uptime
+                    type:
+                      kind:
+                        stringvalue: metrics
+            id:
+              kind:
+                stringvalue: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: uptime
+            period:
+              kind:
+                stringvalue: 10s
+      type: system/metrics
+    id: system/metrics-default-system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    log_level: 2
+    type: 0
+  - config:
+      datastream: null
+      id: ""
+      meta: null
+      name: ""
+      revision: 0
+      source:
+        fields:
+          hosts:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    stringvalue: https://your.elasticsearch.host:443
+          type:
+            kind:
+              stringvalue: elasticsearch
+      streams: []
+      type: elasticsearch
+    id: system/metrics-default
+    log_level: 2
+    type: 1
+- id: log-default
+  type: log
+  units:
+  - config:
+      datastream:
+        dataset: ""
+        namespace: default
+        source:
+          fields:
+            namespace:
+              kind:
+                stringvalue: default
+        type: ""
+      id: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+      meta:
+        package:
+          name: system
+          source:
+            fields:
+              name:
+                kind:
+                  stringvalue: system
+              version:
+                kind:
+                  stringvalue: 1.24.3
+          version: 1.24.3
+        source:
+          fields:
+            package:
+              kind:
+                structvalue:
+                  fields:
+                    name:
+                      kind:
+                        stringvalue: system
+                    version:
+                      kind:
+                        stringvalue: 1.24.3
+      name: system-1
+      revision: 1
+      source:
+        fields:
+          data_stream:
+            kind:
+              structvalue:
+                fields:
+                  namespace:
+                    kind:
+                      stringvalue: default
+          id:
+            kind:
+              stringvalue: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+          meta:
+            kind:
+              structvalue:
+                fields:
+                  package:
+                    kind:
+                      structvalue:
+                        fields:
+                          name:
+                            kind:
+                              stringvalue: system
+                          version:
+                            kind:
+                              stringvalue: 1.24.3
+          name:
+            kind:
+              stringvalue: system-1
+          package_policy_id:
+            kind:
+              stringvalue: d38b6b0b-cc52-4a61-b897-1b236982ac42
+          policy:
+            kind:
+              structvalue:
+                fields:
+                  revision:
+                    kind:
+                      numbervalue: 5
+          revision:
+            kind:
+              numbervalue: 1
+          streams:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.auth
+                                type:
+                                  kind:
+                                    stringvalue: logs
+                        exclude_files:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: .gz$
+                        id:
+                          kind:
+                            stringvalue: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        ignore_older:
+                          kind:
+                            stringvalue: 72h
+                        multiline:
+                          kind:
+                            structvalue:
+                              fields:
+                                match:
+                                  kind:
+                                    stringvalue: after
+                                pattern:
+                                  kind:
+                                    stringvalue: ^\s
+                        paths:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: /var/log/auth.log*
+                              - kind:
+                                  stringvalue: /var/log/secure*
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_locale:
+                                        kind:
+                                          nullvalue: 0
+                        tags:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: system-auth
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: system.syslog
+                                type:
+                                  kind:
+                                    stringvalue: logs
+                        exclude_files:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: .gz$
+                        id:
+                          kind:
+                            stringvalue: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
+                        ignore_older:
+                          kind:
+                            stringvalue: 72h
+                        multiline:
+                          kind:
+                            structvalue:
+                              fields:
+                                match:
+                                  kind:
+                                    stringvalue: after
+                                pattern:
+                                  kind:
+                                    stringvalue: ^\s
+                        paths:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: /var/log/messages*
+                              - kind:
+                                  stringvalue: /var/log/syslog*
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_locale:
+                                        kind:
+                                          nullvalue: 0
+          type:
+            kind:
+              stringvalue: log
+      streams:
+      - datastream:
+          dataset: system.auth
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.auth
+              type:
+                kind:
+                  stringvalue: logs
+          type: logs
+        id: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.auth
+                    type:
+                      kind:
+                        stringvalue: logs
+            exclude_files:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: .gz$
+            id:
+              kind:
+                stringvalue: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            ignore_older:
+              kind:
+                stringvalue: 72h
+            multiline:
+              kind:
+                structvalue:
+                  fields:
+                    match:
+                      kind:
+                        stringvalue: after
+                    pattern:
+                      kind:
+                        stringvalue: ^\s
+            paths:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: /var/log/auth.log*
+                  - kind:
+                      stringvalue: /var/log/secure*
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_locale:
+                            kind:
+                              nullvalue: 0
+            tags:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: system-auth
+      - datastream:
+          dataset: system.syslog
+          namespace: ""
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: system.syslog
+              type:
+                kind:
+                  stringvalue: logs
+          type: logs
+        id: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: system.syslog
+                    type:
+                      kind:
+                        stringvalue: logs
+            exclude_files:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: .gz$
+            id:
+              kind:
+                stringvalue: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
+            ignore_older:
+              kind:
+                stringvalue: 72h
+            multiline:
+              kind:
+                structvalue:
+                  fields:
+                    match:
+                      kind:
+                        stringvalue: after
+                    pattern:
+                      kind:
+                        stringvalue: ^\s
+            paths:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: /var/log/messages*
+                  - kind:
+                      stringvalue: /var/log/syslog*
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_locale:
+                            kind:
+                              nullvalue: 0
+      type: log
+    id: log-default-logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    log_level: 2
+    type: 0
+  - config:
+      datastream: null
+      id: ""
+      meta: null
+      name: ""
+      revision: 0
+      source:
+        fields:
+          hosts:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    stringvalue: https://your.elasticsearch.host:443
+          type:
+            kind:
+              stringvalue: elasticsearch
+      streams: []
+      type: elasticsearch
+    id: log-default
+    log_level: 2
+    type: 1
+- id: filestream-monitoring
+  type: filestream
+  units:
+  - config:
+      datastream: null
+      id: filestream-monitoring-agent
+      meta: null
+      name: filestream-monitoring-agent
+      revision: 0
+      source:
+        fields:
+          id:
+            kind:
+              stringvalue: filestream-monitoring-agent
+          name:
+            kind:
+              stringvalue: filestream-monitoring-agent
+          streams:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    structvalue:
+                      fields:
+                        close:
+                          kind:
+                            structvalue:
+                              fields:
+                                on_state_change:
+                                  kind:
+                                    structvalue:
+                                      fields:
+                                        inactive:
+                                          kind:
+                                            stringvalue: 5m
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: elastic_agent
+                                namespace:
+                                  kind:
+                                    stringvalue: default
+                                type:
+                                  kind:
+                                    stringvalue: logs
+                        id:
+                          kind:
+                            stringvalue: filestream-monitoring-agent
+                        parsers:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      ndjson:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              add_error_key:
+                                                kind:
+                                                  boolvalue: true
+                                              message_key:
+                                                kind:
+                                                  stringvalue: message
+                                              overwrite_keys:
+                                                kind:
+                                                  boolvalue: true
+                                              target:
+                                                kind:
+                                                  stringvalue: ""
+                        paths:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: /home/paolo/dev/elastic-agent/build/distributions/elastic-agent-8.8.0-SNAPSHOT-linux-x86_64/data/elastic-agent-e32275/logs/elastic-agent-*.ndjson
+                              - kind:
+                                  stringvalue: /home/paolo/dev/elastic-agent/build/distributions/elastic-agent-8.8.0-SNAPSHOT-linux-x86_64/data/elastic-agent-e32275/logs/elastic-agent-watcher-*.ndjson
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_event:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              when:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      or:
+                                                        kind:
+                                                          listvalue:
+                                                            values:
+                                                            - kind:
+                                                                structvalue:
+                                                                  fields:
+                                                                    equals:
+                                                                      kind:
+                                                                        structvalue:
+                                                                          fields:
+                                                                            component.dataset:
+                                                                              kind:
+                                                                                stringvalue: elastic_agent.filestream_monitoring
+                                                            - kind:
+                                                                structvalue:
+                                                                  fields:
+                                                                    equals:
+                                                                      kind:
+                                                                        structvalue:
+                                                                          fields:
+                                                                            component.dataset:
+                                                                              kind:
+                                                                                stringvalue: elastic_agent.beats_metrics_monitoring
+                                                            - kind:
+                                                                structvalue:
+                                                                  fields:
+                                                                    equals:
+                                                                      kind:
+                                                                        structvalue:
+                                                                          fields:
+                                                                            component.dataset:
+                                                                              kind:
+                                                                                stringvalue: elastic_agent.http_metrics_monitoring
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      copy_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: data_stream.dataset
+                                                            to:
+                                                              kind:
+                                                                stringvalue: data_stream.dataset_original
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        stringvalue: data_stream.dataset
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      copy_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fail_on_error:
+                                                kind:
+                                                  boolvalue: false
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: component.dataset
+                                                            to:
+                                                              kind:
+                                                                stringvalue: data_stream.dataset
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      copy_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fail_on_error:
+                                                kind:
+                                                  boolvalue: false
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: data_stream.dataset_original
+                                                            to:
+                                                              kind:
+                                                                stringvalue: data_stream.dataset
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        stringvalue: data_stream.dataset_original
+                                                    - kind:
+                                                        stringvalue: event.dataset
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      copy_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: data_stream.dataset
+                                                            to:
+                                                              kind:
+                                                                stringvalue: event.dataset
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        stringvalue: ecs.version
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_formatted_index:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              index:
+                                                kind:
+                                                  stringvalue: '%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}'
+                        type:
+                          kind:
+                            stringvalue: filestream
+          type:
+            kind:
+              stringvalue: filestream
+      streams:
+      - datastream:
+          dataset: elastic_agent
+          namespace: default
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: elastic_agent
+              namespace:
+                kind:
+                  stringvalue: default
+              type:
+                kind:
+                  stringvalue: logs
+          type: logs
+        id: filestream-monitoring-agent
+        source:
+          fields:
+            close:
+              kind:
+                structvalue:
+                  fields:
+                    on_state_change:
+                      kind:
+                        structvalue:
+                          fields:
+                            inactive:
+                              kind:
+                                stringvalue: 5m
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: elastic_agent
+                    namespace:
+                      kind:
+                        stringvalue: default
+                    type:
+                      kind:
+                        stringvalue: logs
+            id:
+              kind:
+                stringvalue: filestream-monitoring-agent
+            parsers:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          ndjson:
+                            kind:
+                              structvalue:
+                                fields:
+                                  add_error_key:
+                                    kind:
+                                      boolvalue: true
+                                  message_key:
+                                    kind:
+                                      stringvalue: message
+                                  overwrite_keys:
+                                    kind:
+                                      boolvalue: true
+                                  target:
+                                    kind:
+                                      stringvalue: ""
+            paths:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: /home/paolo/dev/elastic-agent/build/distributions/elastic-agent-8.8.0-SNAPSHOT-linux-x86_64/data/elastic-agent-e32275/logs/elastic-agent-*.ndjson
+                  - kind:
+                      stringvalue: /home/paolo/dev/elastic-agent/build/distributions/elastic-agent-8.8.0-SNAPSHOT-linux-x86_64/data/elastic-agent-e32275/logs/elastic-agent-watcher-*.ndjson
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_event:
+                            kind:
+                              structvalue:
+                                fields:
+                                  when:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          or:
+                                            kind:
+                                              listvalue:
+                                                values:
+                                                - kind:
+                                                    structvalue:
+                                                      fields:
+                                                        equals:
+                                                          kind:
+                                                            structvalue:
+                                                              fields:
+                                                                component.dataset:
+                                                                  kind:
+                                                                    stringvalue: elastic_agent.filestream_monitoring
+                                                - kind:
+                                                    structvalue:
+                                                      fields:
+                                                        equals:
+                                                          kind:
+                                                            structvalue:
+                                                              fields:
+                                                                component.dataset:
+                                                                  kind:
+                                                                    stringvalue: elastic_agent.beats_metrics_monitoring
+                                                - kind:
+                                                    structvalue:
+                                                      fields:
+                                                        equals:
+                                                          kind:
+                                                            structvalue:
+                                                              fields:
+                                                                component.dataset:
+                                                                  kind:
+                                                                    stringvalue: elastic_agent.http_metrics_monitoring
+                  - kind:
+                      structvalue:
+                        fields:
+                          copy_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: data_stream.dataset
+                                                to:
+                                                  kind:
+                                                    stringvalue: data_stream.dataset_original
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            stringvalue: data_stream.dataset
+                  - kind:
+                      structvalue:
+                        fields:
+                          copy_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fail_on_error:
+                                    kind:
+                                      boolvalue: false
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: component.dataset
+                                                to:
+                                                  kind:
+                                                    stringvalue: data_stream.dataset
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+                  - kind:
+                      structvalue:
+                        fields:
+                          copy_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fail_on_error:
+                                    kind:
+                                      boolvalue: false
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: data_stream.dataset_original
+                                                to:
+                                                  kind:
+                                                    stringvalue: data_stream.dataset
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            stringvalue: data_stream.dataset_original
+                                        - kind:
+                                            stringvalue: event.dataset
+                  - kind:
+                      structvalue:
+                        fields:
+                          copy_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: data_stream.dataset
+                                                to:
+                                                  kind:
+                                                    stringvalue: event.dataset
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            stringvalue: ecs.version
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_formatted_index:
+                            kind:
+                              structvalue:
+                                fields:
+                                  index:
+                                    kind:
+                                      stringvalue: '%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}'
+            type:
+              kind:
+                stringvalue: filestream
+      type: filestream
+    id: filestream-monitoring-filestream-monitoring-agent
+    log_level: 2
+    type: 0
+  - config:
+      datastream: null
+      id: ""
+      meta: null
+      name: ""
+      revision: 0
+      source:
+        fields:
+          hosts:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    stringvalue: https://your.elasticsearch.host:443
+          type:
+            kind:
+              stringvalue: elasticsearch
+      streams: []
+      type: elasticsearch
+    id: filestream-monitoring
+    log_level: 2
+    type: 1
+- id: beat/metrics-monitoring
+  type: beat/metrics
+  units:
+  - config:
+      datastream:
+        dataset: ""
+        namespace: default
+        source:
+          fields:
+            namespace:
+              kind:
+                stringvalue: default
+        type: ""
+      id: metrics-monitoring-beats
+      meta: null
+      name: metrics-monitoring-beats
+      revision: 0
+      source:
+        fields:
+          data_stream:
+            kind:
+              structvalue:
+                fields:
+                  namespace:
+                    kind:
+                      stringvalue: default
+          id:
+            kind:
+              stringvalue: metrics-monitoring-beats
+          name:
+            kind:
+              stringvalue: metrics-monitoring-beats
+          streams:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: elastic_agent.filebeat
+                                namespace:
+                                  kind:
+                                    stringvalue: default
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        hosts:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: http+unix:///tmp/elastic-agent/3f7ed952aa85010a7081d21653cb35b759d83aa3551ba5dc8c57a0d971fb3630.sock
+                        id:
+                          kind:
+                            stringvalue: metrics-monitoring-filebeat
+                        index:
+                          kind:
+                            stringvalue: metrics-elastic_agent.filebeat-default
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: stats
+                              - kind:
+                                  stringvalue: state
+                        period:
+                          kind:
+                            stringvalue: 10s
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.filebeat
+                                                      namespace:
+                                                        kind:
+                                                          stringvalue: default
+                                                      type:
+                                                        kind:
+                                                          stringvalue: metrics
+                                              target:
+                                                kind:
+                                                  stringvalue: data_stream
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.filebeat
+                                              target:
+                                                kind:
+                                                  stringvalue: event
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                                      process:
+                                                        kind:
+                                                          stringvalue: filebeat
+                                                      snapshot:
+                                                        kind:
+                                                          boolvalue: true
+                                                      version:
+                                                        kind:
+                                                          stringvalue: 8.8.0
+                                              target:
+                                                kind:
+                                                  stringvalue: elastic_agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                              target:
+                                                kind:
+                                                  stringvalue: agent
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: elastic_agent.metricbeat
+                                namespace:
+                                  kind:
+                                    stringvalue: default
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        hosts:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: http+unix:///tmp/elastic-agent/1cbe39a4a4a4e0df8da0ae206e88ef22509fbb50790e68ab44dea82bceede8f4.sock
+                        id:
+                          kind:
+                            stringvalue: metrics-monitoring-metricbeat
+                        index:
+                          kind:
+                            stringvalue: metrics-elastic_agent.metricbeat-default
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: stats
+                              - kind:
+                                  stringvalue: state
+                        period:
+                          kind:
+                            stringvalue: 10s
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.metricbeat
+                                                      namespace:
+                                                        kind:
+                                                          stringvalue: default
+                                                      type:
+                                                        kind:
+                                                          stringvalue: metrics
+                                              target:
+                                                kind:
+                                                  stringvalue: data_stream
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.metricbeat
+                                              target:
+                                                kind:
+                                                  stringvalue: event
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                                      process:
+                                                        kind:
+                                                          stringvalue: metricbeat
+                                                      snapshot:
+                                                        kind:
+                                                          boolvalue: true
+                                                      version:
+                                                        kind:
+                                                          stringvalue: 8.8.0
+                                              target:
+                                                kind:
+                                                  stringvalue: elastic_agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                              target:
+                                                kind:
+                                                  stringvalue: agent
+          type:
+            kind:
+              stringvalue: beat/metrics
+      streams:
+      - datastream:
+          dataset: elastic_agent.filebeat
+          namespace: default
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: elastic_agent.filebeat
+              namespace:
+                kind:
+                  stringvalue: default
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: metrics-monitoring-filebeat
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: elastic_agent.filebeat
+                    namespace:
+                      kind:
+                        stringvalue: default
+                    type:
+                      kind:
+                        stringvalue: metrics
+            hosts:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: http+unix:///tmp/elastic-agent/3f7ed952aa85010a7081d21653cb35b759d83aa3551ba5dc8c57a0d971fb3630.sock
+            id:
+              kind:
+                stringvalue: metrics-monitoring-filebeat
+            index:
+              kind:
+                stringvalue: metrics-elastic_agent.filebeat-default
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: stats
+                  - kind:
+                      stringvalue: state
+            period:
+              kind:
+                stringvalue: 10s
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.filebeat
+                                          namespace:
+                                            kind:
+                                              stringvalue: default
+                                          type:
+                                            kind:
+                                              stringvalue: metrics
+                                  target:
+                                    kind:
+                                      stringvalue: data_stream
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.filebeat
+                                  target:
+                                    kind:
+                                      stringvalue: event
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                          process:
+                                            kind:
+                                              stringvalue: filebeat
+                                          snapshot:
+                                            kind:
+                                              boolvalue: true
+                                          version:
+                                            kind:
+                                              stringvalue: 8.8.0
+                                  target:
+                                    kind:
+                                      stringvalue: elastic_agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                  target:
+                                    kind:
+                                      stringvalue: agent
+      - datastream:
+          dataset: elastic_agent.metricbeat
+          namespace: default
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: elastic_agent.metricbeat
+              namespace:
+                kind:
+                  stringvalue: default
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: metrics-monitoring-metricbeat
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: elastic_agent.metricbeat
+                    namespace:
+                      kind:
+                        stringvalue: default
+                    type:
+                      kind:
+                        stringvalue: metrics
+            hosts:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: http+unix:///tmp/elastic-agent/1cbe39a4a4a4e0df8da0ae206e88ef22509fbb50790e68ab44dea82bceede8f4.sock
+            id:
+              kind:
+                stringvalue: metrics-monitoring-metricbeat
+            index:
+              kind:
+                stringvalue: metrics-elastic_agent.metricbeat-default
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: stats
+                  - kind:
+                      stringvalue: state
+            period:
+              kind:
+                stringvalue: 10s
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.metricbeat
+                                          namespace:
+                                            kind:
+                                              stringvalue: default
+                                          type:
+                                            kind:
+                                              stringvalue: metrics
+                                  target:
+                                    kind:
+                                      stringvalue: data_stream
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.metricbeat
+                                  target:
+                                    kind:
+                                      stringvalue: event
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                          process:
+                                            kind:
+                                              stringvalue: metricbeat
+                                          snapshot:
+                                            kind:
+                                              boolvalue: true
+                                          version:
+                                            kind:
+                                              stringvalue: 8.8.0
+                                  target:
+                                    kind:
+                                      stringvalue: elastic_agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                  target:
+                                    kind:
+                                      stringvalue: agent
+      type: beat/metrics
+    id: beat/metrics-monitoring-metrics-monitoring-beats
+    log_level: 2
+    type: 0
+  - config:
+      datastream: null
+      id: ""
+      meta: null
+      name: ""
+      revision: 0
+      source:
+        fields:
+          hosts:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    stringvalue: https://your.elasticsearch.host:443
+          type:
+            kind:
+              stringvalue: elasticsearch
+      streams: []
+      type: elasticsearch
+    id: beat/metrics-monitoring
+    log_level: 2
+    type: 1
+- id: http/metrics-monitoring
+  type: http/metrics
+  units:
+  - config:
+      datastream:
+        dataset: ""
+        namespace: default
+        source:
+          fields:
+            namespace:
+              kind:
+                stringvalue: default
+        type: ""
+      id: metrics-monitoring-agent
+      meta: null
+      name: metrics-monitoring-agent
+      revision: 0
+      source:
+        fields:
+          data_stream:
+            kind:
+              structvalue:
+                fields:
+                  namespace:
+                    kind:
+                      stringvalue: default
+          id:
+            kind:
+              stringvalue: metrics-monitoring-agent
+          name:
+            kind:
+              stringvalue: metrics-monitoring-agent
+          streams:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: elastic_agent.elastic_agent
+                                namespace:
+                                  kind:
+                                    stringvalue: default
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        hosts:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: http://localhost:6791
+                        id:
+                          kind:
+                            stringvalue: metrics-monitoring-agent
+                        index:
+                          kind:
+                            stringvalue: metrics-elastic_agent.elastic_agent-default
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: json
+                        namespace:
+                          kind:
+                            stringvalue: agent
+                        path:
+                          kind:
+                            stringvalue: /stats
+                        period:
+                          kind:
+                            stringvalue: 10s
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.elastic_agent
+                                                      namespace:
+                                                        kind:
+                                                          stringvalue: default
+                                                      type:
+                                                        kind:
+                                                          stringvalue: metrics
+                                              target:
+                                                kind:
+                                                  stringvalue: data_stream
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.elastic_agent
+                                              target:
+                                                kind:
+                                                  stringvalue: event
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                                      process:
+                                                        kind:
+                                                          stringvalue: elastic-agent
+                                                      snapshot:
+                                                        kind:
+                                                          boolvalue: true
+                                                      version:
+                                                        kind:
+                                                          stringvalue: 8.8.0
+                                              target:
+                                                kind:
+                                                  stringvalue: elastic_agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                              target:
+                                                kind:
+                                                  stringvalue: agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      copy_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fail_on_error:
+                                                kind:
+                                                  boolvalue: false
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.cpu
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.cpu
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.memstats.memory_sys
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.memory.size
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.handles
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.fd
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.cgroup
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.cgroup
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.apm-server
+                                                            to:
+                                                              kind:
+                                                                stringvalue: apm-server
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.filebeat_input
+                                                            to:
+                                                              kind:
+                                                                stringvalue: filebeat_input
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        stringvalue: http
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: elastic_agent.elastic_agent
+                                namespace:
+                                  kind:
+                                    stringvalue: default
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        hosts:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: http+unix:///tmp/elastic-agent/3f7ed952aa85010a7081d21653cb35b759d83aa3551ba5dc8c57a0d971fb3630.sock
+                        id:
+                          kind:
+                            stringvalue: metrics-monitoring-filebeat-1
+                        index:
+                          kind:
+                            stringvalue: metrics-elastic_agent.elastic_agent-default
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: json
+                        namespace:
+                          kind:
+                            stringvalue: agent
+                        path:
+                          kind:
+                            stringvalue: /stats
+                        period:
+                          kind:
+                            stringvalue: 10s
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.elastic_agent
+                                              target:
+                                                kind:
+                                                  stringvalue: event
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                                      process:
+                                                        kind:
+                                                          stringvalue: filebeat
+                                                      snapshot:
+                                                        kind:
+                                                          boolvalue: true
+                                                      version:
+                                                        kind:
+                                                          stringvalue: 8.8.0
+                                              target:
+                                                kind:
+                                                  stringvalue: elastic_agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                              target:
+                                                kind:
+                                                  stringvalue: agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      copy_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fail_on_error:
+                                                kind:
+                                                  boolvalue: false
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.cpu
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.cpu
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.memstats.memory_sys
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.memory.size
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.handles
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.fd
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.cgroup
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.cgroup
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.apm-server
+                                                            to:
+                                                              kind:
+                                                                stringvalue: apm-server
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.filebeat_input
+                                                            to:
+                                                              kind:
+                                                                stringvalue: filebeat_input
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        stringvalue: http
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: elastic_agent.filebeat_input
+                                namespace:
+                                  kind:
+                                    stringvalue: default
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        hosts:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: http+unix:///tmp/elastic-agent/3f7ed952aa85010a7081d21653cb35b759d83aa3551ba5dc8c57a0d971fb3630.sock
+                        id:
+                          kind:
+                            stringvalue: metrics-monitoring-filebeat-1
+                        index:
+                          kind:
+                            stringvalue: metrics-elastic_agent.filebeat_input-default
+                        json.is_array:
+                          kind:
+                            boolvalue: true
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: json
+                        namespace:
+                          kind:
+                            stringvalue: filebeat_input
+                        path:
+                          kind:
+                            stringvalue: /inputs/
+                        period:
+                          kind:
+                            stringvalue: 10s
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.filebeat_input
+                                              target:
+                                                kind:
+                                                  stringvalue: event
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                                      process:
+                                                        kind:
+                                                          stringvalue: filebeat
+                                                      snapshot:
+                                                        kind:
+                                                          boolvalue: true
+                                                      version:
+                                                        kind:
+                                                          stringvalue: 8.8.0
+                                              target:
+                                                kind:
+                                                  stringvalue: elastic_agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                              target:
+                                                kind:
+                                                  stringvalue: agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      copy_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fail_on_error:
+                                                kind:
+                                                  boolvalue: false
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.cpu
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.cpu
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.memstats.memory_sys
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.memory.size
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.handles
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.fd
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.cgroup
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.cgroup
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.apm-server
+                                                            to:
+                                                              kind:
+                                                                stringvalue: apm-server
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.filebeat_input
+                                                            to:
+                                                              kind:
+                                                                stringvalue: filebeat_input
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        stringvalue: http
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                - kind:
+                    structvalue:
+                      fields:
+                        data_stream:
+                          kind:
+                            structvalue:
+                              fields:
+                                dataset:
+                                  kind:
+                                    stringvalue: elastic_agent.elastic_agent
+                                namespace:
+                                  kind:
+                                    stringvalue: default
+                                type:
+                                  kind:
+                                    stringvalue: metrics
+                        hosts:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: http+unix:///tmp/elastic-agent/1cbe39a4a4a4e0df8da0ae206e88ef22509fbb50790e68ab44dea82bceede8f4.sock
+                        id:
+                          kind:
+                            stringvalue: metrics-monitoring-metricbeat-1
+                        index:
+                          kind:
+                            stringvalue: metrics-elastic_agent.elastic_agent-default
+                        metricsets:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  stringvalue: json
+                        namespace:
+                          kind:
+                            stringvalue: agent
+                        path:
+                          kind:
+                            stringvalue: /stats
+                        period:
+                          kind:
+                            stringvalue: 10s
+                        processors:
+                          kind:
+                            listvalue:
+                              values:
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      dataset:
+                                                        kind:
+                                                          stringvalue: elastic_agent.elastic_agent
+                                              target:
+                                                kind:
+                                                  stringvalue: event
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                                      process:
+                                                        kind:
+                                                          stringvalue: metricbeat
+                                                      snapshot:
+                                                        kind:
+                                                          boolvalue: true
+                                                      version:
+                                                        kind:
+                                                          stringvalue: 8.8.0
+                                              target:
+                                                kind:
+                                                  stringvalue: elastic_agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      add_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  structvalue:
+                                                    fields:
+                                                      id:
+                                                        kind:
+                                                          stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                              target:
+                                                kind:
+                                                  stringvalue: agent
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      copy_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fail_on_error:
+                                                kind:
+                                                  boolvalue: false
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.cpu
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.cpu
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.memstats.memory_sys
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.memory.size
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.handles
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.fd
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.beat.cgroup
+                                                            to:
+                                                              kind:
+                                                                stringvalue: system.process.cgroup
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.agent.apm-server
+                                                            to:
+                                                              kind:
+                                                                stringvalue: apm-server
+                                                    - kind:
+                                                        structvalue:
+                                                          fields:
+                                                            from:
+                                                              kind:
+                                                                stringvalue: http.filebeat_input
+                                                            to:
+                                                              kind:
+                                                                stringvalue: filebeat_input
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+                              - kind:
+                                  structvalue:
+                                    fields:
+                                      drop_fields:
+                                        kind:
+                                          structvalue:
+                                            fields:
+                                              fields:
+                                                kind:
+                                                  listvalue:
+                                                    values:
+                                                    - kind:
+                                                        stringvalue: http
+                                              ignore_missing:
+                                                kind:
+                                                  boolvalue: true
+          type:
+            kind:
+              stringvalue: http/metrics
+      streams:
+      - datastream:
+          dataset: elastic_agent.elastic_agent
+          namespace: default
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: elastic_agent.elastic_agent
+              namespace:
+                kind:
+                  stringvalue: default
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: metrics-monitoring-agent
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: elastic_agent.elastic_agent
+                    namespace:
+                      kind:
+                        stringvalue: default
+                    type:
+                      kind:
+                        stringvalue: metrics
+            hosts:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: http://localhost:6791
+            id:
+              kind:
+                stringvalue: metrics-monitoring-agent
+            index:
+              kind:
+                stringvalue: metrics-elastic_agent.elastic_agent-default
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: json
+            namespace:
+              kind:
+                stringvalue: agent
+            path:
+              kind:
+                stringvalue: /stats
+            period:
+              kind:
+                stringvalue: 10s
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.elastic_agent
+                                          namespace:
+                                            kind:
+                                              stringvalue: default
+                                          type:
+                                            kind:
+                                              stringvalue: metrics
+                                  target:
+                                    kind:
+                                      stringvalue: data_stream
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.elastic_agent
+                                  target:
+                                    kind:
+                                      stringvalue: event
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                          process:
+                                            kind:
+                                              stringvalue: elastic-agent
+                                          snapshot:
+                                            kind:
+                                              boolvalue: true
+                                          version:
+                                            kind:
+                                              stringvalue: 8.8.0
+                                  target:
+                                    kind:
+                                      stringvalue: elastic_agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                  target:
+                                    kind:
+                                      stringvalue: agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          copy_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fail_on_error:
+                                    kind:
+                                      boolvalue: false
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.cpu
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.cpu
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.memstats.memory_sys
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.memory.size
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.handles
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.fd
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.cgroup
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.cgroup
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.apm-server
+                                                to:
+                                                  kind:
+                                                    stringvalue: apm-server
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.filebeat_input
+                                                to:
+                                                  kind:
+                                                    stringvalue: filebeat_input
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            stringvalue: http
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+      - datastream:
+          dataset: elastic_agent.elastic_agent
+          namespace: default
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: elastic_agent.elastic_agent
+              namespace:
+                kind:
+                  stringvalue: default
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: metrics-monitoring-filebeat-1
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: elastic_agent.elastic_agent
+                    namespace:
+                      kind:
+                        stringvalue: default
+                    type:
+                      kind:
+                        stringvalue: metrics
+            hosts:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: http+unix:///tmp/elastic-agent/3f7ed952aa85010a7081d21653cb35b759d83aa3551ba5dc8c57a0d971fb3630.sock
+            id:
+              kind:
+                stringvalue: metrics-monitoring-filebeat-1
+            index:
+              kind:
+                stringvalue: metrics-elastic_agent.elastic_agent-default
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: json
+            namespace:
+              kind:
+                stringvalue: agent
+            path:
+              kind:
+                stringvalue: /stats
+            period:
+              kind:
+                stringvalue: 10s
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.elastic_agent
+                                  target:
+                                    kind:
+                                      stringvalue: event
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                          process:
+                                            kind:
+                                              stringvalue: filebeat
+                                          snapshot:
+                                            kind:
+                                              boolvalue: true
+                                          version:
+                                            kind:
+                                              stringvalue: 8.8.0
+                                  target:
+                                    kind:
+                                      stringvalue: elastic_agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                  target:
+                                    kind:
+                                      stringvalue: agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          copy_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fail_on_error:
+                                    kind:
+                                      boolvalue: false
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.cpu
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.cpu
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.memstats.memory_sys
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.memory.size
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.handles
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.fd
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.cgroup
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.cgroup
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.apm-server
+                                                to:
+                                                  kind:
+                                                    stringvalue: apm-server
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.filebeat_input
+                                                to:
+                                                  kind:
+                                                    stringvalue: filebeat_input
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            stringvalue: http
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+      - datastream:
+          dataset: elastic_agent.filebeat_input
+          namespace: default
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: elastic_agent.filebeat_input
+              namespace:
+                kind:
+                  stringvalue: default
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: metrics-monitoring-filebeat-1
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: elastic_agent.filebeat_input
+                    namespace:
+                      kind:
+                        stringvalue: default
+                    type:
+                      kind:
+                        stringvalue: metrics
+            hosts:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: http+unix:///tmp/elastic-agent/3f7ed952aa85010a7081d21653cb35b759d83aa3551ba5dc8c57a0d971fb3630.sock
+            id:
+              kind:
+                stringvalue: metrics-monitoring-filebeat-1
+            index:
+              kind:
+                stringvalue: metrics-elastic_agent.filebeat_input-default
+            json.is_array:
+              kind:
+                boolvalue: true
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: json
+            namespace:
+              kind:
+                stringvalue: filebeat_input
+            path:
+              kind:
+                stringvalue: /inputs/
+            period:
+              kind:
+                stringvalue: 10s
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.filebeat_input
+                                  target:
+                                    kind:
+                                      stringvalue: event
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                          process:
+                                            kind:
+                                              stringvalue: filebeat
+                                          snapshot:
+                                            kind:
+                                              boolvalue: true
+                                          version:
+                                            kind:
+                                              stringvalue: 8.8.0
+                                  target:
+                                    kind:
+                                      stringvalue: elastic_agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                  target:
+                                    kind:
+                                      stringvalue: agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          copy_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fail_on_error:
+                                    kind:
+                                      boolvalue: false
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.cpu
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.cpu
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.memstats.memory_sys
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.memory.size
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.handles
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.fd
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.cgroup
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.cgroup
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.apm-server
+                                                to:
+                                                  kind:
+                                                    stringvalue: apm-server
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.filebeat_input
+                                                to:
+                                                  kind:
+                                                    stringvalue: filebeat_input
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            stringvalue: http
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+      - datastream:
+          dataset: elastic_agent.elastic_agent
+          namespace: default
+          source:
+            fields:
+              dataset:
+                kind:
+                  stringvalue: elastic_agent.elastic_agent
+              namespace:
+                kind:
+                  stringvalue: default
+              type:
+                kind:
+                  stringvalue: metrics
+          type: metrics
+        id: metrics-monitoring-metricbeat-1
+        source:
+          fields:
+            data_stream:
+              kind:
+                structvalue:
+                  fields:
+                    dataset:
+                      kind:
+                        stringvalue: elastic_agent.elastic_agent
+                    namespace:
+                      kind:
+                        stringvalue: default
+                    type:
+                      kind:
+                        stringvalue: metrics
+            hosts:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: http+unix:///tmp/elastic-agent/1cbe39a4a4a4e0df8da0ae206e88ef22509fbb50790e68ab44dea82bceede8f4.sock
+            id:
+              kind:
+                stringvalue: metrics-monitoring-metricbeat-1
+            index:
+              kind:
+                stringvalue: metrics-elastic_agent.elastic_agent-default
+            metricsets:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      stringvalue: json
+            namespace:
+              kind:
+                stringvalue: agent
+            path:
+              kind:
+                stringvalue: /stats
+            period:
+              kind:
+                stringvalue: 10s
+            processors:
+              kind:
+                listvalue:
+                  values:
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          dataset:
+                                            kind:
+                                              stringvalue: elastic_agent.elastic_agent
+                                  target:
+                                    kind:
+                                      stringvalue: event
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                          process:
+                                            kind:
+                                              stringvalue: metricbeat
+                                          snapshot:
+                                            kind:
+                                              boolvalue: true
+                                          version:
+                                            kind:
+                                              stringvalue: 8.8.0
+                                  target:
+                                    kind:
+                                      stringvalue: elastic_agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          add_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      structvalue:
+                                        fields:
+                                          id:
+                                            kind:
+                                              stringvalue: cc60eb71-48dd-4383-a72f-0d4d0962153a
+                                  target:
+                                    kind:
+                                      stringvalue: agent
+                  - kind:
+                      structvalue:
+                        fields:
+                          copy_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fail_on_error:
+                                    kind:
+                                      boolvalue: false
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.cpu
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.cpu
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.memstats.memory_sys
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.memory.size
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.handles
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.fd
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.beat.cgroup
+                                                to:
+                                                  kind:
+                                                    stringvalue: system.process.cgroup
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.agent.apm-server
+                                                to:
+                                                  kind:
+                                                    stringvalue: apm-server
+                                        - kind:
+                                            structvalue:
+                                              fields:
+                                                from:
+                                                  kind:
+                                                    stringvalue: http.filebeat_input
+                                                to:
+                                                  kind:
+                                                    stringvalue: filebeat_input
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+                  - kind:
+                      structvalue:
+                        fields:
+                          drop_fields:
+                            kind:
+                              structvalue:
+                                fields:
+                                  fields:
+                                    kind:
+                                      listvalue:
+                                        values:
+                                        - kind:
+                                            stringvalue: http
+                                  ignore_missing:
+                                    kind:
+                                      boolvalue: true
+      type: http/metrics
+    id: http/metrics-monitoring-metrics-monitoring-agent
+    log_level: 2
+    type: 0
+  - config:
+      datastream: null
+      id: ""
+      meta: null
+      name: ""
+      revision: 0
+      source:
+        fields:
+          hosts:
+            kind:
+              listvalue:
+                values:
+                - kind:
+                    stringvalue: https://your.elasticsearch.host:443
+          type:
+            kind:
+              stringvalue: elasticsearch
+      streams: []
+      type: elasticsearch
+    id: http/metrics-monitoring
+    log_level: 2
+    type: 1

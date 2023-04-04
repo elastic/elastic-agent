@@ -148,6 +148,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 			if sendExpected || c.state.unsettled() {
 				comm.CheckinExpected(c.state.toCheckinExpected(), nil)
 			}
+
 			if changed {
 				c.sendObserved()
 			}

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -20,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -149,7 +151,7 @@ type VarsManager interface {
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
 
 // CoordinatorShutdownTimeout is how long the coordinator will wait during shutdown to receive a "clean" shutdown from other components
-const CoordinatorShutdownTimeout = time.Second * 5
+var CoordinatorShutdownTimeout = time.Second * 5
 
 // Coordinator manages the entire state of the Elastic Agent.
 //
@@ -179,6 +181,9 @@ type Coordinator struct {
 	config *config.Config
 	ast    *transpiler.AST
 	vars   []*transpiler.Vars
+
+	mx         sync.RWMutex
+	protection protection.Config
 }
 
 // ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
@@ -224,6 +229,21 @@ func (c *Coordinator) State() state.State {
 // Note: Not reading from a subscription channel will cause the Coordinator to block.
 func (c *Coordinator) StateSubscribe(ctx context.Context) *state.StateSubscription {
 	return c.state.Subscribe(ctx)
+}
+
+// Protection returns the current agent protection configuration
+// This is needed to be able to access the protection configuration for actions validation
+func (c *Coordinator) Protection() protection.Config {
+	c.mx.RLock()
+	defer c.mx.RUnlock()
+	return c.protection
+}
+
+// setProtection sets protection configuration
+func (c *Coordinator) setProtection(protectionConfig protection.Config) {
+	c.mx.Lock()
+	c.protection = protectionConfig
+	c.mx.Unlock()
 }
 
 // ReExec performs the re-execution.
@@ -472,8 +492,8 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 		{
-			Name:        "components",
-			Filename:    "components.yaml",
+			Name:        "components-expected",
+			Filename:    "components-expected.yaml",
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
@@ -496,13 +516,65 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 		{
+			Name:        "components-actual",
+			Filename:    "components-actual.yaml",
+			Description: "actual components model of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				components := c.State().Components
+
+				componentConfigs := make([]component.Component, len(components))
+				for i := 0; i < len(components); i++ {
+					componentConfigs[i] = components[i].Component
+				}
+				o, err := yaml.Marshal(struct {
+					Components []component.Component `yaml:"components"`
+				}{
+					Components: componentConfigs,
+				})
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
+		{
 			Name:        "state",
 			Filename:    "state.yaml",
 			Description: "current state of running components by the Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
+				type StateComponentOutput struct {
+					ID    string                 `yaml:"id"`
+					State runtime.ComponentState `yaml:"state"`
+				}
+				type StateHookOutput struct {
+					State        agentclient.State      `yaml:"state"`
+					Message      string                 `yaml:"message"`
+					FleetState   agentclient.State      `yaml:"fleet_state"`
+					FleetMessage string                 `yaml:"fleet_message"`
+					LogLevel     logp.Level             `yaml:"log_level"`
+					Components   []StateComponentOutput `yaml:"components"`
+				}
+
 				s := c.State()
-				o, err := yaml.Marshal(s)
+				n := len(s.Components)
+				compStates := make([]StateComponentOutput, n)
+				for i := 0; i < n; i++ {
+					compStates[i] = StateComponentOutput{
+						ID:    s.Components[i].Component.ID,
+						State: s.Components[i].State,
+					}
+				}
+				output := StateHookOutput{
+					State:        s.State,
+					Message:      s.Message,
+					FleetState:   s.FleetState,
+					FleetMessage: s.FleetMessage,
+					LogLevel:     s.LogLevel,
+					Components:   compStates,
+				}
+				o, err := yaml.Marshal(output)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -625,8 +697,14 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	// perform and verify ast translation
 	m, err := cfg.ToMapStr()
 	if err != nil {
-		return fmt.Errorf("could not create the AST from the configuration: %w", err)
+		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
+
+	protectionConfig, err := protection.GetAgentProtectionConfig(m)
+	if err != nil && !errors.Is(err, protection.ErrNotFound) {
+		return fmt.Errorf("could not read the agent protection configuration: %w", err)
+	}
+
 	rawAst, err := transpiler.NewAST(m)
 	if err != nil {
 		return fmt.Errorf("could not create the AST from the configuration: %w", err)
@@ -655,6 +733,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 
 	c.config = cfg
 	c.ast = rawAst
+
+	c.setProtection(protectionConfig)
 
 	if c.vars != nil {
 		return c.process(ctx)
@@ -739,7 +819,12 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
-	comps, err := c.specs.ToComponents(cfg, configInjector, c.logLevel, c.agentInfo)
+	comps, err := c.specs.ToComponents(
+		cfg,
+		configInjector,
+		c.logLevel,
+		c.agentInfo,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to render components: %w", err)
 	}
@@ -760,8 +845,22 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 	var varsErr error
 	// in case other components are locked up, let us time out
 	timeoutWait := time.NewTimer(CoordinatorShutdownTimeout)
+	defer timeoutWait.Stop()
+	doneWait := false
+	var returnedRuntime, returnedConfig, returnedVars bool
+	/*
+		Wait for all subcomponents to gently shut down.
+		Logic:
+		If all three subcomponent channels return an error, or close,
+		Assume shutdown is complete.
+		If there's a non-nil error, return it as an ErrFatalCoordinator,
+		If there's no errors from the channels, pass on the underlying context error
+	*/
 
 	for {
+		if doneWait { // we have a timeout, or all channels have returned
+			break
+		}
 		select {
 		case <-timeoutWait.C:
 			var timeouts []string
@@ -775,28 +874,41 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 				timeouts = append(timeouts, "no response from varsWatcher component")
 			}
 			c.logger.Debugf("timeout while waiting for other components to shut down: %v", timeouts)
-			break
-		case err := <-runtimeErrCh:
-			runtimeErr = err
-		case err := <-configErrCh:
-			configErr = err
-		case err := <-varsErrCh:
-			varsErr = err
+			doneWait = true
+		case err, ok := <-runtimeErrCh:
+			if ok {
+				runtimeErr = err
+			}
+			returnedRuntime = true
+		case err, ok := <-configErrCh:
+			if ok {
+				configErr = err
+			}
+			returnedConfig = true
+		case err, ok := <-varsErrCh:
+			if ok {
+				varsErr = err
+			}
+			returnedVars = true
 		}
-		if runtimeErr != nil && configErr != nil && varsErr != nil {
-			timeoutWait.Stop()
-			break
+		if returnedRuntime && returnedConfig && returnedVars {
+			c.logger.Debugf("all error channels have returned in handleCoordinatorDone")
+			doneWait = true
 		}
+
 	}
 	// try not to lose any errors
 	var combinedErr error
 	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
+		c.logger.Debugf("runtime component shut down with error: %s", runtimeErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime Manager: %w", runtimeErr))
 	}
 	if configErr != nil && !errors.Is(configErr, context.Canceled) {
+		c.logger.Debugf("config manager shut down with error: %s", configErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config Manager: %w", configErr))
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
+		c.logger.Debugf("varsWatcher shut down with error: %s", varsErr)
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
 	}
 	if combinedErr != nil {

@@ -121,7 +121,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
 	sendStart := time.Now()
 	resp, err := e.client.Send(ctx, "POST", cp, nil, nil, bytes.NewBuffer(b))
-	sendDuration := time.Now().Sub(sendStart)
+	sendDuration := time.Since(sendStart)
 	if err != nil {
 		return nil, sendDuration, errors.New(err,
 			"fail to checkin to fleet-server",

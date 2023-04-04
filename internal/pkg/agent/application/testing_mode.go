@@ -19,7 +19,11 @@ type testingModeConfigManager struct {
 }
 
 func newTestingModeConfigManager(log *logger.Logger) *testingModeConfigManager {
-	return &testingModeConfigManager{log: log, errCh: make(chan error)}
+	return &testingModeConfigManager{
+		log:   log,
+		ch:    make(chan coordinator.ConfigChange),
+		errCh: make(chan error),
+	}
 }
 
 func (t *testingModeConfigManager) Run(ctx context.Context) error {
@@ -46,6 +50,7 @@ func (t *testingModeConfigManager) SetConfig(ctx context.Context, cfg string) er
 	if err != nil {
 		return err
 	}
+	t.log.Info("Testing mode received new configuration from protocol, passing to coordinator")
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

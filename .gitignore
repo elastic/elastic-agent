@@ -1,4 +1,5 @@
 # Directories
+/.agent-testing
 /.vagrant
 /.idea
 /.vscode
