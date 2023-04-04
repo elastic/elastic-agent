@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
 )
@@ -64,9 +66,9 @@ type Agent struct {
 }
 
 // GetAgentByHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
-func (c *Client) GetAgentByHostnameFromList(hostname string) (Agent, error) {
+func (c *Client) GetAgentByHostnameFromList(ctx context.Context, hostname string) (Agent, error) {
 
-	agents, err := c.ListAgents()
+	agents, err := c.ListAgents(ctx)
 	if err != nil {
 		return Agent{}, err
 	}
@@ -85,9 +87,25 @@ func (c *Client) GetAgentByHostnameFromList(hostname string) (Agent, error) {
 	return Agent{}, nil
 }
 
+func (c *Client) ListAgents(ctx context.Context) ([]Agent, error) {
+	var agents []Agent
+	err := retry.Do(func() error {
+		var err error
+		agents, err = c.listAgents(ctx)
+		return err
+	},
+		retry.Attempts(2),
+		retry.Delay(5*time.Second),
+		retry.OnRetry(func(n uint, err error) {
+			log.Warnf("Failed to list agents. Retrying... Error: %v", err)
+		}),
+	)
+	return agents, err
+}
+
 // ListAgents returns the list of agents enrolled with Fleet.
-func (c *Client) ListAgents() ([]Agent, error) {
-	statusCode, respBody, err := c.get(context.Background(), fmt.Sprintf("%s/agents", "api/fleet"))
+func (c *Client) listAgents(ctx context.Context) ([]Agent, error) {
+	statusCode, respBody, err := c.get(ctx, fmt.Sprintf("%s/agents", "api/fleet"))
 
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -119,64 +137,64 @@ func (c *Client) ListAgents() ([]Agent, error) {
 
 }
 
-func (c *Client) GetAgentStatus() (string, error) {
+func (c *Client) GetAgentStatus(ctx context.Context) (string, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return "", err
 	}
 
-	agent, err := c.GetAgentByHostnameFromList(hostname)
+	agent, err := c.GetAgentByHostnameFromList(ctx, hostname)
 	return agent.Status, err
 }
 
-func (c *Client) GetAgentVersion() (string, error) {
+func (c *Client) GetAgentVersion(ctx context.Context) (string, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return "", err
 	}
 
-	agent, err := c.GetAgentByHostnameFromList(hostname)
+	agent, err := c.GetAgentByHostnameFromList(ctx, hostname)
 	return agent.LocalMetadata.Elastic.Agent.Version, err
 }
 
-func (c *Client) UnEnrollAgent() error {
+func (c *Client) UnEnrollAgent(ctx context.Context) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return err
 	}
-	agentID, err := c.GetAgentIDByHostname(hostname)
+	agentID, err := c.GetAgentIDByHostname(ctx, hostname)
 	if err != nil {
 		return err
 	}
 
 	reqBody := `{"revoke": true}`
-	statusCode, respBody, _ := c.post(context.Background(), fmt.Sprintf("%s/agents/%s/unenroll", "api/fleet", agentID), []byte(reqBody))
+	statusCode, respBody, _ := c.post(ctx, fmt.Sprintf("%s/agents/%s/unenroll", "api/fleet", agentID), []byte(reqBody))
 	if statusCode != 200 {
 		return fmt.Errorf("could not unenroll agent; API status code = %d, response body = %s", statusCode, respBody)
 	}
 	return nil
 }
 
-func (c *Client) GetAgentIDByHostname(hostname string) (string, error) {
-	agent, err := c.GetAgentByHostnameFromList(hostname)
+func (c *Client) GetAgentIDByHostname(ctx context.Context, hostname string) (string, error) {
+	agent, err := c.GetAgentByHostnameFromList(ctx, hostname)
 	if err != nil {
 		return "", err
 	}
 	return agent.ID, nil
 }
 
-func (c *Client) UpgradeAgent(version string) error {
+func (c *Client) UpgradeAgent(ctx context.Context, version string) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return err
 	}
-	agentID, err := c.GetAgentIDByHostname(hostname)
+	agentID, err := c.GetAgentIDByHostname(ctx, hostname)
 	if err != nil {
 		return err
 	}
 
 	reqBody := `{"version":"` + version + `"}`
-	statusCode, respBody, err := c.post(context.Background(), fmt.Sprintf("%s/agents/%s/upgrade", "api/fleet", agentID), []byte(reqBody))
+	statusCode, respBody, err := c.post(ctx, fmt.Sprintf("%s/agents/%s/upgrade", "api/fleet", agentID), []byte(reqBody))
 	if statusCode != 200 {
 		log.WithFields(log.Fields{
 			"body":           string(respBody),

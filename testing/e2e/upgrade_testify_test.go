@@ -4,6 +4,7 @@
 package e2e
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -42,22 +43,23 @@ func (suite *UpgradeElasticAgent) SetupSuite() {
 }
 
 func (suite *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
-	policy, err := suite.client.CreatePolicy()
+
+	policy, err := suite.client.CreatePolicy(context.Background())
 	require.Nil(suite.T(), err, "Could not create policy")
-	enrollmentToken, err := suite.client.CreateEnrollmentAPIKey(policy)
+	enrollmentToken, err := suite.client.CreateEnrollmentAPIKey(context.Background(), policy)
 	require.Nil(suite.T(), err, "Could not create enrollment token")
 
 	err = tools.EnrollElasticAgent(suite.T(), suite.clusterConfig.FleetConfig.Url, enrollmentToken.APIKey, suite.agentVersion)
 	require.Nil(suite.T(), err, "Error while enrolling elastic agent")
 
-	require.Eventually(suite.T(), agentStatus("online", *suite), 5*time.Minute, 5*time.Second, "Agent status is not online")
+	require.Eventually(suite.T(), agentStatus("online", *suite), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
-	err = suite.client.UpgradeAgent("8.6.1")
+	err = suite.client.UpgradeAgent(context.TODO(), "8.6.1")
 	require.Nil(suite.T(), err, "Elastic agent upgrade cmd failed")
 
 	require.Eventually(suite.T(), agentStatus("online", *suite), 5*time.Minute, 5*time.Second, "Agent status is not online")
 
-	version, err := suite.client.GetAgentVersion()
+	version, err := suite.client.GetAgentVersion(context.Background())
 	require.Nil(suite.T(), err, "Couldn't get agent ebsion from Fleet")
 
 	require.Equal(suite.T(), version, "8.6.1", "Elastic egent version is incorrect")
@@ -65,7 +67,7 @@ func (suite *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 
 func (suite *UpgradeElasticAgent) TearDownTest() {
 	suite.T().Log("Un-enrolling elastic agent")
-	assert.NoError(suite.T(), suite.client.UnEnrollAgent())
+	assert.NoError(suite.T(), suite.client.UnEnrollAgent(context.Background()))
 	suite.T().Log("Uninstalling elastic agent")
 	assert.NoError(suite.T(), tools.UninstallAgent(suite.T()))
 }
@@ -76,7 +78,7 @@ func TestElasticAgentUpgrade(t *testing.T) {
 
 func agentStatus(expectedStatus string, suite UpgradeElasticAgent) func() bool {
 	return func() bool {
-		status, err := suite.client.GetAgentStatus()
+		status, err := suite.client.GetAgentStatus(context.Background())
 		if err != nil {
 			suite.T().Error(err)
 		}

@@ -25,7 +25,7 @@ create-cluster:
 
 .PHONY: run-tests
 run-tests:
-	AGENT_VERSION=8.6.0 go test -v -timeout 300s -run ^TestElasticAgentUpgrade$ github.com/elastic/elastic-agent/testing/e2e
+	AGENT_VERSION=8.6.0 go test -v -timeout 300s -tags=e2e -run ^TestElasticAgentUpgrade$ github.com/elastic/elastic-agent/testing/e2e
 
 .PHONY: destroy-cluster
 destroy-cluster:	

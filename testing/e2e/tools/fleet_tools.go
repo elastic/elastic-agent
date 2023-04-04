@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Jeffail/gabs/v2"
+	"github.com/avast/retry-go"
 	"github.com/google/uuid"
 	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
@@ -32,7 +33,23 @@ type EnrollmentAPIKey struct {
 	PolicyID string `json:"policy_id"`
 }
 
-func (c *Client) CreatePolicy() (Policy, error) {
+func (c *Client) CreatePolicy(ctx context.Context) (Policy, error) {
+	var policy Policy
+	err := retry.Do(
+		func() error {
+			var err error
+			policy, err = c.createPolicy(ctx)
+			return err
+		},
+		retry.Attempts(3),
+		retry.OnRetry(func(n uint, err error) {
+			log.Warnf("Failed to create policy. Retrying... Error: %v", err)
+		}),
+	)
+	return policy, err
+}
+
+func (c *Client) createPolicy(ctx context.Context) (Policy, error) {
 	policyUUID := uuid.New().String()
 
 	reqBody := `{
@@ -42,7 +59,7 @@ func (c *Client) CreatePolicy() (Policy, error) {
 		"name": "test-policy-` + policyUUID + `"
 	}`
 
-	statusCode, respBody, _ := c.post(context.Background(), fmt.Sprintf("%s/agent_policies", "api/fleet"), []byte(reqBody))
+	statusCode, respBody, _ := c.post(ctx, fmt.Sprintf("%s/agent_policies", "api/fleet"), []byte(reqBody))
 
 	jsonParsed, err := gabs.ParseJSON(respBody)
 
@@ -73,11 +90,27 @@ func (c *Client) CreatePolicy() (Policy, error) {
 	return resp.Item, nil
 }
 
-func (c *Client) CreateEnrollmentAPIKey(policy Policy) (EnrollmentAPIKey, error) {
+func (c *Client) CreateEnrollmentAPIKey(ctx context.Context, policy Policy) (EnrollmentAPIKey, error) {
+	var apiKey EnrollmentAPIKey
+	err := retry.Do(
+		func() error {
+			var err error
+			apiKey, err = c.createEnrollmentAPIKey(ctx, policy)
+			return err
+		},
+		retry.Attempts(3),
+		retry.OnRetry(func(n uint, err error) {
+			log.Warnf("Failed to create enrollment api key. Retrying... Error: %v", err)
+		}),
+	)
+	return apiKey, err
+}
+
+func (c *Client) createEnrollmentAPIKey(ctx context.Context, policy Policy) (EnrollmentAPIKey, error) {
 
 	reqBody := `{"policy_id": "` + policy.ID + `"}`
 
-	statusCode, respBody, _ := c.post(context.Background(), fmt.Sprintf("%s/enrollment_api_keys", "api/fleet"), []byte(reqBody))
+	statusCode, respBody, _ := c.post(ctx, fmt.Sprintf("%s/enrollment_api_keys", "api/fleet"), []byte(reqBody))
 	if statusCode != 200 {
 		jsonParsed, err := gabs.ParseJSON(respBody)
 		log.WithFields(log.Fields{

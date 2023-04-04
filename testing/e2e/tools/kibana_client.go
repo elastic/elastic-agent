@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/Jeffail/gabs/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
@@ -63,16 +62,10 @@ func (c *Client) sendRequest(ctx context.Context, method, resourcePath string, b
 
 	u := base.ResolveReference(rel)
 
-	jsonParsed, err := gabs.ParseJSON(body)
-
-	if err != nil {
-		return 0, nil, errors.Wrapf(err, "could not parse response of %v request to Kibana API resource: %s", method, resourcePath)
-	}
-
 	log.WithFields(log.Fields{
 		"method":  method,
 		"url":     u,
-		"body":    jsonParsed,
+		"body":    body,
 		"headers": headers,
 	}).Trace("Kibana API Query")
 
