@@ -1,7 +1,9 @@
 agent:
   download:
     sourceURI: https://artifacts.elastic.co/downloads/
-  features: null
+  features:
+    fqdn:
+      enabled: true
   monitoring:
     enabled: true
     logs: true
