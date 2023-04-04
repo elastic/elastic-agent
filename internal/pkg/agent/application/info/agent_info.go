@@ -14,7 +14,6 @@ type AgentInfo struct {
 	agentID  string
 	logLevel string
 	headers  map[string]string
-	log      *logger.Logger
 }
 
 // NewAgentInfoWithLog creates a new agent information.
@@ -29,13 +28,10 @@ func NewAgentInfoWithLog(level string, createAgentID bool) (*AgentInfo, error) {
 		return nil, err
 	}
 
-	log := logger.NewWithoutConfig("agent_info")
-
 	return &AgentInfo{
 		agentID:  agentInfo.ID,
 		logLevel: agentInfo.LogLevel,
 		headers:  agentInfo.Headers,
-		log:      log,
 	}, nil
 }
 
