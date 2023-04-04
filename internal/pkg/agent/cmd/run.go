@@ -60,15 +60,13 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return &cobra.Command{
 		Use:   "run",
 		Short: "Start the elastic-agent.",
-		Run: func(_ *cobra.Command, _ []string) {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
-				// TODO: remove it. os.Exit will be called on main and if it's called
-				// too early some goroutines with deferred functions related
-				// to the shutdown process might not run.
-				os.Exit(1)
+				return err
 			}
+			return nil
 		},
 	}
 }
@@ -99,7 +97,9 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	var stopBeat = func() {
 		close(stop)
 	}
-	service.HandleSignals(stopBeat, cancel)
+
+	defer cancel()
+	go service.ProcessWindowsControlEvents(stopBeat)
 
 	cfg, err := loadConfig(override)
 	if err != nil {
@@ -246,7 +246,7 @@ LOOP:
 	for {
 		select {
 		case <-stop:
-			l.Info("service.HandleSignals invoked stop function. Shutting down")
+			l.Info("service.ProcessWindowsControlEvents invoked stop function. Shutting down")
 			break LOOP
 		case <-appDone:
 			l.Info("application done, coordinator exited")
@@ -386,6 +386,7 @@ func defaultLogLevel(cfg *configuration.Configuration) string {
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
+		//nolint:nilerr // ignore the error, this is expected
 		// no enrollment file exists or failed to stat it; nothing to do
 		return cfg, nil
 	}
