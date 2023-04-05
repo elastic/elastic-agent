@@ -349,7 +349,7 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 	if ignoreErrs {
 		onErr = func(err error) error {
 			// ignore all errors, just log them
-			l.Debugf("ignoring error: failed to copy %q to %q: %s", from, to, err.Error())
+			l.Infof("ignoring error: failed to copy %q to %q: %s", from, to, err.Error())
 			return nil
 		}
 	}
