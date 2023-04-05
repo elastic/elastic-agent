@@ -15,6 +15,7 @@ import (
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -33,31 +34,6 @@ const fleetStateDegraded = "DEGRADED"
 const fleetStateOnline = "online"
 const fleetStateError = "error"
 const fleetStateStarting = "starting"
-
-type FleetGatewaySettings struct {
-	Debounce time.Duration   `config:"checkin_debounce"`
-	Duration time.Duration   `config:"checkin_frequency"`
-	Jitter   time.Duration   `config:"jitter"`
-	Backoff  backoffSettings `config:"backoff"`
-}
-
-// Returns default Configuration for the Fleet Gateway.
-func DefaultFleetGatewaySettings() FleetGatewaySettings {
-	return FleetGatewaySettings{
-		Debounce: 5 * time.Minute,        // time the agent has to wait before cancelling an ongoing checkin and start a new one
-		Duration: 5 * time.Minute,        // time between successful calls
-		Jitter:   500 * time.Millisecond, // used as a jitter for duration
-		Backoff: backoffSettings{ // time after a failed call
-			Init: 60 * time.Second,
-			Max:  10 * time.Minute,
-		},
-	}
-}
-
-type backoffSettings struct {
-	Init time.Duration `config:"init"`
-	Max  time.Duration `config:"max"`
-}
 
 type agentInfo interface {
 	AgentID() string
@@ -105,7 +81,7 @@ type fleetGateway struct {
 	client             client.Sender
 	scheduler          Scheduler
 	clock              clock
-	settings           FleetGatewaySettings
+	settings           *configuration.FleetGatewaySettings
 	agentInfo          agentInfo
 	acker              acker.Acker
 	unauthCounter      int
@@ -119,7 +95,7 @@ type fleetGateway struct {
 // New creates a new fleet gateway
 func New(
 	log loggerIF,
-	settings FleetGatewaySettings,
+	settings *configuration.FleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
@@ -144,7 +120,7 @@ func New(
 
 func newFleetGatewayWithSchedulerAndClock(
 	log loggerIF,
-	settings FleetGatewaySettings,
+	settings *configuration.FleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
 	scheduler Scheduler,

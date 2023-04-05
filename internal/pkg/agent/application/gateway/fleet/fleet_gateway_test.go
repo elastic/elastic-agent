@@ -27,6 +27,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
@@ -127,7 +128,7 @@ func emptyStateFetcher(t *testing.T) *MockStateFetcher {
 
 type withGatewayFunc func(*testing.T, *fleetGateway, *testingClient, *scheduler.Stepper)
 
-func withGateway(agentInfo agentInfo, settings FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
+func withGateway(agentInfo agentInfo, settings *configuration.FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient(t)
@@ -153,7 +154,7 @@ func withGateway(agentInfo agentInfo, settings FleetGatewaySettings, fn withGate
 		fn(t, gateway, client, scheduler)
 	}
 }
-func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
+func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings *configuration.FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient(t)
@@ -218,9 +219,9 @@ func mustWriteToChannelBeforeTimeout[V any](t *testing.T, value V, channel chan 
 
 func TestFleetGateway(t *testing.T) {
 	agentInfo := &testAgentInfo{}
-	settings := FleetGatewaySettings{
+	settings := &configuration.FleetGatewaySettings{
 		Duration: 5 * time.Second,
-		Backoff:  backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
+		Backoff:  configuration.BackoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
 	}
 
 	t.Run("send no event and receive no action", withGateway(agentInfo, settings, func(
@@ -369,9 +370,9 @@ func TestFleetGateway(t *testing.T) {
 
 		gateway, err := newFleetGatewayWithSchedulerAndClock(
 			log,
-			FleetGatewaySettings{
+			&configuration.FleetGatewaySettings{
 				Duration: d,
-				Backoff:  backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
+				Backoff:  configuration.BackoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
 			},
 			agentInfo,
 			client,
@@ -451,7 +452,7 @@ func TestFleetGateway(t *testing.T) {
 
 		gateway, err := newFleetGatewayWithSchedulerAndClock(
 			mockLogger,
-			DefaultFleetGatewaySettings(),
+			configuration.DefaultFleetGatewaySettings(),
 			agentInfo,
 			longPollClient,
 			scheduler,
@@ -546,7 +547,7 @@ func TestFleetGateway(t *testing.T) {
 			return stateUpdateSrc
 		})
 
-		settings := DefaultFleetGatewaySettings()
+		settings := configuration.DefaultFleetGatewaySettings()
 		settings.Debounce = 5 * time.Second
 
 		gateway, err := newFleetGatewayWithSchedulerAndClock(
@@ -656,9 +657,9 @@ func TestFleetGateway(t *testing.T) {
 
 func TestRetriesOnFailures(t *testing.T) {
 	agentInfo := &testAgentInfo{}
-	settings := FleetGatewaySettings{
+	settings := &configuration.FleetGatewaySettings{
 		Duration: 5 * time.Second,
-		Backoff:  backoffSettings{Init: 100 * time.Millisecond, Max: 5 * time.Second},
+		Backoff:  configuration.BackoffSettings{Init: 100 * time.Millisecond, Max: 5 * time.Second},
 	}
 
 	t.Run("When the gateway fails to communicate with the checkin API we will retry",
@@ -707,9 +708,9 @@ func TestRetriesOnFailures(t *testing.T) {
 		}))
 
 	t.Run("The retry loop is interruptible",
-		withGateway(agentInfo, FleetGatewaySettings{
+		withGateway(agentInfo, &configuration.FleetGatewaySettings{
 			Duration: 0 * time.Second,
-			Backoff:  backoffSettings{Init: 10 * time.Minute, Max: 20 * time.Minute},
+			Backoff:  configuration.BackoffSettings{Init: 10 * time.Minute, Max: 20 * time.Minute},
 		}, func(
 			t *testing.T,
 			gateway *fleetGateway,
@@ -742,9 +743,9 @@ func TestRetriesOnFailures(t *testing.T) {
 		withGatewayAndLog(
 			agentInfo,
 			newTestLogger(t),
-			FleetGatewaySettings{
+			&configuration.FleetGatewaySettings{
 				Duration: 0 * time.Second,
-				Backoff: backoffSettings{
+				Backoff: configuration.BackoffSettings{
 					Init: 1 * time.Millisecond,
 					Max:  1 * time.Millisecond,
 				},
