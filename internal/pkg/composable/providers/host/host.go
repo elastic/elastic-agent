@@ -20,8 +20,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// DefaultCheckInterval is the default timeout used to check if any host information has changed.
-const DefaultCheckInterval = 5 * time.Minute
+const (
+	// DefaultCheckInterval is the default timeout used to check if any host information has changed.
+	DefaultCheckInterval = 5 * time.Minute
+
+	fqdnFeatureFlagCallbackID = "host_provider"
+)
 
 func init() {
 	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
@@ -49,13 +53,21 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)
 	}
 
+	fqdnFFChangeCh := make(chan struct{})
+	if err := features.AddFQDNOnChangeCallback(onFQDNFeatureFlagChange(fqdnFFChangeCh), fqdnFeatureFlagCallbackID); err != nil {
+		return fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
+	}
+
 	// Update context when any host information changes.
 	for {
 		t := time.NewTimer(c.CheckInterval)
 		select {
 		case <-comm.Done():
 			t.Stop()
+			features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
+			close(fqdnFFChangeCh)
 			return comm.Err()
+		case <-fqdnFFChangeCh:
 		case <-t.C:
 		}
 
@@ -73,6 +85,13 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		if err != nil {
 			c.logger.Errorf("Failed updating mapping to latest host information: %s", err)
 		}
+	}
+}
+
+func onFQDNFeatureFlagChange(fqdnFFChangeCh chan struct{}) features.BoolValueOnChangeCallback {
+	return func(new, old bool) {
+		// FQDN feature flag was toggled, so notify on channel
+		fqdnFFChangeCh <- struct{}{}
 	}
 }
 
