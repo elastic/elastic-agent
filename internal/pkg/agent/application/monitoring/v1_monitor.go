@@ -791,6 +791,9 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		if comp.ShipperSpec != nil { // a shipper unit
 			endpoints := []interface{}{prefixedEndpoint(endpointPath(comp.ID, b.operatingSystem))}
 			name := "shipper" // in other beats this is the binary name, but we can hard-code it here.
+			if comp.ShipperSpec.Spec.Name != "" {
+				name = comp.ShipperSpec.Spec.Name
+			}
 			// note: this doesn't fetch anything from the /state endpoint, as it doesn't report much beyond name/version,
 			// the equivalent of the beat /state metrics end up in /shipper
 			shipperHTTPStreams = append(shipperHTTPStreams, map[string]interface{}{
@@ -805,7 +808,6 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				"hosts":      endpoints,
 				"namespace":  "application",
 				"period":     "10s",
-				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, "application"),
 				"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
 			},
 				map[string]interface{}{
@@ -820,7 +822,6 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 					"hosts":      endpoints,
 					"namespace":  "agent",
 					"period":     "10s",
-					"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, "resources"),
 					"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
 				})
 		}
