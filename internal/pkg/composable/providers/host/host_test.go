@@ -136,7 +136,7 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}))
 
 	require.Eventually(t, func() bool {
-		// comm.Set should be called twice:
+		// hostProvider.fetcher should be called twice:
 		// - once, right after the provider is run, and
 		// - once again, when the FQDN feature flag callback is triggered
 		if numCalled == 2 {
