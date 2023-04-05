@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -80,7 +81,7 @@ type fleetGateway struct {
 	log                loggerIF
 	client             client.Sender
 	scheduler          Scheduler
-	clock              clock
+	debouncerFactory   debouncerFactory
 	settings           *configuration.FleetGatewaySettings
 	agentInfo          agentInfo
 	acker              acker.Acker
@@ -104,43 +105,43 @@ func New(
 ) (*fleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(settings.Duration, settings.Jitter)
-	clock := new(stdlibClock)
-	return newFleetGatewayWithSchedulerAndClock(
+	debouncerFactory := func() debouncer { return newTimerDebouncer(settings.Debounce) }
+	return newFleetGatewayWithSchedulerAndDebouncer(
 		log,
 		settings,
 		agentInfo,
 		client,
 		scheduler,
-		clock,
+		debouncerFactory,
 		acker,
 		stateFetcher,
 		stateStore,
 	)
 }
 
-func newFleetGatewayWithSchedulerAndClock(
+func newFleetGatewayWithSchedulerAndDebouncer(
 	log loggerIF,
 	settings *configuration.FleetGatewaySettings,
 	agentInfo agentInfo,
 	client client.Sender,
 	scheduler Scheduler,
-	clock clock,
+	df debouncerFactory,
 	acker acker.Acker,
 	stateFetcher StateFetcher,
 	stateStore stateStore,
 ) (*fleetGateway, error) {
 	return &fleetGateway{
-		log:          log,
-		client:       client,
-		settings:     settings,
-		agentInfo:    agentInfo,
-		scheduler:    scheduler,
-		clock:        clock,
-		acker:        acker,
-		stateFetcher: stateFetcher,
-		stateStore:   stateStore,
-		errCh:        make(chan error),
-		actionCh:     make(chan []fleetapi.Action, 1),
+		log:              log,
+		client:           client,
+		settings:         settings,
+		agentInfo:        agentInfo,
+		scheduler:        scheduler,
+		debouncerFactory: df,
+		acker:            acker,
+		stateFetcher:     stateFetcher,
+		stateStore:       stateStore,
+		errCh:            make(chan error),
+		actionCh:         make(chan []fleetapi.Action, 1),
 	}, nil
 }
 
@@ -187,7 +188,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 						return
 					}
 
-					checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff)
+					checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff, f.debouncerFactory())
 
 					if checkinResult.err != nil {
 						var relaunchCheckinErr *needNewCheckinError
@@ -214,7 +215,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 	}
 }
 
-func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state state.State, stateUpdates <-chan state.State, backoff backoff.Backoff) checkinResult {
+func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialState state.State, stateUpdates <-chan state.State, backoff backoff.Backoff, dbouncer debouncer) checkinResult {
 	checkinID, _ := uuid.NewV4()
 	checkinCtx, cancelCheckin := context.WithCancel(ctx)
 	checkinCtx = context.WithValue(checkinCtx, CheckinIDKey, checkinID.String())
@@ -223,11 +224,15 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state stat
 		// make sure we don't leak contexts whatever happens
 		cancelCheckin()
 	}()
-	checkinStartTime := f.clock.Now()
+
 	// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
 	// the function will retry to communicate with fleet-server with an exponential delay and some
 	// jitter to help better distribute the load from a fleet of agents.
-	resCheckinChan := f.doExecuteAsync(checkinCtx, backoff, state)
+	resCheckinChan := f.doExecuteAsync(checkinCtx, backoff, initialState)
+
+	// this variable will hold the latest state we got from coordinator
+	var updatedState *state.State
+	var debounceElapsed bool
 
 	for {
 		select {
@@ -235,21 +240,31 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state stat
 			return checkinResult{err: ctx.Err()}
 		case checkinResult := <-resCheckinChan:
 			return checkinResult
+		case <-dbouncer.Reached():
+			debounceElapsed = true
+			if updatedState != nil && !reflect.DeepEqual(updatedState, &initialState) {
+				// we detected that the updated State is different from the one of the current checkin, cancel and return the needNewCheckinError
+				cancelCheckin()
+				f.log.Debugf("cancelled checkin %s", checkinID.String())
+				cancelledCheckinRes := <-resCheckinChan
+				f.log.Debugf("reaped answer for cancelled checkin %q: %+v", checkinID, cancelledCheckinRes)
+				return checkinResult{err: &needNewCheckinError{newState: *updatedState}}
+			}
 		case newState := <-stateUpdates:
-			checkinElapsedTime := f.clock.Now().Sub(checkinStartTime)
-			if checkinElapsedTime < f.settings.Debounce {
-				f.log.Warnf(
-					"Updated state %+v dropped because elapsed time %s is smaller than debounce time %s",
+			if !debounceElapsed {
+				f.log.Debugf(
+					"Updated state %+v received but current checkin %s not cancelled because we are still within debounce",
 					newState,
-					checkinElapsedTime,
-					f.settings.Debounce,
+					checkinID,
 				)
+				updatedState = &newState
+				_ = updatedState
 				continue
 			}
+
 			f.log.Infof(
-				"Received updated state %+v when checkin is ongoing for %s after configured debounce %s. Cancelling previous checkin %q and starting a new one.",
+				"Received updated state %+v when checkin is ongoing for %s after configured debounce. Cancelling previous checkin %q and starting a new one.",
 				newState,
-				checkinElapsedTime,
 				f.settings.Debounce,
 				checkinID.String(),
 			)

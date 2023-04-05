@@ -40,7 +40,7 @@ import (
 
 // Refer to https://vektra.github.io/mockery/installation/ to check how to install mockery binary
 //go:generate mockery --name StateFetcher
-//go:generate mockery --name clock
+//go:generate mockery --name debouncer
 //go:generate mockery --keeptree --output . --outpkg fleet --dir ../../coordinator/state --name StateUpdateSource
 
 type clientCallbackFunc func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error)
@@ -125,6 +125,16 @@ func emptyStateFetcher(t *testing.T) *MockStateFetcher {
 	return mockFetcher
 }
 
+func neverDebounce(t *testing.T) *mockDebouncer {
+	mockDebouncer := newMockDebouncer(t)
+	alreadyReachedDebounce := make(chan time.Time)
+	go func() {
+		alreadyReachedDebounce <- time.Now()
+	}()
+	mockDebouncer.EXPECT().Reached().Return(alreadyReachedDebounce)
+	return mockDebouncer
+}
+
 type withGatewayFunc func(*testing.T, *fleetGateway, *testingClient, *scheduler.Stepper)
 
 func withGateway(agentInfo agentInfo, settings *configuration.FleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
@@ -136,13 +146,13 @@ func withGateway(agentInfo agentInfo, settings *configuration.FleetGatewaySettin
 
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithSchedulerAndClock(
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			log,
 			settings,
 			agentInfo,
 			client,
 			scheduler,
-			new(stdlibClock),
+			func() debouncer { return neverDebounce(t) },
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -162,13 +172,13 @@ func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings *configurat
 
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithSchedulerAndClock(
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			logIF,
 			settings,
 			agentInfo,
 			client,
 			scheduler,
-			new(stdlibClock),
+			func() debouncer { return neverDebounce(t) },
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -317,13 +327,13 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithSchedulerAndClock(
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			log,
 			settings,
 			agentInfo,
 			client,
 			scheduler,
-			new(stdlibClock),
+			func() debouncer { return neverDebounce(t) },
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -367,7 +377,7 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithSchedulerAndClock(
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			log,
 			&configuration.FleetGatewaySettings{
 				Duration: d,
@@ -376,7 +386,7 @@ func TestFleetGateway(t *testing.T) {
 			agentInfo,
 			client,
 			scheduler,
-			new(stdlibClock),
+			func() debouncer { return neverDebounce(t) },
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -449,13 +459,13 @@ func TestFleetGateway(t *testing.T) {
 			return stateUpdateSrc
 		})
 
-		gateway, err := newFleetGatewayWithSchedulerAndClock(
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			mockLogger,
 			configuration.DefaultFleetGatewaySettings(),
 			agentInfo,
 			longPollClient,
 			scheduler,
-			new(stdlibClock),
+			func() debouncer { return neverDebounce(t) },
 			noop.New(),
 			mockFetcher,
 			stateStore,
@@ -484,7 +494,7 @@ func TestFleetGateway(t *testing.T) {
 		assert.Greater(t, statesSent, 1) // at this point we have sent waaaay more than one, let's keep it easy for slower systems
 	})
 
-	t.Run("Long poll checkin starts a new checkin for state updates coming later than configured debounce", func(t *testing.T) {
+	t.Run("Long poll checkin starts a new checkin for state updates after configured debounce elapsed", func(t *testing.T) {
 
 		longPollClient := newTestingClient(t)
 
@@ -533,11 +543,6 @@ func TestFleetGateway(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		mockLogger := newTestLogger(t)
 
-		mockClock := newMockClock(t)
-		now := time.Now()
-		t.Logf("Setting the clock to %v", now)
-		mockClock.EXPECT().Now().Return(now).Once()
-
 		mockFetcher := NewMockStateFetcher(t)
 
 		stateCh := make(chan state.State)
@@ -551,15 +556,18 @@ func TestFleetGateway(t *testing.T) {
 		})
 
 		settings := configuration.DefaultFleetGatewaySettings()
-		settings.Debounce = 5 * time.Second
 
-		gateway, err := newFleetGatewayWithSchedulerAndClock(
+		debounceOver := make(chan time.Time)
+		mockDebouncer := newMockDebouncer(t)
+		mockDebouncer.EXPECT().Reached().Return(debounceOver)
+
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			mockLogger,
 			settings,
 			agentInfo,
 			longPollClient,
 			scheduler,
-			mockClock,
+			func() debouncer { return mockDebouncer },
 			noop.New(),
 			mockFetcher,
 			stateStore,
@@ -584,11 +592,6 @@ func TestFleetGateway(t *testing.T) {
 
 		require.Eventually(t, func() bool { return startedCheckins > 0 }, 1*time.Second, 50*time.Millisecond, "could not detect a checkin in progress")
 
-		// move the clock forward 10ms
-		now = now.Add(10 * time.Millisecond)
-		t.Logf("Setting the clock to %v", now)
-		mockClock.EXPECT().Now().Return(now).Once()
-
 		// inject new state
 		agentRunningState := state.State{
 			State:        agentclient.Healthy,
@@ -598,28 +601,10 @@ func TestFleetGateway(t *testing.T) {
 			Components:   []runtime.ComponentComponentState{},
 			LogLevel:     logp.InfoLevel,
 		}
-		// push the new state through the subscription (too soon, this will be dropped)
+		// push the new state through the subscription (too soon, this will be saved but previous checkin won't be cancelled)
 		mustWriteToChannelBeforeTimeout(t, agentRunningState, stateCh, 50*time.Millisecond)
 
-		// move the clock forward 5 seconds (we move beyond the debounce)
-		now = now.Add(5 * time.Second)
-		t.Logf("Setting the clock to %v", now)
-		mockClock.EXPECT().Now().Return(now).Twice()
-
-		//inject another new state
-		agentUnhealthyState := state.State{
-			State:        agentclient.Degraded,
-			Message:      "Agent is degraded",
-			FleetState:   agentclient.Healthy,
-			FleetMessage: "Fleet is healthy",
-			Components:   []runtime.ComponentComponentState{},
-			LogLevel:     logp.InfoLevel,
-		}
-		// push the state through the subscription
-		mustWriteToChannelBeforeTimeout(t, agentUnhealthyState, stateCh, 50*time.Millisecond)
-
-		// Make sure that all API calls to the checkin API are successful, the following will happen:
-		// block on the first (canceled) and block on second call.
+		debounceOver <- time.Now()
 
 		/// give some time to cancel the current checkin after the state update
 		assert.Eventually(t, func() bool { return len(reportedAgentStatuses) > 0 }, 10*time.Second, 50*time.Millisecond)
@@ -642,11 +627,174 @@ func TestFleetGateway(t *testing.T) {
 			secondActualState := map[string]any{}
 			err = json.Unmarshal(reportedAgentStatuses[1].body, &secondActualState)
 			if assert.NoError(t, err) {
-				assert.Equal(t, "DEGRADED" /*agentUnhealthyState.State*/, secondActualState["status"])
+				assert.Equal(t, "online" /*agentUnhealthyState.State*/, secondActualState["status"])
 			}
 			assert.NoError(t, reportedAgentStatuses[1].err)
 			assert.NotNil(t, reportedAgentStatuses[1].resp)
 		}
+
+		// wrap it up: stop the fleet gateway and check for errors
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
+	})
+
+	t.Run("New checkin after a state update requires a new debounce before cancelling again", func(t *testing.T) {
+
+		longPollClient := newTestingClient(t)
+
+		// this is an unsynchronized int but since the test client is only going to be incremented by 1 goroutine at the time
+		// and we check it with an assert.Eventually() we should be fine sharing it across the goroutines
+		var startedCheckins uint
+		completeCheckinCh := make(chan struct{})
+
+		// setup testing client callback to block until we can read from the completeCheckinCh to mock a long poll from fleet
+		// it will also unblock on context cancellation (with nil response and an error)
+		clientInvocationChannel := longPollClient.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+			startedCheckins++
+			t.Logf("test client using context %v", ctx.Value(CheckinIDKey))
+			select {
+			case <-ctx.Done():
+				t.Logf("context %v cancelled", ctx.Value(CheckinIDKey))
+				return nil, ctx.Err()
+
+			case <-completeCheckinCh:
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				t.Logf("checkin with context %v completed", ctx.Value(CheckinIDKey))
+				return resp, nil
+			}
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		reportedAgentStatuses := make([]testingClientInvocation, 0, 2)
+
+		// fleet test client invocation consumer
+		go func() {
+			for {
+				select {
+				case tci := <-clientInvocationChannel:
+					reportedAgentStatuses = append(reportedAgentStatuses, tci)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		log, _ := logger.New("tst", false)
+		stateStore := newStateStore(t, log)
+
+		scheduler := scheduler.NewStepper()
+		mockLogger := newTestLogger(t)
+
+		mockFetcher := NewMockStateFetcher(t)
+
+		stateCh := make(chan state.State)
+		mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
+			stateUpdateSrc := NewStateUpdateSource(t)
+			stateUpdateSrc.EXPECT().Ch().Return(stateCh)
+			go func() {
+				<-ctx.Done()
+			}()
+			return stateUpdateSrc
+		})
+
+		settings := configuration.DefaultFleetGatewaySettings()
+
+		debounceOver := make(chan time.Time)
+		mockDebouncer := newMockDebouncer(t)
+		mockDebouncer.EXPECT().Reached().Return(debounceOver)
+
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
+			mockLogger,
+			settings,
+			agentInfo,
+			longPollClient,
+			scheduler,
+			func() debouncer { return mockDebouncer },
+			noop.New(),
+			mockFetcher,
+			stateStore,
+		)
+		require.NoError(t, err)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		// make the fleet gateway start a checkin
+		scheduler.Next()
+
+		// provide an initial state through the subscription
+		agentStartingState := state.State{
+			State:        agentclient.Starting,
+			Message:      "Agent is starting",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
+
+		require.Eventually(t, func() bool { return startedCheckins == 1 }, 1*time.Second, 50*time.Millisecond, "could not detect a checkin in progress")
+
+		// signal that debounce time has elapsed
+		debounceOver <- time.Now()
+
+		// inject new state
+		agentRunningState := state.State{
+			State:        agentclient.Healthy,
+			Message:      "Agent is healthy",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		// push the new state through the subscription (too soon, this will be saved but previous checkin won't be cancelled)
+		mustWriteToChannelBeforeTimeout(t, agentRunningState, stateCh, 50*time.Millisecond)
+
+		//require that we started 2 checkins and completed (cancelled) one
+		require.Eventually(t, func() bool { return startedCheckins == 2 }, 1*time.Second, 50*time.Millisecond, "could not detect a new checkin in progress")
+		// first checkin has completed
+		require.Len(t, reportedAgentStatuses, 1)
+		require.ErrorIs(t, reportedAgentStatuses[0].err, context.Canceled)
+
+		//inject another new state
+		agentUnhealthyState := state.State{
+			State:        agentclient.Degraded,
+			Message:      "Agent is degraded",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		// push the state through the subscription
+		mustWriteToChannelBeforeTimeout(t, agentUnhealthyState, stateCh, 50*time.Millisecond)
+
+		/// give some time to check that the new checkin require the debounce to be relaunched
+		assert.Never(t, func() bool { return len(reportedAgentStatuses) > 1 }, 1*time.Second, 50*time.Millisecond)
+
+		// signal that the debounce is over
+		debounceOver <- time.Now()
+
+		// require that we started 2 checkins and completed (cancelled) one
+		require.Eventually(t, func() bool { return startedCheckins == 3 }, 1*time.Second, 50*time.Millisecond, "could not detect that the 3rd checkin is in progress")
+		// previous 2 checkin have completed (cancelled)
+		require.Len(t, reportedAgentStatuses, 2)
+		require.ErrorIs(t, reportedAgentStatuses[1].err, context.Canceled)
+
+		// allow the test client to complete the checkin (only one since the initial one has been cancelled)
+		completeCheckinCh <- struct{}{}
+
+		require.Eventually(t, func() bool { return len(reportedAgentStatuses) == 3 }, 10*time.Second, 50*time.Millisecond)
+
+		// assert that the third state is the degraded one and that the checkin completed
+		thirdActualState := map[string]any{}
+		err = json.Unmarshal(reportedAgentStatuses[2].body, &thirdActualState)
+		if assert.NoErrorf(t, err, "third checkin request body is not valid json") {
+			assert.Equal(t, "DEGRADED" /*agentStartingState.State*/, thirdActualState["status"])
+		}
+		assert.NoError(t, reportedAgentStatuses[2].err)
+		assert.NotNil(t, reportedAgentStatuses[2].resp)
 
 		// wrap it up: stop the fleet gateway and check for errors
 		cancel()
