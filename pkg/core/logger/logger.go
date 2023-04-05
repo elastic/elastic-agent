@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.elastic.co/ecszap"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
 
@@ -40,6 +41,8 @@ type Logger = logp.Logger
 
 // Config is a logging config.
 type Config = logp.Config
+
+var internalLevelEnabler *zap.AtomicLevel
 
 // New returns a configured ECS Logger
 func New(name string, logInternal bool) (*Logger, error) {
@@ -110,7 +113,11 @@ func toCommonConfig(cfg *Config) (*config.C, error) {
 
 // SetLevel changes the overall log level of the global logger.
 func SetLevel(lvl logp.Level) {
-	logp.SetLevel(lvl.ZapLevel())
+	zapLevel := lvl.ZapLevel()
+	logp.SetLevel(zapLevel)
+	if internalLevelEnabler != nil {
+		internalLevelEnabler.SetLevel(zapLevel)
+	}
 }
 
 // DefaultLoggingConfig returns default configuration for agent logging.
@@ -119,7 +126,7 @@ func DefaultLoggingConfig() *Config {
 	cfg.Beat = agentName
 	cfg.Level = DefaultLogLevel
 	cfg.ToFiles = true
-	cfg.Files.Path = paths.Logs()
+	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory) // paths.Logs()
 	cfg.Files.Name = agentName
 	cfg.Files.MaxSize = 20 * 1024 * 1024
 
@@ -133,8 +140,9 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
-
+	filename := filepath.Join(paths.Logs(), cfg.Beat) // filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
+	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
+	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
 	rotator, err := file.NewFileRotator(filename,
 		file.MaxSizeBytes(defaultCfg.Files.MaxSize),
 		file.MaxBackups(defaultCfg.Files.MaxBackups),
@@ -150,7 +158,7 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
 	encoderConfig.EncodeTime = utcTimestampEncode
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
-	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, cfg.Level.ZapLevel())), nil
+	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, internalLevelEnabler)), nil
 }
 
 // utcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
