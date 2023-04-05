@@ -78,6 +78,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 		cmd.AddCommand(reexec)
 	}
 	cmd.Run = run.Run
+	cmd.RunE = run.RunE
 
 	return cmd
 }

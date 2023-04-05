@@ -238,8 +238,8 @@ func (f *fakeActionOutputRuntime) Unit() *client.Unit {
 }
 
 func (f *fakeActionOutputRuntime) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this to stop
 		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
@@ -251,11 +251,12 @@ func (f *fakeActionOutputRuntime) Update(u *client.Unit) error {
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != fakeActionOutput {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != fakeActionOutput {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 	// nothing to really do
 	return nil
@@ -380,28 +381,40 @@ func (f *fakeShipperInput) Unit() *client.Unit {
 }
 
 func (f *fakeShipperInput) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+	if u.Type() != client.UnitTypeOutput {
+		return nil // right now, it deals only with output
+	}
+
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this to stop
-		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
+		f.logger.Debug().
+			Str("state", client.UnitStateStopping.String()).
+			Str("message", stoppingMsg).
+			Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
+
 		go func() {
 			if f.srv != nil {
 				f.srv.Stop()
 				_ = f.wg.Wait()
 				f.srv = nil
 			}
-			f.logger.Debug().Str("state", client.UnitStateStopped.String()).Str("message", stoppedMsg).Msg("updating unit state")
+			f.logger.Debug().
+				Str("state", client.UnitStateStopped.String()).
+				Str("message", stoppedMsg).
+				Msg("updating unit state")
 			_ = u.UpdateState(client.UnitStateStopped, stoppedMsg, nil)
 		}()
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != fakeActionOutput {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != fakeActionOutput {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 	// nothing to really do
 	return nil

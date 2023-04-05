@@ -6,11 +6,11 @@ package host
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"runtime"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -80,7 +80,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{
 		logger:  log,
-		fetcher: getHostInfo,
+		fetcher: getHostInfo(log),
 	}
 	if c != nil {
 		err := c.Unpack(p)
@@ -94,22 +94,31 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 	return p, nil
 }
 
-func getHostInfo() (map[string]interface{}, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
+func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
+	return func() (map[string]interface{}, error) {
+		sysInfo, err := sysinfo.Host()
+		if err != nil {
+			return nil, err
+		}
+
+		info := sysInfo.Info()
+		name := info.Hostname
+		if features.FQDN() {
+			fqdn, err := sysInfo.FQDN()
+			if err != nil {
+				log.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), name)
+			} else {
+				name = fqdn
+			}
+		}
+
+		return map[string]interface{}{
+			"id":           info.UniqueID,
+			"name":         name,
+			"platform":     runtime.GOOS,
+			"architecture": info.Architecture,
+			"ip":           info.IPs,
+			"mac":          info.MACs,
+		}, nil
 	}
-	sysInfo, err := sysinfo.Host()
-	if err != nil {
-		return nil, err
-	}
-	info := sysInfo.Info()
-	return map[string]interface{}{
-		"id":           info.UniqueID,
-		"name":         hostname,
-		"platform":     runtime.GOOS,
-		"architecture": info.Architecture,
-		"ip":           info.IPs,
-		"mac":          info.MACs,
-	}, nil
 }

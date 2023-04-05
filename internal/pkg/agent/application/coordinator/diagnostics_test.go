@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -153,6 +155,10 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 								Version: "1.2.3",
 							},
 							Units: unitsStates,
+							Features: &proto.Features{
+								Fqdn: &proto.FQDNFeature{Enabled: true},
+							},
+							FeaturesIdx: 1,
 						},
 					}
 
@@ -235,7 +241,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			mustWriteToChannelBeforeTimeout(t, tt.varsProvider(t), helper.varsChannel, 100*time.Millisecond)
 
 			// Inject initial configuration - after starting coordinator
-			configBytes, err := os.ReadFile("./testdata/simple_config/elastic-agent.yml")
+			configBytes, err := os.ReadFile(tt.configFilePath)
 			require.NoError(t, err)
 
 			initialConf := config.MustNewConfigFrom(configBytes)
