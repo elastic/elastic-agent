@@ -484,22 +484,24 @@ func TestFleetGateway(t *testing.T) {
 		assert.Greater(t, statesSent, 1) // at this point we have sent waaaay more than one, let's keep it easy for slower systems
 	})
 
-	t.Run("Long poll checkin drops state updates coming earlier than configured debounce", func(t *testing.T) {
+	t.Run("Long poll checkin starts a new checkin for state updates coming later than configured debounce", func(t *testing.T) {
 
 		longPollClient := newTestingClient(t)
 
 		completeCheckinCh := make(chan struct{})
 
+		// setup testing client callback to block until we can read from the completeCheckinCh to mock a long poll from fleet
+		// it will also unblock on context cancellation (with nil response and an error)
 		clientInvocationChannel := longPollClient.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
-			t.Logf("test client using context %v", ctx.Value("checkinID"))
+			t.Logf("test client using context %v", ctx.Value(CheckinIDKey))
 			select {
 			case <-ctx.Done():
-				t.Logf("context %v cancelled", ctx.Value("checkinID"))
+				t.Logf("context %v cancelled", ctx.Value(CheckinIDKey))
 				return nil, ctx.Err()
 
 			case <-completeCheckinCh:
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
-				t.Logf("checkin with context %v completed", ctx.Value("checkinID"))
+				t.Logf("checkin with context %v completed", ctx.Value(CheckinIDKey))
 				return resp, nil
 			}
 		})

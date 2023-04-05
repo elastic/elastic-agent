@@ -96,6 +96,10 @@ func (*needNewCheckinError) Error() string {
 	return "new checkin needed due to updated state"
 }
 
+type CheckinCtxKey string
+
+const CheckinIDKey CheckinCtxKey = "checkinID"
+
 type fleetGateway struct {
 	log                loggerIF
 	client             client.Sender
@@ -237,8 +241,8 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state state.State, stateUpdates <-chan state.State, backoff backoff.Backoff) checkinResult {
 	checkinID, _ := uuid.NewV4()
 	checkinCtx, cancelCheckin := context.WithCancel(ctx)
-	checkinCtx = context.WithValue(checkinCtx, "checkinID", checkinID.String())
-	f.log.Debugf("starting checkin %s", checkinID.String())
+	checkinCtx = context.WithValue(checkinCtx, CheckinIDKey, checkinID.String())
+	f.log.Debugf("starting checkin %q", checkinID.String())
 	defer func() {
 		// make sure we don't leak contexts whatever happens
 		cancelCheckin()
@@ -267,16 +271,16 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, state stat
 				continue
 			}
 			f.log.Infof(
-				"Received updated state %+v after debounce. Cancelling previous checking and starting a new one.",
+				"Received updated state %+v when checkin is ongoing for %s after configured debounce %s. Cancelling previous checkin %q and starting a new one.",
 				newState,
 				checkinElapsedTime,
 				f.settings.Debounce,
+				checkinID.String(),
 			)
-			f.log.Debugf("cancelling checkin %s", checkinID.String())
 			cancelCheckin()
 			f.log.Debugf("cancelled checkin %s", checkinID.String())
 			cancelledCheckinRes := <-resCheckinChan
-			f.log.Debugf("reaped answer for cancelled checkin %s %+v", cancelledCheckinRes)
+			f.log.Debugf("reaped answer for cancelled checkin %q: %+v", checkinID, cancelledCheckinRes)
 			return checkinResult{err: &needNewCheckinError{newState: newState}}
 		}
 	}
