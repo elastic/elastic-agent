@@ -131,9 +131,10 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 
 	// Trigger the FQDN feature flag callback by
 	// toggling the FQDN feature flag
-	features.Apply(config.MustNewConfigFrom(map[string]interface{}{
+	err = features.Apply(config.MustNewConfigFrom(map[string]interface{}{
 		"agent.features.fqdn.enabled": true,
 	}))
+	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
 		// hostProvider.fetcher should be called twice:
