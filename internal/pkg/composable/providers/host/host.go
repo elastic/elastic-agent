@@ -50,7 +50,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 	}
 
 	const fqdnFeatureFlagCallbackID = "host_provider"
-	)	fqdnFFChangeCh := make(chan struct{})
+	fqdnFFChangeCh := make(chan struct{})
 	if err := features.AddFQDNOnChangeCallback(onFQDNFeatureFlagChange(fqdnFFChangeCh), fqdnFeatureFlagCallbackID); err != nil {
 		return fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
 	}
