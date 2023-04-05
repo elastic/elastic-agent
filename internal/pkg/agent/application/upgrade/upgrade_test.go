@@ -28,7 +28,7 @@ func Test_CopyFile(t *testing.T) {
 		To          string
 		IgnoreErr   bool
 		KeepOpen    bool
-		ExpectedErr bool
+		ExpectedErr bool 
 	}{
 		{
 			"Existing, no onerr",
@@ -85,7 +85,11 @@ func Test_CopyFile(t *testing.T) {
 				fl = flock.New(tc.From)
 				_, err := fl.TryLock()
 				require.NoError(t, err)
-				defer require.NoError(t, fl.Unlock())
+
+				defer func(){
+					require.NoError(t, fl.Unlock())
+				}()
+				
 			}
 
 			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr)
