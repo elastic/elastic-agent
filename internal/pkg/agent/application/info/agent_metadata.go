@@ -6,15 +6,17 @@ package info
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"strings"
 
-	"github.com/elastic/go-sysinfo"
-	"github.com/elastic/go-sysinfo/types"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/features"
+
+	"github.com/elastic/go-sysinfo"
+	"github.com/elastic/go-sysinfo/types"
 )
 
 // ECSMeta is a collection of agent related metadata in ECS compliant object form.
@@ -121,13 +123,13 @@ const (
 )
 
 // Metadata loads metadata from disk.
-func Metadata() (*ECSMeta, error) {
+func Metadata(l *logger.Logger) (*ECSMeta, error) {
 	agentInfo, err := NewAgentInfo(false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new agent info: %w", err)
 	}
 
-	meta, err := agentInfo.ECSMetadata()
+	meta, err := agentInfo.ECSMetadata(l)
 	if err != nil {
 		return nil, errors.New(err, "failed to gather host metadata")
 	}
@@ -136,18 +138,22 @@ func Metadata() (*ECSMeta, error) {
 }
 
 // ECSMetadata returns an agent ECS compliant metadata.
-func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
+func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 	sysInfo, err := sysinfo.Host()
 	if err != nil {
 		return nil, err
 	}
 
 	info := sysInfo.Info()
+	hostname := info.Hostname
+	if features.FQDN() {
+		fqdn, err := sysInfo.FQDN()
+		if err != nil {
+			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
+		} else {
+			hostname = fqdn
+		}
+	}
 
 	return &ECSMeta{
 		Elastic: &ElasticECSMeta{
@@ -184,12 +190,7 @@ func (i *AgentInfo) ECSMetadata() (*ECSMeta, error) {
 }
 
 // ECSMetadataFlatMap returns an agent ECS compliant metadata in a form of flattened map.
-func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
+func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}, error) {
 	// TODO: remove these values when kibana migrates to ECS
 	meta := make(map[string]interface{})
 
@@ -199,6 +200,15 @@ func (i *AgentInfo) ECSMetadataFlatMap() (map[string]interface{}, error) {
 	}
 
 	info := sysInfo.Info()
+	hostname := info.Hostname
+	if features.FQDN() {
+		fqdn, err := sysInfo.FQDN()
+		if err != nil {
+			l.Debugf("unable to lookup FQDN: %s, using hostname = %s", err.Error(), hostname)
+		} else {
+			hostname = fqdn
+		}
+	}
 
 	// Agent
 	meta[agentIDKey] = i.agentID

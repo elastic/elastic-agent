@@ -10,7 +10,6 @@ import (
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
@@ -25,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // New creates a new Agent and bootstrap the required subsystem.
@@ -81,6 +81,10 @@ func New(
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if err := features.Apply(rawConfig); err != nil {
+		return nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
