@@ -89,9 +89,9 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	require.NoError(t, err)
 
 	c, err := config.NewConfigFrom(map[string]interface{}{
-		// Use a long check interval so we can ensure that
-		// any calls to comm.Set are not happening due to
-		// the interval timer elapsing. We want such calls
+		// Use a long check interval so we can ensure that any
+		// calls to hostProvider.fetcher are not happening due
+		// to the interval timer elapsing. We want such calls
 		// to happen only due to explicit actions in our
 		// test below.
 		"check_interval": 10 * time.Minute,
