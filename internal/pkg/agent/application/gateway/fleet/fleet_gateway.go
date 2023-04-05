@@ -285,7 +285,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff, state 
 	// Guard if the context is stopped by a out of bound call,
 	// this mean we are rebooting to change the log level or the system is shutting us down.
 	for ctx.Err() == nil {
-		f.log.Debugf("Checking started")
+		f.log.Debugf("Checkin started")
 		resp, took, err := f.execute(ctx, state)
 		if err != nil {
 

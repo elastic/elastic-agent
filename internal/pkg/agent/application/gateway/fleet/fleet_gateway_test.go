@@ -16,7 +16,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"sync"
 	"testing"
 	"time"
@@ -489,11 +488,15 @@ func TestFleetGateway(t *testing.T) {
 
 		longPollClient := newTestingClient(t)
 
+		// this is an unsynchronized int but since the test client is only going to be incremented by 1 goroutine at the time
+		// and we check it with an assert.Eventually() we should be fine sharing it across the goroutines
+		var startedCheckins uint
 		completeCheckinCh := make(chan struct{})
 
 		// setup testing client callback to block until we can read from the completeCheckinCh to mock a long poll from fleet
 		// it will also unblock on context cancellation (with nil response and an error)
 		clientInvocationChannel := longPollClient.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+			startedCheckins++
 			t.Logf("test client using context %v", ctx.Value(CheckinIDKey))
 			select {
 			case <-ctx.Done():
@@ -579,10 +582,7 @@ func TestFleetGateway(t *testing.T) {
 		}
 		mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
 
-		if goruntime.GOOS == "windows" {
-			// give some time for the checkin to block in the test client
-			time.Sleep(10 * time.Millisecond)
-		}
+		require.Eventually(t, func() bool { return startedCheckins > 0 }, 1*time.Second, 50*time.Millisecond, "could not detect a checkin in progress")
 
 		// move the clock forward 10ms
 		now = now.Add(10 * time.Millisecond)
