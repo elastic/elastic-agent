@@ -258,7 +258,6 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 					checkinID,
 				)
 				updatedState = &newState
-				_ = updatedState
 				continue
 			}
 
