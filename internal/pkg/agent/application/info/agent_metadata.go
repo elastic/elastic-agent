@@ -9,10 +9,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/elastic/go-sysinfo"
@@ -122,8 +121,12 @@ const (
 	hostMACKey = "host.mac"
 )
 
+type debugLogger interface {
+	Debugf(format string, args ...interface{})
+}
+
 // Metadata loads metadata from disk.
-func Metadata(l *logger.Logger) (*ECSMeta, error) {
+func Metadata(l debugLogger) (*ECSMeta, error) {
 	agentInfo, err := NewAgentInfo(false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new agent info: %w", err)
@@ -138,7 +141,7 @@ func Metadata(l *logger.Logger) (*ECSMeta, error) {
 }
 
 // ECSMetadata returns an agent ECS compliant metadata.
-func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
+func (i *AgentInfo) ECSMetadata(l debugLogger) (*ECSMeta, error) {
 	sysInfo, err := sysinfo.Host()
 	if err != nil {
 		return nil, err
