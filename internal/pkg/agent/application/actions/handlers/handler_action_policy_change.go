@@ -134,15 +134,6 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
 
-	// We ignore empty proxies from fleet. That way a proxy is set by --proxy-url
-	// it won't be overridden by an absent proxy from fleet-server.
-	// However, if there is a proxy sent by fleet-server, it'll take precedence.
-	if cfg.Fleet.Client.Transport.Proxy.URL == nil ||
-		cfg.Fleet.Client.Transport.Proxy.URL.String() == "" {
-		h.log.Debug("proxy from fleet is empty, not applying it")
-		return nil
-	}
-
 	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
 		// already the same hosts
 		return nil
@@ -156,7 +147,17 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	h.config.Fleet.Client.Protocol = cfg.Fleet.Client.Protocol
 	h.config.Fleet.Client.Path = cfg.Fleet.Client.Path
 	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
-	h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
+
+	// We ignore empty proxies from fleet. That way a proxy is set by --proxy-url
+	// it won't be overridden by an absent proxy from fleet-server.
+	// However, if there is a proxy sent by fleet-server, it'll take precedence.
+	if cfg.Fleet.Client.Transport.Proxy.URL == nil ||
+		cfg.Fleet.Client.Transport.Proxy.URL.String() == "" {
+		h.log.Debug("proxy from fleet is empty or null, proxy will not be changed")
+	} else {
+		h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
+		h.log.Debug("received proxy from fleet, applying it")
+	}
 
 	// rollback on failure
 	defer func() {
