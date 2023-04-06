@@ -81,14 +81,14 @@ type enrollCmdFleetServerOption struct {
 	ElasticsearchCASHA256 string
 	ElasticsearchInsecure bool
 	ServiceToken          string
-	ServiceTokenPath      string
+	ServiceTokenFile      string
 	PolicyID              string
 	Host                  string
 	Port                  uint16
 	InternalPort          uint16
 	Cert                  string
 	CertKey               string
-	CertKeyPassphrasePath string
+	CertKeyPassphraseFile string
 	Insecure              bool
 	SpawnAgent            bool
 	Headers               map[string]string
@@ -331,10 +331,10 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 
 	//nolint:dupl // duplicate because same params are passed
 	fleetConfig, err := createFleetServerBootstrapConfig(
-		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
+		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenFile,
 		c.options.FleetServer.PolicyID,
 		c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
-		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphraseFile, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
 		c.options.FleetServer.Headers,
 		c.options.ProxyURL,
 		c.options.ProxyDisabled,
@@ -537,10 +537,10 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	if localFleetServer {
 		//nolint:dupl // not duplicates, just similar params are passed
 		serverConfig, err := createFleetServerBootstrapConfig(
-			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
+			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenFile,
 			c.options.FleetServer.PolicyID,
 			c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
-			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphraseFile, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
 			c.options.FleetServer.Headers,
 			c.options.ProxyURL, c.options.ProxyDisabled, c.options.ProxyHeaders,
 			c.options.FleetServer.ElasticsearchInsecure,
@@ -887,9 +887,9 @@ func storeAgentInfo(s saver, reader io.Reader) error {
 }
 
 func createFleetServerBootstrapConfig(
-	connStr, serviceToken, serviceTokenPath, policyID, host string,
+	connStr, serviceToken, serviceTokenFile, policyID, host string,
 	port uint16, internalPort uint16,
-	cert, key, passphrasePath, esCA, esCASHA256 string,
+	cert, key, passphraseFile, esCA, esCASHA256 string,
 	headers map[string]string,
 	proxyURL string,
 	proxyDisabled bool,
@@ -898,7 +898,7 @@ func createFleetServerBootstrapConfig(
 ) (*configuration.FleetAgentConfig, error) {
 	localFleetServer := connStr != ""
 
-	es, err := configuration.ElasticsearchFromConnStr(connStr, serviceToken, serviceTokenPath, insecure)
+	es, err := configuration.ElasticsearchFromConnStr(connStr, serviceToken, serviceTokenFile, insecure)
 	if err != nil {
 		return nil, err
 	}
@@ -961,7 +961,7 @@ func createFleetServerBootstrapConfig(
 			Certificate: tlscommon.CertificateConfig{
 				Certificate:    cert,
 				Key:            key,
-				PassphraseFile: passphrasePath,
+				PassphraseFile: passphraseFile,
 			},
 		}
 		if insecure {

@@ -19,10 +19,14 @@ var (
 	current = Flags{}
 )
 
+type BoolValueOnChangeCallback func(new, old bool)
+
 type Flags struct {
 	mu     sync.RWMutex
 	source *structpb.Struct
-	fqdn   bool
+
+	fqdn          bool
+	fqdnCallbacks map[string]BoolValueOnChangeCallback
 }
 
 type cfg struct {
@@ -51,12 +55,42 @@ func (f *Flags) AsProto() *proto.Features {
 	}
 }
 
+// AddFQDNOnChangeCallback takes a callback function that will be called with the new and old values
+// of `flags.fqdnEnabled` whenever it changes. It also takes a string ID - this is useful
+// in calling `RemoveFQDNOnChangeCallback` to de-register the callback.
+func AddFQDNOnChangeCallback(cb BoolValueOnChangeCallback, id string) error {
+	current.mu.Lock()
+	defer current.mu.Unlock()
+
+	// Initialize callbacks map if necessary.
+	if current.fqdnCallbacks == nil {
+		current.fqdnCallbacks = map[string]BoolValueOnChangeCallback{}
+	}
+
+	current.fqdnCallbacks[id] = cb
+	return nil
+}
+
+// RemoveFQDNOnChangeCallback removes the callback function associated with the given ID (originally
+// returned by `AddFQDNOnChangeCallback` so that function will be no longer be called when
+// `flags.fqdnEnabled` changes.
+func RemoveFQDNOnChangeCallback(id string) {
+	current.mu.Lock()
+	defer current.mu.Unlock()
+
+	delete(current.fqdnCallbacks, id)
+}
+
 // setFQDN sets the value of the FQDN flag in Flags.
 func (f *Flags) setFQDN(newValue bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	oldValue := f.fqdn
 	f.fqdn = newValue
+	for _, cb := range f.fqdnCallbacks {
+		cb(newValue, oldValue)
+	}
 }
 
 // setSource sets the source from he given cfg.

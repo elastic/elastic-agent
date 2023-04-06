@@ -29,7 +29,7 @@ type fleetConfig struct {
 type fleetServerConfig struct {
 	Cert           string              `config:"cert"`
 	CertKey        string              `config:"cert_key"`
-	PassphrasePath string              `config:"key_passphrase_path"`
+	PassphraseFile string              `config:"key_passphrase_path"`
 	Elasticsearch  elasticsearchConfig `config:"elasticsearch"`
 	Enable         bool                `config:"enable"`
 	Host           string              `config:"host"`
@@ -45,7 +45,7 @@ type elasticsearchConfig struct {
 	CATrustedFingerprint string `config:"ca_trusted_fingerprint"`
 	Host                 string `config:"host"`
 	ServiceToken         string `config:"service_token"`
-	ServiceTokenPath     string `config:"service_token_path"`
+	ServiceTokenFile     string `config:"service_token_path"`
 	Insecure             bool   `config:"insecure"`
 }
 
@@ -63,7 +63,7 @@ type kibanaFleetConfig struct {
 	Username         string `config:"username"`
 	Password         string `config:"password"`
 	ServiceToken     string `config:"service_token"`
-	ServiceTokenPath string `config:"service_token_path"`
+	ServiceTokenFile string `config:"service_token_path"`
 }
 
 func defaultAccessConfig() (setupConfig, error) {
@@ -92,11 +92,11 @@ func defaultAccessConfig() (setupConfig, error) {
 		FleetServer: fleetServerConfig{
 			Cert:           envWithDefault("", "FLEET_SERVER_CERT"),
 			CertKey:        envWithDefault("", "FLEET_SERVER_CERT_KEY"),
-			PassphrasePath: envWithDefault("", "FLEET_SERVER_CERT_KEY_PASSPHRASE_PATH"),
+			PassphraseFile: envWithDefault("", "FLEET_SERVER_CERT_KEY_PASSPHRASE_PATH"),
 			Elasticsearch: elasticsearchConfig{
 				Host:                 envWithDefault("http://elasticsearch:9200", "FLEET_SERVER_ELASTICSEARCH_HOST", "ELASTICSEARCH_HOST"),
 				ServiceToken:         envWithDefault("", "FLEET_SERVER_SERVICE_TOKEN"),
-				ServiceTokenPath:     envWithDefault("", "FLEET_SERVER_SERVICE_TOKEN_PATH"),
+				ServiceTokenFile:     envWithDefault("", "FLEET_SERVER_SERVICE_TOKEN_PATH"),
 				CA:                   envWithDefault("", "FLEET_SERVER_ELASTICSEARCH_CA", "ELASTICSEARCH_CA"),
 				CATrustedFingerprint: envWithDefault("", "FLEET_SERVER_ELASTICSEARCH_CA_TRUSTED_FINGERPRINT"),
 				Insecure:             envBool("FLEET_SERVER_ELASTICSEARCH_INSECURE"),
@@ -116,7 +116,7 @@ func defaultAccessConfig() (setupConfig, error) {
 				Username:         envWithDefault("elastic", "KIBANA_FLEET_USERNAME", "KIBANA_USERNAME", "ELASTICSEARCH_USERNAME"),
 				Password:         envWithDefault("changeme", "KIBANA_FLEET_PASSWORD", "KIBANA_PASSWORD", "ELASTICSEARCH_PASSWORD"),
 				ServiceToken:     envWithDefault("", "KIBANA_FLEET_SERVICE_TOKEN", "FLEET_SERVER_SERVICE_TOKEN"),
-				ServiceTokenPath: envWithDefault("", "KIBANA_FLEET_SERVICE_TOKEN_PATH", "FLEET_SERVER_SERVICE_TOKEN_PATH"),
+				ServiceTokenFile: envWithDefault("", "KIBANA_FLEET_SERVICE_TOKEN_PATH", "FLEET_SERVER_SERVICE_TOKEN_PATH"),
 				CA:               envWithDefault("", "KIBANA_FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"),
 			},
 			RetrySleepDuration: retrySleepDuration,

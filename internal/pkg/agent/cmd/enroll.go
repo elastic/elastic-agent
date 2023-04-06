@@ -62,7 +62,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint16P("fleet-server-port", "", 0, "Fleet Server HTTP binding port (overrides the policy)")
 	cmd.Flags().StringP("fleet-server-cert", "", "", "Certificate to use for exposed Fleet Server HTTPS endpoint")
 	cmd.Flags().StringP("fleet-server-cert-key", "", "", "Private key to use for exposed Fleet Server HTTPS endpoint")
-	cmd.Flags().StringP("fleet-server-cert-key-passphrase-path", "", "", "Filepath for private key passphrase file used to decrypt certificate key")
+	cmd.Flags().StringP("fleet-server-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt certificate key")
 	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used in communication with elasticsearch")
 	cmd.Flags().BoolP("fleet-server-insecure-http", "", false, "Expose Fleet Server over HTTP (not recommended; insecure)")
 	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma separated list of root certificate for server verifications")
@@ -103,9 +103,9 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	if fToken != "" && fTokenPath != "" {
 		return errors.New("--fleet-server-service-token and --fleet-server-service-token-path are mutually exclusive", errors.TypeConfig)
 	}
-	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-path")
+	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase")
 	if fPassphrase != "" && !filepath.IsAbs(fPassphrase) {
-		return errors.New("--fleet-server-cert-key-passphrase-path must be provided as an absolute path", errors.M("path", fPassphrase), errors.TypeConfig)
+		return errors.New("--fleet-server-cert-key-passphrase must be provided as an absolute path", errors.M("path", fPassphrase), errors.TypeConfig)
 	}
 	return nil
 }
@@ -128,7 +128,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	fPort, _ := cmd.Flags().GetUint16("fleet-server-port")
 	fCert, _ := cmd.Flags().GetString("fleet-server-cert")
 	fCertKey, _ := cmd.Flags().GetString("fleet-server-cert-key")
-	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-path")
+	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase")
 	fHeaders, _ := cmd.Flags().GetStringSlice("header")
 	fInsecure, _ := cmd.Flags().GetBool("fleet-server-insecure-http")
 	ca, _ := cmd.Flags().GetString("certificate-authorities")
@@ -192,7 +192,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 		args = append(args, fCertKey)
 	}
 	if fPassphrase != "" {
-		args = append(args, "--fleet-server-cert-key-passphrase-path")
+		args = append(args, "--fleet-server-cert-key-passphrase")
 		args = append(args, fPassphrase)
 	}
 	if daemonTimeout != 0 {
@@ -330,7 +330,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	fInternalPort, _ := cmd.Flags().GetUint16("fleet-server-internal-port")
 	fCert, _ := cmd.Flags().GetString("fleet-server-cert")
 	fCertKey, _ := cmd.Flags().GetString("fleet-server-cert-key")
-	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-path")
+	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase")
 	fInsecure, _ := cmd.Flags().GetBool("fleet-server-insecure-http")
 	proxyURL, _ := cmd.Flags().GetString("proxy-url")
 	proxyDisabled, _ := cmd.Flags().GetBool("proxy-disabled")
@@ -377,13 +377,13 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 			ElasticsearchCASHA256: fElasticSearchCASHA256,
 			ElasticsearchInsecure: fElasticSearchInsecure,
 			ServiceToken:          fServiceToken,
-			ServiceTokenPath:      fServiceTokenPath,
+			ServiceTokenFile:      fServiceTokenPath,
 			PolicyID:              fPolicy,
 			Host:                  fHost,
 			Port:                  fPort,
 			Cert:                  fCert,
 			CertKey:               fCertKey,
-			CertKeyPassphrasePath: fPassphrase,
+			CertKeyPassphraseFile: fPassphrase,
 			Insecure:              fInsecure,
 			SpawnAgent:            !fromInstall,
 			Headers:               mapFromEnvList(fHeaders),

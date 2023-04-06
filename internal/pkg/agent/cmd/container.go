@@ -342,7 +342,7 @@ type TokenResp struct {
 
 // ensureServiceToken will ensure that the cfg specified has the service_token attributes filled.
 //
-// If no token is specified it will try to use the value from service_token_file
+// If no token is specified it will try to use the value from service_token_path
 // If no filepath is specified it will use the elasticsearch username/password to request a new token from Kibana
 func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 	// There's already a service token
@@ -350,8 +350,8 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 		return nil
 	}
 	// read from secret file
-	if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
-		p, err := os.ReadFile(cfg.FleetServer.Elasticsearch.ServiceTokenPath)
+	if cfg.FleetServer.Elasticsearch.ServiceTokenFile != "" {
+		p, err := os.ReadFile(cfg.FleetServer.Elasticsearch.ServiceTokenFile)
 		if err != nil {
 			return fmt.Errorf("unable to open service_token_path: %w", err)
 		}
@@ -359,8 +359,8 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 		cfg.FleetServer.Elasticsearch.ServiceToken = string(p)
 		return nil
 	}
-	if cfg.Kibana.Fleet.ServiceTokenPath != "" {
-		p, err := os.ReadFile(cfg.Kibana.Fleet.ServiceTokenPath)
+	if cfg.Kibana.Fleet.ServiceTokenFile != "" {
+		p, err := os.ReadFile(cfg.Kibana.Fleet.ServiceTokenFile)
 		if err != nil {
 			return fmt.Errorf("unable to open service_token_path: %w", err)
 		}
@@ -428,8 +428,8 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		if cfg.FleetServer.Elasticsearch.ServiceToken != "" {
 			args = append(args, "--fleet-server-service-token", cfg.FleetServer.Elasticsearch.ServiceToken)
 		}
-		if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
-			args = append(args, "--fleet-server-service-token-path", cfg.FleetServer.Elasticsearch.ServiceTokenPath)
+		if cfg.FleetServer.Elasticsearch.ServiceTokenFile != "" {
+			args = append(args, "--fleet-server-service-token-path", cfg.FleetServer.Elasticsearch.ServiceTokenFile)
 		}
 		if policyID != "" {
 			args = append(args, "--fleet-server-policy", policyID)
@@ -452,8 +452,8 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		if cfg.FleetServer.CertKey != "" {
 			args = append(args, "--fleet-server-cert-key", cfg.FleetServer.CertKey)
 		}
-		if cfg.FleetServer.PassphrasePath != "" {
-			args = append(args, "--fleet-server-cert-key-passphrase-path", cfg.FleetServer.PassphrasePath)
+		if cfg.FleetServer.PassphraseFile != "" {
+			args = append(args, "--fleet-server-cert-key-passphrase", cfg.FleetServer.PassphraseFile)
 		}
 
 		for k, v := range cfg.FleetServer.Headers {
