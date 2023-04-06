@@ -7,7 +7,6 @@ package operations
 import (
 	"fmt"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -55,7 +54,7 @@ func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissi
 		return c, nil
 	}
 
-	fleetConfig, err := loadFleetConfig()
+	fleetConfig, err := loadFleetConfig(logger)
 	if err != nil {
 		return nil, err
 	} else if fleetConfig == nil {
@@ -104,13 +103,8 @@ func loadConfig(configPath string) (*config.Config, error) {
 	return rawConfig, nil
 }
 
-func loadFleetConfig() (map[string]interface{}, error) {
-	log, err := newErrorLogger()
-	if err != nil {
-		return nil, err
-	}
-
-	stateStore, err := store.NewStateStoreWithMigration(log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+func loadFleetConfig(l *logger.Logger) (map[string]interface{}, error) {
+	stateStore, err := store.NewStateStoreWithMigration(l, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +118,4 @@ func loadFleetConfig() (map[string]interface{}, error) {
 		return cfgChange.Policy, nil
 	}
 	return nil, nil
-}
-
-func newErrorLogger() (*logger.Logger, error) {
-	return logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 }

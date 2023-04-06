@@ -156,7 +156,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		return errors.New(err, "error migrating agent state")
 	}
 
-	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)
+	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
 		return errors.New(err,
 			"could not load agent info",
@@ -368,10 +368,10 @@ func getOverwrites(rawConfig *config.Config) error {
 	return nil
 }
 
-func defaultLogLevel(cfg *configuration.Configuration) string {
+func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) string {
 	if configuration.IsStandalone(cfg.Fleet) {
 		// for standalone always take the one from config and don't override
-		return ""
+		return currentLevel
 	}
 
 	defaultLogLevel := logger.DefaultLogLevel.String()
