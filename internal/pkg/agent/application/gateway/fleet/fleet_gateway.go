@@ -170,6 +170,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 	}()
 
 	f.log.Info("Fleet gateway started")
+	f.log.Debugf("Fleet gateway settings: %+v", f.settings)
 	for {
 		select {
 		case <-ctx.Done():
@@ -210,6 +211,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 					checkinResponse = checkinResult.response
 				}
 
+				f.log.Debugf("Processing checkin response %v", checkinResponse)
 				actions := make([]fleetapi.Action, len(checkinResponse.Actions))
 				copy(actions, checkinResponse.Actions)
 				if len(actions) > 0 {
@@ -256,11 +258,12 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 				f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckinCtxFunc, resCheckinChan)
 				return checkinResult{err: &needNewCheckinError{newState: *updatedState}}
 			}
+			f.log.Debug("No new state detected at the end of the debounce")
 		case newState := <-stateUpdates:
 			if !debounceElapsed {
 				f.log.Debugf(
-					"Updated state %+v received but current checkin %s not cancelled because we are still within debounce",
-					newState,
+					"Updated state (Agent state: %q) received but current checkin %s not cancelled because we are still within debounce",
+					newState.State,
 					checkinID,
 				)
 				updatedState = &newState
@@ -268,8 +271,8 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 			}
 
 			f.log.Infof(
-				"Received updated state %+v when checkin is ongoing past configured debounce. Cancelling previous checkin %q and starting a new one.",
-				newState,
+				"Received updated state (Agent state: %q) when checkin is ongoing past configured debounce. Cancelling previous checkin %q and starting a new one.",
+				newState.State,
 				checkinID.String(),
 			)
 			cancelCheckinTimeoutCtx, cancelCancelCheckin := context.WithTimeout(ctx, f.cancelTimeout)
