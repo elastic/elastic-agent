@@ -56,13 +56,13 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("fleet-server-es-ca-trusted-fingerprint", "", "", "Elasticsearch certificate authority's SHA256 fingerprint")
 	cmd.Flags().BoolP("fleet-server-es-insecure", "", false, "Disables validation of certificates")
 	cmd.Flags().StringP("fleet-server-service-token", "", "", "Service token to use for communication with elasticsearch")
-	cmd.Flags().StringP("fleet-server-service-token-file", "", "", "Filepath for service token secret file to use for communication with elasticsearch")
+	cmd.Flags().StringP("fleet-server-service-token-path", "", "", "Filepath for service token secret file to use for communication with elasticsearch")
 	cmd.Flags().StringP("fleet-server-policy", "", "", "Start and run a Fleet Server on this specific policy")
 	cmd.Flags().StringP("fleet-server-host", "", "", "Fleet Server HTTP binding host (overrides the policy)")
 	cmd.Flags().Uint16P("fleet-server-port", "", 0, "Fleet Server HTTP binding port (overrides the policy)")
 	cmd.Flags().StringP("fleet-server-cert", "", "", "Certificate to use for exposed Fleet Server HTTPS endpoint")
 	cmd.Flags().StringP("fleet-server-cert-key", "", "", "Private key to use for exposed Fleet Server HTTPS endpoint")
-	cmd.Flags().StringP("fleet-server-cert-key-passphrase-file", "", "", "Filepath for private key passphrase file used to decrypt certificate key")
+	cmd.Flags().StringP("fleet-server-cert-key-passphrase-path", "", "", "Filepath for private key passphrase file used to decrypt certificate key")
 	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used in communication with elasticsearch")
 	cmd.Flags().BoolP("fleet-server-insecure-http", "", false, "Expose Fleet Server over HTTP (not recommended; insecure)")
 	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma separated list of root certificate for server verifications")
@@ -95,17 +95,17 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	if fCertKey != "" && !filepath.IsAbs(fCertKey) {
 		return errors.New("--fleet-server-cert-key must be provided as an absolute path", errors.M("path", fCertKey), errors.TypeConfig)
 	}
-	fTokenFile, _ := cmd.Flags().GetString("fleet-server-service-token-file")
-	if fTokenFile != "" && !filepath.IsAbs(fTokenFile) {
-		return errors.New("--fleet-server-service-token-file must be provided as an absolute path", errors.M("path", fTokenFile), errors.TypeConfig)
+	fTokenPath, _ := cmd.Flags().GetString("fleet-server-service-token-path")
+	if fTokenPath != "" && !filepath.IsAbs(fTokenPath) {
+		return errors.New("--fleet-server-service-token-path must be provided as an absolute path", errors.M("path", fTokenPath), errors.TypeConfig)
 	}
 	fToken, _ := cmd.Flags().GetString("fleet-server-service-token")
-	if fToken != "" && fTokenFile != "" {
-		return errors.New("--fleet-server-service-token and --fleet-server-service-token-file are mutually exclusive", errors.TypeConfig)
+	if fToken != "" && fTokenPath != "" {
+		return errors.New("--fleet-server-service-token and --fleet-server-service-token-path are mutually exclusive", errors.TypeConfig)
 	}
-	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-file")
+	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-path")
 	if fPassphrase != "" && !filepath.IsAbs(fPassphrase) {
-		return errors.New("--fleet-server-cert-key-passphrase-file must be provided as an absolute path", errors.M("path", fPassphrase), errors.TypeConfig)
+		return errors.New("--fleet-server-cert-key-passphrase-path must be provided as an absolute path", errors.M("path", fPassphrase), errors.TypeConfig)
 	}
 	return nil
 }
@@ -122,13 +122,13 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	fElasticSearchCASHA256, _ := cmd.Flags().GetString("fleet-server-es-ca-trusted-fingerprint")
 	fElasticSearchInsecure, _ := cmd.Flags().GetBool("fleet-server-es-insecure")
 	fServiceToken, _ := cmd.Flags().GetString("fleet-server-service-token")
-	fServiceTokenFile, _ := cmd.Flags().GetString("fleet-server-service-token-file")
+	fServiceTokenPath, _ := cmd.Flags().GetString("fleet-server-service-token-path")
 	fPolicy, _ := cmd.Flags().GetString("fleet-server-policy")
 	fHost, _ := cmd.Flags().GetString("fleet-server-host")
 	fPort, _ := cmd.Flags().GetUint16("fleet-server-port")
 	fCert, _ := cmd.Flags().GetString("fleet-server-cert")
 	fCertKey, _ := cmd.Flags().GetString("fleet-server-cert-key")
-	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-file")
+	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-path")
 	fHeaders, _ := cmd.Flags().GetStringSlice("header")
 	fInsecure, _ := cmd.Flags().GetBool("fleet-server-insecure-http")
 	ca, _ := cmd.Flags().GetString("certificate-authorities")
@@ -167,9 +167,9 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 		args = append(args, "--fleet-server-service-token")
 		args = append(args, fServiceToken)
 	}
-	if fServiceTokenFile != "" {
-		args = append(args, "--fleet-server-service-token-file")
-		args = append(args, fServiceTokenFile)
+	if fServiceTokenPath != "" {
+		args = append(args, "--fleet-server-service-token-path")
+		args = append(args, fServiceTokenPath)
 	}
 	if fPolicy != "" {
 		args = append(args, "--fleet-server-policy")
@@ -192,7 +192,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 		args = append(args, fCertKey)
 	}
 	if fPassphrase != "" {
-		args = append(args, "--fleet-server-cert-key-passphrase-file")
+		args = append(args, "--fleet-server-cert-key-passphrase-path")
 		args = append(args, fPassphrase)
 	}
 	if daemonTimeout != 0 {
@@ -323,14 +323,14 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	fElasticSearchInsecure, _ := cmd.Flags().GetBool("fleet-server-es-insecure")
 	fHeaders, _ := cmd.Flags().GetStringSlice("header")
 	fServiceToken, _ := cmd.Flags().GetString("fleet-server-service-token")
-	fServiceTokenFile, _ := cmd.Flags().GetString("fleet-server-service-token-file")
+	fServiceTokenPath, _ := cmd.Flags().GetString("fleet-server-service-token-path")
 	fPolicy, _ := cmd.Flags().GetString("fleet-server-policy")
 	fHost, _ := cmd.Flags().GetString("fleet-server-host")
 	fPort, _ := cmd.Flags().GetUint16("fleet-server-port")
 	fInternalPort, _ := cmd.Flags().GetUint16("fleet-server-internal-port")
 	fCert, _ := cmd.Flags().GetString("fleet-server-cert")
 	fCertKey, _ := cmd.Flags().GetString("fleet-server-cert-key")
-	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-file")
+	fPassphrase, _ := cmd.Flags().GetString("fleet-server-cert-key-passphrase-path")
 	fInsecure, _ := cmd.Flags().GetBool("fleet-server-insecure-http")
 	proxyURL, _ := cmd.Flags().GetString("proxy-url")
 	proxyDisabled, _ := cmd.Flags().GetBool("proxy-disabled")
@@ -377,13 +377,13 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 			ElasticsearchCASHA256: fElasticSearchCASHA256,
 			ElasticsearchInsecure: fElasticSearchInsecure,
 			ServiceToken:          fServiceToken,
-			ServiceTokenFile:      fServiceTokenFile,
+			ServiceTokenPath:      fServiceTokenPath,
 			PolicyID:              fPolicy,
 			Host:                  fHost,
 			Port:                  fPort,
 			Cert:                  fCert,
 			CertKey:               fCertKey,
-			CertKeyPassphraseFile: fPassphrase,
+			CertKeyPassphrasePath: fPassphrase,
 			Insecure:              fInsecure,
 			SpawnAgent:            !fromInstall,
 			Headers:               mapFromEnvList(fHeaders),

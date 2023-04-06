@@ -92,13 +92,13 @@ The following actions are possible and grouped based on the actions.
   FLEET_SERVER_ELASTICSEARCH_CA_TRUSTED_FINGERPRINT - The sha-256 fingerprint value of the certificate authority to trust
   FLEET_SERVER_ELASTICSEARCH_INSECURE - disables cert validation for communication with Elasticsearch
   FLEET_SERVER_SERVICE_TOKEN - service token to use for communication with elasticsearch
-  FLEET_SERVER_SERVICE_TOKEN_FILE - to service token file to use for communication with elasticsearch
+  FLEET_SERVER_SERVICE_TOKEN_PATH - path to service token file to use for communication with elasticsearch
   FLEET_SERVER_POLICY_ID - policy ID for Fleet Server to use for itself ("Default Fleet Server policy" used when undefined)
   FLEET_SERVER_HOST - binding host for Fleet Server HTTP (overrides the policy). By default this is 0.0.0.0.
   FLEET_SERVER_PORT - binding port for Fleet Server HTTP (overrides the policy)
   FLEET_SERVER_CERT - path to certificate to use for HTTPS endpoint
   FLEET_SERVER_CERT_KEY - path to private key for certificate to use for HTTPS endpoint
-  FLEET_SERVER_CERT_KEY_PASSPHRASE_FILE - path to private key passphrase file for certificate to use for HTTPS endpoint
+  FLEET_SERVER_CERT_KEY_PASSPHRASE_PATH - path to private key passphrase file for certificate to use for HTTPS endpoint
   FLEET_SERVER_INSECURE_HTTP - expose Fleet Server over HTTP (not recommended; insecure)
 
 * Preparing Kibana for Fleet
@@ -350,19 +350,19 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 		return nil
 	}
 	// read from secret file
-	if cfg.FleetServer.Elasticsearch.ServiceTokenFile != "" {
-		p, err := os.ReadFile(cfg.FleetServer.Elasticsearch.ServiceTokenFile)
+	if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
+		p, err := os.ReadFile(cfg.FleetServer.Elasticsearch.ServiceTokenPath)
 		if err != nil {
-			return fmt.Errorf("unable to open service_token_file: %w", err)
+			return fmt.Errorf("unable to open service_token_path: %w", err)
 		}
 		cfg.Kibana.Fleet.ServiceToken = string(p)
 		cfg.FleetServer.Elasticsearch.ServiceToken = string(p)
 		return nil
 	}
-	if cfg.Kibana.Fleet.ServiceTokenFile != "" {
-		p, err := os.ReadFile(cfg.Kibana.Fleet.ServiceTokenFile)
+	if cfg.Kibana.Fleet.ServiceTokenPath != "" {
+		p, err := os.ReadFile(cfg.Kibana.Fleet.ServiceTokenPath)
 		if err != nil {
-			return fmt.Errorf("unable to open service_token_file: %w", err)
+			return fmt.Errorf("unable to open service_token_path: %w", err)
 		}
 		cfg.Kibana.Fleet.ServiceToken = string(p)
 		cfg.FleetServer.Elasticsearch.ServiceToken = string(p)
@@ -428,8 +428,8 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		if cfg.FleetServer.Elasticsearch.ServiceToken != "" {
 			args = append(args, "--fleet-server-service-token", cfg.FleetServer.Elasticsearch.ServiceToken)
 		}
-		if cfg.FleetServer.Elasticsearch.ServiceTokenFile != "" {
-			args = append(args, "--fleet-server-service-token-file", cfg.FleetServer.Elasticsearch.ServiceTokenFile)
+		if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
+			args = append(args, "--fleet-server-service-token-path", cfg.FleetServer.Elasticsearch.ServiceTokenPath)
 		}
 		if policyID != "" {
 			args = append(args, "--fleet-server-policy", policyID)
@@ -452,8 +452,8 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		if cfg.FleetServer.CertKey != "" {
 			args = append(args, "--fleet-server-cert-key", cfg.FleetServer.CertKey)
 		}
-		if cfg.FleetServer.PassphraseFile != "" {
-			args = append(args, "--fleet-server-cert-key-passphrase-file", cfg.FleetServer.PassphraseFile)
+		if cfg.FleetServer.PassphrasePath != "" {
+			args = append(args, "--fleet-server-cert-key-passphrase-path", cfg.FleetServer.PassphrasePath)
 		}
 
 		for k, v := range cfg.FleetServer.Headers {
