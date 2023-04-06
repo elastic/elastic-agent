@@ -7,6 +7,8 @@ package host
 import (
 	"context"
 
+	"github.com/elastic/elastic-agent/pkg/features"
+
 	"sync"
 	"testing"
 	"time"
@@ -80,6 +82,66 @@ func TestContextProvider(t *testing.T) {
 	next, err = ctesting.CloneMap(next)
 	require.NoError(t, err)
 	assert.Equal(t, next, comm.Current())
+}
+
+func TestFQDNFeatureFlagToggle(t *testing.T) {
+	log, err := logger.New("host_test", false)
+	require.NoError(t, err)
+
+	c, err := config.NewConfigFrom(map[string]interface{}{
+		// Use a long check interval so we can ensure that any
+		// calls to hostProvider.fetcher are not happening due
+		// to the interval timer elapsing. We want such calls
+		// to happen only due to explicit actions in our
+		// test below.
+		"check_interval": 10 * time.Minute,
+	})
+	require.NoError(t, err)
+
+	builder, _ := composable.Providers.GetContextProvider("host")
+	provider, err := builder(log, c, true)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+	comm := ctesting.NewContextComm(ctx)
+
+	// Track the number of times hostProvider.fetcher is called.
+	numCalled := 0
+	hostProvider, ok := provider.(*contextProvider)
+	require.True(t, ok)
+
+	hostProvider.fetcher = func() (map[string]interface{}, error) {
+		numCalled++
+		return nil, nil
+	}
+
+	// Run the provider
+	go func() {
+		err = provider.Run(comm)
+	}()
+
+	// Wait long enough for provider.Run to register
+	// the FQDN feature flag onChange callback.
+	time.Sleep(10 * time.Millisecond)
+
+	// Trigger the FQDN feature flag callback by
+	// toggling the FQDN feature flag
+	err = features.Apply(config.MustNewConfigFrom(map[string]interface{}{
+		"agent.features.fqdn.enabled": true,
+	}))
+	require.NoError(t, err)
+
+	// Wait long enough for the FQDN feature flag onChange
+	// callback to be called.
+	time.Sleep(10 * time.Millisecond)
+
+	// hostProvider.fetcher should be called twice:
+	// - once, right after the provider is run, and
+	// - once again, when the FQDN feature flag callback is triggered
+	require.Equal(t, 2, numCalled)
 }
 
 func returnHostMapping(log *logger.Logger) infoFetcher {
