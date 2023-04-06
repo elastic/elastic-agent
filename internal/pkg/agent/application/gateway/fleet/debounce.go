@@ -3,7 +3,7 @@ package fleet
 import "time"
 
 type debouncer interface {
-	Reached() <-chan time.Time
+	Elapsed() <-chan time.Time
 }
 
 type debouncerFactory func() debouncer
@@ -12,7 +12,7 @@ type timerDebouncer struct {
 	t *time.Timer
 }
 
-func (td *timerDebouncer) Reached() <-chan time.Time {
+func (td *timerDebouncer) Elapsed() <-chan time.Time {
 	return td.t.C
 }
 

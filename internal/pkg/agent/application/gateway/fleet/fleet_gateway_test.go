@@ -131,7 +131,7 @@ func neverDebounce(t *testing.T) *mockDebouncer {
 	go func() {
 		alreadyReachedDebounce <- time.Now()
 	}()
-	mockDebouncer.EXPECT().Reached().Return(alreadyReachedDebounce)
+	mockDebouncer.EXPECT().Elapsed().Return(alreadyReachedDebounce)
 	return mockDebouncer
 }
 
@@ -559,7 +559,7 @@ func TestFleetGateway(t *testing.T) {
 
 		debounceOver := make(chan time.Time)
 		mockDebouncer := newMockDebouncer(t)
-		mockDebouncer.EXPECT().Reached().Return(debounceOver)
+		mockDebouncer.EXPECT().Elapsed().Return(debounceOver)
 
 		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			mockLogger,
@@ -704,7 +704,7 @@ func TestFleetGateway(t *testing.T) {
 
 		debounceOver := make(chan time.Time)
 		mockDebouncer := newMockDebouncer(t)
-		mockDebouncer.EXPECT().Reached().Return(debounceOver)
+		mockDebouncer.EXPECT().Elapsed().Return(debounceOver)
 
 		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			mockLogger,

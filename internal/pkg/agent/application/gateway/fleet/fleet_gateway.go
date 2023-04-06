@@ -240,10 +240,11 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 			return checkinResult{err: ctx.Err()}
 		case checkinResult := <-resCheckinChan:
 			return checkinResult
-		case <-dbouncer.Reached():
+		case <-dbouncer.Elapsed():
 			debounceElapsed = true
 			if updatedState != nil && !reflect.DeepEqual(updatedState, &initialState) {
 				// we detected that the updated State is different from the one of the current checkin, cancel and return the needNewCheckinError
+				f.log.Debugf("Detected an updated state at the end of the debounce, cancelling ongoing checkin %q", checkinID)
 				cancelCheckin()
 				f.log.Debugf("cancelled checkin %s", checkinID.String())
 				cancelledCheckinRes := <-resCheckinChan

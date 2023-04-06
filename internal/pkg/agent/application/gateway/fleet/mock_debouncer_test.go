@@ -25,8 +25,8 @@ func (_m *mockDebouncer) EXPECT() *mockDebouncer_Expecter {
 	return &mockDebouncer_Expecter{mock: &_m.Mock}
 }
 
-// Reached provides a mock function with given fields:
-func (_m *mockDebouncer) Reached() <-chan time.Time {
+// Elapsed provides a mock function with given fields:
+func (_m *mockDebouncer) Elapsed() <-chan time.Time {
 	ret := _m.Called()
 
 	var r0 <-chan time.Time
@@ -41,29 +41,29 @@ func (_m *mockDebouncer) Reached() <-chan time.Time {
 	return r0
 }
 
-// mockDebouncer_Reached_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Reached'
-type mockDebouncer_Reached_Call struct {
+// mockDebouncer_Elapsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Elapsed'
+type mockDebouncer_Elapsed_Call struct {
 	*mock.Call
 }
 
-// Reached is a helper method to define mock.On call
-func (_e *mockDebouncer_Expecter) Reached() *mockDebouncer_Reached_Call {
-	return &mockDebouncer_Reached_Call{Call: _e.mock.On("Reached")}
+// Elapsed is a helper method to define mock.On call
+func (_e *mockDebouncer_Expecter) Elapsed() *mockDebouncer_Elapsed_Call {
+	return &mockDebouncer_Elapsed_Call{Call: _e.mock.On("Elapsed")}
 }
 
-func (_c *mockDebouncer_Reached_Call) Run(run func()) *mockDebouncer_Reached_Call {
+func (_c *mockDebouncer_Elapsed_Call) Run(run func()) *mockDebouncer_Elapsed_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *mockDebouncer_Reached_Call) Return(_a0 <-chan time.Time) *mockDebouncer_Reached_Call {
+func (_c *mockDebouncer_Elapsed_Call) Return(_a0 <-chan time.Time) *mockDebouncer_Elapsed_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *mockDebouncer_Reached_Call) RunAndReturn(run func() <-chan time.Time) *mockDebouncer_Reached_Call {
+func (_c *mockDebouncer_Elapsed_Call) RunAndReturn(run func() <-chan time.Time) *mockDebouncer_Elapsed_Call {
 	_c.Call.Return(run)
 	return _c
 }
