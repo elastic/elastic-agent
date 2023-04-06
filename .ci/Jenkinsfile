@@ -401,11 +401,9 @@ pipeline {
     stage('e2e tests') {
       when {
         // Disable until we fix the e2e test.
-        // This should be always running when builds on branches/tags
-        // Enable if e2e related changes.
+        // This should be running when there is a comment or the e2e label
         beforeAgent true
         anyOf {
-          //not { changeRequest() }
           // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
           expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
         }
