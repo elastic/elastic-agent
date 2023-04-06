@@ -29,7 +29,7 @@ type fleetConfig struct {
 type fleetServerConfig struct {
 	Cert           string              `config:"cert"`
 	CertKey        string              `config:"cert_key"`
-	PassphraseFile string              `config:"key_passphrase_path"`
+	PassphraseFile string              `config:"key_passphrase_file"`
 	Elasticsearch  elasticsearchConfig `config:"elasticsearch"`
 	Enable         bool                `config:"enable"`
 	Host           string              `config:"host"`
@@ -45,7 +45,7 @@ type elasticsearchConfig struct {
 	CATrustedFingerprint string `config:"ca_trusted_fingerprint"`
 	Host                 string `config:"host"`
 	ServiceToken         string `config:"service_token"`
-	ServiceTokenFile     string `config:"service_token_path"`
+	ServiceTokenFile     string `config:"service_token_file"`
 	Insecure             bool   `config:"insecure"`
 }
 
@@ -63,7 +63,7 @@ type kibanaFleetConfig struct {
 	Username         string `config:"username"`
 	Password         string `config:"password"`
 	ServiceToken     string `config:"service_token"`
-	ServiceTokenFile string `config:"service_token_path"`
+	ServiceTokenFile string `config:"service_token_file"`
 }
 
 func defaultAccessConfig() (setupConfig, error) {

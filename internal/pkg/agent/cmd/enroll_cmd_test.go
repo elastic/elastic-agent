@@ -380,12 +380,12 @@ func TestValidateArgs(t *testing.T) {
 
 	t.Run("secret paths are passed", func(t *testing.T) {
 		cmd := newEnrollCommandWithArgs([]string{}, streams)
-		err := cmd.Flags().Set("fleet-server-cert-key-passphrase-path", "/path/to/passphrase")
+		err := cmd.Flags().Set("fleet-server-cert-key-passphrase", "/path/to/passphrase")
 		require.NoError(t, err)
 		err = cmd.Flags().Set("fleet-server-service-token-path", "/path/to/token")
 		require.NoError(t, err)
 		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
-		require.Contains(t, args, "--fleet-server-cert-key-passphrase-path")
+		require.Contains(t, args, "--fleet-server-cert-key-passphrase")
 		require.Contains(t, args, "/path/to/passphrase")
 		require.Contains(t, args, "--fleet-server-service-token-path")
 		require.Contains(t, args, "/path/to/token")
