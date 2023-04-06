@@ -139,7 +139,7 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	// However, if there is a proxy sent by fleet-server, it'll take precedence.
 	if cfg.Fleet.Client.Transport.Proxy.URL == nil ||
 		cfg.Fleet.Client.Transport.Proxy.URL.String() == "" {
-		h.log.Info("proxy from fleet is empty, not applying it")
+		h.log.Debug("proxy from fleet is empty, not applying it")
 		return nil
 	}
 

@@ -47,6 +47,28 @@ func TestPolicyChange(t *testing.T) {
 		change := <-ch
 		require.Equal(t, config.MustNewConfigFrom(conf), change.Config())
 	})
+
+	// TODO: write the test
+	t.Run("A policy without proxy neither changes nor remove the current proxy",
+		func(t *testing.T) {
+			// ch := make(chan coordinator.ConfigChange, 1)
+			//
+			// conf := map[string]interface{}{"hello": "world"}
+			// action := &fleetapi.ActionPolicyChange{
+			// 	ActionID:   "abc123",
+			// 	ActionType: "POLICY_CHANGE",
+			// 	Policy:     conf,
+			// }
+			//
+			// cfg := configuration.DefaultConfiguration()
+			// handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch)
+			//
+			// err := handler.Handle(context.Background(), action, ack)
+			// require.NoError(t, err)
+			//
+			// change := <-ch
+			// require.Equal(t, config.MustNewConfigFrom(conf), change.Config())
+		})
 }
 
 func TestPolicyAcked(t *testing.T) {
