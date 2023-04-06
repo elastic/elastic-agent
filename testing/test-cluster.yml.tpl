@@ -37,4 +37,3 @@ apm:
 
 k8s:
   enabled: false
-
