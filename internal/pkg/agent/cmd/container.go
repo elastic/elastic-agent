@@ -98,7 +98,7 @@ The following actions are possible and grouped based on the actions.
   FLEET_SERVER_PORT - binding port for Fleet Server HTTP (overrides the policy)
   FLEET_SERVER_CERT - path to certificate to use for HTTPS endpoint
   FLEET_SERVER_CERT_KEY - path to private key for certificate to use for HTTPS endpoint
-  FLEET_SERVER_CERT_KEY_PASSPHRASE_PATH - path to private key passphrase file for certificate to use for HTTPS endpoint
+  FLEET_SERVER_CERT_KEY_PASSPHRASE - path to private key passphrase file for certificate to use for HTTPS endpoint
   FLEET_SERVER_INSECURE_HTTP - expose Fleet Server over HTTP (not recommended; insecure)
 
 * Preparing Kibana for Fleet

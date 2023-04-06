@@ -92,7 +92,7 @@ func defaultAccessConfig() (setupConfig, error) {
 		FleetServer: fleetServerConfig{
 			Cert:           envWithDefault("", "FLEET_SERVER_CERT"),
 			CertKey:        envWithDefault("", "FLEET_SERVER_CERT_KEY"),
-			PassphraseFile: envWithDefault("", "FLEET_SERVER_CERT_KEY_PASSPHRASE_PATH"),
+			PassphraseFile: envWithDefault("", "FLEET_SERVER_CERT_KEY_PASSPHRASE"),
 			Elasticsearch: elasticsearchConfig{
 				Host:                 envWithDefault("http://elasticsearch:9200", "FLEET_SERVER_ELASTICSEARCH_HOST", "ELASTICSEARCH_HOST"),
 				ServiceToken:         envWithDefault("", "FLEET_SERVER_SERVICE_TOKEN"),
