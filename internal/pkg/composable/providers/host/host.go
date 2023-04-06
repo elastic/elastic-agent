@@ -59,14 +59,17 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		return fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
 	}
 
+	defer func() {
+		features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
+		close(fqdnFFChangeCh)
+	}()
+
 	// Update context when any host information changes.
 	for {
 		t := time.NewTimer(c.CheckInterval)
 		select {
 		case <-comm.Done():
 			t.Stop()
-			features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
-			close(fqdnFFChangeCh)
 			return comm.Err()
 		case <-fqdnFFChangeCh:
 		case <-t.C:
