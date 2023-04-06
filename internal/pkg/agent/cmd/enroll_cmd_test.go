@@ -42,7 +42,7 @@ func (m *mockStore) Save(in io.Reader) error {
 	}
 
 	buf := new(bytes.Buffer)
-	io.Copy(buf, in) // nolint:errcheck //not required
+	io.Copy(buf, in) //nolint:errcheck //not required
 	m.Content = buf.Bytes()
 	return nil
 }
@@ -331,7 +331,7 @@ func TestValidateArgs(t *testing.T) {
 	enrolmentToken := "my-enrollment-token"
 	streams, _, _, _ := cli.NewTestingIOStreams()
 
-	t.Run("comma seperated tags are parsed", func(t *testing.T) {
+	t.Run("comma separated tags are parsed", func(t *testing.T) {
 		cmd := newEnrollCommandWithArgs([]string{}, streams)
 		err := cmd.Flags().Set("tag", "windows,production")
 		require.NoError(t, err)
@@ -351,7 +351,7 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, cleanedTags, "production")
 	})
 
-	t.Run("comma seperated tags are cleaned", func(t *testing.T) {
+	t.Run("comma separated tags are cleaned", func(t *testing.T) {
 		cmd := newEnrollCommandWithArgs([]string{}, streams)
 		err := cmd.Flags().Set("tag", "windows, production")
 		require.NoError(t, err)
@@ -446,7 +446,7 @@ func withTLSServer(
 
 		port := listener.Addr().(*net.TCPAddr).Port
 
-		s := http.Server{
+		s := http.Server{ //nolint:gosec // testing server
 			Handler: m(t),
 			TLSConfig: &tls.Config{
 				Certificates: []tls.Certificate{serverCert},
@@ -455,7 +455,7 @@ func withTLSServer(
 		}
 
 		// Uses the X509KeyPair pair defined in the TLSConfig struct instead of file on disk.
-		go s.ServeTLS(listener, "", "") // nolint:errcheck //not required
+		go s.ServeTLS(listener, "", "") //nolint:errcheck // not required
 
 		test(t, ca.Crt(), "localhost:"+strconv.Itoa(port))
 	}
@@ -466,7 +466,7 @@ func bytesToTMPFile(b []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	f.Write(b) // nolint:errcheck //not required
+	f.Write(b) //nolint:errcheck // not required
 	if err := f.Close(); err != nil {
 		return "", err
 	}
