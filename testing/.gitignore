@@ -4,3 +4,4 @@ e2e_testing
 e2e/elastic-agent-*/
 !elastic-agent.yml.tpl
 e2e/*.gz
+e2e/infra

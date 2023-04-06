@@ -129,7 +129,7 @@ Vagrant.configure("2") do |config|
     end
   end
 
-    config.vm.define "dev" do |nodeconfig|
+    config.vm.define "elastic-agent" do |nodeconfig|
       nodeconfig.vm.box = "ubuntu/jammy64"
 
       # We deliberately set a fully-qualified domain name for the VM; it helps
