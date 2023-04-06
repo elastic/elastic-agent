@@ -350,8 +350,8 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 		return nil
 	}
 	// read from secret file
-	if cfg.FleetServer.Elasticsearch.ServiceTokenFile != "" {
-		p, err := os.ReadFile(cfg.FleetServer.Elasticsearch.ServiceTokenFile)
+	if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
+		p, err := os.ReadFile(cfg.FleetServer.Elasticsearch.ServiceTokenPath)
 		if err != nil {
 			return fmt.Errorf("unable to open service_token_path: %w", err)
 		}
@@ -359,8 +359,8 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 		cfg.FleetServer.Elasticsearch.ServiceToken = string(p)
 		return nil
 	}
-	if cfg.Kibana.Fleet.ServiceTokenFile != "" {
-		p, err := os.ReadFile(cfg.Kibana.Fleet.ServiceTokenFile)
+	if cfg.Kibana.Fleet.ServiceTokenPath != "" {
+		p, err := os.ReadFile(cfg.Kibana.Fleet.ServiceTokenPath)
 		if err != nil {
 			return fmt.Errorf("unable to open service_token_path: %w", err)
 		}
@@ -428,8 +428,8 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		if cfg.FleetServer.Elasticsearch.ServiceToken != "" {
 			args = append(args, "--fleet-server-service-token", cfg.FleetServer.Elasticsearch.ServiceToken)
 		}
-		if cfg.FleetServer.Elasticsearch.ServiceTokenFile != "" {
-			args = append(args, "--fleet-server-service-token-path", cfg.FleetServer.Elasticsearch.ServiceTokenFile)
+		if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
+			args = append(args, "--fleet-server-service-token-path", cfg.FleetServer.Elasticsearch.ServiceTokenPath)
 		}
 		if policyID != "" {
 			args = append(args, "--fleet-server-policy", policyID)
@@ -452,8 +452,8 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		if cfg.FleetServer.CertKey != "" {
 			args = append(args, "--fleet-server-cert-key", cfg.FleetServer.CertKey)
 		}
-		if cfg.FleetServer.PassphraseFile != "" {
-			args = append(args, "--fleet-server-cert-key-passphrase", cfg.FleetServer.PassphraseFile)
+		if cfg.FleetServer.PassphrasePath != "" {
+			args = append(args, "--fleet-server-cert-key-passphrase", cfg.FleetServer.PassphrasePath)
 		}
 
 		for k, v := range cfg.FleetServer.Headers {

@@ -38,7 +38,7 @@ type Elasticsearch struct {
 	Hosts            []string          `config:"hosts" yaml:"hosts"`
 	Path             string            `config:"path" yaml:"path,omitempty"`
 	ServiceToken     string            `config:"service_token" yaml:"service_token,omitempty"`
-	ServiceTokenFile string            `config:"service_token_file" yaml:"service_token_file,omitempty"`
+	ServiceTokenPath string            `config:"service_token_path" yaml:"service_token_path,omitempty"`
 	TLS              *tlscommon.Config `config:"ssl" yaml:"ssl,omitempty"`
 	Headers          map[string]string `config:"headers" yaml:"headers,omitempty"`
 	ProxyURL         string            `config:"proxy_url" yaml:"proxy_url,omitempty"`
@@ -47,7 +47,7 @@ type Elasticsearch struct {
 }
 
 // ElasticsearchFromConnStr returns an Elasticsearch configuration from the connection string.
-func ElasticsearchFromConnStr(conn string, serviceToken, serviceTokenFile string, insecure bool) (Elasticsearch, error) {
+func ElasticsearchFromConnStr(conn string, serviceToken, serviceTokenPath string, insecure bool) (Elasticsearch, error) {
 	u, err := url.Parse(conn)
 	if err != nil {
 		return Elasticsearch{}, err
@@ -73,6 +73,6 @@ func ElasticsearchFromConnStr(conn string, serviceToken, serviceTokenFile string
 		return Elasticsearch{}, errors.New("invalid connection string: must include a service token")
 	}
 	cfg.ServiceToken = serviceToken
-	cfg.ServiceTokenFile = serviceTokenFile
+	cfg.ServiceTokenPath = serviceTokenPath
 	return cfg, nil
 }
