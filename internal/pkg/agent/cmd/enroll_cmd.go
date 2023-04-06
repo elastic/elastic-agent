@@ -501,7 +501,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]interface{}) error {
 	cmd := fleetapi.NewEnrollCmd(c.client)
 
-	metadata, err := info.Metadata()
+	metadata, err := info.Metadata(c.log)
 	if err != nil {
 		return errors.New(err, "acquiring metadata failed")
 	}

@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 var (
@@ -127,7 +128,7 @@ type ConfigManager interface {
 
 	// ActionErrors returns the error channel for actions.
 	// May return errors for fleet managed agents.
-	// Will always be empty for stand alone agents.
+	// Will always be empty for standalone agents.
 	ActionErrors() <-chan error
 
 	// Watch returns the chanel to watch for configuration changes.
@@ -734,6 +735,10 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		}
 	}
 
+	if err := features.Apply(cfg); err != nil {
+		return fmt.Errorf("could not update feature flags config: %w", err)
+	}
+
 	if err := c.upgradeMgr.Reload(cfg); err != nil {
 		return fmt.Errorf("failed to reload upgrade manager configuration: %w", err)
 	}
@@ -831,7 +836,7 @@ func (c *Coordinator) compute() (map[string]interface{}, []component.Component, 
 	comps, err := c.specs.ToComponents(
 		cfg,
 		configInjector,
-		c.state.logLevel,
+		c.State(false).LogLevel,
 		c.agentInfo,
 	)
 	if err != nil {

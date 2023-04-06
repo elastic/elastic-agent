@@ -57,6 +57,26 @@ components:
         preventions: []
       shippers:
       - shipper
+  features:
+    fqdn:
+      enabled: true
+    source:
+      fields:
+        agent:
+          kind:
+            structvalue:
+              fields:
+                features:
+                  kind:
+                    structvalue:
+                      fields:
+                        fqdn:
+                          kind:
+                            structvalue:
+                              fields:
+                                enabled:
+                                  kind:
+                                    boolvalue: true
   units:
   - config:
       datastream:
@@ -477,6 +497,26 @@ components:
         preventions: []
       shippers:
       - shipper
+  features:
+    fqdn:
+      enabled: true
+    source:
+      fields:
+        agent:
+          kind:
+            structvalue:
+              fields:
+                features:
+                  kind:
+                    structvalue:
+                      fields:
+                        fqdn:
+                          kind:
+                            structvalue:
+                              fields:
+                                enabled:
+                                  kind:
+                                    boolvalue: true
   units:
   - config:
       datastream:

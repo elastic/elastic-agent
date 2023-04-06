@@ -16,6 +16,12 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
 
+const ActionRetrieveFeatures = "retrieve_features"
+
+type retrieveFeaturesAction struct {
+	input *fakeInput
+}
+
 type stateSetterAction struct {
 	input *fakeInput
 }
@@ -43,6 +49,19 @@ func (s *stateSetterAction) Execute(_ context.Context, params map[string]interfa
 	s.input.logger.Debug().Str("state", s.input.state.String()).Str("message", s.input.stateMsg).Msg("updating unit state")
 	_ = s.input.unit.UpdateState(s.input.state, s.input.stateMsg, nil)
 	return nil, nil
+}
+
+func (a *retrieveFeaturesAction) Name() string {
+	return ActionRetrieveFeatures
+}
+
+func (a *retrieveFeaturesAction) Execute(
+	_ context.Context,
+	_ map[string]interface{}) (map[string]interface{}, error) {
+
+	a.input.logger.Info().Msg("executing " + ActionRetrieveFeatures + " action")
+
+	return map[string]interface{}{"features": a.input.features}, nil
 }
 
 func (s *sendEventAction) Name() string {
@@ -94,20 +113,23 @@ func (s *killAction) Execute(_ context.Context, _ map[string]interface{}) (map[s
 }
 
 func newRunningUnit(logger zerolog.Logger, manager *StateManager, unit *client.Unit) (runningUnit, error) {
-	_, logLevel, config := unit.Expected()
-	if config.Type == "" {
+	expected := unit.Expected()
+	if expected.Config.Type == "" {
 		return nil, fmt.Errorf("unit config type empty")
 	}
 	if unit.Type() == client.UnitTypeOutput {
-		switch config.Type {
+		switch expected.Config.Type {
 		case fakeShipper:
-			return newFakeShipperOutput(logger, logLevel, unit, config)
+			return newFakeShipperOutput(
+				logger, expected.LogLevel, unit, expected.Config)
 		}
-		return nil, fmt.Errorf("unknown output unit config type: %s", config.Type)
+		return nil, fmt.Errorf("unknown output unit config type: %s",
+			expected.Config.Type)
 	}
-	switch config.Type {
+	switch expected.Config.Type {
 	case Fake:
-		return newFakeInput(logger, logLevel, manager, unit, config)
+		return newFakeInput(logger, expected.LogLevel, manager, unit, expected.Config)
 	}
-	return nil, fmt.Errorf("unknown input unit config type: %s", config.Type)
+	return nil, fmt.Errorf("unknown input unit config type: %s",
+		expected.Config.Type)
 }
