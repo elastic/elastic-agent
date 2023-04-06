@@ -44,7 +44,7 @@ Open integrated VSCode terminal:
 
 ```
 cd e2e
-AGENT_VERSION=8.6.0 go test -v -timeout 300s -run ^TestElasticAgentUpgrade$ github.com/elastic/elastic-agent/testing/e2e
+AGENT_VERSION=8.6.0 go test -v -timeout 300s -tags=e2e  -run ^TestElasticAgentUpgrade$ github.com/elastic/elastic-agent/testing/e2e
 ```
 
 The credentials and endpoints in the `cluster-digest.yml` are used by e2e tests to communicate with created cluster.
