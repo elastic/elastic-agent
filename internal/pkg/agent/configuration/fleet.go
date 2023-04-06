@@ -27,7 +27,7 @@ type FleetGatewaySettings struct {
 func DefaultFleetGatewaySettings() *FleetGatewaySettings {
 	return &FleetGatewaySettings{
 		Debounce: 5 * time.Minute,        // time the agent has to wait before cancelling an ongoing checkin and start a new one
-		Duration: 5 * time.Minute,        // time between successful calls
+		Duration: 1 * time.Second,        // time between successful calls
 		Jitter:   500 * time.Millisecond, // used as a jitter for duration
 		Backoff: BackoffSettings{ // time after a failed call
 			Init: 60 * time.Second,
