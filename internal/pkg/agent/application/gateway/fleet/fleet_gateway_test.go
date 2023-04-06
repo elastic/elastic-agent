@@ -794,7 +794,7 @@ func TestFleetGateway(t *testing.T) {
 		// allow the test client to complete the checkin (only one since the initial one has been cancelled)
 		completeCheckinCh <- struct{}{}
 
-		require.Eventually(t, func() bool { return len(reportedAgentStatuses) == 3 }, 10*time.Second, 50*time.Millisecond)
+		require.Eventually(t, func() bool { return len(reportedAgentStatuses) == 3 }, 1*time.Second, 50*time.Millisecond)
 
 		// assert that the third state is the degraded one and that the checkin completed
 		thirdActualState := map[string]any{}
@@ -935,6 +935,7 @@ func TestFleetGateway(t *testing.T) {
 
 		// unblock the cancellation of the first checkin
 		unblockCancel <- struct{}{}
+
 		//require that we started 2 checkins and completed 1 (the invocation of the first checkin has returned from the test client)
 		require.Eventually(t, func() bool { return len(reportedAgentStatuses) == 1 }, 1*time.Second, 50*time.Millisecond, "the orphaned cancelled checkin didn't complete")
 

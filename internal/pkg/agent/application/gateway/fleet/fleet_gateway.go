@@ -223,12 +223,12 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 
 func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialState state.State, stateUpdates <-chan state.State, backoff backoff.Backoff, dbouncer debouncer) checkinResult {
 	checkinID, _ := uuid.NewV4()
-	checkinCtx, cancelCheckin := context.WithCancel(ctx)
+	checkinCtx, cancelCheckinCtxFunc := context.WithCancel(ctx)
 	checkinCtx = context.WithValue(checkinCtx, CheckinIDKey, checkinID.String())
 	f.log.Debugf("starting checkin %q", checkinID.String())
 	defer func() {
 		// make sure we don't leak contexts whatever happens
-		cancelCheckin()
+		cancelCheckinCtxFunc()
 	}()
 
 	// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
@@ -253,7 +253,7 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 				f.log.Debugf("Detected an updated state at the end of the debounce, cancelling ongoing checkin %q", checkinID)
 				cancelCheckinTimeoutCtx, cancelCancelCheckin := context.WithTimeout(ctx, f.cancelTimeout)
 				defer cancelCancelCheckin()
-				f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckin, resCheckinChan)
+				f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckinCtxFunc, resCheckinChan)
 				return checkinResult{err: &needNewCheckinError{newState: *updatedState}}
 			}
 		case newState := <-stateUpdates:
@@ -274,24 +274,22 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 			)
 			cancelCheckinTimeoutCtx, cancelCancelCheckin := context.WithTimeout(ctx, f.cancelTimeout)
 			defer cancelCancelCheckin()
-			f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckin, resCheckinChan)
+			f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckinCtxFunc, resCheckinChan)
 			return checkinResult{err: &needNewCheckinError{newState: newState}}
 		}
 	}
 
 }
 
-func (f *fleetGateway) cancelCheckin(ctx context.Context, checkinID string, cancelCheckin context.CancelFunc, resCheckinChan <-chan checkinResult) (*checkinResult, error) {
+func (f *fleetGateway) cancelCheckin(ctx context.Context, checkinID string, cancelCheckin context.CancelFunc, resCheckinChan <-chan checkinResult) {
 	f.log.Debugf("Cancelling checkin %q", checkinID)
 	cancelCheckin()
 	f.log.Debugf("Cancelled checkin %q", checkinID)
 	select {
 	case cancelledCheckinRes := <-resCheckinChan:
 		f.log.Debugf("Reaped answer for cancelled checkin %q: %+v", checkinID, cancelledCheckinRes)
-		return &cancelledCheckinRes, nil
 	case <-ctx.Done():
 		f.log.Debugf("Context expired while waiting for cancelled checkin %q to terminate", checkinID)
-		return nil, ctx.Err()
 	}
 }
 
