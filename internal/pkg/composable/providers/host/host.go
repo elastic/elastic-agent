@@ -49,6 +49,21 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)
 	}
 
+	const fqdnFeatureFlagCallbackID = "host_provider"
+	fqdnFFChangeCh := make(chan struct{})
+	err = features.AddFQDNOnChangeCallback(
+		onFQDNFeatureFlagChange(fqdnFFChangeCh),
+		fqdnFeatureFlagCallbackID,
+	)
+	if err != nil {
+		return fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
+	}
+
+	defer func() {
+		features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
+		close(fqdnFFChangeCh)
+	}()
+
 	// Update context when any host information changes.
 	for {
 		t := time.NewTimer(c.CheckInterval)
@@ -56,6 +71,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		case <-comm.Done():
 			t.Stop()
 			return comm.Err()
+		case <-fqdnFFChangeCh:
 		case <-t.C:
 		}
 
@@ -73,6 +89,13 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		if err != nil {
 			c.logger.Errorf("Failed updating mapping to latest host information: %s", err)
 		}
+	}
+}
+
+func onFQDNFeatureFlagChange(fqdnFFChangeCh chan struct{}) features.BoolValueOnChangeCallback {
+	return func(new, old bool) {
+		// FQDN feature flag was toggled, so notify on channel
+		fqdnFFChangeCh <- struct{}{}
 	}
 }
 

@@ -7,6 +7,8 @@ package features
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
@@ -78,4 +80,39 @@ agent:
 			}
 		})
 	}
+}
+
+func TestFQDNCallbacks(t *testing.T) {
+	cb1Called, cb2Called := false, false
+
+	err := AddFQDNOnChangeCallback(func(new, old bool) {
+		cb1Called = true
+	}, "cb1")
+	require.NoError(t, err)
+
+	err = AddFQDNOnChangeCallback(func(new, old bool) {
+		cb2Called = true
+	}, "cb2")
+	require.NoError(t, err)
+
+	defer func() {
+		// Cleanup in case we don't get to the end of
+		// this test successfully.
+		if _, exists := current.fqdnCallbacks["cb1"]; exists {
+			RemoveFQDNOnChangeCallback("cb1")
+		}
+		if _, exists := current.fqdnCallbacks["cb2"]; exists {
+			RemoveFQDNOnChangeCallback("cb2")
+		}
+	}()
+
+	require.Len(t, current.fqdnCallbacks, 2)
+	current.setFQDN(false)
+	require.True(t, cb1Called)
+	require.True(t, cb2Called)
+
+	RemoveFQDNOnChangeCallback("cb1")
+	require.Len(t, current.fqdnCallbacks, 1)
+	RemoveFQDNOnChangeCallback("cb2")
+	require.Len(t, current.fqdnCallbacks, 0)
 }
