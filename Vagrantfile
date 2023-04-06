@@ -129,14 +129,8 @@ Vagrant.configure("2") do |config|
     end
   end
 
-<<<<<<< HEAD
     config.vm.define "elastic-agent" do |nodeconfig|
       nodeconfig.vm.box = "ubuntu/jammy64"
-=======
-    config.vm.define "dev" do |nodeconfig|
-      nodeconfig.vm.box = "ubuntu/jammy64"
-
->>>>>>> e4768d517c (Minor code cleanup (#2384))
       nodeconfig.vm.hostname = "elastic-agent-dev"
 
       nodeconfig.vm.network "private_network",
