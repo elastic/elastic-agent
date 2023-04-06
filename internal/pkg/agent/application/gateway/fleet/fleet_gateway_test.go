@@ -43,6 +43,8 @@ import (
 //go:generate mockery --name debouncer
 //go:generate mockery --keeptree --output . --outpkg fleet --dir ../../coordinator/state --name StateUpdateSource
 
+const testCancelTimeout = 10 * time.Millisecond
+
 type clientCallbackFunc func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error)
 
 type testingClientInvocation struct {
@@ -153,6 +155,7 @@ func withGateway(agentInfo agentInfo, settings *configuration.FleetGatewaySettin
 			client,
 			scheduler,
 			func() debouncer { return neverDebounce(t) },
+			testCancelTimeout,
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -179,6 +182,7 @@ func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings *configurat
 			client,
 			scheduler,
 			func() debouncer { return neverDebounce(t) },
+			testCancelTimeout,
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -334,6 +338,7 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			func() debouncer { return neverDebounce(t) },
+			testCancelTimeout,
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -387,6 +392,7 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			func() debouncer { return neverDebounce(t) },
+			testCancelTimeout,
 			noop.New(),
 			emptyStateFetcher(t),
 			stateStore,
@@ -466,6 +472,7 @@ func TestFleetGateway(t *testing.T) {
 			longPollClient,
 			scheduler,
 			func() debouncer { return neverDebounce(t) },
+			testCancelTimeout,
 			noop.New(),
 			mockFetcher,
 			stateStore,
@@ -568,6 +575,7 @@ func TestFleetGateway(t *testing.T) {
 			longPollClient,
 			scheduler,
 			func() debouncer { return mockDebouncer },
+			testCancelTimeout,
 			noop.New(),
 			mockFetcher,
 			stateStore,
@@ -713,6 +721,7 @@ func TestFleetGateway(t *testing.T) {
 			longPollClient,
 			scheduler,
 			func() debouncer { return mockDebouncer },
+			testCancelTimeout,
 			noop.New(),
 			mockFetcher,
 			stateStore,
@@ -795,6 +804,144 @@ func TestFleetGateway(t *testing.T) {
 		}
 		assert.NoError(t, reportedAgentStatuses[2].err)
 		assert.NotNil(t, reportedAgentStatuses[2].resp)
+
+		// wrap it up: stop the fleet gateway and check for errors
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
+	})
+
+	t.Run("Fleet Gateway doesn't stop if cancelling checkin does not return within a set timeout", func(t *testing.T) {
+
+		longPollClient := newTestingClient(t)
+
+		// this is an unsynchronized int but since the test client is only going to be incremented by 1 goroutine at the time
+		// and we check it with an assert.Eventually() we should be fine sharing it across the goroutines
+		var startedCheckins uint
+		completeCheckinCh := make(chan struct{})
+		unblockCancel := make(chan struct{})
+		// setup testing client callback to block until we can read from the completeCheckinCh to mock a long poll from fleet
+		// it will also unblock on context cancellation (with nil response and an error)
+		clientInvocationChannel := longPollClient.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+			startedCheckins++
+			t.Logf("test client using context %v", ctx.Value(CheckinIDKey))
+			select {
+			case <-ctx.Done():
+				// block cancellation
+				<-unblockCancel
+				t.Logf("context %v cancelled", ctx.Value(CheckinIDKey))
+				return nil, ctx.Err()
+
+			case <-completeCheckinCh:
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				t.Logf("checkin with context %v completed", ctx.Value(CheckinIDKey))
+				return resp, nil
+			}
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		reportedAgentStatuses := make([]testingClientInvocation, 0, 2)
+
+		// fleet test client invocation consumer
+		go func() {
+			for {
+				select {
+				case tci := <-clientInvocationChannel:
+					reportedAgentStatuses = append(reportedAgentStatuses, tci)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		log, _ := logger.New("tst", false)
+		stateStore := newStateStore(t, log)
+
+		scheduler := scheduler.NewStepper()
+		mockLogger := newTestLogger(t)
+
+		mockFetcher := NewMockStateFetcher(t)
+
+		stateCh := make(chan state.State)
+		mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
+			stateUpdateSrc := NewStateUpdateSource(t)
+			stateUpdateSrc.EXPECT().Ch().Return(stateCh)
+			go func() {
+				<-ctx.Done()
+			}()
+			return stateUpdateSrc
+		})
+
+		settings := configuration.DefaultFleetGatewaySettings()
+
+		debounceOver := make(chan time.Time)
+		mockDebouncer := newMockDebouncer(t)
+		mockDebouncer.EXPECT().Elapsed().Return(debounceOver)
+
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
+			mockLogger,
+			settings,
+			agentInfo,
+			longPollClient,
+			scheduler,
+			func() debouncer { return mockDebouncer },
+			testCancelTimeout,
+			noop.New(),
+			mockFetcher,
+			stateStore,
+		)
+		require.NoError(t, err)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		// make the fleet gateway start a checkin
+		scheduler.Next()
+
+		// provide an initial state through the subscription
+		agentStartingState := state.State{
+			State:        agentclient.Starting,
+			Message:      "Agent is starting",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		mustWriteToChannelBeforeTimeout(t, agentStartingState, stateCh, 50*time.Millisecond)
+
+		require.Eventually(t, func() bool { return startedCheckins == 1 }, 1*time.Second, 50*time.Millisecond, "could not detect a checkin in progress")
+
+		// signal that debounce time has elapsed
+		debounceOver <- time.Now()
+
+		// inject new state
+		agentRunningState := state.State{
+			State:        agentclient.Healthy,
+			Message:      "Agent is healthy",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is healthy",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		// push the new state through the subscription (too soon, this will be saved but previous checkin won't be cancelled)
+		mustWriteToChannelBeforeTimeout(t, agentRunningState, stateCh, 50*time.Millisecond)
+
+		//require that we started 2 checkins and completed 0 (cancel timed out on the first one, but the invocation is still ongoing blocked in the test client)
+		require.Eventually(t, func() bool { return startedCheckins == 2 }, 1*time.Second, 50*time.Millisecond, "could not detect a new checkin in progress")
+
+		// first checkin has timed out its cancellation (the call in the test client is still ongoing)
+		require.Len(t, reportedAgentStatuses, 0)
+
+		// unblock the cancellation of the first checkin
+		unblockCancel <- struct{}{}
+		//require that we started 2 checkins and completed 1 (the invocation of the first checkin has returned from the test client)
+		require.Eventually(t, func() bool { return len(reportedAgentStatuses) == 1 }, 1*time.Second, 50*time.Millisecond, "the orphaned cancelled checkin didn't complete")
+
+		// allow the test client to complete the checkin (only one since the initial one has been cancelled)
+		completeCheckinCh <- struct{}{}
+
+		require.Eventually(t, func() bool { return len(reportedAgentStatuses) == 2 }, 1*time.Second, 50*time.Millisecond)
 
 		// wrap it up: stop the fleet gateway and check for errors
 		cancel()

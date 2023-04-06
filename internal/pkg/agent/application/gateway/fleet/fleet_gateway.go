@@ -77,12 +77,15 @@ type CheckinCtxKey string
 
 const CheckinIDKey CheckinCtxKey = "checkinID"
 
+const cancelCheckinTimeout = 1 * time.Second
+
 type fleetGateway struct {
 	log                loggerIF
 	client             client.Sender
 	scheduler          Scheduler
 	debouncerFactory   debouncerFactory
 	settings           *configuration.FleetGatewaySettings
+	cancelTimeout      time.Duration
 	agentInfo          agentInfo
 	acker              acker.Acker
 	unauthCounter      int
@@ -113,6 +116,7 @@ func New(
 		client,
 		scheduler,
 		debouncerFactory,
+		cancelCheckinTimeout,
 		acker,
 		stateFetcher,
 		stateStore,
@@ -126,6 +130,7 @@ func newFleetGatewayWithSchedulerAndDebouncer(
 	client client.Sender,
 	scheduler Scheduler,
 	df debouncerFactory,
+	cancelTimeout time.Duration,
 	acker acker.Acker,
 	stateFetcher StateFetcher,
 	stateStore stateStore,
@@ -136,6 +141,7 @@ func newFleetGatewayWithSchedulerAndDebouncer(
 		settings:         settings,
 		agentInfo:        agentInfo,
 		scheduler:        scheduler,
+		cancelTimeout:    cancelTimeout,
 		debouncerFactory: df,
 		acker:            acker,
 		stateFetcher:     stateFetcher,
@@ -245,10 +251,9 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 			if updatedState != nil && !reflect.DeepEqual(updatedState, &initialState) {
 				// we detected that the updated State is different from the one of the current checkin, cancel and return the needNewCheckinError
 				f.log.Debugf("Detected an updated state at the end of the debounce, cancelling ongoing checkin %q", checkinID)
-				cancelCheckin()
-				f.log.Debugf("cancelled checkin %s", checkinID.String())
-				cancelledCheckinRes := <-resCheckinChan
-				f.log.Debugf("reaped answer for cancelled checkin %q: %+v", checkinID, cancelledCheckinRes)
+				cancelCheckinTimeoutCtx, cancelCancelCheckin := context.WithTimeout(ctx, f.cancelTimeout)
+				defer cancelCancelCheckin()
+				f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckin, resCheckinChan)
 				return checkinResult{err: &needNewCheckinError{newState: *updatedState}}
 			}
 		case newState := <-stateUpdates:
@@ -263,19 +268,31 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 			}
 
 			f.log.Infof(
-				"Received updated state %+v when checkin is ongoing for %s after configured debounce. Cancelling previous checkin %q and starting a new one.",
+				"Received updated state %+v when checkin is ongoing past configured debounce. Cancelling previous checkin %q and starting a new one.",
 				newState,
-				f.settings.Debounce,
 				checkinID.String(),
 			)
-			cancelCheckin()
-			f.log.Debugf("cancelled checkin %s", checkinID.String())
-			cancelledCheckinRes := <-resCheckinChan
-			f.log.Debugf("reaped answer for cancelled checkin %q: %+v", checkinID, cancelledCheckinRes)
+			cancelCheckinTimeoutCtx, cancelCancelCheckin := context.WithTimeout(ctx, f.cancelTimeout)
+			defer cancelCancelCheckin()
+			f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckin, resCheckinChan)
 			return checkinResult{err: &needNewCheckinError{newState: newState}}
 		}
 	}
 
+}
+
+func (f *fleetGateway) cancelCheckin(ctx context.Context, checkinID string, cancelCheckin context.CancelFunc, resCheckinChan <-chan checkinResult) (*checkinResult, error) {
+	f.log.Debugf("Cancelling checkin %q", checkinID)
+	cancelCheckin()
+	f.log.Debugf("Cancelled checkin %q", checkinID)
+	select {
+	case cancelledCheckinRes := <-resCheckinChan:
+		f.log.Debugf("Reaped answer for cancelled checkin %q: %+v", checkinID, cancelledCheckinRes)
+		return &cancelledCheckinRes, nil
+	case <-ctx.Done():
+		f.log.Debugf("Context expired while waiting for cancelled checkin %q to terminate", checkinID)
+		return nil, ctx.Err()
+	}
 }
 
 // Errors returns the channel to watch for reported errors.
