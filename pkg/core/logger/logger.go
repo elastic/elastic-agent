@@ -126,7 +126,7 @@ func DefaultLoggingConfig() *Config {
 	cfg.Beat = agentName
 	cfg.Level = DefaultLogLevel
 	cfg.ToFiles = true
-	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory)
+	cfg.Files.Path = paths.Logs()
 	cfg.Files.Name = agentName
 	cfg.Files.MaxSize = 20 * 1024 * 1024
 
