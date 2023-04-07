@@ -126,7 +126,7 @@ func DefaultLoggingConfig() *Config {
 	cfg.Beat = agentName
 	cfg.Level = DefaultLogLevel
 	cfg.ToFiles = true
-	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory)
+	cfg.Files.Path = paths.Logs()
 	cfg.Files.Name = agentName
 	cfg.Files.MaxSize = 20 * 1024 * 1024
 
@@ -140,7 +140,7 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Logs(), cfg.Beat)
+	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
 	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
 	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
 	rotator, err := file.NewFileRotator(filename,
