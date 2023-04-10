@@ -774,6 +774,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 			externalBinaries := []string{
 				"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat",
 				// "cloudbeat", // TODO: add once working
+				"cloud-defend",
 				"elastic-agent-shipper",
 				"apm-server",
 				"endpoint-security",
