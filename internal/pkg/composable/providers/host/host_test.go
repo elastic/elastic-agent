@@ -6,12 +6,11 @@ package host
 
 import (
 	"context"
-
-	"github.com/elastic/elastic-agent/pkg/features"
-
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -134,14 +133,14 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	// Wait long enough for the FQDN feature flag onChange
-	// callback to be called.
-	time.Sleep(20 * time.Millisecond)
-
 	// hostProvider.fetcher should be called twice:
 	// - once, right after the provider is run, and
 	// - once again, when the FQDN feature flag callback is triggered
-	require.Equal(t, 2, numCalled)
+	// Wait long enough for the FQDN feature flag onChange
+	// callback to be called.
+	assert.Eventually(t,
+		func() bool { return numCalled == 2 },
+		time.Second, 10*time.Millisecond)
 }
 
 func returnHostMapping(log *logger.Logger) infoFetcher {
