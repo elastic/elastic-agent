@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 package tools
 
 import (
@@ -9,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -20,7 +16,10 @@ func DownloadElasticAgent(version string) error {
 		return err
 	}
 
-	fileName, destFileName := tarName(version)
+	fileName, destFileName, err := tarName(version)
+	if err != nil {
+		return err
+	}
 	agentTarPath := fmt.Sprintf("%s/%s", dirToInstall, destFileName)
 	err = DownloadFile(agentTarPath, fmt.Sprintf("https://artifacts.elastic.co/downloads/beats/elastic-agent/%s", fileName))
 
@@ -50,10 +49,4 @@ func DownloadFile(filepath string, url string) error {
 
 	_, err = io.Copy(out, resp.Body)
 	return err
-}
-
-func tarName(version string) (string, string) {
-	fileName := fmt.Sprintf("elastic-agent-%s-linux-arm64.tar.gz", version)
-	destFileName := fmt.Sprintf("%s%s", "elastic-agent", filepath.Ext(fileName))
-	return fileName, destFileName
 }
