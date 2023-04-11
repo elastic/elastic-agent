@@ -172,11 +172,14 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 		}
 	}()
 
-	client, err := client.NewAuthWithConfig(h.log, h.config.Fleet.AccessAPIKey, h.config.Fleet.Client)
+	client, err := client.NewAuthWithConfig(
+		h.log, h.config.Fleet.AccessAPIKey, h.config.Fleet.Client)
 	if err != nil {
 		return errors.New(
 			err, "fail to create API client with updated hosts",
-			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
+			errors.TypeConfig,
+			errors.M("hosts", append(
+				h.config.Fleet.Client.Hosts, h.config.Fleet.Client.Host)))
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
