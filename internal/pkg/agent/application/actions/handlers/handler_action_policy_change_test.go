@@ -113,60 +113,116 @@ func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 	fleetServerPort, err := strconv.Atoi(fleetServerURL.Port())
 	require.NoError(t, err)
 
-	t.Run("Rollback fleet client changes on error", func(t *testing.T) {
-		log, _ := logger.NewTesting("TestPolicyChangeHandler")
-		var setterCalledCount int
-		setter := testSetter{SetClientFn: func(c client.Sender) {
-			setterCalledCount++
-		}}
+	t.Run("Rollback client changes when cannot create client",
+		func(t *testing.T) {
+			log, _ := logger.NewTesting("TestPolicyChangeHandler")
+			var setterCalledCount int
+			setter := testSetter{SetClientFn: func(c client.Sender) {
+				setterCalledCount++
+			}}
 
-		originalCfg := &configuration.Configuration{
-			Fleet: &configuration.FleetAgentConfig{
-				Server: &configuration.FleetServerConfig{
-					Host: fleetServerHost,
-					Port: uint16(fleetServerPort),
+			originalCfg := &configuration.Configuration{
+				Fleet: &configuration.FleetAgentConfig{
+					Server: &configuration.FleetServerConfig{
+						Host: fleetServerHost,
+						Port: uint16(fleetServerPort),
+					},
+					Client: remote.Config{
+						Host:  "http://example.co",
+						Hosts: []string{"http://hosts1.com", "http://hosts2.com"},
+						Transport: httpcommon.HTTPTransportSettings{
+							Proxy: httpcommon.HTTPClientProxySettings{
+								URL: &httpcommon.ProxyURI{
+									Host: "original.proxy",
+								},
+							}}},
 				},
-				AccessAPIKey: "ignore",
-				Client: remote.Config{
-					Host:  "http://example.co",
-					Hosts: []string{"http://hosts1.com", "http://hosts2.com"},
-					Transport: httpcommon.HTTPTransportSettings{
-						Proxy: httpcommon.HTTPClientProxySettings{
-							URL: &httpcommon.ProxyURI{
-								Host: "original.proxy",
-							},
-						}}},
-			},
-			Settings: configuration.DefaultSettingsConfig()}
+				Settings: configuration.DefaultSettingsConfig()}
 
-		h := PolicyChangeHandler{
-			agentInfo: &info.AgentInfo{},
-			config:    originalCfg,
-			store:     &storage.NullStore{},
-			setters:   []actions.ClientSetter{&setter},
-			log:       log,
-		}
+			h := PolicyChangeHandler{
+				agentInfo: &info.AgentInfo{},
+				config:    originalCfg,
+				store:     &storage.NullStore{},
+				setters:   []actions.ClientSetter{&setter},
+				log:       log,
+			}
 
-		cfg := config.MustNewConfigFrom(
-			map[string]interface{}{
-				"fleet.host":      "http://some.url",
-				"fleet.proxy_url": "http://some.proxy",
-			})
+			cfg := config.MustNewConfigFrom(
+				map[string]interface{}{
+					"fleet.host":      "http://some.url",
+					"fleet.proxy_url": "http://some.proxy",
+				})
 
-		err := h.handleFleetServerHosts(context.Background(), cfg)
-		require.Error(t, err) // it needs to fail to rollback
+			err := h.handleFleetServerHosts(context.Background(), cfg)
+			require.Error(t, err) // it needs to fail to rollback
 
-		assert.Equal(t, 0, setterCalledCount)
-		assert.Equal(t,
-			originalCfg.Fleet.Client.Host,
-			h.config.Fleet.Client.Host)
-		assert.Equal(t,
-			originalCfg.Fleet.Client.Hosts,
-			h.config.Fleet.Client.Hosts)
-		assert.Equal(t,
-			originalCfg.Fleet.Client.Transport.Proxy.URL,
-			h.config.Fleet.Client.Transport.Proxy.URL)
-	})
+			assert.Equal(t, 0, setterCalledCount)
+			assert.Equal(t,
+				originalCfg.Fleet.Client.Host,
+				h.config.Fleet.Client.Host)
+			assert.Equal(t,
+				originalCfg.Fleet.Client.Hosts,
+				h.config.Fleet.Client.Hosts)
+			assert.Equal(t,
+				originalCfg.Fleet.Client.Transport.Proxy.URL,
+				h.config.Fleet.Client.Transport.Proxy.URL)
+		})
+
+	t.Run("Rollback client changes when cannot reach fleet-server",
+		func(t *testing.T) {
+			log, _ := logger.NewTesting("TestPolicyChangeHandler")
+			var setterCalledCount int
+			setter := testSetter{SetClientFn: func(c client.Sender) {
+				setterCalledCount++
+			}}
+
+			originalCfg := &configuration.Configuration{
+				Fleet: &configuration.FleetAgentConfig{
+					Server: &configuration.FleetServerConfig{
+						Host: fleetServerHost,
+						Port: uint16(fleetServerPort),
+					},
+					AccessAPIKey: "ignore",
+					Client: remote.Config{
+						Host:  "http://example.co",
+						Hosts: []string{"http://hosts1.com", "http://hosts2.com"},
+						Transport: httpcommon.HTTPTransportSettings{
+							Proxy: httpcommon.HTTPClientProxySettings{
+								URL: &httpcommon.ProxyURI{
+									Host: "original.proxy",
+								},
+							}}},
+				},
+				Settings: configuration.DefaultSettingsConfig()}
+
+			h := PolicyChangeHandler{
+				agentInfo: &info.AgentInfo{},
+				config:    originalCfg,
+				store:     &storage.NullStore{},
+				setters:   []actions.ClientSetter{&setter},
+				log:       log,
+			}
+
+			cfg := config.MustNewConfigFrom(
+				map[string]interface{}{
+					"fleet.host":      "http://some.url",
+					"fleet.proxy_url": "http://some.proxy",
+				})
+
+			err := h.handleFleetServerHosts(context.Background(), cfg)
+			require.Error(t, err) // it needs to fail to rollback
+
+			assert.Equal(t, 0, setterCalledCount)
+			assert.Equal(t,
+				originalCfg.Fleet.Client.Host,
+				h.config.Fleet.Client.Host)
+			assert.Equal(t,
+				originalCfg.Fleet.Client.Hosts,
+				h.config.Fleet.Client.Hosts)
+			assert.Equal(t,
+				originalCfg.Fleet.Client.Transport.Proxy.URL,
+				h.config.Fleet.Client.Transport.Proxy.URL)
+		})
 
 	t.Run("A policy with a new Host and no proxy changes the Host", func(t *testing.T) {
 		log, _ := logger.NewTesting("TestPolicyChangeHandler")
