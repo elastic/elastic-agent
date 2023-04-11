@@ -81,15 +81,6 @@ func RemoveFQDNOnChangeCallback(id string) {
 	delete(current.fqdnCallbacks, id)
 }
 
-// NumFQDNOnChangeCallbacks returns the number of FQDN onChange
-// callbacks currently registered.  Useful for testing.
-func NumFQDNOnChangeCallbacks() int {
-	current.mu.RLock()
-	defer current.mu.RUnlock()
-
-	return len(current.fqdnCallbacks)
-}
-
 // setFQDN sets the value of the FQDN flag in Flags.
 func (f *Flags) setFQDN(newValue bool) {
 	f.mu.Lock()

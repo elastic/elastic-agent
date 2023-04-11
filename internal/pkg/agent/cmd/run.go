@@ -229,10 +229,11 @@ func run(override cfgOverrider, testingMode bool, modifiers ...component.Platfor
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
+	defer composable.Close()
 
 	serverStopFn, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
