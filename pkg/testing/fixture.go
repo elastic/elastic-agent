@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,6 +41,9 @@ type Fixture struct {
 	connectTimout   time.Duration
 
 	workDir string
+
+	c   client.Client
+	cMx sync.RWMutex
 }
 
 type fixtureOpt func(s *Fixture)
@@ -112,6 +116,13 @@ func NewFixture(t *testing.T, version string, opts ...fixtureOpt) (*Fixture, err
 		o(f)
 	}
 	return f, nil
+}
+
+// Client returns the Elastic Agent communication client.
+func (f *Fixture) Client() client.Client {
+	f.cMx.RLock()
+	defer f.cMx.RUnlock()
+	return f.c
 }
 
 // Prepare prepares the Elastic Agent for usage.
@@ -208,6 +219,9 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	}
 
 	c := client.New(client.WithAddress(cAddr))
+	f.setClient(c)
+	defer f.setClient(nil)
+
 	stateCh, stateErrCh := watchState(ctx, c, f.connectTimout)
 	stopping := false
 	for {
@@ -239,22 +253,24 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
 			}
 		case state := <-stateCh:
-			cfg, cont, err := sm.next(state)
-			if err != nil {
-				killProc()
-				return fmt.Errorf("state management failed with unexpected error: %w", err)
-			}
-			if !cont {
-				if !stopping {
-					// trigger the stop
-					stopping = true
-					_ = proc.Stop()
-				}
-			} else if cfg != "" {
-				err := performConfigure(ctx, c, cfg, 3*time.Second)
+			if sm != nil {
+				cfg, cont, err := sm.next(state)
 				if err != nil {
 					killProc()
-					return err
+					return fmt.Errorf("state management failed with unexpected error: %w", err)
+				}
+				if !cont {
+					if !stopping {
+						// trigger the stop
+						stopping = true
+						_ = proc.Stop()
+					}
+				} else if cfg != "" {
+					err := performConfigure(ctx, c, cfg, 3*time.Second)
+					if err != nil {
+						killProc()
+						return err
+					}
 				}
 			}
 		}
@@ -406,6 +422,12 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 	}
 
 	return nil
+}
+
+func (f *Fixture) setClient(c client.Client) {
+	f.cMx.Lock()
+	defer f.cMx.Unlock()
+	f.c = c
 }
 
 // validateComponents ensures that the provided UsableComponent's are valid.

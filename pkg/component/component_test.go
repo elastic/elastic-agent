@@ -1052,7 +1052,8 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "filestream-default",
+								"id":   "filestream-default",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "filestream-default-filestream-0",
@@ -1280,7 +1281,8 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "filestream-default",
+								"id":   "filestream-default",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "filestream-default-filestream-0",
@@ -1304,7 +1306,8 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "log-default",
+								"id":   "log-default",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "log-default-logfile-0",
@@ -1408,7 +1411,8 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "log-stashit",
+								"id":   "log-stashit",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "log-stashit-logfile-3",
@@ -1475,7 +1479,8 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "log-redis",
+								"id":   "log-redis",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "log-redis-logfile-4",
