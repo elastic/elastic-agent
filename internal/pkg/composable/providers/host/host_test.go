@@ -122,8 +122,18 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	go func() {
 		err = provider.Run(comm)
 	}()
+<<<<<<< HEAD
 	// poke the scheduler to run the goroutine starting the provider
 	runtime.Gosched()
+=======
+
+	// Wait long enough for provider.Run to register
+	// the FQDN feature flag onChange callback.
+	numCallbacks := features.NumFQDNOnChangeCallbacks()
+	require.Eventually(t, func() bool {
+		return features.NumFQDNOnChangeCallbacks() == numCallbacks+1
+	}, 100*time.Millisecond, 10*time.Millisecond)
+>>>>>>> 70843ed336 (Use require.Eventually instead of time.Sleep (#2480))
 
 	// Trigger the FQDN feature flag callback by
 	// toggling the FQDN feature flag
@@ -132,14 +142,20 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	// hostProvider.fetcher should be called twice:
-	// - once, right after the provider is run, and
-	// - once again, when the FQDN feature flag callback is triggered
 	// Wait long enough for the FQDN feature flag onChange
 	// callback to be called.
+<<<<<<< HEAD
 	assert.Eventually(t,
 		func() bool { return numCalled == 2 },
 		5*time.Second, 10*time.Millisecond)
+=======
+	require.Eventually(t, func() bool {
+		// hostProvider.fetcher should be called twice:
+		// - once, right after the provider is run, and
+		// - once again, when the FQDN feature flag callback is triggered
+		return numCalled == 2
+	}, 100*time.Millisecond, 10*time.Millisecond)
+>>>>>>> 70843ed336 (Use require.Eventually instead of time.Sleep (#2480))
 }
 
 func returnHostMapping(log *logger.Logger) infoFetcher {
