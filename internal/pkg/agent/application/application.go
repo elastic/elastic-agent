@@ -7,11 +7,8 @@ package application
 import (
 	"fmt"
 
-<<<<<<< HEAD
 	"github.com/elastic/elastic-agent-libs/logp"
-=======
 	"github.com/elastic/elastic-agent/pkg/features"
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
 
 	"go.elastic.co/apm"
 
@@ -41,81 +38,36 @@ func New(
 	tracer *apm.Tracer,
 	disableMonitoring bool,
 	modifiers ...component.PlatformModifier,
-<<<<<<< HEAD
-) (*coordinator.Coordinator, error) {
+) (*coordinator.Coordinator, composable.Controller, error) {
 	platform, err := component.LoadPlatformDetail(modifiers...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to gather system information: %w", err)
-=======
-) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
-	platform, err := component.LoadPlatformDetail(modifiers...)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to gather system information: %w", err)
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+		return nil, nil, fmt.Errorf("failed to gather system information: %w", err)
 	}
 	log.Info("Gathered system information")
 
 	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
 	if err != nil {
-<<<<<<< HEAD
-		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
-=======
-		return nil, nil, nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+		return nil, nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 	log.With("inputs", specs.Inputs()).Info("Detected available inputs and outputs")
 
 	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
-<<<<<<< HEAD
-		return nil, fmt.Errorf("failed to determine capabilities: %w", err)
-=======
-		return nil, nil, nil, fmt.Errorf("failed to determine capabilities: %w", err)
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+		return nil, nil, fmt.Errorf("failed to determine capabilities: %w", err)
 	}
 	log.Info("Determined allowed capabilities")
 
 	pathConfigFile := paths.ConfigFile()
-<<<<<<< HEAD
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	if err := features.Apply(rawConfig); err != nil {
-		return nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
-=======
-
-	var rawConfig *config.Config
-	if testingMode {
-		// testing mode doesn't read any configuration from the disk
-		rawConfig, err = config.NewConfigFrom("")
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-
-		// monitoring is always disabled in testing mode
-		disableMonitoring = true
-	} else {
-		rawConfig, err = config.LoadFile(pathConfigFile)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-	}
-	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
@@ -133,11 +85,7 @@ func New(
 		cfg.Settings.GRPC,
 	)
 	if err != nil {
-<<<<<<< HEAD
-		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
-=======
-		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+		return nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
 
 	var configMgr coordinator.ConfigManager
@@ -162,11 +110,7 @@ func New(
 		var store storage.Store
 		store, cfg, err = mergeFleetConfig(rawConfig)
 		if err != nil {
-<<<<<<< HEAD
-			return nil, err
-=======
-			return nil, nil, nil, err
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+			return nil, nil, err
 		}
 
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
@@ -183,11 +127,7 @@ func New(
 
 			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
 			if err != nil {
-<<<<<<< HEAD
-				return nil, err
-=======
-				return nil, nil, nil, err
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+				return nil, nil, err
 			}
 			configMgr = managed
 		}
@@ -195,11 +135,7 @@ func New(
 
 	composable, err := composable.New(log, rawConfig, composableManaged)
 	if err != nil {
-<<<<<<< HEAD
-		return nil, errors.New(err, "failed to initialize composable controller")
-=======
-		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+		return nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
 	coord := coordinator.New(log, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, isManaged, compModifiers...)
@@ -208,18 +144,14 @@ func New(
 		// coordinator, so it must be set here once the coordinator is created
 		managed.coord = coord
 	}
-<<<<<<< HEAD
-	return coord, nil
-=======
 
 	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
 	// any feature flag change callbacks are registered before they get called by `features.Apply`.
 	if err := features.Apply(rawConfig); err != nil {
-		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
+		return nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
-	return coord, configMgr, composable, nil
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+	return coord, composable, nil
 }
 
 func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {

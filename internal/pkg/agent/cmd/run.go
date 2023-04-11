@@ -207,11 +207,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		l.Info("APM instrumentation disabled")
 	}
 
-<<<<<<< HEAD
-	coord, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
-=======
-	coord, configMgr, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
->>>>>>> 86c3395a9b (Better callback registration/deregistration in host provider's lifecycle (#2485))
+	coord, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
