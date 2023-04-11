@@ -20,8 +20,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// DefaultCheckInterval is the default timeout used to check if any host information has changed.
-const DefaultCheckInterval = 5 * time.Minute
+const (
+	// DefaultCheckInterval is the default timeout used to check if any host information has changed.
+	DefaultCheckInterval = 5 * time.Minute
+
+	fqdnFeatureFlagCallbackID = "host_provider"
+)
 
 func init() {
 	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
@@ -33,6 +37,10 @@ type contextProvider struct {
 	logger *logger.Logger
 
 	CheckInterval time.Duration `config:"check_interval"`
+
+	// fqdnFFChangeCh is used to signal when the FQDN
+	// feature flag has changed
+	fqdnFFChangeCh chan struct{}
 
 	// used by testing
 	fetcher infoFetcher
@@ -49,21 +57,6 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)
 	}
 
-	const fqdnFeatureFlagCallbackID = "host_provider"
-	fqdnFFChangeCh := make(chan struct{})
-	err = features.AddFQDNOnChangeCallback(
-		onFQDNFeatureFlagChange(fqdnFFChangeCh),
-		fqdnFeatureFlagCallbackID,
-	)
-	if err != nil {
-		return fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
-	}
-
-	defer func() {
-		features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
-		close(fqdnFFChangeCh)
-	}()
-
 	// Update context when any host information changes.
 	for {
 		t := time.NewTimer(c.CheckInterval)
@@ -71,7 +64,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		case <-comm.Done():
 			t.Stop()
 			return comm.Err()
-		case <-fqdnFFChangeCh:
+		case <-c.fqdnFFChangeCh:
 		case <-t.C:
 		}
 
@@ -92,11 +85,19 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 	}
 }
 
-func onFQDNFeatureFlagChange(fqdnFFChangeCh chan struct{}) features.BoolValueOnChangeCallback {
-	return func(new, old bool) {
-		// FQDN feature flag was toggled, so notify on channel
-		fqdnFFChangeCh <- struct{}{}
+func (c *contextProvider) onFQDNFeatureFlagChange(new, old bool) {
+	// FQDN feature flag was toggled, so notify on channel
+	select {
+	case c.fqdnFFChangeCh <- struct{}{}:
+	default:
 	}
+}
+
+func (c *contextProvider) Close() error {
+	features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
+	close(c.fqdnFFChangeCh)
+
+	return nil
 }
 
 // ContextProviderBuilder builds the context provider.
@@ -114,6 +115,16 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 	if p.CheckInterval <= 0 {
 		p.CheckInterval = DefaultCheckInterval
 	}
+
+	p.fqdnFFChangeCh = make(chan struct{}, 1)
+	err := features.AddFQDNOnChangeCallback(
+		p.onFQDNFeatureFlagChange,
+		fqdnFeatureFlagCallbackID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
+	}
+
 	return p, nil
 }
 
