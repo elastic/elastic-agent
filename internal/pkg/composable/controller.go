@@ -115,12 +115,25 @@ func (c *controller) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	wg.Add(len(c.contextProviders) + len(c.dynamicProviders))
 
+	closeProvider := func(name string, provider any) {
+		defer wg.Done()
+
+		cp, ok := provider.(corecomp.CloseableProvider)
+		if !ok {
+			return
+		}
+
+		if err := cp.Close(); err != nil {
+			c.logger.Errorf("unable to close provider %q: %s", name, err.Error())
+		}
+	}
+
 	// run all the enabled context providers
 	for name, state := range c.contextProviders {
 		state.Context = localCtx
 		state.signal = notify
 		go func(name string, state *contextProviderState) {
-			defer wg.Done()
+			defer closeProvider(name, state.provider)
 			err := state.provider.Run(state)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
@@ -137,7 +150,7 @@ func (c *controller) Run(ctx context.Context) error {
 		state.Context = localCtx
 		state.signal = notify
 		go func(name string, state *dynamicProviderState) {
-			defer wg.Done()
+			defer closeProvider(name, state.provider)
 			err := state.provider.Run(state)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
