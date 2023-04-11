@@ -92,15 +92,18 @@ func TestPolicyAcked(t *testing.T) {
 func TestPolicyChangeHandler_handleFleetServerHosts(t *testing.T) {
 	mockProxy := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(nil)
+			_, err := w.Write(nil)
+			require.NoError(t, err)
 		}))
 
 	fleetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "api/status" {
 			w.WriteHeader(http.StatusNotFound)
-			w.Write(nil)
+			_, err := w.Write(nil)
+			require.NoError(t, err)
 		}
-		w.Write(nil)
+		_, err := w.Write(nil)
+		require.NoError(t, err)
 	}))
 
 	defer mockProxy.Close()
