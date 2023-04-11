@@ -83,10 +83,6 @@ func New(
 		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	if err := features.Apply(rawConfig); err != nil {
-		return nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
-	}
-
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
@@ -168,6 +164,13 @@ func New(
 		// coordinator, so it must be set here once the coordinator is created
 		managed.coord = coord
 	}
+
+	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
+	// any feature flag change callbacks are registered before they get called by `features.Apply`.
+	if err := features.Apply(rawConfig); err != nil {
+		return nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
+	}
+
 	return coord, configMgr, nil
 }
 
