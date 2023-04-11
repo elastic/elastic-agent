@@ -142,10 +142,12 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	// only set protocol/hosts as that is all Fleet currently sends
 	prevProtocol := h.config.Fleet.Client.Protocol
 	prevPath := h.config.Fleet.Client.Path
+	prevHost := h.config.Fleet.Client.Host
 	prevHosts := h.config.Fleet.Client.Hosts
 	prevProxy := h.config.Fleet.Client.Transport.Proxy
 	h.config.Fleet.Client.Protocol = cfg.Fleet.Client.Protocol
 	h.config.Fleet.Client.Path = cfg.Fleet.Client.Path
+	h.config.Fleet.Client.Host = cfg.Fleet.Client.Host
 	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
 
 	// We ignore empty proxies from fleet. That way a proxy is set by --proxy-url
@@ -164,6 +166,7 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 		if err != nil {
 			h.config.Fleet.Client.Protocol = prevProtocol
 			h.config.Fleet.Client.Path = prevPath
+			h.config.Fleet.Client.Host = prevHost
 			h.config.Fleet.Client.Hosts = prevHosts
 			h.config.Fleet.Client.Transport.Proxy = prevProxy
 		}
