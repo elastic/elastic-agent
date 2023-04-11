@@ -115,6 +115,9 @@ func (c *controller) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	wg.Add(len(c.contextProviders) + len(c.dynamicProviders))
 
+	// This function will attempt to close a provider if that provider is
+	// closeable, i.e. implements the `CloseableProvider` interface.  It must
+	// be called after a provider has been run.
 	closeProvider := func(name string, provider any) {
 		defer wg.Done()
 
