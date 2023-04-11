@@ -124,7 +124,10 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 
 	// Wait long enough for provider.Run to register
 	// the FQDN feature flag onChange callback.
-	time.Sleep(20 * time.Millisecond)
+	numCallbacks := features.NumFQDNOnChangeCallbacks()
+	require.Eventually(t, func() bool {
+		return features.NumFQDNOnChangeCallbacks() == numCallbacks+1
+	}, 100*time.Millisecond, 10*time.Millisecond)
 
 	// Trigger the FQDN feature flag callback by
 	// toggling the FQDN feature flag
@@ -133,14 +136,14 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	// hostProvider.fetcher should be called twice:
-	// - once, right after the provider is run, and
-	// - once again, when the FQDN feature flag callback is triggered
 	// Wait long enough for the FQDN feature flag onChange
 	// callback to be called.
-	assert.Eventually(t,
-		func() bool { return numCalled == 2 },
-		time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		// hostProvider.fetcher should be called twice:
+		// - once, right after the provider is run, and
+		// - once again, when the FQDN feature flag callback is triggered
+		return numCalled == 2
+	}, 100*time.Millisecond, 10*time.Millisecond)
 }
 
 func returnHostMapping(log *logger.Logger) infoFetcher {
