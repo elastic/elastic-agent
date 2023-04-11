@@ -34,6 +34,10 @@ type Controller interface {
 
 	// Watch returns the channel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
+
+	// Close closes the controller, allowing for any resource
+	// cleanup and such.
+	Close()
 }
 
 // controller manages the state of the providers current context.
@@ -115,28 +119,12 @@ func (c *controller) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	wg.Add(len(c.contextProviders) + len(c.dynamicProviders))
 
-	// This function will attempt to close a provider if that provider is
-	// closeable, i.e. implements the `CloseableProvider` interface.  It must
-	// be called after a provider has been run.
-	closeProvider := func(name string, provider any) {
-		defer wg.Done()
-
-		cp, ok := provider.(corecomp.CloseableProvider)
-		if !ok {
-			return
-		}
-
-		if err := cp.Close(); err != nil {
-			c.logger.Errorf("unable to close provider %q: %s", name, err.Error())
-		}
-	}
-
 	// run all the enabled context providers
 	for name, state := range c.contextProviders {
 		state.Context = localCtx
 		state.signal = notify
 		go func(name string, state *contextProviderState) {
-			defer closeProvider(name, state.provider)
+			defer wg.Done()
 			err := state.provider.Run(state)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
@@ -153,7 +141,7 @@ func (c *controller) Run(ctx context.Context) error {
 		state.Context = localCtx
 		state.signal = notify
 		go func(name string, state *dynamicProviderState) {
-			defer closeProvider(name, state.provider)
+			defer wg.Done()
 			err := state.provider.Run(state)
 			if err != nil && !errors.Is(err, context.Canceled) {
 				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
@@ -265,6 +253,34 @@ func (c *controller) Errors() <-chan error {
 // Watch returns the channel for variable changes.
 func (c *controller) Watch() <-chan []*transpiler.Vars {
 	return c.ch
+}
+
+// Close closes the controller, allowing for any resource
+// cleanup and such.
+func (c *controller) Close() {
+	// Attempt to close all closeable context providers.
+	for name, state := range c.contextProviders {
+		cp, ok := state.provider.(corecomp.CloseableProvider)
+		if !ok {
+			continue
+		}
+
+		if err := cp.Close(); err != nil {
+			c.logger.Errorf("unable to close context provider %q: %s", name, err.Error())
+		}
+	}
+
+	// Attempt to close all closeable dynamic providers.
+	for name, state := range c.dynamicProviders {
+		cp, ok := state.provider.(corecomp.CloseableProvider)
+		if !ok {
+			continue
+		}
+
+		if err := cp.Close(); err != nil {
+			c.logger.Errorf("unable to close dynamic provider %q: %s", name, err.Error())
+		}
+	}
 }
 
 type contextProviderState struct {
