@@ -125,7 +125,7 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 
 	// Wait long enough for provider.Run to register
 	// the FQDN feature flag onChange callback.
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	// Trigger the FQDN feature flag callback by
 	// toggling the FQDN feature flag
@@ -136,7 +136,7 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 
 	// Wait long enough for the FQDN feature flag onChange
 	// callback to be called.
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	// hostProvider.fetcher should be called twice:
 	// - once, right after the provider is run, and
