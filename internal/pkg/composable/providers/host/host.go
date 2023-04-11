@@ -87,7 +87,10 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 
 func (c *contextProvider) onFQDNFeatureFlagChange(new, old bool) {
 	// FQDN feature flag was toggled, so notify on channel
-	c.fqdnFFChangeCh <- struct{}{}
+	select {
+	case c.fqdnFFChangeCh <- struct{}{}:
+	default:
+	}
 }
 
 func (c *contextProvider) Close() error {
