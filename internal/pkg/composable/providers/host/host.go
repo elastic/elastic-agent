@@ -113,7 +113,7 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 		p.CheckInterval = DefaultCheckInterval
 	}
 
-	p.fqdnFFChangeCh = make(chan struct{})
+	p.fqdnFFChangeCh = make(chan struct{}, 1)
 	err := features.AddFQDNOnChangeCallback(
 		p.onFQDNFeatureFlagChange,
 		fqdnFeatureFlagCallbackID,
