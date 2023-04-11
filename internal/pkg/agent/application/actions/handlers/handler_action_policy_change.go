@@ -150,12 +150,13 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	h.config.Fleet.Client.Host = cfg.Fleet.Client.Host
 	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
 
-	// We ignore empty proxies from fleet. That way a proxy is set by --proxy-url
-	// it won't be overridden by an absent proxy from fleet-server.
+	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
+	// it won't be overridden by an absent or empty proxy from fleet-server.
 	// However, if there is a proxy sent by fleet-server, it'll take precedence.
+	// Therefore, it's not possible to remove a proxy once it's set.
 	if cfg.Fleet.Client.Transport.Proxy.URL == nil ||
 		cfg.Fleet.Client.Transport.Proxy.URL.String() == "" {
-		h.log.Debug("proxy from fleet is empty or null, proxy will not be changed")
+		h.log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
 	} else {
 		h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
 		h.log.Debug("received proxy from fleet, applying it")
@@ -176,7 +177,7 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 		h.log, h.config.Fleet.AccessAPIKey, h.config.Fleet.Client)
 	if err != nil {
 		return errors.New(
-			err, "fail to create API client with updated hosts",
+			err, "fail to create API client with updated config",
 			errors.TypeConfig,
 			errors.M("hosts", append(
 				h.config.Fleet.Client.Hosts, h.config.Fleet.Client.Host)))
