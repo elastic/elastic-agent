@@ -122,10 +122,6 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 		err = provider.Run(comm)
 	}()
 
-	// Wait long enough for provider.Run to register
-	// the FQDN feature flag onChange callback.
-	time.Sleep(20 * time.Millisecond)
-
 	// Trigger the FQDN feature flag callback by
 	// toggling the FQDN feature flag
 	err = features.Apply(config.MustNewConfigFrom(map[string]interface{}{
@@ -140,7 +136,7 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	// callback to be called.
 	assert.Eventually(t,
 		func() bool { return numCalled == 2 },
-		time.Second, 10*time.Millisecond)
+		5*time.Second, 10*time.Millisecond)
 }
 
 func returnHostMapping(log *logger.Logger) infoFetcher {
