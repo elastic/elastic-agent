@@ -2498,7 +2498,7 @@ func TestManager_FakeShipper(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
 					} else {
-						subErrCh <- errors.New("input unit missing: fake-input")
+						subErrCh <- errors.New("input unit missing: fake-default")
 					}
 					unit, ok = state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
 					if ok {
@@ -2527,7 +2527,7 @@ func TestManager_FakeShipper(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
 					} else {
-						subErrCh <- errors.New("output unit missing: fake-input")
+						subErrCh <- errors.New("output unit missing: fake-default")
 					}
 				}
 			case state := <-compSub.Ch():
