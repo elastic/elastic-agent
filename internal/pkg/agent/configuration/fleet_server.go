@@ -69,7 +69,7 @@ func ElasticsearchFromConnStr(conn string, serviceToken, serviceTokenPath string
 			VerificationMode: tlscommon.VerifyNone,
 		}
 	}
-	if serviceToken == "" {
+	if serviceToken == "" && serviceTokenPath == "" {
 		return Elasticsearch{}, errors.New("invalid connection string: must include a service token")
 	}
 	cfg.ServiceToken = serviceToken
