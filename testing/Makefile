@@ -22,8 +22,9 @@ clean:
 create-cluster:
 	@$(call check_defined, SLACK_CHANNEL, SLACK_CHANNEL is not defined. Specify a slack channel to send notifications to.)
 	@$(call check_defined, GITHUB_TOKEN, GITHUB_TOKEN is not defined. Specify a github token to use for the cluster.)
-	# oblt-cli cluster create custom --template-file $(CURDIR)/$(TEMPLATE_FILE) --output-file $(CURDIR)/$(CLUSTER_INFO_FILE) --parameters '{"StackVersion": "$(STACK_VERSION)", "ClusterName": "$(CLUSTER_NAME)", "SlackChannel": "$(SLACK_CHANNEL)"}' --wait 15
-	oblt-cli cluster secrets digest-yml --cluster-name $(shell jq -r '.ClusterName' $(CLUSTER_INFO_FILE)) --output-file $(CURDIR)/$(CLUSTER_DIGEST_FILE)
+	oblt-cli cluster create custom --template-file $(CURDIR)/$(TEMPLATE_FILE) --output-file $(CURDIR)/$(CLUSTER_INFO_FILE) --parameters '{"StackVersion": "$(STACK_VERSION)", "ClusterName": "$(CLUSTER_NAME)", "SlackChannel": "$(SLACK_CHANNEL)"}' --wait 15
+	sync $(CURDIR)/$(CLUSTER_INFO_FILE)
+	oblt-cli cluster secrets digest-yml --cluster-name $(shell jq -r '.ClusterName' $(CURDIR)/$(CLUSTER_INFO_FILE)) --output-file $(CURDIR)/$(CLUSTER_DIGEST_FILE)
 
 .PHONY: run-tests
 run-tests:
