@@ -6,7 +6,7 @@ grab_cluster_info: false
 create_ilm: false
 certificate_issuer: letsencrypt-staging
 slack_channel: "{{ .SlackChannel }}"
-digest_secrets_enabled: true
+digest_secrets_enabled: false
 secret_ec_user: "observability-team/ci/elastic-cloud/observability-pro"
 
 elastic_cloud:
