@@ -61,7 +61,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Start the Elastic Agent",
-		Long:  "This command will start the Elastic Agent.",
+		Long:  "This command starts the Elastic Agent.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// done very early so the encrypted store is never used
 			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
