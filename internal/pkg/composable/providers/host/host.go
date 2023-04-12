@@ -20,8 +20,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// DefaultCheckInterval is the default timeout used to check if any host information has changed.
-const DefaultCheckInterval = 5 * time.Minute
+const (
+	// DefaultCheckInterval is the default timeout used to check if any host information has changed.
+	DefaultCheckInterval = 5 * time.Minute
+
+	fqdnFeatureFlagCallbackID = "host_provider"
+)
 
 func init() {
 	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
@@ -33,6 +37,10 @@ type contextProvider struct {
 	logger *logger.Logger
 
 	CheckInterval time.Duration `config:"check_interval"`
+
+	// fqdnFFChangeCh is used to signal when the FQDN
+	// feature flag has changed
+	fqdnFFChangeCh chan struct{}
 
 	// used by testing
 	fetcher infoFetcher
@@ -56,6 +64,7 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		case <-comm.Done():
 			t.Stop()
 			return comm.Err()
+		case <-c.fqdnFFChangeCh:
 		case <-t.C:
 		}
 
@@ -76,6 +85,21 @@ func (c *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 	}
 }
 
+func (c *contextProvider) onFQDNFeatureFlagChange(new, old bool) {
+	// FQDN feature flag was toggled, so notify on channel
+	select {
+	case c.fqdnFFChangeCh <- struct{}{}:
+	default:
+	}
+}
+
+func (c *contextProvider) Close() error {
+	features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
+	close(c.fqdnFFChangeCh)
+
+	return nil
+}
+
 // ContextProviderBuilder builds the context provider.
 func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{
@@ -91,6 +115,16 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 	if p.CheckInterval <= 0 {
 		p.CheckInterval = DefaultCheckInterval
 	}
+
+	p.fqdnFFChangeCh = make(chan struct{}, 1)
+	err := features.AddFQDNOnChangeCallback(
+		p.onFQDNFeatureFlagChange,
+		fqdnFeatureFlagCallbackID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
+	}
+
 	return p, nil
 }
 
