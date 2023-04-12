@@ -23,7 +23,7 @@ func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install Elastic Agent permanently on this system",
-		Long: `This will install Elastic Agent permanently on this system and will become managed by the systems service manager.
+		Long: `This command will install Elastic Agent permanently on this system. The system's service manager will manage the installed Elastic agent.
 
 Unless all the require command-line parameters are provided or -f is used this command will ask questions on how you
 would like the Agent to operate.

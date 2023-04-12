@@ -28,8 +28,8 @@ import (
 func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "enroll",
-		Short: "Enroll the Agent into Fleet",
-		Long:  "This will enroll the Agent into Fleet.",
+		Short: "Enroll the Elastic Agent into Fleet",
+		Long:  "This command will enroll the Elastic Agent into Fleet.",
 		Run: func(c *cobra.Command, args []string) {
 			if err := enroll(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
