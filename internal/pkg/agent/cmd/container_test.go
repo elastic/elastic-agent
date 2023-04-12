@@ -1,10 +1,15 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package cmd
 
 import (
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
 func TestContainerTestPaths(t *testing.T) {
