@@ -111,8 +111,8 @@ The following actions are possible and grouped based on the actions.
   KIBANA_FLEET_USERNAME - Kibana username to service token [$KIBANA_USERNAME]
   KIBANA_FLEET_PASSWORD - Kibana password to service token [$KIBANA_PASSWORD]
   KIBANA_FLEET_CA - path to certificate authority to use with communicate with Kibana [$KIBANA_CA]
-  KIBANA_REQUEST_RETRY_SLEEP - specifies sleep duration taken when agent performs a request to Kibana [default 1s]
-  KIBANA_REQUEST_RETRY_COUNT - specifies number of retries agent performs when executing a request to Kibana [default 30]
+  KIBANA_REQUEST_RETRY_SLEEP - sleep duration taken when agent performs a request to Kibana [default 1s]
+  KIBANA_REQUEST_RETRY_COUNT - number of retries agent performs when executing a request to Kibana [default 30]
 
 The following environment variables are provided as a convenience to prevent a large number of environment variables to
 be used when the same credentials will be used across all the possible actions above.
