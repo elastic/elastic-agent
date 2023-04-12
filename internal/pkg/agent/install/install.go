@@ -70,7 +70,10 @@ func Install(cfgFile string) error {
 						errors.M("destination", paths.ShellWrapperPath))
 				}
 			}
-			err = os.Symlink("/Library/Elastic/Agent/elastic-agent", paths.ShellWrapperPath)
+			err = os.MkdirAll(filepath.Dir(paths.ShellWrapperPath), 0755)
+			if err == nil {
+				err = os.Symlink("/Library/Elastic/Agent/elastic-agent", paths.ShellWrapperPath)
+			}
 			if err != nil {
 				return errors.New(
 					err,
