@@ -120,7 +120,7 @@ be used when the same credentials will be used across all the possible actions a
   ELASTICSEARCH_HOST - Elasticsearch host [http://elasticsearch:9200]
   ELASTICSEARCH_USERNAME - Elasticsearch username [elastic]
   ELASTICSEARCH_PASSWORD - Elasticsearch password [changeme]
-  ELASTICSEARCH_CA - path to certificate authority to use with communicate with Elasticsearch
+  ELASTICSEARCH_CA - path to certificate authority to use to communicate with Elasticsearch
   KIBANA_HOST - Kibana host [http://kibana:5601]
   KIBANA_FLEET_USERNAME - Kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
   KIBANA_FLEET_PASSWORD - Kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
