@@ -39,7 +39,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "watch",
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
-		Long:  `This command will watch Elastic Agent for failures and initiate rollback if necessary.`,
+		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
 		Run: func(_ *cobra.Command, _ []string) {
 			log, err := configuredLogger()
 			if err != nil {
