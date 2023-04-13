@@ -20,7 +20,7 @@ import (
 
 // fixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
 func fixPermissions() error {
-	return recursiveSystemAdminPermissions(paths.InstallPath)
+	return recursiveSystemAdminPermissions(paths.InstallPath())
 }
 
 func recursiveSystemAdminPermissions(path string) error {

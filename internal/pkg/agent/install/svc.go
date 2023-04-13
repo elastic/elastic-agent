@@ -29,7 +29,7 @@ const (
 
 // ExecutablePath returns the path for the installed Agents executable.
 func ExecutablePath() string {
-	exec := filepath.Join(paths.InstallPath, paths.BinaryName)
+	exec := filepath.Join(paths.InstallPath(), paths.BinaryName)
 	if paths.ShellWrapperPath != "" {
 		exec = paths.ShellWrapperPath
 	}
@@ -42,7 +42,7 @@ func newService() (service.Service, error) {
 		DisplayName:      ServiceDisplayName,
 		Description:      ServiceDescription,
 		Executable:       ExecutablePath(),
-		WorkingDirectory: paths.InstallPath,
+		WorkingDirectory: paths.InstallPath(),
 		Option: map[string]interface{}{
 			// Linux (systemd) always restart on failure
 			"Restart": "always",

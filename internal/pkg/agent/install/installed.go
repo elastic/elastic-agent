@@ -29,7 +29,7 @@ const (
 
 // Status returns the installation status of Agent.
 func Status() (StatusType, string) {
-	expected := filepath.Join(paths.InstallPath, paths.BinaryName)
+	expected := filepath.Join(paths.InstallPath(), paths.BinaryName)
 	status, reason := checkService()
 	if checkPackageInstall() {
 		if status == Installed {

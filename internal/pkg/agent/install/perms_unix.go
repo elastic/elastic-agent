@@ -18,7 +18,7 @@ import (
 
 // fixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
 func fixPermissions() error {
-	return recursiveRootPermissions(paths.InstallPath)
+	return recursiveRootPermissions(paths.InstallPath())
 }
 
 func recursiveRootPermissions(path string) error {

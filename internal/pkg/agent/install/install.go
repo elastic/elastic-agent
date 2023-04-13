@@ -34,14 +34,14 @@ func Install(cfgFile string) error {
 	}
 
 	// ensure parent directory exists, copy source into install path
-	err = os.MkdirAll(filepath.Dir(paths.InstallPath), 0755)
+	err = os.MkdirAll(filepath.Dir(paths.InstallPath()), 0755)
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(paths.InstallPath)),
-			errors.M("directory", filepath.Dir(paths.InstallPath)))
+			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(paths.InstallPath())),
+			errors.M("directory", filepath.Dir(paths.InstallPath())))
 	}
-	err = copy.Copy(dir, paths.InstallPath, copy.Options{
+	err = copy.Copy(dir, paths.InstallPath(), copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
@@ -50,8 +50,8 @@ func Install(cfgFile string) error {
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, paths.InstallPath),
-			errors.M("source", dir), errors.M("destination", paths.InstallPath))
+			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, paths.InstallPath()),
+			errors.M("source", dir), errors.M("destination", paths.InstallPath()))
 	}
 
 	// place shell wrapper, if present on platform
@@ -109,7 +109,7 @@ func Install(cfgFile string) error {
 		return errors.New(
 			err,
 			"failed to perform permission changes",
-			errors.M("destination", paths.InstallPath))
+			errors.M("destination", paths.InstallPath()))
 	}
 
 	// install service

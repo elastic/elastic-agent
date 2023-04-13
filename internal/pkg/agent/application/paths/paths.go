@@ -11,8 +11,8 @@ const (
 	// BinaryName is the name of the installed binary.
 	BinaryName = "elastic-agent"
 
-	// InstallPath is the installation path using for install command.
-	InstallPath = "/opt/Elastic/Agent"
+	// defaultInstallPath is the installation path using for install command.
+	defaultInstallPath = "/opt/Elastic/Agent"
 
 	// ControlSocketPath is the control socket path used when installed.
 	ControlSocketPath = "unix:///run/elastic-agent.sock"
