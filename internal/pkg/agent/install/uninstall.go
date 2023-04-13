@@ -72,8 +72,8 @@ func Uninstall(cfgFile string) error {
 		}
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to remove installation directory (%s)", paths.InstallPath()),
-			errors.M("directory", paths.InstallPath()))
+			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
+			errors.M("directory", paths.Top()))
 	}
 
 	return nil
