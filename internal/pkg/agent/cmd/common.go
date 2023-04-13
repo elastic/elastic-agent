@@ -7,9 +7,7 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -41,8 +39,6 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 			return tryContainerLoadPaths()
 		},
 	}
-
-	printBasePath()
 
 	// path flags
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home"))
@@ -85,19 +81,4 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.RunE = run.RunE
 
 	return cmd
-}
-
-func printBasePath() {
-	executablePath, err := os.Executable()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	realExecutablePath, err := filepath.EvalSymlinks(executablePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	executableDir := filepath.Dir(realExecutablePath)
-	log.Println(executableDir)
 }
