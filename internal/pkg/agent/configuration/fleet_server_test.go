@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
@@ -53,6 +54,49 @@ func TestElasticsearchFromConnStr(t *testing.T) {
 		insecure: false,
 		es:       Elasticsearch{},
 		err:      errors.New("invalid connection string: must include a service token"),
+	}, {
+		name:     "http connection",
+		conn:     "http://localhost:9200",
+		token:    "my-token",
+		path:     "",
+		insecure: false,
+		es: Elasticsearch{
+			Protocol:     "http",
+			Hosts:        []string{"localhost:9200"},
+			ServiceToken: "my-token",
+		},
+		err: nil,
+	}, {
+		name:     "insecure https",
+		conn:     "https://localhost:9200",
+		token:    "my-token",
+		path:     "",
+		insecure: true,
+		es: Elasticsearch{
+			Protocol:     "https",
+			Hosts:        []string{"localhost:9200"},
+			ServiceToken: "my-token",
+			TLS: &tlscommon.Config{
+				VerificationMode: tlscommon.VerifyNone,
+			},
+		},
+		err: nil,
+	}, {
+		name:     "file schema",
+		conn:     "file:///path/to/socket",
+		token:    "my-token",
+		path:     "",
+		insecure: false,
+		es:       Elasticsearch{},
+		err:      errors.New("invalid connection string: scheme must be http or https"),
+	}, {
+		name:     "bad conn string",
+		conn:     "http://local host",
+		token:    "my-token",
+		path:     "",
+		insecure: false,
+		es:       Elasticsearch{},
+		err:      errors.New("parse \"http://local host\": invalid character \" \" in host name"),
 	}}
 
 	for _, tc := range testcases {
