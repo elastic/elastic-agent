@@ -16,8 +16,8 @@ const (
 	// BinaryName is the name of the installed binary.
 	BinaryName = "elastic-agent.exe"
 
-	// defaultInstallPath is the installation path using for install command.
-	defaultInstallPath = `C:\Program Files\Elastic\Agent`
+	// defaultBasePath is the installation path using for install command.
+	defaultBasePath = `C:\Program Files`
 
 	// ControlSocketPath is the control socket path used when installed.
 	ControlSocketPath = `\\.\pipe\elastic-agent-system`
