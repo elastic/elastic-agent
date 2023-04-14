@@ -21,27 +21,27 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile string) error {
+func Install(cfgFile, topPath string) error {
 	dir, err := findDirectory()
 	if err != nil {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
 	// uninstall current installation
-	err = Uninstall(cfgFile)
+	err = Uninstall(cfgFile, topPath)
 	if err != nil {
 		return err
 	}
 
 	// ensure parent directory exists, copy source into install path
-	err = os.MkdirAll(filepath.Dir(paths.InstallPath()), 0755)
+	err = os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(paths.InstallPath())),
-			errors.M("directory", filepath.Dir(paths.InstallPath())))
+			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
+			errors.M("directory", filepath.Dir(topPath)))
 	}
-	err = copy.Copy(dir, paths.InstallPath(), copy.Options{
+	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
@@ -50,8 +50,8 @@ func Install(cfgFile string) error {
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, paths.InstallPath()),
-			errors.M("source", dir), errors.M("destination", paths.InstallPath()))
+			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
+			errors.M("source", dir), errors.M("destination", topPath))
 	}
 
 	// place shell wrapper, if present on platform
@@ -98,22 +98,22 @@ func Install(cfgFile string) error {
 	}
 
 	// post install (per platform)
-	err = postInstall()
+	err = postInstall(topPath)
 	if err != nil {
 		return err
 	}
 
 	// fix permissions
-	err = FixPermissions()
+	err = FixPermissions(topPath)
 	if err != nil {
 		return errors.New(
 			err,
 			"failed to perform permission changes",
-			errors.M("destination", paths.InstallPath()))
+			errors.M("destination", topPath))
 	}
 
 	// install service
-	svc, err := newService()
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -130,8 +130,8 @@ func Install(cfgFile string) error {
 // StartService starts the installed service.
 //
 // This should only be called after Install is successful.
-func StartService() error {
-	svc, err := newService()
+func StartService(topPath string) error {
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -146,8 +146,8 @@ func StartService() error {
 }
 
 // StopService stops the installed service.
-func StopService() error {
-	svc, err := newService()
+func StopService(topPath string) error {
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -162,8 +162,8 @@ func StopService() error {
 }
 
 // FixPermissions fixes the permissions on the installed system.
-func FixPermissions() error {
-	return fixPermissions()
+func FixPermissions(topPath string) error {
+	return fixPermissions(topPath)
 }
 
 // findDirectory returns the directory to copy into the installation location.

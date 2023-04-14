@@ -29,9 +29,9 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile string) error {
+func Uninstall(cfgFile, topPath string) error {
 	// uninstall the current service
-	svc, err := newService()
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func Uninstall(cfgFile string) error {
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(paths.InstallPath())
+	err = os.RemoveAll(topPath)
 	if err != nil {
 		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
 			// possible to fail on Windows, because elastic-agent.exe is running from

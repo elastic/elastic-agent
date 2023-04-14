@@ -200,8 +200,8 @@ func SetInstall(path string) {
 
 // InstallPath returns the OS-specific installation path
 // for the Agent.
-func InstallPath() string {
-	return filepath.Join(defaultBasePath, "Elastic", "Agent")
+func InstallPath(basePath string) string {
+	return filepath.Join(basePath, "Elastic", "Agent")
 }
 
 // initialTop returns the initial top-level path for the binary

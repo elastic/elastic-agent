@@ -46,12 +46,12 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if !isAdmin {
 		return fmt.Errorf("unable to perform command, not executed with %s permissions", utils.PermissionUser)
 	}
-	status, reason := install.Status()
+	status, reason := install.Status(paths.Top())
 	if status == install.NotInstalled {
 		return fmt.Errorf("not installed")
 	}
 	if status == install.Installed && !info.RunningInstalled() {
-		return fmt.Errorf("can only be uninstall by executing the installed Elastic Agent at: %s", install.ExecutablePath())
+		return fmt.Errorf("can only be uninstall by executing the installed Elastic Agent at: %s", install.ExecutablePath(paths.Top()))
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
@@ -78,7 +78,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
-	err = install.Uninstall(paths.ConfigFile())
+	err = install.Uninstall(paths.ConfigFile(), paths.Top())
 	if err != nil {
 		return err
 	}

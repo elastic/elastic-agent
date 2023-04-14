@@ -38,6 +38,7 @@ would like the Agent to operate.
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
+	cmd.Flags().String("base-path", paths.DefaultBasePath, "Base path for installing Elastic Agent's files.")
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -56,10 +57,14 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
-	status, reason := install.Status()
+
+	basePath, _ := cmd.Flags().GetString("base-path")
+	topPath := paths.InstallPath(basePath)
+
+	status, reason := install.Status(topPath)
 	force, _ := cmd.Flags().GetBool("force")
 	if status == install.Installed && !force {
-		return fmt.Errorf("already installed at: %s", paths.InstallPath())
+		return fmt.Errorf("already installed at: %s", topPath)
 	}
 
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
@@ -84,7 +89,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if status == install.Broken {
 		if !force && !nonInteractive {
 			fmt.Fprintf(streams.Out, "Elastic Agent is installed but currently broken: %s\n", reason)
-			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will re-install Elastic Agent over the current installation at %s. Do you want to continue?", paths.InstallPath()), true)
+			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will re-install Elastic Agent over the current installation at %s. Do you want to continue?", topPath), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
 			}
@@ -94,7 +99,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	} else if status != install.PackageInstall {
 		if !force && !nonInteractive {
-			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be installed at %s and will run as a service. Do you want to continue?", paths.InstallPath()), true)
+			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be installed at %s and will run as a service. Do you want to continue?", topPath), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
 			}
@@ -162,19 +167,19 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	cfgFile := paths.ConfigFile()
 	if status != install.PackageInstall {
-		err = install.Install(cfgFile)
+		err = install.Install(cfgFile, topPath)
 		if err != nil {
 			return err
 		}
 
 		defer func() {
 			if err != nil {
-				_ = install.Uninstall(cfgFile)
+				_ = install.Uninstall(cfgFile, topPath)
 			}
 		}()
 
 		if !delayEnroll {
-			err = install.StartService()
+			err = install.StartService(topPath)
 			if err != nil {
 				fmt.Fprintf(streams.Out, "Installation failed to start Elastic Agent service.\n")
 				return err
@@ -182,7 +187,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 			defer func() {
 				if err != nil {
-					_ = install.StopService()
+					_ = install.StopService(topPath)
 				}
 			}()
 		}
@@ -191,7 +196,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if enroll {
 		enrollArgs := []string{"enroll", "--from-install"}
 		enrollArgs = append(enrollArgs, buildEnrollmentFlags(cmd, url, token)...)
-		enrollCmd := exec.Command(install.ExecutablePath(), enrollArgs...) //nolint:gosec // it's not tainted
+		enrollCmd := exec.Command(install.ExecutablePath(topPath), enrollArgs...) //nolint:gosec // it's not tainted
 		enrollCmd.Stdin = os.Stdin
 		enrollCmd.Stdout = os.Stdout
 		enrollCmd.Stderr = os.Stderr
@@ -203,7 +208,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		if err != nil {
 			if status != install.PackageInstall {
 				var exitErr *exec.ExitError
-				_ = install.Uninstall(cfgFile)
+				_ = install.Uninstall(cfgFile, topPath)
 				if err != nil && errors.As(err, &exitErr) {
 					return fmt.Errorf("enroll command failed with exit code: %d", exitErr.ExitCode())
 				}
