@@ -198,12 +198,6 @@ func SetInstall(path string) {
 	installPath = path
 }
 
-// InstallPath returns the OS-specific installation path
-// for the Agent.
-func InstallPath(basePath string) string {
-	return filepath.Join(basePath, "Elastic", "Agent")
-}
-
 // initialTop returns the initial top-level path for the binary
 //
 // When nested in top-level/data/elastic-agent-${hash}/ the result is top-level/.

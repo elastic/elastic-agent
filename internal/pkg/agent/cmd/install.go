@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -59,7 +60,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	basePath, _ := cmd.Flags().GetString("base-path")
-	topPath := paths.InstallPath(basePath)
+	topPath := installPath(basePath)
 
 	status, reason := install.Status(topPath)
 	force, _ := cmd.Flags().GetBool("force")
@@ -219,4 +220,8 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	fmt.Fprint(streams.Out, "Elastic Agent has been successfully installed.\n")
 	return nil
+}
+
+func installPath(basePath string) string {
+	return filepath.Join(basePath, "Elastic", "Agent")
 }
