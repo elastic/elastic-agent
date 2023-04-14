@@ -20,8 +20,8 @@ import (
 func newUninstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "uninstall",
-		Short: "Uninstall permanent Elastic Agent from this system",
-		Long: `This will uninstall permanent Elastic Agent from this system and will no longer be managed by this system.
+		Short: "Uninstall Elastic Agent from this system",
+		Long: `This command uninstalls the Elastic Agent permanently from this system.  The system's service manager will no longer manage Elastic agent.
 
 Unless -f is used this command will ask confirmation before performing removal.
 `,

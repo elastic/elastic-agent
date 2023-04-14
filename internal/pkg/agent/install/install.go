@@ -56,6 +56,14 @@ func Install(cfgFile string) error {
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
+		pathDir := filepath.Dir(paths.ShellWrapperPath)
+		err = os.MkdirAll(pathDir, 0755)
+		if err != nil {
+			return errors.New(
+				err,
+				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath),
+				errors.M("directory", pathDir))
+		}
 		// Install symlink for darwin instead of the wrapper script.
 		// Elastic-agent should be first process that launchd starts in order to be able to grant
 		// the Full-Disk Access (FDA) to the agent and it's child processes.
@@ -78,11 +86,8 @@ func Install(cfgFile string) error {
 					errors.M("destination", paths.ShellWrapperPath))
 			}
 		} else {
-			err = os.MkdirAll(filepath.Dir(paths.ShellWrapperPath), 0755)
-			if err == nil {
-				//nolint: gosec // this is intended to be an executable shell script, not chaning the permissions for the linter
-				err = os.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
-			}
+			//nolint: gosec // this is intended to be an executable shell script, not changing the permissions for the linter
+			err = os.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
 			if err != nil {
 				return errors.New(
 					err,

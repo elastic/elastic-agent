@@ -6,12 +6,11 @@ package host
 
 import (
 	"context"
-
-	"github.com/elastic/elastic-agent/pkg/features"
-
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,6 +101,13 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	provider, err := builder(log, c, true)
 	require.NoError(t, err)
 
+	hostProvider, ok := provider.(*contextProvider)
+	require.True(t, ok)
+	defer func() {
+		err := hostProvider.Close()
+		require.NoError(t, err)
+	}()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
@@ -110,9 +116,6 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 
 	// Track the number of times hostProvider.fetcher is called.
 	numCalled := 0
-	hostProvider, ok := provider.(*contextProvider)
-	require.True(t, ok)
-
 	hostProvider.fetcher = func() (map[string]interface{}, error) {
 		numCalled++
 		return nil, nil
@@ -120,12 +123,8 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 
 	// Run the provider
 	go func() {
-		err = provider.Run(comm)
+		err = hostProvider.Run(comm)
 	}()
-
-	// Wait long enough for provider.Run to register
-	// the FQDN feature flag onChange callback.
-	time.Sleep(10 * time.Millisecond)
 
 	// Trigger the FQDN feature flag callback by
 	// toggling the FQDN feature flag
@@ -136,12 +135,12 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 
 	// Wait long enough for the FQDN feature flag onChange
 	// callback to be called.
-	time.Sleep(10 * time.Millisecond)
-
-	// hostProvider.fetcher should be called twice:
-	// - once, right after the provider is run, and
-	// - once again, when the FQDN feature flag callback is triggered
-	require.Equal(t, 2, numCalled)
+	require.Eventually(t, func() bool {
+		// hostProvider.fetcher should be called twice:
+		// - once, right after the provider is run, and
+		// - once again, when the FQDN feature flag callback is triggered
+		return numCalled == 2
+	}, 10*time.Second, 100*time.Millisecond)
 }
 
 func returnHostMapping(log *logger.Logger) infoFetcher {

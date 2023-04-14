@@ -218,7 +218,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 
 			ctx, cancelFunc := context.WithCancel(context.Background())
 			componentsUpdateChannel := make(chan runtime.ComponentComponentState)
-			subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, nil, componentsUpdateChannel)
+			subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, componentsUpdateChannel)
 			helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
 			helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
 
