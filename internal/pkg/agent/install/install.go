@@ -78,7 +78,7 @@ func Install(cfgFile, topPath string) error {
 						errors.M("destination", paths.ShellWrapperPath))
 				}
 			}
-			err = os.Symlink("/Library/Elastic/Agent/elastic-agent", paths.ShellWrapperPath)
+			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath)
 			if err != nil {
 				return errors.New(
 					err,
@@ -86,8 +86,9 @@ func Install(cfgFile, topPath string) error {
 					errors.M("destination", paths.ShellWrapperPath))
 			}
 		} else {
+			shellWrapper := fmt.Sprintf(paths.ShellWrapper, topPath)
 			//nolint: gosec // this is intended to be an executable shell script, not changing the permissions for the linter
-			err = os.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
+			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
 			if err != nil {
 				return errors.New(
 					err,
