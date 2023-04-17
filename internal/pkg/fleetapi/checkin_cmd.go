@@ -45,7 +45,12 @@ type CheckinComponent struct {
 	Shipper *CheckinShipperReference `json:"shipper,omitempty"`
 }
 
-// CheckinDuration is an alias for time.Duration used to control json marshaling/unmarshaling
+// CheckinDuration is an alias for time.Duration used to control json marshaling/unmarshaling.
+// We need this as we have to control the marshaling of poll_timeout into a string during
+// the checkin request to fleet.
+// Fleet accepts a duration string that can be parsed using the time.ParseDuration() function, so
+// we need to marshal using the corresponding function time.Duration.String() instead of the
+// default marshaling of the time.Duration type (it would marshaled as an integer since it's really an int64)
 type CheckinDuration time.Duration
 
 // MarshalJSON implements the json.Marshaler interface

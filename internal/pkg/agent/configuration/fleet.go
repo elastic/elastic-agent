@@ -17,19 +17,19 @@ type BackoffSettings struct {
 }
 
 type FleetGatewaySettings struct {
-	Debounce time.Duration   `config:"checkin.debounce" yaml:"checkin.debounce,omitempty"`
-	Duration time.Duration   `config:"checkin.frequency" yaml:"checkin.frequency,omitempty"`
-	Jitter   time.Duration   `config:"jitter" yaml:"jitter,omitempty"`
-	Backoff  BackoffSettings `config:"backoff" yaml:"backoff,omitempty"`
+	Debounce time.Duration   `config:"checkin.debounce" yaml:"checkin.debounce,omitempty"`   // time the agent has to wait before cancelling an ongoing checkin and start a new one
+	Duration time.Duration   `config:"checkin.frequency" yaml:"checkin.frequency,omitempty"` // time between successful calls
+	Jitter   time.Duration   `config:"jitter" yaml:"jitter,omitempty"`                       // used as a jitter for duration
+	Backoff  BackoffSettings `config:"backoff" yaml:"backoff,omitempty"`                     // time after a failed call
 }
 
 // Returns default Configuration for the Fleet Gateway.
 func DefaultFleetGatewaySettings() *FleetGatewaySettings {
 	return &FleetGatewaySettings{
-		Debounce: 5 * time.Minute,        // time the agent has to wait before cancelling an ongoing checkin and start a new one
-		Duration: 1 * time.Second,        // time between successful calls
-		Jitter:   500 * time.Millisecond, // used as a jitter for duration
-		Backoff: BackoffSettings{ // time after a failed call
+		Debounce: 5 * time.Minute,
+		Duration: 1 * time.Second,
+		Jitter:   500 * time.Millisecond,
+		Backoff: BackoffSettings{
 			Init: 60 * time.Second,
 			Max:  10 * time.Minute,
 		},
