@@ -25,6 +25,52 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+func TestFleetServerComponentModifier_NoServerConfig(t *testing.T) {
+	cfg := map[string]interface{}{}
+	modifier := FleetServerComponentModifier(nil)
+	fleetServerInputSource, err := structpb.NewStruct(map[string]interface{}{
+		"id":   "fleet-server",
+		"type": "fleet-server",
+	})
+	require.NoError(t, err)
+	fleetServerOutputSource, err := structpb.NewStruct(map[string]interface{}{
+		"type":  "elasticsearch",
+		"hosts": []interface{}{"localhost:9200"},
+	})
+	require.NoError(t, err)
+
+	fleetServerComponent := component.Component{
+		InputSpec: &component.InputRuntimeSpec{
+			InputType: "fleet-server",
+		},
+		Units: []component.Unit{
+			{
+				Type: client.UnitTypeInput,
+				Config: &proto.UnitExpectedConfig{
+					Type:   "fleet-server",
+					Source: fleetServerInputSource,
+				},
+			},
+			{
+				Type: client.UnitTypeOutput,
+				Config: &proto.UnitExpectedConfig{
+					Type:   "elasticsearch",
+					Source: fleetServerOutputSource,
+				},
+			},
+		},
+	}
+	comps := []component.Component{fleetServerComponent}
+	resComps, err := modifier(comps, cfg)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(resComps))
+	require.Equal(t, 2, len(resComps[0].Units))
+	require.ErrorIs(t, resComps[0].Err, ErrFleetServerNotBootstrapped)
+	require.ErrorIs(t, resComps[0].Units[0].Err, ErrFleetServerNotBootstrapped)
+	require.ErrorIs(t, resComps[0].Units[1].Err, ErrFleetServerNotBootstrapped)
+}
+
 func TestInjectFleetConfigComponentModifier(t *testing.T) {
 	fleetConfig := &configuration.FleetAgentConfig{
 		Enabled: true,
