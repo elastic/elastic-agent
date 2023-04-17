@@ -380,7 +380,7 @@ func TestMarshalUnmarshalCheckinPollTimeout(t *testing.T) {
 						return
 					}
 
-					w.Write([]byte("{}"))
+					_, _ = w.Write([]byte("{}"))
 					return
 				}
 
@@ -394,7 +394,7 @@ func TestMarshalUnmarshalCheckinPollTimeout(t *testing.T) {
 				actualDuration, err := time.ParseDuration(req.PollTimeout)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.inputPollTimeout, actualDuration)
-				w.Write([]byte("{}"))
+				_, _ = w.Write([]byte("{}"))
 			})
 
 			srv := httptest.NewServer(mux)
