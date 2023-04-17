@@ -156,13 +156,13 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	}
 
 	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
-	encoderConfig.EncodeTime = utcTimestampEncode
+	encoderConfig.EncodeTime = UtcTimestampEncode
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
 	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, internalLevelEnabler)), nil
 }
 
-// utcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
-func utcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+// UtcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
+func UtcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	type appendTimeEncoder interface {
 		AppendTimeLayout(time.Time, string)
 	}

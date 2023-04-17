@@ -9,13 +9,20 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.elastic.co/ecszap"
+	"go.uber.org/zap/zapcore"
+	"gopkg.in/yaml.v2"
 
+	libconf "github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -57,6 +64,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 }
 
 func watchCmd(log *logp.Logger) error {
+	log.Info("hey look here")
 	marker, err := upgrade.LoadMarker()
 	if err != nil {
 		log.Error("failed to load marker", err)
@@ -209,12 +217,59 @@ func configuredLogger() (*logger.Logger, error) {
 			errors.M(errors.MetaKeyPath, pathConfigFile))
 	}
 
-	cfg.Settings.LoggingConfig.Beat = watcherName
-
-	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, false)
+	internal, err := makeInternalFileOutput()
 	if err != nil {
 		return nil, err
 	}
 
-	return logger, nil
+	libC, err := toCommonConfig(cfg.Settings.LoggingConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := configure.LoggingWithOutputs("", libC, internal); err != nil {
+		return nil, fmt.Errorf("error initializing logging: %w", err)
+	}
+	return logp.NewLogger(""), nil
+}
+
+func toCommonConfig(cfg *logger.Config) (*libconf.C, error) {
+	// work around custom types and common config
+	// when custom type is transformed to common.Config
+	// value is determined based on reflect value which is incorrect
+	// enum vs human readable form
+	yamlCfg, err := yaml.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	commonLogp, err := libconf.NewConfigFrom(string(yamlCfg))
+	if err != nil {
+		return nil, errors.New(err, errors.TypeConfig)
+	}
+
+	return commonLogp, nil
+}
+
+func makeInternalFileOutput() (zapcore.Core, error) {
+	// defaultCfg is used to set the defaults for the file rotation of the internal logging
+	// these settings cannot be changed by a user configuration
+	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
+	filename := filepath.Join(paths.Home(), logger.DefaultLogDirectory, watcherName)
+	rotator, err := file.NewFileRotator(filename,
+		file.MaxSizeBytes(defaultCfg.Files.MaxSize),
+		file.MaxBackups(defaultCfg.Files.MaxBackups),
+		file.Permissions(os.FileMode(defaultCfg.Files.Permissions)),
+		file.Interval(defaultCfg.Files.Interval),
+		file.RotateOnStartup(defaultCfg.Files.RotateOnStartup),
+		file.RedirectStderr(defaultCfg.Files.RedirectStderr),
+	)
+	if err != nil {
+		return nil, errors.New("failed to create internal file rotator")
+	}
+
+	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
+	encoderConfig.EncodeTime = logger.UtcTimestampEncode
+	encoder := zapcore.NewJSONEncoder(encoderConfig)
+	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, zapcore.DebugLevel)), nil
 }
