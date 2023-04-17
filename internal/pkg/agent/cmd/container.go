@@ -848,8 +848,8 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 
 type containerPaths struct {
 	StatePath  string `config:"state_path" yaml:"state_path"`
-	ConfigPath string `config:"state_path" yaml:"config_path,omitempty"`
-	LogsPath   string `config:"state_path" yaml:"logs_path,omitempty"`
+	ConfigPath string `config:"config_path" yaml:"config_path,omitempty"`
+	LogsPath   string `config:"logs_path" yaml:"logs_path,omitempty"`
 }
 
 func writeContainerPaths(original, statePath, configPath, logsPath string) error {
