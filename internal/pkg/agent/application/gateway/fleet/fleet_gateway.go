@@ -467,11 +467,12 @@ func (f *fleetGateway) execute(ctx context.Context, state state.State) (*fleetap
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken:   ackToken,
-		Metadata:   ecsMeta,
-		Status:     agentStateToString(state.State),
-		Message:    state.Message,
-		Components: components,
+		AckToken:    ackToken,
+		Metadata:    ecsMeta,
+		Status:      agentStateToString(state.State),
+		Message:     state.Message,
+		Components:  components,
+		PollTimeout: fleetapi.CheckinDuration(f.client.Timeout()),
 	}
 
 	resp, took, err := cmd.Execute(ctx, req)

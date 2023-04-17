@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,6 +56,10 @@ func (s *testSender) Send(
 
 func (s *testSender) URI() string {
 	return "http://localhost"
+}
+
+func (s *testSender) Timeout() time.Duration {
+	return 0
 }
 
 func wrapStrToResp(code int, body string) *http.Response {

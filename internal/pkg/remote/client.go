@@ -233,6 +233,11 @@ func (c *Client) URI() string {
 	return string(c.config.Protocol) + "://" + host + "/" + c.config.Path
 }
 
+// Timeout returns the configured transport timeout for this client
+func (c *Client) Timeout() time.Duration {
+	return c.config.Transport.Timeout
+}
+
 // newClient creates a new API client.
 func newClient(
 	log *logger.Logger,

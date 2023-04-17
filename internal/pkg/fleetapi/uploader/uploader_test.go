@@ -52,6 +52,11 @@ func (m *mockSender) URI() string {
 	return args.String(0)
 }
 
+func (m *mockSender) Timeout() time.Duration {
+	args := m.Called()
+	return args.Get(0).(time.Duration)
+}
+
 func Test_retrySender_Send(t *testing.T) {
 	tests := []struct {
 		name   string

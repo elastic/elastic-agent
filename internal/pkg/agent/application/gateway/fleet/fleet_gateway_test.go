@@ -101,6 +101,10 @@ func (t *testingClient) URI() string {
 	return "http://localhost"
 }
 
+func (t *testingClient) Timeout() time.Duration {
+	return 0
+}
+
 func (t *testingClient) Answer(fn clientCallbackFunc) <-chan testingClientInvocation {
 	t.Lock()
 	defer t.Unlock()

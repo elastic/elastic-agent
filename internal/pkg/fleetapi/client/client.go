@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -32,6 +33,8 @@ type Sender interface {
 	) (*http.Response, error)
 
 	URI() string
+
+	Timeout() time.Duration
 }
 
 var baseRoundTrippers = func(rt http.RoundTripper) (http.RoundTripper, error) {

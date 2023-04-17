@@ -16,6 +16,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -100,6 +101,11 @@ func (r *retrySender) Send(ctx context.Context, method, path string, params url.
 // URI calls the underlying Sender's URI method.
 func (r *retrySender) URI() string {
 	return r.c.URI()
+}
+
+// Timeout calls the underlying Sender's Timeout method
+func (r *retrySender) Timeout() time.Duration {
+	return r.c.Timeout()
 }
 
 // Client provides methods to upload a file to ES through fleet-server.
