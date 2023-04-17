@@ -79,6 +79,11 @@ func (tl *testlogger) Infof(format string, args ...interface{}) {
 	tl.handleLog(logMessage{lvl: INFO, msg: format, args: args})
 }
 
+func (tl *testlogger) Infow(msg string, args ...interface{}) {
+	tl.t.Helper()
+	tl.handleLog(logMessage{lvl: INFO, msg: msg, args: args})
+}
+
 func (tl *testlogger) Warnf(format string, args ...interface{}) {
 	tl.t.Helper()
 	tl.handleLog(logMessage{lvl: WARN, msg: format, args: args})

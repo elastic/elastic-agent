@@ -53,6 +53,7 @@ type loggerIF interface {
 	Debugf(format string, args ...interface{})
 	Info(args ...interface{})
 	Infof(format string, args ...interface{})
+	Infow(format string, args ...interface{})
 	Warnf(format string, args ...interface{})
 	Warnw(msg string, keysAndValues ...interface{})
 	Error(args ...interface{})
@@ -211,7 +212,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 					checkinResponse = checkinResult.response
 				}
 
-				f.log.Debugf("Processing checkin response %v", checkinResponse)
+				f.log.Debug("Processing checkin response")
 				actions := make([]fleetapi.Action, len(checkinResponse.Actions))
 				copy(actions, checkinResponse.Actions)
 				if len(actions) > 0 {
@@ -270,7 +271,7 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 				continue
 			}
 
-			f.log.Infof(
+			f.log.Debugf(
 				"Received updated state (Agent state: %q) when checkin is ongoing past configured debounce. Cancelling previous checkin %q and starting a new one.",
 				newState.State,
 				checkinID.String(),
@@ -287,7 +288,6 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 func (f *fleetGateway) cancelCheckin(ctx context.Context, checkinID string, cancelCheckin context.CancelFunc, resCheckinChan <-chan checkinResult) {
 	f.log.Debugf("Cancelling checkin %q", checkinID)
 	cancelCheckin()
-	f.log.Debugf("Cancelled checkin %q", checkinID)
 	select {
 	case cancelledCheckinRes := <-resCheckinChan:
 		f.log.Debugf("Reaped answer for cancelled checkin %q: %+v", checkinID, cancelledCheckinRes)
@@ -324,7 +324,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff, state 
 
 			if errors.Is(err, context.Canceled) {
 				// the checkin was explicitly canceled
-				f.log.Warnw("Ongoing checkin with fleet-server has been explicitly canceled, won't be retried",
+				f.log.Infow("Ongoing checkin with fleet-server has been explicitly canceled, won't be retried",
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter)
 				return resp, err
 			}

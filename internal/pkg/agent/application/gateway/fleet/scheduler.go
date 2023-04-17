@@ -6,7 +6,7 @@ package fleet
 
 import "time"
 
-// Scheduler simple interface that encapsulate the scheduling logic, this is useful if you want to
+// Scheduler is a simple interface that encapsulate the scheduling logic, this is useful if you want to
 // test asynchronous code in a synchronous way.
 type Scheduler interface {
 	WaitTick() <-chan time.Time
