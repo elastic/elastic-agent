@@ -180,47 +180,51 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 			return ctx.Err()
 		case <-f.scheduler.WaitTick():
 			f.log.Debug("FleetGateway calling Checkin API")
-			func() {
-				// get current state
-				stateUpdateSubCtx, cancelStateUpdateSub := context.WithCancel(ctx)
-				stateUpdateCh := f.stateFetcher.StateSubscribe(stateUpdateSubCtx).Ch()
-				defer func() {
-					cancelStateUpdateSub()
-				}()
-				state := <-stateUpdateCh
 
-				var checkinResponse *fleetapi.CheckinResponse
+			checkinResponse, err := f.triggerCheckin(ctx, backoff)
+			if err != nil {
+				f.log.Errorf("triggering checkin failed: %v", err)
+				continue
+			}
 
-				for checkinResponse == nil {
-					if ctx.Err() != nil {
-						return
-					}
-
-					checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff, f.debouncerFactory())
-
-					if checkinResult.err != nil {
-						var relaunchCheckinErr *needNewCheckinError
-						if errors.As(checkinResult.err, &relaunchCheckinErr) {
-							// checkin was cancelled because we have an updated state to send to fleet
-							state = relaunchCheckinErr.newState
-						}
-
-						continue
-					}
-
-					// if we got here the checkin has been completed
-					checkinResponse = checkinResult.response
-				}
-
-				f.log.Debug("Processing checkin response")
-				actions := make([]fleetapi.Action, len(checkinResponse.Actions))
-				copy(actions, checkinResponse.Actions)
-				if len(actions) > 0 {
-					f.actionCh <- actions
-				}
-			}()
-
+			f.log.Debug("Processing checkin response")
+			actions := make([]fleetapi.Action, len(checkinResponse.Actions))
+			copy(actions, checkinResponse.Actions)
+			if len(actions) > 0 {
+				f.actionCh <- actions
+			}
 		}
+	}
+}
+
+func (f *fleetGateway) triggerCheckin(ctx context.Context, backoff backoff.Backoff) (*fleetapi.CheckinResponse, error) {
+	// get current state
+	stateUpdateSubCtx, cancelStateUpdateSub := context.WithCancel(ctx)
+	stateUpdateCh := f.stateFetcher.StateSubscribe(stateUpdateSubCtx).Ch()
+	defer func() {
+		cancelStateUpdateSub()
+	}()
+	state := <-stateUpdateCh
+
+	for {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff, f.debouncerFactory())
+
+		if checkinResult.err != nil {
+			var relaunchCheckinErr *needNewCheckinError
+			if errors.As(checkinResult.err, &relaunchCheckinErr) {
+				// checkin was cancelled because we have an updated state to send to fleet
+				state = relaunchCheckinErr.newState
+			}
+
+			continue
+		}
+
+		// if we got here the checkin has been completed
+		return checkinResult.response, nil
 	}
 }
 
