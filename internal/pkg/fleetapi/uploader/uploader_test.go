@@ -135,7 +135,10 @@ func Test_retrySender_Send(t *testing.T) {
 			}
 			resp, err := c.Send(context.Background(), "POST", "/", nil, nil, bytes.NewReader([]byte("abcd")))
 			defer func() {
-				_ = resp.Body.Close()
+				if resp.Body != nil {
+					_ = resp.Body.Close()
+				}
+
 			}()
 			if err != nil {
 				assert.EqualError(t, err, tc.err.Error())
@@ -175,7 +178,9 @@ func Test_retrySender_bodyValidation(t *testing.T) {
 	}
 	resp, err := c.Send(context.Background(), "POST", "/", nil, nil, bytes.NewReader([]byte("abcd")))
 	defer func() {
-		_ = resp.Body.Close()
+		if resp.Body != nil {
+			_ = resp.Body.Close()
+		}
 	}()
 	require.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, 200)
