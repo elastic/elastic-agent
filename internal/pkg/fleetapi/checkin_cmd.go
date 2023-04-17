@@ -45,7 +45,7 @@ type CheckinComponent struct {
 	Shipper *CheckinShipperReference `json:"shipper,omitempty"`
 }
 
-// CheckinDuration is an alias for time.Duration used to json marshal/unmarshal
+// CheckinDuration is an alias for time.Duration used to control json marshaling/unmarshaling
 type CheckinDuration time.Duration
 
 // MarshalJSON implements the json.Marshaler interface
@@ -58,7 +58,7 @@ func (jd CheckinDuration) MarshalJSON() ([]byte, error) {
 func (jd *CheckinDuration) UnmarshalJSON(b []byte) error {
 	parsed, err := time.ParseDuration(string(b))
 	if err != nil {
-		return fmt.Errorf("parsing duration %s: %w", b, err)
+		return fmt.Errorf("parsing duration %q: %w", b, err)
 	}
 
 	*jd = CheckinDuration(parsed)
