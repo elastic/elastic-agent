@@ -45,13 +45,34 @@ type CheckinComponent struct {
 	Shipper *CheckinShipperReference `json:"shipper,omitempty"`
 }
 
+// CheckinDuration is an alias for time.Duration used to json marshal/unmarshal
+type CheckinDuration time.Duration
+
+// MarshalJSON implements the json.Marshaler interface
+func (jd CheckinDuration) MarshalJSON() ([]byte, error) {
+	str := time.Duration(jd).String()
+	return []byte(`"` + str + `"`), nil
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (jd *CheckinDuration) UnmarshalJSON(b []byte) error {
+	parsed, err := time.ParseDuration(string(b))
+	if err != nil {
+		return fmt.Errorf("parsing duration %s: %w", b, err)
+	}
+
+	*jd = CheckinDuration(parsed)
+	return nil
+}
+
 // CheckinRequest consists of multiple events reported to fleet ui.
 type CheckinRequest struct {
-	Status     string             `json:"status"`
-	AckToken   string             `json:"ack_token,omitempty"`
-	Metadata   *info.ECSMeta      `json:"local_metadata,omitempty"`
-	Message    string             `json:"message"`    // V2 Agent message
-	Components []CheckinComponent `json:"components"` // V2 Agent components
+	Status      string             `json:"status"`
+	AckToken    string             `json:"ack_token,omitempty"`
+	Metadata    *info.ECSMeta      `json:"local_metadata,omitempty"`
+	Message     string             `json:"message"`                // V2 Agent message
+	Components  []CheckinComponent `json:"components"`             // V2 Agent components
+	PollTimeout CheckinDuration    `json:"poll_timeout,omitempty"` // Fleet long polls: agent poll duration indicator
 }
 
 // SerializableEvent is a representation of the event to be send to the Fleet Server API via the checkin

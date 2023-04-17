@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -17,8 +18,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type agentinfo struct{}
@@ -316,4 +320,106 @@ func TestCheckin(t *testing.T) {
 			assert.Nil(t, r)
 		},
 	))
+}
+
+func TestMarshalUnmarshalCheckinPollTimeout(t *testing.T) {
+
+	type Request struct {
+		PollTimeout string `json:"poll_timeout"`
+	}
+
+	const apikey = "apikey"
+	const pollTimeoutJsonKey = "poll_timeout"
+	ctx := context.Background()
+	agentInfo := &agentinfo{}
+
+	type testcase struct {
+		name             string
+		inputPollTimeout time.Duration
+		containsKey      bool
+		jsonValue        string
+	}
+
+	testcases := []testcase{
+		{
+			name:             "simple long poll timeout",
+			inputPollTimeout: 35 * time.Minute,
+			containsKey:      true,
+			jsonValue:        "35m0s",
+		},
+		{
+			name:             "zero long poll timeout is not present in json",
+			inputPollTimeout: 0,
+			containsKey:      false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
+			mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+				var req *Request
+				content, err := ioutil.ReadAll(r.Body)
+				if !assert.NoError(t, err) {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+
+				// test the raw json body
+				var rawJson map[string]any
+				if !assert.NoErrorf(t, json.Unmarshal(content, &rawJson), "request body is invalid json") {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+
+				if !tc.containsKey {
+					// rawjson should not contain the poll_timeout
+					if !assert.NotContains(t, rawJson, pollTimeoutJsonKey) {
+						w.WriteHeader(http.StatusBadRequest)
+						return
+					}
+
+					w.Write([]byte("{}"))
+					return
+				}
+
+				assert.Equal(t, tc.jsonValue, rawJson[pollTimeoutJsonKey])
+
+				if !assert.NoError(t, json.Unmarshal(content, &req)) {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+
+				actualDuration, err := time.ParseDuration(req.PollTimeout)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.inputPollTimeout, actualDuration)
+				w.Write([]byte("{}"))
+			})
+
+			srv := httptest.NewServer(mux)
+			defer srv.Close()
+
+			transportSettings := httpcommon.DefaultHTTPTransportSettings()
+			transportSettings.Timeout = tc.inputPollTimeout
+
+			cfg := remote.Config{
+				Host:      srv.Listener.Addr().String(),
+				Transport: transportSettings,
+			}
+
+			log, _ := logger.New("", false)
+
+			client, err := client.NewAuthWithConfig(log, apikey, cfg)
+			require.NoError(t, err)
+
+			cmd := NewCheckinCmd(agentInfo, client)
+
+			request := CheckinRequest{PollTimeout: CheckinDuration(tc.inputPollTimeout)}
+
+			_, _, err = cmd.Execute(ctx, &request)
+			require.NoError(t, err)
+		})
+	}
+
 }
