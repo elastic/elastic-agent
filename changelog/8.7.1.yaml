@@ -42,9 +42,10 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - "2456"
+        - https://github.com/elastic/elastic-agent/pull/2456
       issue:
-        - "2450"
+        - https://github.com/elastic/elastic-agent/issues/2399
+        - https://github.com/elastic/elastic-agent/issues/2450
       timestamp: 1680764383
       file:
         name: 1680764383-Respecting-logging.level-settings.yaml
@@ -55,7 +56,9 @@ entries:
       component: action handlers
       pr:
         - https://github.com/elastic/elastic-agent/pull/2468
-      issue: []
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2304
+        - https://github.com/elastic/elastic-agent/issues/2447
       timestamp: 1681211832
       file:
         name: 1681211832-empty-proxy-from-the-policy-don't-overrides-the-proxy-set-by---proxy-url.yaml
@@ -67,8 +70,9 @@ entries:
         creating the /usr/local/bin/elastic-agent symlink.
       component: ""
       pr:
-        - https://github.com/elastic/elastic-agent/2490
-      issue: []
+        - https://github.com/elastic/elastic-agent/pull/2490
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2487
       timestamp: 1681311024
       file:
         name: 1681311024-Ensure-local-bin-directory-exists-on-Mac-OS-during-installation..yaml
