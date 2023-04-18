@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -219,7 +219,7 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := ioutil.ReadAll(r.Body)
+				content, err := io.ReadAll(r.Body)
 				assert.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Equal(t, "linux", req.Metadata.OS.Name)
@@ -253,7 +253,7 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := ioutil.ReadAll(r.Body)
+				content, err := io.ReadAll(r.Body)
 				assert.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Nil(t, req.Metadata)
@@ -287,7 +287,7 @@ func TestCheckin(t *testing.T) {
 
 				var req *Request
 
-				content, err := ioutil.ReadAll(r.Body)
+				content, err := io.ReadAll(r.Body)
 				assert.NoError(t, err)
 				assert.NoError(t, json.Unmarshal(content, &req))
 				assert.Nil(t, req.Metadata)
@@ -360,7 +360,7 @@ func TestMarshalUnmarshalCheckinPollTimeout(t *testing.T) {
 			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
 			mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 				var req *Request
-				content, err := ioutil.ReadAll(r.Body)
+				content, err := io.ReadAll(r.Body)
 				if !assert.NoError(t, err) {
 					w.WriteHeader(http.StatusBadRequest)
 					return

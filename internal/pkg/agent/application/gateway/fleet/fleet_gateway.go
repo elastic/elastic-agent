@@ -157,19 +157,6 @@ func (f *fleetGateway) Actions() <-chan []fleetapi.Action {
 }
 
 func (f *fleetGateway) Run(ctx context.Context) error {
-	// Backoff implementation doesn't support the use of a context [cancellation] as the shutdown mechanism.
-	// So we keep a done channel that will be closed when the current context is shutdown.
-	done := make(chan struct{})
-	backoff := backoff.NewEqualJitterBackoff(
-		done,
-		f.settings.Backoff.Init,
-		f.settings.Backoff.Max,
-	)
-	go func() {
-		<-ctx.Done()
-		close(done)
-	}()
-
 	f.log.Info("Fleet gateway started")
 	f.log.Debugf("Fleet gateway settings: %+v", f.settings)
 	for {
@@ -181,7 +168,7 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 		case <-f.scheduler.WaitTick():
 			f.log.Debug("FleetGateway calling Checkin API")
 
-			checkinResponse, err := f.triggerCheckin(ctx, backoff)
+			checkinResponse, err := f.triggerCheckin(ctx)
 			if err != nil {
 				f.log.Errorf("triggering checkin failed: %v", err)
 				continue
@@ -197,13 +184,29 @@ func (f *fleetGateway) Run(ctx context.Context) error {
 	}
 }
 
-func (f *fleetGateway) triggerCheckin(ctx context.Context, backoff backoff.Backoff) (*fleetapi.CheckinResponse, error) {
-	// get current state
+func (f *fleetGateway) triggerCheckin(ctx context.Context) (*fleetapi.CheckinResponse, error) {
+
+	// create a subcontext for this checkin and the state subscription
 	stateUpdateSubCtx, cancelStateUpdateSub := context.WithCancel(ctx)
-	stateUpdateCh := f.stateFetcher.StateSubscribe(stateUpdateSubCtx).Ch()
 	defer func() {
 		cancelStateUpdateSub()
 	}()
+
+	// Backoff implementation doesn't support the use of a context [cancellation] as the shutdown mechanism.
+	// So we keep a done channel that will be closed when the current context is shutdown.
+	done := make(chan struct{})
+	backoff := backoff.NewEqualJitterBackoff(
+		done,
+		f.settings.Backoff.Init,
+		f.settings.Backoff.Max,
+	)
+	go func() {
+		<-stateUpdateSubCtx.Done()
+		close(done)
+	}()
+
+	// get current state
+	stateUpdateCh := f.stateFetcher.StateSubscribe(stateUpdateSubCtx).Ch()
 	state := <-stateUpdateCh
 
 	for {
