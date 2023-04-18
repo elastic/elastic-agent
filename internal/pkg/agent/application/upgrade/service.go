@@ -136,7 +136,8 @@ func (p *sysvPidProvider) PID(ctx context.Context) (int, error) {
 		return 0, errors.New(fmt.Sprintf("'%v' is not running", paths.ServiceName))
 	}
 
-	pidofLine, err := exec.Command("pidof", filepath.Join(paths.InstallPath, paths.BinaryName)).Output()
+	cmdArgs := filepath.Join(paths.InstallPath, paths.BinaryName)
+	pidofLine, err := exec.Command("pidof", cmdArgs).Output()
 	if err != nil {
 		return 0, errors.New(fmt.Sprintf("PID not found for'%v': %v", paths.ServiceName, err))
 	}
