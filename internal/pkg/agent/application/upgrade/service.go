@@ -43,7 +43,9 @@ type pidProvider interface {
 // Init initializes os dependent properties.
 func (ch *CrashChecker) Init(ctx context.Context, _ *logger.Logger) error {
 	pp := relevantPidProvider()
-	pp.Init()
+	if err := pp.Init(); err != nil {
+		return fmt.Errorf("unable to initialize relevant PID provider: %w", err)
+	}
 
 	ch.sc = pp
 
