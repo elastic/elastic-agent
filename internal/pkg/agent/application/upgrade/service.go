@@ -157,7 +157,7 @@ type dbusPidProvider struct {
 }
 
 func (p *dbusPidProvider) Init() error {
-	dbusConn, err := dbus.New()
+	dbusConn, err := dbus.NewWithContext(context.Background())
 	if err != nil {
 		return errors.New("failed to create dbus connection", err)
 	}
