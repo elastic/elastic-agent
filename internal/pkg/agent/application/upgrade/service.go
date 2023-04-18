@@ -240,7 +240,9 @@ func isSystemd() bool {
 		defer filerc.Close()
 
 		buf := new(bytes.Buffer)
-		buf.ReadFrom(filerc)
+		if _, err := buf.ReadFrom(filerc); err != nil {
+			return false
+		}
 		contents := buf.String()
 
 		if strings.Trim(contents, " \r\n") == "systemd" {
