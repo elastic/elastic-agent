@@ -84,7 +84,7 @@ type fleetGateway struct {
 	log                loggerIF
 	client             client.Sender
 	scheduler          Scheduler
-	debouncerFactory   debouncerFactory
+	debouncerFunction  debouncerFunc[state.State]
 	settings           *configuration.FleetGatewaySettings
 	cancelTimeout      time.Duration
 	agentInfo          agentInfo
@@ -109,14 +109,14 @@ func New(
 ) (*fleetGateway, error) {
 
 	scheduler := scheduler.NewPeriodicJitter(settings.Duration, settings.Jitter)
-	debouncerFactory := func() debouncer { return newTimerDebouncer(settings.Debounce) }
+	debouncerFunction := Debounce[state.State]
 	return newFleetGatewayWithSchedulerAndDebouncer(
 		log,
 		settings,
 		agentInfo,
 		client,
 		scheduler,
-		debouncerFactory,
+		debouncerFunction,
 		cancelCheckinTimeout,
 		acker,
 		stateFetcher,
@@ -130,25 +130,25 @@ func newFleetGatewayWithSchedulerAndDebouncer(
 	agentInfo agentInfo,
 	client client.Sender,
 	scheduler Scheduler,
-	df debouncerFactory,
+	df debouncerFunc[state.State],
 	cancelTimeout time.Duration,
 	acker acker.Acker,
 	stateFetcher StateFetcher,
 	stateStore stateStore,
 ) (*fleetGateway, error) {
 	return &fleetGateway{
-		log:              log,
-		client:           client,
-		settings:         settings,
-		agentInfo:        agentInfo,
-		scheduler:        scheduler,
-		cancelTimeout:    cancelTimeout,
-		debouncerFactory: df,
-		acker:            acker,
-		stateFetcher:     stateFetcher,
-		stateStore:       stateStore,
-		errCh:            make(chan error),
-		actionCh:         make(chan []fleetapi.Action, 1),
+		log:               log,
+		client:            client,
+		settings:          settings,
+		agentInfo:         agentInfo,
+		scheduler:         scheduler,
+		cancelTimeout:     cancelTimeout,
+		debouncerFunction: df,
+		acker:             acker,
+		stateFetcher:      stateFetcher,
+		stateStore:        stateStore,
+		errCh:             make(chan error),
+		actionCh:          make(chan []fleetapi.Action, 1),
 	}, nil
 }
 
@@ -214,7 +214,7 @@ func (f *fleetGateway) triggerCheckin(ctx context.Context) (*fleetapi.CheckinRes
 			return nil, ctx.Err()
 		}
 
-		checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff, f.debouncerFactory())
+		checkinResult := f.performCancellableCheckin(ctx, state, stateUpdateCh, backoff)
 
 		if checkinResult.err != nil {
 			var relaunchCheckinErr *needNewCheckinError
@@ -231,7 +231,7 @@ func (f *fleetGateway) triggerCheckin(ctx context.Context) (*fleetapi.CheckinRes
 	}
 }
 
-func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialState state.State, stateUpdates <-chan state.State, backoff backoff.Backoff, dbouncer debouncer) checkinResult {
+func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialState state.State, stateUpdates <-chan state.State, backoff backoff.Backoff) checkinResult {
 	checkinID, _ := uuid.NewV4()
 	checkinCtx, cancelCheckinCtxFunc := context.WithCancel(ctx)
 	checkinCtx = context.WithValue(checkinCtx, CheckinIDKey, checkinID.String())
@@ -245,48 +245,32 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 	// the function will retry to communicate with fleet-server with an exponential delay and some
 	// jitter to help better distribute the load from a fleet of agents.
 	resCheckinChan := f.doExecuteAsync(checkinCtx, backoff, initialState)
-
-	// this variable will hold the latest state we got from coordinator
-	var updatedState *state.State
-	var debounceElapsed bool
-
+	debounceDuration := f.settings.Debounce
 	for {
 		select {
 		case <-ctx.Done():
 			return checkinResult{err: ctx.Err()}
 		case checkinResult := <-resCheckinChan:
 			return checkinResult
-		case <-dbouncer.Elapsed():
-			debounceElapsed = true
-			if updatedState != nil && !reflect.DeepEqual(updatedState, &initialState) {
-				// we detected that the updated State is different from the one of the current checkin, cancel and return the needNewCheckinError
-				f.log.Debugf("Detected an updated state at the end of the debounce, cancelling ongoing checkin %q", checkinID)
-				cancelCheckinTimeoutCtx, cancelCancelCheckin := context.WithTimeout(ctx, f.cancelTimeout)
-				defer cancelCancelCheckin()
-				f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckinCtxFunc, resCheckinChan)
-				return checkinResult{err: &needNewCheckinError{newState: *updatedState}}
-			}
-			f.log.Debug("No new state detected at the end of the debounce")
-		case newState := <-stateUpdates:
-			if !debounceElapsed {
-				f.log.Debugf(
-					"Updated state (Agent state: %q) received but current checkin %s not cancelled because we are still within debounce",
-					newState.State,
-					checkinID,
-				)
-				updatedState = &newState
+		case newState, ok := <-f.debouncerFunction(checkinCtx, stateUpdates, debounceDuration):
+			if !ok {
+				// update channel is closed with no value
 				continue
 			}
 
-			f.log.Debugf(
-				"Received updated state (Agent state: %q) when checkin is ongoing past configured debounce. Cancelling previous checkin %q and starting a new one.",
-				newState.State,
-				checkinID.String(),
-			)
-			cancelCheckinTimeoutCtx, cancelCancelCheckin := context.WithTimeout(ctx, f.cancelTimeout)
-			defer cancelCancelCheckin()
-			f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckinCtxFunc, resCheckinChan)
-			return checkinResult{err: &needNewCheckinError{newState: newState}}
+			if !reflect.DeepEqual(newState, initialState) {
+				f.log.Debugf(
+					"Received updated state (Agent state: %q) when checkin is ongoing past configured debounce. Cancelling previous checkin %q and starting a new one.",
+					newState.State,
+					checkinID.String(),
+				)
+				cancelCheckinTimeoutCtx, cancelCancelCheckin := context.WithTimeout(ctx, f.cancelTimeout)
+				defer cancelCancelCheckin()
+				f.cancelCheckin(cancelCheckinTimeoutCtx, checkinID.String(), cancelCheckinCtxFunc, resCheckinChan)
+				return checkinResult{err: &needNewCheckinError{newState: newState}}
+			}
+			// reset the debounce duration to zero to get the next update immediately (we already waited for a debounce duration anyway without cancelling and sending a new state)
+			debounceDuration = 0
 		}
 	}
 

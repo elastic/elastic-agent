@@ -40,7 +40,6 @@ import (
 
 // Refer to https://vektra.github.io/mockery/installation/ to check how to install mockery binary
 //go:generate mockery --name StateFetcher
-//go:generate mockery --name debouncer
 //go:generate mockery --keeptree --output . --outpkg fleet --dir ../../coordinator/state --name StateUpdateSource
 
 const testCancelTimeout = 10 * time.Millisecond
@@ -131,14 +130,10 @@ func emptyStateFetcher(t *testing.T) *MockStateFetcher {
 	return mockFetcher
 }
 
-func neverDebounce(t *testing.T) *mockDebouncer {
-	mockDebouncer := newMockDebouncer(t)
-	alreadyReachedDebounce := make(chan time.Time)
-	go func() {
-		alreadyReachedDebounce <- time.Now()
-	}()
-	mockDebouncer.EXPECT().Elapsed().Return(alreadyReachedDebounce)
-	return mockDebouncer
+func neverDebounce(t *testing.T) debouncerFunc[state.State] {
+	return func(_ context.Context, in <-chan state.State, _ time.Duration) <-chan state.State {
+		return in
+	}
 }
 
 type withGatewayFunc func(*testing.T, *fleetGateway, *testingClient, *scheduler.Stepper)
@@ -158,7 +153,7 @@ func withGateway(agentInfo agentInfo, settings *configuration.FleetGatewaySettin
 			agentInfo,
 			client,
 			scheduler,
-			func() debouncer { return neverDebounce(t) },
+			neverDebounce(t),
 			testCancelTimeout,
 			noop.New(),
 			emptyStateFetcher(t),
@@ -185,7 +180,7 @@ func withGatewayAndLog(agentInfo agentInfo, logIF loggerIF, settings *configurat
 			agentInfo,
 			client,
 			scheduler,
-			func() debouncer { return neverDebounce(t) },
+			neverDebounce(t),
 			testCancelTimeout,
 			noop.New(),
 			emptyStateFetcher(t),
@@ -341,7 +336,7 @@ func TestFleetGateway(t *testing.T) {
 			agentInfo,
 			client,
 			scheduler,
-			func() debouncer { return neverDebounce(t) },
+			neverDebounce(t),
 			testCancelTimeout,
 			noop.New(),
 			emptyStateFetcher(t),
@@ -395,7 +390,7 @@ func TestFleetGateway(t *testing.T) {
 			agentInfo,
 			client,
 			scheduler,
-			func() debouncer { return neverDebounce(t) },
+			neverDebounce(t),
 			testCancelTimeout,
 			noop.New(),
 			emptyStateFetcher(t),
@@ -475,7 +470,7 @@ func TestFleetGateway(t *testing.T) {
 			agentInfo,
 			longPollClient,
 			scheduler,
-			func() debouncer { return neverDebounce(t) },
+			neverDebounce(t),
 			testCancelTimeout,
 			noop.New(),
 			mockFetcher,
@@ -569,8 +564,11 @@ func TestFleetGateway(t *testing.T) {
 		settings := configuration.DefaultFleetGatewaySettings()
 
 		debounceOver := make(chan time.Time)
-		mockDebouncer := newMockDebouncer(t)
-		mockDebouncer.EXPECT().Elapsed().Return(debounceOver)
+
+		onDemandDebounce := func(ctx context.Context, in <-chan state.State, _ time.Duration) <-chan state.State {
+			noopFunc := func() {}
+			return debounceWithTimeSource(ctx, in, debounceOver, noopFunc)
+		}
 
 		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			mockLogger,
@@ -578,7 +576,7 @@ func TestFleetGateway(t *testing.T) {
 			agentInfo,
 			longPollClient,
 			scheduler,
-			func() debouncer { return mockDebouncer },
+			onDemandDebounce,
 			testCancelTimeout,
 			noop.New(),
 			mockFetcher,
@@ -715,8 +713,11 @@ func TestFleetGateway(t *testing.T) {
 		settings := configuration.DefaultFleetGatewaySettings()
 
 		debounceOver := make(chan time.Time)
-		mockDebouncer := newMockDebouncer(t)
-		mockDebouncer.EXPECT().Elapsed().Return(debounceOver)
+
+		onDemandDebounce := func(ctx context.Context, in <-chan state.State, _ time.Duration) <-chan state.State {
+			noopFunc := func() {}
+			return debounceWithTimeSource(ctx, in, debounceOver, noopFunc)
+		}
 
 		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			mockLogger,
@@ -724,7 +725,7 @@ func TestFleetGateway(t *testing.T) {
 			agentInfo,
 			longPollClient,
 			scheduler,
-			func() debouncer { return mockDebouncer },
+			onDemandDebounce,
 			testCancelTimeout,
 			noop.New(),
 			mockFetcher,
@@ -881,8 +882,11 @@ func TestFleetGateway(t *testing.T) {
 		settings := configuration.DefaultFleetGatewaySettings()
 
 		debounceOver := make(chan time.Time)
-		mockDebouncer := newMockDebouncer(t)
-		mockDebouncer.EXPECT().Elapsed().Return(debounceOver)
+
+		onDemandDebounce := func(ctx context.Context, in <-chan state.State, _ time.Duration) <-chan state.State {
+			noopFunc := func() {}
+			return debounceWithTimeSource(ctx, in, debounceOver, noopFunc)
+		}
 
 		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
 			mockLogger,
@@ -890,7 +894,7 @@ func TestFleetGateway(t *testing.T) {
 			agentInfo,
 			longPollClient,
 			scheduler,
-			func() debouncer { return mockDebouncer },
+			onDemandDebounce,
 			testCancelTimeout,
 			noop.New(),
 			mockFetcher,
