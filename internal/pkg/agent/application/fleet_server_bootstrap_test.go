@@ -64,11 +64,14 @@ func TestFleetServerComponentModifier_NoServerConfig(t *testing.T) {
 	resComps, err := modifier(comps, cfg)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(resComps))
-	require.Equal(t, 2, len(resComps[0].Units))
-	require.ErrorIs(t, resComps[0].Err, ErrFleetServerNotBootstrapped)
-	require.ErrorIs(t, resComps[0].Units[0].Err, ErrFleetServerNotBootstrapped)
-	require.ErrorIs(t, resComps[0].Units[1].Err, ErrFleetServerNotBootstrapped)
+	if assert.Len(t, resComps, 1) {
+		assert.ErrorIs(t, resComps[0].Err, ErrFleetServerNotBootstrapped)
+		if assert.Len(t, resComps[0].Units, 2) {
+			assert.ErrorIs(t, resComps[0].Units[0].Err, ErrFleetServerNotBootstrapped)
+			assert.ErrorIs(t, resComps[0].Units[1].Err, ErrFleetServerNotBootstrapped)
+		}
+
+	}
 }
 
 func TestInjectFleetConfigComponentModifier(t *testing.T) {
