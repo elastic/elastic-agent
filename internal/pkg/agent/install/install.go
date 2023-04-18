@@ -86,8 +86,8 @@ func Install(cfgFile, topPath string) error {
 					errors.M("destination", paths.ShellWrapperPath))
 			}
 		} else {
-			//nolint: govet // the first argument to fmt.Sprintf is a constant containing
-			// one formatting directive.
+			// the first argument to fmt.Sprintf is a constant containing one formatting directive.
+			//nolint: govet,SA5009
 			shellWrapper := fmt.Sprintf(paths.ShellWrapper, topPath)
 			//nolint: gosec // this is intended to be an executable shell script, not changing the permissions for the linter
 			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
