@@ -86,7 +86,7 @@ func Install(cfgFile, topPath string) error {
 					errors.M("destination", paths.ShellWrapperPath))
 			}
 		} else {
-			//nolint: govet,staticheck // the first argument to fmt.Sprintf is a constant containing one formatting directive.
+			//nolint: govet,staticcheck // the first argument to fmt.Sprintf is a constant containing one formatting directive.
 			shellWrapper := fmt.Sprintf(paths.ShellWrapper, topPath)
 			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
 			if err != nil {
