@@ -97,7 +97,7 @@ func watchCmd(log *logp.Logger) error {
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		if err := upgrade.Cleanup(log, release.ShortCommit(), true); err != nil {
+		if err := upgrade.Cleanup(log, release.ShortCommit(), true, false); err != nil {
 			log.Error("rollback failed", err)
 		}
 		// exit nicely
@@ -118,7 +118,7 @@ func watchCmd(log *logp.Logger) error {
 	// in windows it might leave self untouched, this will get cleaned up
 	// later at the start, because for windows we leave marker untouched.
 	removeMarker := !isWindows()
-	err = upgrade.Cleanup(log, marker.Hash, removeMarker)
+	err = upgrade.Cleanup(log, marker.Hash, removeMarker, false)
 	if err != nil {
 		log.Error("rollback failed", err)
 	}
