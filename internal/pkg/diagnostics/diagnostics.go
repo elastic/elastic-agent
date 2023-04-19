@@ -304,7 +304,7 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 
 		if d.IsDir() {
 			_, err := zw.CreateHeader(&zip.FileHeader{
-				Name:     "logs" + name + "/",
+				Name:     "logs/" + name + "/",
 				Method:   zip.Deflate,
 				Modified: ts,
 			})
