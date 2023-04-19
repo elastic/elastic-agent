@@ -170,7 +170,6 @@ pipeline {
                 anyOf {
                   expression { return isE2eEnabled() }
                   expression { return isPackageEnabled() }
-                  not { changeRequest() }
                 }
                 // Run packaging only for the linux specific arch
                 expression { return (PLATFORM.contains('ubuntu') || PLATFORM.contains('aarch64')) }
