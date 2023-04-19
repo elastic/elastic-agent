@@ -191,6 +191,8 @@ func TestCancellation(t *testing.T) {
 		t.Run(fmt.Sprintf("test run %d", i), func(t *testing.T) {
 			c, err := composable.New(log, cfg, false)
 			require.NoError(t, err)
+			defer c.Close()
+
 			ctx, cancelFn := context.WithTimeout(context.Background(), timeout)
 			defer cancelFn()
 			err = c.Run(ctx)
@@ -205,6 +207,8 @@ func TestCancellation(t *testing.T) {
 	t.Run("immediate cancellation", func(t *testing.T) {
 		c, err := composable.New(log, cfg, false)
 		require.NoError(t, err)
+		defer c.Close()
+
 		ctx, cancelFn := context.WithTimeout(context.Background(), 0)
 		cancelFn()
 		err = c.Run(ctx)

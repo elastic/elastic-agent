@@ -26,6 +26,7 @@ func WaitForVariables(ctx context.Context, l *logger.Logger, cfg *config.Config,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create composable controller: %w", err)
 	}
+	defer composable.Close()
 
 	hasTimeout := false
 	if wait > time.Duration(0) {

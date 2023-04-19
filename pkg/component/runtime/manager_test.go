@@ -2307,8 +2307,6 @@ func TestManager_FakeShipper(t *testing.T) {
 		5. Send `send_event` action to the component fake input (GRPC client); returns once sent.
 		6. Wait for `record_event` action to return from the shipper input (GRPC server).
 	*/
-	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/2301")
-
 	testPaths(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -2412,14 +2410,21 @@ func TestManager_FakeShipper(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		shipperOn := false
+		shipperInputOn := false
+		shipperOutputOn := false
 		compConnected := false
+		eventSent := false
 
 		sendEvent := func() (bool, error) {
-			if !shipperOn || !compConnected {
+			if !shipperInputOn || !shipperOutputOn || !compConnected {
 				// wait until connected
 				return false, nil
 			}
+			if eventSent {
+				// other path already sent event
+				return false, nil
+			}
+			eventSent = true
 
 			// send an event between component and the fake shipper
 			eventID, err := uuid.NewV4()
@@ -2471,7 +2476,7 @@ func TestManager_FakeShipper(t *testing.T) {
 						if unit.State == client.UnitStateFailed {
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 						} else if unit.State == client.UnitStateHealthy {
-							shipperOn = true
+							shipperInputOn = true
 							ok, err := sendEvent()
 							if ok {
 								if err != nil {
@@ -2493,7 +2498,36 @@ func TestManager_FakeShipper(t *testing.T) {
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
 					} else {
-						subErrCh <- errors.New("unit missing: fake-input")
+						subErrCh <- errors.New("input unit missing: fake-default")
+					}
+					unit, ok = state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
+					if ok {
+						if unit.State == client.UnitStateFailed {
+							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+						} else if unit.State == client.UnitStateHealthy {
+							shipperOutputOn = true
+							ok, err := sendEvent()
+							if ok {
+								if err != nil {
+									subErrCh <- err
+								} else {
+									// successful; turn it all off
+									err := m.Update([]component.Component{})
+									if err != nil {
+										subErrCh <- err
+									}
+								}
+							}
+						} else if unit.State == client.UnitStateStopped {
+							subErrCh <- nil
+						} else if unit.State == client.UnitStateStarting {
+							// acceptable
+						} else {
+							// unknown state that should not have occurred
+							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+						}
+					} else {
+						subErrCh <- errors.New("output unit missing: fake-default")
 					}
 				}
 			case state := <-compSub.Ch():
