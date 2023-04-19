@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/otiai10/copy"
 
@@ -86,8 +87,10 @@ func Install(cfgFile, topPath string) error {
 					errors.M("destination", paths.ShellWrapperPath))
 			}
 		} else {
-			//nolint: govet,staticcheck // the first argument to fmt.Sprintf is a constant containing one formatting directive.
-			shellWrapper := fmt.Sprintf(paths.ShellWrapper, topPath)
+			// We use strings.Replace instead of fmt.Sprintf here because, with the
+			// latter, govet throws a false positive error here: "fmt.Sprintf call has
+			// arguments but no formatting directives".
+			shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
 			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
 			if err != nil {
 				return errors.New(
