@@ -80,6 +80,14 @@ const CheckinIDKey CheckinCtxKey = "checkinID"
 
 const cancelCheckinTimeout = 1 * time.Second
 
+// checkinState represented the data we send about agent state in fleet checkin requests.
+// This is used to determine if a change in agent state should trigger a new checkin
+type checkinState struct {
+	status        string
+	statusMessage string
+	components    []fleetapi.CheckinComponent
+}
+
 type fleetGateway struct {
 	log                loggerIF
 	client             client.Sender
@@ -159,6 +167,7 @@ func (f *fleetGateway) Actions() <-chan []fleetapi.Action {
 func (f *fleetGateway) Run(ctx context.Context) error {
 	f.log.Info("Fleet gateway started")
 	f.log.Debugf("Fleet gateway settings: %+v", f.settings)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -241,6 +250,8 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 		cancelCheckinCtxFunc()
 	}()
 
+	initialCheckinState := convertToCheckinState(initialState)
+
 	// Execute the checkin call asynchronously. For any errors returned by the fleet-server API
 	// the function will retry to communicate with fleet-server with an exponential delay and some
 	// jitter to help better distribute the load from a fleet of agents.
@@ -257,8 +268,8 @@ func (f *fleetGateway) performCancellableCheckin(ctx context.Context, initialSta
 				// update channel is closed with no value
 				continue
 			}
-
-			if !reflect.DeepEqual(newState, initialState) {
+			updatedCheckinState := convertToCheckinState(newState)
+			if !reflect.DeepEqual(updatedCheckinState, initialCheckinState) {
 				f.log.Debugf(
 					"Received updated state (Agent state: %q) when checkin is ongoing past configured debounce. Cancelling previous checkin %q and starting a new one.",
 					newState.State,
@@ -365,7 +376,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff, state 
 	return nil, ctx.Err()
 }
 
-func (f *fleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
+func convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
 	if components == nil {
 		return nil
 	}
@@ -453,7 +464,7 @@ func (f *fleetGateway) execute(ctx context.Context, state state.State) (*fleetap
 	}
 
 	// convert components into checkin components structure
-	components := f.convertToCheckinComponents(state.Components)
+	components := convertToCheckinComponents(state.Components)
 
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
@@ -520,4 +531,12 @@ func agentStateToString(state agentclient.State) string {
 		return fleetStateStarting
 	}
 	return fleetStateDegraded
+}
+
+func convertToCheckinState(s state.State) checkinState {
+	return checkinState{
+		status:        agentStateToString(s.State),
+		statusMessage: s.Message,
+		components:    convertToCheckinComponents(s.Components),
+	}
 }

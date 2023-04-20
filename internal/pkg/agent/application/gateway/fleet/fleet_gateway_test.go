@@ -130,6 +130,19 @@ func emptyStateFetcher(t *testing.T) *MockStateFetcher {
 	return mockFetcher
 }
 
+func createMockStateFetcher(t *testing.T, stateUpdateCh chan state.State) *MockStateFetcher {
+	mockFetcher := NewMockStateFetcher(t)
+	mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
+		stateUpdateSrc := NewStateUpdateSource(t)
+		stateUpdateSrc.EXPECT().Ch().Return(stateUpdateCh)
+		go func() {
+			<-ctx.Done()
+		}()
+		return stateUpdateSrc
+	})
+	return mockFetcher
+}
+
 func neverDebounce(t *testing.T) debouncerFunc[state.State] {
 	return func(_ context.Context, in <-chan state.State, _ time.Duration) <-chan state.State {
 		return in
@@ -549,17 +562,7 @@ func TestFleetGateway(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		mockLogger := newTestLogger(t)
 
-		mockFetcher := NewMockStateFetcher(t)
-
 		stateCh := make(chan state.State)
-		mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
-			stateUpdateSrc := NewStateUpdateSource(t)
-			stateUpdateSrc.EXPECT().Ch().Return(stateCh)
-			go func() {
-				<-ctx.Done()
-			}()
-			return stateUpdateSrc
-		})
 
 		settings := configuration.DefaultFleetGatewaySettings()
 
@@ -579,7 +582,7 @@ func TestFleetGateway(t *testing.T) {
 			onDemandDebounce,
 			testCancelTimeout,
 			noop.New(),
-			mockFetcher,
+			createMockStateFetcher(t, stateCh),
 			stateStore,
 		)
 		require.NoError(t, err)
@@ -649,6 +652,126 @@ func TestFleetGateway(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("Long poll checkin does not start a new checkin for state updates that would not change the checkin data", func(t *testing.T) {
+
+		longPollClient := newTestingClient(t)
+
+		// this is an unsynchronized int but since the test client is only going to be incremented by 1 goroutine at the time
+		// and we check it with an assert.Eventually() we should be fine sharing it across the goroutines
+		var startedCheckins uint
+		completeCheckinCh := make(chan struct{})
+
+		// setup testing client callback to block until we can read from the completeCheckinCh to mock a long poll from fleet
+		// it will also unblock on context cancellation (with nil response and an error)
+		clientInvocationChannel := longPollClient.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+			startedCheckins++
+			t.Logf("test client using context %v", ctx.Value(CheckinIDKey))
+			select {
+			case <-ctx.Done():
+				t.Logf("context %v cancelled", ctx.Value(CheckinIDKey))
+				return nil, ctx.Err()
+
+			case <-completeCheckinCh:
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				t.Logf("checkin with context %v completed", ctx.Value(CheckinIDKey))
+				return resp, nil
+			}
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		reportedAgentStatuses := make([]testingClientInvocation, 0, 2)
+
+		// fleet test client invocation consumer
+		go func() {
+			for {
+				select {
+				case tci := <-clientInvocationChannel:
+					reportedAgentStatuses = append(reportedAgentStatuses, tci)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		log, _ := logger.New("tst", false)
+		stateStore := newStateStore(t, log)
+
+		scheduler := scheduler.NewStepper()
+		mockLogger := newTestLogger(t)
+
+		stateCh := make(chan state.State)
+
+		settings := configuration.DefaultFleetGatewaySettings()
+
+		debounceOver := make(chan time.Time)
+
+		onDemandDebounce := func(ctx context.Context, in <-chan state.State, _ time.Duration) <-chan state.State {
+			noopFunc := func() {}
+			return debounceWithTimeSource(ctx, in, debounceOver, noopFunc)
+		}
+
+		gateway, err := newFleetGatewayWithSchedulerAndDebouncer(
+			mockLogger,
+			settings,
+			agentInfo,
+			longPollClient,
+			scheduler,
+			onDemandDebounce,
+			testCancelTimeout,
+			noop.New(),
+			createMockStateFetcher(t, stateCh),
+			stateStore,
+		)
+		require.NoError(t, err)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		// make the fleet gateway start a checkin
+		scheduler.Next()
+
+		// provide an initial state through the subscription
+		agentInitialState := state.State{
+			State:        agentclient.Healthy,
+			Message:      "Agent is healthy",
+			FleetState:   agentclient.Starting,
+			FleetMessage: "",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.InfoLevel,
+		}
+		mustWriteToChannelBeforeTimeout(t, agentInitialState, stateCh, 50*time.Millisecond)
+
+		require.Eventually(t, func() bool { return startedCheckins > 0 }, 1*time.Second, 50*time.Millisecond, "could not detect a checkin in progress")
+
+		// inject new state (fleet state and log level are not part of the checkin request)
+		agentNotRelevantNewState := state.State{
+			State:        agentclient.Healthy,
+			Message:      "Agent is healthy",
+			FleetState:   agentclient.Healthy,
+			FleetMessage: "Fleet is connected",
+			Components:   []runtime.ComponentComponentState{},
+			LogLevel:     logp.DebugLevel,
+		}
+		// push the new state through the subscription (too soon, this will be saved but previous checkin won't be cancelled)
+		mustWriteToChannelBeforeTimeout(t, agentNotRelevantNewState, stateCh, 50*time.Millisecond)
+
+		debounceOver <- time.Now()
+
+		/// check for some time that we didn't cancel the current checkin after the state update
+		assert.Never(t, func() bool { return startedCheckins > 1 }, 1*time.Second, 50*time.Millisecond)
+
+		// allow the test client to complete the checkin (only the initial one since none other should have been triggered)
+		completeCheckinCh <- struct{}{}
+
+		assert.Eventually(t, func() bool { return len(reportedAgentStatuses) == 1 }, 1*time.Second, 50*time.Millisecond) // we should have only 1 reported state (the completed one with the initial state)
+
+		// wrap it up: stop the fleet gateway and check for errors
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
+	})
+
 	t.Run("New checkin after a state update requires a new debounce before cancelling again", func(t *testing.T) {
 
 		longPollClient := newTestingClient(t)
@@ -698,17 +821,7 @@ func TestFleetGateway(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		mockLogger := newTestLogger(t)
 
-		mockFetcher := NewMockStateFetcher(t)
-
 		stateCh := make(chan state.State)
-		mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
-			stateUpdateSrc := NewStateUpdateSource(t)
-			stateUpdateSrc.EXPECT().Ch().Return(stateCh)
-			go func() {
-				<-ctx.Done()
-			}()
-			return stateUpdateSrc
-		})
 
 		settings := configuration.DefaultFleetGatewaySettings()
 
@@ -728,7 +841,7 @@ func TestFleetGateway(t *testing.T) {
 			onDemandDebounce,
 			testCancelTimeout,
 			noop.New(),
-			mockFetcher,
+			createMockStateFetcher(t, stateCh),
 			stateStore,
 		)
 		require.NoError(t, err)
@@ -867,17 +980,7 @@ func TestFleetGateway(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		mockLogger := newTestLogger(t)
 
-		mockFetcher := NewMockStateFetcher(t)
-
 		stateCh := make(chan state.State)
-		mockFetcher.EXPECT().StateSubscribe(mock.Anything).RunAndReturn(func(ctx context.Context) state.StateUpdateSource {
-			stateUpdateSrc := NewStateUpdateSource(t)
-			stateUpdateSrc.EXPECT().Ch().Return(stateCh)
-			go func() {
-				<-ctx.Done()
-			}()
-			return stateUpdateSrc
-		})
 
 		settings := configuration.DefaultFleetGatewaySettings()
 
@@ -897,7 +1000,7 @@ func TestFleetGateway(t *testing.T) {
 			onDemandDebounce,
 			testCancelTimeout,
 			noop.New(),
-			mockFetcher,
+			createMockStateFetcher(t, stateCh),
 			stateStore,
 		)
 		require.NoError(t, err)
