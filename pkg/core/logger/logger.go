@@ -72,14 +72,14 @@ func NewWithoutConfig(name string) *Logger {
 }
 
 func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	commonCfg, err := toCommonConfig(cfg)
+	commonCfg, err := ToCommonConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	var outputs []zapcore.Core
 	if logInternal {
-		internal, err := makeInternalFileOutput(cfg)
+		internal, err := MakeInternalFileOutput(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +93,7 @@ func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 	return logp.NewLogger(name), nil
 }
 
-func toCommonConfig(cfg *Config) (*config.C, error) {
+func ToCommonConfig(cfg *Config) (*config.C, error) {
 	// work around custom types and common config
 	// when custom type is transformed to common.Config
 	// value is determined based on reflect value which is incorrect
@@ -136,7 +136,7 @@ func DefaultLoggingConfig() *Config {
 // makeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
 //
 // This is the logger that the spawned filebeat expects to read the log file from and ship to ES.
-func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
+func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
@@ -156,13 +156,13 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	}
 
 	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
-	encoderConfig.EncodeTime = utcTimestampEncode
+	encoderConfig.EncodeTime = UtcTimestampEncode
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
 	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, internalLevelEnabler)), nil
 }
 
-// utcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
-func utcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+// UtcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
+func UtcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	type appendTimeEncoder interface {
 		AppendTimeLayout(time.Time, string)
 	}

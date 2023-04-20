@@ -50,11 +50,11 @@ func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentH
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, prevHash, true)
+	return Cleanup(log, prevHash, true, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(log *logger.Logger, currentHash string, removeMarker bool) error {
+func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs bool) error {
 	log.Debugw("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
 	<-time.After(afterRestartDelay)
 
@@ -94,7 +94,11 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool) error {
 
 		hashedDir := filepath.Join(paths.Data(), dir)
 		log.Debugw("Removing hashed data directory", "file.path", hashedDir)
-		if cleanupErr := install.RemovePath(hashedDir); cleanupErr != nil {
+		var ignoredDirs []string
+		if keepLogs {
+			ignoredDirs = append(ignoredDirs, "logs")
+		}
+		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
 			err = multierror.Append(err, cleanupErr)
 		}
 	}
