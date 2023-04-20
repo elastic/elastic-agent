@@ -58,7 +58,7 @@ entries:
         name: 1680764383-Respecting-logging.level-settings.yaml
         checksum: b4c689aa41884020f23848adab7b586d886c3659
     - kind: bug-fix
-      summary: An empty proxy from the policy don't override the proxy set by --proxy-url.
+      summary: An empty proxy from a Fleet agent policy no longer overrides the proxy set by --proxy-url.
       description: |
         Fixes a bug that caused an empty proxy from a Fleet managed Elastic Agent policy to override
         the proxy set by `--proxy-url`.
