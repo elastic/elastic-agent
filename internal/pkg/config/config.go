@@ -54,25 +54,12 @@ func NewConfigFrom(from interface{}, opts ...interface{}) (*Config, error) {
 	if len(opts) == 0 {
 		opts = DefaultOptions
 	}
-	var ucfgOpts []ucfg.Option
-	var localOpts []Option
-	for _, o := range opts {
-		switch ot := o.(type) {
-		case ucfg.Option:
-			ucfgOpts = append(ucfgOpts, ot)
-		case Option:
-			localOpts = append(localOpts, ot)
-		default:
-			return nil, fmt.Errorf("unknown option type %T", o)
-		}
-	}
-	local := &options{}
-	for _, o := range localOpts {
-		o(local)
+	ucfgOpts, local, err := getOptions(opts...)
+	if err != nil {
+		return nil, err
 	}
 
 	var data map[string]interface{}
-	var err error
 	if bytes, ok := from.([]byte); ok {
 		err = yaml.Unmarshal(bytes, &data)
 		if err != nil {
@@ -142,7 +129,7 @@ func newConfigFrom(in *ucfg.Config) *Config {
 
 // Unpack unpacks a struct to Config.
 func (c *Config) Unpack(to interface{}, opts ...interface{}) error {
-	ucfgOpts, err := getUcfgOptions(opts...)
+	ucfgOpts, _, err := getOptions(opts...)
 	if err != nil {
 		return err
 	}
@@ -155,7 +142,7 @@ func (c *Config) access() *ucfg.Config {
 
 // Merge merges two configuration together.
 func (c *Config) Merge(from interface{}, opts ...interface{}) error {
-	ucfgOpts, err := getUcfgOptions(opts...)
+	ucfgOpts, _, err := getOptions(opts...)
 	if err != nil {
 		return err
 	}
@@ -163,10 +150,67 @@ func (c *Config) Merge(from interface{}, opts ...interface{}) error {
 }
 
 // ToMapStr takes the config and transform it into a map[string]interface{}
-func (c *Config) ToMapStr() (map[string]interface{}, error) {
-	var m map[string]interface{}
-	if err := c.Unpack(&m); err != nil {
+func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
+	if len(opts) == 0 {
+		opts = DefaultOptions
+	}
+	ucfgOpts, local, err := getOptions(opts...)
+	if err != nil {
 		return nil, err
+	}
+
+	// remove and unpack each skip keys into its own map with no resolve
+	// so that variables are not substituted
+	skippedKeys := map[string]interface{}{}
+	skippedKeysOrig := map[string]*ucfg.Config{}
+	for _, skip := range local.skipKeys {
+		if c.access().HasField(skip) {
+			subCfg, err := c.access().Child(skip, -1)
+			if err != nil {
+				return nil, err
+			}
+			var subUnpacked interface{}
+			if subCfg.IsDict() {
+				var subDict map[string]interface{}
+				err = subCfg.Unpack(&subDict, ucfg.ResolveNOOP)
+				if err != nil {
+					return nil, err
+				}
+				subUnpacked = subDict
+			} else if subCfg.IsArray() {
+				var subArr []interface{}
+				err = subCfg.Unpack(&subArr, ucfg.ResolveNOOP)
+				if err != nil {
+					return nil, err
+				}
+				subUnpacked = subArr
+			} else {
+				return nil, fmt.Errorf("unsupported type for SkipKeys option %s", skip)
+			}
+			_, err = c.access().Remove(skip, -1)
+			if err != nil {
+				return nil, err
+			}
+			skippedKeys[skip] = subUnpacked
+			skippedKeysOrig[skip] = subCfg
+		}
+	}
+
+	// perform unpack with the skip keys removed
+	var m map[string]interface{}
+	if err := c.access().Unpack(&m, ucfgOpts...); err != nil {
+		return nil, err
+	}
+
+	// add the skipped keys into the map and back into the config
+	for k, v := range skippedKeys {
+		m[k] = v
+	}
+	if len(skippedKeysOrig) > 0 {
+		err := c.access().Merge(skippedKeysOrig, ucfg.ResolveNOOP)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return m, nil
 }
@@ -208,21 +252,25 @@ func LoadFiles(paths ...string) (*Config, error) {
 	return newConfigFrom(merger.Config()), nil
 }
 
-func getUcfgOptions(opts ...interface{}) ([]ucfg.Option, error) {
+func getOptions(opts ...interface{}) ([]ucfg.Option, options, error) {
 	if len(opts) == 0 {
 		opts = DefaultOptions
 	}
 	var ucfgOpts []ucfg.Option
+	var localOpts []Option
+	var local options
 	for _, o := range opts {
 		switch ot := o.(type) {
 		case ucfg.Option:
 			ucfgOpts = append(ucfgOpts, ot)
 		case Option:
-			// ignored during unpack
-			continue
+			localOpts = append(localOpts, ot)
 		default:
-			return nil, fmt.Errorf("unknown option type %T", o)
+			return nil, local, fmt.Errorf("unknown option type %T", o)
 		}
 	}
-	return ucfgOpts, nil
+	for _, o := range localOpts {
+		o(&local)
+	}
+	return ucfgOpts, local, nil
 }

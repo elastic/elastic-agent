@@ -55,7 +55,13 @@ func TestInputsResolveNOOP(t *testing.T) {
 
 	cfgData, err := cfg.ToMapStr()
 	require.NoError(t, err)
+	require.Equal(t, contents, cfgData)
 
+	// run `ToMapStr` again to ensure that the result is the
+	// same, this is because the `cfg` has to be mutated for
+	// `ToMapStr` to with the `SkipVars()` option
+	cfgData, err = cfg.ToMapStr()
+	require.NoError(t, err)
 	assert.Equal(t, contents, cfgData)
 }
 
