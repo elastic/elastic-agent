@@ -43,7 +43,7 @@ entries:
         name: 1680101776-Fix-actions-acks-delay.yaml
         checksum: 1ec1403420a07e550002cc162fdd1d92fae28dfa
     - kind: bug-fix
-      summary: Respecting logging.level settings coming whether from Fleet UI or config file.
+      summary: Fix for the logging.level setting not being respected.
       description: |
         Fixes a bug that `logging.level` settings were not being respected, coming either
         from Fleet UI or a config file.
