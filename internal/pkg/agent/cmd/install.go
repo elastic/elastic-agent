@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -218,7 +219,20 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
+	if err := createInstallMarker(topPath); err != nil {
+		return fmt.Errorf("failed to create install marker: %w", err)
+	}
+
 	fmt.Fprint(streams.Out, "Elastic Agent has been successfully installed.\n")
+	return nil
+}
+
+func createInstallMarker(topPath string) error {
+	markerFilePath := filepath.Join(topPath, info.MarkerFileName)
+	if _, err := os.Create(markerFilePath); err != nil {
+		return err
+	}
+
 	return nil
 }
 
