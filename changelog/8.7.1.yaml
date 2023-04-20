@@ -86,3 +86,15 @@ entries:
       file:
         name: 1681311024-Ensure-local-bin-directory-exists-on-Mac-OS-during-installation..yaml
         checksum: 648894f466ad911ee06be9c3b4b2477fad3488bc
+    - kind: bug-fix
+      summary: Re-add lumberjack input to the Filebeat spec.
+      description: ""
+      component: spec
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2511
+      issue:
+        - https://github.com/elastic/integrations/issues/5912
+      timestamp: 1681842199
+      file:
+        name: 1681842199-re-add-lumberjack-input-spec.yaml
+        checksum: a0bb03fb0a7739946d631eece1dc0c5a807038e6
