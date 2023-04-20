@@ -91,6 +91,46 @@ func RemovePath(path string) error {
 	return cleanupErr
 }
 
+func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
+	if len(exceptions) == 0 {
+		return RemovePath(path)
+	}
+
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		if containsString(f.Name(), exceptions, runtime.GOOS != component.Windows) {
+			continue
+		}
+
+		err = RemovePath(filepath.Join(path, f.Name()))
+		if !bestEffort && err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
+func containsString(str string, a []string, caseSensitive bool) bool {
+	if !caseSensitive {
+		str = strings.ToLower(str)
+	}
+	for _, v := range a {
+		if !caseSensitive {
+			v = strings.ToLower(v)
+		}
+		if str == v {
+			return true
+		}
+	}
+
+	return false
+}
+
 func isBlockingOnSelf(err error) bool {
 	// cannot remove self, this is expected on windows
 	// fails with  remove {path}}\elastic-agent.exe: Access is denied
