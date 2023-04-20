@@ -31,8 +31,8 @@ entries:
     - kind: bug-fix
       summary: Fix actions acks delay
       description: |
-        Fixes a bug that caused delayed "ack" response following Osquerybeat query
-        completions.
+        Fix action acknowledgements taking up to 5 minutes. Fixed OSQuery live query results
+        taking up to five minutes to show up in Kibana.
       component: ""
       pr:
         - https://github.com/elastic/elastic-agent/pull/2406
@@ -60,8 +60,8 @@ entries:
     - kind: bug-fix
       summary: An empty proxy from the policy don't override the proxy set by --proxy-url.
       description: |
-        Fixes a bug that caused an empty proxy from the Elastic Agent policy to
-        override the proxy set by `--proxy-url`.
+        Fixes a bug that caused an empty proxy from a Fleet managed Elastic Agent policy to override
+        the proxy set by `--proxy-url`.
       component: action handlers
       pr:
         - https://github.com/elastic/elastic-agent/pull/2468
