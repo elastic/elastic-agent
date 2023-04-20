@@ -6,6 +6,7 @@ package handlers
 
 import (
 	"context"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"testing"
 	"time"
 
@@ -56,7 +57,7 @@ func TestUpgradeHandler(t *testing.T) {
 	msgChan := make(chan string)
 	upgradeMgr := &mockUpgradeManager{msgChan: msgChan}
 	specs := component.RuntimeSpecs{}
-	c := coordinator.New(log, logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
+	c := coordinator.New(log, configuration.DefaultConfiguration(), logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
 	u := NewUpgrade(log, c)
 	ctx := context.Background()
 	a := fleetapi.ActionUpgrade{Version: "8.3.0", SourceURI: "http://localhost"}
@@ -73,7 +74,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	msgChan := make(chan string)
 	upgradeMgr := &mockUpgradeManager{msgChan: msgChan}
 	specs := component.RuntimeSpecs{}
-	c := coordinator.New(log, logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
+	c := coordinator.New(log, configuration.DefaultConfiguration(), logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
 	u := NewUpgrade(log, c)
 	ctx1 := context.Background()
 	ctx2 := context.Background()
@@ -93,7 +94,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	msgChan := make(chan string)
 	upgradeMgr := &mockUpgradeManager{msgChan: msgChan}
 	specs := component.RuntimeSpecs{}
-	c := coordinator.New(log, logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
+	c := coordinator.New(log, configuration.DefaultConfiguration(), logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
 	u := NewUpgrade(log, c)
 	ctx1 := context.Background()
 	ctx2 := context.Background()

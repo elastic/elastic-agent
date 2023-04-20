@@ -5,7 +5,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -43,7 +42,7 @@ func TestInputsResolveNOOP(t *testing.T) {
 		},
 	}
 
-	tmp, err := ioutil.TempDir("", "config")
+	tmp, err := os.MkdirTemp("", "config")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmp)
 
@@ -80,7 +79,7 @@ func testToMapStr(t *testing.T) {
 }
 
 func testLoadFiles(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "watch")
+	tmp, err := os.MkdirTemp("", "watch")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmp)
 
@@ -125,5 +124,6 @@ func testLoadFiles(t *testing.T) {
 func dumpToYAML(t *testing.T, out string, in interface{}) {
 	b, err := yaml.Marshal(in)
 	require.NoError(t, err)
-	ioutil.WriteFile(out, b, 0600)
+	err = os.WriteFile(out, b, 0600)
+	require.NoError(t, err)
 }
