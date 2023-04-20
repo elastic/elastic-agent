@@ -49,6 +49,7 @@ func TestZipLogs(t *testing.T) {
 	// Verify the results.
 	expected := []zippedItem{
 		{"logs/", true},
+		{"logs/elastic-agent-unknow/", true},
 		{"logs/elastic-agent-unknow/sub-dir/", true},
 		{"logs/elastic-agent-unknow/sub-dir/log.ndjson", false},
 	}
