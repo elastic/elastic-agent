@@ -178,7 +178,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	// FIXME this should not be instantiated directly but injected as interface FleetGateway
 	gateway, err := fleetgateway.New(
 		m.log,
-		m.cfg.Fleet.GatewaySettings,
+		configuration.DefaultFleetGatewaySettings(),
 		m.agentInfo,
 		m.client,
 		actionAcker,
