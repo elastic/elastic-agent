@@ -58,4 +58,4 @@ fleet:
   timeout: 12m0s
 ```
 
-Due to the way that configuration for fleet-managed agents is handled, it is not currently possible to change such values using `elastic-agent.yml` once the agent has been enrolled and Fleet UI does not allow for setting these values at this time.
+Due to the way that configuration for fleet-managed agents is handled, it is not currently possible to change such values from whatever the default values were when the agent has been enrolled.
