@@ -15,7 +15,7 @@ import (
 // FleetServerConfig is the configuration written so Elastic Agent can run Fleet Server.
 type FleetServerConfig struct {
 	Bootstrap    bool                     `config:"bootstrap" yaml:"bootstrap,omitempty"`
-	InitTimeout  *time.Duration           `config:"init_timeout" yaml:"init_timeout"`
+	InitTimeout  *time.Duration           `config:"fleet_timeout" yaml:"fleet_timeout"`
 	Policy       *FleetServerPolicyConfig `config:"policy" yaml:"policy,omitempty"`
 	Output       FleetServerOutputConfig  `config:"output" yaml:"output,omitempty"`
 	Host         string                   `config:"host" yaml:"host,omitempty"`
