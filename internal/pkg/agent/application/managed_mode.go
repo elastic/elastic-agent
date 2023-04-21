@@ -271,7 +271,7 @@ func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configu
 		var err error
 		startTimeout, err = time.ParseDuration(envTimeout)
 		if err != nil {
-			return fmt.Errorf("error parsing FLEET_TIMEOUT value: %s: %s", envTimeout, err)
+			return fmt.Errorf("error parsing FLEET_TIMEOUT value: %s: %w", envTimeout, err)
 		}
 	}
 
