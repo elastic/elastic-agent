@@ -72,6 +72,7 @@ The following actions are possible and grouped based on the actions.
   FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
+  FLEET_TIMEOUT - Sets the initial timeout when starting up the fleet server under agent. Default: 30s.
 
   The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
 

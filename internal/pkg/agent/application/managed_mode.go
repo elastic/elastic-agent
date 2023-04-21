@@ -7,6 +7,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -169,7 +170,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
 		} else {
-			err = m.initFleetServer(ctx)
+			err = m.initFleetServer(ctx, m.cfg.Fleet.Server)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
@@ -259,14 +260,28 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 	return false
 }
 
-func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
+	startTimeout := 30 * time.Second
+	// set timeout from config
+	if cfg != nil && cfg.InitTimeout != nil {
+		startTimeout = *cfg.InitTimeout
+	}
+	// override with env var, match the other FLEET_* settings
+	if envTimeout := os.Getenv("FLEET_TIMEOUT"); envTimeout != "" {
+		var err error
+		startTimeout, err = time.ParseDuration(envTimeout)
+		if err != nil {
+			return fmt.Errorf("error parsing FLEET_TIMEOUT value: %s: %s", envTimeout, err)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, startTimeout)
 	defer cancel()
 
-	m.log.Debugf("injecting basic fleet-server for first start")
+	m.log.Debugf("injecting basic fleet-server for first start, will wait %s", startTimeout)
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("timeout while waiting for fleet server start: %w", ctx.Err())
 	case m.ch <- &localConfigChange{injectFleetServerInput}:
 	}
 
