@@ -11,7 +11,7 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: increase-fleet-long-poll-timeout
+summary: Increase fleet checkin poll duration to 12 minutes, relaunching a checkin if agent status changes (with a debounce of 5 minutes)
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
