@@ -14,13 +14,10 @@ import (
 	"github.com/google/uuid"
 )
 
-func EnrollElasticAgent(t *testing.T, fleetUrl string, enrollmentToken string, version string) error {
+func EnrollElasticAgent(t *testing.T, fleetUrl string, enrollmentToken string, agentPath string) error {
 	t.Log("Enrolling elastic agent ...")
-	arch, err := getArchFileTag()
-	if err != nil {
-		return err
-	}
-	cmd := exec.Command(fmt.Sprintf("elastic-agent-%s-linux-%s/elastic-agent", version, arch), //nolint:gosec //TODO: exclude from binary
+
+	cmd := exec.Command(agentPath, //nolint:gosec
 		"install", "--non-interactive", fmt.Sprintf("--url=%s", fleetUrl), fmt.Sprintf("--enrollment-token=%s", enrollmentToken))
 
 	out, err := cmd.CombinedOutput()

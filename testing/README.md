@@ -18,7 +18,7 @@ For further details about how to configure Vault check [the Vault documentation]
 In the `testing` directory:
 
 ```
-GITHUB_TOKEN=... SLACK_CHANNEL=... make create-cluster
+GITHUB_TOKEN=... SLACK_CHANNEL=... make -C testing/e2e create-cluster
 ```
 
 Specify a `GITHUB_TOKEN` with configured SSO and the `SLACK_CHANNEL` - the slack channel identifier to send messages about cluster state. 
@@ -30,6 +30,12 @@ The cluster specs are located in `test-cluster.yml.tpl`.
 The `create-cluster` target creates 2 files: 
 * `cluster-info.json` - Basic cluster information
 * `cluster-digest.yml` - a sensitive YAML containing all required endpoints and credentials to be passed to tests in the next step.
+
+4. Download elastic-agent
+
+```
+make -C testing/e2e download-agent
+```
 
 3. Run tests:
 It's not always easy to run the tests locally because we can already have an elastic-agent installed on our machine. 
@@ -44,7 +50,7 @@ Open integrated VSCode terminal:
 
 ```
 cd e2e
-AGENT_VERSION=8.6.0 go test -v -timeout 300s -tags=e2e  -run ^TestElasticAgentUpgrade$ github.com/elastic/elastic-agent/testing/e2e
+make run-tests
 ```
 
 The credentials and endpoints in the `cluster-digest.yml` are used by e2e tests to communicate with created cluster.

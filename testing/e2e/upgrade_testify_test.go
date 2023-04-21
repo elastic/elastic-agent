@@ -21,25 +21,25 @@ type UpgradeElasticAgent struct {
 	clusterConfig     tools.ClusterConfig
 	client            *tools.Client
 	agentVersion      string
+	agentBinPath      string
 }
 
 // Before suite
 func (suite *UpgradeElasticAgent) SetupSuite() {
 	suite.agentVersion = os.Getenv("AGENT_VERSION")
-	assert.NotEmpty(suite.T(), suite.agentVersion, "AGENT_VERSION is not set")
+	require.NotEmpty(suite.T(), suite.agentVersion, "AGENT_VERSION is not set")
+	suite.agentBinPath = os.Getenv("AGENT_BIN_PATH")
+	require.NotEmpty(suite.T(), suite.agentBinPath, "AGENT_BIN_PATH (path to elastic-agen binary) is not set")
 
 	suite.clusterConfigPath = os.Getenv("CLUSTER_CONFIG_PATH")
 	if suite.clusterConfigPath == "" {
-		suite.clusterConfigPath = "../cluster-digest.yml"
+		suite.clusterConfigPath = "./cluster-digest.yml"
 	}
 	var err error
 	suite.clusterConfig, err = tools.ReadConfig(suite.clusterConfigPath)
 	require.Nil(suite.T(), err, "Could not read cluster config")
 	suite.client, err = tools.NewClient(&suite.clusterConfig)
 	require.Nil(suite.T(), err, "Could not create Kibana client")
-
-	err = tools.DownloadElasticAgent(suite.agentVersion)
-	require.Nil(suite.T(), err, "Could not download Elastic Agent")
 }
 
 func (suite *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
@@ -49,7 +49,7 @@ func (suite *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 	enrollmentToken, err := suite.client.CreateEnrollmentAPIKey(context.Background(), policy)
 	require.Nil(suite.T(), err, "Could not create enrollment token")
 
-	err = tools.EnrollElasticAgent(suite.T(), suite.clusterConfig.FleetConfig.Url, enrollmentToken.APIKey, suite.agentVersion)
+	err = tools.EnrollElasticAgent(suite.T(), suite.clusterConfig.FleetConfig.Url, enrollmentToken.APIKey, suite.agentBinPath)
 	require.Nil(suite.T(), err, "Error while enrolling elastic agent")
 
 	require.Eventually(suite.T(), agentStatus("online", *suite), 2*time.Minute, 10*time.Second, "Agent status is not online")
