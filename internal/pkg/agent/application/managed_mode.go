@@ -261,17 +261,18 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 }
 
 func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
+	fleetTimeoutEnvKey := "FLEET_TIMEOUT"
 	startTimeout := 30 * time.Second
 	// set timeout from config
 	if cfg != nil && cfg.InitTimeout != nil {
 		startTimeout = *cfg.InitTimeout
 	}
 	// override with env var, match the other FLEET_* settings
-	if envTimeout := os.Getenv("FLEET_TIMEOUT"); envTimeout != "" {
+	if envTimeout := os.Getenv(fleetTimeoutEnvKey); envTimeout != "" {
 		var err error
 		startTimeout, err = time.ParseDuration(envTimeout)
 		if err != nil {
-			return fmt.Errorf("error parsing FLEET_TIMEOUT value: %s: %w", envTimeout, err)
+			return fmt.Errorf("error parsing %s value: %s: %w", fleetTimeoutEnvKey, envTimeout, err)
 		}
 	}
 
