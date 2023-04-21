@@ -19,7 +19,7 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	c := DefaultClientConfig()
-	assert.Equal(t, 35*time.Minute, c.Transport.Timeout)
+	assert.Equal(t, 12*time.Minute, c.Transport.Timeout)
 }
 
 func TestPackUnpack(t *testing.T) {
