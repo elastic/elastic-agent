@@ -77,16 +77,27 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic detected: %v", r)
 			action.Err = err
-			h.log.Errorw("diagnostics handler paniced", "err", err)
+			h.log.Errorw("diagnostics handler panicked", "err", err)
 		}
 	}()
 	defer func() {
-		ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
-		ack.Commit(ctx)      //nolint:errcheck //no path for failing a commit
+		err := ack.Ack(ctx, action)
+		if err != nil {
+			h.log.Errorw(
+				fmt.Sprintf("failed to ack diagnostics action: %v", err),
+				"action", action)
+		}
+
+		err = ack.Commit(ctx)
+		if err != nil {
+			h.log.Errorf("failed to commit diagnostics action ack: %v", err)
+
+		}
 	}()
 
 	if !h.limiter.Allow() {
 		action.Err = ErrRateLimit
+		h.log.Infof("diagnostics action handler: %v", ErrRateLimit)
 		return
 	}
 
@@ -94,19 +105,23 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	aDiag, err := h.runHooks(ctx)
 	if err != nil {
 		action.Err = err
+		h.log.Errorf(
+			"diagnostics action handler failed to run diagnostics hooks: %v",
+			err)
 		return
 	}
 	h.log.Debug("Gathering unit diagnostics.")
 	uDiag := h.diagUnits(ctx)
 
 	var r io.Reader
-	// attempt to create the a temporary diagnostics file on disk in order to avoid loading a
-	// potentially large file in memory.
-	// if on-disk creation fails an in-memory buffer is used.
+	// attempt to create a temporary diagnostics file on disk in order to avoid
+	// loading a potentially large file in memory.
+	// If on-disk creation fails an in-memory buffer is used.
 	f, s, err := h.diagFile(aDiag, uDiag)
 	if err != nil {
 		var b bytes.Buffer
-		h.log.Warnw("Diagnostics action unable to use temporary file, using buffer instead.", "err", err)
+		h.log.Infow("Diagnostics action unable to use temporary file, using buffer instead.",
+			"err", err)
 		var wBuf bytes.Buffer
 		defer func() {
 			if str := wBuf.String(); str != "" {
@@ -116,22 +131,38 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag)
 		if err != nil {
 			action.Err = err
+			h.log.Errorf(
+				"diagnostics action handler failed generate zip archive: %v",
+				err)
 			return
 		}
 		r = &b
 		s = int64(b.Len())
 	} else {
 		defer func() {
-			f.Close()
-			os.Remove(f.Name())
+			err := f.Close()
+			if err != nil {
+				h.log.Warnf("failed to close temporary diagnostics file %s: %v",
+					f.Name(), err)
+			}
+
+			err = os.Remove(f.Name())
+			if err != nil {
+				h.log.Warnf("failed to remove temporary diagnostics file %s: %v",
+					f.Name(), err)
+			}
 		}()
 		r = f
 	}
 	h.log.Debug("Sending diagnostics archive.")
-	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, ts.Format("2006-01-02T15-04-05Z07-00"), s, r) // RFC3339 format that uses - instead of : so it works on Windows
+	uploadID, err := h.uploader.UploadDiagnostics(
+		ctx, action.ActionID, ts.Format("2006-01-02T15-04-05Z07-00"), s, r) // RFC3339 format that uses - instead of : so it works on Windows
 	action.Err = err
 	action.UploadID = uploadID
 	if err != nil {
+		h.log.Errorf(
+			"diagnostics action handler failed to upload diagnostics: %v",
+			err)
 		return
 	}
 	h.log.Debugf("Diagnostics action '%+v' complete.", action)
@@ -188,7 +219,8 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 	return uDiag
 }
 
-// diagFile will write the diagnostics to a temporary file and return the file ready to be read
+// diagFile will write the diagnostics to a temporary file and return the file
+// ready to be read, its size and a nil error.
 func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []client.DiagnosticUnitResult) (*os.File, int64, error) {
 	f, err := os.CreateTemp("", "elastic-agent-diagnostics")
 	if err != nil {
@@ -202,21 +234,31 @@ func (h *Diagnostics) diagFile(aDiag []client.DiagnosticFileResult, uDiag []clie
 			h.log.Warn(str)
 		}
 	}()
+
 	if err := diagnostics.ZipArchive(&wBuf, f, aDiag, uDiag); err != nil {
-		os.Remove(name)
+		rErr := os.Remove(name)
+		if rErr != nil {
+			h.log.Warnf("failed to create diagnostics zip, then failed to remove the file: %v", rErr)
+		}
 		return nil, 0, err
 	}
 	_ = f.Sync()
 
 	_, err = f.Seek(0, 0)
 	if err != nil {
-		os.Remove(name)
+		rErr := os.Remove(name)
+		if rErr != nil {
+			h.log.Warnf("failed to set diagnostics file offset, then failed to remove the file: %v", rErr)
+		}
 		return nil, 0, err
 	}
 
 	fi, err := f.Stat()
 	if err != nil {
-		os.Remove(name)
+		rErr := os.Remove(name)
+		if rErr != nil {
+			h.log.Warnf("failed to get diagnostics file info, then failed to remove the file: %v", rErr)
+		}
 		return nil, 0, err
 	}
 	return f, fi.Size(), nil
