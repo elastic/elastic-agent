@@ -318,6 +318,15 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices bool, zw *zip
 		}
 	}
 
+	_, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/" + commitName + "/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
+	if err != nil {
+		return err
+	}
+
 	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
 	logPath := filepath.Join(pathsHome, "logs") + string(filepath.Separator)
 	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
@@ -339,7 +348,7 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices bool, zw *zip
 
 		if d.IsDir() {
 			_, err := zw.CreateHeader(&zip.FileHeader{
-				Name:     "logs" + name + "/",
+				Name:     "logs/" + filepath.ToSlash(name) + "/",
 				Method:   zip.Deflate,
 				Modified: ts,
 			})
@@ -407,7 +416,7 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 		ts = li.ModTime()
 	}
 	zf, err := zw.CreateHeader(&zip.FileHeader{
-		Name:     "logs/" + name,
+		Name:     "logs/" + filepath.ToSlash(name),
 		Method:   zip.Deflate,
 		Modified: ts,
 	})
