@@ -15,5 +15,4 @@ inputs:
           message: "Elastic Agent must be running as root"
     command: &args
       args:
-        - "--fleet-managed"
-        - "--process-managed"
+        - "--agent-managed"
