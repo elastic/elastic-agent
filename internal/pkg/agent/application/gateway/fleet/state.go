@@ -10,7 +10,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 )
 
-// StateFetcher is an interface used to fetch the current state of the coordinator.
+// StateFetcher fetches the current state of the coordinator.
 type StateFetcher interface {
 	// StateSubscribe subscribes to changes in the coordinator state.
 	//

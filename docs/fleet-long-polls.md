@@ -23,7 +23,7 @@ The backoff mechanism for transient errors is still in place but now it will sto
 #### To cancel or not to cancel?
 When Fleet Gateway receives a tick from the scheduler, it will trigger a check-in (see `FleetGateway.triggerCheckin()`):
 
-- creates a subcontext from the main Fleet Gateway context and uses it to subscribe and uses it to subscribe to state updates from Coordinator (abstracted away as a StateFetcher interface)
+- creates a subcontext from the main Fleet Gateway context and uses it to subscribe to state updates from Coordinator (abstracted away as a StateFetcher interface)
 - it uses the first state to initiate a cancellable check-in (see `FleetGateway.performCancellableCheckin()` for details)
 - the cancellable check-in is implemented as an infinite loop where we continuosly listen for:
   - main context expiration (meaning Fleet Gateway is shutting down) so we return immediately, canceling the check-in on our way out

@@ -197,9 +197,7 @@ func (f *fleetGateway) triggerCheckin(ctx context.Context) (*fleetapi.CheckinRes
 
 	// create a subcontext for this checkin and the state subscription
 	stateUpdateSubCtx, cancelStateUpdateSub := context.WithCancel(ctx)
-	defer func() {
-		cancelStateUpdateSub()
-	}()
+	defer cancelStateUpdateSub()
 
 	// Backoff implementation doesn't support the use of a context [cancellation] as the shutdown mechanism.
 	// So we keep a done channel that will be closed when the current context is shutdown.
