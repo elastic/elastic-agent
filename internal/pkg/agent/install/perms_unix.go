@@ -12,13 +12,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 // fixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
-func fixPermissions() error {
-	return recursiveRootPermissions(paths.InstallPath)
+func fixPermissions(topPath string) error {
+	return recursiveRootPermissions(topPath)
 }
 
 func recursiveRootPermissions(path string) error {

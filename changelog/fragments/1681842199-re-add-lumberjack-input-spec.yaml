@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Re-add lumberjack input to the Filebeat spec.
+component: spec
+pr: https://github.com/elastic/elastic-agent/pull/2511

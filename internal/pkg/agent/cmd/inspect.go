@@ -35,8 +35,8 @@ import (
 func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect",
-		Short: "Shows configuration of the agent",
-		Long: `Shows current configuration of the agent.
+		Short: "Show current configuration of the Elastic Agent",
+		Long: `This command shows the current configuration of the Elastic Agent.
 
 By default variable substitution is not performed. Use the --variables flag to enable variable substitution. The
 first set of computed variables are used when only the --variables flag is defined. This can prevent some of the

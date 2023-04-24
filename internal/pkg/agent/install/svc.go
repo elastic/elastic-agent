@@ -28,21 +28,21 @@ const (
 )
 
 // ExecutablePath returns the path for the installed Agents executable.
-func ExecutablePath() string {
-	exec := filepath.Join(paths.InstallPath, paths.BinaryName)
+func ExecutablePath(topPath string) string {
+	exec := filepath.Join(topPath, paths.BinaryName)
 	if paths.ShellWrapperPath != "" {
 		exec = paths.ShellWrapperPath
 	}
 	return exec
 }
 
-func newService() (service.Service, error) {
+func newService(topPath string) (service.Service, error) {
 	cfg := &service.Config{
 		Name:             paths.ServiceName,
 		DisplayName:      ServiceDisplayName,
 		Description:      ServiceDescription,
-		Executable:       ExecutablePath(),
-		WorkingDirectory: paths.InstallPath,
+		Executable:       ExecutablePath(topPath),
+		WorkingDirectory: topPath,
 		Option: map[string]interface{}{
 			// Linux (systemd) always restart on failure
 			"Restart": "always",
