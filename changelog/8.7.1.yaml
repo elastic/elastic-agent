@@ -98,3 +98,14 @@ entries:
       file:
         name: 1681842199-re-add-lumberjack-input-spec.yaml
         checksum: a0bb03fb0a7739946d631eece1dc0c5a807038e6
+    - kind: bug-fix
+      summary: Fix diagnostic zip file handling of sub-directories in logs/.
+      description: ""
+      component: diagnostics
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2523
+      issue: []
+      timestamp: 1681942680
+      file:
+        name: 1681942680-fix-diag-zip-file.yaml
+        checksum: ff3bd63aa3dfa8d9c7d8f708cf7d3febde4e5bae
