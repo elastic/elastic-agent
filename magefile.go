@@ -1260,25 +1260,6 @@ func (Integration) Clean() {
 	_ = os.RemoveAll(".agent-testing")
 }
 
-func (Integration) Pull() error {
-	images := []string{"google/cloud-sdk:latest", "gorambo/ogc:v4"}
-	for _, image := range images {
-		err := sh.RunV("docker", "pull", image)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (Integration) AuthGoogle() error {
-	err := sh.RunV("docker", "run", "-it", "--name", "agent-int-gcloud-config", "google/cloud-sdk:latest", "gcloud", "auth", "login")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (Integration) Local(ctx context.Context) error {
 	if shouldBuildAgent() {
 		// need only local package for current platform
@@ -1295,14 +1276,6 @@ func (Integration) Local(ctx context.Context) error {
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
 	return devtools.GoTest(ctx, params)
-}
-
-func (Integration) Test(ctx context.Context) error {
-	return nil
-}
-
-func (Integration) All() {
-	mg.Deps(Integration.Test)
 }
 
 func shouldBuildAgent() bool {
