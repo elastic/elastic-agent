@@ -175,14 +175,16 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	return nil
 }
 
+// Run runs the Elastic Agent.
+//
+// If `states` are provided then the Elastic Agent runs until each state has been reached. Once reached the
+// Elastic Agent is stopped. If at any time the Elastic Agent logs an error log and the Fixture is not started
+// with `WithAllowErrors()` then `Run` will exit early and return the logged error.
+//
+// If no `states` are provided then the Elastic Agent runs until the context is cancelled.
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	binary := filepath.Join(f.workDir, "elastic-agent")
-	if f.operatingSystem == "windows" {
-		binary += ".exe"
-	}
 
 	var err error
 	var sm *stateMachine
@@ -206,7 +208,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	}
 
 	proc, err := process.Start(
-		binary,
+		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs([]string{"run", "-e", "--disable-encrypted-store", "--testing-mode"}),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
@@ -275,6 +277,33 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 			}
 		}
 	}
+}
+
+// Exec provides a way of performing subcommand on the prepared Elastic Agent binary.
+func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, f.binaryPath(), args...)
+	for _, o := range opts {
+		if err := o(cmd); err != nil {
+			return nil, err
+		}
+	}
+
+	err := cmd.Run()
+	if err != nil {
+		return nil, err
+	}
+	return cmd.CombinedOutput()
+}
+
+func (f *Fixture) binaryPath() string {
+	binary := filepath.Join(f.workDir, "elastic-agent")
+	if f.operatingSystem == "windows" {
+		binary += ".exe"
+	}
+	return binary
 }
 
 func (f *Fixture) fetch(ctx context.Context) (string, error) {
