@@ -17,7 +17,7 @@ import (
 func EnrollElasticAgent(t *testing.T, fleetUrl string, enrollmentToken string, agentPath string) error {
 	t.Log("Enrolling elastic agent ...")
 
-	cmd := exec.Command(agentPath, //nolint:gosec
+	cmd := exec.Command(agentPath, //nolint:gosec //TODO: exclude from binary
 		"install", "--non-interactive", fmt.Sprintf("--url=%s", fleetUrl), fmt.Sprintf("--enrollment-token=%s", enrollmentToken))
 
 	out, err := cmd.CombinedOutput()

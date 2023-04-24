@@ -44,12 +44,11 @@ create-cluster:
 	@$(call check_defined, GITHUB_TOKEN, GITHUB_TOKEN is not defined. Specify a github token to use for the cluster.)
 	oblt-cli cluster create custom --template-file $(CURDIR)/$(TEMPLATE_FILE) --output-file $(CURDIR)/$(CLUSTER_INFO_FILE) --parameters '{"StackVersion": "$(STACK_VERSION)", "ClusterName": "$(CLUSTER_NAME)", "SlackChannel": "$(SLACK_CHANNEL)"}' --wait 15
 	sync $(CURDIR)/$(CLUSTER_INFO_FILE)
-	oblt-cli cluster secrets digest-yml --cluster-name $$(jq -r '.ClusterName' $(CURDIR)/$(CLUSTER_INFO_FILE)) --output-file $(CURDIR)/$(CLUSTER_DIGEST_FILE)
+	oblt-cli cluster secrets digest-yml --cluster-name $$(cat $(CURDIR)/$(CLUSTER_INFO_FILE) | jq -r '.ClusterName') --output-file $(CURDIR)/$(CLUSTER_DIGEST_FILE)
 
 .PHONY: run-tests
 run-tests: set-arch
-	@$(call check_defined, AGENT_VERSION, AGENT_VERSION is not defined)	
-	echo $(ARCH)
+	@$(call check_defined, AGENT_VERSION, AGENT_VERSION is not defined)
 	AGENT_VERSION=$(AGENT_VERSION) AGENT_BIN_PATH=$(CURDIR)/$(ARTIFACTS_DIR)/elastic-agent-$(AGENT_VERSION)-linux-$(ARCH)/elastic-agent go test -v -timeout 300s -tags=e2e github.com/elastic/elastic-agent/testing/e2e
 
 .PHONY: destroy-cluster
