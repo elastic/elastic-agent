@@ -1,0 +1,282 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+//go:build integration
+
+package integration
+
+import (
+	"archive/zip"
+	"context"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/process"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/version"
+)
+
+const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
+
+var diagnosticsFiles = []string{
+	"allocs.txt",
+	"block.txt",
+	"components-actual.yaml",
+	"components-expected.yaml",
+	"computed-config.yaml",
+	"goroutine.txt",
+	"heap.txt",
+	"mutex.txt",
+	"pre-config.yaml",
+	"state.yaml",
+	"threadcreate.txt",
+	"variables.yaml",
+	"version.txt",
+}
+
+var unitsDiagnosticsFiles []string = []string{
+	"allocs.txt",
+	"block.txt",
+	"goroutine.txt",
+	"heap.txt",
+	"mutex.txt",
+	"threadcreate.txt",
+}
+
+type componentAndUnitNames struct {
+	name      string
+	unitNames []string
+}
+
+type DiagnosticsIntegrationTestSuite struct {
+	suite.Suite
+	f *integrationtest.Fixture
+}
+
+func (s *DiagnosticsIntegrationTestSuite) SetupSuite() {
+	l := integrationtest.LocalFetcher("../../build/distributions")
+	f, err := integrationtest.NewFixture(
+		s.T(),
+		version.GetDefaultVersion(),
+		integrationtest.WithFetcher(l),
+		integrationtest.WithLogOutput(),
+		integrationtest.WithAllowErrors(),
+	)
+	s.Require().NoError(err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err = f.Prepare(ctx, fakeComponent, fakeShipper)
+	s.Require().NoError(err)
+	s.f = f
+}
+
+func (s *DiagnosticsIntegrationTestSuite) TestDiagnosticsFromHealthyAgent() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testDiagnostics := func() error {
+		diagnosticCommandWD := s.T().TempDir()
+		diagnosticCmdOutput, err := s.f.Exec(ctx, []string{"diagnostics", "dump"}, process.WithWorkDir(diagnosticCommandWD))
+
+		s.T().Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
+		s.Require().NoErrorf(err, "error running diagnostic command: %v", err)
+
+		s.T().Logf("checking directory %q for the generated archive", diagnosticCommandWD)
+		files, err := filepath.Glob(filepath.Join(diagnosticCommandWD, diagnosticsArchiveGlobPattern))
+		s.Require().NoError(err)
+		s.Require().Len(files, 1)
+		s.T().Logf("Found %q diagnostic archive.", files[0])
+
+		// get the version of the running agent
+		avi, err := s.getRunningAgentVersion(ctx)
+		s.Require().NoError(err)
+
+		verifyDiagnosticArchive(s.T(), ctx, files[0], avi)
+
+		return nil
+	}
+
+	err := s.f.Run(ctx, integrationtest.State{
+		Configure:  simpleConfig1,
+		AgentState: atesting.NewClientState(client.Healthy),
+		Components: map[string]atesting.ComponentState{
+			"fake-default": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+				},
+			},
+		},
+		After: testDiagnostics,
+	})
+	s.Assert().NoError(err)
+}
+
+func verifyDiagnosticArchive(t *testing.T, ctx context.Context, diagArchive string, avi *agentVersionInfo) {
+	// check that the archive is not an empty file
+	stat, err := os.Stat(diagArchive)
+	require.NoErrorf(t, err, "stat file %q failed", diagArchive)
+	require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", diagArchive)
+
+	// extract the zip file into a temp folder
+	extractionDir := t.TempDir()
+
+	extractZipArchive(t, diagArchive, extractionDir)
+
+	expectedDiagArchiveFilePatterns := compileExpectedDiagnosticFilePatterns(avi, []componentAndUnitNames{
+		{
+			name:      "fake-default",
+			unitNames: []string{"fake-default", "fake"},
+		},
+		{
+			name:      "fake-shipper-default",
+			unitNames: []string{"fake-shipper-default", "fake-default"},
+		},
+	})
+
+	expectedExtractedFiles := map[string]struct{}{}
+	for _, filePattern := range expectedDiagArchiveFilePatterns {
+		absFilePattern := filepath.Join(extractionDir, filePattern)
+		files, err := filepath.Glob(absFilePattern)
+		assert.NoErrorf(t, err, "error globbing with pattern %q", absFilePattern)
+		assert.Greaterf(t, len(files), 0, "glob pattern %q matched no files", absFilePattern)
+		for _, f := range files {
+			expectedExtractedFiles[f] = struct{}{}
+		}
+	}
+
+	actualExtractedDiagFiles := map[string]struct{}{}
+
+	err = filepath.Walk(extractionDir, func(path string, info fs.FileInfo, err error) error {
+		require.NoErrorf(t, err, "error walking extracted path %q", path)
+
+		// we are not interested in directories
+		if !info.IsDir() {
+			actualExtractedDiagFiles[path] = struct{}{}
+			assert.Greaterf(t, info.Size(), int64(0), "file %q has an invalid size", path)
+		}
+
+		return nil
+	})
+	require.NoErrorf(t, err, "error walking output directory %q", extractionDir)
+
+	assert.ElementsMatch(t, extractKeysFromMap(expectedExtractedFiles), extractKeysFromMap(actualExtractedDiagFiles))
+}
+
+func TestDiagnosticsCommandIntegrationTestSuite(t *testing.T) {
+	suite.Run(t, new(DiagnosticsIntegrationTestSuite))
+}
+
+type versionInfo struct {
+	Version   string    `yaml:"version"`
+	Commit    string    `yaml:"commit"`
+	BuildTime time.Time `yaml:"build_time"`
+	Snapshot  bool      `yaml:"snapshot"`
+}
+type agentVersionInfo struct {
+	Binary versionInfo `yaml:"binary"`
+	Daemon versionInfo `yaml:"daemon"`
+}
+
+func extractZipArchive(t *testing.T, zipFile string, dst string) {
+	zReader, err := zip.OpenReader(zipFile)
+	require.NoErrorf(t, err, "file %q is not a valid zip archive", zipFile)
+	defer zReader.Close()
+
+	t.Logf("extracting diagnostic archive in dir %q", dst)
+	for _, zf := range zReader.File {
+		filePath := filepath.Join(dst, zf.Name)
+		t.Logf("unzipping file %q", filePath)
+		require.Truef(t, strings.HasPrefix(filePath, filepath.Clean(dst)+string(os.PathSeparator)), "file %q points outside of extraction dir %q", filePath, dst)
+
+		if zf.FileInfo().IsDir() {
+			t.Logf("creating directory %q", filePath)
+			os.MkdirAll(filePath, os.ModePerm)
+			continue
+		}
+
+		err = os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
+		require.NoErrorf(t, err, "error creating parent folder for file %q", filePath)
+
+		extractSingleFileFromArchive(t, zf, filePath)
+
+	}
+}
+
+func extractSingleFileFromArchive(t *testing.T, src *zip.File, dst string) {
+	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, src.Mode())
+	require.NoErrorf(t, err, "error creating extracted file %q", dst)
+
+	defer dstFile.Close()
+
+	srcFile, err := src.Open()
+	require.NoErrorf(t, err, "error opening zipped file %q", src.Name)
+
+	defer srcFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	require.NoErrorf(t, err, "error copying content from zipped file %q to extracted file %q", src.Name, dst)
+}
+
+func (s *DiagnosticsIntegrationTestSuite) getRunningAgentVersion(ctx context.Context) (*agentVersionInfo, error) {
+	cmdOutput, err := s.f.Exec(ctx, []string{"version", "--yaml"})
+	if err != nil {
+		return nil, fmt.Errorf("error executing version command: %w", err)
+	}
+	avi := new(agentVersionInfo)
+	err = yaml.Unmarshal(cmdOutput, avi)
+	if err != nil {
+		return avi, fmt.Errorf("error unmarshaling YAML version output: %w", err)
+	}
+	return avi, nil
+}
+
+func compileExpectedDiagnosticFilePatterns(avi *agentVersionInfo, comps []componentAndUnitNames) []string {
+	files := make([]string, 0, len(diagnosticsFiles)+len(comps)*len(unitsDiagnosticsFiles))
+
+	files = append(files, diagnosticsFiles...)
+
+	for _, comp := range comps {
+		for _, unitName := range comp.unitNames {
+			unitPath := path.Join("components", comp.name, unitName)
+			for _, fileName := range unitsDiagnosticsFiles {
+				files = append(files, path.Join(unitPath, fileName))
+			}
+		}
+	}
+
+	files = append(files, path.Join("logs", "elastic-agent-"+avi.Daemon.Commit[:6], "elastic-agent-*.ndjson"))
+	// this pattern overlaps with the previous one but filepath.Glob() does not seem to match using '?' wildcard
+	files = append(files, path.Join("logs", "elastic-agent-"+avi.Daemon.Commit[:6], "elastic-agent-watcher-*.ndjson"))
+
+	return files
+}
+
+func extractKeysFromMap[K comparable, V any](src map[K]V) []K {
+	keys := make([]K, 0, len(src))
+	for k := range src {
+		keys = append(keys, k)
+	}
+	return keys
+}
