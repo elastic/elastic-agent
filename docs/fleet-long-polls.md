@@ -47,15 +47,10 @@ This mechanism will ensure that we don't cancel and retrigger checkins too quick
 ### Configuration
 Timeout setting for the http client is read from `fleet.timeout` key in configuration expressed as a time duration string.
 
-Checkin debounce and frequency are set under `fleet.gateway.checkin`.
 Here's an example of a partial config
 ```yaml
 fleet:
-  gateway:
-    checkin:
-      debounce: 5m0s
-      frequency: 1s
   timeout: 12m0s
 ```
 
-Due to the way that configuration for fleet-managed agents is handled, it is not currently possible to change such values from whatever the default values were when the agent has been enrolled.
+Due to the way that configuration for fleet-managed agents is handled, it is not currently possible to change such values from whatever the default values were when the agent has been enrolled. For this reason the fleet gateway debounce,interval and backoff settings contained in `FleetGatewaySettings` struct has not been included in the overall `FleetAgentConfig` struct.
