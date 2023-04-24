@@ -57,7 +57,7 @@ pipeline {
         stashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
-          setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
+          setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile|.go-version|Dockerfile)' ], shouldMatchAll: false).toString())
           setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('EXT_WINDOWS_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
           setEnvVar('EXT_M1_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
@@ -400,11 +400,10 @@ pipeline {
     }
     stage('e2e tests') {
       when {
-        // Always when running builds on branches/tags
-        // Enable if e2e related changes.
+        // Disable until we fix the e2e test.
+        // This should be running when there is a comment or the e2e label
         beforeAgent true
         anyOf {
-          not { changeRequest() }
           // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
           expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
         }

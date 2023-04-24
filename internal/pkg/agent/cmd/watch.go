@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -38,8 +39,8 @@ const (
 func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "watch",
-		Short: "Watch watches Elastic Agent for failures and initiates rollback.",
-		Long:  `Watch watches Elastic Agent for failures and initiates rollback.`,
+		Short: "Watch the Elastic Agent for failures and initiate rollback",
+		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
 		Run: func(_ *cobra.Command, _ []string) {
 			log, err := configuredLogger()
 			if err != nil {
@@ -89,7 +90,7 @@ func watchCmd(log *logp.Logger) error {
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		if err := upgrade.Cleanup(log, release.ShortCommit(), true); err != nil {
+		if err := upgrade.Cleanup(log, release.ShortCommit(), true, false); err != nil {
 			log.Error("rollback failed", err)
 		}
 		// exit nicely
@@ -110,7 +111,7 @@ func watchCmd(log *logp.Logger) error {
 	// in windows it might leave self untouched, this will get cleaned up
 	// later at the start, because for windows we leave marker untouched.
 	removeMarker := !isWindows()
-	err = upgrade.Cleanup(log, marker.Hash, removeMarker)
+	err = upgrade.Cleanup(log, marker.Hash, removeMarker, false)
 	if err != nil {
 		log.Error("rollback failed", err)
 	}
@@ -210,11 +211,19 @@ func configuredLogger() (*logger.Logger, error) {
 	}
 
 	cfg.Settings.LoggingConfig.Beat = watcherName
-
-	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, false)
+	cfg.Settings.LoggingConfig.Level = logp.DebugLevel
+	internal, err := logger.MakeInternalFileOutput(cfg.Settings.LoggingConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return logger, nil
+	libC, err := logger.ToCommonConfig(cfg.Settings.LoggingConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := configure.LoggingWithOutputs("", libC, internal); err != nil {
+		return nil, fmt.Errorf("error initializing logging: %w", err)
+	}
+	return logp.NewLogger(""), nil
 }

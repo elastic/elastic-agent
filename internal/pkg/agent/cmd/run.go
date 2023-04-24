@@ -60,8 +60,9 @@ type cfgOverrider func(cfg *configuration.Configuration)
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Start the elastic-agent.",
-		Run: func(cmd *cobra.Command, _ []string) {
+		Short: "Start the Elastic Agent",
+		Long:  "This command starts the Elastic Agent.",
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// done very early so the encrypted store is never used
 			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
 			if disableEncryptedStore {
@@ -72,11 +73,9 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			if err := run(nil, testingMode); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
-				// TODO: remove it. os.Exit will be called on main and if it's called
-				// too early some goroutines with deferred functions related
-				// to the shutdown process might not run.
-				os.Exit(1)
+				return err
 			}
+			return nil
 		},
 	}
 
@@ -121,7 +120,9 @@ func run(override cfgOverrider, testingMode bool, modifiers ...component.Platfor
 	var stopBeat = func() {
 		close(stop)
 	}
-	service.HandleSignals(stopBeat, cancel)
+
+	defer cancel()
+	go service.ProcessWindowsControlEvents(stopBeat)
 
 	cfg, err := loadConfig(override)
 	if err != nil {
@@ -178,7 +179,7 @@ func run(override cfgOverrider, testingMode bool, modifiers ...component.Platfor
 		return errors.New(err, "error migrating agent state")
 	}
 
-	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)
+	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
 		return errors.New(err,
 			"could not load agent info",
@@ -229,10 +230,11 @@ func run(override cfgOverrider, testingMode bool, modifiers ...component.Platfor
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
+	defer composable.Close()
 
 	serverStopFn, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
@@ -277,7 +279,7 @@ LOOP:
 	for {
 		select {
 		case <-stop:
-			l.Info("service.HandleSignals invoked stop function. Shutting down")
+			l.Info("service.ProcessWindowsControlEvents invoked stop function. Shutting down")
 			break LOOP
 		case <-appDone:
 			l.Info("application done, coordinator exited")
@@ -399,10 +401,10 @@ func getOverwrites(rawConfig *config.Config) error {
 	return nil
 }
 
-func defaultLogLevel(cfg *configuration.Configuration) string {
+func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) string {
 	if configuration.IsStandalone(cfg.Fleet) {
 		// for standalone always take the one from config and don't override
-		return ""
+		return currentLevel
 	}
 
 	defaultLogLevel := logger.DefaultLogLevel.String()
@@ -417,6 +419,7 @@ func defaultLogLevel(cfg *configuration.Configuration) string {
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
+		//nolint:nilerr // ignore the error, this is expected
 		// no enrollment file exists or failed to stat it; nothing to do
 		return cfg, nil
 	}
