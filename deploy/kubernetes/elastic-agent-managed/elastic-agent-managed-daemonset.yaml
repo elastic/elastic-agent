@@ -101,6 +101,8 @@ spec:
               readOnly: true
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
+            - name: elastic-agent-state
+              mountPath: /usr/share/elastic-agent/state
       volumes:
         - name: proc
           hostPath:
@@ -135,3 +137,7 @@ spec:
         - name: sys-kernel-debug
           hostPath:
             path: /sys/kernel/debug
+        - name: elastic-agent-state
+          hostPath:
+            path: /var/lib/elastic-agent-managed/kube-system/state
+            type: DirectoryOrCreate
