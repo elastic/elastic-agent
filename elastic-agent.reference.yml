@@ -66,9 +66,6 @@ inputs:
 #     #reporting_threshold: 10000
 #     # Frequency used to check the queue of events to be sent out to fleet.
 #     #reporting_check_frequency_sec: 30
-    server:
-      # Sets the the to wait for setup when elastic-agent first starts an instance of fleet-server
-      fleet_timeout: 30s
 
 # agent.download:
 #   # source of the artifacts, requires elastic like structure and naming of the binaries
