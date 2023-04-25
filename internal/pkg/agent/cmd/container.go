@@ -72,7 +72,7 @@ The following actions are possible and grouped based on the actions.
   FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
-  FLEET_TIMEOUT - Sets the initial timeout when starting up the fleet server under agent. Default: 30s.
+  FLEET_SERVER_INIT_TIMEOUT - Sets the initial timeout when starting up the fleet server under agent. Default: 30s.
 
   The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
 
@@ -262,10 +262,12 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		return err
 	}
 
+	initTimeout := envTimeout(fleetInitTimeoutName)
+
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr, false, isContainer)
+		return run(logToStderr, false, initTimeout, isContainer)
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -330,7 +332,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr, false, isContainer)
+	return run(logToStderr, false, initTimeout, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token

@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 
@@ -52,7 +53,8 @@ import (
 )
 
 const (
-	agentName = "elastic-agent"
+	agentName            = "elastic-agent"
+	fleetInitTimeoutName = "FLEET_SERVER_INIT_TIMEOUT"
 )
 
 type cfgOverrider func(cfg *configuration.Configuration)
@@ -67,9 +69,9 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			if disableEncryptedStore {
 				storage.DisableEncryptionDarwin()
 			}
-
+			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
-			if err := run(nil, testingMode); err != nil && !errors.Is(err, context.Canceled) {
+			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
 				return err
@@ -88,12 +90,14 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	// it is hidden because we really don't want users to execute Elastic Agent to run
 	// this way, only the integration testing framework runs the Elastic Agent in this mode
 	cmd.Flags().Bool("testing-mode", false, "Run with testing mode enabled")
+
+	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
 	_ = cmd.Flags().MarkHidden("testing-mode")
 
 	return cmd
 }
 
-func run(override cfgOverrider, testingMode bool, modifiers ...component.PlatformModifier) error {
+func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
