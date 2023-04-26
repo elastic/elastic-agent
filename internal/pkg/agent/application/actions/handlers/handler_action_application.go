@@ -15,7 +15,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -54,16 +53,19 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 	}
 
 	// Validate action
-	h.log.Debugf("handlerAppAction: validate action '%+v', for agentID %s", a, h.agentID)
-	validated, err := protection.ValidateAction(*action, h.coord.Protection().SignatureValidationKey, h.agentID)
-	if err != nil {
-		action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
-		action.CompletedAt = action.StartedAt
-		h.log.Errorf("handlerAppAction: action '%+v' failed validation: %v", action, err) // error details are logged
-		action.Error = fmt.Sprintf("action failed validation: %s", action.InputType)      // generic error message for the action response
-		return acker.Ack(ctx, action)
-	}
-	action = &validated
+	// Disabled for 8.8.0 release in order to limit the surface
+	// https://github.com/elastic/security-team/issues/6501
+	//
+	// h.log.Debugf("handlerAppAction: validate action '%+v', for agentID %s", a, h.agentID)
+	// validated, err := protection.ValidateAction(*action, h.coord.Protection().SignatureValidationKey, h.agentID)
+	// if err != nil {
+	// 	action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	// 	action.CompletedAt = action.StartedAt
+	// 	h.log.Errorf("handlerAppAction: action '%+v' failed validation: %v", action, err) // error details are logged
+	// 	action.Error = fmt.Sprintf("action failed validation: %s", action.InputType)      // generic error message for the action response
+	// 	return acker.Ack(ctx, action)
+	// }
+	// action = &validated
 
 	state := h.coord.State()
 	comp, unit, ok := findUnitFromInputType(state, action.InputType)
