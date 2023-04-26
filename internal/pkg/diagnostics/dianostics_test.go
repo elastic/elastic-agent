@@ -7,13 +7,19 @@ package diagnostics
 import (
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
+	"context"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/google/pprof/profile"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
@@ -53,4 +59,45 @@ func TestZipLogs(t *testing.T) {
 		{"logs/sub-dir/log.ndjson", false},
 	}
 	assert.Equal(t, expected, observed)
+}
+
+func TestGlobalHooks(t *testing.T) {
+	hooks := GlobalHooks()
+	assert.NotEmpty(t, hooks, "multiple hooks should be returned")
+	deadline, _ := t.Deadline()
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	t.Cleanup(func() { cancel() })
+	for _, h := range hooks {
+		output := h.Hook(ctx)
+		assert.NotEmpty(t, h, "hook should produce output")
+		var ok bool
+		var err error
+		switch h.Name {
+		case "version":
+			ok, err = isVersion(output)
+		default:
+			ok, err = isPprof(output)
+		}
+		assert.Truef(t, ok, "hook: %s returned incompatible data, err: %s, data: %v ", h.Name, err, output)
+	}
+}
+
+func isVersion(input []byte) (bool, error) {
+	return strings.Contains(string(input), "version:"), nil
+}
+
+func isPprof(input []byte) (bool, error) {
+	gz, err := gzip.NewReader(bytes.NewBuffer(input))
+	if err != nil {
+		return false, err
+	}
+	uncompressed, err := io.ReadAll(gz)
+	if err != nil {
+		return false, err
+	}
+	_, err = profile.ParseUncompressed(uncompressed)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

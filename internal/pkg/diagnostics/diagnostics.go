@@ -65,53 +65,53 @@ func GlobalHooks() Hooks {
 		},
 		{
 			Name:        "goroutine",
-			Filename:    "goroutine.txt",
+			Filename:    "goroutine.pprof.gz",
 			Description: "stack traces of all current goroutines",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("goroutine"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("goroutine", 0),
 		},
 		{
 			Name:        "heap",
-			Filename:    "heap.txt",
+			Filename:    "heap.pprof.gz",
 			Description: "a sampling of memory allocations of live objects",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("heap"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("heap", 0),
 		},
 		{
 			Name:        "allocs",
-			Filename:    "allocs.txt",
+			Filename:    "allocs.pprof.gz",
 			Description: "a sampling of all past memory allocations",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("allocs"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("allocs", 0),
 		},
 		{
 			Name:        "threadcreate",
-			Filename:    "threadcreate.txt",
+			Filename:    "threadcreate.pprof.gz",
 			Description: "stack traces that led to the creation of new OS threads",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("threadcreate"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("threadcreate", 0),
 		},
 		{
 			Name:        "block",
-			Filename:    "block.txt",
+			Filename:    "block.pprog.gz",
 			Description: "stack traces that led to blocking on synchronization primitives",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("block"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("block", 0),
 		},
 		{
 			Name:        "mutex",
-			Filename:    "mutex.txt",
+			Filename:    "mutex.pprof.gz",
 			Description: "stack traces of holders of contended mutexes",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("mutex"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("mutex", 0),
 		},
 	}
 }
 
-func pprofDiag(name string) func(context.Context) []byte {
+func pprofDiag(name string, debug int) func(context.Context) []byte {
 	return func(_ context.Context) []byte {
 		var w bytes.Buffer
-		err := pprof.Lookup(name).WriteTo(&w, 1)
+		err := pprof.Lookup(name).WriteTo(&w, debug)
 		if err != nil {
 			// error is returned as the content
 			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err))
