@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/avast/retry-go"
-	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
 )
 
@@ -130,7 +129,8 @@ func (c *Client) listAgents(ctx context.Context) ([]Agent, error) {
 	}
 
 	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return nil, errors.Wrap(err, "could not convert list of agents (response) to JSON")
+
+		return nil, fmt.Errorf("could not convert list of agents (response) to JSON. %w", err)
 	}
 
 	return resp.Items, nil

@@ -9,7 +9,6 @@ import (
 	"net/url"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
 	"go.elastic.co/apm"
 )
@@ -52,12 +51,12 @@ func (c *Client) sendRequest(ctx context.Context, method, resourcePath string, b
 	reqBody := bytes.NewReader(body)
 	base, err := url.Parse(c.clusterConfig.KibanaConfig.Host)
 	if err != nil {
-		return 0, nil, errors.Wrapf(err, "could not create base URL from host: %v", c.clusterConfig.KibanaConfig.Host)
+		return 0, nil, fmt.Errorf("could not create base URL from host: %v. %w", c.clusterConfig.KibanaConfig.Host, err)
 	}
 
 	rel, err := url.Parse(resourcePath)
 	if err != nil {
-		return 0, nil, errors.Wrapf(err, "could not create relative URL from resource path: %v", resourcePath)
+		return 0, nil, fmt.Errorf("could not create relative URL from resource path: %v. %w", resourcePath, err)
 	}
 
 	u := base.ResolveReference(rel)
@@ -71,7 +70,7 @@ func (c *Client) sendRequest(ctx context.Context, method, resourcePath string, b
 
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), reqBody)
 	if err != nil {
-		return 0, nil, errors.Wrapf(err, "could not create %v request to Kibana API resource: %s", method, resourcePath)
+		return 0, nil, fmt.Errorf("could not create %v request to Kibana API resource: %s. %w", method, resourcePath, err)
 	}
 
 	req.SetBasicAuth(c.clusterConfig.KibanaConfig.User, c.clusterConfig.KibanaConfig.Password)
@@ -85,13 +84,13 @@ func (c *Client) sendRequest(ctx context.Context, method, resourcePath string, b
 	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "could not send request to Kibana API")
+		return 0, nil, fmt.Errorf("could not send request to Kibana API. %w", err)
 	}
 
 	defer resp.Body.Close()
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return resp.StatusCode, nil, errors.Wrap(err, "could not read response body")
+		return resp.StatusCode, nil, fmt.Errorf("could not read response body. %w", err)
 	}
 
 	return resp.StatusCode, body, nil

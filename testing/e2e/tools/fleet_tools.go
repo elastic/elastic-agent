@@ -8,7 +8,6 @@ import (
 	"github.com/Jeffail/gabs/v2"
 	"github.com/avast/retry-go"
 	"github.com/google/uuid"
-	"github.com/pkg/errors" //nolint:gomodguard //for tests
 	log "github.com/sirupsen/logrus"
 )
 
@@ -76,7 +75,7 @@ func (c *Client) createPolicy(ctx context.Context) (Policy, error) {
 	}
 
 	if err != nil {
-		return Policy{}, errors.Wrap(err, "Could not create Fleet's policy")
+		return Policy{}, fmt.Errorf("could not create Fleet's policy. %w", err)
 	}
 
 	var resp struct {
@@ -84,7 +83,8 @@ func (c *Client) createPolicy(ctx context.Context) (Policy, error) {
 	}
 
 	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return Policy{}, errors.Wrap(err, "Unable to convert list of new policy to JSON")
+
+		return Policy{}, fmt.Errorf("unable to convert list of new policy to JSON. %w", err)
 	}
 
 	return resp.Item, nil
@@ -128,7 +128,7 @@ func (c *Client) createEnrollmentAPIKey(ctx context.Context, policy Policy) (Enr
 	}
 
 	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return EnrollmentAPIKey{}, errors.Wrap(err, "Unable to convert enrollment response to JSON")
+		return EnrollmentAPIKey{}, fmt.Errorf("unable to convert enrollment response to JSON. %w", err)
 	}
 
 	return resp.Enrollment, nil
