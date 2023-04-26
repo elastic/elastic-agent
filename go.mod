@@ -21,7 +21,12 @@ require (
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid v4.2.0+incompatible
+<<<<<<< HEAD
 	github.com/google/go-cmp v0.5.6
+=======
+	github.com/google/go-cmp v0.5.9
+	github.com/google/pprof v0.0.0-20230406165453-00490a63f317
+>>>>>>> bb047ae490 (fix diagnostics pprof output (#2549))
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
