@@ -44,8 +44,10 @@ type PolicyChangeHandler struct {
 	ch        chan coordinator.ConfigChange
 	setters   []actions.ClientSetter
 
-	// Last known valid signature validation key
-	signatureValidationKey []byte
+	// Disabled for 8.8.0 release in order to limit the surface
+	// https://github.com/elastic/security-team/issues/6501
+	// // Last known valid signature validation key
+	// signatureValidationKey []byte
 }
 
 // NewPolicyChangeHandler creates a new PolicyChange handler.
