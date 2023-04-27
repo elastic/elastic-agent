@@ -52,6 +52,7 @@ import (
 //go:generate mockery --dir ../../../core/composable/ --name FetchContextProvider
 
 var /*const*/ expectedDiagnosticHooks map[string]string = map[string]string{
+	"local-config":        "local-config.yaml",
 	"pre-config":          "pre-config.yaml",
 	"variables":           "variables.yaml",
 	"computed-config":     "computed-config.yaml",
@@ -269,11 +270,21 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			t.Logf("Received diagnostics: %+v", diagHooks)
 			assert.NotEmpty(t, diagHooks)
 
+			hooksNames := make([]string, 0, len(diagHooks))
 			hooksMap := map[string]diagnostics.Hook{}
 			for i, h := range diagHooks {
+				hooksNames = append(hooksNames, h.Name)
 				hooksMap[h.Name] = diagHooks[i]
 			}
+			sort.Strings(hooksNames)
 
+			expectedNames := make([]string, 0, len(expectedDiagnosticHooks))
+			for n, _ := range expectedDiagnosticHooks {
+				expectedNames = append(expectedNames, n)
+			}
+			sort.Strings(expectedNames)
+
+			require.Equal(t, expectedNames, hooksNames)
 			for hookName, diagFileName := range expectedDiagnosticHooks {
 				if !assert.Contains(t, hooksMap, hookName) {
 					continue // this iteration failed, no reason to do further tests, moving forward
