@@ -278,7 +278,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			}
 
 			expectedNames := make([]string, 0, len(expectedDiagnosticHooks))
-			for n, _ := range expectedDiagnosticHooks {
+			for n := range expectedDiagnosticHooks {
 				expectedNames = append(expectedNames, n)
 			}
 
