@@ -16,7 +16,7 @@ import (
 )
 
 // postInstall performs post installation for unix-based systems.
-func postInstall() error {
+func postInstall(topPath string) error {
 	// do nothing
 	return nil
 }

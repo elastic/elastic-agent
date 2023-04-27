@@ -344,12 +344,16 @@ func readDirs(dir string) ([]string, error) {
 }
 
 func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
-	var onErr func(error) error
+	var onErr func(src, dst string, err error) error
 
 	if ignoreErrs {
-		onErr = func(err error) error {
+		onErr = func(src, dst string, err error) error {
+			if err == nil {
+				return nil
+			}
+
 			// ignore all errors, just log them
-			l.Infof("ignoring error: failed to copy %q to %q: %s", from, to, err.Error())
+			l.Infof("ignoring error: failed to copy %q to %q: %s", src, dst, err.Error())
 			return nil
 		}
 	}
@@ -358,7 +362,7 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync:  true,
-		OnErr: onErr,
+		Sync:    true,
+		OnError: onErr,
 	})
 }

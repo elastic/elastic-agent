@@ -303,7 +303,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 			for _, componentID := range connected {
 				for i, component := range components {
 					if component.ID == componentID && component.Err == nil {
-						cfg, cfgErr := componentToShipperConfig(component)
+						cfg, cfgErr := componentToShipperConfig(shipperType, component)
 						shipperUnit := Unit{
 							ID:       componentID,
 							Type:     client.UnitTypeInput,
@@ -385,7 +385,7 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, input map[string]in
 	}
 }
 
-func componentToShipperConfig(comp Component) (*proto.UnitExpectedConfig, error) {
+func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitExpectedConfig, error) {
 	cfgUnits := make([]interface{}, 0, len(comp.Units))
 	for _, unit := range comp.Units {
 		if unit.Err == nil && unit.Type == client.UnitTypeInput {
@@ -397,6 +397,7 @@ func componentToShipperConfig(comp Component) (*proto.UnitExpectedConfig, error)
 	}
 	cfg := map[string]interface{}{
 		"id":    comp.ID,
+		"type":  shipperType,
 		"units": cfgUnits,
 	}
 	return ExpectedConfig(cfg)

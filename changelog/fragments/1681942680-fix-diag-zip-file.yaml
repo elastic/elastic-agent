@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Fix diagnostic zip file handling of sub-directories in logs/.
+component: diagnostics
+pr: https://github.com/elastic/elastic-agent/pull/2523

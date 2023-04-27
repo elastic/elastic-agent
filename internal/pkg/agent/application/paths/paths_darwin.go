@@ -11,8 +11,9 @@ const (
 	// BinaryName is the name of the installed binary.
 	BinaryName = "elastic-agent"
 
-	// InstallPath is the installation path using for install command.
-	InstallPath = "/Library/Elastic/Agent"
+	// DefaultBasePath is the base path used by the install command
+	// for installing Elastic Agent's files.
+	DefaultBasePath = "/Library"
 
 	// ControlSocketPath is the control socket path used when installed.
 	ControlSocketPath = "unix:///var/run/elastic-agent.sock"
@@ -26,9 +27,10 @@ const (
 	// ShellWrapperPath is the path to the installed shell wrapper.
 	ShellWrapperPath = "/usr/local/bin/elastic-agent"
 
-	// ShellWrapper is the wrapper that is installed.
+	// ShellWrapper is the wrapper that is installed.  The %s must
+	// be substituted with the appropriate top path.
 	ShellWrapper = `#!/bin/sh
-exec /Library/Elastic/Agent/elastic-agent $@
+exec %s/elastic-agent $@
 `
 
 	// defaultAgentVaultName is keychain item name for mac

@@ -32,7 +32,8 @@ const (
 	// ContentTypeDirectory should be used to indicate that a directory should be made in the resulting bundle
 	ContentTypeDirectory = "directory"
 	// REDACTED is used to replace sensative fields
-	REDACTED = "<REDACTED>"
+	REDACTED  = "<REDACTED>"
+	agentName = "elastic-agent"
 )
 
 // Hook is a hook that gets used when diagnostic information is requested from the Elastic Agent.
@@ -66,53 +67,53 @@ func GlobalHooks() Hooks {
 		},
 		{
 			Name:        "goroutine",
-			Filename:    "goroutine.txt",
+			Filename:    "goroutine.pprof.gz",
 			Description: "stack traces of all current goroutines",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("goroutine"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("goroutine", 0),
 		},
 		{
 			Name:        "heap",
-			Filename:    "heap.txt",
+			Filename:    "heap.pprof.gz",
 			Description: "a sampling of memory allocations of live objects",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("heap"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("heap", 0),
 		},
 		{
 			Name:        "allocs",
-			Filename:    "allocs.txt",
+			Filename:    "allocs.pprof.gz",
 			Description: "a sampling of all past memory allocations",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("allocs"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("allocs", 0),
 		},
 		{
 			Name:        "threadcreate",
-			Filename:    "threadcreate.txt",
+			Filename:    "threadcreate.pprof.gz",
 			Description: "stack traces that led to the creation of new OS threads",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("threadcreate"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("threadcreate", 0),
 		},
 		{
 			Name:        "block",
-			Filename:    "block.txt",
+			Filename:    "block.pprog.gz",
 			Description: "stack traces that led to blocking on synchronization primitives",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("block"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("block", 0),
 		},
 		{
 			Name:        "mutex",
-			Filename:    "mutex.txt",
+			Filename:    "mutex.pprof.gz",
 			Description: "stack traces of holders of contended mutexes",
-			ContentType: "plain/text",
-			Hook:        pprofDiag("mutex"),
+			ContentType: "application/octet-stream",
+			Hook:        pprofDiag("mutex", 0),
 		},
 	}
 }
 
-func pprofDiag(name string) func(context.Context) []byte {
+func pprofDiag(name string, debug int) func(context.Context) []byte {
 	return func(_ context.Context) []byte {
 		var w bytes.Buffer
-		err := pprof.Lookup(name).WriteTo(&w, 1)
+		err := pprof.Lookup(name).WriteTo(&w, debug)
 		if err != nil {
 			// error is returned as the content
 			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err))
@@ -271,8 +272,37 @@ func redactKey(k string) bool {
 		strings.Contains(k, "key")
 }
 
-// zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
 func zipLogs(zw *zip.Writer, ts time.Time) error {
+	dataDir, err := os.Open(paths.Data())
+	if err != nil {
+		return err
+	}
+	defer dataDir.Close()
+
+	subdirs, err := dataDir.Readdirnames(0)
+	if err != nil {
+		return err
+	}
+
+	dirPrefix := fmt.Sprintf("%s-", agentName)
+	currentDir := fmt.Sprintf("%s-%s", agentName, release.ShortCommit())
+	for _, dir := range subdirs {
+		if !strings.HasPrefix(dir, dirPrefix) {
+			continue
+		}
+		collectServices := dir == currentDir
+		path := filepath.Join(paths.Data(), dir)
+		if err := zipLogsWithPath(path, dir, collectServices, zw, ts); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+// zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
+func zipLogsWithPath(pathsHome, commitName string, collectServices bool, zw *zip.Writer, ts time.Time) error {
 	_, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "logs/",
 		Method:   zip.Deflate,
@@ -282,12 +312,23 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 		return err
 	}
 
-	if err := collectServiceComponentsLogs(zw); err != nil {
-		return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
+	if collectServices {
+		if err := collectServiceComponentsLogs(zw); err != nil {
+			return fmt.Errorf("failed to collect endpoint-security logs: %w", err)
+		}
+	}
+
+	_, err = zw.CreateHeader(&zip.FileHeader{
+		Name:     "logs/" + commitName + "/",
+		Method:   zip.Deflate,
+		Modified: ts,
+	})
+	if err != nil {
+		return err
 	}
 
 	// using Data() + "/logs", for some reason default paths/Logs() is the home dir...
-	logPath := filepath.Join(paths.Home(), "logs") + string(filepath.Separator)
+	logPath := filepath.Join(pathsHome, "logs") + string(filepath.Separator)
 	return filepath.WalkDir(logPath, func(path string, d fs.DirEntry, fErr error) error {
 		if errors.Is(fErr, fs.ErrNotExist) {
 			return nil
@@ -303,9 +344,11 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 			return nil
 		}
 
+		name = filepath.Join(commitName, name)
+
 		if d.IsDir() {
 			_, err := zw.CreateHeader(&zip.FileHeader{
-				Name:     "logs" + name + "/",
+				Name:     "logs/" + filepath.ToSlash(name) + "/",
 				Method:   zip.Deflate,
 				Modified: ts,
 			})
@@ -373,7 +416,7 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 		ts = li.ModTime()
 	}
 	zf, err := zw.CreateHeader(&zip.FileHeader{
-		Name:     "logs/" + name,
+		Name:     "logs/" + filepath.ToSlash(name),
 		Method:   zip.Deflate,
 		Modified: ts,
 	})
