@@ -137,6 +137,8 @@ spec:
         - name: sys-kernel-debug
           hostPath:
             path: /sys/kernel/debug
+        # Mount /var/lib/elastic-agent-managed/kube-system/state to store elastic-agent state
+        # Update 'kube-system' with the namespace of your agent installation
         - name: elastic-agent-state
           hostPath:
             path: /var/lib/elastic-agent-managed/kube-system/state
