@@ -23,7 +23,7 @@ import (
 
 var fakeComponent = atesting.UsableComponent{
 	Name:       "fake",
-	BinaryPath: mustAbs(filepath.Join("..", "component", "fake", "component", osExt("component"))),
+	BinaryPath: mustAbs(filepath.Join("..", "..", "pkg", "component", "fake", "component", osExt("component"))),
 	Spec: &component.Spec{
 		Name:    "fake",
 		Version: 2,
@@ -51,7 +51,7 @@ var fakeComponent = atesting.UsableComponent{
 
 var fakeShipper = atesting.UsableComponent{
 	Name:       "fake-shipper",
-	BinaryPath: mustAbs(filepath.Join("..", "component", "fake", "shipper", osExt("shipper"))),
+	BinaryPath: mustAbs(filepath.Join("..", "..", "pkg", "component", "fake", "shipper", osExt("shipper"))),
 	Spec: &component.Spec{
 		Name:    "fake-shipper",
 		Version: 2,
@@ -77,7 +77,19 @@ var fakeShipper = atesting.UsableComponent{
 	},
 }
 
-var simpleConfig = `
+var simpleConfig1 = `
+outputs:
+  default:
+    type: fake-action-output
+    fake-shipper: {}
+inputs:
+  - id: fake
+    type: fake
+    state: 1
+    message: Configuring
+`
+
+var simpleConfig2 = `
 outputs:
   default:
     type: fake-action-output
@@ -111,7 +123,7 @@ func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
 	defer cancel()
 
 	err := s.f.Run(ctx, atesting.State{
-		Configure:  simpleConfig,
+		Configure:  simpleConfig1,
 		AgentState: atesting.NewClientState(client.Healthy),
 		Components: map[string]atesting.ComponentState{
 			"fake-default": {
@@ -121,6 +133,33 @@ func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
 						State: atesting.NewClientState(client.Healthy),
 					},
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: atesting.NewClientState(client.Configuring),
+					},
+				},
+			},
+		},
+	}, atesting.State{
+		Configure:  simpleConfig2,
+		AgentState: atesting.NewClientState(client.Healthy),
+		StrictComponents: map[string]atesting.ComponentState{
+			"fake-default": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+				},
+			},
+			"fake-shipper-default": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 				},
