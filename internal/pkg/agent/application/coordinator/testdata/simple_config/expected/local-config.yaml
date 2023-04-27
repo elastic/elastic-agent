@@ -12,8 +12,8 @@ agent:
     operatingsystem: ""
     architecture: ""
     sourceuri: https://artifacts.elastic.co/downloads/
-    targetdirectory: /Users/blake/Library/Caches/JetBrains/GoLand2023.1/tmp/GoLand/data/elastic-agent-unknow/downloads
-    installPath: /Users/blake/Library/Caches/JetBrains/GoLand2023.1/tmp/GoLand/data/elastic-agent-unknow/install
+    targetdirectory: target
+    installPath: install
     dropPath: ""
     timeout: 2h0m0s
   process:
@@ -53,7 +53,7 @@ agent:
     to_files: true
     to_eventlog: false
     files:
-      path: /Users/blake/Library/Caches/JetBrains/GoLand2023.1/tmp/GoLand
+      path: logs
       name: elastic-agent
       rotateeverybytes: 20971520
       keepfiles: 7

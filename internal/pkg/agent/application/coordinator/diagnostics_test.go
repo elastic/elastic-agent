@@ -276,15 +276,13 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 				hooksNames = append(hooksNames, h.Name)
 				hooksMap[h.Name] = diagHooks[i]
 			}
-			sort.Strings(hooksNames)
 
 			expectedNames := make([]string, 0, len(expectedDiagnosticHooks))
 			for n, _ := range expectedDiagnosticHooks {
 				expectedNames = append(expectedNames, n)
 			}
-			sort.Strings(expectedNames)
 
-			require.Equal(t, expectedNames, hooksNames)
+			require.ElementsMatch(t, expectedNames, hooksNames)
 			for hookName, diagFileName := range expectedDiagnosticHooks {
 				if !assert.Contains(t, hooksMap, hookName) {
 					continue // this iteration failed, no reason to do further tests, moving forward
@@ -498,9 +496,14 @@ func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs com
 	log, err := logger.NewFromConfig("coordinator-test", loggerCfg, false)
 	require.NoError(t, err)
 
+	cfg := configuration.DefaultConfiguration()
+	cfg.Settings.DownloadConfig.InstallPath = "install"
+	cfg.Settings.DownloadConfig.TargetDirectory = "target"
+	cfg.Settings.LoggingConfig.Files.Path = "logs"
+
 	helper.coordinator = coordinator.New(
 		log,
-		configuration.DefaultConfiguration(),
+		cfg,
 		logp.InfoLevel,
 		agentInfo,
 		specs,
