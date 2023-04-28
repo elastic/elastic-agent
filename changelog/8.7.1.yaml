@@ -109,3 +109,15 @@ entries:
       file:
         name: 1681942680-fix-diag-zip-file.yaml
         checksum: ff3bd63aa3dfa8d9c7d8f708cf7d3febde4e5bae
+    - kind: bug-fix
+      summary: Make best effort in copying the run directory on upgrades
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2448
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2433
+      timestamp: 1682721331
+      file:
+        name: 1682721331-Make-best-effort-in-copying-the-run-directory-on-upgrades.yaml
+        checksum: 7753fe110c81503074dbcb7ca0c4acd33ccfa267
