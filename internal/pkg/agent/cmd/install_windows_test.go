@@ -9,7 +9,10 @@ package cmd
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 func TestInstallPath(t *testing.T) {
