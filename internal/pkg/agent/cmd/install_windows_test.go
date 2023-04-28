@@ -35,12 +35,12 @@ func TestInvalidBasePath(t *testing.T) {
 		expectedError string
 	}{
 		"relative_path_1": {
-			basePath:      `relative\path`,
-			expectedError: `base path "relative\path" is not absolute`,
+			basePath:      "relative\\path",
+			expectedError: "base path \"relative\\path\" is not absolute",
 		},
 		"relative_path_2": {
-			basePath:      `.\relative\path`,
-			expectedError: `base path ".\relative\path" is not absolute`,
+			basePath:      ".\\relative\\path",
+			expectedError: "base path \".\\relative\\path\" is not absolute",
 		},
 		"empty_path": {
 			basePath:      "",
