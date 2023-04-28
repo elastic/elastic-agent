@@ -9,7 +9,6 @@ package integration
 import (
 	"archive/zip"
 	"context"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -17,12 +16,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -75,7 +72,6 @@ func (s *DiagnosticsIntegrationTestSuite) SetupSuite() {
 		version.GetDefaultVersion(),
 		integrationtest.WithFetcher(l),
 		integrationtest.WithLogOutput(),
-		integrationtest.WithAllowErrors(),
 	)
 	s.Require().NoError(err)
 
@@ -133,7 +129,7 @@ func (s *DiagnosticsIntegrationTestSuite) TestDiagnosticsFromHealthyAgent() {
 	s.Assert().NoError(err)
 }
 
-func verifyDiagnosticArchive(t *testing.T, ctx context.Context, diagArchive string, avi *agentVersionInfo) {
+func verifyDiagnosticArchive(t *testing.T, ctx context.Context, diagArchive string, avi *client.Version) {
 	// check that the archive is not an empty file
 	stat, err := os.Stat(diagArchive)
 	require.NoErrorf(t, err, "stat file %q failed", diagArchive)
@@ -188,17 +184,6 @@ func TestDiagnosticsCommandIntegrationTestSuite(t *testing.T) {
 	suite.Run(t, new(DiagnosticsIntegrationTestSuite))
 }
 
-type versionInfo struct {
-	Version   string    `yaml:"version"`
-	Commit    string    `yaml:"commit"`
-	BuildTime time.Time `yaml:"build_time"`
-	Snapshot  bool      `yaml:"snapshot"`
-}
-type agentVersionInfo struct {
-	Binary versionInfo `yaml:"binary"`
-	Daemon versionInfo `yaml:"daemon"`
-}
-
 func extractZipArchive(t *testing.T, zipFile string, dst string) {
 	zReader, err := zip.OpenReader(zipFile)
 	require.NoErrorf(t, err, "file %q is not a valid zip archive", zipFile)
@@ -239,20 +224,13 @@ func extractSingleFileFromArchive(t *testing.T, src *zip.File, dst string) {
 	require.NoErrorf(t, err, "error copying content from zipped file %q to extracted file %q", src.Name, dst)
 }
 
-func (s *DiagnosticsIntegrationTestSuite) getRunningAgentVersion(ctx context.Context) (*agentVersionInfo, error) {
-	cmdOutput, err := s.f.Exec(ctx, []string{"version", "--yaml"})
-	if err != nil {
-		return nil, fmt.Errorf("error executing version command: %w", err)
-	}
-	avi := new(agentVersionInfo)
-	err = yaml.Unmarshal(cmdOutput, avi)
-	if err != nil {
-		return avi, fmt.Errorf("error unmarshaling YAML version output: %w", err)
-	}
-	return avi, nil
+func (s *DiagnosticsIntegrationTestSuite) getRunningAgentVersion(ctx context.Context) (*client.Version, error) {
+	avi, err := s.f.Client().Version(ctx)
+	s.Require().NoErrorf(err, "error executing version command")
+	return &avi, err
 }
 
-func compileExpectedDiagnosticFilePatterns(avi *agentVersionInfo, comps []componentAndUnitNames) []string {
+func compileExpectedDiagnosticFilePatterns(avi *client.Version, comps []componentAndUnitNames) []string {
 	files := make([]string, 0, len(diagnosticsFiles)+len(comps)*len(unitsDiagnosticsFiles))
 
 	files = append(files, diagnosticsFiles...)
@@ -266,9 +244,9 @@ func compileExpectedDiagnosticFilePatterns(avi *agentVersionInfo, comps []compon
 		}
 	}
 
-	files = append(files, path.Join("logs", "elastic-agent-"+avi.Daemon.Commit[:6], "elastic-agent-*.ndjson"))
+	files = append(files, path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-agent-*.ndjson"))
 	// this pattern overlaps with the previous one but filepath.Glob() does not seem to match using '?' wildcard
-	files = append(files, path.Join("logs", "elastic-agent-"+avi.Daemon.Commit[:6], "elastic-agent-watcher-*.ndjson"))
+	files = append(files, path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-agent-watcher-*.ndjson"))
 
 	return files
 }
