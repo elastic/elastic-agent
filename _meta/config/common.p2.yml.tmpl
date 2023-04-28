@@ -6,8 +6,8 @@ outputs:
     type: elasticsearch
     hosts: [127.0.0.1:9200]
     api_key: "example-key"
-    # username: "elastic"
-    # password: "changeme"
+    #username: "elastic"
+    #password: "changeme"
 
 inputs:
   - type: system/metrics
@@ -31,6 +31,17 @@ inputs:
       - metricsets:
         - filesystem
         data_stream.dataset: system.filesystem
+
+  # Collecting log files
+  #- type: filestream
+  #  id: your-first-filestream-input
+  #  streams:
+  #    - #id: logfile-log.logs-566cd4b0-e5ce-11ed-bcd4-43d4f70535fd # is this id needed too?
+  #      data_stream:
+  #        dataset: generic
+  #      paths:
+  #        - /var/log/*.log
+
 
 # agent.monitoring:
 #   # enabled turns on monitoring of running processes
