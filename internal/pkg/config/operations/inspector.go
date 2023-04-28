@@ -66,7 +66,12 @@ func LoadFullAgentConfig(logger *logger.Logger, cfgPath string, failOnFleetMissi
 		return rawConfig, nil
 	}
 
-	return config.NewConfigFrom(fleetConfig)
+	// merge the policy on top of the configuration to provide a unified configuration
+	err = rawConfig.Merge(fleetConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge latest fleet policy with local configuration: %w", err)
+	}
+	return rawConfig, nil
 }
 
 func loadConfig(configPath string) (*config.Config, error) {

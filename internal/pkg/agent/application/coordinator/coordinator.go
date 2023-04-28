@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -160,6 +161,7 @@ type Coordinator struct {
 	agentInfo *info.AgentInfo
 	isManaged bool
 
+	cfg   *configuration.Configuration
 	specs component.RuntimeSpecs
 
 	logLevelCh chan logp.Level
@@ -192,7 +194,7 @@ type Coordinator struct {
 var ErrFatalCoordinator = errors.New("fatal error in coordinator")
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -202,6 +204,7 @@ func New(logger *logger.Logger, logLevel logp.Level, agentInfo *info.AgentInfo, 
 	}
 	return &Coordinator{
 		logger:     logger,
+		cfg:        cfg,
 		agentInfo:  agentInfo,
 		isManaged:  isManaged,
 		specs:      specs,
@@ -428,6 +431,22 @@ func (c *Coordinator) Run(ctx context.Context) error {
 // information about the state of the Elastic Agent.
 func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 	return diagnostics.Hooks{
+		{
+			Name:        "local-config",
+			Filename:    "local-config.yaml",
+			Description: "current local configuration of the running Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.cfg == nil {
+					return []byte("error: failed no local configuration")
+				}
+				o, err := yaml.Marshal(c.cfg)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return o
+			},
+		},
 		{
 			Name:        "pre-config",
 			Filename:    "pre-config.yaml",

@@ -548,7 +548,7 @@ func createCoordinator(t *testing.T, opts ...CoordinatorOpt) (*Coordinator, *fak
 	cfgMgr := newFakeConfigManager()
 	varsMgr := newFakeVarsManager()
 
-	coord := New(l, logp.DebugLevel, ai, specs, &fakeReExecManager{}, &fakeUpgradeManager{}, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, &fakeUpgradeManager{}, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
 	return coord, cfgMgr, varsMgr
 }
 
