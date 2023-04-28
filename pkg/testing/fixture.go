@@ -284,6 +284,7 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// #nosec G204 -- Not so many ways to support variadic arguments to the elastic-agent command :(
 	cmd := exec.CommandContext(ctx, f.binaryPath(), args...)
 	for _, o := range opts {
 		if err := o(cmd); err != nil {
