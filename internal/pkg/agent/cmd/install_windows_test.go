@@ -25,3 +25,39 @@ func TestInstallPath(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateBasePath(t *testing.T) {
+	tests := map[string]struct {
+		basePath      string
+		expectedError string
+	}{
+		"absolute_path": {
+			basePath:      `D:\absolute\path`,
+			expectedError: "",
+		},
+		"relative_path_1": {
+			basePath:      `relative\path`,
+			expectedError: `base path "relative\path" is not absolute`,
+		},
+		"relative_path_2": {
+			basePath:      `.\relative\path`,
+			expectedError: `base path ".\relative\path" is not absolute`,
+		},
+		"empty_path": {
+			basePath:      "",
+			expectedError: `base path "" is not absolute`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := validateBasePath(test.basePath)
+
+			if test.expectedError == "" {
+				require.NoError(t, err)
+			} else {
+				require.Equal(t, test.expectedError, err.Error())
+			}
+		})
+	}
+}
