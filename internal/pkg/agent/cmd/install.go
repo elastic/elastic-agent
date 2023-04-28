@@ -54,17 +54,17 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return err
 	}
 
+	basePath, _ := cmd.Flags().GetString(flagInstallBasePath)
+	if !filepath.IsAbs(basePath) {
+		return fmt.Errorf("base path %q is not absolute", basePath)
+	}
+
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
 		return fmt.Errorf("unable to perform install command while checking for administrator rights, %w", err)
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
-	}
-
-	basePath, _ := cmd.Flags().GetString(flagInstallBasePath)
-	if err := validateBasePath(basePath); err != nil {
-		return err
 	}
 
 	topPath := installPath(basePath)
@@ -230,14 +230,6 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	fmt.Fprint(streams.Out, "Elastic Agent has been successfully installed.\n")
-	return nil
-}
-
-func validateBasePath(basePath string) error {
-	if !filepath.IsAbs(basePath) {
-		return fmt.Errorf("base path %q is not absolute", basePath)
-	}
-
 	return nil
 }
 
