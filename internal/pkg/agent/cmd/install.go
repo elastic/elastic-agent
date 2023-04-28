@@ -21,6 +21,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+const flagInstallBasePath = "base-path"
+
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install",
@@ -40,7 +42,7 @@ would like the Agent to operate.
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
-	cmd.Flags().String("base-path", paths.DefaultBasePath, "Base path for installing Elastic Agent's files.")
+	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "Base path (absolute) for installing Elastic Agent's files.")
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -60,7 +62,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("unable to perform install command, not executed with %s permissions", utils.PermissionUser)
 	}
 
-	basePath, _ := cmd.Flags().GetString("base-path")
+	basePath, _ := cmd.Flags().GetString(flagInstallBasePath)
+	if err := validateBasePath(basePath); err != nil {
+		return err
+	}
+
 	topPath := installPath(basePath)
 
 	status, reason := install.Status(topPath)
@@ -224,6 +230,14 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	fmt.Fprint(streams.Out, "Elastic Agent has been successfully installed.\n")
+	return nil
+}
+
+func validateBasePath(basePath string) error {
+	if !filepath.IsAbs(basePath) {
+		return fmt.Errorf("base path %q is not absolute", basePath)
+	}
+
 	return nil
 }
 

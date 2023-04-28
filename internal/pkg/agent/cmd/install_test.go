@@ -25,3 +25,22 @@ func TestInstallPath(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateBasePath(t *testing.T) {
+	tests := map[string]string{
+		"/absolute/path": "",
+		"relative/path":  `base path "relative/path" is not absolute`,
+	}
+
+	for basePath, expectedError := range tests {
+		t.Run(basePath, func(t *testing.T) {
+			err := validateBasePath(basePath)
+
+			if expectedError == "" {
+				require.NoError(t, err)
+			} else {
+				require.Equal(t, expectedError, err.Error())
+			}
+		})
+	}
+}
