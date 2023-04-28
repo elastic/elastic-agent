@@ -56,7 +56,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	basePath, _ := cmd.Flags().GetString(flagInstallBasePath)
 	if !filepath.IsAbs(basePath) {
-		return fmt.Errorf("base path %q is not absolute", basePath)
+		return fmt.Errorf("base path [%s] is not absolute", basePath)
 	}
 
 	isAdmin, err := utils.HasRoot()
