@@ -34,17 +34,17 @@ import (
 const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
 
 var diagnosticsFiles = []string{
-	"allocs.txt",
-	"block.txt",
+	"allocs.pprof.gz",
+	"block.pprog.gz",
 	"components-actual.yaml",
 	"components-expected.yaml",
 	"computed-config.yaml",
-	"goroutine.txt",
-	"heap.txt",
-	"mutex.txt",
+	"goroutine.pprof.gz",
+	"heap.pprof.gz",
+	"mutex.pprof.gz",
 	"pre-config.yaml",
 	"state.yaml",
-	"threadcreate.txt",
+	"threadcreate.pprof.gz",
 	"variables.yaml",
 	"version.txt",
 }
@@ -113,7 +113,7 @@ func (s *DiagnosticsIntegrationTestSuite) TestDiagnosticsFromHealthyAgent() {
 	}
 
 	err := s.f.Run(ctx, integrationtest.State{
-		Configure:  simpleConfig1,
+		Configure:  simpleConfig2,
 		AgentState: atesting.NewClientState(client.Healthy),
 		Components: map[string]atesting.ComponentState{
 			"fake-default": {
