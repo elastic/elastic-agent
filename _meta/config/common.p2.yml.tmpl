@@ -9,6 +9,9 @@ outputs:
     # username: "elastic"
     # password: "changeme"
 
+# Here you can configure your list of inputs. You can either configure all the inputs as a list of arrays
+# or create an "inputs.d" directory and put a yaml file inside for each input. If you use the inputs.d
+# directory, it is important that each .yml file repeats the `inputs:` top level array part.
 inputs:
   - type: system/metrics
     # Each input must have a unique ID.
