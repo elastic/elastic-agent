@@ -170,6 +170,9 @@ func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
 }
 
 func TestFakeComponentIntegrationTestSuite(t *testing.T) {
+	//define.Require(t, define.Requirements{
+	//	Local: true,
+	//})
 	suite.Run(t, new(FakeComponentIntegrationTestSuite))
 }
 
