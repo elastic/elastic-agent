@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,8 @@ func TestInstall(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		OS: []define.OS{
 			define.OS{Type: "darwin"},
+			define.OS{Type: "linux"},
+			define.OS{Type: "windows"},
 		},
 
 		// We require sudo for this test to run
@@ -53,8 +56,17 @@ type InstallTestSuite struct {
 
 func (i *InstallTestSuite) TestInstallWithoutBasePath() {
 	// Check that default base path is clean
-	basePath := "/Library"
-	topPath := filepath.Join(basePath, "Elastic", "Agent")
+	var defaultBasePath string
+	switch runtime.GOOS {
+	case "darwin":
+		defaultBasePath = `/Library`
+	case "linux":
+		defaultBasePath = `/opt`
+	case "windows":
+		defaultBasePath = `C:\Program Files`
+	}
+
+	topPath := filepath.Join(defaultBasePath, "Elastic", "Agent")
 	_, err := os.Stat(topPath)
 	i.Require().True(os.IsNotExist(err))
 
