@@ -92,7 +92,7 @@ func (s *DiagnosticsIntegrationTestSuite) TestDiagnosticsFromHealthyAgent() {
 
 	testDiagnostics := func() error {
 		diagnosticCommandWD := s.T().TempDir()
-		diagnosticCmdOutput, err := s.f.Exec(ctx, []string{"diagnostics", "dump"}, process.WithWorkDir(diagnosticCommandWD))
+		diagnosticCmdOutput, err := s.f.Exec(ctx, []string{"diagnostics", "collect"}, process.WithWorkDir(diagnosticCommandWD))
 
 		s.T().Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
 		s.Require().NoErrorf(err, "error running diagnostic command: %v", err)
