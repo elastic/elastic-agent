@@ -110,7 +110,7 @@ entries:
         name: 1681942680-fix-diag-zip-file.yaml
         checksum: ff3bd63aa3dfa8d9c7d8f708cf7d3febde4e5bae
     - kind: bug-fix
-      summary: Make best effort in copying the run directory on upgrades
+      summary: Make best effort in copying the run directory on upgrades to avoid unnecessary failures.
       description: ""
       component: agent
       pr:
