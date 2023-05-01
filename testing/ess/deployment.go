@@ -123,6 +123,24 @@ func (c *Client) CreateDeployment(req CreateDeploymentRequest) (*CreateDeploymen
 	return &r, nil
 }
 
+func (c *Client) ShutdownDeployment(deploymentID string) error {
+	u, err := url.JoinPath("deployments", deploymentID, "_shutdown")
+	if err != nil {
+		return fmt.Errorf("unable to create deployment shutdown API URL: %w", err)
+	}
+
+	res, err := c.doPost(u, "", nil)
+	if err != nil {
+		return fmt.Errorf("error calling deployment shutdown API: %w", err)
+	}
+
+	if res.StatusCode != 200 {
+		return fmt.Errorf("got unexpected response code [%d] from deployment shutdown API", res.StatusCode)
+	}
+
+	return nil
+}
+
 // TODO: make work for cloud other than GCP
 const createDeploymentRequestTemplate = `
 {

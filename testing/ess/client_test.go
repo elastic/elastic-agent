@@ -5,9 +5,12 @@
 package ess
 
 import (
-	"fmt"
 	"os"
+	"strconv"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestClient_CreateDeployment(t *testing.T) {
@@ -17,17 +20,29 @@ func TestClient_CreateDeployment(t *testing.T) {
 	}
 
 	cfg := Config{ApiKey: essApiKey}
-
 	client := NewClient(cfg)
+
+	// Create deployment
 	resp, err := client.CreateDeployment(CreateDeploymentRequest{
 		Name:    "test-880",
 		Region:  "gcp-us-central1",
 		Version: "8.8.0-SNAPSHOT",
 	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err.Error())
-		os.Exit(1)
+	require.NoError(t, err)
+	t.Logf("creation response: %#+v\n", resp)
+
+	// Delay shutdown if requested (useful for debugging)
+	shutdownDelayStr := os.Getenv("ESS_CLIENT_TEST_SHUTDOWN_DELAY_SECONDS")
+	if shutdownDelayStr != "" {
+		shutdownDelayVal, err := strconv.Atoi(shutdownDelayStr)
+		require.NoError(t, err)
+
+		shutdownDelay := time.Duration(shutdownDelayVal) * time.Second
+		t.Logf("delaying shutdown by [%d] seconds\n", shutdownDelayVal)
+		time.Sleep(shutdownDelay)
 	}
 
-	t.Logf("creation response: %#+v\n", resp)
+	// Shutdown deployment
+	err = client.ShutdownDeployment(resp.ID)
+	require.NoError(t, err)
 }
