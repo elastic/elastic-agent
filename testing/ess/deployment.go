@@ -49,6 +49,7 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 	if err != nil {
 		return nil, fmt.Errorf("error calling deployment creation API: %w", err)
 	}
+	defer res.Body.Close()
 
 	//data, _ := io.ReadAll(res.Body)
 	//fmt.Println(string(data))
@@ -91,6 +92,7 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 	if err != nil {
 		return nil, fmt.Errorf("error calling deployment retrieval API: %w", err)
 	}
+	defer res.Body.Close()
 
 	//data, _ := io.ReadAll(res.Body)
 	//fmt.Println(string(data))
@@ -135,6 +137,7 @@ func (c *Client) ShutdownDeployment(ctx context.Context, deploymentID string) er
 	if err != nil {
 		return fmt.Errorf("error calling deployment shutdown API: %w", err)
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
 		return fmt.Errorf("got unexpected response code [%d] from deployment shutdown API", res.StatusCode)
