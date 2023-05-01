@@ -29,6 +29,7 @@ type CreateDeploymentResponse struct {
 	Password string
 }
 
+// CreateDeployment creates the deployment with the specified configuration.
 func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentRequest) (*CreateDeploymentResponse, error) {
 	tpl, err := template.New("create_deployment_request").Parse(createDeploymentRequestTemplate)
 	if err != nil {
@@ -127,6 +128,7 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 	return &r, nil
 }
 
+// ShutdownDeployment attempts to shut down the ESS deployment with the specified ID.
 func (c *Client) ShutdownDeployment(ctx context.Context, deploymentID string) error {
 	u, err := url.JoinPath("deployments", deploymentID, "_shutdown")
 	if err != nil {
