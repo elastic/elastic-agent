@@ -7,9 +7,9 @@
 package integration
 
 import (
+	"context"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
+
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
 func TestInstall(t *testing.T) {
@@ -37,21 +39,21 @@ func TestInstall(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	binPath := info.Fixture.ExecutablePath
+	fixture := define.NewFixture(t)
 
-	suite.Run(t, newInstallTestSuite(binPath))
+	suite.Run(t, newInstallTestSuite(fixture))
 }
 
-func newInstallTestSuite(binPath string) *InstallTestSuite {
+func newInstallTestSuite(fixture *atesting.Fixture) *InstallTestSuite {
 	i := new(InstallTestSuite)
-	i.binPath = binPath
+	i.fixture = fixture
 
 	return i
 }
 
 type InstallTestSuite struct {
 	suite.Suite
-	binPath string
+	fixture *atesting.Fixture
 }
 
 func (i *InstallTestSuite) TestInstallWithoutBasePath() {
@@ -72,8 +74,7 @@ func (i *InstallTestSuite) TestInstallWithoutBasePath() {
 
 	// Run elastic-agent install.  We use --force to prevent interactive
 	// execution.
-	cmd := exec.Command(i.binPath, "--force")
-	err := cmd.Run()
+	_, err := i.fixture.Exec(context.Background(), []string{"install", "--force"})
 	i.Require().NoError(err)
 
 	// Check that Agent was installed in default base path
@@ -87,8 +88,7 @@ func (i *InstallTestSuite) TestInstallWithBasePath() {
 
 	// Run elastic-agent install.  We use --force to prevent interactive
 	// execution.
-	cmd := exec.Command(i.binPath, "--base-path", randomBasePath, "--force")
-	err := cmd.Run()
+	_, err := i.fixture.Exec(context.Background(), []string{"install", "--base-path", randomBasePath, "--force"})
 	i.Require().NoError(err)
 
 	// Check that Agent was installed in the custom base path
