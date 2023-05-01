@@ -427,8 +427,7 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		args = append(args, "--fleet-server-es", connStr)
 		if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
 			args = append(args, "--fleet-server-service-token-path", cfg.FleetServer.Elasticsearch.ServiceTokenPath)
-		}
-		if cfg.FleetServer.Elasticsearch.ServiceTokenPath == "" && cfg.FleetServer.Elasticsearch.ServiceToken != "" {
+		} else if cfg.FleetServer.Elasticsearch.ServiceTokenPath == "" && cfg.FleetServer.Elasticsearch.ServiceToken != "" {
 			args = append(args, "--fleet-server-service-token", cfg.FleetServer.Elasticsearch.ServiceToken)
 		}
 		if policyID != "" {

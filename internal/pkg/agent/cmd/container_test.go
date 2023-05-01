@@ -58,55 +58,55 @@ func TestContainerTestPaths(t *testing.T) {
 }
 
 func TestBuildEnrollArgs(t *testing.T) {
-	cases := []struct {
-		name   string
+	cases := map[string]struct {
 		cfg    setupConfig
 		expect []string
 		err    error
-	}{{
-		name: "service token passes",
-		cfg: setupConfig{
-			FleetServer: fleetServerConfig{
-				Enable: true,
-				Elasticsearch: elasticsearchConfig{
-					Host:         "http://localhost:9200",
-					ServiceToken: "token-val",
+	}{
+		"service token passes": {
+			cfg: setupConfig{
+				FleetServer: fleetServerConfig{
+					Enable: true,
+					Elasticsearch: elasticsearchConfig{
+						Host:         "http://localhost:9200",
+						ServiceToken: "token-val",
+					},
 				},
 			},
+			expect: []string{"--fleet-server-service-token", "token-val"},
+			err:    nil,
 		},
-		expect: []string{"--fleet-server-service-token", "token-val"},
-		err:    nil,
-	}, {
-		name: "service token path passes",
-		cfg: setupConfig{
-			FleetServer: fleetServerConfig{
-				Enable: true,
-				Elasticsearch: elasticsearchConfig{
-					Host:             "http://localhost:9200",
-					ServiceTokenPath: "/path/to/token",
+		"service token path passes": {
+			cfg: setupConfig{
+				FleetServer: fleetServerConfig{
+					Enable: true,
+					Elasticsearch: elasticsearchConfig{
+						Host:             "http://localhost:9200",
+						ServiceTokenPath: "/path/to/token",
+					},
 				},
 			},
+			expect: []string{"--fleet-server-service-token-path", "/path/to/token"},
+			err:    nil,
 		},
-		expect: []string{"--fleet-server-service-token-path", "/path/to/token"},
-		err:    nil,
-	}, {
-		name: "service token path preffered",
-		cfg: setupConfig{
-			FleetServer: fleetServerConfig{
-				Enable: true,
-				Elasticsearch: elasticsearchConfig{
-					Host:             "http://localhost:9200",
-					ServiceTokenPath: "/path/to/token",
-					ServiceToken:     "token-val",
+		"service token path preferred": {
+			cfg: setupConfig{
+				FleetServer: fleetServerConfig{
+					Enable: true,
+					Elasticsearch: elasticsearchConfig{
+						Host:             "http://localhost:9200",
+						ServiceTokenPath: "/path/to/token",
+						ServiceToken:     "token-val",
+					},
 				},
 			},
+			expect: []string{"--fleet-server-service-token-path", "/path/to/token"},
+			err:    nil,
 		},
-		expect: []string{"--fleet-server-service-token-path", "/path/to/token"},
-		err:    nil,
-	}}
+	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
 			args, err := buildEnrollArgs(tc.cfg, "", "")
 			if tc.err != nil {
 				require.EqualError(t, err, tc.err.Error())
