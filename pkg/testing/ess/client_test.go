@@ -32,6 +32,12 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("creation response: %#+v\n", resp)
 
+	require.NotEmpty(t, resp.ID)
+	require.NotEmpty(t, resp.ElasticsearchEndpoint)
+	require.NotEmpty(t, resp.KibanaEndpoint)
+	require.NotEmpty(t, resp.Username)
+	require.NotEmpty(t, resp.Password)
+
 	// Delay shutdown if requested (useful for debugging)
 	shutdownDelayStr := os.Getenv("ESS_CLIENT_TEST_SHUTDOWN_DELAY_SECONDS")
 	if shutdownDelayStr != "" {
