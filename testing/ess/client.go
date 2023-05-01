@@ -5,6 +5,7 @@
 package ess
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,13 +28,13 @@ func NewClient(config Config) *Client {
 	return c
 }
 
-func (c *Client) doGet(relativeUrl string) (*http.Response, error) {
+func (c *Client) doGet(ctx context.Context, relativeUrl string) (*http.Response, error) {
 	u, err := url.JoinPath(c.config.BaseUrl, relativeUrl)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create API URL: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create GET request: %w", err)
 	}
@@ -43,13 +44,13 @@ func (c *Client) doGet(relativeUrl string) (*http.Response, error) {
 	return c.client.Do(req)
 }
 
-func (c *Client) doPost(relativeUrl, contentType string, body io.Reader) (*http.Response, error) {
+func (c *Client) doPost(ctx context.Context, relativeUrl, contentType string, body io.Reader) (*http.Response, error) {
 	u, err := url.JoinPath(c.config.BaseUrl, relativeUrl)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create API URL: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, u, body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, body)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create POST request: %w", err)
 	}

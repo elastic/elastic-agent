@@ -6,6 +6,7 @@ package ess
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -28,7 +29,7 @@ type CreateDeploymentResponse struct {
 	Password string
 }
 
-func (c *Client) CreateDeployment(req CreateDeploymentRequest) (*CreateDeploymentResponse, error) {
+func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentRequest) (*CreateDeploymentResponse, error) {
 	tpl, err := template.New("create_deployment_request").Parse(createDeploymentRequestTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse deployment creation template: %w", err)
@@ -40,6 +41,7 @@ func (c *Client) CreateDeployment(req CreateDeploymentRequest) (*CreateDeploymen
 	}
 
 	res, err := c.doPost(
+		ctx,
 		"deployments",
 		"application/json",
 		&buf,
@@ -85,7 +87,7 @@ func (c *Client) CreateDeployment(req CreateDeploymentRequest) (*CreateDeploymen
 		return nil, fmt.Errorf("unable to create deployment retrieval API URL: %w", err)
 	}
 
-	res, err = c.doGet(u)
+	res, err = c.doGet(ctx, u)
 	if err != nil {
 		return nil, fmt.Errorf("error calling deployment retrieval API: %w", err)
 	}
@@ -123,13 +125,13 @@ func (c *Client) CreateDeployment(req CreateDeploymentRequest) (*CreateDeploymen
 	return &r, nil
 }
 
-func (c *Client) ShutdownDeployment(deploymentID string) error {
+func (c *Client) ShutdownDeployment(ctx context.Context, deploymentID string) error {
 	u, err := url.JoinPath("deployments", deploymentID, "_shutdown")
 	if err != nil {
 		return fmt.Errorf("unable to create deployment shutdown API URL: %w", err)
 	}
 
-	res, err := c.doPost(u, "", nil)
+	res, err := c.doPost(ctx, u, "", nil)
 	if err != nil {
 		return fmt.Errorf("error calling deployment shutdown API: %w", err)
 	}

@@ -5,6 +5,7 @@
 package ess
 
 import (
+	"context"
 	"os"
 	"strconv"
 	"testing"
@@ -23,7 +24,7 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	client := NewClient(cfg)
 
 	// Create deployment
-	resp, err := client.CreateDeployment(CreateDeploymentRequest{
+	resp, err := client.CreateDeployment(context.Background(), CreateDeploymentRequest{
 		Name:    "test-880",
 		Region:  "gcp-us-central1",
 		Version: "8.8.0-SNAPSHOT",
@@ -43,6 +44,6 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	}
 
 	// Shutdown deployment
-	err = client.ShutdownDeployment(resp.ID)
+	err = client.ShutdownDeployment(context.Background(), resp.ID)
 	require.NoError(t, err)
 }
