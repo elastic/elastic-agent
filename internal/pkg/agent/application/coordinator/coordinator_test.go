@@ -6,6 +6,7 @@ package coordinator
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -379,6 +380,67 @@ func TestCoordinatorShutdownErrorCloseTimeout(t *testing.T) {
 	close(varWatcher)
 
 	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
+}
+
+func TestCoordinatorProcessConfig(t *testing.T) {
+	c := Coordinator{
+		logger:     logp.L(),
+		upgradeMgr: &fakeUpgradeManager{},
+		monitorMgr: newTestMonitoringMgr(),
+	}
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	tests := []struct {
+		name          string
+		protectionCfg map[string]interface{}
+		wantErr       error
+	}{
+		{
+			name: "no protection",
+		},
+		{
+			name: "valid protection",
+			protectionCfg: map[string]interface{}{
+				"enabled":              false,
+				"uninstall_token_hash": "EuaakkgkOQlVh78UOZuT8fOco",
+				"signing_key":          "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuaakkgkOQlVh78UOZuT8fOcocIMXAp01azX5ZK4LkLiMe8BjENTF/tT8rf3nlu5mqBvlePc/IJMXMYiN5YJo4A==",
+			},
+		},
+		{
+			name: "corrupted signing_key",
+			protectionCfg: map[string]interface{}{
+				"enabled":              false,
+				"uninstall_token_hash": "EuaakkgkOQlVh78UOZuT8fOco",
+				"signing_key":          "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuaakkgkOQlVh78UOZuT8fOcocIMXAp01azX5ZK4LkLiMe8BjENTF/tT8rf3nlu5mqBvlePc/IJ",
+			},
+			wantErr: base64.CorruptInputError(108),
+		},
+	}
+
+	for _, tc := range tests {
+		var agent map[string]interface{}
+		if tc.protectionCfg != nil {
+			agent = map[string]interface{}{
+				"protection": tc.protectionCfg,
+			}
+		}
+
+		cfg, err := config.NewConfigFrom(map[string]interface{}{
+			"agent": agent,
+		})
+
+		require.NoError(t, err)
+
+		err = c.processConfig(ctx, cfg)
+		require.ErrorIs(t, err, tc.wantErr)
+		if err == nil && tc.protectionCfg != nil {
+			protection := c.Protection()
+			require.EqualValues(t, tc.protectionCfg["enabled"], protection.Enabled)
+			require.EqualValues(t, tc.protectionCfg["uninstall_token_hash"], protection.UninstallTokenHash)
+			require.EqualValues(t, tc.protectionCfg["signing_key"], base64.StdEncoding.EncodeToString(protection.SignatureValidationKey))
+		}
+	}
 }
 
 func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan error) {

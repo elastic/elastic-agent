@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -54,6 +55,69 @@ func TestPolicyChange(t *testing.T) {
 
 		change := <-ch
 		require.Equal(t, config.MustNewConfigFrom(conf), change.Config())
+	})
+
+	t.Run("Receive a signed policy configuration", func(t *testing.T) {
+		ch := make(chan coordinator.ConfigChange, 1)
+		const goodData = "eyJpZCI6ImY2ODMzNDQwLWU1ZDItMTFlZC04MDdkLTU5NTZmZDg3YjhjMSIsImFnZW50Ijp7InByb3RlY3Rpb24iOnsiZW5hYmxlZCI6ZmFsc2UsInVuaW5zdGFsbF90b2tlbl9oYXNoIjoiIiwic2lnbmluZ19rZXkiOiJNRmt3RXdZSEtvWkl6ajBDQVFZSUtvWkl6ajBEQVFjRFFnQUV1YWFra2drT1FsVmg3OFVPWnVUOGZPY29jSU1YQXAwMWF6WDVaSzRMa0xpTWU4QmpFTlRGL3RUOHJmM25sdTVtcUJ2bGVQYy9JSk1YTVlpTjVZSm80QT09In19fQ=="
+		conf := map[string]interface{}{
+			"id": "f6833440-e5d2-11ed-807d-5956fd87b8c1",
+			"agent": map[string]interface{}{
+				"protection": map[string]interface{}{
+					"enabled":              false,
+					"uninstall_token_hash": "EuaakkgkOQlVh78UOZuT8fOco",
+					"signing_key":          "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuaakkgkOQlVh78UOZuT8fOcocIMXAp01azX5ZK4LkLiMe8BjENTF/tT8rf3nlu5mqBvlePc/IJMXMYiN5YJo4A==",
+				},
+			},
+			"signed": map[string]interface{}{
+				"data":      goodData,
+				"signature": "MEUCIAHcG2RmW3Ppal9LaY6BEPyUBEUFKpK+Zpzy6+0FK6bCAiEA9KCHBUeI94SHyIvBL5Y3hLJcOgTinZm34T6LO0Ud7d0=",
+			},
+		}
+		action := &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Policy:     conf,
+		}
+
+		cfg := configuration.DefaultConfiguration()
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch)
+
+		handleAction := func(action *fleetapi.ActionPolicyChange) (map[string]interface{}, error) {
+			err := handler.Handle(context.Background(), action, ack)
+			if err != nil {
+				return nil, err
+			}
+
+			change := <-ch
+			return change.Config().ToMapStr()
+		}
+
+		// First ever config change is trusted, can't be validated
+		m, err := handleAction(action)
+		require.NoError(t, err)
+		require.Equal(t, conf, m)
+
+		// Second config change should be validated successfully
+		m, err = handleAction(action)
+		require.NoError(t, err)
+		require.Equal(t, conf, m)
+
+		// Non matching policy id should fail
+		action.Policy["id"] = "a6833440-e5d2-11ed-807d-5956fd87b8c2"
+		_, err = handleAction(action)
+		require.ErrorIs(t, err, protection.ErrMismatchedPolicyID)
+
+		// Missing policy id should fail
+		delete(action.Policy, "id")
+		_, err = handleAction(action)
+		require.ErrorIs(t, err, protection.ErrMissingPolicyID)
+
+		// Corrupted signed data should fail
+		signed := conf["signed"].(map[string]interface{})
+		signed["data"] = "eyJpZCI6ImY2ODMzNDQwLWU1ZDIt"
+		_, err = handleAction(action)
+		require.ErrorIs(t, err, protection.ErrInvalidSignature)
 	})
 }
 

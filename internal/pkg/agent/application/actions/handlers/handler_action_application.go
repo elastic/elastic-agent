@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -28,15 +28,22 @@ const (
 
 var errActionTimeoutInvalid = errors.New("action timeout is invalid")
 
+// Interface to coordinatitor for AppAction handler testability
+type ActionProtectionCoordinator interface {
+	Protection() protection.Config
+	State() state.State
+	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
+}
+
 // AppAction is a handler for application actions.
 type AppAction struct {
 	log     *logger.Logger
-	coord   *coordinator.Coordinator
+	coord   ActionProtectionCoordinator
 	agentID string
 }
 
 // NewAppAction creates a new AppAction handler.
-func NewAppAction(log *logger.Logger, coord *coordinator.Coordinator, agentID string) *AppAction {
+func NewAppAction(log *logger.Logger, coord ActionProtectionCoordinator, agentID string) *AppAction {
 	return &AppAction{
 		log:     log,
 		coord:   coord,
@@ -53,19 +60,16 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 	}
 
 	// Validate action
-	// Disabled for 8.8.0 release in order to limit the surface
-	// https://github.com/elastic/security-team/issues/6501
-	//
-	// h.log.Debugf("handlerAppAction: validate action '%+v', for agentID %s", a, h.agentID)
-	// validated, err := protection.ValidateAction(*action, h.coord.Protection().SignatureValidationKey, h.agentID)
-	// if err != nil {
-	// 	action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	// 	action.CompletedAt = action.StartedAt
-	// 	h.log.Errorf("handlerAppAction: action '%+v' failed validation: %v", action, err) // error details are logged
-	// 	action.Error = fmt.Sprintf("action failed validation: %s", action.InputType)      // generic error message for the action response
-	// 	return acker.Ack(ctx, action)
-	// }
-	// action = &validated
+	h.log.Debugf("handlerAppAction: validate action '%+v', for agentID %s", a, h.agentID)
+	validated, err := protection.ValidateAction(*action, h.coord.Protection().SignatureValidationKey, h.agentID)
+	if err != nil {
+		action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
+		action.CompletedAt = action.StartedAt
+		h.log.Errorf("handlerAppAction: action '%+v' failed validation: %v", action, err) // error details are logged
+		action.Error = fmt.Sprintf("action failed validation: %s", action.InputType)      // generic error message for the action response
+		return acker.Ack(ctx, action)
+	}
+	action = &validated
 
 	state := h.coord.State()
 	comp, unit, ok := findUnitFromInputType(state, action.InputType)
