@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestClient_CreateDeployment(t *testing.T) {
+func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	essApiKey := os.Getenv("ESS_API_KEY")
 	if essApiKey == "" {
 		t.Skip("ESS_API_KEY (for QA) environment variable not set")
