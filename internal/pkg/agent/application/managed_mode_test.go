@@ -6,6 +6,7 @@ package application
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -69,10 +70,11 @@ func (m *mockAcker) Commit(ctx context.Context) error {
 
 func Test_runDispatcher(t *testing.T) {
 	tests := []struct {
-		name           string
-		mockGateway    func(chan []fleetapi.Action) *mockGateway
-		mockDispatcher func() *mockDispatcher
-		interval       time.Duration
+		name                string
+		mockGateway         func(chan []fleetapi.Action) *mockGateway
+		mockDispatcher      func() *mockDispatcher
+		interval            time.Duration
+		skipOnWindowsReason string
 	}{{
 		name: "dispatcher not called",
 		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
@@ -100,7 +102,8 @@ func Test_runDispatcher(t *testing.T) {
 		},
 		interval: time.Second,
 	}, {
-		name: "no gateway actions, dispatcher is flushed",
+		name:                "no gateway actions, dispatcher is flushed",
+		skipOnWindowsReason: "Flaky test: https://github.com/elastic/elastic-agent/issues/2585",
 		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
 			gateway := &mockGateway{}
 			gateway.On("Actions").Return((<-chan []fleetapi.Action)(ch))
@@ -116,6 +119,10 @@ func Test_runDispatcher(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && tc.skipOnWindowsReason != "" {
+				t.Skip(tc.skipOnWindowsReason)
+			}
+
 			ch := make(chan []fleetapi.Action, 1)
 			gateway := tc.mockGateway(ch)
 			dispatcher := tc.mockDispatcher()
