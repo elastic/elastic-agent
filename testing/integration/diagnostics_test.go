@@ -66,7 +66,7 @@ type DiagnosticsIntegrationTestSuite struct {
 }
 
 func (s *DiagnosticsIntegrationTestSuite) SetupSuite() {
-	f, err := define.Fixture(s.T())
+	f, err := define.NewFixture(s.T())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())

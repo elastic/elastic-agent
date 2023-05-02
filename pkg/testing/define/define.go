@@ -52,8 +52,8 @@ func Version() string {
 	return ver
 }
 
-// Fixture returns the testing fixture to use for testing.
-func Fixture(t *testing.T, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+// NewFixture returns a new Elastic Agent testing fixture.
+func NewFixture(t *testing.T, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	buildsDir := os.Getenv("TEST_DEFINE_AGENT_BUILD_DIR")
 	if buildsDir == "" {
 		projectDir, err := findProjectRoot()
