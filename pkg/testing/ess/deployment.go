@@ -52,10 +52,6 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 	}
 	defer res.Body.Close()
 
-	//data, _ := io.ReadAll(res.Body)
-	//fmt.Println(string(data))
-	//return nil, nil
-
 	var createRespBody struct {
 		ID        string `json:"id"`
 		Resources []struct {
@@ -94,10 +90,6 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 		return nil, fmt.Errorf("error calling deployment retrieval API: %w", err)
 	}
 	defer res.Body.Close()
-
-	//data, _ := io.ReadAll(res.Body)
-	//fmt.Println(string(data))
-	//return &r, nil
 
 	var getRespBody struct {
 		Resources struct {
