@@ -41,9 +41,9 @@ inputs:
 
   # Collecting log files
   #- type: filestream
-  #  id: your-first-filestream-input
   #  streams:
-  #    - #id: logfile-log.logs-566cd4b0-e5ce-11ed-bcd4-43d4f70535fd # is this id needed too?
+  #    # This is a unique id describing your input    
+  #    - id: your-filestream-input-id
   #      data_stream:
   #        dataset: generic
   #      paths:
