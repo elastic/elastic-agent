@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net/http"
 	"net/url"
 )
 
@@ -29,6 +30,54 @@ type CreateDeploymentResponse struct {
 	Password string
 }
 
+type GetDeploymentResponse struct {
+	Elasticsearch struct {
+		Status     DeploymentStatus
+		ServiceUrl string
+	}
+	Kibana struct {
+		Status     DeploymentStatus
+		ServiceUrl string
+	}
+	IntegrationsServer struct {
+		Status     DeploymentStatus
+		ServiceUrl string
+	}
+}
+
+type DeploymentStatus string
+
+func (d *DeploymentStatus) UnmarshalJSON(data []byte) error {
+	var status string
+	json.Unmarshal(data, &status)
+	switch status {
+	case string(DeploymentStatusInitializing), string(DeploymentStatusReconfiguring), string(DeploymentStatusStarted):
+		*d = DeploymentStatus(status)
+	default:
+		return fmt.Errorf("unknown status: [%s]", status)
+	}
+
+	return nil
+}
+
+func (d *DeploymentStatus) String() string {
+	return string(*d)
+}
+
+const (
+	DeploymentStatusInitializing  DeploymentStatus = "initializing"
+	DeploymentStatusReconfiguring DeploymentStatus = "reconfiguring"
+	DeploymentStatusStarted       DeploymentStatus = "started"
+)
+
+type DeploymentStatusResponse struct {
+	Overall DeploymentStatus
+
+	Elasticsearch      DeploymentStatus
+	Kibana             DeploymentStatus
+	IntegrationsServer DeploymentStatus
+}
+
 // CreateDeployment creates the deployment with the specified configuration.
 func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentRequest) (*CreateDeploymentResponse, error) {
 	tpl, err := template.New("create_deployment_request").Parse(createDeploymentRequestTemplate)
@@ -41,7 +90,7 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 		return nil, fmt.Errorf("unable to create deployment creation request body: %w", err)
 	}
 
-	res, err := c.doPost(
+	createResp, err := c.doPost(
 		ctx,
 		"deployments",
 		"application/json",
@@ -50,7 +99,7 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 	if err != nil {
 		return nil, fmt.Errorf("error calling deployment creation API: %w", err)
 	}
-	defer res.Body.Close()
+	defer createResp.Body.Close()
 
 	var createRespBody struct {
 		ID        string `json:"id"`
@@ -63,7 +112,7 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 		} `json:"resources"`
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(&createRespBody); err != nil {
+	if err := json.NewDecoder(createResp.Body).Decode(&createRespBody); err != nil {
 		return nil, fmt.Errorf("error parsing deployment creation API response: %w", err)
 	}
 
@@ -80,16 +129,11 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 	}
 
 	// Get Elasticsearch and Kibana endpoint URLs
-	u, err := url.JoinPath("deployments", r.ID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create deployment retrieval API URL: %w", err)
-	}
-
-	res, err = c.doGet(ctx, u)
+	getResp, err := c.getDeployment(ctx, r.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error calling deployment retrieval API: %w", err)
 	}
-	defer res.Body.Close()
+	defer getResp.Body.Close()
 
 	var getRespBody struct {
 		Resources struct {
@@ -110,7 +154,7 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 		} `json:"resources"`
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(&getRespBody); err != nil {
+	if err := json.NewDecoder(getResp.Body).Decode(&getRespBody); err != nil {
 		return nil, fmt.Errorf("error parsing deployment retrieval API response: %w", err)
 	}
 
@@ -138,6 +182,83 @@ func (c *Client) ShutdownDeployment(ctx context.Context, deploymentID string) er
 	}
 
 	return nil
+}
+
+// DeploymentStatus returns the overall status of the deployment as well as statuses of every component.
+func (c *Client) DeploymentStatus(ctx context.Context, deploymentID string) (*DeploymentStatusResponse, error) {
+	getResp, err := c.getDeployment(ctx, deploymentID)
+	if err != nil {
+		return nil, fmt.Errorf("error calling deployment retrieval API: %w", err)
+	}
+	defer getResp.Body.Close()
+
+	var getRespBody struct {
+		Resources struct {
+			Elasticsearch []struct {
+				Info struct {
+					Status DeploymentStatus `json:"status"`
+				} `json:"info"`
+			} `json:"elasticsearch"`
+			Kibana []struct {
+				Info struct {
+					Status DeploymentStatus `json:"status"`
+				} `json:"info"`
+			} `json:"kibana"`
+			IntegrationsServer []struct {
+				Info struct {
+					Status DeploymentStatus `json:"status"`
+				} `json:"info"`
+			} `json:"integrations_server"`
+		} `json:"resources"`
+	}
+
+	if err := json.NewDecoder(getResp.Body).Decode(&getRespBody); err != nil {
+		return nil, fmt.Errorf("error parsing deployment retrieval API response: %w", err)
+	}
+
+	s := DeploymentStatusResponse{
+		Elasticsearch:      getRespBody.Resources.Elasticsearch[0].Info.Status,
+		Kibana:             getRespBody.Resources.Kibana[0].Info.Status,
+		IntegrationsServer: getRespBody.Resources.IntegrationsServer[0].Info.Status,
+	}
+	s.Overall = overallStatus(s.Elasticsearch, s.Kibana, s.IntegrationsServer)
+
+	return &s, nil
+}
+
+func (c *Client) getDeployment(ctx context.Context, deploymentID string) (*http.Response, error) {
+	u, err := url.JoinPath("deployments", deploymentID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create deployment retrieval API URL: %w", err)
+	}
+
+	return c.doGet(ctx, u)
+}
+
+func overallStatus(statuses ...DeploymentStatus) DeploymentStatus {
+	// The overall status is started if every component's status is started. Otherwise,
+	// we take the non-started components' statuses and pick the first one as the overall
+	// status.
+	statusMap := map[DeploymentStatus]struct{}{}
+	for _, status := range statuses {
+		statusMap[status] = struct{}{}
+	}
+
+	if len(statusMap) == 1 {
+		if _, allStarted := statusMap[DeploymentStatusStarted]; allStarted {
+			return DeploymentStatusStarted
+		}
+	}
+
+	var overallStatus DeploymentStatus
+	for _, status := range statuses {
+		if status != DeploymentStatusStarted {
+			overallStatus = status
+			break
+		}
+	}
+
+	return overallStatus
 }
 
 // TODO: make work for cloud other than GCP

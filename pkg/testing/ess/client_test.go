@@ -38,6 +38,15 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	require.NotEmpty(t, resp.Username)
 	require.NotEmpty(t, resp.Password)
 
+	// Wait until deployment is started
+	require.Eventually(t, func() bool {
+		status, err := client.DeploymentStatus(context.Background(), resp.ID)
+		require.NoError(t, err)
+
+		t.Logf("deployment status: %#+v\n", status)
+		return status.Overall == DeploymentStatusStarted
+	}, 5*time.Minute, 10*time.Second)
+
 	// Delay shutdown if requested (useful for debugging)
 	shutdownDelayStr := os.Getenv("ESS_CLIENT_TEST_SHUTDOWN_DELAY_SECONDS")
 	if shutdownDelayStr != "" {
