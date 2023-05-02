@@ -107,8 +107,7 @@ type FakeComponentIntegrationTestSuite struct {
 }
 
 func (s *FakeComponentIntegrationTestSuite) SetupSuite() {
-	l := atesting.LocalFetcher("../../build/distributions")
-	f, err := atesting.NewFixture(s.T(), "8.8.0", atesting.WithFetcher(l), atesting.WithLogOutput())
+	f, err := define.Fixture(s.T())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
