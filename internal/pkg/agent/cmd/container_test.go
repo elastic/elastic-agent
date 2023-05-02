@@ -56,3 +56,66 @@ func TestContainerTestPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildEnrollArgs(t *testing.T) {
+	cases := map[string]struct {
+		cfg    setupConfig
+		expect []string
+		err    error
+	}{
+		"service token passes": {
+			cfg: setupConfig{
+				FleetServer: fleetServerConfig{
+					Enable: true,
+					Elasticsearch: elasticsearchConfig{
+						Host:         "http://localhost:9200",
+						ServiceToken: "token-val",
+					},
+				},
+			},
+			expect: []string{"--fleet-server-service-token", "token-val"},
+			err:    nil,
+		},
+		"service token path passes": {
+			cfg: setupConfig{
+				FleetServer: fleetServerConfig{
+					Enable: true,
+					Elasticsearch: elasticsearchConfig{
+						Host:             "http://localhost:9200",
+						ServiceTokenPath: "/path/to/token",
+					},
+				},
+			},
+			expect: []string{"--fleet-server-service-token-path", "/path/to/token"},
+			err:    nil,
+		},
+		"service token path preferred": {
+			cfg: setupConfig{
+				FleetServer: fleetServerConfig{
+					Enable: true,
+					Elasticsearch: elasticsearchConfig{
+						Host:             "http://localhost:9200",
+						ServiceTokenPath: "/path/to/token",
+						ServiceToken:     "token-val",
+					},
+				},
+			},
+			expect: []string{"--fleet-server-service-token-path", "/path/to/token"},
+			err:    nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			args, err := buildEnrollArgs(tc.cfg, "", "")
+			if tc.err != nil {
+				require.EqualError(t, err, tc.err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			for _, arg := range tc.expect {
+				require.Contains(t, args, arg)
+			}
+		})
+	}
+}
