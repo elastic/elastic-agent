@@ -84,6 +84,7 @@ func DetermineBatches(dir string, buildTags ...string) ([]Batch, error) {
 	}
 
 	// run 'go test' and collect the JSON output to be parsed
+	// #nosec G204 -- test function code, it will be okay
 	testCmd := exec.Command("go", "test", "-v", "--tags", strings.Join(buildTags, ","), "-json", dir)
 	output, err := testCmd.Output()
 	if err != nil {
