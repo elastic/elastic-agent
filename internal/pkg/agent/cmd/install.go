@@ -43,7 +43,7 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	// We are not supporting a custom base path, supplied via the `--base-path` CLI flag, just yet because
-	// we don't have Endpoint support for it yet.
+	// we don't have Endpoint support for it yet. See also: https://github.com/elastic/elastic-agent/pull/2592
 	//cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	addEnrollFlags(cmd)
 
@@ -57,7 +57,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	// We are not supporting a custom base path, supplied via the `--base-path` CLI flag, just yet because
-	// we don't have Endpoint support for it yet.
+	// we don't have Endpoint support for it yet. See also: https://github.com/elastic/elastic-agent/pull/2592
 	//basePath, _ := cmd.Flags().GetString(flagInstallBasePath)
 	basePath := paths.DefaultBasePath
 	if !filepath.IsAbs(basePath) {
