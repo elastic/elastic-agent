@@ -42,7 +42,9 @@ would like the Agent to operate.
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
-	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
+	// We are not supporting a custom base path, supplied via the `--base-path` CLI flag, just yet because
+	// we don't have Endpoint support for it yet.
+	//cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	addEnrollFlags(cmd)
 
 	return cmd
@@ -54,7 +56,10 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return err
 	}
 
-	basePath, _ := cmd.Flags().GetString(flagInstallBasePath)
+	// We are not supporting a custom base path, supplied via the `--base-path` CLI flag, just yet because
+	// we don't have Endpoint support for it yet.
+	//basePath, _ := cmd.Flags().GetString(flagInstallBasePath)
+	basePath := paths.DefaultBasePath
 	if !filepath.IsAbs(basePath) {
 		return fmt.Errorf("base path [%s] is not absolute", basePath)
 	}
