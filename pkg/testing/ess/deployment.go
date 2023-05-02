@@ -290,7 +290,7 @@ const createDeploymentRequestTemplate = `
             }
           ],
           "elasticsearch": {
-            "version": "8.8.0",
+            "version": "{{ .Version }}",
             "enabled_built_in_plugins": []
           },
           "deployment_template": {
@@ -317,7 +317,7 @@ const createDeploymentRequestTemplate = `
             }
           ],
           "kibana": {
-            "version": "8.8.0"
+            "version": "{{ .Version }}"
           }
         },
         "ref_id": "main-kibana"
