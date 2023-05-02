@@ -9,7 +9,10 @@ package cmd
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 func TestInstallPath(t *testing.T) {
@@ -22,6 +25,42 @@ func TestInstallPath(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			p := installPath(basePath)
 			require.Equal(t, basePath+`\Elastic\Agent`, p)
+		})
+	}
+}
+
+func TestInvalidBasePath(t *testing.T) {
+	tests := map[string]struct {
+		basePath      string
+		expectedError string
+	}{
+		"relative_path_1": {
+			basePath:      `relative\path`,
+			expectedError: `base path [relative\path] is not absolute`,
+		},
+		"relative_path_2": {
+			basePath:      `.\relative\path`,
+			expectedError: `base path [.\relative\path] is not absolute`,
+		},
+		"empty_path": {
+			basePath:      "",
+			expectedError: `base path [] is not absolute`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			streams := cli.NewIOStreams()
+			cmd := cobra.Command{}
+			cmd.Flags().String(flagInstallBasePath, test.basePath, "")
+
+			err := installCmd(streams, &cmd)
+
+			if test.expectedError == "" {
+				require.NoError(t, err)
+			} else {
+				require.Equal(t, test.expectedError, err.Error())
+			}
 		})
 	}
 }
