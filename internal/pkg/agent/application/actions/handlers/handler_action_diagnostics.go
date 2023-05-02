@@ -12,15 +12,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"golang.org/x/time/rate"
 )
@@ -36,22 +35,40 @@ type Uploader interface {
 	UploadDiagnostics(context.Context, string, string, int64, io.Reader) (string, error)
 }
 
+// diagnosticsProvider abstracts the source of the diagnostic data
+type diagnosticsProvider interface {
+	DiagnosticHooks() diagnostics.Hooks
+	PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+}
+
+// abstractLogger represents a logger implementation
+type abstractLogger interface {
+	Debug(args ...interface{})
+	Debugf(template string, args ...interface{})
+	Debugw(msg string, keysAndValues ...interface{})
+	Infof(template string, args ...interface{})
+	Warn(args ...interface{})
+	Warnw(msg string, keysAndValues ...interface{})
+	Errorf(template string, args ...interface{})
+	Errorw(msg string, keysAndValues ...interface{})
+}
+
 // Diagnostics is the handler to process Diagnostics actions.
 // When a Diagnostics action is received a full diagnostics bundle is taken and uploaded to fleet-server.
 type Diagnostics struct {
-	log      *logger.Logger
-	coord    *coordinator.Coordinator
-	limiter  *rate.Limiter
-	uploader Uploader
+	log          abstractLogger
+	diagProvider diagnosticsProvider
+	limiter      *rate.Limiter
+	uploader     Uploader
 }
 
 // NewDiagnostics returns a new Diagnostics handler.
-func NewDiagnostics(log *logger.Logger, coord *coordinator.Coordinator, cfg config.Limit, uploader Uploader) *Diagnostics {
+func NewDiagnostics(log abstractLogger, coord diagnosticsProvider, cfg config.Limit, uploader Uploader) *Diagnostics {
 	return &Diagnostics{
-		log:      log,
-		coord:    coord,
-		limiter:  rate.NewLimiter(rate.Every(cfg.Interval), cfg.Burst),
-		uploader: uploader,
+		log:          log,
+		diagProvider: coord,
+		limiter:      rate.NewLimiter(rate.Every(cfg.Interval), cfg.Burst),
+		uploader:     uploader,
 	}
 }
 
@@ -77,16 +94,28 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic detected: %v", r)
 			action.Err = err
-			h.log.Errorw("diagnostics handler paniced", "err", err)
+			h.log.Errorw("diagnostics handler panicked", "err", err)
 		}
 	}()
 	defer func() {
-		ack.Ack(ctx, action) //nolint:errcheck // no path for a failed ack
-		ack.Commit(ctx)      //nolint:errcheck //no path for failing a commit
+		err := ack.Ack(ctx, action)
+		if err != nil {
+			h.log.Errorw("failed to ack diagnostics action",
+				"err", err,
+				"action", action)
+		}
+		err = ack.Commit(ctx)
+		if err != nil {
+			h.log.Errorw("failed to commit diagnostics action",
+				"err", err,
+				"action", action)
+
+		}
 	}()
 
 	if !h.limiter.Allow() {
 		action.Err = ErrRateLimit
+		h.log.Infof("diagnostics action handler rate limited: %v", ErrRateLimit)
 		return
 	}
 
@@ -94,6 +123,9 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	aDiag, err := h.runHooks(ctx)
 	if err != nil {
 		action.Err = err
+		h.log.Errorw("diagnostics action handler failed to run diagnostics hooks",
+			"err", err,
+			"action", action)
 		return
 	}
 	h.log.Debug("Gathering unit diagnostics.")
@@ -115,6 +147,11 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 		}()
 		err := diagnostics.ZipArchive(&wBuf, &b, aDiag, uDiag)
 		if err != nil {
+			h.log.Errorw(
+				"diagnostics action handler failed generate zip archive",
+				"err", err,
+				"action", action,
+			)
 			action.Err = err
 			return
 		}
@@ -132,19 +169,25 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	action.Err = err
 	action.UploadID = uploadID
 	if err != nil {
+		h.log.Errorw(
+			"diagnostics action handler failed to upload diagnostics",
+			"err", err,
+			"action", action)
 		return
 	}
-	h.log.Debugf("Diagnostics action '%+v' complete.", action)
+	h.log.Debugw("Diagnostics action complete.", "action", action, "elapsed", time.Since(ts))
 }
 
 // runHooks runs the agent diagnostics hooks.
 func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResult, error) {
-	hooks := append(h.coord.DiagnosticHooks(), diagnostics.GlobalHooks()...)
+	hooks := append(h.diagProvider.DiagnosticHooks(), diagnostics.GlobalHooks()...)
 	diags := make([]client.DiagnosticFileResult, 0, len(hooks))
 	for _, hook := range hooks {
 		if ctx.Err() != nil {
 			return diags, ctx.Err()
 		}
+		h.log.Debugw("Executing hook", "hook", hook.Name, "filename", hook.Filename)
+		startTime := time.Now()
 		diags = append(diags, client.DiagnosticFileResult{
 			Name:        hook.Name,
 			Filename:    hook.Filename,
@@ -153,6 +196,7 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 			Content:     hook.Hook(ctx),
 			Generated:   time.Now().UTC(),
 		})
+		h.log.Debugw("Hook execution complete", "hook", hook.Name, "filename", hook.Filename, "elapsed", time.Since(startTime))
 	}
 	return diags, nil
 }
@@ -160,7 +204,9 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 // diagUnits gathers diagnostics from units.
 func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResult {
 	uDiag := make([]client.DiagnosticUnitResult, 0)
-	rr := h.coord.PerformDiagnostics(ctx)
+	h.log.Debug("Performing unit diagnostics")
+	rr := h.diagProvider.PerformDiagnostics(ctx)
+	h.log.Debug("Collecting results of unit diagnostics")
 	for _, r := range rr {
 		diag := client.DiagnosticUnitResult{
 			ComponentID: r.Component.ID,
@@ -185,6 +231,7 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 		}
 		uDiag = append(uDiag, diag)
 	}
+	h.log.Debug("Unit diagnostics complete")
 	return uDiag
 }
 
