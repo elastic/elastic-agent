@@ -30,7 +30,6 @@ func TestInstallPath(t *testing.T) {
 }
 
 func TestInvalidBasePath(t *testing.T) {
-	t.Skip("reverting feature; see https://github.com/elastic/elastic-agent/pull/2592")
 	tests := map[string]struct {
 		basePath      string
 		expectedError string
