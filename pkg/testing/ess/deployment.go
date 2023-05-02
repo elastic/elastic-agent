@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type CreateDeploymentRequest struct {
@@ -224,6 +225,42 @@ func (c *Client) DeploymentStatus(ctx context.Context, deploymentID string) (*De
 	s.Overall = overallStatus(s.Elasticsearch, s.Kibana, s.IntegrationsServer)
 
 	return &s, nil
+}
+
+// DeploymentIsReady returns true when the deployment is ready, checking its status
+// every `tick` until `waitFor` duration.
+func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, waitFor, tick time.Duration) (bool, error) {
+	timer := time.NewTimer(waitFor)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	statusCh := make(chan DeploymentStatus, 1)
+	errCh := make(chan error)
+
+	for tick := ticker.C; ; {
+		select {
+		case <-timer.C:
+			return false, nil
+		case <-tick:
+			tick = nil
+			go func() {
+				status, err := c.DeploymentStatus(ctx, deploymentID)
+				if err != nil {
+					errCh <- err
+				}
+				statusCh <- status.Overall
+			}()
+		case status := <-statusCh:
+			if status == DeploymentStatusStarted {
+				return true, nil
+			}
+			tick = ticker.C
+		case err := <-errCh:
+			return false, err
+		}
+	}
 }
 
 func (c *Client) getDeployment(ctx context.Context, deploymentID string) (*http.Response, error) {
