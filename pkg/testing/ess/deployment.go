@@ -50,7 +50,10 @@ type DeploymentStatus string
 
 func (d *DeploymentStatus) UnmarshalJSON(data []byte) error {
 	var status string
-	json.Unmarshal(data, &status)
+	if err := json.Unmarshal(data, &status); err != nil {
+		return err
+	}
+
 	switch status {
 	case string(DeploymentStatusInitializing), string(DeploymentStatusReconfiguring), string(DeploymentStatusStarted):
 		*d = DeploymentStatus(status)
