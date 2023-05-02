@@ -1,38 +1,35 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package define
 
 import (
-	"errors"
-	"fmt"
-	"os"
-	"sync"
 	"testing"
 
-	"gopkg.in/yaml.v2"
+	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
-var setRequirements *Requirements
-var setRequirementsOnce sync.Once
-
-func Require(t *testing.T, req Requirements) {
-	setRequirementsOnce.Do(func() {
-		req, err := loadRequirements()
-		if err != nil {
-			panic(err)
-		}
-		setRequirements = &req
-	})
-
+// Require defines what this test requires for it to be run by the test runner.
+//
+// This must be defined as the first line of a test, otherwise the test runner.
+func Require(t *testing.T, req Requirements) *Info {
+	return defineAction(t, req)
 }
 
-func loadRequirements() (Requirements, error) {
-	raw := os.Getenv("AGENT_TEST_DEFINE_REQUIREMENTS")
-	if raw == "" {
-		return Requirements{}, errors.New("AGENT_TEST_DEFINE_REQUIREMENTS not defined")
-	}
-	var req Requirements
-	err := yaml.Unmarshal([]byte(raw), &req)
-	if err != nil {
-		return Requirements{}, fmt.Errorf("failed to unmarshal AGENT_TEST_DEFINE_REQUIREMENTS: %w", err)
-	}
-	return req, nil
+type Info struct {
+	// ESClient is the elasticsearch client to communicate with elasticsearch.
+	// This is only present if you say a cloud is required in the `define.Require`.
+	ESClient *elasticsearch.Client
+
+	// KibanaClient is the kibana client to communicate with kibana.
+	// This is only present if you say a cloud is required in the `define.Require`.
+	KibanaClient *kibana.Client
+
+	// Namespace should be used for isolating data and actions per test.
+	//
+	// This is unique to each test and instance combination so a test that need to
+	// read/write data to a data stream in elasticsearch do not collide.
+	Namespace string
 }

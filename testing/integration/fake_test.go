@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent/pkg/component"
-
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 var fakeComponent = atesting.UsableComponent{
@@ -170,9 +170,9 @@ func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
 }
 
 func TestFakeComponentIntegrationTestSuite(t *testing.T) {
-	//define.Require(t, define.Requirements{
-	//	Local: true,
-	//})
+	define.Require(t, define.Requirements{
+		Local: true,
+	})
 	suite.Run(t, new(FakeComponentIntegrationTestSuite))
 }
 
