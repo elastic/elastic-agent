@@ -72,13 +72,9 @@ spec:
             runAsUser: 0
           resources:
             limits:
-              memory: 900Mi
-              ephemeral-storage: "2Gi"
-            requests:
               #cpu: 200m # Keep this commented. We dont set the cpu limit to avoid scheduling problems of agent in autopilot scenarios
               memory: 700Mi
               ephemeral-storage: "500Mi"
-               
           volumeMounts:
             - name: varlog
               mountPath: /var/log
