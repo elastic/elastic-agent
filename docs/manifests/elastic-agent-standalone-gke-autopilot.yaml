@@ -386,7 +386,7 @@ spec:
               memory: 500Mi
               ephemeral-storage: "4Gi"
             requests:
-              # cpu: 200m # Keep this commented. We dont set the cpu limit to avoid scheduling problems of agent in autopilot scenarioss
+              # cpu: 200m # Keep this commented. We dont set the cpu limit to avoid scheduling problems of agent in autopilot scenarios
               memory: 300Mi
               ephemeral-storage: "2Gi"
           volumeMounts:
