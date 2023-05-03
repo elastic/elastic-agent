@@ -102,8 +102,7 @@ func Test_runDispatcher(t *testing.T) {
 		},
 		interval: time.Second,
 	}, {
-		name:                "no gateway actions, dispatcher is flushed",
-		skipOnWindowsReason: "Flaky test: https://github.com/elastic/elastic-agent/issues/2585",
+		name: "no gateway actions, dispatcher is flushed",
 		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
 			gateway := &mockGateway{}
 			gateway.On("Actions").Return((<-chan []fleetapi.Action)(ch))
@@ -112,6 +111,7 @@ func Test_runDispatcher(t *testing.T) {
 		mockDispatcher: func() *mockDispatcher {
 			dispatcher := &mockDispatcher{}
 			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Once()
+			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Maybe() // allow a second call in case there are timing issues in the CI pipeline
 			return dispatcher
 		},
 		interval: time.Millisecond * 60,
