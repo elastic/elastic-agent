@@ -232,26 +232,24 @@ func (c *Client) DeploymentStatus(ctx context.Context, deploymentID string) (*De
 
 // DeploymentIsReady returns true when the deployment is ready, checking its status
 // every `tick` until `waitFor` duration.
-func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, waitFor, tick time.Duration) (bool, error) {
-	timer := time.NewTimer(waitFor)
-	defer timer.Stop()
-
+func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tick time.Duration) (bool, error) {
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
 	statusCh := make(chan DeploymentStatus, 1)
 	errCh := make(chan error)
 
-	for tick := ticker.C; ; {
+	for {
 		select {
-		case <-timer.C:
-			return false, nil
-		case <-tick:
-			tick = nil
+		case <-ctx.Done():
+			return false, ctx.Err()
+		case <-ticker.C:
+			statusCtx, _ := context.WithTimeout(ctx, tick)
 			go func() {
-				status, err := c.DeploymentStatus(ctx, deploymentID)
+				status, err := c.DeploymentStatus(statusCtx, deploymentID)
 				if err != nil {
 					errCh <- err
+					return
 				}
 				statusCh <- status.Overall
 			}()
@@ -259,7 +257,6 @@ func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, wai
 			if status == DeploymentStatusStarted {
 				return true, nil
 			}
-			tick = ticker.C
 		case err := <-errCh:
 			return false, err
 		}

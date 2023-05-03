@@ -39,7 +39,9 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	require.NotEmpty(t, resp.Password)
 
 	// Wait until deployment is started
-	isReady, err := client.DeploymentIsReady(context.Background(), resp.ID, 5*time.Minute, 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	isReady, err := client.DeploymentIsReady(ctx, resp.ID, 10*time.Second)
 	require.NoError(t, err)
 	require.True(t, isReady)
 
