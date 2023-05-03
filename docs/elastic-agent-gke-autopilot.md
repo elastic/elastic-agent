@@ -128,7 +128,7 @@ containers:
   value: "WmpQbUVJVUJnX0kE6aDg0OGVtNG1TTDJqWlM2VGp"
   ```
 
-2. [Elastic Agent Stanadlone Manifest]./manifests/elastic-agent-standalone-gke-autopilot.yaml)
+2. [Elastic Agent Stanadlone Manifest](./manifests/elastic-agent-standalone-gke-autopilot.yaml)
 
 - Set Container Image version of Elastic Agent
 
@@ -153,7 +153,9 @@ containers:
 - name: NODE_NAME
 ```
 
-5. **Step 5: Install Elastic Agent Manifest:**
+> **Note**: Depending on the size of your kubernetes cluster, users need to adjust the resource limits of your agent daemonset accordingly.
+
+1. **Step 5: Install Elastic Agent Manifest:**
 
 For example:
 
