@@ -71,6 +71,9 @@ spec:
           securityContext:
             runAsUser: 0
           resources:
+            requests:
+              memory: 700Mi
+              ephemeral-storage: "500Mi"
             limits:
               memory: 500Mi
               ephemeral-storage: "4Gi"
