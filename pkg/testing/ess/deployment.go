@@ -244,7 +244,8 @@ func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tic
 		case <-ctx.Done():
 			return false, ctx.Err()
 		case <-ticker.C:
-			statusCtx, _ := context.WithTimeout(ctx, tick)
+			statusCtx, statusCancel := context.WithTimeout(ctx, tick)
+			defer statusCancel()
 			go func() {
 				status, err := c.DeploymentStatus(statusCtx, deploymentID)
 				if err != nil {
