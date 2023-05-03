@@ -45,6 +45,12 @@ would like the Agent to operate.
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	addEnrollFlags(cmd)
 
+	// We are not supporting a custom base path, supplied via the `--base-path` CLI
+	// flag, just yet because we don't have Endpoint support for it yet. So we mark
+	// this flag as hidden.
+	// See also: https://github.com/elastic/elastic-agent/pull/2592
+	_ = cmd.Flags().MarkHidden(flagInstallBasePath)
+
 	return cmd
 }
 
