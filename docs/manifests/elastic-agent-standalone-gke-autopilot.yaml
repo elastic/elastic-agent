@@ -5,6 +5,16 @@ metadata:
   labels:
     name: elastic-agent
 ---
+# PriorityClass created for elastic agent daemonset. To allow elastic-agent pod scheduling in nodes
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: elastic-agent
+value: 1000000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Ensure that Elastic Agent Pods are always scheduled onto Nodes, by evicting other non-essential workloads."
+---
 # For more information refer https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
 apiVersion: v1
 kind: ConfigMap
@@ -343,6 +353,7 @@ spec:
       serviceAccountName: elastic-agent
       # hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      priorityClassName: elastic-agent
       containers:
         - name: elastic-agent
           image: docker.elastic.co/beats/elastic-agent:8.5.3
@@ -375,7 +386,7 @@ spec:
               memory: 500Mi
               ephemeral-storage: "4Gi"
             requests:
-              cpu: 200m
+              # cpu: 200m # Keep this commented. We dont set the cpu limit to avoid scheduling problems of agent in autopilot scenarioss
               memory: 300Mi
               ephemeral-storage: "2Gi"
           volumeMounts:

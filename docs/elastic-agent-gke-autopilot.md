@@ -19,7 +19,7 @@ The goal of this document is to assist users to Kubernetes Observability of Auto
   On the deployment overview page of your cloud setup, copy down the Elasticsearch Endpoint(ES_HOST).
   Username and password (ES_USERNAME, ES_PASSWORD) will be provided upon Elastic Cloud creation.
 
-## Folow below steps to configure GKE with Elastic Agent:
+## Folow below steps to configure GKE with Elastic Agent
 
 1. **Step 1: Initialise and login to your Google project**
 
@@ -153,7 +153,9 @@ containers:
 - name: NODE_NAME
 ```
 
-> **Note**: Depending on the size of your kubernetes cluster, users need to adjust the resource limits of your agent daemonset accordingly.
+> **1. Note**: Depending on the size of your kubernetes cluster, users need to adjust the resource limits of your agent daemonset accordingly.
+> **2. Note**: Access to kube-system namespace is not allowed in autopilot clusters. That said, provided manifests create and make use of a new created namespace `elastic-agent`.
+> **3. Note**: Provided manifests make use of PriorityClass in order to allow elastic-agent to be scheduled before other application pods.
 
 1. **Step 5: Install Elastic Agent Manifest:**
 
