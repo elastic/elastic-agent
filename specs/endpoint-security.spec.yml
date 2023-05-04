@@ -12,7 +12,7 @@ inputs:
       - logstash
     runtime:
       preventions:
-        - condition: ${runtime.user.root} == false
+        - condition: ${user.root} == false
           message: "Elastic Agent must be running as root"
         - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
           message: "No support for RHEL7 on arm64"
@@ -64,7 +64,7 @@ inputs:
       - logstash
     runtime:
       preventions:
-        - condition: ${runtime.user.root} == false
+        - condition: ${user.root} == false
           message: "Elastic Agent must be running as Administrator or SYSTEM"
     service:
       cport: 6788
