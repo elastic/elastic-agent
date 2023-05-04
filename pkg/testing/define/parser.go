@@ -13,28 +13,6 @@ import (
 	"strings"
 )
 
-// Test is a found test with its requirements.
-type Test struct {
-	Name         string
-	Requirements Requirements
-}
-
-// File is a file and its set of tests it contains.
-type File struct {
-	// Name of the file.
-	Name string
-	// Tests are the tests contained in the file.
-	Tests []Test
-}
-
-// Package is a package of files with tests.
-type Package struct {
-	// Name of the package.
-	Name string
-	// File is the name of the file.
-	Files []File
-}
-
 // ValidateDir parses a directory and ensures that every test first function call is to `define.Require`.
 func ValidateDir(dir string) error {
 	fset := token.NewFileSet()
@@ -60,21 +38,23 @@ func ValidateDir(dir string) error {
 }
 
 func validateRequireFromFunc(fn *ast.FuncDecl) bool {
-	for _, stmt := range fn.Body.List {
-		switch st := stmt.(type) {
-		case *ast.AssignStmt:
-			switch rh := st.Rhs[0].(type) {
-			case *ast.CallExpr:
-				return validateRequireFromCall(rh)
-			}
-		case *ast.ExprStmt:
-			switch xt := st.X.(type) {
-			case *ast.CallExpr:
-				return validateRequireFromCall(xt)
-			}
-		}
-		// must be the first call
+	if len(fn.Body.List) < 1 {
 		return false
+	}
+	stmt := fn.Body.List[0]
+	switch st := stmt.(type) {
+	// info := define.Require(...)
+	case *ast.AssignStmt:
+		switch rh := st.Rhs[0].(type) {
+		case *ast.CallExpr:
+			return validateRequireFromCall(rh)
+		}
+	// define.Require(...)
+	case *ast.ExprStmt:
+		switch xt := st.X.(type) {
+		case *ast.CallExpr:
+			return validateRequireFromCall(xt)
+		}
 	}
 	return false
 }

@@ -51,6 +51,26 @@ func defineAction(t *testing.T, req Requirements) *Info {
 		t.Skip("platform, architecture, version, and distro not supported by test")
 		return nil
 	}
+	// use a default local namespace
+	namespace, err := getNamespace(t, "local")
+	if err != nil {
+		panic(err)
+	}
+	info := &Info{
+		Namespace: namespace,
+	}
+	if req.Stack != nil {
+		info.ESClient, err = getESClient()
+		if err != nil {
+			t.Skipf("test requires a stack but failed to create a valid client to elasticsearch: %s", err)
+			return nil
+		}
+		info.KibanaClient, err = getKibanaClient()
+		if err != nil {
+			t.Skipf("test requires a stack but failed to create a valid client to kibana: %s", err)
+			return nil
+		}
+	}
 	return nil
 }
 

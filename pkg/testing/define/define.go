@@ -5,6 +5,8 @@
 package define
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -22,7 +24,8 @@ import (
 
 // Require defines what this test requires for it to be run by the test runner.
 //
-// This must be defined as the first line of a test, otherwise the test runner.
+// This must be defined as the first line of a test, or `ValidateDir` will fail
+// and the test runner will not be able to determine the requirements for a test.
 func Require(t *testing.T, req Requirements) *Info {
 	return defineAction(t, req)
 }
@@ -86,4 +89,63 @@ func findProjectRoot() (string, error) {
 			return "", fmt.Errorf("unable to find golang root directory from caller path %s", caller)
 		}
 	}
+}
+
+// getNamespace is a general namespace that the test can use that will ensure that it
+// is unique and won't collide with other tests (even the same test from a different batch).
+//
+// this function uses a sha256 of the prefix, package and test name, to ensure that the
+// length of the namespace is not over the 100 byte limit from Fleet
+// see: https://www.elastic.co/guide/en/fleet/current/data-streams.html#data-streams-naming-scheme
+func getNamespace(t *testing.T, defaultNamespace string) (string, error) {
+	prefix := os.Getenv("TEST_DEFINE_PREFIX")
+	if prefix == "" {
+		prefix = defaultNamespace
+		if prefix == "" {
+			return "", errors.New("TEST_DEFINE_PREFIX must be defined by the test runner")
+		}
+	}
+	name := fmt.Sprintf("%s-%s", prefix, t.Name())
+	hasher := sha256.New()
+	hasher.Write([]byte(name))
+	return base64.URLEncoding.EncodeToString(hasher.Sum(nil)), nil
+}
+
+// getESClient creates the elasticsearch client from the information passed from the test runner.
+func getESClient() (*elasticsearch.Client, error) {
+	esHost := os.Getenv("ELASTICSEARCH_HOST")
+	esUser := os.Getenv("ELASTICSEARCH_USERNAME")
+	esPass := os.Getenv("ELASTICSEARCH_PASSWORD")
+	if esHost == "" || esUser == "" || esPass == "" {
+		return nil, errors.New("ELASTICSEARCH_* must be defined by the test runner")
+	}
+	c, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{esHost},
+		Username:  esUser,
+		Password:  esPass,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create elasticsearch client: %w", err)
+	}
+	return c, nil
+}
+
+// getKibanaClient creates the kibana client from the information passed from the test runner.
+func getKibanaClient() (*kibana.Client, error) {
+	kibanaHost := os.Getenv("KIBANA_HOST")
+	kibanaUser := os.Getenv("KIBANA_USERNAME")
+	kibanaPass := os.Getenv("KIBANA_PASSWORD")
+	if kibanaHost == "" || kibanaUser == "" || kibanaPass == "" {
+		return nil, errors.New("KIBANA_* must be defined by the test runner")
+	}
+	c, err := kibana.NewClientWithConfigDefault(&kibana.ClientConfig{
+		Host:          kibanaHost,
+		Username:      kibanaUser,
+		Password:      kibanaPass,
+		IgnoreVersion: true,
+	}, 0, "Elastic-Agent-Test-Define", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kibana client: %w", err)
+	}
+	return c, nil
 }

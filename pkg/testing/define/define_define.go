@@ -17,8 +17,8 @@ func defineAction(t *testing.T, req Requirements) *Info {
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
 	}
-	// skip recording the requirements for the test
-	// this is picked up by the pre-processor to determine where the test will be executed
+	// use skip to recode the requirements for the test
+	// this is picked up by the `DetermineBatches` function to determine where the test will be executed
 	data, err := json.Marshal(req)
 	if err != nil {
 		panic(fmt.Sprintf("test %s failed to marshal requirements: %s", t.Name(), err))

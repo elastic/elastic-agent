@@ -43,8 +43,8 @@ type Batch struct {
 	// OS defines the operating systems this test batch needs.
 	OS OS `json:"os"`
 
-	// Cloud defines the cloud instance required for this batch.
-	Cloud *Cloud `json:"cloud,omitempty"`
+	// Stack defines the stack required for this batch.
+	Stack *Stack `json:"stack,omitempty"`
 
 	// Isolate defines that this batch is isolated to a single test.
 	Isolate bool `json:"isolate"`
@@ -152,7 +152,7 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 		var batch Batch
 		batchIdx := -1
 		if !req.Isolate {
-			batchIdx = findBatchIdx(batches, o, req.Cloud)
+			batchIdx = findBatchIdx(batches, o, req.Stack)
 		}
 		if batchIdx == -1 {
 			// new batch required
@@ -172,9 +172,9 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 		if o.Version != "" {
 			batch.OS.Version = o.Version
 		}
-		if req.Cloud != nil && batch.Cloud == nil {
-			// assign the cloud to this batch
-			batch.Cloud = copyCloud(req.Cloud)
+		if req.Stack != nil && batch.Stack == nil {
+			// assign the stack to this batch
+			batch.Stack = copyStack(req.Stack)
 		}
 		if req.Sudo {
 			batch.SudoTests = appendPackageTest(batch.SudoTests, tar.Package, tar.Test)
@@ -201,7 +201,7 @@ func appendPackageTest(tests []BatchPackageTests, pkg string, name string) []Bat
 	return tests
 }
 
-func findBatchIdx(batches []Batch, os OS, cloud *Cloud) int {
+func findBatchIdx(batches []Batch, os OS, stack *Stack) int {
 	for i, b := range batches {
 		if b.Isolate {
 			// never add to an isolate batch
@@ -223,15 +223,15 @@ func findBatchIdx(batches []Batch, os OS, cloud *Cloud) int {
 				continue
 			}
 		}
-		if cloud == nil {
+		if stack == nil {
 			// don't care if the batch has a cloud or not
 			return i
 		}
-		if b.Cloud == nil {
+		if b.Stack == nil {
 			// need cloud, but batch doesn't have cloud calling code can set it
 			return i
 		}
-		if b.Cloud.Version == cloud.Version {
+		if b.Stack.Version == stack.Version {
 			// same cloud version; compatible
 			return i
 		}
@@ -239,11 +239,11 @@ func findBatchIdx(batches []Batch, os OS, cloud *Cloud) int {
 	return -1
 }
 
-func copyCloud(cloud *Cloud) *Cloud {
-	var c Cloud
-	if cloud != nil {
-		c = *cloud
-		return &c
+func copyStack(stack *Stack) *Stack {
+	var s Stack
+	if stack != nil {
+		s = *stack
+		return &s
 	}
 	return nil
 }

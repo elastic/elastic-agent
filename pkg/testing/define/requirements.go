@@ -71,9 +71,9 @@ func (o OS) Validate() error {
 	return nil
 }
 
-// Cloud defines that a cloud instance is required.
-type Cloud struct {
-	// Version defines a specific cloud version to create for this test.
+// Stack defines the stack required for the test.
+type Stack struct {
+	// Version defines a specific stack version to create for this test.
 	//
 	// In the case that no version is provided the same version being used for
 	// the current test execution is used.
@@ -87,11 +87,14 @@ type Requirements struct {
 	// combination.
 	OS []OS `json:"os,omitempty"`
 
-	// Cloud defines that a cloud instance is required
-	Cloud *Cloud `json:"cloud,omitempty"`
+	// Stack defines the stack required for the test.
+	Stack *Stack `json:"stack,omitempty"`
 
 	// Local defines if this test can safely be performed on a local development machine.
 	// If not set then the test will not be performed when local only testing is performed.
+	//
+	// This doesn't mean this test can only run locally. It will still run on defined OS's
+	// when a full test run is performed.
 	Local bool `json:"local"`
 
 	// Isolate defines that this test must be isolated to its own dedicated VM and the test
@@ -109,12 +112,6 @@ func (r Requirements) Validate() error {
 		if err := o.Validate(); err != nil {
 			return fmt.Errorf("invalid os %d: %w", i, err)
 		}
-	}
-	if r.Local && r.Cloud != nil {
-		// this limitation is only added because to run a local subset of tests we don't
-		// want to require a cloud instance to be setup (this allows the local set of
-		// integration tests to be a simple execution of go test with the --tags=local)
-		return errors.New("test cannot support local and require a cloud instance")
 	}
 	return nil
 }
