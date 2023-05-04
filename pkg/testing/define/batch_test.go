@@ -91,7 +91,7 @@ func TestBatch(t *testing.T) {
 				Version: "20.04",
 				Distro:  "ubuntu",
 			},
-			Cloud: &Cloud{
+			Stack: &Stack{
 				Version: "8.8.0",
 			},
 			Tests: []BatchPackageTests{
