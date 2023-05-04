@@ -91,6 +91,14 @@ func WithCmdOptions(cmdOpts ...CmdOption) StartOption {
 	}
 }
 
+// WithWorkDir sets the cmd working directory
+func WithWorkDir(wd string) CmdOption {
+	return func(c *exec.Cmd) error {
+		c.Dir = wd
+		return nil
+	}
+}
+
 // Kill kills the process.
 func (i *Info) Kill() error {
 	return killCmd(i.Process)

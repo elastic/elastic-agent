@@ -6,6 +6,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"gopkg.in/yaml.v2"
@@ -25,6 +26,10 @@ const (
 	endpoint      = "endpoint"
 	apmServer     = "apm"
 )
+
+// ErrFleetServerNotBootstrapped set on fleet-server component and units when the Elastic Agent has not been
+// bootstrapped with the required command-line arguments for the Elastic Agent to be able to run the Fleet Server.
+var ErrFleetServerNotBootstrapped = errors.New("elastic-agent must be bootstrapped with a fleet-server; re-install or re-enroll with --fleet-server-* options")
 
 // injectFleetServerInput is the base configuration that is used plus the FleetServerComponentModifier that adjusts
 // the components before sending them to the runtime manager.
@@ -48,35 +53,45 @@ var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
 func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) coordinator.ComponentsModifier {
 	return func(comps []component.Component, _ map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
-			if comp.InputSpec != nil && comp.InputSpec.InputType == fleetServer {
-				for j, unit := range comp.Units {
-					if unit.Type == client.UnitTypeOutput && unit.Config.Type == elasticsearch {
-						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &serverCfg.Output.Elasticsearch)
-						if err != nil {
-							return nil, err
-						}
-						fixOutputMap(unitCfgMap)
-						unitCfg, err := component.ExpectedConfig(unitCfgMap)
-						if err != nil {
-							return nil, err
-						}
-						unit.Config = unitCfg
-					} else if unit.Type == client.UnitTypeInput && unit.Config.Type == fleetServer {
-						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &inputFleetServer{
-							Policy: serverCfg.Policy,
-							Server: serverCfg,
-						})
-						if err != nil {
-							return nil, err
-						}
-						fixInputMap(unitCfgMap)
-						unitCfg, err := component.ExpectedConfig(unitCfgMap)
-						if err != nil {
-							return nil, err
-						}
-						unit.Config = unitCfg
+			if comp.InputSpec != nil && comp.InputSpec.InputType == fleetServer && comp.Err == nil {
+				if serverCfg == nil {
+					// Elastic Agent was bootstrapped without a Fleet Server so enabling a Fleet Server is not
+					// supported. The Elastic Agent needs to be re-enrolled to run a Fleet Server.
+					comp.Err = ErrFleetServerNotBootstrapped
+					for j, unit := range comp.Units {
+						unit.Err = ErrFleetServerNotBootstrapped
+						comp.Units[j] = unit
 					}
-					comp.Units[j] = unit
+				} else {
+					for j, unit := range comp.Units {
+						if unit.Type == client.UnitTypeOutput && unit.Config.Type == elasticsearch {
+							unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &serverCfg.Output.Elasticsearch)
+							if err != nil {
+								return nil, err
+							}
+							fixOutputMap(unitCfgMap)
+							unitCfg, err := component.ExpectedConfig(unitCfgMap)
+							if err != nil {
+								return nil, err
+							}
+							unit.Config = unitCfg
+						} else if unit.Type == client.UnitTypeInput && unit.Config.Type == fleetServer {
+							unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &inputFleetServer{
+								Policy: serverCfg.Policy,
+								Server: serverCfg,
+							})
+							if err != nil {
+								return nil, err
+							}
+							fixInputMap(unitCfgMap)
+							unitCfg, err := component.ExpectedConfig(unitCfgMap)
+							if err != nil {
+								return nil, err
+							}
+							unit.Config = unitCfg
+						}
+						comp.Units[j] = unit
+					}
 				}
 			}
 			comps[i] = comp

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,6 +41,9 @@ type Fixture struct {
 	connectTimout   time.Duration
 
 	workDir string
+
+	c   client.Client
+	cMx sync.RWMutex
 }
 
 type fixtureOpt func(s *Fixture)
@@ -114,6 +118,13 @@ func NewFixture(t *testing.T, version string, opts ...fixtureOpt) (*Fixture, err
 	return f, nil
 }
 
+// Client returns the Elastic Agent communication client.
+func (f *Fixture) Client() client.Client {
+	f.cMx.RLock()
+	defer f.cMx.RUnlock()
+	return f.c
+}
+
 // Prepare prepares the Elastic Agent for usage.
 //
 // This must be called before `Run` or `Install` can be called. `components` defines the components that you want to
@@ -164,14 +175,16 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	return nil
 }
 
+// Run runs the Elastic Agent.
+//
+// If `states` are provided then the Elastic Agent runs until each state has been reached. Once reached the
+// Elastic Agent is stopped. If at any time the Elastic Agent logs an error log and the Fixture is not started
+// with `WithAllowErrors()` then `Run` will exit early and return the logged error.
+//
+// If no `states` are provided then the Elastic Agent runs until the context is cancelled.
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	binary := filepath.Join(f.workDir, "elastic-agent")
-	if f.operatingSystem == "windows" {
-		binary += ".exe"
-	}
 
 	var err error
 	var sm *stateMachine
@@ -195,7 +208,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	}
 
 	proc, err := process.Start(
-		binary,
+		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs([]string{"run", "-e", "--disable-encrypted-store", "--testing-mode"}),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
@@ -208,6 +221,9 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 	}
 
 	c := client.New(client.WithAddress(cAddr))
+	f.setClient(c)
+	defer f.setClient(nil)
+
 	stateCh, stateErrCh := watchState(ctx, c, f.connectTimout)
 	stopping := false
 	for {
@@ -239,26 +255,52 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 				return fmt.Errorf("elastic-agent client received unexpected error: %w", err)
 			}
 		case state := <-stateCh:
-			cfg, cont, err := sm.next(state)
-			if err != nil {
-				killProc()
-				return fmt.Errorf("state management failed with unexpected error: %w", err)
-			}
-			if !cont {
-				if !stopping {
-					// trigger the stop
-					stopping = true
-					_ = proc.Stop()
-				}
-			} else if cfg != "" {
-				err := performConfigure(ctx, c, cfg, 3*time.Second)
+			if sm != nil {
+				cfg, cont, err := sm.next(state)
 				if err != nil {
 					killProc()
-					return err
+					return fmt.Errorf("state management failed with unexpected error: %w", err)
+				}
+				if !cont {
+					if !stopping {
+						// trigger the stop
+						stopping = true
+						_ = proc.Stop()
+					}
+				} else if cfg != "" {
+					err := performConfigure(ctx, c, cfg, 3*time.Second)
+					if err != nil {
+						killProc()
+						return err
+					}
 				}
 			}
 		}
 	}
+}
+
+// Exec provides a way of performing subcommand on the prepared Elastic Agent binary.
+func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// #nosec G204 -- Not so many ways to support variadic arguments to the elastic-agent command :(
+	cmd := exec.CommandContext(ctx, f.binaryPath(), args...)
+	for _, o := range opts {
+		if err := o(cmd); err != nil {
+			return nil, err
+		}
+	}
+
+	return cmd.CombinedOutput()
+}
+
+func (f *Fixture) binaryPath() string {
+	binary := filepath.Join(f.workDir, "elastic-agent")
+	if f.operatingSystem == "windows" {
+		binary += ".exe"
+	}
+	return binary
 }
 
 func (f *Fixture) fetch(ctx context.Context) (string, error) {
@@ -406,6 +448,12 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 	}
 
 	return nil
+}
+
+func (f *Fixture) setClient(c client.Client) {
+	f.cMx.Lock()
+	defer f.cMx.Unlock()
+	f.c = c
 }
 
 // validateComponents ensures that the provided UsableComponent's are valid.

@@ -12,9 +12,7 @@ inputs:
     runtime:
       preventions:
         - condition: ${runtime.user.root} == false
-          message: "Elastic agent must be running as root"
-    command:
-      args: &args
-        - "run"
-        - "--fleet-managed"
-        - "--process-managed"
+          message: "Elastic Agent must be running as root"
+    command: &args
+      args:
+        - "--agent-managed"

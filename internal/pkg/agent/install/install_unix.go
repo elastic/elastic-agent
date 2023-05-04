@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !windows
-// +build !windows
 
 package install
 
@@ -16,7 +15,7 @@ import (
 )
 
 // postInstall performs post installation for unix-based systems.
-func postInstall() error {
+func postInstall(topPath string) error {
 	// do nothing
 	return nil
 }
@@ -25,6 +24,8 @@ func checkPackageInstall() bool {
 	if runtime.GOOS != "linux" {
 		return false
 	}
+
+	binaryName := paths.BinaryName
 
 	// NOTE searching for english words might not be a great idea as far as portability goes.
 	// list all installed packages then search for paths.BinaryName?
@@ -35,7 +36,7 @@ func checkPackageInstall() bool {
 	// If the package has been removed (but not pruged) status starts with "deinstall"
 	// If purged or never installed, rc is 1
 	if _, err := exec.Command("which", "dpkg-query").Output(); err == nil {
-		out, err := exec.Command("dpkg-query", "-W", "-f", "${Status}", paths.BinaryName).Output()
+		out, err := exec.Command("dpkg-query", "-W", "-f", "${Status}", binaryName).Output()
 		if err != nil {
 			return false
 		}
@@ -49,7 +50,7 @@ func checkPackageInstall() bool {
 	// if package has been installed the query will returns the list of associated files.
 	// otherwise if uninstalled, or has never been installled status ends with "not installed"
 	if _, err := exec.Command("which", "rpm").Output(); err == nil {
-		out, err := exec.Command("rpm", "-q", paths.BinaryName, "--state").Output()
+		out, err := exec.Command("rpm", "-q", binaryName, "--state").Output()
 		if err != nil {
 			return false
 		}

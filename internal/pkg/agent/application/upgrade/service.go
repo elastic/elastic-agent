@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !darwin && !windows
-// +build !darwin,!windows
 
 package upgrade
 
@@ -43,7 +42,9 @@ type pidProvider interface {
 // Init initializes os dependent properties.
 func (ch *CrashChecker) Init(ctx context.Context, _ *logger.Logger) error {
 	pp := relevantPidProvider()
-	pp.Init()
+	if err := pp.Init(); err != nil {
+		return fmt.Errorf("unable to initialize relevant PID provider: %w", err)
+	}
 
 	ch.sc = pp
 
@@ -134,7 +135,8 @@ func (p *sysvPidProvider) PID(ctx context.Context) (int, error) {
 		return 0, errors.New(fmt.Sprintf("'%v' is not running", paths.ServiceName))
 	}
 
-	pidofLine, err := exec.Command("pidof", filepath.Join(paths.InstallPath, paths.BinaryName)).Output()
+	cmdArgs := filepath.Join(paths.Top(), paths.BinaryName)
+	pidofLine, err := exec.Command("pidof", cmdArgs).Output()
 	if err != nil {
 		return 0, errors.New(fmt.Sprintf("PID not found for'%v': %v", paths.ServiceName, err))
 	}
@@ -154,7 +156,7 @@ type dbusPidProvider struct {
 }
 
 func (p *dbusPidProvider) Init() error {
-	dbusConn, err := dbus.New()
+	dbusConn, err := dbus.NewWithContext(context.Background())
 	if err != nil {
 		return errors.New("failed to create dbus connection", err)
 	}
@@ -175,7 +177,7 @@ func (p *dbusPidProvider) PID(ctx context.Context) (int, error) {
 		sn += ".service"
 	}
 
-	prop, err := p.dbusConn.GetServiceProperty(sn, "MainPID")
+	prop, err := p.dbusConn.GetServicePropertyContext(ctx, sn, "MainPID")
 	if err != nil {
 		return 0, errors.New("failed to read service", err)
 	}
@@ -237,7 +239,9 @@ func isSystemd() bool {
 		defer filerc.Close()
 
 		buf := new(bytes.Buffer)
-		buf.ReadFrom(filerc)
+		if _, err := buf.ReadFrom(filerc); err != nil {
+			return false
+		}
 		contents := buf.String()
 
 		if strings.Trim(contents, " \r\n") == "systemd" {

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/version"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -23,7 +24,7 @@ import (
 
 var fakeComponent = atesting.UsableComponent{
 	Name:       "fake",
-	BinaryPath: mustAbs(filepath.Join("..", "component", "fake", "component", osExt("component"))),
+	BinaryPath: mustAbs(filepath.Join("..", "..", "pkg", "component", "fake", "component", osExt("component"))),
 	Spec: &component.Spec{
 		Name:    "fake",
 		Version: 2,
@@ -51,7 +52,7 @@ var fakeComponent = atesting.UsableComponent{
 
 var fakeShipper = atesting.UsableComponent{
 	Name:       "fake-shipper",
-	BinaryPath: mustAbs(filepath.Join("..", "component", "fake", "shipper", osExt("shipper"))),
+	BinaryPath: mustAbs(filepath.Join("..", "..", "pkg", "component", "fake", "shipper", osExt("shipper"))),
 	Spec: &component.Spec{
 		Name:    "fake-shipper",
 		Version: 2,
@@ -77,7 +78,19 @@ var fakeShipper = atesting.UsableComponent{
 	},
 }
 
-var simpleConfig = `
+var simpleConfig1 = `
+outputs:
+  default:
+    type: fake-action-output
+    fake-shipper: {}
+inputs:
+  - id: fake
+    type: fake
+    state: 1
+    message: Configuring
+`
+
+var simpleConfig2 = `
 outputs:
   default:
     type: fake-action-output
@@ -96,7 +109,7 @@ type FakeComponentIntegrationTestSuite struct {
 
 func (s *FakeComponentIntegrationTestSuite) SetupSuite() {
 	l := atesting.LocalFetcher("../../build/distributions")
-	f, err := atesting.NewFixture(s.T(), "8.8.0", atesting.WithFetcher(l), atesting.WithLogOutput())
+	f, err := atesting.NewFixture(s.T(), version.GetDefaultVersion(), atesting.WithFetcher(l), atesting.WithLogOutput())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -111,7 +124,7 @@ func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
 	defer cancel()
 
 	err := s.f.Run(ctx, atesting.State{
-		Configure:  simpleConfig,
+		Configure:  simpleConfig1,
 		AgentState: atesting.NewClientState(client.Healthy),
 		Components: map[string]atesting.ComponentState{
 			"fake-default": {
@@ -121,6 +134,33 @@ func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
 						State: atesting.NewClientState(client.Healthy),
 					},
 					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: atesting.NewClientState(client.Configuring),
+					},
+				},
+			},
+		},
+	}, atesting.State{
+		Configure:  simpleConfig2,
+		AgentState: atesting.NewClientState(client.Healthy),
+		StrictComponents: map[string]atesting.ComponentState{
+			"fake-default": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+				},
+			},
+			"fake-shipper-default": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 				},

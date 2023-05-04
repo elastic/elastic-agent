@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/mocks"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
@@ -51,6 +52,7 @@ import (
 //go:generate mockery --dir ../../../core/composable/ --name FetchContextProvider
 
 var /*const*/ expectedDiagnosticHooks map[string]string = map[string]string{
+	"local-config":        "local-config.yaml",
 	"pre-config":          "pre-config.yaml",
 	"variables":           "variables.yaml",
 	"computed-config":     "computed-config.yaml",
@@ -218,7 +220,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 
 			ctx, cancelFunc := context.WithCancel(context.Background())
 			componentsUpdateChannel := make(chan runtime.ComponentComponentState)
-			subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, nil, componentsUpdateChannel)
+			subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, componentsUpdateChannel)
 			helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
 			helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
 
@@ -268,11 +270,19 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			t.Logf("Received diagnostics: %+v", diagHooks)
 			assert.NotEmpty(t, diagHooks)
 
+			hooksNames := make([]string, 0, len(diagHooks))
 			hooksMap := map[string]diagnostics.Hook{}
 			for i, h := range diagHooks {
+				hooksNames = append(hooksNames, h.Name)
 				hooksMap[h.Name] = diagHooks[i]
 			}
 
+			expectedNames := make([]string, 0, len(expectedDiagnosticHooks))
+			for n := range expectedDiagnosticHooks {
+				expectedNames = append(expectedNames, n)
+			}
+
+			require.ElementsMatch(t, expectedNames, hooksNames)
 			for hookName, diagFileName := range expectedDiagnosticHooks {
 				if !assert.Contains(t, hooksMap, hookName) {
 					continue // this iteration failed, no reason to do further tests, moving forward
@@ -486,8 +496,14 @@ func newCoordinatorTestHelper(t *testing.T, agentInfo *info.AgentInfo, specs com
 	log, err := logger.NewFromConfig("coordinator-test", loggerCfg, false)
 	require.NoError(t, err)
 
+	cfg := configuration.DefaultConfiguration()
+	cfg.Settings.DownloadConfig.InstallPath = "install"
+	cfg.Settings.DownloadConfig.TargetDirectory = "target"
+	cfg.Settings.LoggingConfig.Files.Path = "logs"
+
 	helper.coordinator = coordinator.New(
 		log,
+		cfg,
 		logp.InfoLevel,
 		agentInfo,
 		specs,
