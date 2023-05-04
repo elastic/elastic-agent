@@ -9,6 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
+	"github.com/elastic/elastic-agent-libs/kibana"
+
 	tools "github.com/elastic/elastic-agent/testing/e2e/tools"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +23,7 @@ type UpgradeElasticAgent struct {
 	suite.Suite
 	clusterConfigPath string
 	clusterConfig     tools.ClusterConfig
-	client            *tools.Client
+	client            *kibana.Client
 	agentVersion      string
 	agentBinPath      string
 }
@@ -38,15 +42,35 @@ func (s *UpgradeElasticAgent) SetupSuite() {
 	var err error
 	s.clusterConfig, err = tools.ReadConfig(s.clusterConfigPath)
 	require.Nil(s.T(), err, "Could not read cluster config")
-	s.client, err = tools.NewClient(&s.clusterConfig)
+
+	kibanaConfig := kibana.ClientConfig{
+		Host:     s.clusterConfig.KibanaConfig.Host,
+		Username: s.clusterConfig.KibanaConfig.User,
+		Password: s.clusterConfig.KibanaConfig.Password,
+	}
+	s.client, err = kibana.NewClientWithConfig(&kibanaConfig, "elastic-agent-e2e", "", "", "")
 	require.Nil(s.T(), err, "Could not create Kibana client")
 }
 
 func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
+	policyUUID := uuid.New().String()
 
-	policy, err := s.client.CreatePolicy(context.Background())
+	createPolicyReq := kibana.CreatePolicyRequest{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	policy, err := s.client.CreatePolicy(createPolicyReq)
 	require.Nil(s.T(), err, "Could not create policy")
-	enrollmentToken, err := s.client.CreateEnrollmentAPIKey(context.Background(), policy)
+
+	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policy.ID,
+	}
+	enrollmentToken, err := s.client.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
 	require.Nil(s.T(), err, "Could not create enrollment token")
 
 	err = tools.EnrollElasticAgent(s.T(), s.clusterConfig.FleetConfig.Url, enrollmentToken.APIKey, s.agentBinPath)
