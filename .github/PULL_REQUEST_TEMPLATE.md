@@ -20,6 +20,12 @@ Explain here the changes you made on the PR. Please explain the WHAT: patterns u
 Explain here the WHY, or the rationale/motivation for the changes.
 -->
 
+## What is the definition of done?
+
+<!-- Mandatory
+Explain here what are the conditions to validate this change
+-->
+
 ## Checklist
 
 <!-- Mandatory
@@ -35,6 +41,9 @@ List here all the items you have verified BEFORE sending this PR. Please DO NOT 
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] I have added an entry in `./changelog/fragments` using the [changelog tool](https://github.com/elastic/elastic-agent#changelog)
 - [ ] I have added an integration test or an E2E test
+- [ ] Does Endpoint team need to be informed of this change?
+- [ ] Does Profiling team need to be informed of this change?
+- [ ] Does Cloud defend team need to be informed of this change?
 
 ## Author's Checklist
 
