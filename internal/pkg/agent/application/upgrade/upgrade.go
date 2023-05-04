@@ -263,7 +263,7 @@ func copyRunDirectory(log *logger.Logger, newHash string) error {
 		return errors.New(err, "failed to create run directory")
 	}
 
-	err := copyDir(oldRunPath, newRunPath)
+	err := copyDir(log, oldRunPath, newRunPath, true)
 	if os.IsNotExist(err) {
 		// nothing to copy, operation ok
 		log.Debugw("Run directory not present", "old_run_path", oldRunPath)
@@ -279,7 +279,7 @@ func copyRunDirectory(log *logger.Logger, newHash string) error {
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.
 // this goes through runtime directory of agent and copies all the state files created by processes to new versioned
 // home directory with updated process name to match new version.
-func shutdownCallback(_ *logger.Logger, homePath, prevVersion, newVersion, newHash string) reexec.ShutdownCallbackFn {
+func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHash string) reexec.ShutdownCallbackFn {
 	if release.Snapshot() {
 		// SNAPSHOT is part of newVersion
 		prevVersion += "-SNAPSHOT"
@@ -297,7 +297,7 @@ func shutdownCallback(_ *logger.Logger, homePath, prevVersion, newVersion, newHa
 		for _, processDir := range processDirs {
 			newDir := strings.ReplaceAll(processDir, prevVersion, newVersion)
 			newDir = strings.ReplaceAll(newDir, oldHome, newHome)
-			if err := copyDir(processDir, newDir); err != nil {
+			if err := copyDir(l, processDir, newDir, true); err != nil {
 				return err
 			}
 		}
@@ -343,11 +343,26 @@ func readDirs(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-func copyDir(from, to string) error {
+func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
+	var onErr func(src, dst string, err error) error
+
+	if ignoreErrs {
+		onErr = func(src, dst string, err error) error {
+			if err == nil {
+				return nil
+			}
+
+			// ignore all errors, just log them
+			l.Infof("ignoring error: failed to copy %q to %q: %s", src, dst, err.Error())
+			return nil
+		}
+	}
+
 	return copy.Copy(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync: true,
+		Sync:    true,
+		OnError: onErr,
 	})
 }

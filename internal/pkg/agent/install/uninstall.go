@@ -29,9 +29,9 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile string) error {
+func Uninstall(cfgFile, topPath string) error {
 	// uninstall the current service
-	svc, err := newService()
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func Uninstall(cfgFile string) error {
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(paths.InstallPath)
+	err = os.RemoveAll(topPath)
 	if err != nil {
 		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
 			// possible to fail on Windows, because elastic-agent.exe is running from
@@ -72,8 +72,8 @@ func Uninstall(cfgFile string) error {
 		}
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to remove installation directory (%s)", paths.InstallPath),
-			errors.M("directory", paths.InstallPath))
+			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
+			errors.M("directory", paths.Top()))
 	}
 
 	return nil
@@ -89,6 +89,46 @@ func RemovePath(path string) error {
 	}
 
 	return cleanupErr
+}
+
+func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
+	if len(exceptions) == 0 {
+		return RemovePath(path)
+	}
+
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		if containsString(f.Name(), exceptions, runtime.GOOS != component.Windows) {
+			continue
+		}
+
+		err = RemovePath(filepath.Join(path, f.Name()))
+		if !bestEffort && err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
+func containsString(str string, a []string, caseSensitive bool) bool {
+	if !caseSensitive {
+		str = strings.ToLower(str)
+	}
+	for _, v := range a {
+		if !caseSensitive {
+			v = strings.ToLower(v)
+		}
+		if str == v {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isBlockingOnSelf(err error) bool {

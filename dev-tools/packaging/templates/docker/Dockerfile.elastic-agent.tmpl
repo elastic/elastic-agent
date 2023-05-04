@@ -20,6 +20,7 @@ RUN mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_s
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/*beat && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/osquery* || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/apm-server || true) && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-agent-shipper || true) && \

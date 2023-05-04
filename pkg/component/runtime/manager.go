@@ -454,7 +454,7 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 //
 // Note: Not reading from a subscription channel will cause the Manager to block.
 func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscription {
-	sub := newSubscription(ctx, m)
+	sub := newSubscription(ctx)
 
 	// add latestState to channel
 	m.mx.RLock()
@@ -503,7 +503,7 @@ func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscripti
 //
 // Note: Not reading from a subscription channel will cause the Manager to block.
 func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
-	sub := newSubscriptionAll(ctx, m)
+	sub := newSubscriptionAll(ctx)
 
 	// add the latest states
 	m.mx.RLock()

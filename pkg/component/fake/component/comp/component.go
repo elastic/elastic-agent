@@ -73,27 +73,33 @@ func (s *StateManager) Added(unit *client.Unit) {
 	s.inputs[unit.ID()] = r
 }
 
-func (s *StateManager) Modified(unit *client.Unit) {
-	if unit.Type() == client.UnitTypeOutput {
+func (s *StateManager) Modified(change client.UnitChanged) {
+	unit := change.Unit
+	switch unit.Type() {
+	case client.UnitTypeOutput:
 		if s.output == nil {
 			_ = unit.UpdateState(client.UnitStateFailed, "Error: modified a non-existing output unit", nil)
 			return
 		}
-		err := s.output.Update(unit)
+		err := s.output.Update(unit, client.TriggeredNothing)
 		if err != nil {
 			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
 		}
 		return
-	}
 
-	existing, ok := s.inputs[unit.ID()]
-	if !ok {
-		_ = unit.UpdateState(client.UnitStateFailed, "Error: unknown unit", nil)
+	case client.UnitTypeInput:
+		existingInput, ok := s.inputs[unit.ID()]
+		if !ok {
+			_ = unit.UpdateState(client.UnitStateFailed, "Error: unknown unit", nil)
+			return
+		}
+
+		err := existingInput.Update(unit, change.Triggers)
+		if err != nil {
+			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
+		}
+
 		return
-	}
-	err := existing.Update(unit)
-	if err != nil {
-		_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error: %s", err), nil)
 	}
 }
 
@@ -114,7 +120,7 @@ func (s *StateManager) Removed(unit *client.Unit) {
 
 type runningUnit interface {
 	Unit() *client.Unit
-	Update(u *client.Unit) error
+	Update(u *client.Unit, triggers client.Trigger) error
 }
 
 type sendEvent struct {
@@ -156,9 +162,9 @@ func (f *fakeShipperOutput) Unit() *client.Unit {
 	return f.unit
 }
 
-func (f *fakeShipperOutput) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+func (f *fakeShipperOutput) Update(u *client.Unit, triggers client.Trigger) error {
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this input to stop
 		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
@@ -170,16 +176,17 @@ func (f *fakeShipperOutput) Update(u *client.Unit) error {
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != fakeShipper {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != fakeShipper {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 
 	f.stop()
-	f.cfg = config
-	f.start(u, config)
+	f.cfg = expected.Config
+	f.start(u, expected.Config)
 
 	return nil
 }
@@ -281,6 +288,8 @@ type fakeInput struct {
 	state    client.UnitState
 	stateMsg string
 
+	features *proto.Features
+
 	canceller       context.CancelFunc
 	killerCanceller context.CancelFunc
 }
@@ -307,6 +316,8 @@ func newFakeInput(logger zerolog.Logger, logLevel client.UnitLogLevel, manager *
 	unit.RegisterAction(&sendEventAction{i})
 	logger.Trace().Msg("registering kill action for unit")
 	unit.RegisterAction(&killAction{i.logger})
+	logger.Trace().Msg("registering " + ActionRetrieveFeatures + " action for unit")
+	unit.RegisterAction(&retrieveFeaturesAction{i})
 
 	logger.Debug().
 		Str("state", i.state.String()).
@@ -347,37 +358,59 @@ func (f *fakeInput) Unit() *client.Unit {
 	return f.unit
 }
 
-func (f *fakeInput) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+func (f *fakeInput) Update(u *client.Unit, triggers client.Trigger) error {
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this input to stop
-		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
+		f.logger.Debug().
+			Str("state", client.UnitStateStopping.String()).
+			Str("message", stoppingMsg).
+			Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
 		f.canceller()
 		go func() {
 			<-time.After(1 * time.Second)
-			f.logger.Debug().Str("state", client.UnitStateStopped.String()).Str("message", stoppedMsg).Msg("updating unit state")
+			f.logger.Debug().
+				Str("state", client.UnitStateStopped.String()).
+				Str("message", stoppedMsg).
+				Msg("updating unit state")
 			_ = u.UpdateState(client.UnitStateStopped, stoppedMsg, nil)
 		}()
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != Fake {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != Fake {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 
-	f.parseConfig(config)
-	state, stateMsg, err := getStateFromConfig(config)
+	f.parseConfig(expected.Config)
+	state, stateMsg, err := getStateFromConfig(expected.Config)
 	if err != nil {
 		return fmt.Errorf("unit config parsing error: %w", err)
 	}
+
 	f.state = state
 	f.stateMsg = stateMsg
-	f.logger.Debug().Str("state", f.state.String()).Str("message", f.stateMsg).Msg("updating unit state")
+	f.logger.Debug().
+		Str("state", f.state.String()).
+		Str("message", f.stateMsg).
+		Msg("updating unit state")
 	_ = u.UpdateState(f.state, f.stateMsg, nil)
+
+	if triggers&client.TriggeredFeatureChange == client.TriggeredFeatureChange {
+		f.logger.Info().
+			Interface("features", expected.Features).
+			Msg("updating features")
+		f.features = &proto.Features{
+			Source: nil,
+			Fqdn:   &proto.FQDNFeature{Enabled: expected.Features.Fqdn.Enabled},
+		}
+	}
+
 	return nil
 }
 

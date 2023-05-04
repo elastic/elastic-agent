@@ -34,8 +34,8 @@ var statusOutputs = map[string]outputter{
 func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
-		Short: "Status returns the current status of the running Elastic Agent daemon.",
-		Long:  `Status returns the current status of the running Elastic Agent daemon.`,
+		Short: "Show the current status of the running Elastic Agent daemon",
+		Long:  `This command shows the current status of the running Elastic Agent daemon.`,
 		Run: func(c *cobra.Command, args []string) {
 			if err := statusCmd(streams, c, args); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())

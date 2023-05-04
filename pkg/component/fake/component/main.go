@@ -13,10 +13,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
+
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
 )
 
 func main() {
@@ -68,10 +69,11 @@ func run() error {
 			return nil
 		case change := <-c.UnitChanges():
 			switch change.Type {
+
 			case client.UnitChangedAdded:
 				s.Added(change.Unit)
 			case client.UnitChangedModified:
-				s.Modified(change.Unit)
+				s.Modified(change)
 			case client.UnitChangedRemoved:
 				s.Removed(change.Unit)
 			}

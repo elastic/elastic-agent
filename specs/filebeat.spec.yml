@@ -140,6 +140,12 @@ inputs:
     outputs: *outputs
     shippers: *shippers
     command: *command
+  - name: lumberjack
+    description: "Lumberjack"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
   - name: mqtt
     description: "MQTT"
     platforms: *platforms

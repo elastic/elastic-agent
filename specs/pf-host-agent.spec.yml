@@ -5,6 +5,8 @@ inputs:
     platforms:
       - linux/amd64
       - linux/arm64
+      - container/amd64
+      - container/arm64
     outputs:
       - elasticsearch
     runtime:

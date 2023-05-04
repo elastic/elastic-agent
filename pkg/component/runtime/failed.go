@@ -97,8 +97,9 @@ func createState(comp component.Component, done bool) ComponentState {
 		}
 	}
 	return ComponentState{
-		State:   state,
-		Message: comp.Err.Error(),
-		Units:   unitErrs,
+		State:    state,
+		Message:  comp.Err.Error(),
+		Units:    unitErrs,
+		Features: comp.Features,
 	}
 }

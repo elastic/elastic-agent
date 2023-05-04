@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !darwin && !windows
-// +build !darwin,!windows
 
 package paths
 
@@ -11,8 +10,9 @@ const (
 	// BinaryName is the name of the installed binary.
 	BinaryName = "elastic-agent"
 
-	// InstallPath is the installation path using for install command.
-	InstallPath = "/opt/Elastic/Agent"
+	// DefaultBasePath is the base path used by the install command
+	// for installing Elastic Agent's files.
+	DefaultBasePath = "/opt"
 
 	// ControlSocketPath is the control socket path used when installed.
 	ControlSocketPath = "unix:///run/elastic-agent.sock"
@@ -26,9 +26,10 @@ const (
 	// ShellWrapperPath is the path to the installed shell wrapper.
 	ShellWrapperPath = "/usr/bin/elastic-agent"
 
-	// ShellWrapper is the wrapper that is installed.
+	// ShellWrapper is the wrapper that is installed.  The %s must
+	// be substituted with the appropriate top path.
 	ShellWrapper = `#!/bin/sh
-exec /opt/Elastic/Agent/elastic-agent $@
+exec %s/elastic-agent $@
 `
 )
 

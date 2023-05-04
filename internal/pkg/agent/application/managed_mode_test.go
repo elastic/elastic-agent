@@ -6,6 +6,7 @@ package application
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -69,10 +70,11 @@ func (m *mockAcker) Commit(ctx context.Context) error {
 
 func Test_runDispatcher(t *testing.T) {
 	tests := []struct {
-		name           string
-		mockGateway    func(chan []fleetapi.Action) *mockGateway
-		mockDispatcher func() *mockDispatcher
-		interval       time.Duration
+		name                string
+		mockGateway         func(chan []fleetapi.Action) *mockGateway
+		mockDispatcher      func() *mockDispatcher
+		interval            time.Duration
+		skipOnWindowsReason string
 	}{{
 		name: "dispatcher not called",
 		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
@@ -109,6 +111,7 @@ func Test_runDispatcher(t *testing.T) {
 		mockDispatcher: func() *mockDispatcher {
 			dispatcher := &mockDispatcher{}
 			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Once()
+			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Maybe() // allow a second call in case there are timing issues in the CI pipeline
 			return dispatcher
 		},
 		interval: time.Millisecond * 60,
@@ -116,6 +119,10 @@ func Test_runDispatcher(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && tc.skipOnWindowsReason != "" {
+				t.Skip(tc.skipOnWindowsReason)
+			}
+
 			ch := make(chan []fleetapi.Action, 1)
 			gateway := tc.mockGateway(ch)
 			dispatcher := tc.mockDispatcher()

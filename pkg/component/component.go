@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -94,6 +95,9 @@ type Component struct {
 	// Units that should be running inside this component.
 	Units []Unit `yaml:"units"`
 
+	// Features configuration the component should use.
+	Features *proto.Features `yaml:"features,omitempty"`
+
 	// Shipper references the component/unit that this component used as its output. (not set when ShipperSpec)
 	Shipper *ShipperReference `yaml:"shipper,omitempty"`
 }
@@ -148,6 +152,12 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	ll logp.Level,
 	headers HeadersProvider,
 ) ([]Component, map[string]string, error) {
+	// get feature flags from policy
+	featureFlags, err := features.Parse(policy)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
+	}
+
 	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers)
 	if err != nil {
 		return nil, nil, err
@@ -272,11 +282,13 @@ func (r *RuntimeSpecs) PolicyToComponents(
 						Err:      cfgErr,
 					})
 				}
+
 				components = append(components, Component{
 					ID:        componentID,
 					Err:       err,
 					InputSpec: &inputSpec,
 					Units:     units,
+					Features:  featureFlags.AsProto(),
 				})
 				componentIdsInputMap[componentID] = inputSpec.BinaryName
 			}
@@ -291,7 +303,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 			for _, componentID := range connected {
 				for i, component := range components {
 					if component.ID == componentID && component.Err == nil {
-						cfg, cfgErr := componentToShipperConfig(component)
+						cfg, cfgErr := componentToShipperConfig(shipperType, component)
 						shipperUnit := Unit{
 							ID:       componentID,
 							Type:     client.UnitTypeInput,
@@ -314,6 +326,8 @@ func (r *RuntimeSpecs) PolicyToComponents(
 							Config:   cfg,
 							Err:      cfgErr,
 						})
+						component.Features = featureFlags.AsProto()
+
 						components[i] = component
 						break
 					}
@@ -333,6 +347,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 					ID:          shipperCompID,
 					ShipperSpec: &shipperSpec,
 					Units:       shipperUnits,
+					Features:    featureFlags.AsProto(),
 				})
 			}
 		}
@@ -370,7 +385,7 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, input map[string]in
 	}
 }
 
-func componentToShipperConfig(comp Component) (*proto.UnitExpectedConfig, error) {
+func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitExpectedConfig, error) {
 	cfgUnits := make([]interface{}, 0, len(comp.Units))
 	for _, unit := range comp.Units {
 		if unit.Err == nil && unit.Type == client.UnitTypeInput {
@@ -382,6 +397,7 @@ func componentToShipperConfig(comp Component) (*proto.UnitExpectedConfig, error)
 	}
 	cfg := map[string]interface{}{
 		"id":    comp.ID,
+		"type":  shipperType,
 		"units": cfgUnits,
 	}
 	return ExpectedConfig(cfg)

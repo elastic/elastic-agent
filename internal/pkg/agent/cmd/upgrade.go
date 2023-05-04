@@ -31,7 +31,8 @@ const (
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade <version>",
-		Short: "Upgrade the currently running Elastic Agent to the specified version",
+		Short: "Upgrade the currently installed Elastic Agent to the specified version",
+		Long:  "This command upgrades the currently installed Elastic Agent to the specified version.",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			if err := upgradeCmd(streams, c, args); err != nil {

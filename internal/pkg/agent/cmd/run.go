@@ -60,7 +60,8 @@ type cfgOverrider func(cfg *configuration.Configuration)
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Start the elastic-agent.",
+		Short: "Start the Elastic Agent",
+		Long:  "This command starts the Elastic Agent.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// done very early so the encrypted store is never used
 			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
@@ -178,7 +179,7 @@ func run(override cfgOverrider, testingMode bool, modifiers ...component.Platfor
 		return errors.New(err, "error migrating agent state")
 	}
 
-	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)
+	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
 		return errors.New(err,
 			"could not load agent info",
@@ -229,10 +230,11 @@ func run(override cfgOverrider, testingMode bool, modifiers ...component.Platfor
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
+	defer composable.Close()
 
 	serverStopFn, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
@@ -399,10 +401,10 @@ func getOverwrites(rawConfig *config.Config) error {
 	return nil
 }
 
-func defaultLogLevel(cfg *configuration.Configuration) string {
+func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) string {
 	if configuration.IsStandalone(cfg.Fleet) {
 		// for standalone always take the one from config and don't override
-		return ""
+		return currentLevel
 	}
 
 	defaultLogLevel := logger.DefaultLogLevel.String()

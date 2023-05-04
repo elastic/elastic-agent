@@ -34,6 +34,10 @@ type Controller interface {
 
 	// Watch returns the channel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
+
+	// Close closes the controller, allowing for any resource
+	// cleanup and such.
+	Close()
 }
 
 // controller manages the state of the providers current context.
@@ -249,6 +253,34 @@ func (c *controller) Errors() <-chan error {
 // Watch returns the channel for variable changes.
 func (c *controller) Watch() <-chan []*transpiler.Vars {
 	return c.ch
+}
+
+// Close closes the controller, allowing for any resource
+// cleanup and such.
+func (c *controller) Close() {
+	// Attempt to close all closeable context providers.
+	for name, state := range c.contextProviders {
+		cp, ok := state.provider.(corecomp.CloseableProvider)
+		if !ok {
+			continue
+		}
+
+		if err := cp.Close(); err != nil {
+			c.logger.Errorf("unable to close context provider %q: %s", name, err.Error())
+		}
+	}
+
+	// Attempt to close all closeable dynamic providers.
+	for name, state := range c.dynamicProviders {
+		cp, ok := state.provider.(corecomp.CloseableProvider)
+		if !ok {
+			continue
+		}
+
+		if err := cp.Close(); err != nil {
+			c.logger.Errorf("unable to close dynamic provider %q: %s", name, err.Error())
+		}
+	}
 }
 
 type contextProviderState struct {

@@ -57,8 +57,8 @@ func newContainerCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := cobra.Command{
 		Hidden: true, // not exposed over help; used by container entrypoint only
 		Use:    "container",
-		Short:  "Bootstrap Elastic Agent to run inside of a container",
-		Long: `This should only be used as an entrypoint for a container. This will prepare the Elastic Agent using
+		Short:  "Bootstrap Elastic Agent to run inside a container",
+		Long: `This command should only be used as an entrypoint for a container. This will prepare the Elastic Agent using
 environment variables to run inside of the container.
 
 The following actions are possible and grouped based on the actions.
@@ -67,7 +67,7 @@ The following actions are possible and grouped based on the actions.
   This enrolls the Elastic Agent into a Fleet Server. It is also possible to have this create a new enrollment token
   for this specific Elastic Agent.
 
-  FLEET_ENROLL - set to 1 for enrollment into fleet-server. If not set, Elastic Agent is run in standalone mode.
+  FLEET_ENROLL - set to 1 for enrollment into Fleet Server. If not set, Elastic Agent is run in standalone mode.
   FLEET_URL - URL of the Fleet Server to enroll into
   FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
@@ -75,53 +75,55 @@ The following actions are possible and grouped based on the actions.
 
   The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
 
-  KIBANA_FLEET_HOST - kibana host to enable create enrollment token on [$KIBANA_HOST]
+  KIBANA_FLEET_HOST - Kibana host to enable create enrollment token on [$KIBANA_HOST]
   FLEET_TOKEN_NAME - token name to use for fetching token from Kibana. This requires Kibana configs to be set.
   FLEET_TOKEN_POLICY_NAME - token policy name to use for fetching token from Kibana. This requires Kibana configs to be set.
 
 * Bootstrapping Fleet Server
   This bootstraps the Fleet Server to be run by this Elastic Agent. At least one Fleet Server is required in a Fleet
-  deployment for other Elastic Agent to bootstrap. In case the Elastic Agent is run without fleet-server. These variables
+  deployment for other Elastic Agents to bootstrap. In case the Elastic Agent is run without Fleet Server, these variables
   are not needed.
 
   If FLEET_SERVER_ENABLE and FLEET_ENROLL is set but no FLEET_ENROLLMENT_TOKEN, the token is automatically fetched from Kibana.
 
   FLEET_SERVER_ENABLE - set to 1 enables bootstrapping of Fleet Server inside Elastic Agent (forces FLEET_ENROLL enabled)
-  FLEET_SERVER_ELASTICSEARCH_HOST - elasticsearch host for Fleet Server to communicate with [$ELASTICSEARCH_HOST]
-  FLEET_SERVER_ELASTICSEARCH_CA - path to certificate authority to use with communicate with elasticsearch [$ELASTICSEARCH_CA]
+  FLEET_SERVER_ELASTICSEARCH_HOST - Elasticsearch host for Fleet Server to communicate with [$ELASTICSEARCH_HOST]
+  FLEET_SERVER_ELASTICSEARCH_CA - path to certificate authority to use to communicate with Elasticsearch [$ELASTICSEARCH_CA]
   FLEET_SERVER_ELASTICSEARCH_CA_TRUSTED_FINGERPRINT - The sha-256 fingerprint value of the certificate authority to trust
   FLEET_SERVER_ELASTICSEARCH_INSECURE - disables cert validation for communication with Elasticsearch
-  FLEET_SERVER_SERVICE_TOKEN - service token to use for communication with elasticsearch
+  FLEET_SERVER_SERVICE_TOKEN - service token to use for communication with Elasticsearch
+  FLEET_SERVER_SERVICE_TOKEN_PATH - path to service token file to use for communication with Elasticsearch
   FLEET_SERVER_POLICY_ID - policy ID for Fleet Server to use for itself ("Default Fleet Server policy" used when undefined)
   FLEET_SERVER_HOST - binding host for Fleet Server HTTP (overrides the policy). By default this is 0.0.0.0.
   FLEET_SERVER_PORT - binding port for Fleet Server HTTP (overrides the policy)
   FLEET_SERVER_CERT - path to certificate to use for HTTPS endpoint
   FLEET_SERVER_CERT_KEY - path to private key for certificate to use for HTTPS endpoint
+  FLEET_SERVER_CERT_KEY_PASSPHRASE - path to private key passphrase file for certificate to use for HTTPS endpoint
   FLEET_SERVER_INSECURE_HTTP - expose Fleet Server over HTTP (not recommended; insecure)
 
 * Preparing Kibana for Fleet
   This prepares the Fleet plugin that exists inside of Kibana. This must either be enabled here or done externally
   before Fleet Server will actually successfully start. All the Kibana variables are not needed in case Elastic Agent
-  should not setup Fleet. To manually trigger KIBANA_FLEET_SETUP navigate to Kibana -> Fleet -> Agents and enabled it.
+  should not setup Fleet. To manually trigger KIBANA_FLEET_SETUP navigate to Kibana -> Fleet -> Agents and enable it.
 
   KIBANA_FLEET_SETUP - set to 1 enables the setup of Fleet in Kibana by Elastic Agent. This was previously FLEET_SETUP.
-  KIBANA_FLEET_HOST - Kibana host accessible from fleet-server. [$KIBANA_HOST]
-  KIBANA_FLEET_USERNAME - kibana username to service token [$KIBANA_USERNAME]
-  KIBANA_FLEET_PASSWORD - kibana password to service token [$KIBANA_PASSWORD]
+  KIBANA_FLEET_HOST - Kibana host accessible from Fleet Server. [$KIBANA_HOST]
+  KIBANA_FLEET_USERNAME - Kibana username to service token [$KIBANA_USERNAME]
+  KIBANA_FLEET_PASSWORD - Kibana password to service token [$KIBANA_PASSWORD]
   KIBANA_FLEET_CA - path to certificate authority to use with communicate with Kibana [$KIBANA_CA]
-  KIBANA_REQUEST_RETRY_SLEEP - specifies sleep duration taken when agent performs a request to kibana [default 1s]
-  KIBANA_REQUEST_RETRY_COUNT - specifies number of retries agent performs when executing a request to kibana [default 30]
+  KIBANA_REQUEST_RETRY_SLEEP - sleep duration taken when agent performs a request to Kibana [default 1s]
+  KIBANA_REQUEST_RETRY_COUNT - number of retries agent performs when executing a request to Kibana [default 30]
 
-The following environment variables are provided as a convenience to prevent a large number of environment variable to
+The following environment variables are provided as a convenience to prevent a large number of environment variables to
 be used when the same credentials will be used across all the possible actions above.
 
-  ELASTICSEARCH_HOST - elasticsearch host [http://elasticsearch:9200]
-  ELASTICSEARCH_USERNAME - elasticsearch username [elastic]
-  ELASTICSEARCH_PASSWORD - elasticsearch password [changeme]
-  ELASTICSEARCH_CA - path to certificate authority to use with communicate with elasticsearch
-  KIBANA_HOST - kibana host [http://kibana:5601]
-  KIBANA_FLEET_USERNAME - kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
-  KIBANA_FLEET_PASSWORD - kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
+  ELASTICSEARCH_HOST - Elasticsearch host [http://elasticsearch:9200]
+  ELASTICSEARCH_USERNAME - Elasticsearch username [elastic]
+  ELASTICSEARCH_PASSWORD - Elasticsearch password [changeme]
+  ELASTICSEARCH_CA - path to certificate authority to use to communicate with Elasticsearch
+  KIBANA_HOST - Kibana host [http://kibana:5601]
+  KIBANA_FLEET_USERNAME - Kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
+  KIBANA_FLEET_PASSWORD - Kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
 
@@ -340,12 +342,33 @@ type TokenResp struct {
 
 // ensureServiceToken will ensure that the cfg specified has the service_token attributes filled.
 //
-// If no token is specified it will use the elasticsearch username/password to request a new token from Kibana
+// If no token is specified it will try to use the value from service_token_path
+// If no filepath is specified it will use the elasticsearch username/password to request a new token from Kibana
 func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 	// There's already a service token
 	if cfg.Kibana.Fleet.ServiceToken != "" || cfg.FleetServer.Elasticsearch.ServiceToken != "" {
 		return nil
 	}
+	// read from secret file
+	if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
+		p, err := os.ReadFile(cfg.FleetServer.Elasticsearch.ServiceTokenPath)
+		if err != nil {
+			return fmt.Errorf("unable to open service_token_path: %w", err)
+		}
+		cfg.Kibana.Fleet.ServiceToken = string(p)
+		cfg.FleetServer.Elasticsearch.ServiceToken = string(p)
+		return nil
+	}
+	if cfg.Kibana.Fleet.ServiceTokenPath != "" {
+		p, err := os.ReadFile(cfg.Kibana.Fleet.ServiceTokenPath)
+		if err != nil {
+			return fmt.Errorf("unable to open service_token_path: %w", err)
+		}
+		cfg.Kibana.Fleet.ServiceToken = string(p)
+		cfg.FleetServer.Elasticsearch.ServiceToken = string(p)
+		return nil
+	}
+	// request new token
 	if cfg.Kibana.Fleet.Username == "" || cfg.Kibana.Fleet.Password == "" {
 		return fmt.Errorf("username/password must be provided to retrieve service token")
 	}
@@ -402,7 +425,9 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 			return nil, err
 		}
 		args = append(args, "--fleet-server-es", connStr)
-		if cfg.FleetServer.Elasticsearch.ServiceToken != "" {
+		if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
+			args = append(args, "--fleet-server-service-token-path", cfg.FleetServer.Elasticsearch.ServiceTokenPath)
+		} else if cfg.FleetServer.Elasticsearch.ServiceTokenPath == "" && cfg.FleetServer.Elasticsearch.ServiceToken != "" {
 			args = append(args, "--fleet-server-service-token", cfg.FleetServer.Elasticsearch.ServiceToken)
 		}
 		if policyID != "" {
@@ -425,6 +450,9 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		}
 		if cfg.FleetServer.CertKey != "" {
 			args = append(args, "--fleet-server-cert-key", cfg.FleetServer.CertKey)
+		}
+		if cfg.FleetServer.PassphrasePath != "" {
+			args = append(args, "--fleet-server-cert-key-passphrase", cfg.FleetServer.PassphrasePath)
 		}
 
 		for k, v := range cfg.FleetServer.Headers {
@@ -819,8 +847,8 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 
 type containerPaths struct {
 	StatePath  string `config:"state_path" yaml:"state_path"`
-	ConfigPath string `config:"state_path" yaml:"config_path,omitempty"`
-	LogsPath   string `config:"state_path" yaml:"logs_path,omitempty"`
+	ConfigPath string `config:"config_path" yaml:"config_path,omitempty"`
+	LogsPath   string `config:"logs_path" yaml:"logs_path,omitempty"`
 }
 
 func writeContainerPaths(original, statePath, configPath, logsPath string) error {

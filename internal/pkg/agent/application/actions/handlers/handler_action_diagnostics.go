@@ -106,7 +106,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	f, s, err := h.diagFile(aDiag, uDiag)
 	if err != nil {
 		var b bytes.Buffer
-		h.log.Warnw("Diagnostics action unable to use tempoary file, using buffer instead.", "err", err)
+		h.log.Warnw("Diagnostics action unable to use temporary file, using buffer instead.", "err", err)
 		var wBuf bytes.Buffer
 		defer func() {
 			if str := wBuf.String(); str != "" {

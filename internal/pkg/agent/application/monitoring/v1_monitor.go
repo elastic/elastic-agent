@@ -57,7 +57,7 @@ const (
 
 var (
 	errNoOuputPresent          = errors.New("outputs not part of the config")
-	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "fleet-server", "heartbeat", "osquerybeat", "packetbeat"}
+	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "fleet-server", "heartbeat", "osquerybeat", "packetbeat", "shipper"}
 	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat"}
 )
 
@@ -113,8 +113,13 @@ func (b *BeatsMonitor) MonitoringConfig(
 		return nil, nil
 	}
 
+	cfg := make(map[string]interface{})
+
 	monitoringOutputName := defaultOutputName
 	if agentCfg, found := policy[agentKey]; found {
+		// The agent section is required for feature flags
+		cfg[agentKey] = agentCfg
+
 		agentCfgMap, ok := agentCfg.(map[string]interface{})
 		if ok {
 			if monitoringCfg, found := agentCfgMap[monitoringKey]; found {
@@ -129,8 +134,6 @@ func (b *BeatsMonitor) MonitoringConfig(
 			}
 		}
 	}
-
-	cfg := make(map[string]interface{})
 
 	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil && !errors.Is(err, errNoOuputPresent) {
 		return nil, errors.New(err, "failed to inject monitoring output")
@@ -149,7 +152,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, monitoringOutput, components); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -165,8 +168,8 @@ func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
 		return args
 	}
 
-	// only beats understands these flags
-	if !isSupportedBeatsBinary(binary) {
+	// only beats & shipper understand these flags
+	if !isSupportedBeatsBinary(binary) && binary != "shipper" {
 		return args
 	}
 
@@ -524,7 +527,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	}
 	return defaultMonitoringNamespace
 }
-func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string) error {
+func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
 	beatsStreams := make([]interface{}, 0, len(componentIDToBinary))
@@ -781,6 +784,51 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 				},
 			})
 		}
+
+	}
+
+	shipperHTTPStreams := []interface{}{}
+	// the shipper is listed in componentList, but not componentIDToBinary
+	// iterate over the full component list, adding a monitoring output for every shipper binary.
+	for _, comp := range componentList {
+		if comp.ShipperSpec != nil { // a shipper unit
+			endpoints := []interface{}{prefixedEndpoint(endpointPath(comp.ID, b.operatingSystem))}
+			name := "shipper" // in other beats this is the binary name, but we can hard-code it here.
+			if comp.ShipperSpec.Spec.Name != "" {
+				name = comp.ShipperSpec.Spec.Name
+			}
+			// note: this doesn't fetch anything from the /state endpoint, as it doesn't report much beyond name/version,
+			// the equivalent of the beat /state metrics end up in /shipper
+			shipperHTTPStreams = append(shipperHTTPStreams, map[string]interface{}{
+				idKey: "metrics-monitoring-shipper",
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+					"namespace": monitoringNamespace,
+				},
+				"metricsets": []interface{}{"json"},
+				"path":       "/shipper",
+				"hosts":      endpoints,
+				"namespace":  "application",
+				"period":     "10s",
+				"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
+			},
+				map[string]interface{}{
+					idKey: "metrics-monitoring-shipper-stats",
+					"data_stream": map[string]interface{}{
+						"type":      "metrics",
+						"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+						"namespace": monitoringNamespace,
+					},
+					"metricsets": []interface{}{"json"},
+					"path":       "/stats",
+					"hosts":      endpoints,
+					"namespace":  "agent",
+					"period":     "10s",
+					"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
+				})
+		}
+
 	}
 
 	inputs := []interface{}{
@@ -806,6 +854,20 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 		},
 	}
 
+	// if we have shipper data, inject the extra inputs
+	if len(shipperHTTPStreams) > 0 {
+		inputs = append(inputs, map[string]interface{}{
+			idKey:        "metrics-monitoring-shipper",
+			"name":       "metrics-monitoring-shipper",
+			"type":       "http/metrics",
+			useOutputKey: monitoringOutput,
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
+			},
+			"streams": shipperHTTPStreams,
+		})
+	}
+
 	inputsNode, found := cfg[inputsKey]
 	if !found {
 		return fmt.Errorf("no inputs in config")
@@ -819,6 +881,63 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	inputsCfg = append(inputsCfg, inputs...)
 	cfg[inputsKey] = inputsCfg
 	return nil
+}
+
+func createProcessorsForJSONInput(name string, monitoringNamespace string, agentInfo *info.AgentInfo) []interface{} {
+	return []interface{}{
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "data_stream",
+				"fields": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   fmt.Sprintf("elastic_agent.%s", name),
+					"namespace": monitoringNamespace,
+				},
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "event",
+				"fields": map[string]interface{}{
+					"dataset": fmt.Sprintf("elastic_agent.%s", name),
+				},
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "elastic_agent",
+				"fields": map[string]interface{}{
+					"id":       agentInfo.AgentID(),
+					"version":  agentInfo.Version(),
+					"snapshot": agentInfo.Snapshot(),
+					"process":  name,
+				},
+			},
+		},
+		map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": "agent",
+				"fields": map[string]interface{}{
+					"id": agentInfo.AgentID(),
+				},
+			},
+		},
+		map[string]interface{}{
+			"copy_fields": map[string]interface{}{
+				"fields":         httpCopyRules(),
+				"ignore_missing": true,
+				"fail_on_error":  false,
+			},
+		},
+		map[string]interface{}{
+			"drop_fields": map[string]interface{}{
+				"fields": []interface{}{
+					"http",
+				},
+				"ignore_missing": true,
+			},
+		},
+	}
 }
 
 func loggingPath(id, operatingSystem string) string {
@@ -967,6 +1086,12 @@ func httpCopyRules() []interface{} {
 		map[string]interface{}{
 			"from": "http.filebeat_input",
 			"to":   "filebeat_input",
+		},
+
+		// shipper specific metrics
+		map[string]interface{}{
+			"from": "http.application.shipper",
+			"to":   "shipper",
 		},
 	}
 

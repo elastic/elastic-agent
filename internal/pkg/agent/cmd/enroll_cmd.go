@@ -81,12 +81,14 @@ type enrollCmdFleetServerOption struct {
 	ElasticsearchCASHA256 string
 	ElasticsearchInsecure bool
 	ServiceToken          string
+	ServiceTokenPath      string
 	PolicyID              string
 	Host                  string
 	Port                  uint16
 	InternalPort          uint16
 	Cert                  string
 	CertKey               string
+	CertKeyPassphrasePath string
 	Insecure              bool
 	SpawnAgent            bool
 	Headers               map[string]string
@@ -257,7 +259,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}
 
 	if c.options.FixPermissions {
-		err = install.FixPermissions()
+		err = install.FixPermissions(paths.Top())
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}
@@ -329,10 +331,10 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 
 	//nolint:dupl // duplicate because same params are passed
 	fleetConfig, err := createFleetServerBootstrapConfig(
-		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken,
+		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
 		c.options.FleetServer.PolicyID,
 		c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
-		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
 		c.options.FleetServer.Headers,
 		c.options.ProxyURL,
 		c.options.ProxyDisabled,
@@ -502,7 +504,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]interface{}) error {
 	cmd := fleetapi.NewEnrollCmd(c.client)
 
-	metadata, err := info.Metadata()
+	metadata, err := info.Metadata(c.log)
 	if err != nil {
 		return errors.New(err, "acquiring metadata failed")
 	}
@@ -535,10 +537,10 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	if localFleetServer {
 		//nolint:dupl // not duplicates, just similar params are passed
 		serverConfig, err := createFleetServerBootstrapConfig(
-			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken,
+			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
 			c.options.FleetServer.PolicyID,
 			c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
-			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
 			c.options.FleetServer.Headers,
 			c.options.ProxyURL, c.options.ProxyDisabled, c.options.ProxyHeaders,
 			c.options.FleetServer.ElasticsearchInsecure,
@@ -885,9 +887,9 @@ func storeAgentInfo(s saver, reader io.Reader) error {
 }
 
 func createFleetServerBootstrapConfig(
-	connStr, serviceToken, policyID, host string,
+	connStr, serviceToken, serviceTokenPath, policyID, host string,
 	port uint16, internalPort uint16,
-	cert, key, esCA, esCASHA256 string,
+	cert, key, passphrasePath, esCA, esCASHA256 string,
 	headers map[string]string,
 	proxyURL string,
 	proxyDisabled bool,
@@ -896,7 +898,7 @@ func createFleetServerBootstrapConfig(
 ) (*configuration.FleetAgentConfig, error) {
 	localFleetServer := connStr != ""
 
-	es, err := configuration.ElasticsearchFromConnStr(connStr, serviceToken, insecure)
+	es, err := configuration.ElasticsearchFromConnStr(connStr, serviceToken, serviceTokenPath, insecure)
 	if err != nil {
 		return nil, err
 	}
@@ -957,8 +959,9 @@ func createFleetServerBootstrapConfig(
 	if cert != "" || key != "" {
 		cfg.Server.TLS = &tlscommon.Config{
 			Certificate: tlscommon.CertificateConfig{
-				Certificate: cert,
-				Key:         key,
+				Certificate:    cert,
+				Key:            key,
+				PassphrasePath: passphrasePath,
 			},
 		}
 		if insecure {

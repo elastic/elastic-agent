@@ -28,3 +28,11 @@ type ContextProvider interface {
 	// Run runs the context provider.
 	Run(ContextProviderComm) error
 }
+
+// CloseableProvider is an interface that providers may choose to implement
+// if it makes sense for them, e.g. if they have any resources that need
+// cleaning up after the provider's (final) run.
+type CloseableProvider interface {
+	// Close is called after all runs of the provider have finished.
+	Close() error
+}

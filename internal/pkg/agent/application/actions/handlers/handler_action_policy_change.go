@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -45,8 +44,10 @@ type PolicyChangeHandler struct {
 	ch        chan coordinator.ConfigChange
 	setters   []actions.ClientSetter
 
-	// Last known valid signature validation key
-	signatureValidationKey []byte
+	// Disabled for 8.8.0 release in order to limit the surface
+	// https://github.com/elastic/security-team/issues/6501
+	// // Last known valid signature validation key
+	// signatureValidationKey []byte
 }
 
 // NewPolicyChangeHandler creates a new PolicyChange handler.
@@ -85,17 +86,20 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return fmt.Errorf("invalid type, expected ActionPolicyChange and received %T", a)
 	}
 
-	// Validate policy signature and overlay signed configuration
-	policy, signatureValidationKey, err := protection.ValidatePolicySignature(h.log, action.Policy, h.signatureValidationKey)
-	if err != nil {
-		return errors.New(err, "could not validate the policy signed configuration", errors.TypeConfig)
-	}
-	h.log.Debugf("handlerPolicyChange: policy validation result: signature validation key length: %v, err: %v", len(signatureValidationKey), err)
+	// Disabled for 8.8.0 release in order to limit the surface
+	// https://github.com/elastic/security-team/issues/6501
 
-	// Cache signature validation key for the next policy handling
-	h.signatureValidationKey = signatureValidationKey
+	// // Validate policy signature and overlay signed configuration
+	// policy, signatureValidationKey, err := protection.ValidatePolicySignature(h.log, action.Policy, h.signatureValidationKey)
+	// if err != nil {
+	// 	return errors.New(err, "could not validate the policy signed configuration", errors.TypeConfig)
+	// }
+	// h.log.Debugf("handlerPolicyChange: policy validation result: signature validation key length: %v, err: %v", len(signatureValidationKey), err)
 
-	c, err := config.NewConfigFrom(policy)
+	// // Cache signature validation key for the next policy handling
+	// h.signatureValidationKey = signatureValidationKey
+
+	c, err := config.NewConfigFrom(action.Policy)
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
@@ -133,6 +137,7 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
+
 	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
 		// already the same hosts
 		return nil
@@ -141,28 +146,45 @@ func (h *PolicyChangeHandler) handleFleetServerHosts(ctx context.Context, c *con
 	// only set protocol/hosts as that is all Fleet currently sends
 	prevProtocol := h.config.Fleet.Client.Protocol
 	prevPath := h.config.Fleet.Client.Path
+	prevHost := h.config.Fleet.Client.Host
 	prevHosts := h.config.Fleet.Client.Hosts
 	prevProxy := h.config.Fleet.Client.Transport.Proxy
 	h.config.Fleet.Client.Protocol = cfg.Fleet.Client.Protocol
 	h.config.Fleet.Client.Path = cfg.Fleet.Client.Path
+	h.config.Fleet.Client.Host = cfg.Fleet.Client.Host
 	h.config.Fleet.Client.Hosts = cfg.Fleet.Client.Hosts
-	h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
+
+	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
+	// it won't be overridden by an absent or empty proxy from fleet-server.
+	// However, if there is a proxy sent by fleet-server, it'll take precedence.
+	// Therefore, it's not possible to remove a proxy once it's set.
+	if cfg.Fleet.Client.Transport.Proxy.URL == nil ||
+		cfg.Fleet.Client.Transport.Proxy.URL.String() == "" {
+		h.log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
+	} else {
+		h.config.Fleet.Client.Transport.Proxy = cfg.Fleet.Client.Transport.Proxy
+		h.log.Debug("received proxy from fleet, applying it")
+	}
 
 	// rollback on failure
 	defer func() {
 		if err != nil {
 			h.config.Fleet.Client.Protocol = prevProtocol
 			h.config.Fleet.Client.Path = prevPath
+			h.config.Fleet.Client.Host = prevHost
 			h.config.Fleet.Client.Hosts = prevHosts
 			h.config.Fleet.Client.Transport.Proxy = prevProxy
 		}
 	}()
 
-	client, err := client.NewAuthWithConfig(h.log, h.config.Fleet.AccessAPIKey, h.config.Fleet.Client)
+	client, err := client.NewAuthWithConfig(
+		h.log, h.config.Fleet.AccessAPIKey, h.config.Fleet.Client)
 	if err != nil {
 		return errors.New(
-			err, "fail to create API client with updated hosts",
-			errors.TypeNetwork, errors.M("hosts", h.config.Fleet.Client.Hosts))
+			err, "fail to create API client with updated config",
+			errors.TypeConfig,
+			errors.M("hosts", append(
+				h.config.Fleet.Client.Hosts, h.config.Fleet.Client.Host)))
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)

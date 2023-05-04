@@ -59,10 +59,18 @@ type ComponentState struct {
 
 	Units map[ComponentUnitKey]ComponentUnitState `yaml:"units"`
 
+	// We don't serialize the Features field as YAML so it doesn't show up
+	// in the diagnostics-generated state.yaml file, keeping it concise.
+	Features    *proto.Features `yaml:"-"`
+	FeaturesIdx uint64          `yaml:"features_idx"`
+
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
 
 	// internal
 	expectedUnits map[ComponentUnitKey]expectedUnitState
+
+	expectedFeatures    *proto.Features
+	expectedFeaturesIdx uint64
 }
 
 // expectedUnitState is the expected state of a unit.
@@ -79,6 +87,7 @@ func newComponentState(comp *component.Component) (s ComponentState) {
 	s.Message = startingMsg
 	s.Units = make(map[ComponentUnitKey]ComponentUnitState)
 	s.expectedUnits = make(map[ComponentUnitKey]expectedUnitState)
+
 	s.syncComponent(comp)
 	return s
 }
@@ -94,6 +103,12 @@ func (s *ComponentState) Copy() (c ComponentState) {
 	for k, v := range s.expectedUnits {
 		c.expectedUnits[k] = v
 	}
+
+	c.Features = s.Features
+	c.FeaturesIdx = s.FeaturesIdx
+	c.expectedFeatures = s.expectedFeatures
+	c.expectedFeaturesIdx = s.expectedFeaturesIdx
+
 	return c
 }
 
@@ -159,6 +174,15 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 			}
 		}
 	}
+
+	if !gproto.Equal(s.expectedFeatures, comp.Features) {
+		changed = true
+		s.expectedFeaturesIdx++
+		s.expectedFeatures = comp.Features
+	} else {
+		s.expectedFeaturesIdx = 1
+	}
+
 	return changed
 }
 
@@ -212,6 +236,12 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 			}
 		}
 	}
+
+	if !gproto.Equal(s.Features, comp.Features) {
+		s.Features = comp.Features
+		changed = true
+	}
+
 	return changed
 }
 
@@ -260,6 +290,7 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 		}
 		s.Units[key] = existing
 	}
+
 	for key, unit := range s.Units {
 		_, ok := touched[key]
 		if !ok {
@@ -284,8 +315,10 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 				}
 			}
 		}
+
 		s.Units[key] = unit
 	}
+
 	if checkin.VersionInfo != nil {
 		if checkin.VersionInfo.Name != "" && s.VersionInfo.Name != checkin.VersionInfo.Name {
 			s.VersionInfo.Name = checkin.VersionInfo.Name
@@ -300,6 +333,19 @@ func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 			changed = true
 		}
 	}
+
+	if s.FeaturesIdx != checkin.FeaturesIdx {
+		s.FeaturesIdx = checkin.FeaturesIdx
+		if checkin.Features != nil {
+			s.Features = &proto.Features{
+				Fqdn: &proto.FQDNFeature{
+					Enabled: checkin.Features.Fqdn.Enabled,
+				},
+			}
+		}
+		changed = true
+	}
+
 	return changed
 }
 
@@ -315,13 +361,14 @@ func (s *ComponentState) unsettled() bool {
 			// unit missing
 			return true
 		}
-		if o.configStateIdx != e.configStateIdx || e.state != o.State {
+		if o.configStateIdx != e.configStateIdx ||
+			e.state != o.State {
 			// config or state mismatch
 			return true
 		}
 	}
 
-	return false
+	return s.FeaturesIdx != s.expectedFeaturesIdx
 }
 
 func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
@@ -353,7 +400,11 @@ func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
 		units = append(units, e)
 	}
 
-	return &proto.CheckinExpected{Units: units}
+	return &proto.CheckinExpected{
+		Units:       units,
+		Features:    s.expectedFeatures,
+		FeaturesIdx: s.expectedFeaturesIdx,
+	}
 }
 
 func (s *ComponentState) cleanupStopped() bool {
