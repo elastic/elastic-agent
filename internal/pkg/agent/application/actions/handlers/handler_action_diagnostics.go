@@ -175,7 +175,8 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 			"action", action)
 		return
 	}
-	h.log.Debugw("Diagnostics action complete.", "action", action, "elapsed", time.Since(ts))
+	elapsed := time.Since(ts)
+	h.log.Debugw(fmt.Sprintf("Diagnostics action complete. Took %s", elapsed), "action", action, "elapsed", elapsed)
 }
 
 // runHooks runs the agent diagnostics hooks.
@@ -186,7 +187,7 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 		if ctx.Err() != nil {
 			return diags, ctx.Err()
 		}
-		h.log.Debugw("Executing hook", "hook", hook.Name, "filename", hook.Filename)
+		h.log.Debugw(fmt.Sprintf("Executing hook %s", hook.Name), "hook", hook.Name, "filename", hook.Filename)
 		startTime := time.Now()
 		diags = append(diags, client.DiagnosticFileResult{
 			Name:        hook.Name,
@@ -196,7 +197,8 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 			Content:     hook.Hook(ctx),
 			Generated:   time.Now().UTC(),
 		})
-		h.log.Debugw("Hook execution complete", "hook", hook.Name, "filename", hook.Filename, "elapsed", time.Since(startTime))
+		elapsed := time.Since(startTime)
+		h.log.Debugw(fmt.Sprintf("Hook %s execution complete, took %s", hook.Name, elapsed.String()), "hook", hook.Name, "filename", hook.Filename, "elapsed", elapsed.String())
 	}
 	return diags, nil
 }
@@ -205,6 +207,7 @@ func (h *Diagnostics) runHooks(ctx context.Context) ([]client.DiagnosticFileResu
 func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResult {
 	uDiag := make([]client.DiagnosticUnitResult, 0)
 	h.log.Debug("Performing unit diagnostics")
+	startTime := time.Now()
 	rr := h.diagProvider.PerformDiagnostics(ctx)
 	h.log.Debug("Collecting results of unit diagnostics")
 	for _, r := range rr {
@@ -231,7 +234,7 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 		}
 		uDiag = append(uDiag, diag)
 	}
-	h.log.Debug("Unit diagnostics complete")
+	h.log.Debugf("Unit diagnostics complete. Took: %s", time.Since(startTime))
 	return uDiag
 }
 
