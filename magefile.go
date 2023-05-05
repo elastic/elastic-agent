@@ -1340,28 +1340,33 @@ func authGCP(ctx context.Context) error {
 	}
 
 	// Check if user is already authenticated
-	cmd = exec.CommandContext(ctx, cliName, "auth", "list", "--filter=status:ACTIVE", "--format=json")
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("unable to list authenticated accounts: %w", err)
-	}
+	for authSuccess := false; !authSuccess; {
+		cmd = exec.CommandContext(ctx, cliName, "auth", "list", "--filter=status:ACTIVE", "--format=json")
+		output, err := cmd.Output()
+		if err != nil {
+			return fmt.Errorf("unable to list authenticated accounts: %w", err)
+		}
 
-	var authList []struct {
-		Account string `json:"account"`
-	}
-	if err := json.Unmarshal(output, &authList); err != nil {
-		return fmt.Errorf("unable to parse authenticated accounts: %w", err)
-	}
+		var authList []struct {
+			Account string `json:"account"`
+		}
+		if err := json.Unmarshal(output, &authList); err != nil {
+			return fmt.Errorf("unable to parse authenticated accounts: %w", err)
+		}
 
-	if len(authList) > 0 {
-		// We have at least one authenticated, active account. All set!
-		return nil
-	}
+		if len(authList) > 0 {
+			// We have at least one authenticated, active account. All set!
+			authSuccess = true
+			continue
+		}
 
-	// Try to authenticate user
-	cmd = exec.CommandContext(ctx, cliName, "auth", "login")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("unable to authenticate user: %w", cliName, err)
+		fmt.Fprintln(os.Stderr, "❌  GCP authentication unsuccessful. Retrying...")
+
+		// Try to authenticate user
+		cmd = exec.CommandContext(ctx, cliName, "auth", "login")
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("unable to authenticate user: %w", cliName, err)
+		}
 	}
 
 	return nil
@@ -1387,17 +1392,8 @@ func authESS(ctx context.Context) error {
 		return fmt.Errorf("unable to read ESS API key: %w", err)
 	}
 
-	var essAPIKey string
 	data = bytes.TrimSpace(data)
-	if len(data) > 0 {
-		// Use API key from file
-		essAPIKey = string(data)
-	} else {
-		essAPIKey, err = askAndPersistEssAPIKey()
-		if err != nil {
-			return err
-		}
-	}
+	essAPIKey := string(data)
 
 	// Attempt to use API key to check if it's valid
 	for authSuccess := false; !authSuccess; {
@@ -1413,28 +1409,20 @@ func authESS(ctx context.Context) error {
 			continue
 		}
 
-		fmt.Fprintln(os.Stderr, "❌  ESS authentication unsuccessful")
-		essAPIKey, err = askAndPersistEssAPIKey()
+		fmt.Fprintln(os.Stderr, "❌  ESS authentication unsuccessful. Retrying...")
+
+		essAPIKey, err = stringPrompt("Please provide a ESS (QA) API key:")
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to read ESS API key from prompt: %w", err)
 		}
-	}
-
-	return nil
-}
-
-func askAndPersistEssAPIKey() (string, error) {
-	essAPIKey, err := stringPrompt("Please provide a ESS (QA) API key:")
-	if err != nil {
-		return "", err
 	}
 
 	// Write API key to file for future use
 	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0600); err != nil {
-		return "", fmt.Errorf("unable to persiste ESS API key for future use: %w", err)
+		return fmt.Errorf("unable to persiste ESS API key for future use: %w", err)
 	}
 
-	return essAPIKey, nil
+	return nil
 }
 
 // stringPrompt asks for a string value using the label
@@ -1448,7 +1436,6 @@ func stringPrompt(prompt string) (string, error) {
 		}
 
 		s = strings.TrimSpace(s)
-		fmt.Println("s:", s)
 		if s != "" {
 			return s, nil
 		}
