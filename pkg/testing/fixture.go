@@ -46,10 +46,11 @@ type Fixture struct {
 	cMx sync.RWMutex
 }
 
-type fixtureOpt func(s *Fixture)
+// FixtureOpt is an option for the fixture.
+type FixtureOpt func(s *Fixture)
 
 // WithFetcher changes the fetcher that is used for the fixture.
-func WithFetcher(fetcher Fetcher) fixtureOpt {
+func WithFetcher(fetcher Fetcher) FixtureOpt {
 	if fetcher == nil {
 		panic("fetcher cannot be nil")
 	}
@@ -60,7 +61,7 @@ func WithFetcher(fetcher Fetcher) fixtureOpt {
 
 // WithOSArchitecture changes the operating system and the architecture to use for the fixture.
 // By default, the runtime operating system and the architecture is selected.
-func WithOSArchitecture(operatingSystem string, architecture string) fixtureOpt {
+func WithOSArchitecture(operatingSystem string, architecture string) FixtureOpt {
 	return func(f *Fixture) {
 		f.operatingSystem = operatingSystem
 		f.architecture = architecture
@@ -69,7 +70,7 @@ func WithOSArchitecture(operatingSystem string, architecture string) fixtureOpt 
 
 // WithLogOutput instructs the fixture to log all Elastic Agent output to the test log.
 // By default, the Elastic Agent output will not be logged to the test logger.
-func WithLogOutput() fixtureOpt {
+func WithLogOutput() FixtureOpt {
 	return func(f *Fixture) {
 		f.logOutput = true
 	}
@@ -78,7 +79,7 @@ func WithLogOutput() fixtureOpt {
 // WithAllowErrors instructs the fixture to allow the Elastic Agent to log errors.
 // By default, the Fixture will not allow the Elastic Agent to log any errors, logging any error
 // will result on the Fixture to kill the Elastic Agent and report it as an error.
-func WithAllowErrors() fixtureOpt {
+func WithAllowErrors() FixtureOpt {
 	return func(f *Fixture) {
 		f.allowErrs = true
 	}
@@ -86,14 +87,14 @@ func WithAllowErrors() fixtureOpt {
 
 // WithConnectTimeout adjusts the timeout for connecting to the spawned Elastic Agent control protocol.
 // By default, the timeout is 5 seconds.
-func WithConnectTimeout(timeout time.Duration) fixtureOpt {
+func WithConnectTimeout(timeout time.Duration) FixtureOpt {
 	return func(f *Fixture) {
 		f.connectTimout = timeout
 	}
 }
 
 // NewFixture creates a new fixture to setup and manage Elastic Agent.
-func NewFixture(t *testing.T, version string, opts ...fixtureOpt) (*Fixture, error) {
+func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, error) {
 	// we store the caller so the fixture can find the cache directory for the artifacts that
 	// are used for the testing with the Elastic Agent.
 	//
@@ -183,10 +184,15 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 //
 // If no `states` are provided then the Elastic Agent runs until the context is cancelled.
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
+	var err error
+	err = f.ensurePrepared(ctx)
+	if err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var err error
 	var sm *stateMachine
 	if states != nil {
 		sm, err = newStateMachine(states)
@@ -281,6 +287,11 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 
 // Exec provides a way of performing subcommand on the prepared Elastic Agent binary.
 func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	err := f.ensurePrepared(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -293,6 +304,13 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	}
 
 	return cmd.CombinedOutput()
+}
+
+func (f *Fixture) ensurePrepared(ctx context.Context) error {
+	if f.workDir == "" {
+		return f.Prepare(ctx)
+	}
+	return nil
 }
 
 func (f *Fixture) binaryPath() string {

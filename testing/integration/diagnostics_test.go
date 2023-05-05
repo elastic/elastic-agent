@@ -25,7 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/version"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
@@ -66,13 +66,7 @@ type DiagnosticsIntegrationTestSuite struct {
 }
 
 func (s *DiagnosticsIntegrationTestSuite) SetupSuite() {
-	l := integrationtest.LocalFetcher("../../build/distributions")
-	f, err := integrationtest.NewFixture(
-		s.T(),
-		version.GetDefaultVersion(),
-		integrationtest.WithFetcher(l),
-		integrationtest.WithLogOutput(),
-	)
+	f, err := define.NewFixture(s.T())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -181,6 +175,9 @@ func verifyDiagnosticArchive(t *testing.T, ctx context.Context, diagArchive stri
 }
 
 func TestDiagnosticsCommandIntegrationTestSuite(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local: true,
+	})
 	suite.Run(t, new(DiagnosticsIntegrationTestSuite))
 }
 
