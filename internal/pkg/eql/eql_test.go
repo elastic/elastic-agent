@@ -27,6 +27,27 @@ func (s *testVarStore) Lookup(v string) (interface{}, bool) {
 	return val, ok
 }
 
+func TestEqlNewReportsBadSyntax(t *testing.T) {
+	// Some malformed antlr expressions can produce an error when evaluated
+	// because they cause a nil pointer reference or similar unhelpful
+	// error. These test cases confirm that eql.New reports these errors
+	// during the initial parsing of the expression, so things don't get
+	// that far.
+	testCases := []string{
+		"asdf",
+		"${***}",
+		"${",
+		"{}{}{}",
+		"1+=2",
+		"1.23f == ''",
+		"${asdf}...",
+	}
+	for _, expression := range testCases {
+		_, err := New(expression)
+		assert.Error(t, err, "malformed EQL expression \"%v\" should produce an error", expression)
+	}
+}
+
 func TestEql(t *testing.T) {
 	testcases := []struct {
 		expression string
