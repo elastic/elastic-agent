@@ -7,6 +7,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
@@ -68,6 +72,8 @@ var Aliases = map[string]interface{}{
 	"demo":  Demo.Enroll,
 }
 
+var essAPIKeyFile string
+
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
 	test.RegisterDeps(UnitTest)
@@ -76,6 +82,12 @@ func init() {
 
 	devtools.Platforms = devtools.Platforms.Filter("!linux/386")
 	devtools.Platforms = devtools.Platforms.Filter("!windows/386")
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic(fmt.Errorf("unable to determine user's home directory: %w", err))
+	}
+	essAPIKeyFile = filepath.Join(homeDir, ".config", "ess", "api_key.txt")
 }
 
 // Default set to build everything by default.
@@ -1260,6 +1272,7 @@ func majorMinor() string {
 
 func (Integration) Clean() {
 	_ = os.RemoveAll(".agent-testing")
+	mg.Deps()
 }
 
 func (Integration) Check() error {
@@ -1290,12 +1303,17 @@ func (Integration) Auth(ctx context.Context) error {
 	if err := authGCP(ctx); err != nil {
 		return fmt.Errorf("unable to authenticate to GCP: %w", err)
 	}
+	fmt.Println("✔️  GCP authentication successful")
 
 	// TODO: Authenticate user to AWS
 
 	// TODO: Authenticate user to Azure
 
 	// TODO: Authenticate user to ESS
+	if err := authESS(ctx); err != nil {
+		return fmt.Errorf("unable to authenticate to ESS: %w", err)
+	}
+	fmt.Println("✔️  ESS authentication successful")
 
 	return nil
 }
@@ -1316,13 +1334,13 @@ func shouldBuildAgent() bool {
 func authGCP(ctx context.Context) error {
 	// Check if gcloud CLI is installed
 	const cliName = "gcloud"
-	cmd := exec.Command("which", cliName)
+	cmd := exec.CommandContext(ctx, "which", cliName)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%s CLI is not installed: %w", cliName, err)
 	}
 
 	// Check if user is already authenticated
-	cmd = exec.Command(cliName, "auth", "list", "--filter=status:ACTIVE", "--format=json")
+	cmd = exec.CommandContext(ctx, cliName, "auth", "list", "--filter=status:ACTIVE", "--format=json")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("unable to list authenticated accounts: %w", err)
@@ -1341,10 +1359,100 @@ func authGCP(ctx context.Context) error {
 	}
 
 	// Try to authenticate user
-	cmd = exec.Command(cliName, "auth", "login")
+	cmd = exec.CommandContext(ctx, cliName, "auth", "login")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("unable to login user: %w", cliName, err)
+		return fmt.Errorf("unable to authenticate user: %w", cliName, err)
 	}
 
 	return nil
+}
+
+func authESS(ctx context.Context) error {
+	_, err := os.Stat(essAPIKeyFile)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0700); err != nil {
+			return fmt.Errorf("unable to create ESS config directory: %w", err)
+		}
+
+		if err := os.WriteFile(essAPIKeyFile, nil, 0600); err != nil {
+			return fmt.Errorf("unable to initialize ESS API key file: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("unable to check if ESS config directory exists: %w", err)
+	}
+
+	// Read API key from file
+	data, err := os.ReadFile(essAPIKeyFile)
+	if err != nil {
+		return fmt.Errorf("unable to read ESS API key: %w", err)
+	}
+
+	var essAPIKey string
+	data = bytes.TrimSpace(data)
+	if len(data) > 0 {
+		// Use API key from file
+		essAPIKey = string(data)
+	} else {
+		essAPIKey, err = askAndPersistEssAPIKey()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Attempt to use API key to check if it's valid
+	for authSuccess := false; !authSuccess; {
+		client := ess.NewClient(ess.Config{ApiKey: essAPIKey})
+		u, err := client.GetUser(ctx, ess.GetUserRequest{})
+		if err != nil {
+			return fmt.Errorf("unable to successfully connect to ESS API: %w", err)
+		}
+
+		if u.User.UserID != 0 {
+			// We have a user. All set!
+			authSuccess = true
+			continue
+		}
+
+		fmt.Fprintln(os.Stderr, "❌  ESS authentication unsuccessful")
+		essAPIKey, err = askAndPersistEssAPIKey()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func askAndPersistEssAPIKey() (string, error) {
+	essAPIKey, err := stringPrompt("Please provide a ESS (QA) API key:")
+	if err != nil {
+		return "", err
+	}
+
+	// Write API key to file for future use
+	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0600); err != nil {
+		return "", fmt.Errorf("unable to persiste ESS API key for future use: %w", err)
+	}
+
+	return essAPIKey, nil
+}
+
+// stringPrompt asks for a string value using the label
+func stringPrompt(prompt string) (string, error) {
+	r := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Fprint(os.Stdout, prompt+" ")
+		s, err := r.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("unable to read answer: %w", err)
+		}
+
+		s = strings.TrimSpace(s)
+		fmt.Println("s:", s)
+		if s != "" {
+			return s, nil
+		}
+	}
+
+	return "", nil
 }
