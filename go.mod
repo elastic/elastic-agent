@@ -3,7 +3,7 @@ module github.com/elastic/elastic-agent
 go 1.19
 
 require (
-	github.com/Masterminds/semver/v3 v3.1.1
+	github.com/Masterminds/semver v1.5.0
 	github.com/Microsoft/go-winio v0.6.0
 	github.com/antlr/antlr4 v0.0.0-20200820155224-be881fa6b91d
 	github.com/billgraziano/dpapi v0.4.0
