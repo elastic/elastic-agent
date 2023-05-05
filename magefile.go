@@ -72,8 +72,6 @@ var Aliases = map[string]interface{}{
 	"demo":  Demo.Enroll,
 }
 
-var essAPIKeyFile string
-
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
 	test.RegisterDeps(UnitTest)
@@ -82,12 +80,6 @@ func init() {
 
 	devtools.Platforms = devtools.Platforms.Filter("!linux/386")
 	devtools.Platforms = devtools.Platforms.Filter("!windows/386")
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		panic(fmt.Errorf("unable to determine user's home directory: %w", err))
-	}
-	essAPIKeyFile = filepath.Join(homeDir, ".config", "ess", "api_key.txt")
 }
 
 // Default set to build everything by default.
@@ -1373,7 +1365,13 @@ func authGCP(ctx context.Context) error {
 }
 
 func authESS(ctx context.Context) error {
-	_, err := os.Stat(essAPIKeyFile)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine user's home directory: %w", err)
+	}
+	essAPIKeyFile := filepath.Join(homeDir, ".config", "ess", "api_key.txt")
+
+	_, err = os.Stat(essAPIKeyFile)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0700); err != nil {
 			return fmt.Errorf("unable to create ESS config directory: %w", err)
