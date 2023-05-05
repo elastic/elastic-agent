@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -1284,6 +1285,21 @@ func (Integration) Local(ctx context.Context) error {
 	return devtools.GoTest(ctx, params)
 }
 
+// authenticates users who run it to various IaaS CSPs and ESS
+func (Integration) Auth(ctx context.Context) error {
+	if err := authGCP(ctx); err != nil {
+		return fmt.Errorf("unable to authenticate to GCP: %w", err)
+	}
+
+	// TODO: Authenticate user to AWS
+
+	// TODO: Authenticate user to Azure
+
+	// TODO: Authenticate user to ESS
+
+	return nil
+}
+
 func shouldBuildAgent() bool {
 	build := os.Getenv("BUILD_AGENT")
 	if build == "" {
@@ -1294,4 +1310,41 @@ func shouldBuildAgent() bool {
 		return false
 	}
 	return ret
+}
+
+// Pre-requisite: user must have the gcloud CLI installed
+func authGCP(ctx context.Context) error {
+	// Check if gcloud CLI is installed
+	const cliName = "gcloud"
+	cmd := exec.Command("which", cliName)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s CLI is not installed: %w", cliName, err)
+	}
+
+	// Check if user is already authenticated
+	cmd = exec.Command(cliName, "auth", "list", "--filter=status:ACTIVE", "--format=json")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("unable to list authenticated accounts: %w", err)
+	}
+
+	var authList []struct {
+		Account string `json:"account"`
+	}
+	if err := json.Unmarshal(output, &authList); err != nil {
+		return fmt.Errorf("unable to parse authenticated accounts: %w", err)
+	}
+
+	if len(authList) > 0 {
+		// We have at least one authenticated, active account. All set!
+		return nil
+	}
+
+	// Try to authenticate user
+	cmd = exec.Command(cliName, "auth", "login")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("unable to login user: %w", cliName, err)
+	}
+
+	return nil
 }
