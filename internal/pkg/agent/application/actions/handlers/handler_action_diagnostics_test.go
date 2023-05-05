@@ -220,7 +220,7 @@ func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 	diagAction := &fleetapi.ActionDiagnostics{}
 	handler.collectDiag(context.Background(), diagAction, mockAcker)
 
-	// assert that we logged an ERROR log that includes the error from uploader and the action
+	// assert that we logged an ERROR log that includes the error from the zip compression and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
 			FilterFieldKey("err").
@@ -258,7 +258,7 @@ func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 	diagAction := &fleetapi.ActionDiagnostics{}
 	handler.collectDiag(context.Background(), diagAction, mockAcker)
 
-	// assert that we logged an ERROR log that includes the error from uploader and the action
+	// assert that we logged an ERROR log that includes the error from acker and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
 			FilterField(zapcore.Field{Key: "err", Type: zapcore.ErrorType, Interface: ackError}).
@@ -297,7 +297,7 @@ func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 	diagAction := &fleetapi.ActionDiagnostics{}
 	handler.collectDiag(context.Background(), diagAction, mockAcker)
 
-	// assert that we logged an ERROR log that includes the error from uploader and the action
+	// assert that we logged an ERROR log that includes the error from acker and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
 			FilterField(zapcore.Field{Key: "err", Type: zapcore.ErrorType, Interface: commitError}).
@@ -334,7 +334,7 @@ func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 	cancel()
 	handler.collectDiag(ctx, diagAction, mockAcker)
 
-	// assert that we logged an ERROR log that includes the error from uploader and the action
+	// assert that we logged an ERROR log that includes the error from running the hooks with an expired context and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
 			FilterField(zapcore.Field{Key: "err", Type: zapcore.ErrorType, Interface: context.Canceled}).
