@@ -12,7 +12,8 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 
-	tools "github.com/elastic/elastic-agent/testing/e2e/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
