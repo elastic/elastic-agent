@@ -62,13 +62,45 @@ func New(expression string) (*Expression, error) {
 		return nil, ErrEmptyExpression
 	}
 
+	errorListener := newErrorListener()
 	input := antlr.NewInputStream(expression)
 	lexer := parser.NewEqlLexer(input)
 	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errorListener)
 	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	p := parser.NewEqlParser(tokens)
 	p.RemoveErrorListeners()
+	p.AddErrorListener(errorListener)
 	tree := p.ExpList()
 
+	if len(errorListener.errors) > 0 {
+		// TODO: When we hit go 1.20 this should become
+		// errors.Join(errorListener.errors...) so we include all the errors
+		// instead of just the first one.
+		return nil, errorListener.errors[0]
+	}
+
 	return &Expression{expression: expression, tree: tree}, nil
+}
+
+// A simple listener that collects errors reported by antlr for reporting
+// from eql.New. Create via newErrorListener.
+type errorListener struct {
+	antlr.ErrorListener
+	errors []error
+}
+
+func newErrorListener() *errorListener {
+	return &errorListener{antlr.NewDefaultErrorListener(), nil}
+}
+
+func (el *errorListener) SyntaxError(
+	recognizer antlr.Recognizer,
+	offendingSymbol interface{},
+	line, column int,
+	msg string,
+	e antlr.RecognitionException,
+) {
+	el.errors = append(el.errors,
+		fmt.Errorf("condition line %d column %d: %v", line, column, msg))
 }

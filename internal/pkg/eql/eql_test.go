@@ -305,6 +305,9 @@ func TestEql(t *testing.T) {
 		{expression: "length('hello')", err: true},
 		{expression: "length()", err: true},
 		{expression: "donotexist()", err: true},
+		{expression: "${***} != ${~~~}", err: true},
+		{expression: "false asdf!@#$", err: true},
+		{expression: "length('something' 345) > 1000", err: true},
 	}
 
 	store := &testVarStore{
