@@ -4,7 +4,6 @@
 package tests
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -79,12 +78,12 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 
 	require.Eventually(s.T(), agentStatus("online", *s), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
-	err = s.client.UpgradeAgent(context.TODO(), "8.6.1")
+	err = tools.UpgradeAgent(s.client, "8.6.1")
 	require.Nil(s.T(), err, "Elastic agent upgrade cmd failed")
 
 	require.Eventually(s.T(), agentStatus("online", *s), 5*time.Minute, 5*time.Second, "Agent status is not online")
 
-	version, err := s.client.GetAgentVersion(context.Background())
+	version, err := tools.GetAgentVersion(s.client)
 	require.Nil(s.T(), err, "Couldn't get agent ebsion from Fleet")
 
 	require.Equal(s.T(), version, "8.6.1", "Elastic egent version is incorrect")
@@ -92,7 +91,7 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 
 func (s *UpgradeElasticAgent) TearDownTest() {
 	s.T().Log("Un-enrolling elastic agent")
-	assert.NoError(s.T(), s.client.UnEnrollAgent(context.Background()))
+	assert.NoError(s.T(), tools.UnEnrollAgent(s.client))
 	s.T().Log("Uninstalling elastic agent")
 	assert.NoError(s.T(), tools.UninstallAgent(s.T()))
 }
@@ -103,7 +102,7 @@ func TestElasticAgentUpgrade(t *testing.T) {
 
 func agentStatus(expectedStatus string, suite UpgradeElasticAgent) func() bool {
 	return func() bool {
-		status, err := suite.client.GetAgentStatus(context.Background())
+		status, err := tools.GetAgentStatus(suite.client)
 		if err != nil {
 			suite.T().Error(err)
 		}
