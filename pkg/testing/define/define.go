@@ -13,14 +13,22 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-sysinfo"
+	"github.com/elastic/go-sysinfo/types"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 )
+
+var osInfo *types.OSInfo
+var osInfoErr error
+var osInfoOnce sync.Once
 
 // Require defines what this test requires for it to be run by the test runner.
 //
@@ -48,7 +56,7 @@ type Info struct {
 
 // Version returns the version of the Elastic Agent the tests should be using.
 func Version() string {
-	ver := os.Getenv("TEST_DEFINE_AGENT_VERSION")
+	ver := os.Getenv("AGENT_VERSION")
 	if ver == "" {
 		return version.GetDefaultVersion()
 	}
@@ -57,7 +65,7 @@ func Version() string {
 
 // NewFixture returns a new Elastic Agent testing fixture.
 func NewFixture(t *testing.T, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	buildsDir := os.Getenv("TEST_DEFINE_AGENT_BUILD_DIR")
+	buildsDir := os.Getenv("AGENT_BUILD_DIR")
 	if buildsDir == "" {
 		projectDir, err := findProjectRoot()
 		if err != nil {
@@ -91,16 +99,89 @@ func findProjectRoot() (string, error) {
 	}
 }
 
+func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
+	// always validate requirement is valid
+	if err := req.Validate(); err != nil {
+		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
+	}
+	if !req.Local && !local {
+		t.Skip("running local only tests and this test doesn't support local")
+		return nil
+	}
+	if req.Sudo {
+		// we can run sudo tests if we are being executed as root
+		root, err := utils.HasRoot()
+		if err != nil {
+			panic(fmt.Sprintf("test %s failed to determine if running as root: %s", t.Name(), err))
+		}
+		if !root {
+			t.Skip("not running as root and test requires root")
+			return nil
+		}
+	}
+	// need OS info to determine if the test can run
+	osInfo, err := getOSInfo()
+	if err != nil {
+		panic("failed to get OS information")
+	}
+	if !req.runtimeAllowed(runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform) {
+		t.Skip("platform, architecture, version, and distro not supported by test")
+		return nil
+	}
+	namespace, err := getNamespace(t, local)
+	if err != nil {
+		panic(err)
+	}
+	info := &Info{
+		Namespace: namespace,
+	}
+	if req.Stack != nil {
+		info.ESClient, err = getESClient()
+		if err != nil {
+			if local {
+				t.Skipf("test requires a stack but failed to create a valid client to elasticsearch: %s", err)
+				return nil
+			}
+			// non-local test and stack was required
+			panic(err)
+		}
+		info.KibanaClient, err = getKibanaClient()
+		if err != nil {
+			if local {
+				t.Skipf("test requires a stack but failed to create a valid client to kibana: %s", err)
+				return nil
+			}
+			// non-local test and stack was required
+			panic(err)
+		}
+	}
+	return info
+}
+
+func getOSInfo() (*types.OSInfo, error) {
+	osInfoOnce.Do(func() {
+		sysInfo, err := sysinfo.Host()
+		if err != nil {
+			osInfoErr = err
+		} else {
+			osInfo = sysInfo.Info().OS
+		}
+	})
+	return osInfo, osInfoErr
+}
+
 // getNamespace is a general namespace that the test can use that will ensure that it
 // is unique and won't collide with other tests (even the same test from a different batch).
 //
 // this function uses a sha256 of the prefix, package and test name, to ensure that the
 // length of the namespace is not over the 100 byte limit from Fleet
 // see: https://www.elastic.co/guide/en/fleet/current/data-streams.html#data-streams-naming-scheme
-func getNamespace(t *testing.T, defaultNamespace string) (string, error) {
+func getNamespace(t *testing.T, local bool) (string, error) {
 	prefix := os.Getenv("TEST_DEFINE_PREFIX")
 	if prefix == "" {
-		prefix = defaultNamespace
+		if local {
+			prefix = "local"
+		}
 		if prefix == "" {
 			return "", errors.New("TEST_DEFINE_PREFIX must be defined by the test runner")
 		}

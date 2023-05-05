@@ -165,7 +165,7 @@ func TestSpecificCombinationWithCloud(t *testing.T) {
 				Version: "20.04",
 			},
 		},
-		Cloud: &define.Cloud{
+		Stack: &define.Stack{
 			Version: "8.8.0",
 		},
 	})

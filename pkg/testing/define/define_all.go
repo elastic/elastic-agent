@@ -7,31 +7,9 @@
 package define
 
 import (
-	"fmt"
 	"testing"
 )
 
 func defineAction(t *testing.T, req Requirements) *Info {
-	// always validate requirement is valid
-	if err := req.Validate(); err != nil {
-		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
-	}
-	namespace, err := getNamespace(t, "")
-	if err != nil {
-		panic(err)
-	}
-	info := &Info{
-		Namespace: namespace,
-	}
-	if req.Stack != nil {
-		info.ESClient, err = getESClient()
-		if err != nil {
-			panic(err)
-		}
-		info.KibanaClient, err = getKibanaClient()
-		if err != nil {
-			panic(err)
-		}
-	}
-	return info
+	return runOrSkip(t, req, false)
 }
