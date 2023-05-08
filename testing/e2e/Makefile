@@ -1,5 +1,6 @@
 STACK_VERSION ?= 8.6.1
 AGENT_VERSION ?= 8.6.0
+GO_VERSION ?= $(shell cat ../../.go-version)
 CLUSTER_DIGEST_FILE ?= cluster-digest.yml
 CLUSTER_INFO_FILE ?= cluster-info.json
 CLUSTER_NAME ?= e2e-elasic-agent-$(shell date +%s)
@@ -7,7 +8,6 @@ TEMPLATE_FILE ?= test-cluster.yml.tpl
 SLACK_CHANNEL ?= @U0396725PSN
 # The directory where the pre-downloaded agent binary is stored.
 ARTIFACTS_DIR := e2e_artifacts
-
 LOCAL_SSH_KEY ?= ~/.ssh/id_rsa
 
 check_defined = \
@@ -18,7 +18,7 @@ __check_defined = \
       $(error Undefined $1$(if $2, ($2))))
 
 .PHONY: clean
-clean: 
+clean:
 	rm $(CURDIR)/$(CLUSTER_INFO_FILE)
 
 .PHONY: set-arch
@@ -27,7 +27,7 @@ ifeq ($(filter $(shell uname -m),x86_64 amd64),$(shell uname -m))
 	$(eval ARCH := x86_64)
 	echo "x86_64"
 else ifeq ($(filter $(shell uname -m),aarch64 arm64),$(shell uname -m))
-	$(eval ARCH := arm64)	
+	$(eval ARCH := arm64)
 endif
 
 .PHONY: download-agent
@@ -49,10 +49,17 @@ create-cluster:
 .PHONY: run-tests
 run-tests: set-arch
 	@$(call check_defined, AGENT_VERSION, AGENT_VERSION is not defined)
-	AGENT_VERSION=$(AGENT_VERSION) AGENT_BIN_PATH=$(CURDIR)/$(ARTIFACTS_DIR)/elastic-agent-$(AGENT_VERSION)-linux-$(ARCH)/elastic-agent go test -v -timeout 300s -tags=e2e github.com/elastic/elastic-agent/testing/e2e
+	docker run \
+		--rm \
+		-v $(CURDIR)/../..:/mnt/e2e \
+		-w /mnt/e2e \
+		golang:$(GO_VERSION) \
+			sh -c 'AGENT_VERSION=$(AGENT_VERSION) \
+			AGENT_BIN_PATH=/mnt/e2e/testing/e2e/$(ARTIFACTS_DIR)/elastic-agent-$(AGENT_VERSION)-linux-$(ARCH)/elastic-agent \
+			go test -v -timeout 300s -tags=e2e github.com/elastic/elastic-agent/testing/e2e/tests/...'
 
 .PHONY: destroy-cluster
-destroy-cluster:	
+destroy-cluster:
 	oblt-cli cluster destroy --force --cluster-name $$(jq -r '.ClusterName' $(CURDIR)/$(CLUSTER_INFO_FILE))
 
 .PHONY: start-ubuntu
@@ -64,4 +71,3 @@ start-ubuntu:
     -v `pwd`:`pwd` \
     -w `pwd` gorambo/ogc:v4 \
     ogc e2e/infra/ubuntu.py up -v
-	
