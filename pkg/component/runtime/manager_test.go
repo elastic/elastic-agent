@@ -2908,16 +2908,6 @@ func testBinary(t *testing.T, name string) string {
 	return binaryPath
 }
 
-func fakeBinaryPath(name string) string {
-	binaryPath := filepath.Join("..", "fake", name, name)
-
-	if runtime.GOOS == component.Windows {
-		binaryPath += exeExt
-	}
-
-	return binaryPath
-}
-
 type testMonitoringManager struct{}
 
 func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManager{} }
