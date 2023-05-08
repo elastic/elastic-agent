@@ -1301,7 +1301,6 @@ func (Integration) Auth(ctx context.Context) error {
 
 	// TODO: Authenticate user to Azure
 
-	// TODO: Authenticate user to ESS
 	if err := authESS(ctx); err != nil {
 		return fmt.Errorf("unable to authenticate to ESS: %w", err)
 	}
