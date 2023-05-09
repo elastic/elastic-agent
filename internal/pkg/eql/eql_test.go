@@ -43,6 +43,7 @@ func TestEqlNewReportsBadSyntax(t *testing.T) {
 		"${asdf}...",
 		"${...}",
 		"${a.b.}",
+		"${a..b}",
 	}
 	for _, expression := range testCases {
 		_, err := New(expression)
