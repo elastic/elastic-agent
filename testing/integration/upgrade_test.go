@@ -73,8 +73,10 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 	enrollmentToken, err := s.requirementsInfo.KibanaClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
 	require.NoError(s.T(), err)
 
-	// TODO: figure out how to get Fleet Server URL
-	fleetServerURL := ""
+	// Get default fleet server URL
+	fleetServerURL, err := tools.GetDefaultFleetServerURL(s.requirementsInfo.KibanaClient)
+	require.NoError(s.T(), err)
+
 	output, err := tools.EnrollElasticAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
 	if err != nil {
 		s.T().Log(string(output))
