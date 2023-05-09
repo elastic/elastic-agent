@@ -1401,7 +1401,7 @@ func authESS(ctx context.Context) error {
 		}
 
 		if u.User.UserID != 0 {
-			// We have a user. All set!
+			// We have a user. It indicates that the API key works. All set!
 			authSuccess = true
 			continue
 		}
