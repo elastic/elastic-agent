@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"runtime"
 	"syscall"
@@ -67,7 +68,7 @@ func (c *mockCommunicator) CheckinObserved() <-chan *proto.CheckinObserved {
 	return c.ch
 }
 
-const testPort = 6788
+var testPort = rand.Intn(6799) + 6700
 
 func getAddress() string {
 	return fmt.Sprintf("127.0.0.1:%d", testPort)

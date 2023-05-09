@@ -316,6 +316,11 @@ func (Check) Changes() error {
 	return nil
 }
 
+// SonarCloud Upload to sonar cloud
+func (c Check) SonarCloud() {
+	mg.Deps(devtools.SonarCloud.UploadSonarCloud)
+}
+
 // All runs all the tests.
 func (Test) All() {
 	mg.SerialDeps(Test.Unit)
