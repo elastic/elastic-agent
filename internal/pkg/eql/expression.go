@@ -7,9 +7,9 @@ package eql
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
@@ -74,11 +74,8 @@ func New(expression string) (*Expression, error) {
 	p.AddErrorListener(errorListener)
 	tree := p.ExpList()
 
-	if len(errorListener.errors) > 0 {
-		// TODO: When we hit go 1.20 this should become
-		// errors.Join(errorListener.errors...) so we include a real collective
-		// error instead of just one error concatenating all the messages.
-		return nil, fmt.Errorf("parsing error: %v", strings.Join(errorListener.errors, "\n"))
+	if errorListener.errors != nil {
+		return nil, errorListener.errors
 	}
 
 	return &Expression{expression: expression, tree: tree}, nil
@@ -88,7 +85,10 @@ func New(expression string) (*Expression, error) {
 // from eql.New. Create via newErrorListener.
 type errorListener struct {
 	antlr.ErrorListener
-	errors []string
+
+	// "errors" uses multierror to store all parse errors in a single
+	// error object.
+	errors error
 }
 
 func newErrorListener() *errorListener {
@@ -102,6 +102,6 @@ func (el *errorListener) SyntaxError(
 	msg string,
 	e antlr.RecognitionException,
 ) {
-	el.errors = append(el.errors,
-		fmt.Sprintf("condition line %d column %d: %v", line, column, msg))
+	el.errors = multierror.Append(el.errors,
+		fmt.Errorf("condition line %d column %d: %v", line, column, msg))
 }
