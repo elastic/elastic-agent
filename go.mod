@@ -165,5 +165,11 @@ replace (
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
 
+// FIXME: Remove these after testing https://github.com/elastic/elastic-agent/pull/2638
+replace (
+	github.com/elastic/elastic-agent-autodiscover => ../elastic-agent-autodiscover
+	github.com/elastic/elatic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20230509203943-bda0ff6ed73c
+)
+
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
