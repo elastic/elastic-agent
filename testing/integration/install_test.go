@@ -32,6 +32,12 @@ func TestInstall(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
+
+		// Since this test sets the location on the
+		// filesystem where Elastic Agent will be
+		// installed, it's probably safest not to run
+		// it along with other tests.
+		Isolate: true,
 	})
 
 	// Get path to Elastic Agent executable
