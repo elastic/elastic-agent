@@ -306,6 +306,82 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	return cmd.CombinedOutput()
 }
 
+// ExecComponent executes the `elastic-agent component` sub-command
+func (f *Fixture) ExecComponent(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "component", args, opts...)
+
+}
+
+// ExecDiagnostics executes the `elastic-agent diagnostics` sub-command
+func (f *Fixture) ExecDiagnostics(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "diagnostics", args, opts...)
+
+}
+
+// ExecEnroll executes the `elastic-agent enroll` sub-command
+func (f *Fixture) ExecEnroll(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "enroll", args, opts...)
+
+}
+
+// ExecInspect executes the `elastic-agent inspect` sub-command
+func (f *Fixture) ExecInspect(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "inspect", args, opts...)
+
+}
+
+// ExecInstall executes the `elastic-agent install` sub-command
+func (f *Fixture) ExecInstall(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "install", args, opts...)
+
+}
+
+// ExecRestart executes the `elastic-agent restart` sub-command
+func (f *Fixture) ExecRestart(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "restart", args, opts...)
+
+}
+
+// ExecRun executes the `elastic-agent run` sub-command
+func (f *Fixture) ExecRun(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "run", args, opts...)
+
+}
+
+// ExecStatus executes the `elastic-agent status` sub-command
+func (f *Fixture) ExecStatus(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "status", args, opts...)
+
+}
+
+// ExecUninstall executes the `elastic-agent uninstall` sub-command
+func (f *Fixture) ExecUninstall(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "uninstall", args, opts...)
+
+}
+
+// ExecUpgrade executes the `elastic-agent upgrade` sub-command
+func (f *Fixture) ExecUpgrade(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "upgrade", args, opts...)
+}
+
+// ExecVersion executes the `elastic-agent version` sub-command
+func (f *Fixture) ExecVersion(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "version", args, opts...)
+}
+
+// ExecWatch executes the `elastic-agent watch` sub-command
+func (f *Fixture) ExecWatch(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	return f.execSubCommand(ctx, "watch", args, opts...)
+}
+
+func (f *Fixture) execSubCommand(ctx context.Context, subCommand string, args []string, opts ...process.CmdOption) ([]byte, error) {
+	cmdArgs := []string{subCommand}
+	cmdArgs = append(cmdArgs, args...)
+
+	return f.Exec(ctx, cmdArgs, opts...)
+}
+
 func (f *Fixture) ensurePrepared(ctx context.Context) error {
 	if f.workDir == "" {
 		return f.Prepare(ctx)
