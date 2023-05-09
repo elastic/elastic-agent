@@ -1416,7 +1416,7 @@ func authESS(ctx context.Context) error {
 
 	// Write API key to file for future use
 	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0600); err != nil {
-		return fmt.Errorf("unable to persiste ESS API key for future use: %w", err)
+		return fmt.Errorf("unable to persist ESS API key for future use: %w", err)
 	}
 
 	return nil
