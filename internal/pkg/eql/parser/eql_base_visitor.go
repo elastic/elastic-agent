@@ -1,12 +1,8 @@
-// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
-
-// Code generated from Eql.g4 by ANTLR 4.7.1. DO NOT EDIT.
+// Code generated from Eql.g4 by ANTLR 4.12.0. DO NOT EDIT.
 
 package parser // Eql
 
-import "github.com/antlr/antlr4/runtime/Go/antlr"
+import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 type BaseEqlVisitor struct {
 	*antlr.BaseParseTreeVisitor
