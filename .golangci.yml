@@ -55,6 +55,7 @@ linters:
     - unconvert # Remove unnecessary type conversions
     - wastedassign # wastedassign finds wasted assignment statements.
     - gomodguard # check for blocked dependencies
+    - gomoddirectives
 
 # all available settings of specific linters
 linters-settings:
@@ -102,6 +103,9 @@ linters-settings:
   gomoddirectives:
     # Forbid local `replace` directives
     replace-local: false
+
+    # Forbid any non-local `replace` directives as well
+    replace-allow-list: []
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
