@@ -1375,10 +1375,21 @@ func authGCP(ctx context.Context) error {
 		return fmt.Errorf("unable to get project: %w", err)
 	}
 
-	const expectedProject = "elastic-obs-integrations-dev"
+	const expectedProject = "elastic-platform-ingest"
 	project := strings.TrimSpace(string(output))
-	if project != expectedProject {
-		return fmt.Errorf("please configure %s to use the %s project (currently using the %s project)", cliName, expectedProject, project)
+	if project == expectedProject {
+		// We're all set!
+		return nil
+	}
+
+	// Attempt to select correct GCP project
+	fmt.Printf("Attempting to switch GCP project from [%s] to [%s]...\n", project, expectedProject)
+	cmd = exec.CommandContext(ctx, cliName, "config", "set", "core/project", expectedProject)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err = cmd.Run(); err != nil {
+		return fmt.Errorf("unable to switch project from [%s] to [%s]: %w", project, expectedProject, err)
 	}
 
 	return nil
