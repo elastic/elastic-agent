@@ -156,6 +156,7 @@ require (
 	k8s.io/klog/v2 v2.30.0 // indirect
 )
 
+//nolint:gomoddirectives // these replacements are approved
 replace (
 	github.com/Microsoft/go-winio => github.com/bi-zone/go-winio v0.4.15
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
