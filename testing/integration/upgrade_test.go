@@ -106,15 +106,15 @@ func (s *UpgradeElasticAgent) TearDownTest() {
 }
 
 func TestElasticAgentUpgrade(t *testing.T) {
-	previousVersion, err := getPreviousMinorVersion(currentVersion)
-	require.NoError(t, err)
-
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
 		Isolate: false,
 		Sudo:    true, // requires Agent installation
 	})
+
+	previousVersion, err := getPreviousMinorVersion(currentVersion)
+	require.NoError(t, err)
 
 	suite.Run(t, newUpgradeElasticAgentTestSuite(info, previousVersion, currentVersion))
 }
