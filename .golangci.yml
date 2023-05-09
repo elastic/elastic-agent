@@ -104,8 +104,15 @@ linters-settings:
     # Forbid local `replace` directives
     replace-local: false
 
-    # Forbid any non-local `replace` directives as well
-    replace-allow-list: []
+    # Forbid any `replace` directives that are intended temporarily only during
+    # development. The modules listed below are intended to be replaced permanently.
+    replace-allow-list:
+      - github.com/Microsoft/go-winio
+      - github.com/Shopify/sarama
+      - github.com/dop251/goja
+      - github.com/dop251/goja_nodejs
+      - github.com/fsnotify/fsnotify
+      - github.com/tonistiigi/fifo
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
