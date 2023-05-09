@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -41,6 +41,8 @@ func TestEqlNewReportsBadSyntax(t *testing.T) {
 		"1+=2",
 		"1.23f == ''",
 		"${asdf}...",
+		"${...}",
+		"${a.b.}",
 	}
 	for _, expression := range testCases {
 		_, err := New(expression)
