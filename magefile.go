@@ -1360,6 +1360,21 @@ func authGCP(ctx context.Context) error {
 		}
 	}
 
+	// Skip additional Elastic-specific checks if so requested
+	const skipEnvVar = "TEST_INTEG_AUTH_GCP_SKIP_ELASTIC_CHECK"
+	skipElasticChecks := os.Getenv(skipEnvVar)
+	if skipElasticChecks != "" {
+		shouldSkip, err := strconv.ParseBool(skipElasticChecks)
+		if err != nil {
+			return fmt.Errorf("unable to parse environment variable %s as boolean: %w", skipEnvVar, err)
+		}
+
+		if shouldSkip {
+			// We're all set, no further checks to do.
+			return nil
+		}
+	}
+
 	// Check that authenticated account's email domain name
 	const expectedEmailDomain = "elastic.co"
 	email := authList[0].Account
