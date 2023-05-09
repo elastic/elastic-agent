@@ -84,9 +84,7 @@ func (i *InstallTestSuite) TestInstallWithoutBasePath() {
 }
 
 func (i *InstallTestSuite) TestInstallWithBasePath() {
-	tmpDir := os.TempDir()
-	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
-	defer os.RemoveAll(randomBasePath)
+	const basePathFlag = "--base-path"
 
 	// The `--base-path` flag is defined for the `elastic-agent install` CLI sub-command BUT
 	// it is hidden (see https://github.com/elastic/elastic-agent/pull/2592).  So we validate
@@ -94,11 +92,17 @@ func (i *InstallTestSuite) TestInstallWithBasePath() {
 	// flag in it.
 	output, err := i.fixture.Exec(context.Background(), []string{"help", "install"})
 	i.Require().NoError(err)
-	require.NotContains(i.T(), string(output), "--base-path")
+	require.NotContains(i.T(), string(output), basePathFlag)
+
+	// Set up random temporary directory to serve as base path for Elastic Agent
+	// installation.
+	tmpDir := os.TempDir()
+	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	defer os.RemoveAll(randomBasePath)
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	_, err = i.fixture.Exec(context.Background(), []string{"install", "--base-path", randomBasePath, "--force"})
+	_, err = i.fixture.Exec(context.Background(), []string{"install", basePathFlag, randomBasePath, "--force"})
 	i.Require().NoError(err)
 
 	// Check that Agent was installed in the custom base path
