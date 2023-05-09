@@ -16,9 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/suite"
-
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestInstall(t *testing.T) {
