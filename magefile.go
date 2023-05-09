@@ -1331,6 +1331,9 @@ func authGCP(ctx context.Context) error {
 	}
 
 	// Check if user is already authenticated
+	var authList []struct {
+		Account string `json:"account"`
+	}
 	for authSuccess := false; !authSuccess; {
 		cmd = exec.CommandContext(ctx, cliName, "auth", "list", "--filter=status:ACTIVE", "--format=json")
 		output, err := cmd.Output()
@@ -1338,9 +1341,6 @@ func authGCP(ctx context.Context) error {
 			return fmt.Errorf("unable to list authenticated accounts: %w", err)
 		}
 
-		var authList []struct {
-			Account string `json:"account"`
-		}
 		if err := json.Unmarshal(output, &authList); err != nil {
 			return fmt.Errorf("unable to parse authenticated accounts: %w", err)
 		}
@@ -1358,6 +1358,27 @@ func authGCP(ctx context.Context) error {
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("unable to authenticate user: %w", cliName, err)
 		}
+	}
+
+	// Check that authenticated account's email domain name
+	const expectedEmailDomain = "elastic.co"
+	email := authList[0].Account
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 || parts[1] != expectedEmailDomain {
+		return fmt.Errorf("please authenticate with your @%s email address (currently authenticated with %s)", expectedEmailDomain, email)
+	}
+
+	// Check the authenticated account's project
+	cmd = exec.CommandContext(ctx, cliName, "config", "get", "core/project")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("unable to get project: %w", err)
+	}
+
+	const expectedProject = "elastic-obs-integrations-dev"
+	project := strings.TrimSpace(string(output))
+	if project != expectedProject {
+		return fmt.Errorf("please configure %s to use the %s project (currently using the %s project)", cliName, expectedProject, project)
 	}
 
 	return nil
