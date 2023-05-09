@@ -19,8 +19,6 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/version"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -108,12 +106,11 @@ func (s *UpgradeElasticAgent) TearDownTest() {
 }
 
 func TestElasticAgentUpgrade(t *testing.T) {
-	currentVersion := version.GetDefaultVersion()
 	previousVersion, err := getPreviousMinorVersion(currentVersion)
 	require.NoError(t, err)
 
 	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{Version: currentVersion},
+		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
 		Isolate: false,
 		Sudo:    true, // requires Agent installation
