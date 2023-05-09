@@ -167,7 +167,7 @@ replace (
 
 // FIXME: Remove these after testing https://github.com/elastic/elastic-agent/pull/2638
 replace (
-	github.com/elastic/elastic-agent-autodiscover => ../elastic-agent-autodiscover
+	//github.com/elastic/elastic-agent-autodiscover => ../elastic-agent-autodiscover
 	github.com/elastic/elatic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20230509203943-bda0ff6ed73c
 )
 
