@@ -99,6 +99,10 @@ linters-settings:
               - fmt
             reason: "This package is deprecated, use `fmt.Errorf` with `%w` instead"
 
+  gomoddirectives:
+    # Forbid local `replace` directives
+    replace-local: false
+
   gosimple:
     # Select the Go version to target. The default is '1.13'.
     go: "1.19.9"
