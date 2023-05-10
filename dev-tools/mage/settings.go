@@ -75,6 +75,9 @@ var (
 	SonarProjectKey  = EnvOr("SONAR_PROJECT", BeatName)
 	SonarHostUrl     = EnvOr("SONAR_HOST", "https://sonarcloud.io")
 	SonarQualityGate = EnvOr("SONAR_QUALITY_GATE", "false")
+	SonarPRBase      = EnvOr("GITHUB_PR_TARGET_BRANCH", "")
+	SonarPRBranch    = EnvOr("GITHUB_PR_BRANCH", "")
+	SonarPRNumber    = EnvOr("GITHUB_PR_NUMBER", "")
 
 	BeatProjectType ProjectType
 

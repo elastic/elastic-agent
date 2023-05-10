@@ -20,7 +20,10 @@ type GoSonarArgs struct {
 	Organization string
 	ProjectKey   string
 	SonarHostUrl string
-	QualityGate bool
+	QualityGate  bool
+	PRBase       string
+	PRBranch     string
+	PRNumber     string
 }
 
 type SonarCloud mg.Namespace
@@ -33,7 +36,10 @@ func DefaultGoSonarArgs() GoSonarArgs {
 		Organization: SonarOrg,
 		ProjectKey:   SonarProjectKey,
 		SonarHostUrl: SonarHostUrl,
-		QualityGate: SonarQualityGate=="true",
+		QualityGate:  SonarQualityGate == "true",
+		PRBase:       SonarPRBase,
+		PRBranch:     SonarPRBranch,
+		PRNumber:     SonarPRNumber,
 	}
 }
 
@@ -50,7 +56,7 @@ func GoUploadSonarCloud(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to determine repo root and package sub dir, %s", err)
 	}
-	mountPoint := filepath.ToSlash(filepath.Join("/usr", "src", repoInfo.CanonicalRootImportPath))
+	mountPoint := filepath.ToSlash(filepath.Join("/usr", "src"))
 
 	fmt.Println(">> sonarcloud:", params.SonarHostUrl)
 
@@ -65,12 +71,20 @@ func GoUploadSonarCloud(ctx context.Context) error {
 		sonarImage,
 
 		//Arguments for the CLI
-		fmt.Sprintf("-Dsonar.verbose=%s",+string(mg.Verbose())),
-		//TODO have this as parameter
-		"-Dsonar.pullrequest.base=main",
-		"-Dsonar.pullrequest.branch=sonar",
-		"-Dsonar.pullrequest.key=2632",
-		"-Dsonar.qualitygate.wait="+params.
+		fmt.Sprintf("-Dsonar.verbose=%t", mg.Verbose()),
+		fmt.Sprintf("-Dsonar.qualitygate.wait=%t", params.QualityGate),
 	)
+	if params.PRBase != "" && params.PRNumber != "" {
+		// Parameters that are parsed in order to analyse PR
+		fmt.Sprintf(">> running pull request analysis (%s#%s -> %s)\n", params.PRBranch, params.PRNumber, params.PRBase)
+		args = append(args,
+			fmt.Sprintf("-Dsonar.pullrequest.base=%s", params.PRBase),
+			fmt.Sprintf("-Dsonar.pullrequest.branch=%s", params.PRBranch),
+			fmt.Sprintf("-Dsonar.pullrequest.key=%s", params.PRNumber),
+		)
+	} else {
+		fmt.Printf(">> Running analysis on the main branch")
+	}
+
 	return dockerRun(args...)
 }
