@@ -19,7 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 )
 
-func TestFleetStateMapping(t *testing.T) {
+func TestStateMapping(t *testing.T) {
 
 	testcases := []struct {
 		name         string
