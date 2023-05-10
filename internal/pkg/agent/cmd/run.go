@@ -574,13 +574,8 @@ func handleUpgrade() error {
 
 	if upgradeMarker == nil {
 		// We're not being upgraded. Nothing more to do.
-		data := "no upgrade marker found\n"
-		os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
 		return nil
 	}
-
-	data := "previous version: " + upgradeMarker.PrevVersion + "\n"
-	os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
 
 	// In v8.8.0, we introduced a new installation marker file to indicate that
 	// an Agent was running as installed. When an installed Agent that's older
@@ -590,25 +585,15 @@ func handleUpgrade() error {
 	// https://github.com/elastic/elastic-agent/issues/2645).
 
 	installMarkerVersion := semver.MustParse("8.8.0")
-	data += "install marker version: " + installMarkerVersion.String() + "\n"
-	os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
-
 	prevVersion, err := semver.NewVersion(upgradeMarker.PrevVersion)
-	data += "previous version: " + prevVersion.String() + "\n"
-	os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
+
 	if !prevVersion.LessThan(installMarkerVersion) {
 		// We're upgrading from a version that contains the installation
 		// marker file. Nothing more to do.
-		data += "previous version >= install marker version\n"
-		os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
 		return nil
 	}
 
-	data += "creating install marker in " + paths.Top() + "...\n"
-	os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
 	if err := info.CreateInstallMarker(paths.Top()); err != nil {
-		data += "error creating install marker in " + paths.Top() + "\n"
-		os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
 
