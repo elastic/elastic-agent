@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"path/filepath"
 	"strings"
 )
 
@@ -19,21 +20,21 @@ type GoSonarArgs struct {
 	Organization string
 	ProjectKey   string
 	SonarHostUrl string
+	QualityGate bool
 }
 
 type SonarCloud mg.Namespace
 
 func DefaultGoSonarArgs() GoSonarArgs {
-	params := GoSonarArgs{
+	return GoSonarArgs{
 		Version:      SonarVersion,
 		ScannerOpts:  strings.Split(SonarScannerOpt, " "),
 		Token:        SonarToken,
 		Organization: SonarOrg,
 		ProjectKey:   SonarProjectKey,
 		SonarHostUrl: SonarHostUrl,
+		QualityGate: SonarQualityGate=="true",
 	}
-
-	return params
 }
 
 // UploadSonarCloud Upload testcoverage to SonarlCloud
@@ -45,12 +46,31 @@ func (SonarCloud) UploadSonarCloud() {
 
 func GoUploadSonarCloud(ctx context.Context) error {
 	params := DefaultGoSonarArgs()
+	repoInfo, err := GetProjectRepoInfo()
+	if err != nil {
+		return fmt.Errorf("failed to determine repo root and package sub dir, %s", err)
+	}
+	mountPoint := filepath.ToSlash(filepath.Join("/usr", "src", repoInfo.CanonicalRootImportPath))
+
 	fmt.Println(">> sonarcloud:", params.SonarHostUrl)
 
 	dockerRun := sh.RunCmd("docker", "run")
 	var args []string
 	sonarImage := fmt.Sprintf("sonarsource/sonar-scanner-cli:%s", params.Version)
 
-	args = append(args, sonarImage)
+	args = append(args,
+		"--rm",
+		"-v", repoInfo.RootDir+":"+mountPoint,
+		"--env", "SONAR_TOKEN="+params.Token,
+		sonarImage,
+
+		//Arguments for the CLI
+		fmt.Sprintf("-Dsonar.verbose=%s",+string(mg.Verbose())),
+		//TODO have this as parameter
+		"-Dsonar.pullrequest.base=main",
+		"-Dsonar.pullrequest.branch=sonar",
+		"-Dsonar.pullrequest.key=2632",
+		"-Dsonar.qualitygate.wait="+params.
+	)
 	return dockerRun(args...)
 }

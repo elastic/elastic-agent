@@ -68,12 +68,13 @@ var (
 	BeatUser        = EnvOr("BEAT_USER", "root")
 
 	// SonarCloud variables
-	SonarVersion    = EnvOr("SONAR_VERSION", "4.7.0")
-	SonarScannerOpt = EnvOr("SONAR_SCANNER_OPT", "-server")
-	SonarToken      = EnvOr("SONAR_TOKEN", "")
-	SonarOrg        = EnvOr("SONAR_ORG", "elastic-1")
-	SonarProjectKey = EnvOr("SONAR_PROJECT", BeatName)
-	SonarHostUrl    = EnvOr("SONAR_HOST", "https://sonarcloud.io")
+	SonarVersion     = EnvOr("SONAR_VERSION", "4.8.0")
+	SonarScannerOpt  = EnvOr("SONAR_SCANNER_OPT", "-server")
+	SonarToken       = EnvOr("SONAR_TOKEN", "")
+	SonarOrg         = EnvOr("SONAR_ORG", "elastic-1")
+	SonarProjectKey  = EnvOr("SONAR_PROJECT", BeatName)
+	SonarHostUrl     = EnvOr("SONAR_HOST", "https://sonarcloud.io")
+	SonarQualityGate = EnvOr("SONAR_QUALITY_GATE", "false")
 
 	BeatProjectType ProjectType
 
