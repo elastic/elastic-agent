@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+
 	"github.com/Masterminds/semver"
 	"github.com/google/uuid"
 
@@ -23,6 +25,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+func TestElasticAgentUpgrade(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack:   &define.Stack{},
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+	})
+
+	previousVersion, err := getPreviousMinorVersion(currentVersion)
+	require.NoError(t, err)
+
+	suite.Run(t, newUpgradeElasticAgentTestSuite(info, previousVersion, currentVersion))
+}
 
 type UpgradeElasticAgent struct {
 	suite.Suite
@@ -90,6 +106,10 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 
 	require.Eventually(s.T(), agentStatus("online", *s), 5*time.Minute, 5*time.Second, "Agent status is not online")
 
+	// Wait until the upgrade marker is removed, indicating the end of the
+	// upgrade process
+	require.Eventually(s.T(), upgradeMarkerRemoved, 10*time.Minute, 20*time.Second)
+
 	newVersion, err := tools.GetAgentVersion(s.requirementsInfo.KibanaClient)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), s.agentEndVersion, newVersion)
@@ -107,20 +127,6 @@ func (s *UpgradeElasticAgent) TearDownTest() {
 	require.NoError(s.T(), err)
 }
 
-func TestElasticAgentUpgrade(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation
-	})
-
-	previousVersion, err := getPreviousMinorVersion(currentVersion)
-	require.NoError(t, err)
-
-	suite.Run(t, newUpgradeElasticAgentTestSuite(info, previousVersion, currentVersion))
-}
-
 func agentStatus(expectedStatus string, suite UpgradeElasticAgent) func() bool {
 	return func() bool {
 		status, err := tools.GetAgentStatus(suite.requirementsInfo.KibanaClient)
@@ -130,6 +136,15 @@ func agentStatus(expectedStatus string, suite UpgradeElasticAgent) func() bool {
 		suite.T().Logf("Agent status: %s", status)
 		return status == expectedStatus
 	}
+}
+
+func upgradeMarkerRemoved() bool {
+	marker, err := upgrade.LoadMarker()
+	if err != nil {
+		return false
+	}
+
+	return marker == nil
 }
 
 func getPreviousMinorVersion(version string) (string, error) {
