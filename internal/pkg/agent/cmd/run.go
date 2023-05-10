@@ -564,8 +564,8 @@ func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
 }
 
 // handleUpgrade checks if agent is being run as part of an
-// ongoing upgrade operation and performs any upgrade-specific
-// work, if needed.
+// ongoing upgrade operation, i.e. being re-exec'd and performs
+// any upgrade-specific work, if needed.
 func handleUpgrade() error {
 	upgradeMarker, err := upgrade.LoadMarker()
 	if err != nil {
