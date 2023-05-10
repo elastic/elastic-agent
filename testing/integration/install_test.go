@@ -97,7 +97,7 @@ func (i *InstallTestSuite) TestInstallWithBasePath() {
 
 	// Set up random temporary directory to serve as base path for Elastic Agent
 	// installation.
-	tmpDir := os.TempDir()
+	tmpDir := i.T().TempDir()
 	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
 	defer os.RemoveAll(randomBasePath)
 
