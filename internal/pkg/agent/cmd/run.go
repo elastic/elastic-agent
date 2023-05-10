@@ -585,6 +585,9 @@ func handleUpgrade() error {
 
 	installMarkerVersion := semver.MustParse("8.8.0")
 	prevVersion, err := semver.NewVersion(upgradeMarker.PrevVersion)
+	if err != nil {
+		return fmt.Errorf("unable to determine previous version during upgrade: %w", err)
+	}
 
 	if !prevVersion.LessThan(installMarkerVersion) {
 		// We're upgrading from a version that contains the installation
