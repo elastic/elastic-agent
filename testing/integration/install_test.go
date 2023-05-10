@@ -41,7 +41,8 @@ func TestInstall(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture := define.NewFixture(t)
+	fixture, err := define.NewFixture(t)
+	require.NoError(t, err)
 
 	suite.Run(t, newInstallTestSuite(fixture))
 }
