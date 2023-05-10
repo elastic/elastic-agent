@@ -1442,8 +1442,7 @@ func authESS(ctx context.Context) error {
 		return fmt.Errorf("unable to read ESS API key: %w", err)
 	}
 
-	data = bytes.TrimSpace(data)
-	essAPIKey := string(data)
+	essAPIKey := strings.TrimSpace(string(data))
 
 	// Attempt to use API key to check if it's valid
 	for authSuccess := false; !authSuccess; {
