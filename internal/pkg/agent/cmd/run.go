@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/Masterminds/semver"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -102,6 +103,10 @@ func run(override cfgOverrider, testingMode bool, modifiers ...component.Platfor
 		service.NotifyTermination()
 		service.WaitExecutionDone()
 	}()
+
+	if err := handleUpgrade(); err != nil {
+		return fmt.Errorf("error checking for and handling upgrade: %w", err)
+	}
 
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	if err := locker.TryLock(); err != nil {
@@ -556,4 +561,56 @@ func setupMetrics(
 
 func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
 	return cfg != nil && cfg.HTTP.Enabled
+}
+
+// handleUpgrade checks if agent is being run as part of an
+// ongoing upgrade operation and performs any upgrade-specific
+// work, if needed.
+func handleUpgrade() error {
+	upgradeMarker, err := upgrade.LoadMarker()
+	if err != nil {
+		return fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
+	}
+
+	if upgradeMarker == nil {
+		// We're not being upgraded. Nothing more to do.
+		data := "no upgrade marker found\n"
+		os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
+		return nil
+	}
+
+	data := "previous version: " + upgradeMarker.PrevVersion + "\n"
+	os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
+
+	// In v8.8.0, we introduced a new installation marker file to indicate that
+	// an Agent was running as installed. When an installed Agent that's older
+	// than v8.8.0 is upgraded, this installation marker file is not present.
+	// So, in such cases, we need to create it manually post-upgrade.
+	// Otherwise, the upgrade will be unsuccessful (see
+	// https://github.com/elastic/elastic-agent/issues/2645).
+
+	installMarkerVersion := semver.MustParse("8.8.0")
+	data += "install marker version: " + installMarkerVersion.String() + "\n"
+	os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
+
+	prevVersion, err := semver.NewVersion(upgradeMarker.PrevVersion)
+	data += "previous version: " + prevVersion.String() + "\n"
+	os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
+	if !prevVersion.LessThan(installMarkerVersion) {
+		// We're upgrading from a version that contains the installation
+		// marker file. Nothing more to do.
+		data += "previous version >= install marker version\n"
+		os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
+		return nil
+	}
+
+	data += "creating install marker in " + paths.Top() + "...\n"
+	os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
+	if err := info.CreateInstallMarker(paths.Top()); err != nil {
+		data += "error creating install marker in " + paths.Top() + "\n"
+		os.WriteFile("/tmp/handle_upgrade", []byte(data), 0644)
+		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
+	}
+
+	return nil
 }
