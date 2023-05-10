@@ -15,7 +15,7 @@ require (
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
 	github.com/elastic/elastic-agent-autodiscover v0.2.1
 	github.com/elastic/elastic-agent-client/v7 v7.1.0
-	github.com/elastic/elastic-agent-libs v0.3.8
+	github.com/elastic/elastic-agent-libs v0.3.8-0.20230510160003-d0085fbc36c1
 	github.com/elastic/elastic-agent-system-metrics v0.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.0.0-20210317102009-a9d74cec0186
 	github.com/elastic/go-licenser v0.4.0
@@ -165,8 +165,6 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/adriansr/fsnotify v1.4.8-0.20211018144411-a81f2b630e7c
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )
-
-replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20230509191159-8d7df98f60f7
 
 // Exclude this version because the version has an invalid checksum.
 exclude github.com/docker/distribution v2.8.0+incompatible
