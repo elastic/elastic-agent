@@ -23,10 +23,28 @@ type CmdOpts interface {
 	toCmdArgs() []string
 }
 
+type EnrollOpts struct {
+	URL             string // --url
+	EnrollmentToken string // --enrollment-token
+}
+
+func (e EnrollOpts) toCmdArgs() []string {
+	var args []string
+	if e.URL != "" {
+		args = append(args, "--url", e.URL)
+	}
+	if e.EnrollmentToken != "" {
+		args = append(args, "--enrollment-token", e.EnrollmentToken)
+	}
+	return args
+}
+
 type InstallOpts struct {
 	BasePath       string // --base-path
 	Force          bool   // --force
 	NonInteractive bool   // --non-interactive
+
+	EnrollOpts
 }
 
 func (i InstallOpts) toCmdArgs() []string {
@@ -40,6 +58,8 @@ func (i InstallOpts) toCmdArgs() []string {
 	if i.NonInteractive {
 		args = append(args, "--non-interactive")
 	}
+
+	args = append(args, i.EnrollOpts.toCmdArgs()...)
 
 	return args
 }
