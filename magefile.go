@@ -243,25 +243,20 @@ func (Build) Clean() {
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
-	wd, _ := os.Getwd()
-	p := filepath.Join(wd, "pkg", "component", "fake")
-	for _, name := range []string{"component", "shipper"} {
-		binary := name
-		if runtime.GOOS == "windows" {
-			binary += ".exe"
-		}
-
-		fakeDir := filepath.Join(p, name)
-		outputName := filepath.Join(fakeDir, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join(fakeDir))
-		if err != nil {
-			return err
-		}
-		err = os.Chmod(outputName, 0755)
-		if err != nil {
-			return err
-		}
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
 	}
+	// p := filepath.Join(wd, "pkg", "component", "fake")
+	env := map[string]string{"REMOVE_FAKE_BINARIES": "false"}
+	err = sh.RunWithV(env, mg.GoCmd(),
+		"test",
+		"-run", "no-test", "-count", "1",
+		filepath.Join(wd, "pkg", "component", "runtime"))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

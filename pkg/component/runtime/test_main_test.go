@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -23,6 +24,8 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 
+	removeBinaries := os.Getenv("REMOVE_FAKE_BINARIES")
+
 	fakeCompPackage := path.Join("..", "fake", "component")
 	fakeShipperPackage := path.Join("..", "fake", "shipper")
 
@@ -31,29 +34,31 @@ func TestMain(m *testing.M) {
 
 	exitCode := m.Run()
 
-	errRmFakeComp := os.Remove(fakeCompBinPath)
-	if errRmFakeComp != nil {
-		fmt.Printf("failed to remove fake/component: %q: %v\n",
-			fakeShipperBinPath, errRmFakeComp)
-	}
+	if strings.ToLower(removeBinaries) != "false" {
+		errRmFakeComp := os.Remove(fakeCompBinPath)
+		if errRmFakeComp != nil {
+			fmt.Printf("failed to remove fake/component: %q: %v\n",
+				fakeShipperBinPath, errRmFakeComp)
+		}
 
-	errRmFakeshipper := os.Remove(fakeShipperBinPath)
-	if errRmFakeComp != nil {
-		fmt.Printf("failed to remove fake/shipper: %q: %v\n",
-			fakeShipperBinPath, errRmFakeshipper)
-	}
+		errRmFakeshipper := os.Remove(fakeShipperBinPath)
+		if errRmFakeComp != nil {
+			fmt.Printf("failed to remove fake/shipper: %q: %v\n",
+				fakeShipperBinPath, errRmFakeshipper)
+		}
 
-	switch {
-	case exitCode != 0 && errRmFakeComp == nil && errRmFakeshipper == nil:
-		fmt.Printf("tests exited with code %d, but clean up succeeded\n",
-			exitCode)
-	case exitCode == 0 && (errRmFakeComp != nil || errRmFakeshipper != nil):
-		fmt.Printf("test clean up failed: fake/component err:%v, fake/shipper err: %v\n",
-			errRmFakeComp, errRmFakeshipper)
-		exitCode = 1
-	case exitCode != 0 && (errRmFakeComp != nil || errRmFakeshipper != nil):
-		fmt.Printf("test exited with code %d. clean up failed: fake/component err:%v, fake/shipper err: %v\n",
-			exitCode, errRmFakeComp, errRmFakeshipper)
+		switch {
+		case exitCode != 0 && errRmFakeComp == nil && errRmFakeshipper == nil:
+			fmt.Printf("tests exited with code %d, but clean up succeeded\n",
+				exitCode)
+		case exitCode == 0 && (errRmFakeComp != nil || errRmFakeshipper != nil):
+			fmt.Printf("test clean up failed: fake/component err:%v, fake/shipper err: %v\n",
+				errRmFakeComp, errRmFakeshipper)
+			exitCode = 1
+		case exitCode != 0 && (errRmFakeComp != nil || errRmFakeshipper != nil):
+			fmt.Printf("test exited with code %d. clean up failed: fake/component err:%v, fake/shipper err: %v\n",
+				exitCode, errRmFakeComp, errRmFakeshipper)
+		}
 	}
 
 	os.Exit(exitCode)
