@@ -76,7 +76,7 @@ func (i *InstallTestSuite) TestInstallWithoutBasePath() {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	_, err := i.fixture.Exec(context.Background(), []string{"install", "--force"})
+	_, err = i.fixture.Install(context.Background(), &atesting.InstallOpts{Force: true})
 	i.Require().NoError(err)
 
 	// Check that Agent was installed in default base path
@@ -102,7 +102,10 @@ func (i *InstallTestSuite) TestInstallWithBasePath() {
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	_, err = i.fixture.Exec(context.Background(), []string{"install", basePathFlag, randomBasePath, "--force"})
+	_, err = i.fixture.Install(context.Background(), &atesting.InstallOpts{
+		BasePath: randomBasePath,
+		Force:    true,
+	})
 	i.Require().NoError(err)
 
 	// Check that Agent was installed in the custom base path
