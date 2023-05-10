@@ -1,0 +1,27 @@
+name: fragment-in-pr
+
+on:
+  pull_request:
+    types:
+      - [ labeled, unlabeled, opened, reopened, synchronize ]
+jobs:
+  fragments:
+    if: "!contains(github.event.pull_request.labels.*.name, 'skip-changelog') && !contains(github.event.pull_request.labels.*.name, 'backport')"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        go-version-file: .go-version
+    - name: check pr-has-fragment
+      run: |
+        GOBIN=$PWD/bin go install github.com/elastic/elastic-agent-changelog-tool@latest
+        ./bin/elastic-agent-changelog-tool pr-has-fragment --repo ${{ github.event.repository.name }} ${{github.event.number}}
+    - name: get elasti-agent version
+      run: |
+        gv=$(awk '$0 ~ /[0-9]+\.[0-9]+\.[0-9]+/ {print $4}' version/version.go)
+        echo "agent-version=$gv" >> $GITHUB_OUTPUT
+      id: agent-version
+    - name: check fragment-syntax
+      run: |
+        ./bin/elastic-agent-changelog-tool build --version ${{steps.agent-version.outputs.agent-version}} --owner elastic --repo elastic-agent
