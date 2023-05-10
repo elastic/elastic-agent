@@ -8,7 +8,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -1366,23 +1365,19 @@ func authGCP(ctx context.Context) error {
 		}
 	}
 
-	// Skip additional Elastic-specific checks if so requested
-	const skipEnvVar = "TEST_INTEG_AUTH_GCP_SKIP_ELASTIC_CHECK"
-	skipElasticChecks := os.Getenv(skipEnvVar)
-	if skipElasticChecks != "" {
-		shouldSkip, err := strconv.ParseBool(skipElasticChecks)
-		if err != nil {
-			return fmt.Errorf("unable to parse environment variable %s as boolean: %w", skipEnvVar, err)
-		}
-
-		if shouldSkip {
-			// We're all set, no further checks to do.
-			return nil
-		}
+	// Parse env vars for
+	// - expected email domain (default: elastic.co)
+	// - expected GCP project (default: elastic-platform-ingest)
+	expectedEmailDomain := os.Getenv("TEST_INTEG_AUTH_EMAIL_DOMAIN")
+	if expectedEmailDomain == "" {
+		expectedEmailDomain = "elastic.co"
+	}
+	expectedProject := os.Getenv("TEST_INTEG_AUTH_GCP_PROJECT")
+	if expectedProject == "" {
+		expectedProject = "elastic-platform-ingest"
 	}
 
 	// Check that authenticated account's email domain name
-	const expectedEmailDomain = "elastic.co"
 	email := authList[0].Account
 	parts := strings.Split(email, "@")
 	if len(parts) != 2 || parts[1] != expectedEmailDomain {
@@ -1396,7 +1391,6 @@ func authGCP(ctx context.Context) error {
 		return fmt.Errorf("unable to get project: %w", err)
 	}
 
-	const expectedProject = "elastic-platform-ingest"
 	project := strings.TrimSpace(string(output))
 	if project == expectedProject {
 		// We're all set!
