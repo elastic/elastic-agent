@@ -318,14 +318,14 @@ func (Test) All() {
 
 // Unit runs all the unit tests.
 func (Test) Unit(ctx context.Context) error {
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+	mg.Deps(Prepare.Env)
 	params := devtools.DefaultGoTestUnitArgs()
 	return devtools.GoTest(ctx, params)
 }
 
 // Coverage takes the coverages report from running all the tests and display the results in the browser.
 func (Test) Coverage() error {
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+	mg.Deps(Prepare.Env)
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 
@@ -1267,7 +1267,6 @@ func (Integration) Local(ctx context.Context) error {
 		devtools.Platforms = devtools.Platforms.Select(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
 		mg.Deps(Package)
 	}
-	mg.Deps(Build.TestBinaries)
 
 	// clean the .agent-testing/local so this run will use the latest build
 	_ = os.RemoveAll(".agent-testing/local")
