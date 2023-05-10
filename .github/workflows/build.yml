@@ -1,8 +1,9 @@
-name: Build
-on: workflow_dispatch
+name: CodeCoverage Build
+on:
+  pull_request:
 jobs:
-  sonarcloud:
-    name: SonarCloud
+  coverage:
+    name: CodeCoverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -31,10 +32,8 @@ jobs:
         with:
           version: latest
           args: unitTest
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-          
+      - uses: actions/upload-artifact@v3
+        with:
+          name: test-coverage
+          path: build/TEST-*
+          if-no-files-found: error
