@@ -94,20 +94,20 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic detected: %v", r)
 			action.Err = err
-			h.log.Errorw("diagnostics handler panicked", "err", err)
+			h.log.Errorw("diagnostics handler panicked", "error.message", err)
 		}
 	}()
 	defer func() {
 		err := ack.Ack(ctx, action)
 		if err != nil {
 			h.log.Errorw("failed to ack diagnostics action",
-				"err", err,
+				"error.message", err,
 				"action", action)
 		}
 		err = ack.Commit(ctx)
 		if err != nil {
 			h.log.Errorw("failed to commit diagnostics action",
-				"err", err,
+				"error.message", err,
 				"action", action)
 
 		}
@@ -124,7 +124,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	if err != nil {
 		action.Err = err
 		h.log.Errorw("diagnostics action handler failed to run diagnostics hooks",
-			"err", err,
+			"error.message", err,
 			"action", action)
 		return
 	}
@@ -138,7 +138,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	f, s, err := h.diagFile(aDiag, uDiag)
 	if err != nil {
 		var b bytes.Buffer
-		h.log.Warnw("Diagnostics action unable to use temporary file, using buffer instead.", "err", err)
+		h.log.Warnw("Diagnostics action unable to use temporary file, using buffer instead.", "error.message", err)
 		var wBuf bytes.Buffer
 		defer func() {
 			if str := wBuf.String(); str != "" {
@@ -149,7 +149,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 		if err != nil {
 			h.log.Errorw(
 				"diagnostics action handler failed generate zip archive",
-				"err", err,
+				"error.message", err,
 				"action", action,
 			)
 			action.Err = err
@@ -166,12 +166,12 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	}
 	h.log.Debug("Sending diagnostics archive.")
 	uploadID, err := h.uploader.UploadDiagnostics(ctx, action.ActionID, ts.Format("2006-01-02T15-04-05Z07-00"), s, r) // RFC3339 format that uses - instead of : so it works on Windows
-	action.Err = err
 	action.UploadID = uploadID
 	if err != nil {
+		action.Err = err
 		h.log.Errorw(
 			"diagnostics action handler failed to upload diagnostics",
-			"err", err,
+			"error.message", err,
 			"action", action)
 		return
 	}
@@ -208,6 +208,9 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 	uDiag := make([]client.DiagnosticUnitResult, 0)
 	h.log.Debug("Performing unit diagnostics")
 	startTime := time.Now()
+	defer func() {
+		h.log.Debugf("Unit diagnostics complete. Took: %s", time.Since(startTime))
+	}()
 	rr := h.diagProvider.PerformDiagnostics(ctx)
 	h.log.Debug("Collecting results of unit diagnostics")
 	for _, r := range rr {
@@ -234,7 +237,6 @@ func (h *Diagnostics) diagUnits(ctx context.Context) []client.DiagnosticUnitResu
 		}
 		uDiag = append(uDiag, diag)
 	}
-	h.log.Debugf("Unit diagnostics complete. Took: %s", time.Since(startTime))
 	return uDiag
 }
 

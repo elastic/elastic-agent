@@ -56,23 +56,24 @@ func init() {
 	}
 }
 
-var mockInputUnit component.Unit = component.Unit{ID: "UnitID", Type: client.UnitTypeInput}
-
-var mockUnitDiagnostic runtime.ComponentUnitDiagnostic = runtime.ComponentUnitDiagnostic{
-	Component: component.Component{
-		ID:    "ComponentID",
-		Units: []component.Unit{mockInputUnit},
-	},
-	Unit: mockInputUnit,
-	Results: []*proto.ActionDiagnosticUnitResult{
-		{
-			Name:        "mock unit diagnostic result",
-			Filename:    "mock_unit_diag_file.yaml",
-			ContentType: "application/yaml",
-			Content:     []byte("hello: there"),
+var (
+	mockInputUnit      = component.Unit{ID: "UnitID", Type: client.UnitTypeInput}
+	mockUnitDiagnostic = runtime.ComponentUnitDiagnostic{
+		Component: component.Component{
+			ID:    "ComponentID",
+			Units: []component.Unit{mockInputUnit},
 		},
-	},
-}
+		Unit: mockInputUnit,
+		Results: []*proto.ActionDiagnosticUnitResult{
+			{
+				Name:        "mock unit diagnostic result",
+				Filename:    "mock_unit_diag_file.yaml",
+				ContentType: "application/yaml",
+				Content:     []byte("hello: there"),
+			},
+		},
+	}
+)
 
 func TestDiagnosticHandlerHappyPathWithLogs(t *testing.T) {
 
@@ -188,7 +189,7 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 	// assert that we logged an ERROR log that includes the error from uploader and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
-			FilterField(zapcore.Field{Key: "err", Type: zapcore.ErrorType, Interface: uploaderError}).
+			FilterField(zapcore.Field{Key: "error.message", Type: zapcore.ErrorType, Interface: uploaderError}).
 			FilterField(zapcore.Field{Key: "action", Type: zapcore.StringerType, Interface: diagAction}).
 			All(),
 		1)
@@ -223,7 +224,7 @@ func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 	// assert that we logged an ERROR log that includes the error from the zip compression and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
-			FilterFieldKey("err").
+			FilterFieldKey("error.message").
 			FilterField(zapcore.Field{Key: "action", Type: zapcore.StringerType, Interface: diagAction}).
 			All(),
 		1)
@@ -261,7 +262,7 @@ func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 	// assert that we logged an ERROR log that includes the error from acker and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
-			FilterField(zapcore.Field{Key: "err", Type: zapcore.ErrorType, Interface: ackError}).
+			FilterField(zapcore.Field{Key: "error.message", Type: zapcore.ErrorType, Interface: ackError}).
 			FilterField(zapcore.Field{Key: "action", Type: zapcore.StringerType, Interface: diagAction}).
 			All(),
 		1)
@@ -300,7 +301,7 @@ func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 	// assert that we logged an ERROR log that includes the error from acker and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
-			FilterField(zapcore.Field{Key: "err", Type: zapcore.ErrorType, Interface: commitError}).
+			FilterField(zapcore.Field{Key: "error.message", Type: zapcore.ErrorType, Interface: commitError}).
 			FilterField(zapcore.Field{Key: "action", Type: zapcore.StringerType, Interface: diagAction}).
 			All(),
 		1)
@@ -337,7 +338,7 @@ func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 	// assert that we logged an ERROR log that includes the error from running the hooks with an expired context and the action
 	assert.Len(t,
 		observedLogs.FilterLevelExact(zapcore.ErrorLevel).
-			FilterField(zapcore.Field{Key: "err", Type: zapcore.ErrorType, Interface: context.Canceled}).
+			FilterField(zapcore.Field{Key: "error.message", Type: zapcore.ErrorType, Interface: context.Canceled}).
 			FilterField(zapcore.Field{Key: "action", Type: zapcore.StringerType, Interface: diagAction}).
 			All(),
 		1)
