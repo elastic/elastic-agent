@@ -18,8 +18,8 @@ issues:
     - text: "ST1003:"
       linters:
         - stylecheck
-    # From mage we are priting to the console to ourselves
-    - path: (.*magefile.go|.*dev-tools/mage/.*)
+    # From mage and tests we are printing to the console to ourselves
+    - path: (.*magefile.go|.*dev-tools/mage/.*|_test\.go)
       linters:
        - forbidigo
 
