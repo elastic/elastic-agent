@@ -24,7 +24,7 @@ import (
 )
 
 func TestInstall(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	define.Require(t, define.Requirements{
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
