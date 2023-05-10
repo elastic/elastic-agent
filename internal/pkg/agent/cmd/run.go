@@ -14,8 +14,6 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/Masterminds/semver"
-
 	"github.com/spf13/cobra"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
@@ -583,18 +581,14 @@ func handleUpgrade() error {
 	// Otherwise, the upgrade will be unsuccessful (see
 	// https://github.com/elastic/elastic-agent/issues/2645).
 
-	installMarkerVersion := semver.MustParse("8.8.0")
-	prevVersion, err := semver.NewVersion(upgradeMarker.PrevVersion)
-	if err != nil {
-		return fmt.Errorf("unable to determine previous version during upgrade: %w", err)
-	}
-
-	if !prevVersion.LessThan(installMarkerVersion) {
-		// We're upgrading from a version that contains the installation
-		// marker file. Nothing more to do.
+	// If the installation marker file is present, we're all set.
+	if info.RunningInstalled() {
 		return nil
 	}
 
+	// Otherwise, we're being upgraded from a version of Agent that didn't
+	// use an installation marker file (that is, before v8.8.0). So create
+	// the file now.
 	if err := info.CreateInstallMarker(paths.Top()); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
