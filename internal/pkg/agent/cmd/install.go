@@ -231,8 +231,6 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
-	os.UserHomeDir()
-
 	if err := info.CreateInstallMarker(topPath); err != nil {
 		return fmt.Errorf("failed to create install marker: %w", err)
 	}
