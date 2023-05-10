@@ -118,13 +118,6 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 func (s *UpgradeElasticAgent) TearDownTest() {
 	s.T().Log("Un-enrolling elastic agent")
 	assert.NoError(s.T(), tools.UnEnrollAgent(s.requirementsInfo.KibanaClient))
-
-	s.T().Log("Uninstalling elastic agent")
-	output, err := tools.UninstallAgent(s.agentFixture)
-	if err != nil {
-		s.T().Log(string(output))
-	}
-	require.NoError(s.T(), err)
 }
 
 func agentStatus(expectedStatus string, suite UpgradeElasticAgent) func() bool {
