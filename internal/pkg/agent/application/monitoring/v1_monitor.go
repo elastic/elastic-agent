@@ -58,7 +58,7 @@ const (
 var (
 	errNoOuputPresent          = errors.New("outputs not part of the config")
 	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "fleet-server", "heartbeat", "osquerybeat", "packetbeat", "shipper"}
-	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat", "pf-host-agent", "pf-elastic-collecor", "pf-elastic-symbolizer"}
+	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat", "pf-host-agent", "pf-elastic-collector", "pf-elastic-symbolizer"}
 )
 
 // BeatsMonitor is providing V1 monitoring support for metrics and logs for endpoint-security only.
