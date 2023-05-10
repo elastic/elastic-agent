@@ -15,19 +15,17 @@ import (
 	"syscall"
 
 	"github.com/Masterminds/semver"
-	"github.com/elastic/elastic-agent/pkg/control/v2/server"
-
-	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/spf13/cobra"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
 
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-
 	"github.com/elastic/elastic-agent-libs/api"
+	"github.com/elastic/elastic-agent-libs/logp"
+	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
+
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -48,6 +46,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/version"
 )
