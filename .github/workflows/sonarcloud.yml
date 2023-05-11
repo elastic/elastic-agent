@@ -43,8 +43,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
+            -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha }}
+            -Dsonar.pullrequest.key=${{ github.event.workflow_run.pull_requests[0].number }}
+            -Dsonar.pullrequest.branch=${{ github.event.workflow_run.pull_requests[0].head.ref }}
             -Dsonar.pullrequest.base=${{ github.event.workflow_run.pull_requests[0].base.ref }}
-            -Dsonar.pullrequest.branch=${{ github.event.workflow_run.head_branch }}
-            -Dsonar.pullrequest.key=${{ github.event.workflow_run.pull_requests[0].id }}
-
-
+            
