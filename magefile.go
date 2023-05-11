@@ -1324,12 +1324,13 @@ func shouldBuildAgent() bool {
 func authGCP(ctx context.Context) error {
 	// Use OS-appropriate command to find executables
 	execFindCmd := "which"
+	cliName := "gcloud"
 	if runtime.GOOS == "windows" {
 		execFindCmd = "where"
+		cliName += ".exe"
 	}
 
 	// Check if gcloud CLI is installed
-	const cliName = "gcloud"
 	cmd := exec.CommandContext(ctx, execFindCmd, cliName)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%s CLI is not installed: %w", cliName, err)
