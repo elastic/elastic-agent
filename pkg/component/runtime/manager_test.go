@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/component/fake/bintools"
 	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
 
 	"github.com/gofrs/uuid"
@@ -35,7 +36,6 @@ import (
 )
 
 const (
-	exeExt             = ".exe"
 	errActionUndefined = "action undefined"
 )
 
@@ -2898,7 +2898,7 @@ func testBinary(t *testing.T, name string) string {
 	t.Helper()
 
 	var err error
-	binaryPath := fakeBinaryPath(name)
+	binaryPath := bintools.BinaryPath(name)
 
 	binaryPath, err = filepath.Abs(binaryPath)
 	if err != nil {
