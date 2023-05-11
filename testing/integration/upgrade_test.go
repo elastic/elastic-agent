@@ -34,6 +34,7 @@ func TestElasticAgentUpgrade(t *testing.T) {
 		Sudo:    true, // requires Agent installation
 	})
 
+	currentVersion := define.Version()
 	previousVersion, err := getPreviousMinorVersion(currentVersion)
 	require.NoError(t, err)
 
