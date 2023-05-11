@@ -155,7 +155,7 @@ containers:
 
 > **1. Note**: Depending on the size of your kubernetes cluster, users need to adjust the resource limits of your agent daemonset accordingly.
 
-> **2. Note**: Access to kube-system namespace is not allowed in autopilot clusters. That said, provided manifests create and make use of a new created namespace `elastic-agent`. Additionally some mounting capabilities are restricted in specific host paths
+> **2. Note**: Access to kube-system namespace is not allowed in autopilot clusters. That said, provided manifests create and make use of a new created namespace `elastic-agent`. Additionally some mounting capabilities are restricted in specific host paths.
 
 > **3. Note**: Provided manifests make use of PriorityClass in order to allow elastic-agent to be scheduled before other application pods.
 
