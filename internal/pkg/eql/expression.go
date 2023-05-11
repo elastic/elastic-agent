@@ -38,8 +38,9 @@ type Expression struct {
 
 // Eval evaluates the expression using a visitor and the provided methods registry, will return true
 // or any evaluation errors.
-// If allowMissingVars is true, then variable expressions that don't exist
-// in the VarStore will evaluate to Null, otherwise they will return an error.
+// Variable expressions that don't exist in the VarStore will evaluate to
+// Null, but will still be considered valid if allowMissingVars is true.
+// Otherwise they will return an error.
 func (e *Expression) Eval(store VarStore, allowMissingVars bool) (result bool, err error) {
 	// Antlr can panic on errors so we have to recover somehow.
 	defer func() {
