@@ -44,9 +44,9 @@ jobs:
       - run: ls -l
       - name: Dump GitHub github.event.workflow_run
         env:
-          EVENT: ${{ toJson(github.event.workflow_run) }}
+          GITHUB_EVENT: ${{ toJson(github.event.workflow_run) }}
         run: |
-          echo "$GITHUB_CONTEXT"
+          echo "$GITHUB_EVENT"
         
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
