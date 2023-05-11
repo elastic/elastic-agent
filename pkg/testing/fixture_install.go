@@ -6,6 +6,7 @@ package testing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,10 +15,10 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
+
+var ErrNotInstalled = errors.New("Elastic Agent is not installed")
 
 type CmdOpts interface {
 	toCmdArgs() []string
@@ -78,6 +79,12 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 	f.t.Cleanup(func() {
 		_, err := f.Uninstall(ctx, nil)
+		if err == ErrNotInstalled {
+			// Agent fixture has already been uninstalled, perhaps by
+			// an explicit call to fixture.Uninstall, so nothing needs
+			// to be done here.
+			return
+		}
 		require.NoError(f.t, err)
 	})
 
@@ -100,7 +107,7 @@ func (i UninstallOpts) toCmdArgs() []string {
 // Uninstall uninstalls the installed Elastic Agent binary
 func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	if !f.installed {
-		return nil, errors.New("Elastic Agent is not installed")
+		return nil, ErrNotInstalled
 	}
 
 	uninstallArgs := []string{"uninstall"}
