@@ -18,7 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
-var ErrNotInstalled = errors.New("Elastic Agent is not installed")
+var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:stylecheck // Elastic Agent is a proper noun
 
 type CmdOpts interface {
 	toCmdArgs() []string
@@ -79,7 +79,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 	f.t.Cleanup(func() {
 		_, err := f.Uninstall(ctx, nil)
-		if err == ErrNotInstalled {
+		if errors.Is(err, ErrNotInstalled) {
 			// Agent fixture has already been uninstalled, perhaps by
 			// an explicit call to fixture.Uninstall, so nothing needs
 			// to be done here.
@@ -125,7 +125,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
 	_, err = os.Stat(topPath)
 	if os.IsExist(err) {
-		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath)
+		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
 	}
 	if err != nil {
 		return nil, err
