@@ -27,3 +27,12 @@ func RunningInstalled() bool {
 
 	return true
 }
+
+func CreateInstallMarker(topPath string) error {
+	markerFilePath := filepath.Join(topPath, MarkerFileName)
+	if _, err := os.Create(markerFilePath); err != nil {
+		return err
+	}
+
+	return nil
+}
