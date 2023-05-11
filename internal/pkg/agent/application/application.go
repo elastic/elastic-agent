@@ -6,6 +6,7 @@ package application
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/elastic/elastic-agent/pkg/features"
 
@@ -37,6 +38,7 @@ func New(
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
 	testingMode bool,
+	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
@@ -146,7 +148,7 @@ func New(
 				EndpointSignedComponentModifier(),
 			)
 
-			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
+			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, nil, err
 			}
