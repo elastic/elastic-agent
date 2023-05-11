@@ -8,10 +8,10 @@ package eql
 
 // Eval takes an expression, parse and evaluate it, everytime this method is called a new
 // parser is created, if you want to reuse the parsed tree see the `New` method.
-func Eval(expression string, store VarStore) (bool, error) {
+func Eval(expression string, store VarStore, allowMissingVars bool) (bool, error) {
 	e, err := New(expression)
 	if err != nil {
 		return false, err
 	}
-	return e.Eval(store)
+	return e.Eval(store, allowMissingVars)
 }

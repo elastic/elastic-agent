@@ -38,7 +38,9 @@ type Expression struct {
 
 // Eval evaluates the expression using a visitor and the provided methods registry, will return true
 // or any evaluation errors.
-func (e *Expression) Eval(store VarStore) (result bool, err error) {
+// If allowMissingVars is true, then variable expressions that don't exist
+// in the VarStore will evaluate to Null, otherwise they will return an error.
+func (e *Expression) Eval(store VarStore, allowMissingVars bool) (result bool, err error) {
 	// Antlr can panic on errors so we have to recover somehow.
 	defer func() {
 		r := recover()
@@ -47,7 +49,7 @@ func (e *Expression) Eval(store VarStore) (result bool, err error) {
 		}
 	}()
 
-	visitor := &expVisitor{vars: store}
+	visitor := &expVisitor{vars: store, allowMissingVars: allowMissingVars}
 	r := visitor.Visit(e.tree)
 
 	if visitor.err != nil {

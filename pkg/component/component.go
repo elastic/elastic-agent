@@ -639,7 +639,7 @@ func validateRuntimeChecks(runtime *RuntimeSpec, store eql.VarStore) error {
 			// should never error; but just in-case we consider this a reason to prevent the running of the input
 			return NewErrInputRuntimeCheckFail(err.Error())
 		}
-		ok, err := expression.Eval(store)
+		ok, err := expression.Eval(store, false)
 		if err != nil {
 			// error is considered a failure and reported as a reason
 			return NewErrInputRuntimeCheckFail(err.Error())
