@@ -35,5 +35,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: test-coverage
-          path: build/TEST-*
+          path: |
+            build/TEST-*
+            sonar-project.properties
           if-no-files-found: error
