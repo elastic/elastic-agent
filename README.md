@@ -1,4 +1,4 @@
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic-agent&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic-agent)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=elastic_elastic-agent&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=elastic_elastic-agent)
 
 # Elastic Agent
 
