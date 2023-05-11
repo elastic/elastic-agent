@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -23,8 +22,8 @@ var (
 	PathBinShipper   = BinaryPath("shipper")
 	PathBinComponent = BinaryPath("component")
 
-	PathPkgShipper, _   = path.Split(PathBinShipper)
-	PathPkgComponent, _ = path.Split(PathBinComponent)
+	PathPkgShipper, _   = filepath.Split(PathBinShipper)
+	PathPkgComponent, _ = filepath.Split(PathBinComponent)
 )
 
 func RemoveBinaries(binaries ...string) error {
@@ -79,6 +78,7 @@ func CompileBinary(out string, packagePath string) {
 		"go",
 		"build",
 		"-gcflags=all=-N -l",
+		"-buildvcs=false",
 		"-o", out,
 		packagePath)
 	cmd.Stdout = &outBuff
