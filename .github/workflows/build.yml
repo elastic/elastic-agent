@@ -32,10 +32,19 @@ jobs:
         with:
           version: latest
           args: unitTest
+      
+      - name: Save PR information
+        run: |
+          mkdir -p ./pr
+          echo ${{ github.event.number }} > ./build/pull_request_number
+          echo ${{ github.event.pull_request.base.ref }} > ./build/pull_request_base
+          echo ${{ github.event.pull_request.head.ref }} > ./build/pull_request_branch
+
       - uses: actions/upload-artifact@v3
         with:
           name: test-coverage
           path: |
             build/TEST-*
+            build/pull_request*
             sonar-project.properties
           if-no-files-found: error
