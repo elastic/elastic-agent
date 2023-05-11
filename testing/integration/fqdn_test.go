@@ -132,6 +132,15 @@ func (s *FQDN) TestFQDN() {
 	s.verifyHostNameInIndices("metrics-*", shortName)
 
 	// TODO: Update Agent policy to enable FQDN
+	policy.AgentFeatures = []map[string]interface{}{
+		{
+			"name":    "fqdn",
+			"enabled": true,
+		},
+	}
+	updatePolicyReq := kibana.UpdatePolicyRequest(policy)
+	_, err = s.requirementsInfo.KibanaClient.UpdatePolicy(updatePolicyReq)
+	require.NoError(s.T(), err)
 
 	// TODO: Wait until policy has been applied by Agent
 
@@ -145,6 +154,15 @@ func (s *FQDN) TestFQDN() {
 	s.verifyHostNameInIndices("metrics-*", fqdn)
 
 	// TODO: Update Agent policy to disable FQDN
+	policy.AgentFeatures = []map[string]interface{}{
+		{
+			"name":    "fqdn",
+			"enabled": false,
+		},
+	}
+	updatePolicyReq = kibana.UpdatePolicyRequest(policy)
+	_, err = s.requirementsInfo.KibanaClient.UpdatePolicy(updatePolicyReq)
+	require.NoError(s.T(), err)
 
 	// TODO: Wait until policy has been applied by Agent
 
