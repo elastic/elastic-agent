@@ -8,10 +8,10 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-dkind: other
+kind: other
 
 # Change summary; a 80ish characters long description of the change.
-summary: Test new Github Action for fragments
+   summary: Test new Github Action for fragments
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
