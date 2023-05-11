@@ -6,6 +6,8 @@ kind: Component
 metadata:
   name: elastic-agent
   description: Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host.
+  annotations:
+    sonarqube.org/project-key: elastic_elastic-agent
 
 spec:
   type: tool
@@ -44,6 +46,10 @@ spec:
         filter_enabled: true
         filter_condition: |
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
+      cancel_intermediate_builds: true
+      cancel_intermediate_builds_branch_filter: '!main'
+      skip_intermediate_builds: true
+      skip_intermediate_builds_branch_filter: '!main'
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
