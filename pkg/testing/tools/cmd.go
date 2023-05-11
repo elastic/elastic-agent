@@ -12,9 +12,11 @@ import (
 
 func EnrollElasticAgent(fleetUrl string, enrollmentToken string, agentFixture *atesting.Fixture) ([]byte, error) {
 	installOpts := atesting.InstallOpts{
-		NonInteractive:  true,
-		URL:             fleetUrl,
-		EnrollmentToken: enrollmentToken,
+		NonInteractive: true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetUrl,
+			EnrollmentToken: enrollmentToken,
+		},
 	}
 	return agentFixture.Install(context.Background(), &installOpts)
 }
