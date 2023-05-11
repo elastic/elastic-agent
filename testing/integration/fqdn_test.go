@@ -2,20 +2,37 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build integration
+
 package integration
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/elastic/elastic-agent-libs/kibana"
 
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestFQDN(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		OS: []define.OS{
-			define.Linux,
+			{Type: define.Linux},
 		},
 		Stack: &define.Stack{},
 		Local: false,
@@ -27,38 +44,205 @@ func TestFQDN(t *testing.T) {
 type FQDN struct {
 	suite.Suite
 	requirementsInfo *define.Info
+	agentFixture     *atesting.Fixture
+
+	origFQDN string
+}
+
+// Before suite
+func (s *FQDN) SetupSuite() {
+	agentFixture, err := define.NewFixture(s.T())
+	require.NoError(s.T(), err)
+	s.agentFixture = agentFixture
+}
+
+// Before each test
+func (s *FQDN) SetupTest() {
+	ctx := context.Background()
+
+	// Save original hostname so we can restore it at the end of each test
+	origFQDN, err := getHostFQDN(ctx)
+	require.NoError(s.T(), err)
+	s.origFQDN = origFQDN
+}
+
+func (s *FQDN) TearDownTest() {
+	ctx := context.Background()
+
+	// Restore original FQDN
+	err := setHostFQDN(ctx, s.origFQDN)
+	require.NoError(s.T(), err)
 }
 
 func (s *FQDN) TestFQDN() {
+	ctx := context.Background()
+
 	// Set FQDN on host
-	s.setHostFQDN()
-	defer s.resetHostFQDN()
+	shortName := randStr(6)
+	fqdn := shortName + ".baz.io"
+	err := setHostFQDN(ctx, fqdn)
+	require.NoError(s.T(), err)
 
 	// Create Agent policy
+	createPolicyReq := kibana.CreatePolicyRequest{
+		Name:        "test-policy-fqdn-" + strings.ReplaceAll(fqdn, ".", "-"),
+		Namespace:   "default",
+		Description: fmt.Sprintf("Test policy for FQDN E2E test (%s)", fqdn),
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+
+	policy, err := s.requirementsInfo.KibanaClient.CreatePolicy(createPolicyReq)
+	require.NoError(s.T(), err)
+
+	// Create enrollment API key
+	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policy.ID,
+	}
+	enrollmentToken, err := s.requirementsInfo.KibanaClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+	require.Nil(s.T(), err, "Could not create enrollment token")
 
 	// Get default Fleet Server URL
+	fleetServerURL, err := tools.GetDefaultFleetServerURL(s.requirementsInfo.KibanaClient)
+	require.NoError(s.T(), err)
 
 	// Enroll agent
+	output, err := tools.EnrollElasticAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
+	if err != nil {
+		s.T().Log(string(output))
+	}
+	require.NoError(s.T(), err)
+
+	// TODO: Generalize agentStatus from https://github.com/elastic/elastic-agent/pull/2618 after it's merged
+	require.Eventually(s.T(), agentStatus("online", *s), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	// Verify that agent name is short hostname
+	agent, err := tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, shortName)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), agent)
 
-	// Verify that hostname in `logs-*` is short hostname
+	// Verify that hostname in `logs-*` and `metrics-*` is short hostname
+	s.verifyHostNameInIndices("logs-*", shortName)
+	s.verifyHostNameInIndices("metrics-*", shortName)
 
-	// Verify that hostname in `metrics-*` is short hostname
+	// TODO: Update Agent policy to enable FQDN
 
-	// Update Agent policy to enable FQDN
+	// TODO: Wait until policy has been applied by Agent
 
 	// Verify that agent name is FQDN
+	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, fqdn)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), agent)
 
-	// Verify that hostname in `logs-*` is FQDN
+	// Verify that hostname in `logs-*` and `metrics-*` is FQDN
+	s.verifyHostNameInIndices("logs-*", fqdn)
+	s.verifyHostNameInIndices("metrics-*", fqdn)
 
-	// Verify that hostname in `metrics-*` FQDN
+	// TODO: Update Agent policy to disable FQDN
 
-	// Update Agent policy to disable FQDN
+	// TODO: Wait until policy has been applied by Agent
 
 	// Verify that agent name is short hostname
+	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, shortName)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), agent)
 
-	// Verify that hostname in `logs-*` is short hostname
+	// Verify that hostname in `logs-*` and `metrics-*` is short hostname
+	s.verifyHostNameInIndices("logs-*", shortName)
+	s.verifyHostNameInIndices("metrics-*", shortName)
 
-	// Verify that hostname in `metrics-*` is short hostname
+}
+
+func (s *FQDN) verifyHostNameInIndices(indices, hostname string) {
+	search := s.requirementsInfo.ESClient.Search
+	resp, err := search(
+		search.WithIndex(indices),
+		search.WithSort("@timestamp:desc"),
+		search.WithFilterPath("hits.hits"),
+	)
+	require.NoError(s.T(), err)
+	require.False(s.T(), resp.IsError())
+	defer resp.Body.Close()
+
+	var body struct {
+		Hits struct {
+			Hits []struct {
+				Source struct {
+					Host struct {
+						Name string `json:"name"`
+					} `json:"host"`
+				} `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&body)
+	require.NoError(s.T(), err)
+
+	for _, hit := range body.Hits.Hits {
+		require.Equal(s.T(), hostname, hit.Source.Host.Name)
+	}
+}
+
+func getHostFQDN(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "hostname", "--fqdn")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("unable to get FQDN: %w", err)
+	}
+
+	return strings.TrimSpace(string(out)), nil
+}
+func setHostFQDN(ctx context.Context, fqdn string) error {
+	// Check if FQDN is already set in /etc/hosts
+	filename := string(filepath.Separator) + filepath.Join("etc", "hosts")
+	etcHosts, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("unable to read /etc/hosts: %w", err)
+	}
+
+	lines := string(etcHosts)
+	lines = strings.TrimSuffix(lines, "\n")
+	for _, line := range strings.Split(lines, "\n") {
+		if strings.Contains(line, fqdn) {
+			// Desired fqdn is already set in /etc/hosts; nothing
+			// more to do!
+			return nil
+		}
+	}
+
+	// Get IP
+	resp, err := http.Get("https://api.ipify.org")
+	if err != nil {
+		return fmt.Errorf("unable to determine IP: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unable to parse IP address: %w", err)
+	}
+
+	ip := string(body)
+	ip = strings.TrimSpace(ip)
+
+	// Add entry for FQDN in /etc/hosts
+	parts := strings.Split(fqdn, ".")
+	shortName := parts[0]
+	line := fmt.Sprintf("%s\t%s %s\n", ip, fqdn, shortName)
+
+	etcHosts = append(etcHosts, []byte(line)...)
+	if err := os.WriteFile(filename, etcHosts, 0644); err != nil {
+		return fmt.Errorf("unable to write FQDN to /etc/hosts: %w", err)
+	}
+
+	// Set hostname to FQDN
+	cmd := exec.CommandContext(ctx, "hostname", shortName)
+	if _, err := cmd.Output(); err != nil {
+		return fmt.Errorf("unable to set hostname to FQDN: %w", err)
+	}
+
+	return nil
 }
