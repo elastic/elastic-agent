@@ -46,7 +46,8 @@ type FQDN struct {
 	requirementsInfo *define.Info
 	agentFixture     *atesting.Fixture
 
-	origFQDN string
+	externalIP string
+	origFQDN   string
 }
 
 // Before suite
@@ -54,6 +55,10 @@ func (s *FQDN) SetupSuite() {
 	agentFixture, err := define.NewFixture(s.T())
 	require.NoError(s.T(), err)
 	s.agentFixture = agentFixture
+
+	externalIP, err := getExternalIP()
+	require.NoError(s.T(), err)
+	s.externalIP = externalIP
 }
 
 // Before each test
@@ -70,7 +75,7 @@ func (s *FQDN) TearDownTest() {
 	ctx := context.Background()
 
 	// Restore original FQDN
-	err := setHostFQDN(ctx, s.origFQDN)
+	err := setHostFQDN(ctx, s.externalIP, s.origFQDN)
 	require.NoError(s.T(), err)
 }
 
@@ -80,7 +85,7 @@ func (s *FQDN) TestFQDN() {
 	// Set FQDN on host
 	shortName := randStr(6)
 	fqdn := shortName + ".baz.io"
-	err := setHostFQDN(ctx, fqdn)
+	err := setHostFQDN(ctx, s.externalIP, fqdn)
 	require.NoError(s.T(), err)
 
 	// Create Agent policy
@@ -195,7 +200,7 @@ func getHostFQDN(ctx context.Context) (string, error) {
 
 	return strings.TrimSpace(string(out)), nil
 }
-func setHostFQDN(ctx context.Context, fqdn string) error {
+func setHostFQDN(ctx context.Context, externalIP, fqdn string) error {
 	// Check if FQDN is already set in /etc/hosts
 	filename := string(filepath.Separator) + filepath.Join("etc", "hosts")
 	etcHosts, err := os.ReadFile(filename)
@@ -213,25 +218,10 @@ func setHostFQDN(ctx context.Context, fqdn string) error {
 		}
 	}
 
-	// Get IP
-	resp, err := http.Get("https://api.ipify.org")
-	if err != nil {
-		return fmt.Errorf("unable to determine IP: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("unable to parse IP address: %w", err)
-	}
-
-	ip := string(body)
-	ip = strings.TrimSpace(ip)
-
 	// Add entry for FQDN in /etc/hosts
 	parts := strings.Split(fqdn, ".")
 	shortName := parts[0]
-	line := fmt.Sprintf("%s\t%s %s\n", ip, fqdn, shortName)
+	line := fmt.Sprintf("%s\t%s %s\n", externalIP, fqdn, shortName)
 
 	etcHosts = append(etcHosts, []byte(line)...)
 	if err := os.WriteFile(filename, etcHosts, 0644); err != nil {
@@ -245,4 +235,22 @@ func setHostFQDN(ctx context.Context, fqdn string) error {
 	}
 
 	return nil
+}
+
+func getExternalIP() (string, error) {
+	resp, err := http.Get("https://api.ipify.org")
+	if err != nil {
+		return "", fmt.Errorf("unable to determine IP: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("unable to parse IP address: %w", err)
+	}
+
+	ip := string(body)
+	ip = strings.TrimSpace(ip)
+
+	return ip, nil
 }
