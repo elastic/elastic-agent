@@ -581,14 +581,15 @@ func handleUpgrade() error {
 	// Otherwise, the upgrade will be unsuccessful (see
 	// https://github.com/elastic/elastic-agent/issues/2645).
 
-	// If the installation marker file is present, we're all set.
+	// Only an installed Elastic Agent can be self-upgraded. So, if the
+	// installation marker file is already present, we're all set.
 	if info.RunningInstalled() {
 		return nil
 	}
 
-	// Otherwise, we're being upgraded from a version of Agent that didn't
-	// use an installation marker file (that is, before v8.8.0). So create
-	// the file now.
+	// Otherwise, we're being upgraded from a version of an installed Agent
+	// that didn't use an installation marker file (that is, before v8.8.0).
+	// So create the file now.
 	if err := info.CreateInstallMarker(paths.Top()); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
