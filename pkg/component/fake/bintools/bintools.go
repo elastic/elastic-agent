@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"testing"
 
 	"github.com/hashicorp/go-multierror"
 
@@ -25,6 +26,38 @@ var (
 	PathPkgShipper, _   = filepath.Split(PathBinShipper)
 	PathPkgComponent, _ = filepath.Split(PathBinComponent)
 )
+
+// TestMain compiles the fake binaries, calls m.Run(), remove the binaries if
+// KEEP_FAKE_BINARIES isn't true, prints any error and finally returns the
+// exitCode returned by m.Run().
+// If a package needs the fake binaries, it can define a TestMain as this:
+//
+//	 func TestMain(m *testing.M) {
+//		flag.Parse()
+//
+//		os.Exit(bintools.TestMain(m))
+//	 }
+func TestMain(m *testing.M) int {
+	CompileBinary(PathBinComponent, PathPkgComponent)
+	CompileBinary(PathBinShipper, PathPkgShipper)
+
+	exitCode := m.Run()
+
+	err := RemoveBinaries(PathBinComponent, PathBinShipper)
+
+	switch {
+	case exitCode == 0 && err != nil:
+		fmt.Printf("test clean up failed: %v\n", err)
+	case exitCode != 0 && err == nil:
+		fmt.Printf("test exited with code %d but clean up succeeded: %v\n",
+			exitCode, err)
+	case exitCode != 0 && err != nil:
+		fmt.Printf("test exited with code %d and clean up failed: %v\n",
+			exitCode, err)
+	}
+
+	return exitCode
+}
 
 func RemoveBinaries(binaries ...string) error {
 	const envVarRemoveBinaries = "KEEP_FAKE_BINARIES"
