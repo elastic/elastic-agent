@@ -1,11 +1,10 @@
-STACK_VERSION ?= 8.6.1
-AGENT_VERSION ?= 8.6.0
+STACK_VERSION ?= 8.7.1
+AGENT_VERSION ?= 8.7.0
+ELASTIC_AGENT_DOCKER_IMAGE ?= docker.elastic.co/observability-ci/elastic-agent-cloud:$(STACK_VERSION)
 GO_VERSION ?= $(shell cat ../../.go-version)
 CLUSTER_DIGEST_FILE ?= cluster-digest.yml
 CLUSTER_INFO_FILE ?= cluster-info.json
-CLUSTER_NAME ?= e2e-elasic-agent-$(shell date +%s)
 TEMPLATE_FILE ?= test-cluster.yml.tpl
-SLACK_CHANNEL ?= @U0396725PSN
 # The directory where the pre-downloaded agent binary is stored.
 ARTIFACTS_DIR := e2e_artifacts
 LOCAL_SSH_KEY ?= ~/.ssh/id_rsa
@@ -40,9 +39,11 @@ download-agent: set-arch
 
 .PHONY: create-cluster
 create-cluster:
-	@$(call check_defined, SLACK_CHANNEL, SLACK_CHANNEL is not defined. Specify a slack channel to send notifications to.)
 	@$(call check_defined, GITHUB_TOKEN, GITHUB_TOKEN is not defined. Specify a github token to use for the cluster.)
-	oblt-cli cluster create custom --template-file $(CURDIR)/$(TEMPLATE_FILE) --output-file $(CURDIR)/$(CLUSTER_INFO_FILE) --parameters '{"StackVersion": "$(STACK_VERSION)", "ClusterName": "$(CLUSTER_NAME)", "SlackChannel": "$(SLACK_CHANNEL)"}' --wait 15
+	oblt-cli cluster create custom --template-file $(CURDIR)/$(TEMPLATE_FILE) \
+		--output-file $(CURDIR)/$(CLUSTER_INFO_FILE) \
+		--parameters '{"StackVersion": "$(STACK_VERSION)", "ElasticAgentDockerImage": "$(ELASTIC_AGENT_DOCKER_IMAGE)"}' \
+		--wait 15
 	sync $(CURDIR)/$(CLUSTER_INFO_FILE)
 	oblt-cli cluster secrets digest-yml --cluster-name $$(cat $(CURDIR)/$(CLUSTER_INFO_FILE) | jq -r '.ClusterName') --output-file $(CURDIR)/$(CLUSTER_DIGEST_FILE)
 
