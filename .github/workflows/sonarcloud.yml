@@ -43,9 +43,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.pullrequest.base=github.event.workflow_run.pull_requests.base
-            -Dsonar.pullrequest.branch=github.event.workflow_run.head_branch
-            -Dsonar.pullrequest.key=github.event.workflow_run.pull_requests.number
-            -Dsonar.go.tests.reportPaths=TEST-go-unit.out.json
-            -Dsonar.go.coverage.reportPaths=TEST-*.cov
+            -Dsonar.pullrequest.base=${{ github.event.workflow_run.pull_requests.base }}
+            -Dsonar.pullrequest.branch=${{ github.event.workflow_run.head_branch }}
+            -Dsonar.pullrequest.key=${{ github.event.workflow_run.pull_requests.number }}
+
 
