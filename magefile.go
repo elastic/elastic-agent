@@ -32,6 +32,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/runner"
 
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
@@ -1282,6 +1283,25 @@ func (Integration) Local(ctx context.Context) error {
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
 	return devtools.GoTest(ctx, params)
+}
+
+func (Integration) Test(ctx context.Context) error {
+	//if shouldBuildAgent() {
+	//	// need only local package for current platform
+	//	devtools.Platforms = devtools.Platforms.Select(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
+	//	mg.Deps(Package)
+	//}
+	//mg.Deps(Build.TestBinaries)
+
+	batches, err := define.DetermineBatches("testing/integration", "integration")
+	if err != nil {
+		return fmt.Errorf("failed to detemine batches: %w", err)
+	}
+	r, err := runner.NewRunner(batches...)
+	if err != nil {
+		return fmt.Errorf("failed to create runner: %w", err)
+	}
+	return r.Run(ctx)
 }
 
 func shouldBuildAgent() bool {
