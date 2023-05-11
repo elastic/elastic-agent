@@ -249,7 +249,7 @@ func (Build) TestBinaries() error {
 	}
 
 	env := map[string]string{"REMOVE_FAKE_BINARIES": "false"}
-	err = sh.RunWithV(env, mg.GoCmd(),
+	err = sh.RunWith(env, mg.GoCmd(),
 		"test",
 		"-run", "no-test", "-count", "1",
 		filepath.Join(wd, "pkg", "component", "runtime"))
