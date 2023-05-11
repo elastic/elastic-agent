@@ -98,7 +98,6 @@ func (s *FQDN) TestFQDN() {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-
 	policy, err := s.requirementsInfo.KibanaClient.CreatePolicy(createPolicyReq)
 	require.NoError(s.T(), err)
 
@@ -149,12 +148,12 @@ func (s *FQDN) TestFQDN() {
 
 	// TODO: Wait until policy has been applied by Agent
 
-	// Verify that agent name is short hostname
+	// Verify that agent name is short hostname again
 	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, shortName)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), agent)
 
-	// Verify that hostname in `logs-*` and `metrics-*` is short hostname
+	// Verify that hostname in `logs-*` and `metrics-*` is short hostname again
 	s.verifyHostNameInIndices("logs-*", shortName)
 	s.verifyHostNameInIndices("metrics-*", shortName)
 
