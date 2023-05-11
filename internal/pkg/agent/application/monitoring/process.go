@@ -22,12 +22,13 @@ import (
 )
 
 const (
-	componentIDKey    = "componentID"
-	metricsPathKey    = "metricsPath"
-	timeout           = 10 * time.Second
-	apmPrefix         = "apm-server"
-	apmTypePrefix     = "apm"
-	fleetServerPrefix = "fleet-server"
+	componentIDKey         = "componentID"
+	metricsPathKey         = "metricsPath"
+	timeout                = 10 * time.Second
+	apmPrefix              = "apm-server"
+	apmTypePrefix          = "apm"
+	fleetServerPrefix      = "fleet-server"
+	profilingServicePrefix = "pf-elastic-"
 )
 
 var redirectPathAllowlist = map[string]struct{}{
@@ -39,6 +40,7 @@ var redirectPathAllowlist = map[string]struct{}{
 var redirectableProcesses = []string{
 	apmTypePrefix,
 	fleetServerPrefix,
+	profilingServicePrefix,
 }
 
 func processHandler(coord *coordinator.Coordinator, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
