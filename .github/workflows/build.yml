@@ -37,4 +37,5 @@ jobs:
           name: test-coverage
           path: |
             build/TEST-*
+            sonar-project.properties
           if-no-files-found: error
