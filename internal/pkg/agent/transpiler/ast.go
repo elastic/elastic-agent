@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -16,8 +15,6 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
-
-	"github.com/elastic/go-ucfg"
 )
 
 const (
@@ -668,41 +665,6 @@ func NewAST(m map[string]interface{}) (*AST, error) {
 	return &AST{root: root}, nil
 }
 
-// MustNewAST create a new AST based on a map[string]iface and panic on any errors.
-func MustNewAST(m map[string]interface{}) *AST {
-	v, err := NewAST(m)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// NewASTFromConfig takes a config and converts it to an internal Tree, allowing us to executes rules on the
-// data to shape it in a different way or to filter some of the information.
-func NewASTFromConfig(cfg *ucfg.Config) (*AST, error) {
-	var v interface{}
-	if cfg.IsDict() {
-		var m map[string]interface{}
-		if err := cfg.Unpack(&m); err != nil {
-			return nil, err
-		}
-		v = m
-	} else if cfg.IsArray() {
-		var l []string
-		if err := cfg.Unpack(&l); err != nil {
-			return nil, err
-		}
-		v = l
-	} else {
-		return nil, fmt.Errorf("cannot create AST from none dict or array type")
-	}
-	root, err := loadForNew(v)
-	if err != nil {
-		return nil, err
-	}
-	return &AST{root: root}, nil
-}
-
 func loadForNew(val interface{}) (Node, error) {
 	root, err := load(reflect.ValueOf(val))
 	if err != nil {
@@ -801,37 +763,6 @@ func (a *AST) HashStr() string {
 // Equal check if two AST are equals by using the computed hash.
 func (a *AST) Equal(other *AST) bool {
 	return bytes.Equal(a.Hash(), other.Hash())
-}
-
-// MarshalYAML defines how to marshal the Tree, it will convert the tree to a
-// map[string]interface{}.
-func (a *AST) MarshalYAML() (interface{}, error) {
-	m := &MapVisitor{}
-	a.Accept(m)
-	return m.Content, nil
-}
-
-// MarshalJSON concerts an AST to a valid JSON.
-func (a *AST) MarshalJSON() ([]byte, error) {
-	m := &MapVisitor{}
-	a.Accept(m)
-
-	b, err := json.Marshal(m.Content)
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// Apply applies the variables to the replacement in the AST.
-func (a *AST) Apply(vars *Vars) error {
-	n, err := a.root.Apply(vars)
-	if err != nil {
-		return err
-	}
-	a.root = n
-	return nil
 }
 
 // Lookup looks for a value from the AST.
@@ -983,38 +914,6 @@ func attachProcessors(node Node, processors Processors) Node {
 	return node
 }
 
-// Select takes an AST and a selector and will return a sub AST based on the selector path, will
-// return false if the path could not be found.
-func Select(a *AST, selector Selector) (*AST, bool) {
-	var appendTo []Node
-
-	// Run through the graph and find matching nodes.
-	current := a.root
-	for _, part := range splitPath(selector) {
-		n, ok := current.Find(part)
-		if !ok {
-			return nil, false
-		}
-
-		current = n
-		appendTo = append(appendTo, current)
-	}
-
-	newAST := &Dict{}
-	d := newAST
-	for idx, n := range appendTo {
-		d.value = append(d.value, n)
-		// Prepare to add the next level.
-		if idx < len(appendTo)-1 {
-			node := n.(*Key)
-			subdict := &Dict{}
-			node.value = subdict
-			d = subdict
-		}
-	}
-	return &AST{root: newAST}, true
-}
-
 // Lookup accept an AST and a selector and return the matching Node at that position.
 func Lookup(a *AST, selector Selector) (Node, bool) {
 	// Run through the graph and find matching nodes.
@@ -1028,21 +927,6 @@ func Lookup(a *AST, selector Selector) (Node, bool) {
 	}
 
 	return current, true
-}
-
-// LookupString accepts an AST and a selector and return the matching node at that position as a string.
-func LookupString(a *AST, selector Selector) (string, bool) {
-	n, ok := Lookup(a, selector)
-	if !ok {
-		return "", false
-	}
-
-	v, ok := n.Value().(*StrVal)
-	if !ok {
-		return "", false
-	}
-
-	return v.String(), true
 }
 
 // Insert inserts a node into an existing AST, will return and error if the target position cannot
@@ -1129,59 +1013,6 @@ func Insert(a *AST, node Node, to Selector) error {
 		d.value = &Dict{[]Node{node}, nil}
 	}
 	return nil
-}
-
-// Combine takes two AST and try to combine both of them into a single AST, notes that this operation
-// is not a merges and will return an error if position to merge are not compatible type or
-// if the key is already present in the target AST. This method useful if you use the Select methods
-// to create 2 different sub AST and want to merge them together again.
-func Combine(a, b *AST) (*AST, error) {
-	newAST := &AST{}
-	if reflect.TypeOf(a.root) != reflect.TypeOf(b.root) {
-		return nil, fmt.Errorf("incompatible node type to combine, received %T and %T", a, b)
-	}
-
-	switch t := a.root.(type) {
-	case *Dict:
-		newAST.root = t
-		for _, element := range b.root.Value().([]Node) {
-			key := element.(*Key)
-			_, ok := t.Find(key.name)
-			if ok {
-				return nil, fmt.Errorf("could not combine tree, key %s present in both trees", key.name)
-			}
-			t.value = append(t.value, key)
-		}
-	case *List:
-		newAST.root = t
-		t.value = append(t.value, b.root.(*List).value...)
-	}
-
-	return newAST, nil
-}
-
-// CompOp is operation used for comparing counts in CountComp
-type CompOp func(actual int) bool
-
-// CountComp is a comparison operation which returns true if compareOp evaluates true.
-// provided to compareOp is the actual count of elements within a specified paths.
-func CountComp(ast *AST, selector Selector, compareOp CompOp) bool {
-	var actualCount int
-	node, ok := Lookup(ast, selector)
-	if ok {
-		switch t := node.Value().(type) {
-		case *Key:
-			actualCount = 1
-		case *Dict:
-			actualCount = len(t.value)
-		case *List:
-			actualCount = len(t.value)
-		default:
-			actualCount = 1
-		}
-	}
-
-	return compareOp(actualCount)
 }
 
 // Map transforms the AST into a map[string]interface{} and will abort and return any errors related

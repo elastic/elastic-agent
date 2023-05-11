@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,6 +25,30 @@ type testVarStore struct {
 func (s *testVarStore) Lookup(v string) (interface{}, bool) {
 	val, ok := s.vars[v]
 	return val, ok
+}
+
+func TestEqlNewReportsBadSyntax(t *testing.T) {
+	// Some malformed antlr expressions can produce an error when evaluated
+	// because they cause a nil pointer reference or similar unhelpful
+	// error. These test cases confirm that eql.New reports these errors
+	// during the initial parsing of the expression, so things don't get
+	// that far.
+	testCases := []string{
+		"asdf",
+		"${***}",
+		"${",
+		"{}{}{}",
+		"1+=2",
+		"1.23f == ''",
+		"${asdf}...",
+		"${...}",
+		"${a.b.}",
+		"${a..b}",
+	}
+	for _, expression := range testCases {
+		_, err := New(expression)
+		assert.Error(t, err, "malformed EQL expression \"%v\" should produce an error", expression)
+	}
 }
 
 func TestEql(t *testing.T) {
@@ -305,6 +329,9 @@ func TestEql(t *testing.T) {
 		{expression: "length('hello')", err: true},
 		{expression: "length()", err: true},
 		{expression: "donotexist()", err: true},
+		{expression: "${***} != ${~~~}", err: true},
+		{expression: "false asdf!@#$", err: true},
+		{expression: "length('something' 345) > 1000", err: true},
 	}
 
 	store := &testVarStore{

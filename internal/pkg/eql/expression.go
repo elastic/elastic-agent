@@ -8,7 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
@@ -62,13 +63,45 @@ func New(expression string) (*Expression, error) {
 		return nil, ErrEmptyExpression
 	}
 
+	errorListener := newErrorListener()
 	input := antlr.NewInputStream(expression)
 	lexer := parser.NewEqlLexer(input)
 	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errorListener)
 	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	p := parser.NewEqlParser(tokens)
 	p.RemoveErrorListeners()
+	p.AddErrorListener(errorListener)
 	tree := p.ExpList()
 
+	if errorListener.errors != nil {
+		return nil, errorListener.errors
+	}
+
 	return &Expression{expression: expression, tree: tree}, nil
+}
+
+// A simple listener that collects errors reported by antlr for reporting
+// from eql.New. Create via newErrorListener.
+type errorListener struct {
+	antlr.ErrorListener
+
+	// "errors" uses multierror to store all parse errors in a single
+	// error object.
+	errors error
+}
+
+func newErrorListener() *errorListener {
+	return &errorListener{antlr.NewDefaultErrorListener(), nil}
+}
+
+func (el *errorListener) SyntaxError(
+	recognizer antlr.Recognizer,
+	offendingSymbol interface{},
+	line, column int,
+	msg string,
+	e antlr.RecognitionException,
+) {
+	el.errors = multierror.Append(el.errors,
+		fmt.Errorf("condition line %d column %d: %v", line, column, msg))
 }
