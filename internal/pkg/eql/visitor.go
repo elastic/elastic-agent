@@ -278,6 +278,9 @@ func (v *expVisitor) VisitVariableExp(ctx *parser.VariableExpContext) interface{
 			v.err = fmt.Errorf("all variables were unknown at line %v column %v: %v", line, column, strings.Join(names, ", "))
 		}
 	}
+	// Return Null even if allowMissingVars is false -- if we return nil
+	// here it reports a confusing typecheck error instead of propagating
+	// back and returning the variable error we set above.
 	return Null
 }
 
