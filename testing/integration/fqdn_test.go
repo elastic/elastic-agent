@@ -142,7 +142,20 @@ func (s *FQDN) TestFQDN() {
 	_, err = s.requirementsInfo.KibanaClient.UpdatePolicy(updatePolicyReq)
 	require.NoError(s.T(), err)
 
-	// TODO: Wait until policy has been applied by Agent
+	// Wait until policy has been applied by Agent
+	prevAgentPolicyRevision := agent.PolicyRevision
+	require.Eventually(s.T(), func() bool {
+		getAgentReq := kibana.GetAgentRequest{ID: agent.ID}
+		updatedPolicyAgent, err := s.requirementsInfo.KibanaClient.GetAgent(getAgentReq)
+		require.NoError(s.T(), err)
+
+		if updatedPolicyAgent.PolicyRevision > prevAgentPolicyRevision {
+			prevAgentPolicyRevision = updatedPolicyAgent.PolicyRevision
+			return true
+		}
+
+		return false
+	}, 1*time.Second, 30*time.Second)
 
 	// Verify that agent name is FQDN
 	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, fqdn)
@@ -164,7 +177,14 @@ func (s *FQDN) TestFQDN() {
 	_, err = s.requirementsInfo.KibanaClient.UpdatePolicy(updatePolicyReq)
 	require.NoError(s.T(), err)
 
-	// TODO: Wait until policy has been applied by Agent
+	// Wait until policy has been applied by Agent
+	require.Eventually(s.T(), func() bool {
+		getAgentReq := kibana.GetAgentRequest{ID: agent.ID}
+		updatedPolicyAgent, err := s.requirementsInfo.KibanaClient.GetAgent(getAgentReq)
+		require.NoError(s.T(), err)
+
+		return updatedPolicyAgent.PolicyRevision > prevAgentPolicyRevision
+	}, 1*time.Second, 30*time.Second)
 
 	// Verify that agent name is short hostname again
 	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, shortName)
@@ -174,7 +194,6 @@ func (s *FQDN) TestFQDN() {
 	// Verify that hostname in `logs-*` and `metrics-*` is short hostname again
 	s.verifyHostNameInIndices("logs-*", shortName)
 	s.verifyHostNameInIndices("metrics-*", shortName)
-
 }
 
 func (s *FQDN) verifyHostNameInIndices(indices, hostname string) {
