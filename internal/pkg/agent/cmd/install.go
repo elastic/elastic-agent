@@ -231,20 +231,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
-	if err := createInstallMarker(topPath); err != nil {
+	if err := info.CreateInstallMarker(topPath); err != nil {
 		return fmt.Errorf("failed to create install marker: %w", err)
 	}
 
 	fmt.Fprint(streams.Out, "Elastic Agent has been successfully installed.\n")
-	return nil
-}
-
-func createInstallMarker(topPath string) error {
-	markerFilePath := filepath.Join(topPath, info.MarkerFileName)
-	if _, err := os.Create(markerFilePath); err != nil {
-		return err
-	}
-
 	return nil
 }
 

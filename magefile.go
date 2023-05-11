@@ -7,7 +7,9 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
@@ -1259,6 +1263,7 @@ func majorMinor() string {
 
 func (Integration) Clean() {
 	_ = os.RemoveAll(".agent-testing")
+	mg.Deps()
 }
 
 func (Integration) Check() error {
@@ -1284,6 +1289,25 @@ func (Integration) Local(ctx context.Context) error {
 	return devtools.GoTest(ctx, params)
 }
 
+// authenticates users who run it to various IaaS CSPs and ESS
+func (Integration) Auth(ctx context.Context) error {
+	if err := authGCP(ctx); err != nil {
+		return fmt.Errorf("unable to authenticate to GCP: %w", err)
+	}
+	fmt.Println("✔️  GCP authentication successful")
+
+	// TODO: Authenticate user to AWS
+
+	// TODO: Authenticate user to Azure
+
+	if err := authESS(ctx); err != nil {
+		return fmt.Errorf("unable to authenticate to ESS: %w", err)
+	}
+	fmt.Println("✔️  ESS authentication successful")
+
+	return nil
+}
+
 func shouldBuildAgent() bool {
 	build := os.Getenv("BUILD_AGENT")
 	if build == "" {
@@ -1294,4 +1318,174 @@ func shouldBuildAgent() bool {
 		return false
 	}
 	return ret
+}
+
+// Pre-requisite: user must have the gcloud CLI installed
+func authGCP(ctx context.Context) error {
+	// Use OS-appropriate command to find executables
+	execFindCmd := "which"
+	cliName := "gcloud"
+	if runtime.GOOS == "windows" {
+		execFindCmd = "where"
+		cliName += ".exe"
+	}
+
+	// Check if gcloud CLI is installed
+	cmd := exec.CommandContext(ctx, execFindCmd, cliName)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s CLI is not installed: %w", cliName, err)
+	}
+
+	// Check if user is already authenticated
+	var authList []struct {
+		Account string `json:"account"`
+	}
+	for authSuccess := false; !authSuccess; {
+		cmd = exec.CommandContext(ctx, cliName, "auth", "list", "--filter=status:ACTIVE", "--format=json")
+		output, err := cmd.Output()
+		if err != nil {
+			return fmt.Errorf("unable to list authenticated accounts: %w", err)
+		}
+
+		if err := json.Unmarshal(output, &authList); err != nil {
+			return fmt.Errorf("unable to parse authenticated accounts: %w", err)
+		}
+
+		if len(authList) > 0 {
+			// We have at least one authenticated, active account. All set!
+			authSuccess = true
+			continue
+		}
+
+		fmt.Fprintln(os.Stderr, "❌  GCP authentication unsuccessful. Retrying...")
+
+		// Try to authenticate user
+		cmd = exec.CommandContext(ctx, cliName, "auth", "login")
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("unable to authenticate user: %w", cliName, err)
+		}
+	}
+
+	// Parse env vars for
+	// - expected email domain (default: elastic.co)
+	// - expected GCP project (default: elastic-platform-ingest)
+	expectedEmailDomain := os.Getenv("TEST_INTEG_AUTH_EMAIL_DOMAIN")
+	if expectedEmailDomain == "" {
+		expectedEmailDomain = "elastic.co"
+	}
+	expectedProject := os.Getenv("TEST_INTEG_AUTH_GCP_PROJECT")
+	if expectedProject == "" {
+		expectedProject = "elastic-platform-ingest"
+	}
+
+	// Check that authenticated account's email domain name
+	email := authList[0].Account
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 || parts[1] != expectedEmailDomain {
+		return fmt.Errorf("please authenticate with your @%s email address (currently authenticated with %s)", expectedEmailDomain, email)
+	}
+
+	// Check the authenticated account's project
+	cmd = exec.CommandContext(ctx, cliName, "config", "get", "core/project")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("unable to get project: %w", err)
+	}
+
+	project := strings.TrimSpace(string(output))
+	if project == expectedProject {
+		// We're all set!
+		return nil
+	}
+
+	// Attempt to select correct GCP project
+	fmt.Printf("Attempting to switch GCP project from [%s] to [%s]...\n", project, expectedProject)
+	cmd = exec.CommandContext(ctx, cliName, "config", "set", "core/project", expectedProject)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err = cmd.Run(); err != nil {
+		return fmt.Errorf("unable to switch project from [%s] to [%s]: %w", project, expectedProject, err)
+	}
+
+	return nil
+}
+
+func authESS(ctx context.Context) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine user's home directory: %w", err)
+	}
+	essAPIKeyFile := filepath.Join(homeDir, ".config", "ess", "api_key.txt")
+
+	_, err = os.Stat(essAPIKeyFile)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0700); err != nil {
+			return fmt.Errorf("unable to create ESS config directory: %w", err)
+		}
+
+		if err := os.WriteFile(essAPIKeyFile, nil, 0600); err != nil {
+			return fmt.Errorf("unable to initialize ESS API key file: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("unable to check if ESS config directory exists: %w", err)
+	}
+
+	// Read API key from file
+	data, err := os.ReadFile(essAPIKeyFile)
+	if err != nil {
+		return fmt.Errorf("unable to read ESS API key: %w", err)
+	}
+
+	essAPIKey := strings.TrimSpace(string(data))
+
+	// Attempt to use API key to check if it's valid
+	for authSuccess := false; !authSuccess; {
+		client := ess.NewClient(ess.Config{ApiKey: essAPIKey})
+		u, err := client.GetUser(ctx, ess.GetUserRequest{})
+		if err != nil {
+			return fmt.Errorf("unable to successfully connect to ESS API: %w", err)
+		}
+
+		if u.User.UserID != 0 {
+			// We have a user. It indicates that the API key works. All set!
+			authSuccess = true
+			continue
+		}
+
+		fmt.Fprintln(os.Stderr, "❌  ESS authentication unsuccessful. Retrying...")
+
+		prompt := "Please provide a ESS (QA) API key. To get your API key, " +
+			"visit https://console.qa.cld.elstc.co/deployment-features/keys:"
+		essAPIKey, err = stringPrompt(prompt)
+		if err != nil {
+			return fmt.Errorf("unable to read ESS API key from prompt: %w", err)
+		}
+	}
+
+	// Write API key to file for future use
+	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0600); err != nil {
+		return fmt.Errorf("unable to persist ESS API key for future use: %w", err)
+	}
+
+	return nil
+}
+
+// stringPrompt asks for a string value using the label
+func stringPrompt(prompt string) (string, error) {
+	r := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Fprint(os.Stdout, prompt+" ")
+		s, err := r.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("unable to read answer: %w", err)
+		}
+
+		s = strings.TrimSpace(s)
+		if s != "" {
+			return s, nil
+		}
+	}
+
+	return "", nil
 }

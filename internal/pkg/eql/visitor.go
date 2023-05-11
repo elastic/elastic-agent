@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
