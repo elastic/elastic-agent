@@ -18,7 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
-var ErrNotInstalled = errors.New("Elastic Agent is not installed")
+var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:stylecheck // Elastic Agent is a proper noun
 
 type CmdOpts interface {
 	toCmdArgs() []string
