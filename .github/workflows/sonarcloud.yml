@@ -41,11 +41,10 @@ jobs:
             var fs = require('fs');
             fs.writeFileSync('${{github.workspace}}/test-coverage.zip', Buffer.from(download.data));
       - run: unzip -o test-coverage.zip
-      - run: ls -l
       
       - name: Retrieve the pr number
         id: pr-number
-        uses: actions/github-script@v3.1.0
+        uses: actions/github-script@v6
         with:
           result-encoding: string
           script: |
@@ -55,7 +54,7 @@ jobs:
 
       - name: Retrieve the pr base
         id: pr-base
-        uses: actions/github-script@v3.1.0
+        uses: actions/github-script@v6
         with:
           result-encoding: string
           script: |
@@ -65,19 +64,13 @@ jobs:
       
       - name: Retrieve the pr branch
         id: pr-branch
-        uses: actions/github-script@v3.1.0
+        uses: actions/github-script@v6
         with:
           result-encoding: string
           script: |
             var fs = require('fs');
             var pr_base = fs.readFileSync('./build/pull_request_branch');
             return pr_base;
-
-      - name: Dump GitHub github.event.workflow_run
-        env:
-          GITHUB_EVENT: ${{ toJson(github.event.workflow_run) }}
-        run: |
-          echo "$GITHUB_EVENT"
         
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
