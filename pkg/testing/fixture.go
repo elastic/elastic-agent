@@ -42,6 +42,9 @@ type Fixture struct {
 
 	workDir string
 
+	installed   bool
+	installOpts *InstallOpts
+
 	c   client.Client
 	cMx sync.RWMutex
 }
@@ -184,6 +187,10 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 //
 // If no `states` are provided then the Elastic Agent runs until the context is cancelled.
 func (f *Fixture) Run(ctx context.Context, states ...State) error {
+	if f.installed {
+		return errors.New("fixture is installed; cannot be run")
+	}
+
 	var err error
 	err = f.ensurePrepared(ctx)
 	if err != nil {
