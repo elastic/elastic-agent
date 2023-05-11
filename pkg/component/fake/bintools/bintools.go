@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
 
@@ -22,33 +23,34 @@ var (
 	PathBinShipper   = BinaryPath("shipper")
 	PathBinComponent = BinaryPath("component")
 
-	PathPkgShipper, _   = path.Split("shipper")
-	PathPkgComponent, _ = path.Split("component")
+	PathPkgShipper, _   = path.Split(PathBinShipper)
+	PathPkgComponent, _ = path.Split(PathBinComponent)
 )
 
 func RemoveBinaries(binaries ...string) error {
-	const envVarRemoveBinaries = "REMOVE_FAKE_BINARIES"
-	removeBinaries := os.Getenv(envVarRemoveBinaries)
+	const envVarRemoveBinaries = "KEEP_FAKE_BINARIES"
+	keepBinaries := os.Getenv(envVarRemoveBinaries)
+	if keepBinaries == "" {
+		keepBinaries = "false"
+	}
 
-	remove, err := strconv.ParseBool(removeBinaries)
+	keep, err := strconv.ParseBool(keepBinaries)
 	if err != nil {
-		remove = true // if anything fails, keep the default
 		fmt.Printf("could not parse %s: %v", envVarRemoveBinaries, err)
 	}
 
-	if !remove {
-		fmt.Println("not removing binaries")
+	if keep {
+		fmt.Printf("keeping fake binaries: %s\n", strings.Join(binaries, ", "))
+		return nil
 	}
 
-	var multErr *multierror.Error
+	var multErr error
 	for _, b := range binaries {
-		err := os.Remove(PathBinComponent)
+		err := os.Remove(b)
 		if err != nil {
 			multErr = multierror.Append(multErr, fmt.Errorf(
-				"failed to remove %s: %q: %v", b, err))
-
+				"failed to keep %s: %v", b, err))
 		}
-
 	}
 
 	return multErr
@@ -61,7 +63,12 @@ func BinaryPath(name string) string {
 		binaryPath += ExtExe
 	}
 
-	return binaryPath
+	absPath, err := filepath.Abs(binaryPath)
+	if err != nil {
+		fmt.Printf("culd not get absolut path of %s: %v", binaryPath, err)
+	}
+
+	return absPath
 }
 
 func CompileBinary(out string, packagePath string) {
