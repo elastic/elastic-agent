@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -51,7 +52,8 @@ import (
 )
 
 const (
-	agentName = "elastic-agent"
+	agentName            = "elastic-agent"
+	fleetInitTimeoutName = "FLEET_SERVER_INIT_TIMEOUT"
 )
 
 type cfgOverrider func(cfg *configuration.Configuration)
@@ -59,9 +61,23 @@ type cfgOverrider func(cfg *configuration.Configuration)
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return &cobra.Command{
 		Use:   "run",
+<<<<<<< HEAD
 		Short: "Start the elastic-agent.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
+=======
+		Short: "Start the Elastic Agent",
+		Long:  "This command starts the Elastic Agent.",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			// done very early so the encrypted store is never used
+			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
+			if disableEncryptedStore {
+				storage.DisableEncryptionDarwin()
+			}
+			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
+			testingMode, _ := cmd.Flags().GetBool("testing-mode")
+			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
+>>>>>>> 8a07dc8c0f (Increase timeout, add config for timeout in fleet setup (#2541))
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
 				return err
@@ -69,9 +85,31 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			return nil
 		},
 	}
+<<<<<<< HEAD
 }
 
 func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
+=======
+
+	// --disable-encrypted-store only has meaning on Mac OS, and it disables the encrypted disk store
+	// feature of the Elastic Agent. On Mac OS root privileges are required to perform the disk
+	// store encryption, by setting this flag it disables that feature and allows the Elastic Agent to
+	// run as non-root.
+	cmd.Flags().Bool("disable-encrypted-store", false, "Disable the encrypted disk storage (Only useful on Mac OS)")
+
+	// --testing-mode is a hidden flag that spawns the Elastic Agent in testing mode
+	// it is hidden because we really don't want users to execute Elastic Agent to run
+	// this way, only the integration testing framework runs the Elastic Agent in this mode
+	cmd.Flags().Bool("testing-mode", false, "Run with testing mode enabled")
+
+	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
+	_ = cmd.Flags().MarkHidden("testing-mode")
+
+	return cmd
+}
+
+func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+>>>>>>> 8a07dc8c0f (Increase timeout, add config for timeout in fleet setup (#2541))
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -207,7 +245,11 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		l.Info("APM instrumentation disabled")
 	}
 
+<<<<<<< HEAD
 	coord, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+=======
+	coord, configMgr, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+>>>>>>> 8a07dc8c0f (Increase timeout, add config for timeout in fleet setup (#2541))
 	if err != nil {
 		return err
 	}

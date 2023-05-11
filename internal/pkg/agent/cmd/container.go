@@ -73,6 +73,7 @@ The following actions are possible and grouped based on the actions.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
 
+
   The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
 
   KIBANA_FLEET_HOST - kibana host to enable create enrollment token on [$KIBANA_HOST]
@@ -98,6 +99,7 @@ The following actions are possible and grouped based on the actions.
   FLEET_SERVER_CERT - path to certificate to use for HTTPS endpoint
   FLEET_SERVER_CERT_KEY - path to private key for certificate to use for HTTPS endpoint
   FLEET_SERVER_INSECURE_HTTP - expose Fleet Server over HTTP (not recommended; insecure)
+  FLEET_SERVER_INIT_TIMEOUT - Sets the initial timeout when starting up the fleet server under agent. Default: 30s.
 
 * Preparing Kibana for Fleet
   This prepares the Fleet plugin that exists inside of Kibana. This must either be enabled here or done externally
@@ -261,10 +263,16 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		return err
 	}
 
+	initTimeout := envTimeout(fleetInitTimeoutName)
+
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
+<<<<<<< HEAD
 		return run(logToStderr, isContainer)
+=======
+		return run(logToStderr, false, initTimeout, isContainer)
+>>>>>>> 8a07dc8c0f (Increase timeout, add config for timeout in fleet setup (#2541))
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -329,7 +337,11 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
+<<<<<<< HEAD
 	return run(logToStderr, isContainer)
+=======
+	return run(logToStderr, false, initTimeout, isContainer)
+>>>>>>> 8a07dc8c0f (Increase timeout, add config for timeout in fleet setup (#2541))
 }
 
 // TokenResp is used to decode a response for generating a service token
