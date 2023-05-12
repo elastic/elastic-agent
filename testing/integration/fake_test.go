@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent/pkg/component"
-
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 var fakeComponent = atesting.UsableComponent{
@@ -107,8 +107,7 @@ type FakeComponentIntegrationTestSuite struct {
 }
 
 func (s *FakeComponentIntegrationTestSuite) SetupSuite() {
-	l := atesting.LocalFetcher("../../build/distributions")
-	f, err := atesting.NewFixture(s.T(), "8.8.0", atesting.WithFetcher(l), atesting.WithLogOutput())
+	f, err := define.NewFixture(s.T())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -170,6 +169,9 @@ func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
 }
 
 func TestFakeComponentIntegrationTestSuite(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local: true,
+	})
 	suite.Run(t, new(FakeComponentIntegrationTestSuite))
 }
 

@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
@@ -267,7 +268,7 @@ func (Build) TestBinaries() error {
 
 // All run all the code checks.
 func (Check) All() {
-	mg.SerialDeps(Check.License, Check.GoLint)
+	mg.SerialDeps(Check.License, Integration.Check, Check.GoLint)
 }
 
 // GoLint run the code through the linter.
@@ -1259,6 +1260,11 @@ func majorMinor() string {
 
 func (Integration) Clean() {
 	_ = os.RemoveAll(".agent-testing")
+}
+
+func (Integration) Check() error {
+	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
+	return define.ValidateDir("testing/integration")
 }
 
 func (Integration) Local(ctx context.Context) error {
