@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -1941,9 +1942,17 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	agentInfo, _ := info.NewAgentInfo(true)
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		"localhost:0",
+		agentInfo,
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
+
 	errCh := make(chan error)
 	go func() {
 		err := m.Run(ctx)
@@ -2606,16 +2615,24 @@ LOOP:
 }
 
 func TestManager_FakeInput_OutputChange(t *testing.T) {
-	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/2403")
 	testPaths(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	ai, _ := info.NewAgentInfo(true)
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
-	require.NoError(t, err)
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		"localhost:0",
+		ai,
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		configuration.DefaultGRPCConfig())
+	require.NoError(t, err, "could not crete new manager")
+
 	errCh := make(chan error)
+	t.Cleanup(func() { drainErrChan(errCh) })
 	go func() {
 		err := m.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -2637,9 +2654,12 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 		BinaryPath: binaryPath,
 		Spec:       fakeInputSpec,
 	}
+	const IDComp0 = "fake-0"
+	const IDComp1 = "fake-1"
+
 	components := []component.Component{
 		{
-			ID:        "fake-0",
+			ID:        IDComp0,
 			InputSpec: &runtimeSpec,
 			Units: []component.Unit{
 				{
@@ -2675,7 +2695,7 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 
 	components2 := []component.Component{
 		{
-			ID:        "fake-1",
+			ID:        IDComp1,
 			InputSpec: &runtimeSpec,
 			Units: []component.Unit{
 				{
@@ -2713,85 +2733,97 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 		componentID string
 		state       ComponentState
 	}
-	stateProgression := make([]progressionStep, 0)
+	var stateProgression []progressionStep
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
-	stateProgCh := make(chan progressionStep)
+
+	stateProgressionCh := make(chan progressionStep)
 	subErrCh0 := make(chan error)
 	subErrCh1 := make(chan error)
+	t.Cleanup(func() { drainErrChan(subErrCh0) })
+	t.Cleanup(func() { drainErrChan(subErrCh1) })
+
 	go func() {
-		sub0 := m.Subscribe(subCtx, "fake-0")
-		sub1 := m.Subscribe(subCtx, "fake-1")
+		sub0 := m.Subscribe(subCtx, IDComp0)
+		sub1 := m.Subscribe(subCtx, IDComp1)
 		for {
 			select {
 			case <-subCtx.Done():
-				close(stateProgCh)
+				close(stateProgressionCh)
 				return
 			case state := <-sub0.Ch():
-				t.Logf("component fake-0 state changed: %+v", state)
-				signalState(subErrCh0, &state, []client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
-				stateProgCh <- progressionStep{"fake-o", state}
+				t.Logf("component %s state changed: %+v", IDComp0, state)
+				signalState(
+					subErrCh0,
+					&state,
+					[]client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
+				stateProgressionCh <- progressionStep{IDComp0, state}
+
 			case state := <-sub1.Ch():
-				t.Logf("component fake-1 state changed: %+v", state)
-				signalState(subErrCh1, &state, []client.UnitState{client.UnitStateHealthy})
-				stateProgCh <- progressionStep{"fake-o", state}
+				t.Logf("component %s state changed: %+v", IDComp1, state)
+				signalState(
+					subErrCh1,
+					&state,
+					[]client.UnitState{client.UnitStateHealthy})
+				stateProgressionCh <- progressionStep{IDComp1, state}
 			}
 		}
 	}()
 
 	go func() {
-		for step := range stateProgCh {
+		for step := range stateProgressionCh {
 			stateProgression = append(stateProgression, step)
 		}
 	}()
 
-	defer drainErrChan(errCh)
-	defer drainErrChan(subErrCh0)
-	defer drainErrChan(subErrCh1)
+	// Wait manager start running, then check if any error happened
+	assert.Eventually(t,
+		func() bool { return m.running.Load() },
+		500*time.Millisecond,
+		10*time.Millisecond)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
 	select {
-	case <-startTimer.C:
-		err = m.Update(components)
-		require.NoError(t, err)
 	case err := <-errCh:
 		t.Fatalf("failed early: %s", err)
+	default:
 	}
 
-	updateTimeout := 300 * time.Millisecond
+	time.Sleep(100 * time.Millisecond)
+	err = m.Update(components)
+	require.NoError(t, err)
+
+	updateSleep := 300 * time.Millisecond
 	if runtime.GOOS == component.Windows {
-		// windows is slow, preventing flakyness
-		updateTimeout = 550 * time.Millisecond
+		// windows is slow, preventing flakiness
+		updateSleep = time.Second
 	}
-	updateTimer := time.NewTimer(updateTimeout)
-	defer updateTimer.Stop()
-	select {
-	case <-updateTimer.C:
-		err = m.Update(components2)
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	time.Sleep(updateSleep)
+	err = m.Update(components2)
+	require.NoError(t, err)
 
 	count := 0
-	endTimer := time.NewTimer(30 * time.Second)
+	timeout := 30 * time.Second
+	endTimer := time.NewTimer(timeout)
 	defer endTimer.Stop()
+
 LOOP:
 	for {
 		select {
 		case <-endTimer.C:
-			t.Fatalf("timed out after 30 seconds")
+			t.Fatalf("timed out after %s seconds, "+
+				"did not receive enought state changes", timeout)
 		case err := <-errCh:
 			require.NoError(t, err)
 		case err := <-subErrCh0:
+			t.Logf("[subErrCh0] received: %v", err)
 			require.NoError(t, err)
 			count++
 			if count >= 2 {
 				break LOOP
 			}
 		case err := <-subErrCh1:
+			t.Logf("[subErrCh1] received: %v", err)
 			require.NoError(t, err)
 			count++
 			if count >= 2 {
@@ -2803,14 +2835,16 @@ LOOP:
 	subCancel()
 	cancel()
 
-	// check progresstion, require stop fake-0 before start fake-1
-	wasStopped := false
+	// check progression, require stop fake-0 before start fake-1
+	comp0Stopped := false
 	for _, step := range stateProgression {
-		if step.componentID == "fake-0" && step.state.State == client.UnitStateStopped {
-			wasStopped = true
+		if step.componentID == IDComp0 &&
+			step.state.State == client.UnitStateStopped {
+			comp0Stopped = true
 		}
-		if step.componentID == "fake-1" && step.state.State == client.UnitStateStarting {
-			require.True(t, wasStopped)
+		if step.componentID == IDComp1 &&
+			step.state.State == client.UnitStateStarting {
+			require.True(t, comp0Stopped)
 			break
 		}
 	}
@@ -2844,28 +2878,34 @@ func drainErrChan(ch chan error) {
 func signalState(subErrCh chan error, state *ComponentState, acceptableStates []client.UnitState) {
 	if state.State == client.UnitStateFailed {
 		subErrCh <- fmt.Errorf("component failed: %s", state.Message)
-	} else {
-		issue := ""
-		healthy := 0
-		for key, unit := range state.Units {
-			if unit.State == client.UnitStateStarting {
-				// acceptable
-			} else if isAcceptableState(unit.State, acceptableStates) {
-				healthy++
-			} else if issue == "" {
-				issue = fmt.Sprintf("unit %s in invalid state %v", key.UnitID, unit.State)
-			}
+		return
+	}
+
+	var issues []string
+	healthy := 0
+	for key, unit := range state.Units {
+		switch {
+		case unit.State == client.UnitStateStarting:
+		// acceptable, but does not count as health
+		case isValidState(unit.State, acceptableStates):
+			healthy++
+		default:
+
+			issues = append(issues, fmt.Sprintf(
+				"unit %s in invalid state %v", key.UnitID, unit.State))
 		}
-		if issue != "" {
-			subErrCh <- fmt.Errorf("%s", issue)
-		}
-		if healthy == 3 {
-			subErrCh <- nil
-		}
+	}
+
+	if len(issues) != 0 {
+		subErrCh <- errors.New(strings.Join(issues, "| "))
+	}
+
+	if healthy == len(state.Units) {
+		subErrCh <- nil
 	}
 }
 
-func isAcceptableState(state client.UnitState, acceptableStates []client.UnitState) bool {
+func isValidState(state client.UnitState, acceptableStates []client.UnitState) bool {
 	for _, s := range acceptableStates {
 		if s == state {
 			return true

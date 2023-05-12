@@ -68,8 +68,18 @@ func run() error {
 		case <-ctx.Done():
 			return nil
 		case change := <-c.UnitChanges():
-			switch change.Type {
+			if change.Unit != nil {
+				u := change.Unit
+				state, _, _ := u.State()
+				logger.Info().
+					Str("state", state.String()).
+					Str("expectedState", u.Expected().State.String()).
+					Msg("unit change received")
+			} else {
+				logger.Info().Msg("unit change received, but no unit on it")
+			}
 
+			switch change.Type {
 			case client.UnitChangedAdded:
 				s.Added(change.Unit)
 			case client.UnitChangedModified:
