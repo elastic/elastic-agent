@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/stretchr/testify/require"
-
 	"github.com/elastic/elastic-agent-libs/kibana"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // WaitForAgentStatus returns a niladic function that returns true if the agent
