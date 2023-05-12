@@ -3,6 +3,7 @@ module github.com/elastic/elastic-agent
 go 1.19
 
 require (
+	github.com/Masterminds/semver v1.5.0
 	github.com/Microsoft/go-winio v0.6.0
 	github.com/antlr/antlr4 v0.0.0-20200820155224-be881fa6b91d
 	github.com/billgraziano/dpapi v0.4.0
@@ -14,7 +15,7 @@ require (
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
 	github.com/elastic/elastic-agent-autodiscover v0.2.1
 	github.com/elastic/elastic-agent-client/v7 v7.1.0
-	github.com/elastic/elastic-agent-libs v0.3.8
+	github.com/elastic/elastic-agent-libs v0.3.8-0.20230510160003-d0085fbc36c1
 	github.com/elastic/elastic-agent-system-metrics v0.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.0.0-20210317102009-a9d74cec0186
 	github.com/elastic/go-licenser v0.4.0
