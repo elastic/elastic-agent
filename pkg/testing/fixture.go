@@ -302,10 +302,6 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 		}
 	}
 
-	err := cmd.Run()
-	if err != nil {
-		return nil, err
-	}
 	return cmd.CombinedOutput()
 }
 
