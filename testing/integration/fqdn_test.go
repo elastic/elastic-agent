@@ -92,7 +92,7 @@ func (s *FQDN) TestFQDN() {
 	// Create Agent policy
 	createPolicyReq := kibana.CreatePolicyRequest{
 		Name:        "test-policy-fqdn-" + strings.ReplaceAll(fqdn, ".", "-"),
-		Namespace:   "default",
+		Namespace:   s.requirementsInfo.Namespace,
 		Description: fmt.Sprintf("Test policy for FQDN E2E test (%s)", fqdn),
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
