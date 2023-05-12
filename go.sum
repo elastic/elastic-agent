@@ -83,6 +83,7 @@ github.com/Jeffail/gabs/v2 v2.6.0/go.mod h1:xCn81vdHKxFUuWWAaD5jCTQDNPBMh5pPs9IJ
 github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd/go.mod h1:64YHyfSL2R96J44Nlwm39UHepQbyR5q10x7iYa1ks2E=
 github.com/Masterminds/goutils v1.1.0/go.mod h1:8cTjp+g8YejhMuvIA5y2vz3BpJxksy863GQaJW2MFNU=
 github.com/Masterminds/goutils v1.1.1/go.mod h1:8cTjp+g8YejhMuvIA5y2vz3BpJxksy863GQaJW2MFNU=
+github.com/Masterminds/semver v1.5.0 h1:H65muMkzWKEuNDnfl9d70GUjFniHKHRbFPGBuZ3QEww=
 github.com/Masterminds/semver v1.5.0/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=
 github.com/Masterminds/sprig v2.22.0+incompatible/go.mod h1:y6hNFY5UBTIWBxnzTeuNhlNS5hqE0NB0E6fgfo2Br3o=
@@ -401,8 +402,8 @@ github.com/elastic/elastic-agent-autodiscover v0.2.1/go.mod h1:gPnzzfdYNdgznAb+i
 github.com/elastic/elastic-agent-client/v7 v7.1.0 h1:3+4GCzYV1kjdECrvCvNCrwnsVN/dt/VPi7UfSY3fJLs=
 github.com/elastic/elastic-agent-client/v7 v7.1.0/go.mod h1:UlVOHSDvTA4Mfdhdg+BE7aqOsUR3ab+x2Zl0aHlBXs4=
 github.com/elastic/elastic-agent-libs v0.2.5/go.mod h1:chO3rtcLyGlKi9S0iGVZhYCzDfdDsAQYBc+ui588AFE=
-github.com/elastic/elastic-agent-libs v0.3.8 h1:kj8yNIu/dYrAfxXZKTmCsEgP6agAvmCra22TKTGsU+M=
-github.com/elastic/elastic-agent-libs v0.3.8/go.mod h1:h48hzjQcn6XPwfWRM5HimAKlsG0J92ULgAzdX+WedA8=
+github.com/elastic/elastic-agent-libs v0.3.8-0.20230510160003-d0085fbc36c1 h1:FjiRMUtNWmIM3Yd8FPaTkJZyajqxH3+6WGVU/mWG30k=
+github.com/elastic/elastic-agent-libs v0.3.8-0.20230510160003-d0085fbc36c1/go.mod h1:h48hzjQcn6XPwfWRM5HimAKlsG0J92ULgAzdX+WedA8=
 github.com/elastic/elastic-agent-system-metrics v0.6.0 h1:2LqS4cEJ+zK/zLbjFYCRt6bkBs4SUflRNAPH4766rOo=
 github.com/elastic/elastic-agent-system-metrics v0.6.0/go.mod h1:lOtxwLoqIzjvStjri2q2b3VOjm0QfgJYzuOuNesaz6s=
 github.com/elastic/elastic-package v0.36.0/go.mod h1:TUyhRXtf+kazrUthMF+5FtngcFJZtsgty0o/nnl8UFU=
