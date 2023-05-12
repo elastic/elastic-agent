@@ -1,6 +1,11 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -102,4 +107,23 @@ func UpgradeAgent(client *kibana.Client, version string) error {
 	}
 
 	return nil
+}
+
+func GetDefaultFleetServerURL(client *kibana.Client) (string, error) {
+	req := kibana.ListFleetServerHostsRequest{}
+	resp, err := client.ListFleetServerHosts(req)
+	if err != nil {
+		return "", fmt.Errorf("unable to list fleet server hosts: %w", err)
+	}
+
+	for _, item := range resp.Items {
+		if item.IsDefault {
+			hostURLs := item.HostURLs
+			if len(hostURLs) > 0 {
+				return hostURLs[0], nil
+			}
+		}
+	}
+
+	return "", errors.New("unable to determine default fleet server host")
 }
