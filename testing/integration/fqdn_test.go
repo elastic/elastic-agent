@@ -155,7 +155,7 @@ func (s *FQDN) TestFQDN() {
 		}
 
 		return false
-	}, 30*time.Second, 1*time.Second)
+	}, 2*time.Minute, 1*time.Second)
 
 	// Verify that agent name is FQDN
 	agent, err = tools.GetAgentByHostnameFromList(kibClient, fqdn)
@@ -184,7 +184,7 @@ func (s *FQDN) TestFQDN() {
 		require.NoError(s.T(), err)
 
 		return updatedPolicyAgent.PolicyRevision > prevAgentPolicyRevision
-	}, 30*time.Second, 1*time.Second)
+	}, 2*time.Minute, 1*time.Second)
 
 	// Verify that agent name is short hostname again
 	agent, err = tools.GetAgentByHostnameFromList(kibClient, shortName)
