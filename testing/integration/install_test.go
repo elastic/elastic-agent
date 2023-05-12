@@ -99,7 +99,6 @@ func (i *InstallTestSuite) TestInstallWithBasePath() {
 	// installation.
 	tmpDir := i.T().TempDir()
 	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
-	defer os.RemoveAll(randomBasePath)
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
