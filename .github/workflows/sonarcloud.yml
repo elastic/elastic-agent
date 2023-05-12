@@ -40,7 +40,7 @@ jobs:
             });
             var fs = require('fs');
             fs.writeFileSync('${{github.workspace}}/test-coverage.zip', Buffer.from(download.data));
-      - run: unzip -o test-coverage.zip
+      - run: unzip -o test-coverage.zip -d build
 
       - name: Retrieve the pr number
         id: pr-number
