@@ -35,6 +35,20 @@ func WaitForAgentStatus(t *testing.T, client *kibana.Client, expectedStatus stri
 	}
 }
 
+// WaitForPolicyRevision returns a niladic function that returns true if the
+// given agent's policy revision has reached the given policy revision; false
+// otherwise. The returned function is intended
+// for use with assert.Eventually or require.Eventually.
+func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, expectedPolicyRevision int) func() bool {
+	return func() bool {
+		getAgentReq := kibana.GetAgentRequest{ID: agentID}
+		updatedPolicyAgent, err := client.GetAgent(getAgentReq)
+		require.NoError(t, err)
+
+		return updatedPolicyAgent.PolicyRevision == expectedPolicyRevision
+	}
+}
+
 // EnrollAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.

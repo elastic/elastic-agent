@@ -123,19 +123,13 @@ func (s *FQDN) TestFQDN() {
 	require.NoError(s.T(), err)
 
 	// Wait until policy has been applied by Agent
-	prevAgentPolicyRevision := agent.PolicyRevision
-	require.Eventually(s.T(), func() bool {
-		getAgentReq := kibana.GetAgentRequest{ID: agent.ID}
-		updatedPolicyAgent, err := kibClient.GetAgent(getAgentReq)
-		require.NoError(s.T(), err)
-
-		if updatedPolicyAgent.PolicyRevision > prevAgentPolicyRevision {
-			prevAgentPolicyRevision = updatedPolicyAgent.PolicyRevision
-			return true
-		}
-
-		return false
-	}, 2*time.Minute, 1*time.Second)
+	expectedAgentPolicyRevision := agent.PolicyRevision + 1
+	require.Eventually(
+		s.T(),
+		tools.WaitForPolicyRevision(s.T(), kibClient, agent.ID, expectedAgentPolicyRevision),
+		2*time.Minute,
+		1*time.Second,
+	)
 
 	// Verify that agent name is FQDN
 	agent, err = tools.GetAgentByHostnameFromList(kibClient, fqdn)
@@ -158,13 +152,13 @@ func (s *FQDN) TestFQDN() {
 	require.NoError(s.T(), err)
 
 	// Wait until policy has been applied by Agent
-	require.Eventually(s.T(), func() bool {
-		getAgentReq := kibana.GetAgentRequest{ID: agent.ID}
-		updatedPolicyAgent, err := kibClient.GetAgent(getAgentReq)
-		require.NoError(s.T(), err)
-
-		return updatedPolicyAgent.PolicyRevision > prevAgentPolicyRevision
-	}, 2*time.Minute, 1*time.Second)
+	expectedAgentPolicyRevision++
+	require.Eventually(
+		s.T(),
+		tools.WaitForPolicyRevision(s.T(), kibClient, agent.ID, expectedAgentPolicyRevision),
+		2*time.Minute,
+		1*time.Second,
+	)
 
 	// Verify that agent name is short hostname again
 	agent, err = tools.GetAgentByHostnameFromList(kibClient, shortName)
