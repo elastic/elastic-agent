@@ -1,6 +1,7 @@
 name: CodeCoverage Build
 on:
   pull_request:
+
 jobs:
   coverage:
     name: CodeCoverage
@@ -9,11 +10,13 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version-file: 'go.mod'
           cache: true
+
       - name: Go cache
         uses: actions/cache@v3
         with:
@@ -25,6 +28,7 @@ jobs:
           key: ${{ runner.os }}-go-cache-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-cache
+
       - name: Run Mage
         uses: magefile/mage-action@v2
         env:
@@ -32,10 +36,18 @@ jobs:
         with:
           version: latest
           args: unitTest
+
+      - name: Save PR information
+        run: |
+          mkdir -p ./pr
+          echo ${{ github.event.number }} > ./build/pull_request_number
+          echo ${{ github.event.pull_request.base.ref }} > ./build/pull_request_base
+          echo ${{ github.event.pull_request.head.ref }} > ./build/pull_request_branch
+
       - uses: actions/upload-artifact@v3
         with:
           name: test-coverage
           path: |
             build/TEST-*
-            sonar-project.properties
+            build/pull_request*
           if-no-files-found: error

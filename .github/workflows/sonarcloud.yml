@@ -16,7 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0
+          repository: '${{ github.event.workflow_run.head_repository.full_name }}'
+          ref: '${{ github.event.workflow_run.head_branch }}'
 
       - name: 'Download artifact'
         uses: actions/github-script@v3.1.0
@@ -38,11 +40,46 @@ jobs:
             });
             var fs = require('fs');
             fs.writeFileSync('${{github.workspace}}/test-coverage.zip', Buffer.from(download.data));
-      - run: unzip test-coverage.zip
+      - run: unzip -o test-coverage.zip
+
+      - name: Retrieve the pr number
+        id: pr-number
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            var fs = require('fs');
+            var pr_number = Number(fs.readFileSync('./build/pull_request_number'));
+            return pr_number;
+
+      - name: Retrieve the pr base
+        id: pr-base
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            var fs = require('fs');
+            var pr_base = fs.readFileSync('./build/pull_request_base');
+            return pr_base;
+
+      - name: Retrieve the pr branch
+        id: pr-branch
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            var fs = require('fs');
+            var pr_base = fs.readFileSync('./build/pull_request_branch');
+            return pr_base;
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
+        with:
+          args: >
+            -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha }}
+            -Dsonar.pullrequest.key=${{ steps.pr-number.outputs.result }}
+            -Dsonar.pullrequest.branch=${{ steps.pr-branch.outputs.result }}
+            -Dsonar.pullrequest.base=${{ steps.pr-base.outputs.result }}
