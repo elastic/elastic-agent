@@ -240,7 +240,7 @@ func NewRuntimeSpecs(platform PlatformDetail, inputSpecs []InputRuntimeSpec, shi
 	for _, shipperSpec := range shipperSpecs {
 		// map the native outputs that the shipper supports
 		for _, output := range shipperSpec.Spec.Outputs {
-			shippers, _ := shipperOutputs[output]
+			shippers := shipperOutputs[output]
 			shippers = append(shippers, shipperSpec.Spec.Name)
 			shipperOutputs[output] = shippers
 		}
