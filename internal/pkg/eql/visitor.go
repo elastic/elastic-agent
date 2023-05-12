@@ -25,6 +25,8 @@ type null struct{}
 // Null is returned when the variable doesn't exist.
 var Null = &null{}
 
+// expVisitor is an antlr visitor that evaluates EQL expressions, looking
+// up variables in those expressions via the configured VarStore.
 type expVisitor struct {
 	antlr.ParseTreeVisitor
 	err              error

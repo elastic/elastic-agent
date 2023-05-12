@@ -41,6 +41,9 @@ type Expression struct {
 // Variable expressions that don't exist in the VarStore will evaluate to
 // Null, but will still be considered valid if allowMissingVars is true.
 // Otherwise they will return an error.
+// Evaluation does not use logical short circuiting: for example,
+// the expression "${validVariable} or ${invalidVariable}" will generate
+// an error even if ${validVariable} is true.
 func (e *Expression) Eval(store VarStore, allowMissingVars bool) (result bool, err error) {
 	// Antlr can panic on errors so we have to recover somehow.
 	defer func() {
