@@ -89,7 +89,7 @@ func (s *FQDN) TestFQDN() {
 	err := setHostFQDN(ctx, s.externalIP, fqdn)
 	require.NoError(s.T(), err)
 
-	// Create Agent policy
+	// Enroll agent in Fleet with a test policy
 	createPolicyReq := kibana.CreatePolicyRequest{
 		Name:        "test-policy-fqdn-" + strings.ReplaceAll(fqdn, ".", "-"),
 		Namespace:   s.requirementsInfo.Namespace,
@@ -99,28 +99,8 @@ func (s *FQDN) TestFQDN() {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policy, err := kibClient.CreatePolicy(createPolicyReq)
+	policy, err := tools.EnrollAgentWithPolicy(s.T(), s.agentFixture, kibClient, createPolicyReq)
 	require.NoError(s.T(), err)
-
-	// Create enrollment API key
-	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
-		PolicyID: policy.ID,
-	}
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
-	require.Nil(s.T(), err, "Could not create enrollment token")
-
-	// Get default Fleet Server URL
-	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
-	require.NoError(s.T(), err)
-
-	// Enroll agent
-	output, err := tools.EnrollElasticAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
-	if err != nil {
-		s.T().Log(string(output))
-	}
-	require.NoError(s.T(), err)
-
-	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	// Verify that agent name is short hostname
 	agent, err := tools.GetAgentByHostnameFromList(kibClient, shortName)

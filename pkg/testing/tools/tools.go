@@ -5,7 +5,12 @@
 package tools
 
 import (
+	"fmt"
 	"testing"
+	"time"
+
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 )
@@ -28,4 +33,47 @@ func WaitForAgentStatus(t *testing.T, client *kibana.Client, expectedStatus stri
 		t.Logf("Agent status: %s", currentStatus)
 		return false
 	}
+}
+
+// EnrollAgentWithPolicy creates the given policy, enrolls the given agent
+// fixture in Fleet using the default Fleet Server, waits for the agent to be
+// online, and returns the created policy.
+func EnrollAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.CreatePolicyRequest) (*kibana.CreatePolicyResponse, error) {
+	policy, err := kibClient.CreatePolicy(createPolicyReq)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create policy: %w", err)
+	}
+
+	// Create enrollment API key
+	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policy.ID,
+	}
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create enrollment API key: %w", err)
+	}
+
+	// Get default Fleet Server URL
+	fleetServerURL, err := GetDefaultFleetServerURL(kibClient)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get default Fleet Server URL: %w", err)
+	}
+
+	// Enroll agent
+	output, err := EnrollElasticAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
+	if err != nil {
+		t.Log(string(output))
+		return nil, fmt.Errorf("unable to enroll Elastic Agent: %w", err)
+	}
+
+	// Wait for Agent to be healthy
+	require.Eventually(
+		t,
+		WaitForAgentStatus(t, kibClient, "online"),
+		2*time.Minute,
+		10*time.Second,
+		"Elastic Agent status is not online",
+	)
+
+	return policy, nil
 }
