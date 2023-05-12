@@ -1272,11 +1272,6 @@ func (Integration) Check() error {
 	return define.ValidateDir("testing/integration")
 }
 
-func (Integration) Check() error {
-	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
-	return define.ValidateDir("testing/integration")
-}
-
 func (Integration) Local(ctx context.Context) error {
 	if shouldBuildAgent() {
 		// need only local package for current platform
