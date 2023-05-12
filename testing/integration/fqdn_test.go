@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -197,7 +198,7 @@ func (s *FQDN) verifyHostNameInIndices(indices, hostname string) {
 	require.NoError(s.T(), err)
 
 	for _, hit := range body.Hits.Hits {
-		require.Equal(s.T(), hostname, hit.Source.Host.Name)
+		assert.Equal(s.T(), hostname, hit.Source.Host.Name)
 	}
 }
 
