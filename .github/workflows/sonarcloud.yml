@@ -60,8 +60,8 @@ jobs:
     name: SonarCloud
     runs-on: ubuntu-latest
     if: >
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
+      github..event == 'push' &&
+      github.event.head_branch == 'main'
     steps:
       - uses: actions/checkout@v3
         with:
