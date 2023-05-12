@@ -89,8 +89,10 @@ func RemoveBinaries(binaries ...string) error {
 }
 
 func BinaryPath(name string) string {
-	binaryPath := filepath.Join("..", "fake", name, name)
+	_, b, _, _ := runtime.Caller(0)
+	pathPkg := filepath.Dir(b)
 
+	binaryPath := filepath.Join(pathPkg, "..", name, name)
 	if runtime.GOOS == component.Windows {
 		binaryPath += ExtExe
 	}
