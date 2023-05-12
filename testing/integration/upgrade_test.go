@@ -70,6 +70,7 @@ func (s *UpgradeElasticAgent) SetupSuite() {
 }
 
 func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
+	kibClient := s.requirementsInfo.KibanaClient
 	policyUUID := uuid.New().String()
 
 	createPolicyReq := kibana.CreatePolicyRequest{
@@ -81,17 +82,17 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policy, err := s.requirementsInfo.KibanaClient.CreatePolicy(createPolicyReq)
+	policy, err := kibClient.CreatePolicy(createPolicyReq)
 	require.NoError(s.T(), err)
 
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
 	}
-	enrollmentToken, err := s.requirementsInfo.KibanaClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
 	require.NoError(s.T(), err)
 
 	// Get default fleet server URL
-	fleetServerURL, err := tools.GetDefaultFleetServerURL(s.requirementsInfo.KibanaClient)
+	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
 	require.NoError(s.T(), err)
 
 	output, err := tools.EnrollElasticAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
@@ -100,18 +101,18 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 	}
 	require.NoError(s.T(), err)
 
-	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), s.requirementsInfo.KibanaClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
-	err = tools.UpgradeAgent(s.requirementsInfo.KibanaClient, s.agentEndVersion)
+	err = tools.UpgradeAgent(kibClient, s.agentEndVersion)
 	require.NoError(s.T(), err)
 
-	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), s.requirementsInfo.KibanaClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	// Wait until the upgrade marker is removed, indicating the end of the
 	// upgrade process
 	require.Eventually(s.T(), upgradeMarkerRemoved, 10*time.Minute, 20*time.Second)
 
-	newVersion, err := tools.GetAgentVersion(s.requirementsInfo.KibanaClient)
+	newVersion, err := tools.GetAgentVersion(kibClient)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), s.agentEndVersion, newVersion)
 }

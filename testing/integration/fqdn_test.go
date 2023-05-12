@@ -81,6 +81,7 @@ func (s *FQDN) TearDownTest() {
 
 func (s *FQDN) TestFQDN() {
 	ctx := context.Background()
+	kibClient := s.requirementsInfo.KibanaClient
 
 	// Set FQDN on host
 	shortName := randStr(6)
@@ -98,18 +99,18 @@ func (s *FQDN) TestFQDN() {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policy, err := s.requirementsInfo.KibanaClient.CreatePolicy(createPolicyReq)
+	policy, err := kibClient.CreatePolicy(createPolicyReq)
 	require.NoError(s.T(), err)
 
 	// Create enrollment API key
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
 	}
-	enrollmentToken, err := s.requirementsInfo.KibanaClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
 	require.Nil(s.T(), err, "Could not create enrollment token")
 
 	// Get default Fleet Server URL
-	fleetServerURL, err := tools.GetDefaultFleetServerURL(s.requirementsInfo.KibanaClient)
+	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
 	require.NoError(s.T(), err)
 
 	// Enroll agent
@@ -119,10 +120,10 @@ func (s *FQDN) TestFQDN() {
 	}
 	require.NoError(s.T(), err)
 
-	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), s.requirementsInfo.KibanaClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	// Verify that agent name is short hostname
-	agent, err := tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, shortName)
+	agent, err := tools.GetAgentByHostnameFromList(kibClient, shortName)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), agent)
 
@@ -138,14 +139,14 @@ func (s *FQDN) TestFQDN() {
 		},
 	}
 	updatePolicyReq := kibana.UpdatePolicyRequest(*policy)
-	_, err = s.requirementsInfo.KibanaClient.UpdatePolicy(updatePolicyReq)
+	_, err = kibClient.UpdatePolicy(updatePolicyReq)
 	require.NoError(s.T(), err)
 
 	// Wait until policy has been applied by Agent
 	prevAgentPolicyRevision := agent.PolicyRevision
 	require.Eventually(s.T(), func() bool {
 		getAgentReq := kibana.GetAgentRequest{ID: agent.ID}
-		updatedPolicyAgent, err := s.requirementsInfo.KibanaClient.GetAgent(getAgentReq)
+		updatedPolicyAgent, err := kibClient.GetAgent(getAgentReq)
 		require.NoError(s.T(), err)
 
 		if updatedPolicyAgent.PolicyRevision > prevAgentPolicyRevision {
@@ -157,7 +158,7 @@ func (s *FQDN) TestFQDN() {
 	}, 30*time.Second, 1*time.Second)
 
 	// Verify that agent name is FQDN
-	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, fqdn)
+	agent, err = tools.GetAgentByHostnameFromList(kibClient, fqdn)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), agent)
 
@@ -173,20 +174,20 @@ func (s *FQDN) TestFQDN() {
 		},
 	}
 	updatePolicyReq = kibana.UpdatePolicyRequest(*policy)
-	_, err = s.requirementsInfo.KibanaClient.UpdatePolicy(updatePolicyReq)
+	_, err = kibClient.UpdatePolicy(updatePolicyReq)
 	require.NoError(s.T(), err)
 
 	// Wait until policy has been applied by Agent
 	require.Eventually(s.T(), func() bool {
 		getAgentReq := kibana.GetAgentRequest{ID: agent.ID}
-		updatedPolicyAgent, err := s.requirementsInfo.KibanaClient.GetAgent(getAgentReq)
+		updatedPolicyAgent, err := kibClient.GetAgent(getAgentReq)
 		require.NoError(s.T(), err)
 
 		return updatedPolicyAgent.PolicyRevision > prevAgentPolicyRevision
 	}, 30*time.Second, 1*time.Second)
 
 	// Verify that agent name is short hostname again
-	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, shortName)
+	agent, err = tools.GetAgentByHostnameFromList(kibClient, shortName)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), agent)
 
