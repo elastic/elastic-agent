@@ -100,12 +100,12 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 	}
 	require.NoError(s.T(), err)
 
-	require.Eventually(s.T(), agentStatus("online", *s), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), s.requirementsInfo.KibanaClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	err = tools.UpgradeAgent(s.requirementsInfo.KibanaClient, s.agentEndVersion)
 	require.NoError(s.T(), err)
 
-	require.Eventually(s.T(), agentStatus("online", *s), 5*time.Minute, 5*time.Second, "Agent status is not online")
+	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), s.requirementsInfo.KibanaClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	// Wait until the upgrade marker is removed, indicating the end of the
 	// upgrade process
@@ -119,17 +119,6 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 func (s *UpgradeElasticAgent) TearDownTest() {
 	s.T().Log("Un-enrolling elastic agent")
 	assert.NoError(s.T(), tools.UnEnrollAgent(s.requirementsInfo.KibanaClient))
-}
-
-func agentStatus(expectedStatus string, suite UpgradeElasticAgent) func() bool {
-	return func() bool {
-		status, err := tools.GetAgentStatus(suite.requirementsInfo.KibanaClient)
-		if err != nil {
-			suite.T().Error(err)
-		}
-		suite.T().Logf("Agent status: %s", status)
-		return status == expectedStatus
-	}
 }
 
 func upgradeMarkerRemoved() bool {

@@ -119,8 +119,7 @@ func (s *FQDN) TestFQDN() {
 	}
 	require.NoError(s.T(), err)
 
-	// TODO: Generalize agentStatus from https://github.com/elastic/elastic-agent/pull/2618 after it's merged
-	require.Eventually(s.T(), agentStatus("online", *s), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), s.requirementsInfo.KibanaClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
 	// Verify that agent name is short hostname
 	agent, err := tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, shortName)
@@ -155,7 +154,7 @@ func (s *FQDN) TestFQDN() {
 		}
 
 		return false
-	}, 1*time.Second, 30*time.Second)
+	}, 30*time.Second, 1*time.Second)
 
 	// Verify that agent name is FQDN
 	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, fqdn)
@@ -184,7 +183,7 @@ func (s *FQDN) TestFQDN() {
 		require.NoError(s.T(), err)
 
 		return updatedPolicyAgent.PolicyRevision > prevAgentPolicyRevision
-	}, 1*time.Second, 30*time.Second)
+	}, 30*time.Second, 1*time.Second)
 
 	// Verify that agent name is short hostname again
 	agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, shortName)
