@@ -406,7 +406,7 @@ func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitEx
 	return ExpectedConfig(cfg)
 }
 
-func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntimeSpec, vars *transpiler.Vars) (ShipperRuntimeSpec, bool) {
+func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntimeSpec, vars eql.VarStore) (ShipperRuntimeSpec, bool) {
 	const (
 		enabledKey = "enabled"
 	)

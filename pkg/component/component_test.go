@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -1852,6 +1854,57 @@ func TestToComponents(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPreventionsAreValid(t *testing.T) {
+	// Test that all spec file preventions use valid syntax and variable names.
+
+	specFiles, err := specFilesForDirectory(filepath.Join("..", "..", "specs"))
+	require.NoError(t, err)
+
+	// Create placeholder variables containing all valid variable names
+	// for spec file prevention conditions. We don't care what the values
+	// are, because we aren't checking the behavior of the preventions for
+	// specific platforms, just making sure that they don't reference any
+	// invalid variables.
+	// This test intentionally uses a fixed variable list instead of
+	// calling varsForPlatform(), to make sure anyone who adds support for
+	// new variables sees this message:
+	// If you find yourself wanting to update this test to add a new
+	// value because Agent now supports additional variables, make sure
+	// you update `docs/component-specs.md` in the same PR to document
+	// the change.
+	vars, err := transpiler.NewVars("", map[string]interface{}{
+		"runtime": map[string]interface{}{
+			"platform": "platform",
+			"os":       "os",
+			"arch":     "arch",
+			"family":   "family",
+			"major":    "major",
+			"minor":    "minor",
+		},
+		"user": map[string]interface{}{
+			"root": false,
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	for path, spec := range specFiles {
+		for _, input := range spec.Inputs {
+			for _, prevention := range input.Runtime.Preventions {
+				_, err := eql.Eval(prevention.Condition, vars, false)
+				assert.NoErrorf(t, err, "input '%v' in spec file '%v' has error in prevention [%v]",
+					input.Name, path, prevention.Condition)
+			}
+		}
+		for _, shipper := range spec.Shippers {
+			for _, prevention := range shipper.Runtime.Preventions {
+				_, err := eql.Eval(prevention.Condition, vars, false)
+				assert.NoErrorf(t, err, "shipper '%v' in spec file '%v' has error in prevention [%v]",
+					shipper.Name, path, prevention.Condition)
+			}
+		}
 	}
 }
 
