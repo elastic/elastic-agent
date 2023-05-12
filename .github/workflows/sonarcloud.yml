@@ -57,11 +57,10 @@ jobs:
             -Dsonar.pullrequest.base=${{ steps.pr-base.outputs.result }}
 
   branch-coverage:
-    name: SonarCloud
+    name: Branch SonarCloud
     runs-on: ubuntu-latest
     if: >
-      github.event_name == 'push' &&
-      github.event.push.base_ref == 'main'
+      github.event_name == 'push'
     steps:
       - uses: actions/checkout@v3
         with:
