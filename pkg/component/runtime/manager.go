@@ -106,6 +106,9 @@ type Manager struct {
 
 	errCh chan error
 
+	// upon creation the Manager is neither running not shutting down, thus both
+	// flags are needed.
+	running      atomic.Bool
 	shuttingDown atomic.Bool
 }
 
@@ -145,6 +148,9 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
+	m.running.Store(true)
+	m.shuttingDown.Store(false)
+
 	lis, err := net.Listen("tcp", m.listenAddr)
 	if err != nil {
 		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
@@ -202,6 +208,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	}()
 
 	<-ctx.Done()
+	m.running.Store(false)
 	m.shutdown()
 
 	server.Stop()
@@ -286,7 +293,7 @@ func (m *Manager) Errors() <-chan error {
 
 // Update updates the currComp state of the running components.
 //
-// This returns as soon as possible, work is performed in the background to
+// This returns as soon as possible, the work is performed in the background.
 func (m *Manager) Update(components []component.Component) error {
 	shuttingDown := m.shuttingDown.Load()
 	if shuttingDown {
