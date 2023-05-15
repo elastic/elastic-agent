@@ -225,8 +225,10 @@ func TestEql(t *testing.T) {
 		// evaluation doesn't use logical short-circuits
 		{expression: "${host.name} == 'asdf'", result: false},
 		{expression: "${host.name} == 'asdf' AND ${missing} == 'qwer'", err: true},
+		{expression: "${host.name} == 'asdf' AND ${missing} == 'qwer'", allowMissingVars: true, result: false},
 		{expression: "${host.name} == 'host-name'", result: true},
 		{expression: "${host.name} == 'host-name' OR ${missing} == 'qwer'", err: true},
+		{expression: "${host.name} == 'host-name' OR ${missing} == 'qwer'", allowMissingVars: true, result: true},
 
 		// arrays
 		{expression: "[true, false, 1, 1.0, 'test'] == [true, false, 1, 1.0, 'test']", result: true},
