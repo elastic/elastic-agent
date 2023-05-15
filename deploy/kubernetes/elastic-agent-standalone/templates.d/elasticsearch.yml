@@ -1,0 +1,288 @@
+inputs:
+    - name: filestream-elasticsearch
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.elasticsearch.audit.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.audit
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.elasticsearch.audit.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale: null
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+            - else:
+                - script:
+                    id: elasticsearch_audit
+                    lang: javascript
+                    source: |
+                        var requestRegex = new RegExp("request_body=\\\[(.*)\\\]$"); function process(event) {
+                          var message = event.Get("message");
+                          if (message !== null) {
+                            var matches = message.match(requestRegex);
+                            if (matches && matches.length > 1) {
+                              event.Put("_request", matches[1]);
+                            }
+                          }
+                        }
+              if:
+                regexp:
+                    message: ^{
+              then:
+                - decode_json_fields:
+                    fields:
+                        - message
+                    target: _json
+                - rename:
+                    fields:
+                        - from: _json.request.body
+                          to: _request
+                    ignore_missing: true
+                - drop_fields:
+                    fields:
+                        - _json
+            - detect_mime_type:
+                field: _request
+                target: http.request.mime_type
+            - drop_fields:
+                fields:
+                    - _request
+                ignore_missing: true
+          prospector:
+            scanner:
+                symlinks: true
+        - condition: ${kubernetes.hints.elasticsearch.deprecation.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.deprecation
+            type: logs
+          exclude_files:
+            - .gz$
+            - _slowlog.log$
+            - _access.log$
+          multiline:
+            match: after
+            negate: true
+            pattern: ^(\[[0-9]{4}-[0-9]{2}-[0-9]{2}|{)
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.elasticsearch.deprecation.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale.when.not.regexp.message: ^{
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+          prospector:
+            scanner:
+                symlinks: true
+        - condition: ${kubernetes.hints.elasticsearch.gc.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.gc
+            type: logs
+          exclude_files:
+            - .gz$
+          exclude_lines:
+            - '^(OpenJDK|Java HotSpot).* Server VM '
+            - '^CommandLine flags: '
+            - '^Memory: '
+            - ^{
+          multiline:
+            match: after
+            negate: true
+            pattern: ^(\[?[0-9]{4}-[0-9]{2}-[0-9]{2}|{)
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.elasticsearch.gc.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+          prospector:
+            scanner:
+                symlinks: true
+        - condition: ${kubernetes.hints.elasticsearch.server.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.server
+            type: logs
+          exclude_files:
+            - .gz$
+            - _slowlog.log$
+            - _access.log$
+            - _deprecation.log$
+          multiline:
+            match: after
+            negate: true
+            pattern: ^(\[[0-9]{4}-[0-9]{2}-[0-9]{2}|{)
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.elasticsearch.server.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale.when.not.regexp.message: ^{
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+          prospector:
+            scanner:
+                symlinks: true
+        - condition: ${kubernetes.hints.elasticsearch.slowlog.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.slowlog
+            type: logs
+          exclude_files:
+            - .gz$
+          multiline:
+            match: after
+            negate: true
+            pattern: ^(\[?[0-9]{4}-[0-9]{2}-[0-9]{2}|{)
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.elasticsearch.slowlog.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale.when.not.regexp.message: ^{
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+          prospector:
+            scanner:
+                symlinks: true
+      data_stream.namespace: default
+    - name: elasticsearch/metrics-elasticsearch
+      type: elasticsearch/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.elasticsearch.ccr.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.ccr
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.ccr.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - ccr
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.cluster_stats.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.cluster_stats
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.cluster_stats.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - cluster_stats
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.enrich.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.enrich
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.enrich.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - enrich
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.index.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.index
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.index.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - index
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.index_recovery.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.index_recovery
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.index_recovery.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - index_recovery
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.index_summary.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.index_summary
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.index_summary.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - index_summary
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.ml_job.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.ml_job
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.ml_job.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - ml_job
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.node.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.node
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.node.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - node
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.node_stats.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.node_stats
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.node_stats.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - node_stats
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.pending_tasks.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.pending_tasks
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.pending_tasks.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - pending_tasks
+          period: null
+          scope: node
+        - condition: ${kubernetes.hints.elasticsearch.shard.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          data_stream:
+            dataset: elasticsearch.stack_monitoring.shard
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.elasticsearch.shard.host|kubernetes.hints.elasticsearch.host|'http://localhost:9200'}
+          metricsets:
+            - shard
+          period: null
+          scope: node
+      data_stream.namespace: default

@@ -1,0 +1,95 @@
+inputs:
+    - name: filestream-kibana
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.kibana.audit.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.audit
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.kibana.audit.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+        - condition: ${kubernetes.hints.kibana.log.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.kibana.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+      data_stream.namespace: default
+    - name: kibana/metrics-kibana
+      type: kibana/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.kibana.cluster_actions.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.stack_monitoring.cluster_actions
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kibana.cluster_actions.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
+          metricsets:
+            - cluster_actions
+          period: null
+        - condition: ${kubernetes.hints.kibana.cluster_rules.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.stack_monitoring.cluster_rules
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kibana.cluster_rules.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
+          metricsets:
+            - cluster_rules
+          period: null
+        - condition: ${kubernetes.hints.kibana.node_actions.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.stack_monitoring.node_actions
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kibana.node_actions.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
+          metricsets:
+            - node_actions
+          period: null
+        - condition: ${kubernetes.hints.kibana.node_rules.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.stack_monitoring.node_rules
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kibana.node_rules.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
+          metricsets:
+            - node_rules
+          period: null
+        - condition: ${kubernetes.hints.kibana.stats.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.stack_monitoring.stats
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kibana.stats.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
+          metricsets:
+            - stats
+          period: null
+        - condition: ${kubernetes.hints.kibana.status.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.stack_monitoring.status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kibana.status.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
+          metricsets:
+            - status
+          period: null
+      data_stream.namespace: default

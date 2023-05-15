@@ -1,0 +1,376 @@
+inputs:
+    - name: httpjson-mimecast
+      type: httpjson
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mimecast.audit_events.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor:
+            next_date:
+                value: '[[.first_event.eventTime]]'
+          data_stream:
+            dataset: mimecast.audit_events
+            type: logs
+          interval: 5m
+          request.method: POST
+          request.transforms:
+            - set:
+                target: body.meta.pagination.pageSize
+                value: 100
+            - set:
+                default: '[{"endDateTime": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "startDateTime":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
+                target: body.data
+                value: '[{"endDateTime": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "startDateTime":"[[.cursor.next_date]]"}]'
+                value_type: json
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/audit/get-audit-events:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+          request.url: https://eu-api.mimecast.com/api/audit/get-audit-events
+          response.decode_as: application/json
+          response.pagination:
+            - delete:
+                target: body.data
+            - set:
+                fail_on_template_error: true
+                target: body.meta.pagination.pageToken
+                value: '[[.last_response.body.meta.pagination.next]]'
+          response.split:
+            target: body.data
+          tags:
+            - forwarded
+            - mimecast-audit-events
+        - condition: ${kubernetes.hints.mimecast.dlp_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor: null
+          data_stream:
+            dataset: mimecast.dlp_logs
+            type: logs
+          interval: 5m
+          next_date:
+            value: '[[.first_event.eventTime]]'
+          request.method: POST
+          request.transforms:
+            - set:
+                default: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
+                target: body.data
+                value: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.eventTime]]"}]'
+                value_type: json
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/dlp/get-logs:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+          request.url: https://eu-api.mimecast.com/api/dlp/get-logs
+          response.decode_as: application/json
+          response.pagination:
+            - delete:
+                target: body.data
+            - set:
+                fail_on_template_error: true
+                target: body.meta.pagination.pageToken
+                value: '[[.last_response.body.meta.pagination.next]]'
+          response.split:
+            split:
+                target: body.dlpLogs
+            target: body.data
+          tags:
+            - forwarded
+            - mimecast-dlp-logs
+        - condition: ${kubernetes.hints.mimecast.siem_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor:
+            next_token:
+                value: '[[.last_response.header.Get "mc-siem-token"]]'
+          data_stream:
+            dataset: mimecast.siem_logs
+            type: logs
+          interval: 5m
+          request.method: POST
+          request.transforms:
+            - set:
+                default: '[{"type":"MTA","fileFormat":"json", "compress":true}]'
+                target: body.data
+                value: '[{"type":"MTA","fileFormat":"json", "compress":true, "token": "[[.cursor.next_token]]"}]'
+                value_type: json
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/audit/get-siem-logs:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+            - set:
+                target: header.Accept
+                value: '*/*'
+          request.url: https://eu-api.mimecast.com/api/audit/get-siem-logs
+          response.decode_as: application/zip
+          response.split:
+            target: body.data
+            transforms:
+                - set:
+                    target: body.Content-Disposition
+                    value: '[[.last_response.header.Get "Content-Disposition"]]'
+          tags:
+            - forwarded
+            - mimecast-siem-logs
+        - condition: ${kubernetes.hints.mimecast.threat_intel_malware_customer.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor:
+            next_date:
+                value: '[[.first_event.created]]'
+          data_stream:
+            dataset: mimecast.threat_intel_malware_customer
+            type: logs
+          interval: 5m
+          request.method: POST
+          request.transforms:
+            - set:
+                default: '[{"feedType": "malware_customer","fileType": "stix","compress": false,"end": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "start":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
+                target: body.data
+                value: '[{"feedType": "malware_customer","fileType": "stix","compress": false,"token": "[[.last_response.header.Get "x-mc-threat-feed-next-token"]]", "end": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "start":"[[formatDate (.cursor.next_date)  "2006-01-02T15:04:05-0700"]]"}]'
+                value_type: json
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/ttp/threat-intel/get-feed:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+          request.url: https://eu-api.mimecast.com/api/ttp/threat-intel/get-feed
+          response.decode_as: application/json
+          response.split:
+            target: body.objects
+            transforms:
+                - set:
+                    target: body.Content-Disposition
+                    value: '[[.last_response.header.Get "Content-Disposition"]]'
+          tags:
+            - forwarded
+            - mimecast-threat-intel-feed-malware-customer
+        - condition: ${kubernetes.hints.mimecast.threat_intel_malware_grid.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor:
+            next_date:
+                value: '[[.first_event.created]]'
+          data_stream:
+            dataset: mimecast.threat_intel_malware_grid
+            type: logs
+          interval: 5m
+          request.method: POST
+          request.transforms:
+            - set:
+                default: '[{"feedType": "malware_grid","fileType": "stix","compress": false,"end": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "start":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
+                target: body.data
+                value: '[{"feedType": "malware_grid","fileType": "stix","compress": false,"token": "[[.last_response.header.Get "x-mc-threat-feed-next-token"]]", "end": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "start":"[[formatDate (.cursor.next_date)  "2006-01-02T15:04:05-0700"]]"}]'
+                value_type: json
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/ttp/threat-intel/get-feed:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+          request.url: https://eu-api.mimecast.com/api/ttp/threat-intel/get-feed
+          response.decode_as: application/json
+          response.split:
+            target: body.objects
+            transforms:
+                - set:
+                    target: body.Content-Disposition
+                    value: '[[.last_response.header.Get "Content-Disposition"]]'
+          tags:
+            - forwarded
+            - mimecast-threat-intel-feed-malware-grid
+        - condition: ${kubernetes.hints.mimecast.ttp_ap_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor: null
+          data_stream:
+            dataset: mimecast.ttp_ap_logs
+            type: logs
+          interval: 5m
+          next_date:
+            value: '[[.first_event.date]]'
+          request.method: POST
+          request.transforms:
+            - set:
+                default: '[{"oldestFirst": false, "route": "all", "result":"all","to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
+                target: body.data
+                value: '[{"oldestFirst": false, "route": "all", "result":"all","to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.next_date]]"}]'
+                value_type: json
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/ttp/attachment/get-logs:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+          request.url: https://eu-api.mimecast.com/api/ttp/attachment/get-logs
+          response.decode_as: application/json
+          response.pagination:
+            - delete:
+                target: body.data
+            - set:
+                fail_on_template_error: true
+                target: body.meta.pagination.pageToken
+                value: '[[.last_response.body.meta.pagination.next]]'
+          response.split:
+            split:
+                target: body.attachmentLogs
+            target: body.data
+          tags:
+            - forwarded
+            - mimecast-ttp-ap
+        - condition: ${kubernetes.hints.mimecast.ttp_ip_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor: null
+          data_stream:
+            dataset: mimecast.ttp_ip_logs
+            type: logs
+          interval: 5m
+          next_date:
+            value: '[[.first_event.eventTime]]'
+          request.method: POST
+          request.transforms:
+            - set:
+                default: '[{"oldestFirst": false,"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
+                target: body.data
+                value: '[{"oldestFirst": false,"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.next_date]]"}]'
+                value_type: json
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/ttp/impersonation/get-logs:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+          request.url: https://eu-api.mimecast.com/api/ttp/impersonation/get-logs
+          response.decode_as: application/json
+          response.pagination:
+            - delete:
+                target: body.data
+            - set:
+                fail_on_template_error: true
+                target: body.meta.pagination.pageToken
+                value: '[[.last_response.body.meta.pagination.next]]'
+          response.split:
+            split:
+                target: body.impersonationLogs
+            target: body.data
+          tags:
+            - forwarded
+            - mimecast-ttp-ip
+        - condition: ${kubernetes.hints.mimecast.ttp_url_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor:
+            next_date:
+                value: '[[.first_event.date]]'
+          data_stream:
+            dataset: mimecast.ttp_url_logs
+            type: logs
+          interval: 5m
+          request.method: POST
+          request.transforms:
+            - set:
+                default: '[{"oldestFirst": false,"scanResult": "all","route":"all","to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
+                target: body.data
+                value: '[{"oldestFirst": false,"scanResult": "all","route":"all","to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.next_date]]"}]'
+                value_type: json
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/ttp/url/get-logs:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+          request.url: https://eu-api.mimecast.com/api/ttp/url/get-logs
+          response.decode_as: application/json
+          response.pagination:
+            - delete:
+                target: body.data
+            - set:
+                fail_on_template_error: true
+                target: body.meta.pagination.pageToken
+                value: '[[.last_response.body.meta.pagination.next]]'
+          response.split:
+            split:
+                target: body.clickLogs
+            target: body.data
+          tags:
+            - forwarded
+            - mimecast-ttp-url
+      data_stream.namespace: default
+    - name: filestream-mimecast
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mimecast.container_logs.enabled} == true
+          data_stream:
+            dataset: mimecast.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

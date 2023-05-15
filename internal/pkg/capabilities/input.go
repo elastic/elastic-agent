@@ -7,11 +7,8 @@ package capabilities
 import (
 	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -19,7 +16,7 @@ const (
 	inputsKey = "inputs"
 )
 
-func newInputsCapability(log *logger.Logger, rd *ruleDefinitions, reporter status.Reporter) (Capability, error) {
+func newInputsCapability(log *logger.Logger, rd *ruleDefinitions) (Capability, error) {
 	if rd == nil {
 		return &multiInputsCapability{log: log, caps: []*inputCapability{}}, nil
 	}
@@ -27,7 +24,7 @@ func newInputsCapability(log *logger.Logger, rd *ruleDefinitions, reporter statu
 	caps := make([]*inputCapability, 0, len(rd.Capabilities))
 
 	for _, r := range rd.Capabilities {
-		c, err := newInputCapability(log, r, reporter)
+		c, err := newInputCapability(log, r)
 		if err != nil {
 			return nil, err
 		}
@@ -40,23 +37,21 @@ func newInputsCapability(log *logger.Logger, rd *ruleDefinitions, reporter statu
 	return &multiInputsCapability{log: log, caps: caps}, nil
 }
 
-func newInputCapability(log *logger.Logger, r ruler, reporter status.Reporter) (*inputCapability, error) {
+func newInputCapability(log *logger.Logger, r ruler) (*inputCapability, error) {
 	cap, ok := r.(*inputCapability)
 	if !ok {
 		return nil, nil
 	}
 
 	cap.log = log
-	cap.reporter = reporter
 	return cap, nil
 }
 
 type inputCapability struct {
-	log      *logger.Logger
-	reporter status.Reporter
-	Name     string `json:"name,omitempty" yaml:"name,omitempty"`
-	Type     string `json:"rule" yaml:"rule"`
-	Input    string `json:"input" yaml:"input"`
+	log   *logger.Logger
+	Name  string `json:"name,omitempty" yaml:"name,omitempty"`
+	Type  string `json:"rule" yaml:"rule"`
+	Input string `json:"input" yaml:"input"`
 }
 
 func (c *inputCapability) Apply(cfgMap map[string]interface{}) (map[string]interface{}, error) {
@@ -166,7 +161,6 @@ func (c *inputCapability) renderInputs(inputs []map[string]interface{}) ([]map[s
 		if !isSupported {
 			msg := fmt.Sprintf("input '%s' is not run due to capability restriction '%s'", inputType, c.name())
 			c.log.Infof(msg)
-			c.reporter.Update(state.Degraded, msg, nil)
 		}
 
 		newInputs = append(newInputs, input)

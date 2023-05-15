@@ -5,36 +5,34 @@
 package info
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
+// MarkerFileName is the name of the file that's created by
+// `elastic-agent install` in the Agent's topPath folder to
+// indicate that the Agent executing from the binary under
+// the same topPath folder is an installed Agent.
+const MarkerFileName = ".installed"
+
 // RunningInstalled returns true when executing Agent is the installed Agent.
-//
-// This verifies the running executable path based on hard-coded paths
-// for each platform type.
 func RunningInstalled() bool {
-	expected := filepath.Join(paths.InstallPath, paths.BinaryName)
-	execPath, _ := os.Executable()
-	execPath, _ = filepath.Abs(execPath)
-	execName := filepath.Base(execPath)
-	execDir := filepath.Dir(execPath)
-	if IsInsideData(execDir) {
-		// executable path is being reported as being down inside of data path
-		// move up to directories to perform the comparison
-		execDir = filepath.Dir(filepath.Dir(execDir))
-		execPath = filepath.Join(execDir, execName)
+	// Check if install marker created by `elastic-agent install` exists
+	markerFilePath := filepath.Join(paths.Top(), MarkerFileName)
+	if _, err := os.Stat(markerFilePath); err != nil {
+		return false
 	}
-	return paths.ArePathsEqual(expected, execPath)
+
+	return true
 }
 
-// IsInsideData returns true when the exePath is inside of the current Agents data path.
-func IsInsideData(exePath string) bool {
-	expectedPath := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-	return strings.HasSuffix(exePath, expectedPath)
+func CreateInstallMarker(topPath string) error {
+	markerFilePath := filepath.Join(topPath, MarkerFileName)
+	if _, err := os.Create(markerFilePath); err != nil {
+		return err
+	}
+
+	return nil
 }

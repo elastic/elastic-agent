@@ -23,19 +23,17 @@ import (
 )
 
 func init() {
-	_ = composable.Providers.AddContextProvider("kubernetes_leaderelection", ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider("kubernetes_leaderelection", ContextProviderBuilder)
 }
 
 type contextProvider struct {
-	logger               *logger.Logger
-	config               *Config
-	comm                 corecomp.ContextProviderComm
-	leaderElection       *leaderelection.LeaderElectionConfig
-	cancelLeaderElection context.CancelFunc
+	logger         *logger.Logger
+	config         *Config
+	leaderElection *leaderelection.LeaderElectionConfig
 }
 
 // ContextProviderBuilder builds the provider.
-func ContextProviderBuilder(logger *logger.Logger, c *config.Config) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (corecomp.ContextProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()
@@ -44,7 +42,7 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config) (corecomp.C
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
-	return &contextProvider{logger, &cfg, nil, nil, nil}, nil
+	return &contextProvider{logger, &cfg, nil}, nil
 }
 
 // Run runs the leaderelection provider.
@@ -91,57 +89,43 @@ func (p *contextProvider) Run(comm corecomp.ContextProviderComm) error {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				p.logger.Debugf("leader election lock GAINED, id %v", id)
-				p.startLeading()
+				p.startLeading(comm)
 			},
 			OnStoppedLeading: func() {
 				p.logger.Debugf("leader election lock LOST, id %v", id)
-				p.stopLeading()
+				p.stopLeading(comm)
 			},
 		},
 	}
-	ctx, cancel := context.WithCancel(context.TODO())
-	p.cancelLeaderElection = cancel
-	p.comm = comm
-	p.startLeaderElector(ctx)
 
-	return nil
-}
-
-// startLeaderElector starts a Leader Elector in the background with the provided config
-func (p *contextProvider) startLeaderElector(ctx context.Context) {
 	le, err := leaderelection.NewLeaderElector(*p.leaderElection)
 	if err != nil {
 		p.logger.Errorf("error while creating Leader Elector: %v", err)
 	}
 	p.logger.Debugf("Starting Leader Elector")
-	go le.Run(ctx)
+	le.Run(comm)
+	p.logger.Debugf("Stopped Leader Elector")
+	return comm.Err()
 }
 
-func (p *contextProvider) startLeading() {
+func (p *contextProvider) startLeading(comm corecomp.ContextProviderComm) {
 	mapping := map[string]interface{}{
 		"leader": true,
 	}
 
-	err := p.comm.Set(mapping)
+	err := comm.Set(mapping)
 	if err != nil {
 		p.logger.Errorf("Failed updating leaderelection status to leader TRUE: %s", err)
 	}
 }
 
-func (p *contextProvider) stopLeading() {
+func (p *contextProvider) stopLeading(comm corecomp.ContextProviderComm) {
 	mapping := map[string]interface{}{
 		"leader": false,
 	}
 
-	err := p.comm.Set(mapping)
+	err := comm.Set(mapping)
 	if err != nil {
 		p.logger.Errorf("Failed updating leaderelection status to leader FALSE: %s", err)
-	}
-}
-
-// Stop signals the stop channel to force the leader election loop routine to stop.
-func (p *contextProvider) Stop() {
-	if p.cancelLeaderElection != nil {
-		p.cancelLeaderElection()
 	}
 }

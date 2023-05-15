@@ -3,7 +3,7 @@
 @Library('apm@current') _
 
 pipeline {
-  agent { label 'ubuntu-20.04 && immutable' }
+  agent { label 'ubuntu-22 && immutable' }
   environment {
     REPO = "elastic-agent"
     BASE_DIR = "src/github.com/elastic/${env.REPO}"
@@ -19,7 +19,7 @@ pipeline {
     DEVELOPER_MODE=true
   }
   options {
-    timeout(time: 2, unit: 'HOURS')
+    timeout(time: 3, unit: 'HOURS')
     buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '20', daysToKeepStr: '30'))
     timestamps()
     ansiColor('xterm')
@@ -39,6 +39,14 @@ pipeline {
     // disabled by default, but required for merge:
     // opt-in with 'ci:end-to-end' tag on PR
     booleanParam(name: 'end_to_end_tests_ci', defaultValue: false, description: 'Enable End-to-End tests')
+
+    // disabled by default, but required for merge:
+    // opt-in with 'ci:extended-windows' tag on PR
+    booleanParam(name: 'extended_windows_ci', defaultValue: false, description: 'Enable Extended Windows tests')
+
+    // disabled by default, but required for merge:
+    // opt-in with 'ci:extended-m1' tag on PR
+    booleanParam(name: 'extended_m1_ci', defaultValue: false, description: 'Enable M1 tests')
   }
   stages {
     stage('Checkout') {
@@ -49,8 +57,12 @@ pipeline {
         stashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
-          setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
-          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc)' ], shouldMatchAll: false).toString())
+          setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile|.go-version|Dockerfile)' ], shouldMatchAll: false).toString())
+          setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
+          setEnvVar('EXT_WINDOWS_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
+          setEnvVar('EXT_M1_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
+          // set the GO_VERSION env variable with the go version to be used in withMageEnv
+          setEnvVar('GO_VERSION', readFile(file: '.go-version')?.trim())
         }
       }
     }
@@ -79,9 +91,8 @@ pipeline {
         axes {
           axis {
             name 'PLATFORM'
-            // TODO: 'macosx && x86_64' to be added once macosx is available in fleet-ci
-            //       for the time being we use macos
-            values 'ubuntu-20.04 && immutable', 'aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable'
+            // Orka workers are not healthy (memory and connectivity issues)
+            values 'ubuntu-22 && immutable', 'aws && aarch64 && gobld/diskSizeGb:200', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable' //, 'macos12 && x86_64'
           }
         }
         stages {
@@ -141,7 +152,7 @@ pipeline {
               // Always when running builds on branches/tags
               // Enable if k8s related changes.
               allOf {
-                expression { return env.PLATFORM == 'ubuntu-20.04 && immutable' }
+                expression { return env.PLATFORM == 'ubuntu-22 && immutable' }
                 anyOf {
                   not { changeRequest() }                           // If no PR
                   expression { return env.K8S_CHANGES == "true" }
@@ -149,7 +160,7 @@ pipeline {
               }
             }
             steps {
-              runK8s(k8sVersion: 'v1.23.0', kindVersion: 'v0.11.1', context: "K8s-${PLATFORM}")
+              runK8s(k8sVersion: 'v1.26.0', kindVersion: 'v0.17.0', context: "K8s-${PLATFORM}")
             }
           }
           stage('Package') {
@@ -166,7 +177,7 @@ pipeline {
               }
             }
             environment {
-              ARCH = "${PLATFORM.equals('aarch64') ? 'arm64' : 'amd64'}"
+              ARCH = "${PLATFORM.contains('aarch64') ? 'arm64' : 'amd64'}"
               DEV = true
               EXTERNAL = true
             }
@@ -177,7 +188,7 @@ pipeline {
                 withMageEnv(){
                   dir("${BASE_DIR}"){
                     withPackageEnv("${PLATFORM}") {
-                      cmd(label: 'Go package', script: 'mage package')
+                      cmd(label: 'Go package', script: 'mage package ironbank')
                       uploadPackagesToGoogleBucket(
                         credentialsId: env.JOB_GCS_EXT_CREDENTIALS,
                         repo: env.REPO,
@@ -216,12 +227,12 @@ pipeline {
       }
       failFast false
       matrix {
-        agent {label 'ubuntu-20.04 && immutable'}
+        agent {label 'ubuntu-22 && immutable'}
         options { skipDefaultCheckout() }
         axes {
           axis {
             name 'K8S_VERSION'
-            values "v1.23.0", "v1.22.0", "v1.21.1", "v1.20.7", "v1.19.11", "v1.18.19"
+            values "v1.26.0","v1.25.0","v1.24.3", "v1.23.6"
           }
         }
         stages {
@@ -229,7 +240,7 @@ pipeline {
             steps {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.11.1', context: "K8s-${K8S_VERSION}")
+              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.17.0', context: "K8s-${K8S_VERSION}")
             }
             post {
               always {
@@ -240,31 +251,181 @@ pipeline {
         }
       }
     }
-    stage('e2e tests') {
+    stage('Sync K8s') { //This stage opens a PR to kibana Repository in order to sync k8s manifests
+      when {
+        // Only on main branch
+        // Enable if k8s related changes.
+        allOf {
+          branch 'main'         // Only runs for branch main
+          expression { return env.K8S_CHANGES == "true" }   // If k8s changes
+        }
+      }
+      failFast false
+        agent {label 'ubuntu-22 && immutable'}
+        options { skipDefaultCheckout() }
+        stages {
+          stage('OpenKibanaPR') {
+            steps {
+              withGhEnv(version: '2.4.0') {
+                deleteDir()
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+                  dir("${BASE_DIR}/deploy/kubernetes"){
+                  sh(label: '[File Creation] Create-Needed-Manifest', script: """
+                    WITHOUTCONFIG=true make generate-k8s
+                    ./creator_k8s_manifest.sh . """)
+                  sh(label: '[Clone] Kibana-Repository', script: """
+                    make ci-clone-kibana-repository
+                    cp Makefile ./kibana
+                    cd kibana
+                    make ci-create-kubernetes-templates-pull-request """)
+                  }
+              }
+            }
+            post {
+              always {
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+              }
+            }
+          }
+      }
+    }
+    stage('extended windows') {
       when {
         // Always when running builds on branches/tags
-        // Enable if e2e related changes.
+        // Enable if extended windows support related changes.
         beforeAgent true
         anyOf {
           not { changeRequest() }
+          expression { return isExtendedWindowsEnabled() && env.ONLY_DOCS == "false"}
+        }
+      }
+      failFast false
+      matrix {
+        agent {label "${PLATFORM} && windows-immutable"}
+        options { skipDefaultCheckout() }
+        axes {
+          axis {
+            name 'PLATFORM'
+            values 'windows-8', 'windows-10', 'windows-11'
+          }
+        }
+        stages {
+          stage('build'){
+            options { skipDefaultCheckout() }
+            steps {
+              withGithubNotify(context: "Build-${PLATFORM}") {
+                deleteDir()
+                unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+                withMageEnv(){
+                  dir("${BASE_DIR}"){
+                    cmd(label: 'Go build', script: 'mage build')
+                  }
+                }
+              }
+            }
+          }
+          stage('Test') {
+            options { skipDefaultCheckout() }
+            steps {
+              withGithubNotify(context: "Test-${PLATFORM}") {
+                withMageEnv(){
+                  dir("${BASE_DIR}"){
+                    withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                      cmd(label: 'Go unitTest', script: 'mage unitTest')
+                    }
+                  }
+                }
+              }
+            }
+            post {
+              always {
+                junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+                whenTrue(isCodeCoverageEnabled()) {
+                  coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    stage('m1') {
+      agent { label 'orka && darwin && aarch64' }
+      options { skipDefaultCheckout() }
+      when {
+        // Always when running builds on branches/tags
+        // Enable if extended M1 support related changes.
+        beforeAgent true
+        anyOf {
+          not { changeRequest() }
+          expression { return isExtendedM1Enabled() && env.ONLY_DOCS == "false"}
+        }
+      }
+      stages {
+        stage('build'){
+          steps {
+            withGithubNotify(context: "Build-darwin-aarch64") {
+              deleteDir()
+              unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
+              withMageEnv(){
+                dir("${BASE_DIR}"){
+                  cmd(label: 'Go build', script: 'mage build')
+                }
+              }
+            }
+          }
+        }
+        stage('Test') {
+          steps {
+            withGithubNotify(context: "Test-darwin-aarch64") {
+              withMageEnv(){
+                dir("${BASE_DIR}"){
+                  withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                    cmd(label: 'Go unitTest', script: 'mage unitTest')
+                  }
+                }
+              }
+            }
+          }
+          post {
+            always {
+              junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/TEST-*.xml")
+              whenTrue(isCodeCoverageEnabled()) {
+                coverageReport(baseDir: "**/build", reportFiles: 'TEST-go-unit.html', coverageFiles: 'TEST-go-unit-cov.xml')
+              }
+            }
+          }
+        }
+      }
+    }
+    stage('e2e tests') {
+      when {
+        // Disable until we fix the e2e test.
+        // This should be running when there is a comment or the e2e label
+        beforeAgent true
+        anyOf {
           // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
           expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
         }
       }
       steps {
-        // TODO: what's the testMatrixFile to be used if any
-        runE2E(testMatrixFile: '',
+        runE2E(testMatrixFile: '.ci/.e2e-tests-for-elastic-agent.yaml',
                beatVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                elasticAgentVersion: "${env.BEAT_VERSION}-SNAPSHOT",
                gitHubCheckName: "e2e-tests",
                gitHubCheckRepo: env.REPO,
-               gitHubCheckSha1: env.GIT_BASE_COMMIT)
+               gitHubCheckSha1: env.GIT_BASE_COMMIT,
+               propagate: true,
+               wait: true)
       }
     }
   }
   post {
     cleanup {
-      notifyBuildResult(prComment: true)
+      notifyBuildResult(prComment: true,
+                        analyzeFlakey: !isTag(), jobName: getFlakyJobName(withBranch: (isPR() ? env.CHANGE_TARGET : env.BRANCH_NAME)),
+                        githubIssue: false, // Disable creating gh issues for build failures while the E2E tests are stabilized.
+                        githubLabels: 'Team:Elastic-Agent-Control-Plane')
     }
   }
 }
@@ -276,7 +437,7 @@ def isCodeCoverageEnabled() {
 
 def withPackageEnv(platform, Closure body) {
   if (isUnix()) {
-    if (platform.contains('macosx')) {
+    if (isDarwin()) {
       withPackageDarwinEnv() {
         body()
       }
@@ -370,4 +531,18 @@ def isE2eEnabled() {
 */
 def isPackageEnabled() {
   return env.PACKAGING_CHANGES == "true" || env.GITHUB_COMMENT?.contains('package') || matchesPrLabel(label: 'ci:package')
+}
+
+/**
+* Wrapper to know if the build should enable the windows extended support
+*/
+def isExtendedWindowsEnabled() {
+  return env.EXT_WINDOWS_CHANGES == "true" || params.extended_windows_ci || env.GITHUB_COMMENT?.contains('extended windows') || matchesPrLabel(label: 'ci:extended-windows')
+}
+
+/**
+* Wrapper to know if the build should enable the M1 extended support
+*/
+def isExtendedM1Enabled() {
+  return env.EXT_M1_CHANGES == "true" || params.extended_m1_ci || env.GITHUB_COMMENT?.contains('extended m1') || matchesPrLabel(label: 'ci:extended-m1')
 }

@@ -6,11 +6,9 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -31,14 +29,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact/install/tar"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/process"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -48,6 +43,8 @@ const (
 	defaultRequestRetrySleep = "1s"                             // sleep 1 sec between retries for HTTP requests
 	defaultMaxRequestRetries = "30"                             // maximum number of retries for HTTP requests
 	defaultStateDirectory    = "/usr/share/elastic-agent/state" // directory that will hold the state data
+
+	logsPathPerms = 0775
 )
 
 var (
@@ -60,8 +57,8 @@ func newContainerCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := cobra.Command{
 		Hidden: true, // not exposed over help; used by container entrypoint only
 		Use:    "container",
-		Short:  "Bootstrap Elastic Agent to run inside of a container",
-		Long: `This should only be used as an entrypoint for a container. This will prepare the Elastic Agent using
+		Short:  "Bootstrap Elastic Agent to run inside a container",
+		Long: `This command should only be used as an entrypoint for a container. This will prepare the Elastic Agent using
 environment variables to run inside of the container.
 
 The following actions are possible and grouped based on the actions.
@@ -70,61 +67,65 @@ The following actions are possible and grouped based on the actions.
   This enrolls the Elastic Agent into a Fleet Server. It is also possible to have this create a new enrollment token
   for this specific Elastic Agent.
 
-  FLEET_ENROLL - set to 1 for enrollment into fleet-server. If not set, Elastic Agent is run in standalone mode.
+  FLEET_ENROLL - set to 1 for enrollment into Fleet Server. If not set, Elastic Agent is run in standalone mode.
   FLEET_URL - URL of the Fleet Server to enroll into
   FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
 
+
   The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
 
-  KIBANA_FLEET_HOST - kibana host to enable create enrollment token on [$KIBANA_HOST]
+  KIBANA_FLEET_HOST - Kibana host to enable create enrollment token on [$KIBANA_HOST]
   FLEET_TOKEN_NAME - token name to use for fetching token from Kibana. This requires Kibana configs to be set.
   FLEET_TOKEN_POLICY_NAME - token policy name to use for fetching token from Kibana. This requires Kibana configs to be set.
 
 * Bootstrapping Fleet Server
   This bootstraps the Fleet Server to be run by this Elastic Agent. At least one Fleet Server is required in a Fleet
-  deployment for other Elastic Agent to bootstrap. In case the Elastic Agent is run without fleet-server. These variables
+  deployment for other Elastic Agents to bootstrap. In case the Elastic Agent is run without Fleet Server, these variables
   are not needed.
 
   If FLEET_SERVER_ENABLE and FLEET_ENROLL is set but no FLEET_ENROLLMENT_TOKEN, the token is automatically fetched from Kibana.
 
   FLEET_SERVER_ENABLE - set to 1 enables bootstrapping of Fleet Server inside Elastic Agent (forces FLEET_ENROLL enabled)
-  FLEET_SERVER_ELASTICSEARCH_HOST - elasticsearch host for Fleet Server to communicate with [$ELASTICSEARCH_HOST]
-  FLEET_SERVER_ELASTICSEARCH_CA - path to certificate authority to use with communicate with elasticsearch [$ELASTICSEARCH_CA]
+  FLEET_SERVER_ELASTICSEARCH_HOST - Elasticsearch host for Fleet Server to communicate with [$ELASTICSEARCH_HOST]
+  FLEET_SERVER_ELASTICSEARCH_CA - path to certificate authority to use to communicate with Elasticsearch [$ELASTICSEARCH_CA]
   FLEET_SERVER_ELASTICSEARCH_CA_TRUSTED_FINGERPRINT - The sha-256 fingerprint value of the certificate authority to trust
   FLEET_SERVER_ELASTICSEARCH_INSECURE - disables cert validation for communication with Elasticsearch
-  FLEET_SERVER_SERVICE_TOKEN - service token to use for communication with elasticsearch
+  FLEET_SERVER_SERVICE_TOKEN - service token to use for communication with Elasticsearch
+  FLEET_SERVER_SERVICE_TOKEN_PATH - path to service token file to use for communication with Elasticsearch
   FLEET_SERVER_POLICY_ID - policy ID for Fleet Server to use for itself ("Default Fleet Server policy" used when undefined)
   FLEET_SERVER_HOST - binding host for Fleet Server HTTP (overrides the policy). By default this is 0.0.0.0.
   FLEET_SERVER_PORT - binding port for Fleet Server HTTP (overrides the policy)
   FLEET_SERVER_CERT - path to certificate to use for HTTPS endpoint
   FLEET_SERVER_CERT_KEY - path to private key for certificate to use for HTTPS endpoint
+  FLEET_SERVER_CERT_KEY_PASSPHRASE - path to private key passphrase file for certificate to use for HTTPS endpoint
   FLEET_SERVER_INSECURE_HTTP - expose Fleet Server over HTTP (not recommended; insecure)
+  FLEET_SERVER_INIT_TIMEOUT - Sets the initial timeout when starting up the fleet server under agent. Default: 30s.
 
 * Preparing Kibana for Fleet
   This prepares the Fleet plugin that exists inside of Kibana. This must either be enabled here or done externally
   before Fleet Server will actually successfully start. All the Kibana variables are not needed in case Elastic Agent
-  should not setup Fleet. To manually trigger KIBANA_FLEET_SETUP navigate to Kibana -> Fleet -> Agents and enabled it.
+  should not setup Fleet. To manually trigger KIBANA_FLEET_SETUP navigate to Kibana -> Fleet -> Agents and enable it.
 
   KIBANA_FLEET_SETUP - set to 1 enables the setup of Fleet in Kibana by Elastic Agent. This was previously FLEET_SETUP.
-  KIBANA_FLEET_HOST - Kibana host accessible from fleet-server. [$KIBANA_HOST]
-  KIBANA_FLEET_USERNAME - kibana username to service token [$KIBANA_USERNAME]
-  KIBANA_FLEET_PASSWORD - kibana password to service token [$KIBANA_PASSWORD]
+  KIBANA_FLEET_HOST - Kibana host accessible from Fleet Server. [$KIBANA_HOST]
+  KIBANA_FLEET_USERNAME - Kibana username to service token [$KIBANA_USERNAME]
+  KIBANA_FLEET_PASSWORD - Kibana password to service token [$KIBANA_PASSWORD]
   KIBANA_FLEET_CA - path to certificate authority to use with communicate with Kibana [$KIBANA_CA]
-  KIBANA_REQUEST_RETRY_SLEEP - specifies sleep duration taken when agent performs a request to kibana [default 1s]
-  KIBANA_REQUEST_RETRY_COUNT - specifies number of retries agent performs when executing a request to kibana [default 30]
+  KIBANA_REQUEST_RETRY_SLEEP - sleep duration taken when agent performs a request to Kibana [default 1s]
+  KIBANA_REQUEST_RETRY_COUNT - number of retries agent performs when executing a request to Kibana [default 30]
 
-The following environment variables are provided as a convenience to prevent a large number of environment variable to
+The following environment variables are provided as a convenience to prevent a large number of environment variables to
 be used when the same credentials will be used across all the possible actions above.
 
-  ELASTICSEARCH_HOST - elasticsearch host [http://elasticsearch:9200]
-  ELASTICSEARCH_USERNAME - elasticsearch username [elastic]
-  ELASTICSEARCH_PASSWORD - elasticsearch password [changeme]
-  ELASTICSEARCH_CA - path to certificate authority to use with communicate with elasticsearch
-  KIBANA_HOST - kibana host [http://kibana:5601]
-  KIBANA_FLEET_USERNAME - kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
-  KIBANA_FLEET_PASSWORD - kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
+  ELASTICSEARCH_HOST - Elasticsearch host [http://elasticsearch:9200]
+  ELASTICSEARCH_USERNAME - Elasticsearch username [elastic]
+  ELASTICSEARCH_PASSWORD - Elasticsearch password [changeme]
+  ELASTICSEARCH_CA - path to certificate authority to use to communicate with Elasticsearch
+  KIBANA_HOST - Kibana host [http://kibana:5601]
+  KIBANA_FLEET_USERNAME - Kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
+  KIBANA_FLEET_PASSWORD - Kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
 
@@ -155,7 +156,7 @@ func logContainerCmd(streams *cli.IOStreams) error {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
-		if err := os.MkdirAll(logsPath, 0755); err != nil {
+		if err := os.MkdirAll(logsPath, logsPathPerms); err != nil {
 			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 		logPath := filepath.Join(logsPath, "elastic-agent-startup.log")
@@ -213,7 +214,7 @@ func containerCmd(streams *cli.IOStreams) error {
 			if err != nil {
 				return errors.New(err, "finding current process")
 			}
-			if apmProc, err = runLegacyAPMServer(streams, apmPath); err != nil {
+			if apmProc, err = runLegacyAPMServer(streams); err != nil {
 				return errors.New(err, "starting legacy apm-server")
 			}
 			wg.Add(1) // apm-server legacy process
@@ -235,12 +236,12 @@ func containerCmd(streams *cli.IOStreams) error {
 				wg.Done()
 				// sending kill signal to current process (elastic-agent)
 				logInfo(streams, "Initiate shutdown elastic-agent.")
-				mainProc.Signal(syscall.SIGTERM) // nolint:errcheck //not required
+				mainProc.Signal(syscall.SIGTERM) //nolint:errcheck //not required
 			}()
 
 			defer func() {
 				if apmProc != nil {
-					apmProc.Stop() // nolint:errcheck //not required
+					apmProc.Stop() //nolint:errcheck //not required
 					logInfo(streams, "Initiate shutdown legacy apm-server.")
 				}
 			}()
@@ -264,10 +265,12 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		return err
 	}
 
+	initTimeout := envTimeout(fleetInitTimeoutName)
+
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr)
+		return run(logToStderr, false, initTimeout, isContainer)
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -332,7 +335,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr)
+	return run(logToStderr, false, initTimeout, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -343,12 +346,33 @@ type TokenResp struct {
 
 // ensureServiceToken will ensure that the cfg specified has the service_token attributes filled.
 //
-// If no token is specified it will use the elasticsearch username/password to request a new token from Kibana
+// If no token is specified it will try to use the value from service_token_path
+// If no filepath is specified it will use the elasticsearch username/password to request a new token from Kibana
 func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 	// There's already a service token
 	if cfg.Kibana.Fleet.ServiceToken != "" || cfg.FleetServer.Elasticsearch.ServiceToken != "" {
 		return nil
 	}
+	// read from secret file
+	if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
+		p, err := os.ReadFile(cfg.FleetServer.Elasticsearch.ServiceTokenPath)
+		if err != nil {
+			return fmt.Errorf("unable to open service_token_path: %w", err)
+		}
+		cfg.Kibana.Fleet.ServiceToken = string(p)
+		cfg.FleetServer.Elasticsearch.ServiceToken = string(p)
+		return nil
+	}
+	if cfg.Kibana.Fleet.ServiceTokenPath != "" {
+		p, err := os.ReadFile(cfg.Kibana.Fleet.ServiceTokenPath)
+		if err != nil {
+			return fmt.Errorf("unable to open service_token_path: %w", err)
+		}
+		cfg.Kibana.Fleet.ServiceToken = string(p)
+		cfg.FleetServer.Elasticsearch.ServiceToken = string(p)
+		return nil
+	}
+	// request new token
 	if cfg.Kibana.Fleet.Username == "" || cfg.Kibana.Fleet.Password == "" {
 		return fmt.Errorf("username/password must be provided to retrieve service token")
 	}
@@ -405,7 +429,9 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 			return nil, err
 		}
 		args = append(args, "--fleet-server-es", connStr)
-		if cfg.FleetServer.Elasticsearch.ServiceToken != "" {
+		if cfg.FleetServer.Elasticsearch.ServiceTokenPath != "" {
+			args = append(args, "--fleet-server-service-token-path", cfg.FleetServer.Elasticsearch.ServiceTokenPath)
+		} else if cfg.FleetServer.Elasticsearch.ServiceTokenPath == "" && cfg.FleetServer.Elasticsearch.ServiceToken != "" {
 			args = append(args, "--fleet-server-service-token", cfg.FleetServer.Elasticsearch.ServiceToken)
 		}
 		if policyID != "" {
@@ -428,6 +454,9 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		}
 		if cfg.FleetServer.CertKey != "" {
 			args = append(args, "--fleet-server-cert-key", cfg.FleetServer.CertKey)
+		}
+		if cfg.FleetServer.PassphrasePath != "" {
+			args = append(args, "--fleet-server-cert-key-passphrase", cfg.FleetServer.PassphrasePath)
 		}
 
 		for k, v := range cfg.FleetServer.Headers {
@@ -653,8 +682,13 @@ func performGET(cfg setupConfig, client *kibana.Client, path string, response in
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
 		code, result, err := client.Connection.Request("GET", path, nil, nil, nil)
 		if err != nil || code != 200 {
-			err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
-				client.Connection.URL, path, err, truncateString(result))
+			if err != nil {
+				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
+					client.Connection.URL, path, err, truncateString(result))
+			} else {
+				err = fmt.Errorf("http GET request to %s%s fails. StatusCode: %d Response: %s",
+					client.Connection.URL, path, code, truncateString(result))
+			}
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
 			continue
@@ -672,8 +706,13 @@ func performPOST(cfg setupConfig, client *kibana.Client, path string, writer io.
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
 		code, result, err := client.Connection.Request("POST", path, nil, nil, nil)
 		if err != nil || code >= 400 {
-			err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
-				client.Connection.URL, path, err, truncateString(result))
+			if err != nil {
+				err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
+					client.Connection.URL, path, err, truncateString(result))
+			} else {
+				err = fmt.Errorf("http POST request to %s%s fails. StatusCode: %d Response: %s",
+					client.Connection.URL, path, code, truncateString(result))
+			}
 			lastErr = err
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
@@ -696,41 +735,25 @@ func truncateString(b []byte) string {
 
 // runLegacyAPMServer extracts the bundled apm-server from elastic-agent
 // to path and runs it with args.
-func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, error) {
-	name := "apm-server"
+func runLegacyAPMServer(streams *cli.IOStreams) (*process.Info, error) {
+	name := "apm"
 	logInfo(streams, "Preparing apm-server for legacy mode.")
-	cfg := artifact.DefaultConfig()
 
-	logInfo(streams, fmt.Sprintf("Extracting apm-server into install directory %s.", path))
-	installer, err := tar.NewInstaller(cfg)
+	platform, err := component.LoadPlatformDetail(isContainer)
 	if err != nil {
-		return nil, errors.New(err, "creating installer")
+		return nil, fmt.Errorf("failed to gather system information: %w", err)
 	}
-	spec := program.Spec{Name: name, Cmd: name, Artifact: name}
-	version := release.Version()
-	if release.Snapshot() {
-		version = fmt.Sprintf("%s-SNAPSHOT", version)
-	}
-	// Extract the bundled apm-server into the APM_SERVER_PATH
-	if err := installer.Install(context.Background(), spec, version, path); err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("installing %s (%s) from %s to %s", spec.Name, version, cfg.TargetDirectory, path))
-	}
-	// Get the apm-server directory
-	files, err := ioutil.ReadDir(path)
+
+	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
 	if err != nil {
-		return nil, errors.New(err, fmt.Sprintf("reading directory %s", path))
+		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
-	if len(files) != 1 || !files[0].IsDir() {
-		return nil, errors.New("expected one directory")
-	}
-	apmDir := filepath.Join(path, files[0].Name())
-	// Start apm-server process respecting path ENVs
-	apmBinary := filepath.Join(apmDir, spec.Cmd)
-	log, err := logger.New("apm-server", false)
+
+	spec, err := specs.GetInput(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to detect apm-server input: %w", err)
 	}
+
 	// add APM Server specific configuration
 	var args []string
 	addEnv := func(arg, env string) {
@@ -750,8 +773,16 @@ func runLegacyAPMServer(streams *cli.IOStreams, path string) (*process.Info, err
 	addEnv("--path.logs", "LOGS_PATH")
 	addEnv("--httpprof", "HTTPPROF")
 	addSettingEnv("gc_percent", "APMSERVER_GOGC")
-	logInfo(streams, "Starting legacy apm-server daemon as a subprocess.")
-	return process.Start(log, apmBinary, nil, os.Geteuid(), os.Getegid(), args)
+	logInfo(streams, "Starting legacy apm-server daemon as a subprocess."+spec.BinaryPath)
+	options := []process.StartOption{process.WithArgs(args)}
+	wdir := filepath.Dir(spec.BinaryPath)
+	if wdir != "." {
+		options = append(options, process.WithCmdOptions(func(c *exec.Cmd) error {
+			c.Dir = wdir
+			return nil
+		}))
+	}
+	return process.Start(spec.BinaryPath, options...)
 }
 
 func logToStderr(cfg *configuration.Configuration) {
@@ -784,11 +815,7 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 			return err
 		}
 	}
-	// sync the downloads to the data directory
-	destDownloads := filepath.Join(statePath, "data", "downloads")
-	if err := syncDir(paths.Downloads(), destDownloads); err != nil {
-		return fmt.Errorf("syncing download directory to STATE_PATH(%s) failed: %w", statePath, err)
-	}
+
 	originalInstall := paths.Install()
 	originalTop := paths.Top()
 	paths.SetTop(topPath)
@@ -802,10 +829,17 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 	if logsPath != "" {
 		paths.SetLogs(logsPath)
 		// ensure that the logs directory exists
-		if err := os.MkdirAll(filepath.Join(logsPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(logsPath), logsPathPerms); err != nil {
 			return fmt.Errorf("preparing LOGS_PATH(%s) failed: %w", logsPath, err)
 		}
 	}
+
+	// ensure that the internal logger directory exists
+	loggerPath := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	if err := os.MkdirAll(loggerPath, logsPathPerms); err != nil {
+		return fmt.Errorf("preparing internal log path(%s) failed: %w", loggerPath, err)
+	}
+
 	// persist the paths so other commands in the container will use the correct paths
 	if writePaths {
 		if err := writeContainerPaths(originalTop, statePath, configPath, logsPath); err != nil {
@@ -817,8 +851,8 @@ func setPaths(statePath, configPath, logsPath string, writePaths bool) error {
 
 type containerPaths struct {
 	StatePath  string `config:"state_path" yaml:"state_path"`
-	ConfigPath string `config:"state_path" yaml:"config_path,omitempty"`
-	LogsPath   string `config:"state_path" yaml:"logs_path,omitempty"`
+	ConfigPath string `config:"config_path" yaml:"config_path,omitempty"`
+	LogsPath   string `config:"logs_path" yaml:"logs_path,omitempty"`
 }
 
 func writeContainerPaths(original, statePath, configPath, logsPath string) error {
@@ -859,23 +893,6 @@ func tryContainerLoadPaths() error {
 		return fmt.Errorf("failed to unpack %s: %w", pathFile, err)
 	}
 	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, false)
-}
-
-func syncDir(src string, dest string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		relativePath := strings.TrimPrefix(path, src)
-		if info.IsDir() {
-			err = os.MkdirAll(filepath.Join(dest, relativePath), info.Mode())
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-		return copyFile(filepath.Join(dest, relativePath), path, info.Mode())
-	})
 }
 
 func copyFile(destPath string, srcPath string, mode os.FileMode) error {
@@ -954,4 +971,13 @@ func envIntWithDefault(defVal string, keys ...string) (int, error) {
 	}
 
 	return strconv.Atoi(valStr)
+}
+
+// isContainer changes the platform details to be a container.
+//
+// Runtime specifications can provide unique configurations when running in a container, this ensures that
+// those configurations are used versus the standard Linux configurations.
+func isContainer(detail component.PlatformDetail) component.PlatformDetail {
+	detail.OS = component.Container
+	return detail
 }

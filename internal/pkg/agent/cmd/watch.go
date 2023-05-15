@@ -9,11 +9,14 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -36,11 +39,16 @@ const (
 func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "watch",
-		Short: "Watch watches Elastic Agent for failures and initiates rollback.",
-		Long:  `Watch watches Elastic Agent for failures and initiates rollback.`,
+		Short: "Watch the Elastic Agent for failures and initiate rollback",
+		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			if err := watchCmd(); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+			log, err := configuredLogger()
+			if err != nil {
+				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
+			}
+			if err := watchCmd(log); err != nil {
+				log.Errorw("Watch command failed", "error.message", err)
+				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
 			}
 		},
@@ -49,12 +57,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 	return cmd
 }
 
-func watchCmd() error {
-	log, err := configuredLogger()
-	if err != nil {
-		return err
-	}
-
+func watchCmd(log *logp.Logger) error {
 	marker, err := upgrade.LoadMarker()
 	if err != nil {
 		log.Error("failed to load marker", err)
@@ -87,7 +90,7 @@ func watchCmd() error {
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		if err := upgrade.Cleanup(release.ShortCommit(), true); err != nil {
+		if err := upgrade.Cleanup(log, release.ShortCommit(), true, false); err != nil {
 			log.Error("rollback failed", err)
 		}
 		// exit nicely
@@ -96,8 +99,8 @@ func watchCmd() error {
 
 	ctx := context.Background()
 	if err := watch(ctx, tilGrace, log); err != nil {
-		log.Debugf("Error detected proceeding to rollback: %v", err)
-		err = upgrade.Rollback(ctx, marker.PrevHash, marker.Hash)
+		log.Error("Error detected proceeding to rollback: %v", err)
+		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
 			log.Error("rollback failed", err)
 		}
@@ -108,11 +111,15 @@ func watchCmd() error {
 	// in windows it might leave self untouched, this will get cleaned up
 	// later at the start, because for windows we leave marker untouched.
 	removeMarker := !isWindows()
-	err = upgrade.Cleanup(marker.Hash, removeMarker)
+	err = upgrade.Cleanup(log, marker.Hash, removeMarker, false)
 	if err != nil {
 		log.Error("rollback failed", err)
 	}
 	return err
+}
+
+func isWindows() bool {
+	return runtime.GOOS == "windows"
 }
 
 func watch(ctx context.Context, tilGrace time.Duration, log *logger.Logger) error {
@@ -133,7 +140,7 @@ func watch(ctx context.Context, tilGrace time.Duration, log *logger.Logger) erro
 		return err
 	}
 
-	crashChecker, err := upgrade.NewCrashChecker(ctx, errChan, log)
+	crashChecker, err := upgrade.NewCrashChecker(ctx, crashChan, log)
 	if err != nil {
 		return err
 	}
@@ -204,11 +211,19 @@ func configuredLogger() (*logger.Logger, error) {
 	}
 
 	cfg.Settings.LoggingConfig.Beat = watcherName
-
-	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, false)
+	cfg.Settings.LoggingConfig.Level = logp.DebugLevel
+	internal, err := logger.MakeInternalFileOutput(cfg.Settings.LoggingConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return logger, nil
+	libC, err := logger.ToCommonConfig(cfg.Settings.LoggingConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := configure.LoggingWithOutputs("", libC, internal); err != nil {
+		return nil, fmt.Errorf("error initializing logging: %w", err)
+	}
+	return logp.NewLogger(""), nil
 }

@@ -1,0 +1,51 @@
+state: 2
+message: Running
+fleet_state: 6
+fleet_message: "Not enrolled into Fleet"
+components:
+  - id: system/metrics-default
+    state:
+      message: ""
+      state: 2
+      units: {}
+      version_info:
+        name: Mock system/metrics
+        version: 1.2.3
+      features_idx: 1
+  - id: log-default
+    state:
+      message: ""
+      state: 2
+      units: {}
+      version_info:
+        name: Mock log
+        version: 1.2.3
+      features_idx: 1
+  - id: filestream-monitoring
+    state:
+      message: ""
+      state: 2
+      units: {}
+      version_info:
+        name: Mock filestream
+        version: 1.2.3
+      features_idx: 1
+  - id: beat/metrics-monitoring
+    state:
+      message: ""
+      state: 2
+      units: {}
+      version_info:
+        name: Mock beat/metrics
+        version: 1.2.3
+      features_idx: 1
+  - id: http/metrics-monitoring
+    state:
+      message: ""
+      state: 2
+      units: {}
+      version_info:
+        name: Mock http/metrics
+        version: 1.2.3
+      features_idx: 1
+log_level: info

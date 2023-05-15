@@ -182,32 +182,6 @@ func CrossBuild(options ...CrossBuildOption) error {
 	// Each build runs in parallel.
 	Parallel(deps...)
 
-	// // It needs to run after all the builds, as it needs the darwin binaries.
-	// if err := assembleDarwinUniversal(params); err != nil {
-	// 	return err
-	// }
-
-	return nil
-}
-
-// assembleDarwinUniversal checks if darwin/amd64 and darwin/arm64 were build,
-// if so, it generates a darwin/universal binary that is the merge fo them two.
-func assembleDarwinUniversal(params crossBuildParams) error {
-	if IsDarwinUniversal() {
-		builder := GolangCrossBuilder{
-			// the docker image for darwin/arm64 is the one capable of merging the binaries.
-			Platform:      "darwin/arm64",
-			Target:        "assembleDarwinUniversal",
-			InDir:         params.InDir,
-			ImageSelector: params.ImageSelector}
-		if err := builder.Build(); err != nil {
-			return errors.Wrapf(err,
-				"failed merging darwin/amd64 and darwin/arm64 into darwin/universal target=%v for platform=%v",
-				builder.Target,
-				builder.Platform)
-		}
-	}
-
 	return nil
 }
 
@@ -236,19 +210,11 @@ func CrossBuildImage(platform string) (string, error) {
 	switch {
 	case platform == "darwin/amd64":
 		tagSuffix = "darwin-debian10"
-	case platform == "darwin/arm64":
-		tagSuffix = "darwin-arm64-debian10"
-	case platform == "darwin/universal":
+	case platform == "darwin/arm64" || platform == "darwin/universal":
 		tagSuffix = "darwin-arm64-debian10"
 	case platform == "linux/arm64":
 		tagSuffix = "arm"
-		// when it runs on a ARM64 host/worker.
-		if runtime.GOARCH == "arm64" {
-			tagSuffix = "base-arm-debian9"
-		}
-	case platform == "linux/armv5":
-		tagSuffix = "armel"
-	case platform == "linux/armv6":
+	case platform == "linux/armv5" || platform == "linux/armv6":
 		tagSuffix = "armel"
 	case platform == "linux/armv7":
 		tagSuffix = "armhf"
@@ -315,6 +281,15 @@ func (b GolangCrossBuilder) Build() error {
 		verbose = "true"
 	}
 	var args []string
+	// There's a bug on certain debian versions:
+	// https://discuss.linuxcontainers.org/t/debian-jessie-containers-have-extremely-low-performance/1272
+	// basically, apt-get has a bug where will try to iterate through every possible FD as set by the NOFILE ulimit.
+	// On certain docker installs, docker will set the ulimit to a value > 10^9, which means apt-get will take >1 hour.
+	// This runs across all possible debian platforms, since there's no real harm in it.
+	if strings.Contains(image, "debian") {
+		args = append(args, "--ulimit", "nofile=262144:262144")
+	}
+
 	if runtime.GOOS != "windows" {
 		args = append(args,
 			"--env", "EXEC_UID="+strconv.Itoa(os.Getuid()),
@@ -370,7 +345,7 @@ func chownPaths(uid, gid int, path string) error {
 	start := time.Now()
 	numFixed := 0
 	defer func() {
-		log.Printf("chown took: %v, changed %d files", time.Now().Sub(start), numFixed)
+		log.Printf("chown took: %v, changed %d files", time.Since(start), numFixed)
 	}()
 
 	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {

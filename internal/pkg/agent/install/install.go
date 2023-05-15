@@ -6,39 +6,43 @@ package install
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/otiai10/copy"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
+const (
+	darwin = "darwin"
+)
+
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile string) error {
+func Install(cfgFile, topPath string) error {
 	dir, err := findDirectory()
 	if err != nil {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
 	// uninstall current installation
-	err = Uninstall(cfgFile)
+	err = Uninstall(cfgFile, topPath)
 	if err != nil {
 		return err
 	}
 
 	// ensure parent directory exists, copy source into install path
-	err = os.MkdirAll(filepath.Dir(paths.InstallPath), 0755)
+	err = os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(paths.InstallPath)),
-			errors.M("directory", filepath.Dir(paths.InstallPath)))
+			fmt.Sprintf("failed to create installation parent directory (%s)", filepath.Dir(topPath)),
+			errors.M("directory", filepath.Dir(topPath)))
 	}
-	err = copy.Copy(dir, paths.InstallPath, copy.Options{
+	err = copy.Copy(dir, topPath, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
@@ -47,41 +51,73 @@ func Install(cfgFile string) error {
 	if err != nil {
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, paths.InstallPath),
-			errors.M("source", dir), errors.M("destination", paths.InstallPath))
+			fmt.Sprintf("failed to copy source directory (%s) to destination (%s)", dir, topPath),
+			errors.M("source", dir), errors.M("destination", topPath))
 	}
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath != "" {
-		err = os.MkdirAll(filepath.Dir(paths.ShellWrapperPath), 0755)
-		if err == nil {
-			err = ioutil.WriteFile(paths.ShellWrapperPath, []byte(paths.ShellWrapper), 0755)
-		}
+		pathDir := filepath.Dir(paths.ShellWrapperPath)
+		err = os.MkdirAll(pathDir, 0755)
 		if err != nil {
 			return errors.New(
 				err,
-				fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath),
-				errors.M("destination", paths.ShellWrapperPath))
+				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath),
+				errors.M("directory", pathDir))
+		}
+		// Install symlink for darwin instead of the wrapper script.
+		// Elastic-agent should be first process that launchd starts in order to be able to grant
+		// the Full-Disk Access (FDA) to the agent and it's child processes.
+		// This is specifically important for osquery FDA permissions at the moment.
+		if runtime.GOOS == darwin {
+			// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
+			if _, err := os.Lstat(paths.ShellWrapperPath); err == nil {
+				if err := os.Remove(paths.ShellWrapperPath); err != nil {
+					return errors.New(
+						err,
+						fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath),
+						errors.M("destination", paths.ShellWrapperPath))
+				}
+			}
+			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath)
+			if err != nil {
+				return errors.New(
+					err,
+					fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath),
+					errors.M("destination", paths.ShellWrapperPath))
+			}
+		} else {
+			// We use strings.Replace instead of fmt.Sprintf here because, with the
+			// latter, govet throws a false positive error here: "fmt.Sprintf call has
+			// arguments but no formatting directives".
+			shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
+			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
+			if err != nil {
+				return errors.New(
+					err,
+					fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath),
+					errors.M("destination", paths.ShellWrapperPath))
+			}
 		}
 	}
 
 	// post install (per platform)
-	err = postInstall()
+	err = postInstall(topPath)
 	if err != nil {
 		return err
 	}
 
 	// fix permissions
-	err = FixPermissions()
+	err = FixPermissions(topPath)
 	if err != nil {
 		return errors.New(
 			err,
 			"failed to perform permission changes",
-			errors.M("destination", paths.InstallPath))
+			errors.M("destination", topPath))
 	}
 
 	// install service
-	svc, err := newService()
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -98,8 +134,8 @@ func Install(cfgFile string) error {
 // StartService starts the installed service.
 //
 // This should only be called after Install is successful.
-func StartService() error {
-	svc, err := newService()
+func StartService(topPath string) error {
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -114,8 +150,8 @@ func StartService() error {
 }
 
 // StopService stops the installed service.
-func StopService() error {
-	svc, err := newService()
+func StopService(topPath string) error {
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -130,8 +166,8 @@ func StopService() error {
 }
 
 // FixPermissions fixes the permissions on the installed system.
-func FixPermissions() error {
-	return fixPermissions()
+func FixPermissions(topPath string) error {
+	return fixPermissions(topPath)
 }
 
 // findDirectory returns the directory to copy into the installation location.
@@ -146,12 +182,7 @@ func findDirectory() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sourceDir := filepath.Dir(execPath)
-	if info.IsInsideData(sourceDir) {
-		// executable path is being reported as being down inside of data path
-		// move up to directories to perform the copy
-		sourceDir = filepath.Dir(filepath.Dir(sourceDir))
-	}
+	sourceDir := paths.ExecDir(filepath.Dir(execPath))
 	err = verifyDirectory(sourceDir)
 	if err != nil {
 		return "", err

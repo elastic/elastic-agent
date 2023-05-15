@@ -17,12 +17,14 @@ import (
 func TestVars_Replace(t *testing.T) {
 	vars := mustMakeVars(map[string]interface{}{
 		"un-der_score": map[string]interface{}{
-			"key1": "data1",
-			"key2": "data2",
+			"key1":      "data1",
+			"key2":      "data2",
+			"with-dash": "dash-value",
 			"list": []string{
 				"array1",
 				"array2",
 			},
+			"with/slash": "some/path",
 			"dict": map[string]interface{}{
 				"key1": "value1",
 				"key2": "value2",
@@ -41,6 +43,12 @@ func TestVars_Replace(t *testing.T) {
 		{
 			"${un-der_score.key1}",
 			NewStrVal("data1"),
+			false,
+			false,
+		},
+		{
+			"${un-der_score.with-dash}",
+			NewStrVal("dash-value"),
 			false,
 			false,
 		},
@@ -75,8 +83,20 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
+			`${"with:colon"}`,
+			NewStrVal("with:colon"),
+			false,
+			false,
+		},
+		{
 			`${"direct"}`,
 			NewStrVal("direct"),
+			false,
+			false,
+		},
+		{
+			`${un-der_score.missing|'with:colon'}`,
+			NewStrVal("with:colon"),
 			false,
 			false,
 		},
@@ -150,6 +170,12 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
+			`${un-der_score.with/slash}`,
+			NewStrVal(`some/path`),
+			false,
+			false,
+		},
+		{
 			`list inside string ${un-der_score.list} causes no match`,
 			NewList([]Node{
 				NewStrVal("array1"),
@@ -201,6 +227,7 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 		},
 	}
 	vars, err := NewVarsWithProcessors(
+		"",
 		map[string]interface{}{
 			"testing": map[string]interface{}{
 				"key1": "data1",
@@ -267,6 +294,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 		"kubernetes_secrets": mockFetchProvider,
 	}
 	vars, err := NewVarsWithProcessors(
+		"id",
 		map[string]interface{}{
 			"testing": map[string]interface{}{
 				"key1": "data1",

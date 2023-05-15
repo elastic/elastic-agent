@@ -1,0 +1,22 @@
+inputs:
+    - name: filestream-mattermost
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mattermost.audit.enabled} == true or ${kubernetes.hints.mattermost.enabled} == true
+          data_stream:
+            dataset: mattermost.audit
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.mattermost.audit.stream|'all'}
+          paths: null
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - mattermost-audit
+      data_stream.namespace: default

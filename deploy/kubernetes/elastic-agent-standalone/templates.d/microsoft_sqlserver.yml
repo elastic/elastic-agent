@@ -1,0 +1,128 @@
+inputs:
+    - name: winlog-microsoft_sqlserver
+      type: winlog
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.microsoft_sqlserver.audit.enabled} == true or ${kubernetes.hints.microsoft_sqlserver.enabled} == true
+          data_stream:
+            dataset: microsoft_sqlserver.audit
+            type: logs
+          event_id: 33205
+          ignore_older: 72h
+          name: Security
+      data_stream.namespace: default
+    - name: filestream-microsoft_sqlserver
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.microsoft_sqlserver.log.enabled} == true and ${kubernetes.hints.microsoft_sqlserver.enabled} == true
+          data_stream:
+            dataset: microsoft_sqlserver.log
+            type: logs
+          exclude_files:
+            - .gz$
+          multiline:
+            match: after
+            negate: true
+            pattern: ^\d{4}-\d{2}-\d{2}
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.microsoft_sqlserver.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - mssql-logs
+      data_stream.namespace: default
+    - name: sql/metrics-microsoft_sqlserver
+      type: sql/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.microsoft_sqlserver.performance.enabled} == true and ${kubernetes.hints.microsoft_sqlserver.enabled} == true
+          data_stream:
+            dataset: microsoft_sqlserver.performance
+            type: metrics
+          driver: mssql
+          dynamic_counter_name: Memory Grants Pend%
+          hosts:
+            - sqlserver://${kubernetes.hints.microsoft_sqlserver.performance.username|kubernetes.hints.microsoft_sqlserver.username|'domain\username'}:${kubernetes.hints.microsoft_sqlserver.performance.password|kubernetes.hints.microsoft_sqlserver.password|'verysecurepassword'}@${kubernetes.hints.microsoft_sqlserver.performance.host|kubernetes.hints.microsoft_sqlserver.host|'localhost'}
+          merge_results: true
+          metricsets:
+            - query
+          period: ${kubernetes.hints.microsoft_sqlserver.performance.period|kubernetes.hints.microsoft_sqlserver.period|'60s'}
+          raw_data.enabled: true
+          sql_queries:
+            - query: SELECT cntr_value As 'user_connections' FROM sys.dm_os_performance_counters WHERE counter_name= 'User Connections'
+              response_format: table
+            - query: SELECT cntr_value As 'active_temp_tables' FROM sys.dm_os_performance_counters WHERE counter_name = 'Active Temp Tables' AND object_name like '%General Statistics%'
+              response_format: table
+            - query: SELECT cntr_value As 'buffer_cache_hit_ratio' FROM sys.dm_os_performance_counters WHERE counter_name = 'Buffer cache hit ratio' AND object_name like '%Buffer Manager%'
+              response_format: table
+            - query: SELECT cntr_value As 'page_splits_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'Page splits/sec'
+              response_format: table
+            - query: SELECT cntr_value As 'lock_waits_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'Lock Waits/sec' AND instance_name = '_Total'
+              response_format: table
+            - query: SELECT cntr_value As 'compilations_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'SQL Compilations/sec'
+              response_format: table
+            - query: SELECT cntr_value As 'batch_requests_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'Batch Requests/sec'
+              response_format: table
+            - query: SELECT cntr_value As 'buffer_checkpoint_pages_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'Checkpoint pages/sec' AND object_name like '%Buffer Manager%'
+              response_format: table
+            - query: SELECT cntr_value As 'buffer_database_pages' FROM sys.dm_os_performance_counters WHERE counter_name = 'Database pages' AND object_name like '%Buffer Manager%'
+              response_format: table
+            - query: SELECT cntr_value As 'buffer_page_life_expectancy' FROM sys.dm_os_performance_counters WHERE counter_name = 'Page life expectancy' AND  object_name like '%Buffer Manager%'
+              response_format: table
+            - query: SELECT cntr_value As 'buffer_target_pages' FROM sys.dm_os_performance_counters WHERE counter_name = 'Target pages' AND  object_name like '%Buffer Manager%'
+              response_format: table
+            - query: SELECT cntr_value As 'connection_reset_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'Connection Reset/sec' AND object_name like '%Buffer Manager%'
+              response_format: table
+            - query: SELECT cntr_value As 'logins_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'Logins/sec' AND object_name like '%General Statistics%'
+              response_format: table
+            - query: SELECT cntr_value As 'logouts_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'Logouts/sec' AND object_name like '%General Statistics%'
+              response_format: table
+            - query: SELECT cntr_value As 'transactions' FROM sys.dm_os_performance_counters WHERE counter_name = 'Transactions' AND object_name like '%General Statistics%'
+              response_format: table
+            - query: SELECT cntr_value As 're_compilations_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'SQL Re-Compilations/sec'
+              response_format: table
+            - query: SELECT counter_name, cntr_value FROM sys.dm_os_performance_counters WHERE counter_name like 'Memory Grants Pend%'
+              response_format: variables
+        - condition: ${kubernetes.hints.microsoft_sqlserver.transaction_log.enabled} == true and ${kubernetes.hints.microsoft_sqlserver.enabled} == true
+          data_stream:
+            dataset: microsoft_sqlserver.transaction_log
+            type: metrics
+          driver: mssql
+          hosts:
+            - sqlserver://${kubernetes.hints.microsoft_sqlserver.transaction_log.username|kubernetes.hints.microsoft_sqlserver.username|'domain\username'}:${kubernetes.hints.microsoft_sqlserver.transaction_log.password|kubernetes.hints.microsoft_sqlserver.password|'verysecurepassword'}@${kubernetes.hints.microsoft_sqlserver.transaction_log.host|kubernetes.hints.microsoft_sqlserver.host|'localhost'}
+          metricsets:
+            - query
+          period: ${kubernetes.hints.microsoft_sqlserver.transaction_log.period|kubernetes.hints.microsoft_sqlserver.period|'60s'}
+          raw_data.enabled: true
+          sql_queries:
+            - query: SELECT name As 'database_name', database_id FROM sys.databases WHERE database_id=1;
+              response_format: table
+            - query: SELECT 'master' As database_name, database_id,total_log_size_mb,active_log_size_mb,log_backup_time,log_since_last_log_backup_mb,log_since_last_checkpoint_mb,log_recovery_size_mb FROM sys.dm_db_log_stats(1) master
+              response_format: table
+            - query: SELECT 'master' As 'database_name', total_log_size_in_bytes As total_log_size_bytes, used_log_space_in_bytes As used_log_space_bytes, used_log_space_in_percent As used_log_space_pct, log_space_in_bytes_since_last_backup FROM sys.dm_db_log_space_usage master
+              response_format: table
+            - query: SELECT  name As 'database_name', database_id FROM sys.databases WHERE database_id=2;
+              response_format: table
+            - query: SELECT 'tempdb' As 'database_name', database_id,total_log_size_mb,active_log_size_mb As active_log_size,log_backup_time,log_since_last_log_backup_mb, log_since_last_checkpoint_mb,log_recovery_size_mb FROM sys.dm_db_log_stats(2) tempdb
+              response_format: table
+            - query: SELECT 'tempdb' As 'database_name', total_log_size_in_bytes As total_log_size_bytes, used_log_space_in_bytes As used_log_space_bytes, used_log_space_in_percent As used_log_space_pct, log_space_in_bytes_since_last_backup FROM sys.dm_db_log_space_usage tempdb
+              response_format: table
+            - query: SELECT  name As 'database_name', database_id FROM sys.databases WHERE database_id=3;
+              response_format: table
+            - query: SELECT 'model' As 'database_name', database_id,total_log_size_mb,active_log_size_mb As active_log_size,log_backup_time,log_since_last_log_backup_mb, log_since_last_checkpoint_mb,log_recovery_size_mb FROM sys.dm_db_log_stats(3) model
+              response_format: table
+            - query: SELECT 'model' As 'database_name', total_log_size_in_bytes As total_log_size_bytes, used_log_space_in_bytes As used_log_space_bytes, used_log_space_in_percent As used_log_space_pct, log_space_in_bytes_since_last_backup FROM sys.dm_db_log_space_usage model
+              response_format: table
+            - query: SELECT name As 'database_name', database_id FROM sys.databases WHERE database_id=4;
+              response_format: table
+            - query: SELECT 'msdb' As 'database_name', database_id,total_log_size_mb,active_log_size_mb As active_log_size,log_backup_time,log_since_last_log_backup_mb, log_since_last_checkpoint_mb,log_recovery_size_mb FROM sys.dm_db_log_stats(4) msdb
+              response_format: table
+            - query: SELECT 'msdb' As 'database_name', total_log_size_in_bytes As total_log_size_bytes, used_log_space_in_bytes As used_log_space_bytes, used_log_space_in_percent As used_log_space_pct, log_space_in_bytes_since_last_backup FROM sys.dm_db_log_space_usage msdb
+              response_format: table
+      data_stream.namespace: default

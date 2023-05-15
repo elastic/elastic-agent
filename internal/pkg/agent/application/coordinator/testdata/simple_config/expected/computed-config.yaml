@@ -1,0 +1,405 @@
+agent:
+  download:
+    sourceURI: https://artifacts.elastic.co/downloads/
+  features:
+    fqdn:
+      enabled: true
+  monitoring:
+    enabled: true
+    logs: true
+    metrics: true
+    namespace: default
+    use_output: default
+fleet:
+  hosts:
+  - https://https://your.fleet.host:443
+host:
+  id: <HostID>
+id: 18922a40-bbf4-11ed-a1b6-1b60471a8e8b
+inputs:
+- data_stream:
+    namespace: default
+  id: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
+  meta:
+    package:
+      name: system
+      version: 1.24.3
+  name: system-1
+  original_id: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+  package_policy_id: d38b6b0b-cc52-4a61-b897-1b236982ac42
+  policy:
+    revision: 5
+  revision: 1
+  streams:
+  - data_stream:
+      dataset: system.auth
+      type: logs
+    exclude_files:
+    - .gz$
+    id: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    ignore_older: 72h
+    multiline:
+      match: after
+      pattern: ^\s
+    paths:
+    - /var/log/auth.log*
+    - /var/log/secure*
+    processors:
+    - add_locale: null
+    tags:
+    - system-auth
+  - data_stream:
+      dataset: system.syslog
+      type: logs
+    exclude_files:
+    - .gz$
+    id: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    ignore_older: 72h
+    multiline:
+      match: after
+      pattern: ^\s
+    paths:
+    - /var/log/messages*
+    - /var/log/syslog*
+    processors:
+    - add_locale: null
+  type: log
+- data_stream:
+    namespace: default
+  id: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42-id
+  meta:
+    package:
+      name: system
+      version: 1.24.3
+  name: system-1
+  original_id: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+  package_policy_id: d38b6b0b-cc52-4a61-b897-1b236982ac42
+  policy:
+    revision: 5
+  revision: 1
+  streams:
+  - cpu.metrics:
+    - percentages
+    - normalized_percentages
+    data_stream:
+      dataset: system.cpu
+      type: metrics
+    id: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - cpu
+    period: 10s
+  - data_stream:
+      dataset: system.diskio
+      type: metrics
+    diskio.include_devices: null
+    id: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - diskio
+    period: 10s
+  - data_stream:
+      dataset: system.filesystem
+      type: metrics
+    id: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - filesystem
+    period: 1m
+    processors:
+    - drop_event:
+        when:
+          regexp:
+            system.filesystem.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+  - data_stream:
+      dataset: system.fsstat
+      type: metrics
+    id: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - fsstat
+    period: 1m
+    processors:
+    - drop_event:
+        when:
+          regexp:
+            system.fsstat.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+  - data_stream:
+      dataset: system.load
+      type: metrics
+    id: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - load
+    period: 10s
+  - data_stream:
+      dataset: system.memory
+      type: metrics
+    id: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - memory
+    period: 10s
+  - data_stream:
+      dataset: system.network
+      type: metrics
+    id: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - network
+    network.interfaces: null
+    period: 10s
+  - data_stream:
+      dataset: system.process
+      type: metrics
+    id: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - process
+    period: 10s
+    process.cgroups.enabled: false
+    process.cmdline.cache.enabled: true
+    process.include_cpu_ticks: false
+    process.include_top_n.by_cpu: 5
+    process.include_top_n.by_memory: 5
+    processes:
+    - .*
+  - data_stream:
+      dataset: system.process.summary
+      type: metrics
+    id: system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - process_summary
+    period: 10s
+  - data_stream:
+      dataset: system.socket_summary
+      type: metrics
+    id: system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - socket_summary
+    period: 10s
+  - data_stream:
+      dataset: system.uptime
+      type: metrics
+    id: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    metricsets:
+    - uptime
+    period: 10s
+  type: system/metrics
+output_permissions:
+  default:
+    _elastic_agent_checks:
+      cluster:
+      - monitor
+    _elastic_agent_monitoring:
+      indices:
+      - names:
+        - logs-elastic_agent.apm_server-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.apm_server-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.auditbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.auditbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.cloud_defend-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.cloudbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.cloudbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.elastic_agent-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.endpoint_security-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.endpoint_security-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.filebeat_input-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.filebeat_input-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.filebeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.filebeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.fleet_server-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.fleet_server-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.heartbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.heartbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.metricbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.metricbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.osquerybeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.osquerybeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-elastic_agent.packetbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-elastic_agent.packetbeat-default
+        privileges:
+        - auto_configure
+        - create_doc
+    d38b6b0b-cc52-4a61-b897-1b236982ac42:
+      indices:
+      - names:
+        - logs-system.auth-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-system.syslog-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-system.application-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-system.security-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - logs-system.system-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.cpu-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.diskio-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.filesystem-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.fsstat-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.load-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.memory-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.network-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.process-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.process.summary-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.socket_summary-default
+        privileges:
+        - auto_configure
+        - create_doc
+      - names:
+        - metrics-system.uptime-default
+        privileges:
+        - auto_configure
+        - create_doc
+outputs:
+  default:
+    hosts:
+    - https://your.elasticsearch.host:443
+    type: elasticsearch
+path:
+  config: <AgentRunDir>
+  data: <AgentRunDir>/data
+  home: <AgentRunDir>/data/elastic-agent-unknow
+  logs: <AgentRunDir>
+revision: 5

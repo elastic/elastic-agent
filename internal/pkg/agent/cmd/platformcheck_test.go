@@ -39,6 +39,10 @@ func TestCheckPlatformCompat(t *testing.T) {
 	}
 }
 
+func isLinux() bool {
+	return runtime.GOOS == "linux"
+}
+
 func TestHelper(t *testing.T) {
 	if os.Getenv("GO_USE_HELPER") != "1" {
 		t.Log("ignore helper")

@@ -1,0 +1,299 @@
+components:
+- id: beat/metrics-monitoring
+  input_spec:
+    binary_name: metricbeat
+    binary_path: ../../../../../specs/metricbeat
+    input_type: beat/metrics
+    spec:
+      command:
+        args:
+        - -E
+        - setup.ilm.enabled=false
+        - -E
+        - setup.template.enabled=false
+        - -E
+        - management.enabled=true
+        - -E
+        - management.restart_on_output_change=true
+        - -E
+        - logging.level=info
+        - -E
+        - logging.to_stderr=true
+        - -E
+        - gc_percent=${METRICBEAT_GOGC:100}
+        - -E
+        - metricbeat.config.modules.enabled=false
+        log:
+          level_key: log.level
+          message_key: message
+          time_format: 2006-01-02T15:04:05.000Z0700
+          time_key: '@timestamp'
+        maximum_restarts_per_period: 1
+        restart_monitoring_period: 5s
+        timeouts:
+          checkin: 30s
+          restart: 1s
+          stop: 30s
+      description: Beat metrics
+      name: beat/metrics
+      outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+      shippers:
+      - shipper
+  units:
+  - id: beat/metrics-monitoring-metrics-monitoring-beats
+    log_level: 2
+    type: 0
+  - id: beat/metrics-monitoring
+    log_level: 2
+    type: 1
+- id: filestream-monitoring
+  input_spec:
+    binary_name: filebeat
+    binary_path: ../../../../../specs/filebeat
+    input_type: filestream
+    spec:
+      command:
+        args:
+        - -E
+        - setup.ilm.enabled=false
+        - -E
+        - setup.template.enabled=false
+        - -E
+        - management.enabled=true
+        - -E
+        - management.restart_on_output_change=true
+        - -E
+        - logging.level=info
+        - -E
+        - logging.to_stderr=true
+        - -E
+        - gc_percent=${FILEBEAT_GOGC:100}
+        - -E
+        - filebeat.config.modules.enabled=false
+        log:
+          level_key: log.level
+          message_key: message
+          time_format: 2006-01-02T15:04:05.000Z0700
+          time_key: '@timestamp'
+        maximum_restarts_per_period: 1
+        restart_monitoring_period: 5s
+        timeouts:
+          checkin: 30s
+          restart: 1s
+          stop: 30s
+      description: Filestream
+      name: filestream
+      outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+      shippers:
+      - shipper
+  units:
+  - id: filestream-monitoring-filestream-monitoring-agent
+    log_level: 2
+    type: 0
+  - id: filestream-monitoring
+    log_level: 2
+    type: 1
+- id: http/metrics-monitoring
+  input_spec:
+    binary_name: metricbeat
+    binary_path: ../../../../../specs/metricbeat
+    input_type: http/metrics
+    spec:
+      command:
+        args:
+        - -E
+        - setup.ilm.enabled=false
+        - -E
+        - setup.template.enabled=false
+        - -E
+        - management.enabled=true
+        - -E
+        - management.restart_on_output_change=true
+        - -E
+        - logging.level=info
+        - -E
+        - logging.to_stderr=true
+        - -E
+        - gc_percent=${METRICBEAT_GOGC:100}
+        - -E
+        - metricbeat.config.modules.enabled=false
+        log:
+          level_key: log.level
+          message_key: message
+          time_format: 2006-01-02T15:04:05.000Z0700
+          time_key: '@timestamp'
+        maximum_restarts_per_period: 1
+        restart_monitoring_period: 5s
+        timeouts:
+          checkin: 30s
+          restart: 1s
+          stop: 30s
+      description: HTTP metrics
+      name: http/metrics
+      outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+      shippers:
+      - shipper
+  units:
+  - id: http/metrics-monitoring-metrics-monitoring-agent
+    log_level: 2
+    type: 0
+  - id: http/metrics-monitoring
+    log_level: 2
+    type: 1
+- id: log-default
+  input_spec:
+    binary_name: filebeat
+    binary_path: ../../../../../specs/filebeat
+    input_type: log
+    spec:
+      aliases:
+      - logfile
+      - event/file
+      command:
+        args:
+        - -E
+        - setup.ilm.enabled=false
+        - -E
+        - setup.template.enabled=false
+        - -E
+        - management.enabled=true
+        - -E
+        - management.restart_on_output_change=true
+        - -E
+        - logging.level=info
+        - -E
+        - logging.to_stderr=true
+        - -E
+        - gc_percent=${FILEBEAT_GOGC:100}
+        - -E
+        - filebeat.config.modules.enabled=false
+        log:
+          level_key: log.level
+          message_key: message
+          time_format: 2006-01-02T15:04:05.000Z0700
+          time_key: '@timestamp'
+        maximum_restarts_per_period: 1
+        restart_monitoring_period: 5s
+        timeouts:
+          checkin: 30s
+          restart: 1s
+          stop: 30s
+      description: Logfile
+      name: log
+      outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+      shippers:
+      - shipper
+  units:
+  - id: log-default-logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    log_level: 2
+    type: 0
+  - id: log-default
+    log_level: 2
+    type: 1
+- id: system/metrics-default
+  input_spec:
+    binary_name: metricbeat
+    binary_path: ../../../../../specs/metricbeat
+    input_type: system/metrics
+    spec:
+      command:
+        args:
+        - -E
+        - setup.ilm.enabled=false
+        - -E
+        - setup.template.enabled=false
+        - -E
+        - management.enabled=true
+        - -E
+        - management.restart_on_output_change=true
+        - -E
+        - logging.level=info
+        - -E
+        - logging.to_stderr=true
+        - -E
+        - gc_percent=${METRICBEAT_GOGC:100}
+        - -E
+        - metricbeat.config.modules.enabled=false
+        log:
+          level_key: log.level
+          message_key: message
+          time_format: 2006-01-02T15:04:05.000Z0700
+          time_key: '@timestamp'
+        maximum_restarts_per_period: 1
+        restart_monitoring_period: 5s
+        timeouts:
+          checkin: 30s
+          restart: 1s
+          stop: 30s
+      description: System metrics
+      name: system/metrics
+      outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+      shippers:
+      - shipper
+  units:
+  - id: system/metrics-default-system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    log_level: 2
+    type: 0
+  - id: system/metrics-default
+    log_level: 2
+    type: 1

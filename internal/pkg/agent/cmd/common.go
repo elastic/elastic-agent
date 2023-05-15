@@ -35,6 +35,9 @@ func NewCommand() *cobra.Command {
 func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "elastic-agent [subcommand]",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return tryContainerLoadPaths()
+		},
 	}
 
 	// path flags
@@ -67,13 +70,15 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newContainerCommand(args, streams))
 	cmd.AddCommand(newStatusCommand(args, streams))
 	cmd.AddCommand(newDiagnosticsCommand(args, streams))
+	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
 
-	// windows special hidden sub-command (only added on windows)
+	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
 	if reexec != nil {
 		cmd.AddCommand(reexec)
 	}
 	cmd.Run = run.Run
+	cmd.RunE = run.RunE
 
 	return cmd
 }

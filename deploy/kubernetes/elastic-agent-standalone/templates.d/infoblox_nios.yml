@@ -1,0 +1,63 @@
+inputs:
+    - name: udp-infoblox_nios
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
+          data_stream:
+            dataset: infoblox_nios.log
+            type: logs
+          fields:
+            _conf:
+                tz_offset: local
+          fields_under_root: true
+          host: localhost:9028
+          tags:
+            - forwarded
+            - infoblox_nios-log
+      data_stream.namespace: default
+    - name: filestream-infoblox_nios
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
+          data_stream:
+            dataset: infoblox_nios.log
+            type: logs
+          exclude_files:
+            - .gz$
+          fields:
+            _conf:
+                tz_offset: local
+          fields_under_root: true
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.infoblox_nios.log.stream|'all'}
+          paths: null
+          processors:
+            - add_locale: null
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - forwarded
+            - infoblox_nios-log
+      data_stream.namespace: default
+    - name: tcp-infoblox_nios
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
+          data_stream:
+            dataset: infoblox_nios.log
+            type: logs
+          fields:
+            _conf:
+                tz_offset: local
+          fields_under_root: true
+          host: localhost:9027
+          tags:
+            - forwarded
+            - infoblox_nios-log
+      data_stream.namespace: default

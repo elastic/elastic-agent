@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // duplicate code is in test cases
 package capabilities
 
 import (
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -16,7 +18,6 @@ import (
 )
 
 func TestMultiOutput(t *testing.T) {
-	tr := &testReporter{}
 	l, _ := logger.New("test", false)
 	t.Run("no match", func(t *testing.T) {
 		rd := &ruleDefinitions{
@@ -100,7 +101,7 @@ func TestMultiOutput(t *testing.T) {
 		initialOutputs := []string{"elasticsearch", "logstash"}
 		expectedOutputs := []string{"elasticsearch"}
 
-		cap, err := newOutputsCapability(l, rd, tr)
+		cap, err := newOutputsCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -122,7 +123,8 @@ func TestMultiOutput(t *testing.T) {
 
 		for _, in := range expectedOutputs {
 			var typeFound bool
-			nodes := outputsDict.Value().([]transpiler.Node)
+			nodes, ok := outputsDict.Value().([]transpiler.Node)
+			require.True(t, ok)
 			for _, outputKeyNode := range nodes {
 				outputNode, ok := outputKeyNode.(*transpiler.Key).Value().(*transpiler.Dict)
 				assert.True(t, ok, "output type key not string")
@@ -152,7 +154,7 @@ func TestMultiOutput(t *testing.T) {
 			}},
 		}
 
-		cap, err := newOutputsCapability(l, rd, tr)
+		cap, err := newOutputsCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -166,11 +168,10 @@ func TestMultiOutput(t *testing.T) {
 }
 
 func TestOutput(t *testing.T) {
-	tr := &testReporter{}
 	l, _ := logger.New("test", false)
 	t.Run("invalid rule", func(t *testing.T) {
 		r := &upgradeCapability{}
-		cap, err := newOutputCapability(l, r, tr)
+		cap, err := newOutputCapability(l, r)
 		assert.NoError(t, err, "no error expected")
 		assert.Nil(t, cap, "cap should not be created")
 	})
@@ -180,7 +181,7 @@ func TestOutput(t *testing.T) {
 			Type:   "allow",
 			Output: "",
 		}
-		cap, err := newOutputCapability(l, r, tr)
+		cap, err := newOutputCapability(l, r)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 	})
@@ -231,8 +232,7 @@ func TestOutput(t *testing.T) {
 }
 
 func runMultiOutputTest(t *testing.T, l *logger.Logger, rd *ruleDefinitions, expectedOutputs []string, initialOutputs []string) {
-	tr := &testReporter{}
-	cap, err := newOutputsCapability(l, rd, tr)
+	cap, err := newOutputsCapability(l, rd)
 	assert.NoError(t, err, "error not expected, provided eql is valid")
 	assert.NotNil(t, cap, "cap should be created")
 
@@ -286,8 +286,7 @@ func runMultiOutputTest(t *testing.T, l *logger.Logger, rd *ruleDefinitions, exp
 }
 
 func runOutputTest(t *testing.T, l *logger.Logger, r *outputCapability, expectedOutputs []string, initialOutputs []string) {
-	tr := &testReporter{}
-	cap, err := newOutputCapability(l, r, tr)
+	cap, err := newOutputCapability(l, r)
 	assert.NoError(t, err, "error not expected, provided eql is valid")
 	assert.NotNil(t, cap, "cap should be created")
 

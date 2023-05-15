@@ -9,16 +9,27 @@ import (
 	"fmt"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/stretchr/testify/assert"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
+
+func getLogger() *logger.Logger {
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.ErrorLevel
+	l, _ := logger.NewFromConfig("", loggerCfg, false)
+	return l
+}
 
 func TestGeneratePodData(t *testing.T) {
 	pod := &kubernetes.Pod{
@@ -27,7 +38,9 @@ func TestGeneratePodData(t *testing.T) {
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo": "bar",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
 				"app": "production",
@@ -59,7 +72,9 @@ func TestGeneratePodData(t *testing.T) {
 			"nsa": "nsb",
 		},
 		"labels": mapstr.M{
-			"foo": "bar",
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 		"annotations": mapstr.M{
 			"app": "production",
@@ -74,7 +89,9 @@ func TestGeneratePodData(t *testing.T) {
 		}, "kubernetes": mapstr.M{
 			"namespace": "testns",
 			"labels": mapstr.M{
-				"foo": "bar",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			"annotations": mapstr.M{"app": "production"},
 			"pod": mapstr.M{
@@ -119,7 +136,9 @@ func TestGenerateContainerPodData(t *testing.T) {
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo": "bar",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
 				"app": "production",
@@ -145,13 +164,21 @@ func TestGenerateContainerPodData(t *testing.T) {
 		context.TODO(),
 		providerDataChan,
 	}
+	logger := getLogger()
+	var cfg Config
+	c := config.New()
+	_ = c.Unpack(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
 		&podMeta{},
 		mapstr.M{
 			"nsa": "nsb",
-		})
+		},
+		logger,
+		true,
+		&cfg,
+	)
 
 	mapping := map[string]interface{}{
 		"namespace": pod.GetNamespace(),
@@ -175,7 +202,9 @@ func TestGenerateContainerPodData(t *testing.T) {
 			"app": "production",
 		},
 		"labels": mapstr.M{
-			"foo": "bar",
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 	}
 
@@ -191,7 +220,11 @@ func TestGenerateContainerPodData(t *testing.T) {
 		}, "kubernetes": mapstr.M{
 			"namespace":   "testns",
 			"annotations": mapstr.M{"app": "production"},
-			"labels":      mapstr.M{"foo": "bar"},
+			"labels": mapstr.M{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
+			},
 			"pod": mapstr.M{
 				"ip":   "127.0.0.5",
 				"name": "testpod",
@@ -232,7 +265,9 @@ func TestEphemeralContainers(t *testing.T) {
 			UID:       types.UID(uid),
 			Namespace: "testns",
 			Labels: map[string]string{
-				"foo": "bar",
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
 			},
 			Annotations: map[string]string{
 				"app": "production",
@@ -258,13 +293,21 @@ func TestEphemeralContainers(t *testing.T) {
 		context.TODO(),
 		providerDataChan,
 	}
+
+	logger := getLogger()
+	var cfg Config
+	c := config.New()
+	_ = c.Unpack(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
 		&podMeta{},
 		mapstr.M{
 			"nsa": "nsb",
-		})
+		},
+		logger,
+		true,
+		&cfg)
 
 	mapping := map[string]interface{}{
 		"namespace": pod.GetNamespace(),
@@ -274,7 +317,9 @@ func TestEphemeralContainers(t *testing.T) {
 			"ip":   pod.Status.PodIP,
 		},
 		"labels": mapstr.M{
-			"foo": "bar",
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 		"container": mapstr.M{
 			"id":      "asdfghdeadbeef",
@@ -300,8 +345,12 @@ func TestEphemeralContainers(t *testing.T) {
 				"name": "devcluster",
 				"url":  "8.8.8.8:9090"},
 		}, "kubernetes": mapstr.M{
-			"namespace":   "testns",
-			"labels":      mapstr.M{"foo": "bar"},
+			"namespace": "testns",
+			"labels": mapstr.M{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
+			},
 			"annotations": mapstr.M{"app": "production"},
 			"pod": mapstr.M{
 				"ip":   "127.0.0.5",
@@ -344,11 +393,6 @@ func (t *MockDynamicComm) Remove(id string) {
 type podMeta struct{}
 
 // Generate generates pod metadata from a resource object
-// Metadata map is in the following form:
-// {
-// 	  "kubernetes": {},
-//    "some.ecs.field": "asdf"
-// }
 // All Kubernetes fields that need to be stored under kubernetes. prefix are populated by
 // GenerateK8s method while fields that are part of ECS are generated by GenerateECS method
 func (p *podMeta) Generate(obj kubernetes.Resource, opts ...metadata.FieldOptions) mapstr.M {
@@ -383,7 +427,9 @@ func (p *podMeta) GenerateK8s(obj kubernetes.Resource, opts ...metadata.FieldOpt
 			"ip":   k8sPod.Status.PodIP,
 		},
 		"labels": mapstr.M{
-			"foo": "bar",
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
 		},
 		"annotations": mapstr.M{
 			"app": "production",

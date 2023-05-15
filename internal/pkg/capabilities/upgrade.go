@@ -8,25 +8,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-)
-
-const (
-	versionKey   = "version"
-	sourceURIKey = "source_uri"
 )
 
 // NewUpgradeCapability creates capability filter for upgrade.
 // Available variables:
 // - version
 // - source_uri
-func newUpgradesCapability(log *logger.Logger, rd *ruleDefinitions, reporter status.Reporter) (Capability, error) {
+func newUpgradesCapability(log *logger.Logger, rd *ruleDefinitions) (Capability, error) {
 	if rd == nil {
 		return &multiUpgradeCapability{caps: []*upgradeCapability{}}, nil
 	}
@@ -34,7 +25,7 @@ func newUpgradesCapability(log *logger.Logger, rd *ruleDefinitions, reporter sta
 	caps := make([]*upgradeCapability, 0, len(rd.Capabilities))
 
 	for _, r := range rd.Capabilities {
-		c, err := newUpgradeCapability(log, r, reporter)
+		c, err := newUpgradeCapability(log, r)
 		if err != nil {
 			return nil, err
 		}
@@ -47,7 +38,7 @@ func newUpgradesCapability(log *logger.Logger, rd *ruleDefinitions, reporter sta
 	return &multiUpgradeCapability{log: log, caps: caps}, nil
 }
 
-func newUpgradeCapability(log *logger.Logger, r ruler, reporter status.Reporter) (*upgradeCapability, error) {
+func newUpgradeCapability(log *logger.Logger, r ruler) (*upgradeCapability, error) {
 	cap, ok := r.(*upgradeCapability)
 	if !ok {
 		return nil, nil
@@ -70,15 +61,13 @@ func newUpgradeCapability(log *logger.Logger, r ruler, reporter status.Reporter)
 
 	cap.upgradeEql = eqlExp
 	cap.log = log
-	cap.reporter = reporter
 	return cap, nil
 }
 
 type upgradeCapability struct {
-	log      *logger.Logger
-	reporter status.Reporter
-	Name     string `json:"name,omitempty" yaml:"name,omitempty"`
-	Type     string `json:"rule" yaml:"rule"`
+	log  *logger.Logger
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	Type string `json:"rule" yaml:"rule"`
 	// UpgradeEql is eql expression defining upgrade
 	UpgradeEqlDefinition string `json:"upgrade" yaml:"upgrade"`
 
@@ -129,7 +118,6 @@ func (c *upgradeCapability) Apply(upgradeMap map[string]interface{}) (map[string
 		isSupported = !isSupported
 		msg := fmt.Sprintf("upgrade is blocked out due to capability restriction '%s'", c.name())
 		c.log.Errorf(msg)
-		c.reporter.Update(state.Degraded, msg, nil)
 	}
 
 	if !isSupported {
@@ -163,31 +151,8 @@ func (c *multiUpgradeCapability) Apply(in interface{}) (interface{}, error) {
 }
 
 func upgradeObject(a interface{}) map[string]interface{} {
-	resultMap := make(map[string]interface{})
-	if ua, ok := a.(upgradeAction); ok {
-		resultMap[versionKey] = ua.Version()
-		resultMap[sourceURIKey] = ua.SourceURI()
-		return resultMap
+	if m, ok := a.(map[string]interface{}); ok {
+		return m
 	}
-
-	if ua, ok := a.(*fleetapi.ActionUpgrade); ok {
-		resultMap[versionKey] = ua.Version
-		resultMap[sourceURIKey] = ua.SourceURI
-		return resultMap
-	}
-
-	if ua, ok := a.(fleetapi.ActionUpgrade); ok {
-		resultMap[versionKey] = ua.Version
-		resultMap[sourceURIKey] = ua.SourceURI
-		return resultMap
-	}
-
 	return nil
-}
-
-type upgradeAction interface {
-	// Version to upgrade to.
-	Version() string
-	// SourceURI for download.
-	SourceURI() string
 }

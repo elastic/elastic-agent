@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -27,6 +27,30 @@ func (s *testVarStore) Lookup(v string) (interface{}, bool) {
 	return val, ok
 }
 
+func TestEqlNewReportsBadSyntax(t *testing.T) {
+	// Some malformed antlr expressions can produce an error when evaluated
+	// because they cause a nil pointer reference or similar unhelpful
+	// error. These test cases confirm that eql.New reports these errors
+	// during the initial parsing of the expression, so things don't get
+	// that far.
+	testCases := []string{
+		"asdf",
+		"${***}",
+		"${",
+		"{}{}{}",
+		"1+=2",
+		"1.23f == ''",
+		"${asdf}...",
+		"${...}",
+		"${a.b.}",
+		"${a..b}",
+	}
+	for _, expression := range testCases {
+		_, err := New(expression)
+		assert.Error(t, err, "malformed EQL expression \"%v\" should produce an error", expression)
+	}
+}
+
 func TestEql(t *testing.T) {
 	testcases := []struct {
 		expression string
@@ -42,6 +66,9 @@ func TestEql(t *testing.T) {
 		{expression: "${env.MISSING|host.MISSING|true} == true", result: true},
 		{expression: "${env.MISSING|host.MISSING|false} == false", result: true},
 		{expression: "${'constant'} == 'constant'", result: true},
+		{expression: "${data.with-dash} == 'dash-value'", result: true},
+		{expression: "${'dash-value'} == 'dash-value'", result: true},
+		{expression: "${data.with/slash} == 'some/path'", result: true},
 
 		// boolean
 		{expression: "true", result: true},
@@ -302,13 +329,18 @@ func TestEql(t *testing.T) {
 		{expression: "length('hello')", err: true},
 		{expression: "length()", err: true},
 		{expression: "donotexist()", err: true},
+		{expression: "${***} != ${~~~}", err: true},
+		{expression: "false asdf!@#$", err: true},
+		{expression: "length('something' 345) > 1000", err: true},
 	}
 
 	store := &testVarStore{
 		vars: map[string]interface{}{
-			"env.HOSTNAME": "my-hostname",
-			"host.name":    "host-name",
-			"data.array":   []interface{}{"array1", "array2", "array3"},
+			"env.HOSTNAME":    "my-hostname",
+			"host.name":       "host-name",
+			"data.array":      []interface{}{"array1", "array2", "array3"},
+			"data.with-dash":  "dash-value",
+			"data.with/slash": "some/path",
 			"data.dict": map[string]interface{}{
 				"key1": "dict1",
 				"key2": "dict2",
@@ -327,7 +359,7 @@ func TestEql(t *testing.T) {
 		}
 		t.Run(title, func(t *testing.T) {
 			if showDebug == "1" {
-				debug(test.expression)
+				debug(t, test.expression)
 			}
 
 			r, err := Eval(test.expression, store)
@@ -343,17 +375,17 @@ func TestEql(t *testing.T) {
 	}
 }
 
-func debug(expression string) {
+func debug(t *testing.T, expression string) {
 	raw := antlr.NewInputStream(expression)
 
 	lexer := parser.NewEqlLexer(raw)
 	for {
-		t := lexer.NextToken()
-		if t.GetTokenType() == antlr.TokenEOF {
+		token := lexer.NextToken()
+		if token.GetTokenType() == antlr.TokenEOF {
 			break
 		}
-		fmt.Printf("%s (%q)\n",
-			lexer.SymbolicNames[t.GetTokenType()], t.GetText())
+		t.Logf("%s (%q)\n",
+			lexer.SymbolicNames[token.GetTokenType()], token.GetText())
 	}
 }
 

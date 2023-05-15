@@ -11,27 +11,36 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/proc"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // Setups and Runs agent.
 func main() {
-	if err := cmd.CheckNativePlatformCompat(); err != nil {
+	var err error
+	defer func() {
+		if err != nil {
+			os.Exit(1) // defer os exit and allow other goroutines to cleanup
+		}
+	}()
+
+	err = cmd.CheckNativePlatformCompat()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize: %v\n", err)
-		os.Exit(1)
+		return
 	}
 
-	pj, err := proc.CreateJobObject()
+	pj, err := process.CreateJobObject()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize process job object: %v\n", err)
-		os.Exit(1)
+		return
 	}
 	defer pj.Close()
 
 	rand.Seed(time.Now().UnixNano())
 	command := cmd.NewCommand()
-	if err := command.Execute(); err != nil {
+	err = command.Execute()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		return
 	}
 }

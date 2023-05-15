@@ -2,27 +2,29 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package noop
 
 import (
 	"context"
 
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
-// Acker is a noop acker.
+// noopAcker is a noop acker.
 // Methods of these acker do nothing.
-type Acker struct{}
+type noopAcker struct{}
 
-// NewAcker creates a new noop acker.
-func NewAcker() *Acker {
-	return &Acker{}
+// New creates a new noop acker.
+func New() acker.Acker {
+	return &noopAcker{}
 }
 
 // Ack acknowledges action.
-func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) error {
+func (f *noopAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 	return nil
 }
 
 // Commit commits ack actions.
-func (*Acker) Commit(ctx context.Context) error { return nil }
+func (*noopAcker) Commit(ctx context.Context) error { return nil }

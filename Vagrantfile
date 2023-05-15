@@ -129,4 +129,45 @@ Vagrant.configure("2") do |config|
     end
   end
 
+    config.vm.define "elastic-agent" do |nodeconfig|
+      nodeconfig.vm.box = "ubuntu/jammy64"
+
+      # We deliberately set a fully-qualified domain name for the VM; it helps
+      # test the FQDN feature flag.
+      nodeconfig.vm.hostname = "elastic-agent-dev.elastic.dev.internal"
+
+      nodeconfig.vm.network "private_network",
+        hostname: true,
+        ip: "192.168.56.42" # only 192.168.56.0/21 range allowed: https://www.virtualbox.org/manual/ch06.html#network_hostonly
+      nodeconfig.vm.network "forwarded_port",
+        guest: 4242,
+        host: 4242,
+        id: "delve"
+
+      nodeconfig.vm.provider "virtualbox" do |vb|
+        # Display the VirtualBox GUI when booting the machine
+        vb.gui = false
+        vb.customize ["modifyvm", :id, "--vram", "128"]
+        # Customize the amount of memory on the VM:
+        vb.memory = "2048"
+      end
+
+      nodeconfig.vm.provision "shell", inline: <<-SHELL
+         apt-get update
+         apt-get install -y \
+          build-essential \
+          curl \
+          delve \
+          make \
+          unzip
+          vim \
+          wget
+         curl -sL -o /tmp/go#{GO_VERSION}.linux-amd64.tar.gz https://go.dev/dl/go#{GO_VERSION}.linux-amd64.tar.gz
+         tar -C /usr/local -xzf /tmp/go#{GO_VERSION}.linux-amd64.tar.gz
+         echo "alias ll='ls -la'" > /etc/profile.d/ll.sh
+         echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh
+         echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> /etc/profile.d/go.sh
+      SHELL
+    end
+
 end

@@ -1,0 +1,68 @@
+inputs:
+    - name: filestream-haproxy
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.haproxy.log.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
+          data_stream:
+            dataset: haproxy.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.haproxy.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale: null
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - haproxy-log
+      data_stream.namespace: default
+    - name: syslog-haproxy
+      type: syslog
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.haproxy.log.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
+          data_stream:
+            dataset: haproxy.log
+            type: logs
+          processors:
+            - add_locale: null
+          protocol.udp:
+            host: localhost:9001
+          tags:
+            - forwarded
+            - haproxy-log
+      data_stream.namespace: default
+    - name: haproxy/metrics-haproxy
+      type: haproxy/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.haproxy.info.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
+          data_stream:
+            dataset: haproxy.info
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.haproxy.info.host|kubernetes.hints.haproxy.host|'tcp://127.0.0.1:14567'}
+          metricsets:
+            - info
+          password: ${kubernetes.hints.haproxy.info.password|kubernetes.hints.haproxy.password|'admin'}
+          period: ${kubernetes.hints.haproxy.info.period|kubernetes.hints.haproxy.period|'10s'}
+          username: ${kubernetes.hints.haproxy.info.username|kubernetes.hints.haproxy.username|'admin'}
+        - condition: ${kubernetes.hints.haproxy.stat.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
+          data_stream:
+            dataset: haproxy.stat
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.haproxy.stat.host|kubernetes.hints.haproxy.host|'tcp://127.0.0.1:14567'}
+          metricsets:
+            - stat
+          password: ${kubernetes.hints.haproxy.stat.password|kubernetes.hints.haproxy.password|'admin'}
+          period: ${kubernetes.hints.haproxy.stat.period|kubernetes.hints.haproxy.period|'10s'}
+          username: ${kubernetes.hints.haproxy.stat.username|kubernetes.hints.haproxy.username|'admin'}
+      data_stream.namespace: default

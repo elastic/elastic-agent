@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const markerFilename = ".update-marker"
@@ -38,33 +39,86 @@ type UpdateMarker struct {
 	Action *fleetapi.ActionUpgrade `json:"action" yaml:"action"`
 }
 
+// MarkerActionUpgrade adapter struct compatible with pre 8.3 version of the marker file format
+type MarkerActionUpgrade struct {
+	ActionID   string `yaml:"id"`
+	ActionType string `yaml:"type"`
+	Version    string `yaml:"version"`
+	SourceURI  string `yaml:"source_uri,omitempty"`
+}
+
+func convertToMarkerAction(a *fleetapi.ActionUpgrade) *MarkerActionUpgrade {
+	if a == nil {
+		return nil
+	}
+	return &MarkerActionUpgrade{
+		ActionID:   a.ActionID,
+		ActionType: a.ActionType,
+		Version:    a.Version,
+		SourceURI:  a.SourceURI,
+	}
+}
+
+func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
+	if a == nil {
+		return nil
+	}
+	return &fleetapi.ActionUpgrade{
+		ActionID:   a.ActionID,
+		ActionType: a.ActionType,
+		Version:    a.Version,
+		SourceURI:  a.SourceURI,
+	}
+}
+
+type updateMarkerSerializer struct {
+	Hash        string               `yaml:"hash"`
+	UpdatedOn   time.Time            `yaml:"updated_on"`
+	PrevVersion string               `yaml:"prev_version"`
+	PrevHash    string               `yaml:"prev_hash"`
+	Acked       bool                 `yaml:"acked"`
+	Action      *MarkerActionUpgrade `yaml:"action"`
+}
+
+func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
+	return &updateMarkerSerializer{
+		Hash:        m.Hash,
+		UpdatedOn:   m.UpdatedOn,
+		PrevVersion: m.PrevVersion,
+		PrevHash:    m.PrevHash,
+		Acked:       m.Acked,
+		Action:      convertToMarkerAction(m.Action),
+	}
+}
+
 // markUpgrade marks update happened so we can handle grace period
-func (h *Upgrader) markUpgrade(ctx context.Context, hash string, action Action) error {
+func (u *Upgrader) markUpgrade(_ context.Context, log *logger.Logger, hash string, action *fleetapi.ActionUpgrade) error {
 	prevVersion := release.Version()
 	prevHash := release.Commit()
 	if len(prevHash) > hashLen {
 		prevHash = prevHash[:hashLen]
 	}
 
-	marker := UpdateMarker{
+	marker := &UpdateMarker{
 		Hash:        hash,
 		UpdatedOn:   time.Now(),
 		PrevVersion: prevVersion,
 		PrevHash:    prevHash,
-		Action:      action.FleetAction(),
+		Action:      action,
 	}
 
-	markerBytes, err := yaml.Marshal(marker)
+	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
 	if err != nil {
 		return errors.New(err, errors.TypeConfig, "failed to parse marker file")
 	}
 
 	markerPath := markerFilePath()
+	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", prevHash)
 	if err := ioutil.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}
 
-	if err := UpdateActiveCommit(hash); err != nil {
+	if err := UpdateActiveCommit(log, hash); err != nil {
 		return err
 	}
 
@@ -72,9 +126,10 @@ func (h *Upgrader) markUpgrade(ctx context.Context, hash string, action Action) 
 }
 
 // UpdateActiveCommit updates active.commit file to point to active version.
-func UpdateActiveCommit(hash string) error {
+func UpdateActiveCommit(log *logger.Logger, hash string) error {
 	activeCommitPath := filepath.Join(paths.Top(), agentCommitFile)
-	if err := ioutil.WriteFile(activeCommitPath, []byte(hash), 0644); err != nil {
+	log.Infow("Updating active commit", "file.path", activeCommitPath, "hash", hash)
+	if err := ioutil.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath))
 	}
 
@@ -82,8 +137,9 @@ func UpdateActiveCommit(hash string) error {
 }
 
 // CleanMarker removes a marker from disk.
-func CleanMarker() error {
+func CleanMarker(log *logger.Logger) error {
 	markerFile := markerFilePath()
+	log.Debugw("Removing marker file", "file.path", markerFile)
 	if err := os.Remove(markerFile); !os.IsNotExist(err) {
 		return err
 	}
@@ -103,16 +159,31 @@ func LoadMarker() (*UpdateMarker, error) {
 		return nil, err
 	}
 
-	marker := &UpdateMarker{}
+	marker := &updateMarkerSerializer{}
 	if err := yaml.Unmarshal(markerBytes, &marker); err != nil {
 		return nil, err
 	}
 
-	return marker, nil
+	return &UpdateMarker{
+		Hash:        marker.Hash,
+		UpdatedOn:   marker.UpdatedOn,
+		PrevVersion: marker.PrevVersion,
+		PrevHash:    marker.PrevHash,
+		Acked:       marker.Acked,
+		Action:      convertToActionUpgrade(marker.Action),
+	}, nil
 }
 
 func saveMarker(marker *UpdateMarker) error {
-	markerBytes, err := yaml.Marshal(marker)
+	makerSerializer := &updateMarkerSerializer{
+		Hash:        marker.Hash,
+		UpdatedOn:   marker.UpdatedOn,
+		PrevVersion: marker.PrevVersion,
+		PrevHash:    marker.PrevHash,
+		Acked:       marker.Acked,
+		Action:      convertToMarkerAction(marker.Action),
+	}
+	markerBytes, err := yaml.Marshal(makerSerializer)
 	if err != nil {
 		return err
 	}

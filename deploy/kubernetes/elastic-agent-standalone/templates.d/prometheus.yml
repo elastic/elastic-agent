@@ -1,0 +1,87 @@
+inputs:
+    - name: prometheus/metrics-prometheus
+      type: prometheus/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.prometheus.collector.enabled} == true or ${kubernetes.hints.prometheus.enabled} == true
+          data_stream:
+            dataset: prometheus.collector
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.prometheus.collector.host|kubernetes.hints.prometheus.host|'localhost:9090'}
+          metrics_filters.exclude: null
+          metrics_filters.include: null
+          metrics_path: /metrics
+          metricsets:
+            - collector
+          password: ${kubernetes.hints.prometheus.collector.password|kubernetes.hints.prometheus.password|'secret'}
+          period: ${kubernetes.hints.prometheus.collector.period|kubernetes.hints.prometheus.period|'10s'}
+          rate_counters: true
+          use_types: true
+          username: ${kubernetes.hints.prometheus.collector.username|kubernetes.hints.prometheus.username|'user'}
+        - condition: ${kubernetes.hints.prometheus.query.enabled} == true and ${kubernetes.hints.prometheus.enabled} == true
+          data_stream:
+            dataset: prometheus.query
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.prometheus.query.host|kubernetes.hints.prometheus.host|'localhost:9090'}
+          metricsets:
+            - query
+          period: ${kubernetes.hints.prometheus.query.period|kubernetes.hints.prometheus.period|'10s'}
+          queries:
+            - name: instant_vector
+              params:
+                query: sum(rate(prometheus_http_requests_total[2m]))
+              path: /api/v1/query
+            - name: range_vector
+              params:
+                end: "2019-12-21T00:00:00.000Z"
+                query: up
+                start: "2019-12-20T00:00:00.000Z"
+                step: 1h
+              path: /api/v1/query_range
+            - name: scalar
+              params:
+                query: "100"
+              path: /api/v1/query
+            - name: string
+              params:
+                query: some_value
+              path: /api/v1/query
+        - condition: ${kubernetes.hints.prometheus.remote_write.enabled} == true and ${kubernetes.hints.prometheus.enabled} == true
+          data_stream:
+            dataset: prometheus.remote_write
+            type: metrics
+          host: localhost
+          metricsets:
+            - remote_write
+          port: 9201
+          rate_counters: true
+          ssl.certificate: /etc/pki/server/cert.pem
+          ssl.enabled: null
+          ssl.key: null
+          types_patterns.exclude: null
+          types_patterns.include: null
+          use_types: true
+      data_stream.namespace: default
+    - name: filestream-prometheus
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.prometheus.container_logs.enabled} == true
+          data_stream:
+            dataset: prometheus.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

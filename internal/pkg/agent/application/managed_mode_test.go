@@ -6,297 +6,136 @@ package application
 
 import (
 	"context"
-	"encoding/json"
+	"runtime"
 	"testing"
+	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/actions/handlers"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/dispatcher"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configrequest"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/stretchr/testify/mock"
 )
 
-func TestManagedModeRouting(t *testing.T) {
-	streams := make(map[pipeline.RoutingKey]pipeline.Stream)
-	streamFn := func(l *logger.Logger, r pipeline.RoutingKey) (pipeline.Stream, error) {
-		m := newMockStreamStore()
-		streams[r] = m
-
-		return m, nil
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	log, _ := logger.New("", false)
-	router, _ := router.New(log, streamFn)
-	agentInfo, _ := info.NewAgentInfo(true)
-	nullStore := &storage.NullStore{}
-	composableCtrl, _ := composable.New(log, nil)
-	emit, err := emitter.New(ctx, log, agentInfo, composableCtrl, router, &pipeline.ConfigModifiers{Decorators: []pipeline.DecoratorFunc{modifiers.InjectMonitoring}}, nil)
-	require.NoError(t, err)
-
-	actionDispatcher, err := dispatcher.New(ctx, log, handlers.NewDefault(log))
-	require.NoError(t, err)
-
-	cfg := configuration.DefaultConfiguration()
-	actionDispatcher.MustRegister(
-		&fleetapi.ActionPolicyChange{},
-		handlers.NewPolicyChange(
-			log,
-			emit,
-			agentInfo,
-			cfg,
-			nullStore,
-		),
-	)
-
-	actions, err := testActions()
-	require.NoError(t, err)
-
-	err = actionDispatcher.Dispatch(context.Background(), noopacker.NewAcker(), actions...)
-	require.NoError(t, err)
-
-	// has 1 config request for fb, mb and monitoring?
-	assert.Equal(t, 1, len(streams))
-
-	defaultStreamStore, found := streams["default"]
-	assert.True(t, found, "default group not found")
-	assert.Equal(t, 1, len(defaultStreamStore.(*mockStreamStore).store))
-
-	confReq := defaultStreamStore.(*mockStreamStore).store[0]
-	assert.Equal(t, 3, len(confReq.ProgramNames()))
-	assert.Equal(t, modifiers.MonitoringName, confReq.ProgramNames()[2])
+type mockDispatcher struct {
+	mock.Mock
 }
 
-func testActions() ([]fleetapi.Action, error) {
-	checkinResponse := &fleetapi.CheckinResponse{}
-	if err := json.Unmarshal([]byte(fleetResponse), &checkinResponse); err != nil {
-		return nil, err
-	}
-
-	return checkinResponse.Actions, nil
+func (m *mockDispatcher) Dispatch(ctx context.Context, ack acker.Acker, actions ...fleetapi.Action) {
+	m.Called(ctx, ack, actions)
 }
 
-type mockStreamStore struct {
-	store []configrequest.Request
+func (m *mockDispatcher) Errors() <-chan error {
+	args := m.Called()
+	return args.Get(0).(<-chan error)
 }
 
-func newMockStreamStore() *mockStreamStore {
-	return &mockStreamStore{
-		store: make([]configrequest.Request, 0),
-	}
+type mockGateway struct {
+	mock.Mock
 }
 
-func (m *mockStreamStore) Execute(_ context.Context, cr configrequest.Request) error {
-	m.store = append(m.store, cr)
-	return nil
+func (m *mockGateway) Run(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
 }
 
-func (m *mockStreamStore) Close() error {
-	return nil
+func (m *mockGateway) Errors() <-chan error {
+	args := m.Called()
+	return args.Get(0).(<-chan error)
 }
 
-func (m *mockStreamStore) Shutdown() {}
+func (m *mockGateway) Actions() <-chan []fleetapi.Action {
+	args := m.Called()
+	return args.Get(0).(<-chan []fleetapi.Action)
+}
 
-const fleetResponse = `
-{
-	"action": "checkin",
-	"actions": [{
-		"agent_id": "17e93530-7f42-11ea-9330-71e968b29fa4",
-		"type": "POLICY_CHANGE",
-		"data": {
-			"policy": {
-				"id": "86561d50-7f3b-11ea-9fab-3db3bdb4efa4",
-				"outputs": {
-					"default": {
-						"type": "elasticsearch",
-						"hosts": [
-							"http://localhost:9200"
-						],
-						"api_key": "pNr6fnEBupQ3-5oEEkWJ:FzhrQOzZSG-Vpsq9CGk4oA"
-					}
-				},
+func (m *mockGateway) SetClient(c client.Sender) {
+	m.Called(c)
+}
 
-				"inputs": [{
-						"type": "system/metrics",
-						"enabled": true,
-						"streams": [{
-								"id": "system/metrics-system.core",
-								"enabled": true,
-								"data_stream.dataset": "system.core",
-								"period": "10s",
-								"metrics": [
-									"percentages"
-								]
-							},
-							{
-								"id": "system/metrics-system.cpu",
-								"enabled": true,
-								"data_stream.dataset": "system.cpu",
-								"period": "10s",
-								"metrics": [
-									"percentages",
-									"normalized_percentages"
-								]
-							},
-							{
-								"id": "system/metrics-system.diskio",
-								"enabled": true,
-								"data_stream.dataset": "system.diskio",
-								"period": "10s",
-								"include_devices": []
-							},
-							{
-								"id": "system/metrics-system.entropy",
-								"enabled": true,
-								"data_stream.dataset": "system.entropy",
-								"period": "10s",
-								"include_devices": []
-							},
-							{
-								"id": "system/metrics-system.filesystem",
-								"enabled": true,
-								"data_stream.dataset": "system.filesystem",
-								"period": "1m",
-								"ignore_types": []
-							},
-							{
-								"id": "system/metrics-system.fsstat",
-								"enabled": true,
-								"data_stream.dataset": "system.fsstat",
-								"period": "1m",
-								"ignore_types": []
-							},
-							{
-								"id": "system/metrics-system.load",
-								"enabled": true,
-								"data_stream.dataset": "system.load",
-								"period": "10s"
-							},
-							{
-								"id": "system/metrics-system.memory",
-								"enabled": true,
-								"data_stream.dataset": "system.memory",
-								"period": "10s"
-							},
-							{
-								"id": "system/metrics-system.network",
-								"enabled": true,
-								"data_stream.dataset": "system.network",
-								"period": "10s"
-							},
-							{
-								"id": "system/metrics-system.network_summary",
-								"enabled": true,
-								"data_stream.dataset": "system.network_summary",
-								"period": "10s"
-							},
-							{
-								"id": "system/metrics-system.process",
-								"enabled": true,
-								"data_stream.dataset": "system.process",
-								"period": "10s",
-								"processes": [
-									".*"
-								],
-								"include_top_n.enabled": true,
-								"include_top_n.by_cpu": 5,
-								"include_top_n.by_memory": 5,
-								"cmdline.cache.enabled": true,
-								"cgroups.enabled": true,
-								"env.whitelist": [],
-								"include_cpu_ticks": false
-							},
-							{
-								"id": "system/metrics-system.process_summary",
-								"enabled": true,
-								"data_stream.dataset": "system.process_summary",
-								"period": "10s"
-							},
-							{
-								"id": "system/metrics-system.raid",
-								"enabled": true,
-								"data_stream.dataset": "system.raid",
-								"period": "10s",
-								"mount_point": "/"
-							},
-							{
-								"id": "system/metrics-system.service",
-								"enabled": true,
-								"data_stream.dataset": "system.service",
-								"period": "10s",
-								"state_filter": []
-							},
-							{
-								"id": "system/metrics-system.socket_summary",
-								"enabled": true,
-								"data_stream.dataset": "system.socket_summary",
-								"period": "10s"
-							},
-							{
-								"id": "system/metrics-system.uptime",
-								"enabled": true,
-								"data_stream.dataset": "system.uptime",
-								"period": "15m"
-							},
-							{
-								"id": "system/metrics-system.users",
-								"enabled": true,
-								"data_stream.dataset": "system.users",
-								"period": "10s"
-							}
-						]
-					},
-					{
-						"type": "logfile",
-						"enabled": true,
-						"streams": [{
-								"id": "logs-system.auth",
-								"enabled": true,
-								"data_stream.dataset": "system.auth",
-								"paths": [
-									"/var/log/auth.log*",
-									"/var/log/secure*"
-								]
-							},
-							{
-								"id": "logs-system.syslog",
-								"enabled": true,
-								"data_stream.dataset": "system.syslog",
-								"paths": [
-									"/var/log/messages*",
-									"/var/log/syslog*"
-								]
-							}
-						]
-					}
-				],
+type mockAcker struct {
+	mock.Mock
+}
 
-				"revision": 3,
-				"agent.monitoring": {
-					"use_output": "default",
-					"enabled": true,
-					"logs": true,
-					"metrics": true
-				}
-			}
+func (m *mockAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	args := m.Called(ctx, action)
+	return args.Error(0)
+}
+
+func (m *mockAcker) Commit(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func Test_runDispatcher(t *testing.T) {
+	tests := []struct {
+		name                string
+		mockGateway         func(chan []fleetapi.Action) *mockGateway
+		mockDispatcher      func() *mockDispatcher
+		interval            time.Duration
+		skipOnWindowsReason string
+	}{{
+		name: "dispatcher not called",
+		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
+			gateway := &mockGateway{}
+			gateway.On("Actions").Return((<-chan []fleetapi.Action)(ch))
+			return gateway
 		},
-		"id": "1c7e26a0-7f42-11ea-9330-71e968b29fa4",
-		"created_at": "2020-04-15T17:54:11.081Z"
-	}]
+		mockDispatcher: func() *mockDispatcher {
+			dispatcher := &mockDispatcher{}
+			return dispatcher
+		},
+		interval: time.Second,
+	}, {
+		name: "gateway actions passed",
+		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
+			ch <- []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "test"}}
+			gateway := &mockGateway{}
+			gateway.On("Actions").Return((<-chan []fleetapi.Action)(ch))
+			return gateway
+		},
+		mockDispatcher: func() *mockDispatcher {
+			dispatcher := &mockDispatcher{}
+			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Once()
+			return dispatcher
+		},
+		interval: time.Second,
+	}, {
+		name: "no gateway actions, dispatcher is flushed",
+		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
+			gateway := &mockGateway{}
+			gateway.On("Actions").Return((<-chan []fleetapi.Action)(ch))
+			return gateway
+		},
+		mockDispatcher: func() *mockDispatcher {
+			dispatcher := &mockDispatcher{}
+			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Once()
+			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything).Maybe() // allow a second call in case there are timing issues in the CI pipeline
+			return dispatcher
+		},
+		interval: time.Millisecond * 60,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && tc.skipOnWindowsReason != "" {
+				t.Skip(tc.skipOnWindowsReason)
+			}
+
+			ch := make(chan []fleetapi.Action, 1)
+			gateway := tc.mockGateway(ch)
+			dispatcher := tc.mockDispatcher()
+			acker := &mockAcker{}
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+			defer cancel()
+			runDispatcher(ctx, dispatcher, gateway, acker, tc.interval)
+			assert.Empty(t, ch)
+
+			gateway.AssertExpectations(t)
+			dispatcher.AssertExpectations(t)
+			acker.AssertExpectations(t)
+		})
+	}
 }
-	`

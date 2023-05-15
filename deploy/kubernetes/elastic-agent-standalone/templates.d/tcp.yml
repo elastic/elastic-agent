@@ -1,0 +1,32 @@
+inputs:
+    - name: tcp-tcp
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.tcp.generic.enabled} == true or ${kubernetes.hints.tcp.enabled} == true
+          data_stream:
+            dataset: tcp.generic
+            type: logs
+          host: localhost:8080
+      data_stream.namespace: default
+    - name: filestream-tcp
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.tcp.container_logs.enabled} == true
+          data_stream:
+            dataset: tcp.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

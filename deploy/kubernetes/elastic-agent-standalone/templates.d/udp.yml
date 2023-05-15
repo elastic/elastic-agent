@@ -1,0 +1,33 @@
+inputs:
+    - name: udp-udp
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.udp.generic.enabled} == true or ${kubernetes.hints.udp.enabled} == true
+          data_stream:
+            dataset: udp.generic
+            type: logs
+          host: localhost:8080
+          max_message_size: 10KiB
+      data_stream.namespace: default
+    - name: filestream-udp
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.udp.container_logs.enabled} == true
+          data_stream:
+            dataset: udp.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

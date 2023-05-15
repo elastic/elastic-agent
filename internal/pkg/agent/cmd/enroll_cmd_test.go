@@ -14,16 +14,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strconv"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -40,12 +42,18 @@ func (m *mockStore) Save(in io.Reader) error {
 	}
 
 	buf := new(bytes.Buffer)
-	io.Copy(buf, in) // nolint:errcheck //not required
+	io.Copy(buf, in) //nolint:errcheck //not required
 	m.Content = buf.Bytes()
 	return nil
 }
 
 func TestEnroll(t *testing.T) {
+	testutils.InitStorage(t)
+	skipCreateSecret := false
+	if runtime.GOOS == "darwin" {
+		skipCreateSecret = true
+	}
+
 	log, _ := logger.New("tst", false)
 
 	t.Run("fail to save is propagated", withTLSServer(
@@ -89,6 +97,7 @@ func TestEnroll(t *testing.T) {
 					CAs:                  []string{caFile},
 					EnrollAPIKey:         "my-enrollment-token",
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -142,6 +151,7 @@ func TestEnroll(t *testing.T) {
 					CAs:                  []string{caFile},
 					EnrollAPIKey:         "my-enrollment-api-key",
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -198,6 +208,7 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-api-key",
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -256,6 +267,7 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-api-key",
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -299,6 +311,7 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-token",
 					Insecure:             true,
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
 				},
 				"",
 				store,
@@ -317,46 +330,90 @@ func TestValidateArgs(t *testing.T) {
 	url := "http://localhost:8220"
 	enrolmentToken := "my-enrollment-token"
 	streams, _, _, _ := cli.NewTestingIOStreams()
-	cmd := newEnrollCommandWithArgs([]string{}, streams)
-	err := cmd.Flags().Set("tag", "windows,production")
-	require.NoError(t, err)
-	err = cmd.Flags().Set("insecure", "true")
-	require.NoError(t, err)
-	args := buildEnrollmentFlags(cmd, url, enrolmentToken)
-	require.NotNil(t, args)
-	require.Equal(t, len(args), 9)
-	require.Contains(t, args, "--tag")
-	require.Contains(t, args, "windows")
-	require.Contains(t, args, "production")
-	require.Contains(t, args, "--insecure")
-	require.Contains(t, args, enrolmentToken)
-	require.Contains(t, args, url)
-	cleanedTags := cleanTags(args)
-	require.Contains(t, cleanedTags, "windows")
-	require.Contains(t, cleanedTags, "production")
 
-	cmdNew := newEnrollCommandWithArgs([]string{}, streams)
-	err = cmdNew.Flags().Set("tag", "windows, production")
-	require.NoError(t, err)
-	args = buildEnrollmentFlags(cmdNew, url, enrolmentToken)
-	require.Contains(t, args, "--tag")
-	require.Contains(t, args, "windows")
-	require.Contains(t, args, " production")
-	cleanedTags = cleanTags(args)
-	require.Contains(t, cleanedTags, "windows")
-	require.Contains(t, cleanedTags, "production")
+	t.Run("comma separated tags are parsed", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("tag", "windows,production")
+		require.NoError(t, err)
+		err = cmd.Flags().Set("insecure", "true")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.NotNil(t, args)
+		require.Equal(t, len(args), 9)
+		require.Contains(t, args, "--tag")
+		require.Contains(t, args, "windows")
+		require.Contains(t, args, "production")
+		require.Contains(t, args, "--insecure")
+		require.Contains(t, args, enrolmentToken)
+		require.Contains(t, args, url)
+		cleanedTags := cleanTags(args)
+		require.Contains(t, cleanedTags, "windows")
+		require.Contains(t, cleanedTags, "production")
+	})
 
-	cmdEmpty := newEnrollCommandWithArgs([]string{}, streams)
-	err = cmdEmpty.Flags().Set("tag", "windows, ")
-	require.NoError(t, err)
-	argsEmpty := buildEnrollmentFlags(cmdEmpty, url, enrolmentToken)
-	require.Contains(t, argsEmpty, "--tag")
-	require.Contains(t, argsEmpty, "windows")
-	require.Contains(t, argsEmpty, " ")
-	cleanedTags = cleanTags(argsEmpty)
-	require.Contains(t, cleanedTags, "windows")
-	require.NotContains(t, cleanedTags, " ")
-	require.NotContains(t, cleanedTags, "")
+	t.Run("comma separated tags are cleaned", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("tag", "windows, production")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--tag")
+		require.Contains(t, args, "windows")
+		require.Contains(t, args, " production")
+		cleanedTags := cleanTags(args)
+		require.Contains(t, cleanedTags, "windows")
+		require.Contains(t, cleanedTags, "production")
+	})
+
+	t.Run("valid tag and empty tag", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("tag", "windows, ")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--tag")
+		require.Contains(t, args, "windows")
+		require.Contains(t, args, " ")
+		cleanedTags := cleanTags(args)
+		require.Contains(t, cleanedTags, "windows")
+		require.NotContains(t, cleanedTags, " ")
+		require.NotContains(t, cleanedTags, "")
+	})
+
+	t.Run("secret paths are passed", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("fleet-server-cert-key-passphrase", "/path/to/passphrase")
+		require.NoError(t, err)
+		err = cmd.Flags().Set("fleet-server-service-token-path", "/path/to/token")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--fleet-server-cert-key-passphrase")
+		require.Contains(t, args, "/path/to/passphrase")
+		require.Contains(t, args, "--fleet-server-service-token-path")
+		require.Contains(t, args, "/path/to/token")
+	})
+}
+
+func TestValidateEnrollFlags(t *testing.T) {
+	streams, _, _, _ := cli.NewTestingIOStreams()
+
+	t.Run("no flags", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := validateEnrollFlags(cmd)
+		require.NoError(t, err)
+	})
+
+	t.Run("service_token and a service_token_path are mutually exclusive", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("fleet-server-service-token-path", "/path/to/token")
+		require.NoError(t, err)
+		err = cmd.Flags().Set("fleet-server-service-token", "token-value")
+		require.NoError(t, err)
+		err = validateEnrollFlags(cmd)
+		require.Error(t, err)
+
+		var agentErr errors.Error
+		require.ErrorAs(t, err, &agentErr)
+		require.Equal(t, errors.TypeConfig, agentErr.Type())
+	})
 }
 
 func withServer(
@@ -389,15 +446,16 @@ func withTLSServer(
 
 		port := listener.Addr().(*net.TCPAddr).Port
 
-		s := http.Server{
+		s := http.Server{ //nolint:gosec // testing server
 			Handler: m(t),
 			TLSConfig: &tls.Config{
-				Certificates: []tls.Certificate{serverCert}, MinVersion: tls.VersionTLS12,
+				Certificates: []tls.Certificate{serverCert},
+				MinVersion:   tls.VersionTLS12,
 			},
 		}
 
 		// Uses the X509KeyPair pair defined in the TLSConfig struct instead of file on disk.
-		go s.ServeTLS(listener, "", "") // nolint:errcheck //not required
+		go s.ServeTLS(listener, "", "") //nolint:errcheck // not required
 
 		test(t, ca.Crt(), "localhost:"+strconv.Itoa(port))
 	}
@@ -408,7 +466,7 @@ func bytesToTMPFile(b []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	f.Write(b) // nolint:errcheck //not required
+	f.Write(b) //nolint:errcheck // not required
 	if err := f.Close(); err != nil {
 		return "", err
 	}

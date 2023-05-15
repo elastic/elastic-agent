@@ -4,4 +4,4 @@
 
 package version
 
-const defaultBeatVersion = "8.3.0"
+const defaultBeatVersion = "8.9.0"

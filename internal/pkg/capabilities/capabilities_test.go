@@ -16,9 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -35,8 +33,7 @@ func TestLoadCapabilities(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc, func(t *testing.T) {
 			filename := filepath.Join("testdata", fmt.Sprintf("%s-capabilities.yml", tc))
-			controller := status.NewController(l)
-			caps, err := Load(filename, l, controller)
+			caps, err := Load(filename, l)
 			assert.NoError(t, err)
 			assert.NotNil(t, caps)
 
@@ -84,8 +81,7 @@ func TestInvalidLoadCapabilities(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc, func(t *testing.T) {
 			filename := filepath.Join("testdata", fmt.Sprintf("%s-capabilities.yml", tc))
-			controller := status.NewController(l)
-			caps, err := Load(filename, l, controller)
+			caps, err := Load(filename, l)
 			assert.NoError(t, err)
 			assert.NotNil(t, caps)
 
@@ -130,15 +126,12 @@ func fixInputsType(mm map[string]interface{}) {
 }
 
 func TestCapabilityManager(t *testing.T) {
-	l := newErrorLogger(t)
-
 	t.Run("filter", func(t *testing.T) {
 		m := getConfig()
 		mgr := &capabilitiesManager{
 			caps: []Capability{
 				filterKeywordCap{keyWord: "filter"},
 			},
-			reporter: status.NewController(l).RegisterComponent("test"),
 		}
 
 		newIn, err := mgr.Apply(m)
@@ -163,7 +156,6 @@ func TestCapabilityManager(t *testing.T) {
 				filterKeywordCap{keyWord: "filter"},
 				blockCap{},
 			},
-			reporter: status.NewController(l).RegisterComponent("test"),
 		}
 
 		newIn, err := mgr.Apply(m)
@@ -188,7 +180,6 @@ func TestCapabilityManager(t *testing.T) {
 				filterKeywordCap{keyWord: "filter"},
 				blockCap{},
 			},
-			reporter: status.NewController(l).RegisterComponent("test"),
 		}
 
 		newIn, err := mgr.Apply(m)
@@ -213,7 +204,6 @@ func TestCapabilityManager(t *testing.T) {
 				filterKeywordCap{keyWord: "filter"},
 				keepAsIsCap{},
 			},
-			reporter: status.NewController(l).RegisterComponent("test"),
 		}
 
 		newIn, err := mgr.Apply(m)
@@ -238,7 +228,6 @@ func TestCapabilityManager(t *testing.T) {
 				filterKeywordCap{keyWord: "filter"},
 				keepAsIsCap{},
 			},
-			reporter: status.NewController(l).RegisterComponent("test"),
 		}
 
 		newIn, err := mgr.Apply(m)
@@ -263,7 +252,6 @@ func TestCapabilityManager(t *testing.T) {
 				filterKeywordCap{keyWord: "filter"},
 				filterKeywordCap{keyWord: "key"},
 			},
-			reporter: status.NewController(l).RegisterComponent("test"),
 		}
 
 		newIn, err := mgr.Apply(m)
@@ -286,7 +274,6 @@ func TestCapabilityManager(t *testing.T) {
 				filterKeywordCap{keyWord: "key"},
 				filterKeywordCap{keyWord: "filter"},
 			},
-			reporter: status.NewController(l).RegisterComponent("test"),
 		}
 
 		newIn, err := mgr.Apply(m)
@@ -335,15 +322,4 @@ func getConfig() map[string]string {
 		"filter": "f_val",
 		"key":    "val",
 	}
-}
-
-func newErrorLogger(t *testing.T) *logger.Logger {
-	t.Helper()
-
-	loggerCfg := logger.DefaultLoggingConfig()
-	loggerCfg.Level = logp.ErrorLevel
-
-	log, err := logger.NewFromConfig("", loggerCfg, false)
-	require.NoError(t, err)
-	return log
 }

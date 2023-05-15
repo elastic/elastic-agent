@@ -16,7 +16,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -84,13 +86,13 @@ func TestAcker_Ack(t *testing.T) {
 		},
 		{
 			name:    "ack",
-			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "ack-test-action-id"}},
+			actions: []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "ack-test-action-id", ActionType: fleetapi.ActionTypeUnknown}},
 		},
 		{
 			name: "ackbatch",
 			actions: []fleetapi.Action{
-				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id1"},
-				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id2"},
+				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id1", ActionType: fleetapi.ActionTypeUnknown},
+				&fleetapi.ActionUnknown{ActionID: "ack-test-action-id2", ActionType: fleetapi.ActionTypeUnknown},
 			},
 		},
 		{
@@ -114,6 +116,27 @@ func TestAcker_Ack(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "ackupgrade",
+			actions: []fleetapi.Action{
+				&fleetapi.ActionUpgrade{
+					ActionID:   "upgrade-ok",
+					ActionType: fleetapi.ActionTypeUpgrade,
+				},
+				&fleetapi.ActionUpgrade{
+					ActionID:   "upgrade-retry",
+					ActionType: fleetapi.ActionTypeUpgrade,
+					Retry:      1,
+					Err:        errors.New("upgrade failed"),
+				},
+				&fleetapi.ActionUpgrade{
+					ActionID:   "upgrade-failed",
+					ActionType: fleetapi.ActionTypeUpgrade,
+					Retry:      -1,
+					Err:        errors.New("upgrade failed"),
+				},
+			},
+		},
 	}
 
 	log, _ := logger.New("fleet_acker", false)
@@ -130,7 +153,30 @@ func TestAcker_Ack(t *testing.T) {
 			assert.EqualValues(t, "ACKNOWLEDGED", req.Events[i].SubType)
 			assert.EqualValues(t, ac.ID(), req.Events[i].ActionID)
 			assert.EqualValues(t, agentInfo.AgentID(), req.Events[i].AgentID)
-			assert.EqualValues(t, fmt.Sprintf("Action '%s' of type '%s' acknowledged.", ac.ID(), ac.Type()), req.Events[i].Message)
+			assert.EqualValues(t, fmt.Sprintf("Action %q of type %q acknowledged.", ac.ID(), ac.Type()), req.Events[i].Message)
+			// Check if the fleet acker handles RetryableActions correctly using the UpgradeAction
+			if a, ok := ac.(*fleetapi.ActionUpgrade); ok {
+				if a.Err != nil {
+					assert.EqualValues(t, a.Err.Error(), req.Events[i].Error)
+					// Check payload
+					require.NotEmpty(t, req.Events[i].Payload)
+					var pl struct {
+						Retry   bool `json:"retry"`
+						Attempt int  `json:"retry_attempt,omitempty"`
+					}
+					err := json.Unmarshal(req.Events[i].Payload, &pl)
+					require.NoError(t, err)
+					assert.Equal(t, a.Retry, pl.Attempt, "action ID %s failed", a.ActionID)
+					// Check retry flag
+					if pl.Attempt > 0 {
+						assert.True(t, pl.Retry)
+					} else {
+						assert.False(t, pl.Retry)
+					}
+				} else {
+					assert.Empty(t, req.Events[i].Error)
+				}
+			}
 			if a, ok := ac.(*fleetapi.ActionApp); ok {
 				assert.EqualValues(t, a.InputType, req.Events[i].ActionInputType)
 				assert.EqualValues(t, a.Data, req.Events[i].ActionData)
@@ -147,27 +193,18 @@ func TestAcker_Ack(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sender := &testSender{}
 			acker, err := NewAcker(log, agentInfo, sender)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if acker == nil {
-				t.Fatal("acker not initialized")
-			}
+			require.NoError(t, err)
+			require.NotNil(t, acker, "acker not initialized")
 
 			if len(tc.actions) == 1 {
 				err = acker.Ack(context.Background(), tc.actions[0])
 			} else {
 				_, err = acker.AckBatch(context.Background(), tc.actions)
 			}
+			require.NoError(t, err)
 
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if err := acker.Commit(context.Background()); err != nil {
-				t.Fatal(err)
-			}
+			err = acker.Commit(context.Background())
+			require.NoError(t, err)
 
 			checkRequest(t, tc.actions, sender.req)
 		})

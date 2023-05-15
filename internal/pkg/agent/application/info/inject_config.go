@@ -42,6 +42,9 @@ func agentGlobalConfig() (map[string]interface{}, error) {
 			"home":   paths.Home(),
 			"logs":   paths.Logs(),
 		},
+		"host": map[string]interface{}{
+			"id": hostInfo.Info().UniqueID,
+		},
 		"runtime.os":             runtime.GOOS,
 		"runtime.arch":           runtime.GOARCH,
 		"runtime.osinfo.type":    hostInfo.Info().OS.Type,

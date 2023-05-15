@@ -1,0 +1,54 @@
+inputs:
+    - name: zookeeper/metrics-zookeeper
+      type: zookeeper/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.zookeeper.connection.enabled} == true or ${kubernetes.hints.zookeeper.enabled} == true
+          data_stream:
+            dataset: zookeeper.connection
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.zookeeper.connection.host|kubernetes.hints.zookeeper.host|'localhost:2181'}
+          metricsets:
+            - connection
+          period: ${kubernetes.hints.zookeeper.connection.period|kubernetes.hints.zookeeper.period|'10s'}
+        - condition: ${kubernetes.hints.zookeeper.mntr.enabled} == true or ${kubernetes.hints.zookeeper.enabled} == true
+          data_stream:
+            dataset: zookeeper.mntr
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.zookeeper.mntr.host|kubernetes.hints.zookeeper.host|'localhost:2181'}
+          metricsets:
+            - mntr
+          period: ${kubernetes.hints.zookeeper.mntr.period|kubernetes.hints.zookeeper.period|'10s'}
+        - condition: ${kubernetes.hints.zookeeper.server.enabled} == true or ${kubernetes.hints.zookeeper.enabled} == true
+          data_stream:
+            dataset: zookeeper.server
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.zookeeper.server.host|kubernetes.hints.zookeeper.host|'localhost:2181'}
+          metricsets:
+            - server
+          period: ${kubernetes.hints.zookeeper.server.period|kubernetes.hints.zookeeper.period|'10s'}
+      data_stream.namespace: default
+    - name: filestream-zookeeper
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.zookeeper.container_logs.enabled} == true
+          data_stream:
+            dataset: zookeeper.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

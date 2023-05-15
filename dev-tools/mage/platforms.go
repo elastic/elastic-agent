@@ -200,6 +200,14 @@ func (list BuildPlatformList) Get(name string) (BuildPlatform, bool) {
 	return BuildPlatform{}, false
 }
 
+func (list BuildPlatformList) Names() []string {
+	platforms := make([]string, len(list))
+	for i, bp := range list {
+		platforms[i] = bp.Name
+	}
+	return platforms
+}
+
 // Defaults returns the default platforms contained in the list.
 func (list BuildPlatformList) Defaults() BuildPlatformList {
 	return list.filter(func(p BuildPlatform) bool {

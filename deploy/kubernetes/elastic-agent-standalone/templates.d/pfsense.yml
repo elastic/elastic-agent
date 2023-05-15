@@ -1,0 +1,62 @@
+inputs:
+    - name: udp-pfsense
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.pfsense.log.enabled} == true or ${kubernetes.hints.pfsense.enabled} == true
+          data_stream:
+            dataset: pfsense.log
+            type: logs
+          host: localhost:9001
+          processors:
+            - add_locale: null
+            - add_fields:
+                fields:
+                    internal_networks:
+                        - private
+                    tz_offset: local
+                target: _tmp
+          tags:
+            - pfsense
+            - forwarded
+      data_stream.namespace: default
+    - name: tcp-pfsense
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.pfsense.log.enabled} == true and ${kubernetes.hints.pfsense.enabled} == true
+          data_stream:
+            dataset: pfsense.log
+            type: logs
+          host: localhost:9001
+          processors:
+            - add_locale: null
+            - add_fields:
+                fields:
+                    tz_offset: local
+                target: _tmp
+          tags:
+            - pfsense
+            - forwarded
+      data_stream.namespace: default
+    - name: filestream-pfsense
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.pfsense.container_logs.enabled} == true
+          data_stream:
+            dataset: pfsense.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

@@ -1,0 +1,349 @@
+id: 18922a40-bbf4-11ed-a1b6-1b60471a8e8b
+revision: 5
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - >-
+        https://your.elasticsearch.host:443
+fleet:
+  hosts:
+    - >-
+      https://https://your.fleet.host:443
+output_permissions:
+  default:
+    _elastic_agent_monitoring:
+      indices:
+        - names:
+            - logs-elastic_agent.apm_server-default
+          privileges: &ref_0
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.apm_server-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.auditbeat-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.auditbeat-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.cloud_defend-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.cloudbeat-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.cloudbeat-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.elastic_agent-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.endpoint_security-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.endpoint_security-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.filebeat_input-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.filebeat_input-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.filebeat-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.filebeat-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.fleet_server-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.fleet_server-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.heartbeat-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.heartbeat-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.metricbeat-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.metricbeat-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.osquerybeat-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.osquerybeat-default
+          privileges: *ref_0
+        - names:
+            - logs-elastic_agent.packetbeat-default
+          privileges: *ref_0
+        - names:
+            - metrics-elastic_agent.packetbeat-default
+          privileges: *ref_0
+    _elastic_agent_checks:
+      cluster:
+        - monitor
+    d38b6b0b-cc52-4a61-b897-1b236982ac42:
+      indices:
+        - names:
+            - logs-system.auth-default
+          privileges: *ref_0
+        - names:
+            - logs-system.syslog-default
+          privileges: *ref_0
+        - names:
+            - logs-system.application-default
+          privileges: *ref_0
+        - names:
+            - logs-system.security-default
+          privileges: *ref_0
+        - names:
+            - logs-system.system-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.cpu-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.diskio-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.filesystem-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.fsstat-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.load-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.memory-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.network-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.process-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.process.summary-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.socket_summary-default
+          privileges: *ref_0
+        - names:
+            - metrics-system.uptime-default
+          privileges: *ref_0
+agent:
+  download:
+    sourceURI: 'https://artifacts.elastic.co/downloads/'
+  monitoring:
+    enabled: true
+    use_output: default
+    namespace: default
+    logs: true
+    metrics: true
+  features:
+    fqdn:
+      enabled: true
+inputs:
+  - id: logfile-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    name: system-1
+    revision: 1
+    type: logfile
+    use_output: default
+    meta:
+      package:
+        name: system
+        version: 1.24.3
+    data_stream:
+      namespace: default
+    package_policy_id: d38b6b0b-cc52-4a61-b897-1b236982ac42
+    streams:
+      - id: logfile-system.auth-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.auth
+          type: logs
+        ignore_older: 72h
+        paths:
+          - /var/log/auth.log*
+          - /var/log/secure*
+        exclude_files:
+          - .gz$
+        multiline:
+          pattern: ^\s
+          match: after
+        tags:
+          - system-auth
+        processors:
+          - add_locale: null
+      - id: logfile-system.syslog-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.syslog
+          type: logs
+        paths:
+          - /var/log/messages*
+          - /var/log/syslog*
+        exclude_files:
+          - .gz$
+        multiline:
+          pattern: ^\s
+          match: after
+        processors:
+          - add_locale: null
+        ignore_older: 72h
+  - id: winlog-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    name: system-1
+    revision: 1
+    type: winlog
+    use_output: default
+    meta:
+      package:
+        name: system
+        version: 1.24.3
+    data_stream:
+      namespace: default
+    package_policy_id: d38b6b0b-cc52-4a61-b897-1b236982ac42
+    streams:
+      - id: winlog-system.application-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        name: Application
+        data_stream:
+          dataset: system.application
+          type: logs
+        condition: '${host.platform} == ''windows'''
+        ignore_older: 72h
+      - id: winlog-system.security-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        name: Security
+        data_stream:
+          dataset: system.security
+          type: logs
+        condition: '${host.platform} == ''windows'''
+        ignore_older: 72h
+      - id: winlog-system.system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        name: System
+        data_stream:
+          dataset: system.system
+          type: logs
+        condition: '${host.platform} == ''windows'''
+        ignore_older: 72h
+  - id: system/metrics-system-d38b6b0b-cc52-4a61-b897-1b236982ac42
+    name: system-1
+    revision: 1
+    type: system/metrics
+    use_output: default
+    meta:
+      package:
+        name: system
+        version: 1.24.3
+    data_stream:
+      namespace: default
+    package_policy_id: d38b6b0b-cc52-4a61-b897-1b236982ac42
+    streams:
+      - id: system/metrics-system.cpu-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.cpu
+          type: metrics
+        metricsets:
+          - cpu
+        cpu.metrics:
+          - percentages
+          - normalized_percentages
+        period: 10s
+      - id: system/metrics-system.diskio-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.diskio
+          type: metrics
+        metricsets:
+          - diskio
+        diskio.include_devices: null
+        period: 10s
+      - id: system/metrics-system.filesystem-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.filesystem
+          type: metrics
+        metricsets:
+          - filesystem
+        period: 1m
+        processors:
+          - drop_event.when.regexp:
+              system.filesystem.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+      - id: system/metrics-system.fsstat-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.fsstat
+          type: metrics
+        metricsets:
+          - fsstat
+        period: 1m
+        processors:
+          - drop_event.when.regexp:
+              system.fsstat.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+      - id: system/metrics-system.load-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.load
+          type: metrics
+        metricsets:
+          - load
+        condition: '${host.platform} != ''windows'''
+        period: 10s
+      - id: system/metrics-system.memory-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.memory
+          type: metrics
+        metricsets:
+          - memory
+        period: 10s
+      - id: system/metrics-system.network-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.network
+          type: metrics
+        metricsets:
+          - network
+        period: 10s
+        network.interfaces: null
+      - id: system/metrics-system.process-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.process
+          type: metrics
+        metricsets:
+          - process
+        period: 10s
+        process.include_top_n.by_cpu: 5
+        process.include_top_n.by_memory: 5
+        process.cmdline.cache.enabled: true
+        process.cgroups.enabled: false
+        process.include_cpu_ticks: false
+        processes:
+          - .*
+      - id: >-
+          system/metrics-system.process.summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.process.summary
+          type: metrics
+        metricsets:
+          - process_summary
+        period: 10s
+      - id: >-
+          system/metrics-system.socket_summary-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.socket_summary
+          type: metrics
+        metricsets:
+          - socket_summary
+        period: 10s
+      - id: system/metrics-system.uptime-d38b6b0b-cc52-4a61-b897-1b236982ac42
+        data_stream:
+          dataset: system.uptime
+          type: metrics
+        metricsets:
+          - uptime
+        period: 10s

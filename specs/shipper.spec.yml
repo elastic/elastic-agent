@@ -1,0 +1,21 @@
+# this is used only in UT. does not make it into production
+# actual shipper spec file lives in shipper repo and is named 
+# properly 'elastic-agent-shipper.spec.yml'
+version: 2
+shippers:
+  - name: shipper
+    description: "Elastic Agent Shipper"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+    outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+      - redis
+    command: {}

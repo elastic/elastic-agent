@@ -148,8 +148,7 @@ RUN cd /usr/share/heartbeat/.node \
   && mkdir -p node \
   && curl ${NODE_DOWNLOAD_URL} | tar -xJ --strip 1 -C node \
   && chmod ug+rwX -R $NODE_PATH \
-  && npm i -g -f @elastic/synthetics && chmod ug+rwX -R $NODE_PATH
-
+  && npm i -g -f @elastic/synthetics@stack_release && chmod ug+rwX -R $NODE_PATH
 USER root
 
 # Install the deps as needed by the exact version of playwright elastic synthetics uses

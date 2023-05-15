@@ -1,17 +1,16 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
-//
-// nolint:errorlint // Postpone the change here until we refactor error handling.
-//
+
 // Package errors provides a small api to manage hierarchy of errors.
+//
+//nolint:errorlint // Postpone the change here until we refactor error handling.
 package errors
 
 import (
 	goerrors "errors"
+	"fmt"
 	"reflect"
-
-	"github.com/pkg/errors"
 )
 
 // As is just a helper so user dont have to use multiple imports for errors.
@@ -64,7 +63,7 @@ func (e agentError) Error() string {
 		return "unknown error"
 	}
 	if e.msg != "" {
-		return errors.Wrap(e.err, e.msg).Error()
+		return fmt.Errorf("%s: %w", e.msg, e.err).Error()
 	}
 
 	return e.err.Error()
@@ -81,7 +80,7 @@ func (e agentError) Type() ErrorType {
 	}
 
 	inner, ok := e.err.(Error)
-	if causeErr := errors.Cause(e.err); !ok && causeErr == e.err {
+	if causeErr := goerrors.Unwrap(e.err); !ok && causeErr == e.err {
 		return TypeUnexpected
 	} else if !ok {
 		// err is wrapped
@@ -105,7 +104,7 @@ func (e agentError) ReadableType() string {
 
 func (e agentError) Meta() map[string]interface{} {
 	inner, ok := e.err.(Error)
-	if causeErr := errors.Cause(e.err); !ok && causeErr == e.err {
+	if causeErr := goerrors.Unwrap(e.err); !ok && causeErr == e.err {
 		return e.meta
 	} else if !ok {
 		inner = New(causeErr).(Error)
@@ -140,7 +139,7 @@ func (e agentError) Equal(target error) bool {
 		return false
 	}
 
-	return errors.Is(e.err, targetErr.err) &&
+	return goerrors.Is(e.err, targetErr.err) &&
 		e.errType == targetErr.errType &&
 		e.msg == targetErr.msg &&
 		reflect.DeepEqual(e.meta, targetErr.meta)

@@ -7,10 +7,7 @@ package capabilities
 import (
 	"fmt"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -19,7 +16,7 @@ const (
 	typeKey   = "type"
 )
 
-func newOutputsCapability(log *logger.Logger, rd *ruleDefinitions, reporter status.Reporter) (Capability, error) {
+func newOutputsCapability(log *logger.Logger, rd *ruleDefinitions) (Capability, error) {
 	if rd == nil {
 		return &multiOutputsCapability{log: log, caps: []*outputCapability{}}, nil
 	}
@@ -27,7 +24,7 @@ func newOutputsCapability(log *logger.Logger, rd *ruleDefinitions, reporter stat
 	caps := make([]*outputCapability, 0, len(rd.Capabilities))
 
 	for _, r := range rd.Capabilities {
-		c, err := newOutputCapability(log, r, reporter)
+		c, err := newOutputCapability(log, r)
 		if err != nil {
 			return nil, err
 		}
@@ -40,23 +37,21 @@ func newOutputsCapability(log *logger.Logger, rd *ruleDefinitions, reporter stat
 	return &multiOutputsCapability{log: log, caps: caps}, nil
 }
 
-func newOutputCapability(log *logger.Logger, r ruler, reporter status.Reporter) (*outputCapability, error) {
+func newOutputCapability(log *logger.Logger, r ruler) (*outputCapability, error) {
 	cap, ok := r.(*outputCapability)
 	if !ok {
 		return nil, nil
 	}
 
 	cap.log = log
-	cap.reporter = reporter
 	return cap, nil
 }
 
 type outputCapability struct {
-	log      *logger.Logger
-	reporter status.Reporter
-	Name     string `json:"name,omitempty" yaml:"name,omitempty"`
-	Type     string `json:"rule" yaml:"rule"`
-	Output   string `json:"output" yaml:"output"`
+	log    *logger.Logger
+	Name   string `json:"name,omitempty" yaml:"name,omitempty"`
+	Type   string `json:"rule" yaml:"rule"`
+	Output string `json:"output" yaml:"output"`
 }
 
 func (c *outputCapability) Apply(cfgMap map[string]interface{}) (map[string]interface{}, error) {
@@ -133,7 +128,6 @@ func (c *outputCapability) renderOutputs(outputs map[string]interface{}) (map[st
 		if !isSupported {
 			msg := fmt.Sprintf("output '%s' is left out due to capability restriction '%s'", outputName, c.name())
 			c.log.Errorf(msg)
-			c.reporter.Update(state.Degraded, msg, nil)
 		}
 	}
 

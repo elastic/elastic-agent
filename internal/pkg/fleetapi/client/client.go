@@ -87,7 +87,7 @@ func NewWithConfig(log *logger.Logger, cfg remote.Config) (*remote.Client, error
 
 // ExtractError extracts error from a fleet-server response
 func ExtractError(resp io.Reader) error {
-	// Lets try to extract a high level fleet-server error.
+	// Let's try to extract a high level fleet-server error.
 	e := &struct {
 		StatusCode int    `json:"statusCode"`
 		Error      string `json:"error"`

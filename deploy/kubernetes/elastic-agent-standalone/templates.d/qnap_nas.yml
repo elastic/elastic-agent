@@ -1,0 +1,60 @@
+inputs:
+    - name: tcp-qnap_nas
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.qnap_nas.log.enabled} == true or ${kubernetes.hints.qnap_nas.enabled} == true
+          data_stream:
+            dataset: qnap_nas.log
+            type: logs
+          host: localhost:9301
+          processors:
+            - add_locale: null
+            - add_fields:
+                fields:
+                    tz_offset: local
+                target: _tmp
+          tags:
+            - qnap-nas
+            - forwarded
+      data_stream.namespace: default
+    - name: udp-qnap_nas
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.qnap_nas.log.enabled} == true and ${kubernetes.hints.qnap_nas.enabled} == true
+          data_stream:
+            dataset: qnap_nas.log
+            type: logs
+          host: localhost:9301
+          processors:
+            - add_locale: null
+            - add_fields:
+                fields:
+                    tz_offset: local
+                target: _tmp
+          tags:
+            - qnap-nas
+            - forwarded
+      data_stream.namespace: default
+    - name: filestream-qnap_nas
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.qnap_nas.container_logs.enabled} == true
+          data_stream:
+            dataset: qnap_nas.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

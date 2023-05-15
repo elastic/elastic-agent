@@ -8,10 +8,12 @@ import "github.com/elastic/elastic-agent-autodiscover/kubernetes"
 
 // Config for kubernetes_leaderelection provider
 type Config struct {
-	KubeConfig        string                       `config:"kube_config"`
-	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
+	KubeConfig string `config:"kube_config"`
+
 	// Name of the leaderelection lease
 	LeaderLease string `config:"leader_lease"`
+
+	KubeClientOptions kubernetes.KubeClientOptions `config:"kube_client_options"`
 }
 
 // InitDefaults initializes the default values for the config.

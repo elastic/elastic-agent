@@ -7,10 +7,11 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm"
@@ -18,12 +19,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
-	"github.com/elastic/elastic-agent/internal/pkg/core/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -32,50 +31,24 @@ const (
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
+	runDirMod       = 0770
 )
 
-var (
-	agentSpec = program.Spec{
-		Name:     "Elastic Agent",
-		Cmd:      agentName,
-		Artifact: "beats/" + agentName,
-	}
-)
+var agentArtifact = artifact.Artifact{
+	Name:     "Elastic Agent",
+	Cmd:      agentName,
+	Artifact: "beats/" + agentName,
+}
+
+// ErrSameVersion error is returned when the upgrade results in the same installed version.
+var ErrSameVersion = errors.New("upgrade did not occur because its the same version")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	agentInfo   *info.AgentInfo
-	settings    *artifact.Config
 	log         *logger.Logger
-	closers     []context.CancelFunc
-	reexec      reexecManager
-	acker       acker
-	reporter    stateReporter
+	settings    *artifact.Config
+	agentInfo   *info.AgentInfo
 	upgradeable bool
-	caps        capabilities.Capability
-}
-
-// Action is the upgrade action state.
-type Action interface {
-	// Version to upgrade to.
-	Version() string
-	// SourceURI for download.
-	SourceURI() string
-	// FleetAction is the action from fleet that started the action (optional).
-	FleetAction() *fleetapi.ActionUpgrade
-}
-
-type reexecManager interface {
-	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
-}
-
-type acker interface {
-	Ack(ctx context.Context, action fleetapi.Action) error
-	Commit(ctx context.Context) error
-}
-
-type stateReporter interface {
-	OnStateChange(id string, name string, s state.State)
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -86,18 +59,47 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(agentInfo *info.AgentInfo, settings *artifact.Config, log *logger.Logger, closers []context.CancelFunc, reexec reexecManager, a acker, r stateReporter, caps capabilities.Capability) *Upgrader {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.AgentInfo) *Upgrader {
 	return &Upgrader{
-		agentInfo:   agentInfo,
-		settings:    settings,
 		log:         log,
-		closers:     closers,
-		reexec:      reexec,
-		acker:       a,
-		reporter:    r,
+		settings:    settings,
+		agentInfo:   agentInfo,
 		upgradeable: IsUpgradeable(),
-		caps:        caps,
 	}
+}
+
+// Reload reloads the artifact configuration for the upgrader.
+func (u *Upgrader) Reload(rawConfig *config.Config) error {
+	type reloadConfig struct {
+		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
+		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
+
+		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/ coming from fleet which uses
+		// different naming.
+		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
+	}
+	cfg := &reloadConfig{}
+	if err := rawConfig.Unpack(&cfg); err != nil {
+		return errors.New(err, "failed to unpack config during reload")
+	}
+
+	var newSourceURI string
+	if cfg.FleetSourceURI != "" {
+		// fleet configuration takes precedence
+		newSourceURI = cfg.FleetSourceURI
+	} else if cfg.SourceURI != "" {
+		newSourceURI = cfg.SourceURI
+	}
+
+	if newSourceURI != "" {
+		u.log.Infof("Source URI changed from %q to %q", u.settings.SourceURI, newSourceURI)
+		u.settings.SourceURI = newSourceURI
+	} else {
+		// source uri unset, reset to default
+		u.log.Infof("Source URI reset from %q to %q", u.settings.SourceURI, artifact.DefaultSourceURI)
+		u.settings.SourceURI = artifact.DefaultSourceURI
+	}
+	return nil
 }
 
 // Upgradeable returns true if the Elastic Agent can be upgraded.
@@ -105,42 +107,29 @@ func (u *Upgrader) Upgradeable() bool {
 	return u.upgradeable
 }
 
-// Upgrade upgrades running agent, function returns shutdown callback if some needs to be executed for cases when
-// reexec is called by caller.
-func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ reexec.ShutdownCallbackFn, err error) {
+// Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
-	// report failed
-	defer func() {
-		if err != nil {
-			if action := a.FleetAction(); action != nil {
-				u.reportFailure(ctx, action, err)
-			}
-			apm.CaptureError(ctx, err).Send()
-		}
-	}()
 
-	if !u.upgradeable {
-		return nil, fmt.Errorf(
-			"cannot be upgraded; must be installed with install sub-command and " +
-				"running under control of the systems supervisor")
-	}
-
-	if u.caps != nil {
-		if _, err := u.caps.Apply(a); errors.Is(err, capabilities.ErrBlocked) {
-			return nil, nil
-		}
-	}
-
-	u.reportUpdating(a.Version())
-
-	sourceURI, err := u.sourceURI(a.Version(), a.SourceURI())
-	archivePath, err := u.downloadArtifact(ctx, a.Version(), sourceURI)
+	err = cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version())
 	if err != nil {
+		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
+	}
+
+	sourceURI = u.sourceURI(sourceURI)
+	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, skipVerifyOverride, pgpBytes...)
+	if err != nil {
+		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
+		// This may have an issue if users are upgrading to the same version number.
+		if dErr := cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
+			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
+		}
 		return nil, err
 	}
 
-	newHash, err := u.unpack(ctx, a.Version(), archivePath)
+	newHash, err := u.unpack(version, archivePath)
 	if err != nil {
 		return nil, err
 	}
@@ -150,44 +139,50 @@ func (u *Upgrader) Upgrade(ctx context.Context, a Action, reexecNow bool) (_ ree
 	}
 
 	if strings.HasPrefix(release.Commit(), newHash) {
-		// not an error
-		if action := a.FleetAction(); action != nil {
-			u.ackAction(ctx, action)
-		}
-		u.log.Warn("upgrading to same version")
+		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
 		return nil, nil
 	}
 
-	if err := copyActionStore(newHash); err != nil {
+	if err := copyActionStore(u.log, newHash); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
-	if err := ChangeSymlink(ctx, newHash); err != nil {
-		rollbackInstall(ctx, newHash)
+	if err := copyRunDirectory(u.log, newHash); err != nil {
+		return nil, errors.New(err, "failed to copy run directory")
+	}
+
+	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
+		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
-	if err := u.markUpgrade(ctx, newHash, a); err != nil {
-		rollbackInstall(ctx, newHash)
+	if err := u.markUpgrade(ctx, u.log, newHash, action); err != nil {
+		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
 	}
 
 	if err := InvokeWatcher(u.log); err != nil {
-		rollbackInstall(ctx, newHash)
-		return nil, errors.New("failed to invoke rollback watcher", err)
+		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
+		rollbackInstall(ctx, u.log, newHash)
+		return nil, err
 	}
 
-	cb := shutdownCallback(u.log, paths.Home(), release.Version(), a.Version(), release.TrimCommit(newHash))
-	if reexecNow {
-		u.reexec.ReExec(cb)
-		return nil, nil
+	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, release.TrimCommit(newHash))
+
+	// Clean everything from the downloads dir
+	u.log.Debugw("Removing downloads directory", "file.path", paths.Downloads())
+	err = os.RemoveAll(paths.Downloads())
+	if err != nil {
+		u.log.Errorw("Unable to clean downloads after update", "error.message", err, "file.path", paths.Downloads())
 	}
 
 	return cb, nil
 }
 
 // Ack acks last upgrade action
-func (u *Upgrader) Ack(ctx context.Context) error {
+func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	// get upgrade action
 	marker, err := LoadMarker()
 	if err != nil {
@@ -201,78 +196,47 @@ func (u *Upgrader) Ack(ctx context.Context) error {
 		return nil
 	}
 
-	if err := u.ackAction(ctx, marker.Action); err != nil {
-		return err
+	// Action can be nil if the upgrade was called locally.
+	// Should handle gracefully
+	// https://github.com/elastic/elastic-agent/issues/1788
+	if marker.Action != nil {
+		if err := acker.Ack(ctx, marker.Action); err != nil {
+			return err
+		}
+
+		if err := acker.Commit(ctx); err != nil {
+			return err
+		}
 	}
+
+	marker.Acked = true
 
 	return saveMarker(marker)
 }
 
-func (u *Upgrader) sourceURI(version, retrievedURI string) (string, error) {
+func (u *Upgrader) sourceURI(retrievedURI string) string {
 	if retrievedURI != "" {
-		return retrievedURI, nil
+		return retrievedURI
 	}
 
-	return u.settings.SourceURI, nil
+	return u.settings.SourceURI
 }
 
-// ackAction is used for successful updates, it was either updated successfully or to the same version
-// so we need to remove updating state and get prevent from receiving same update action again.
-func (u *Upgrader) ackAction(ctx context.Context, action fleetapi.Action) error {
-	if err := u.acker.Ack(ctx, action); err != nil {
-		return err
-	}
-
-	if err := u.acker.Commit(ctx); err != nil {
-		return err
-	}
-
-	u.reporter.OnStateChange(
-		"",
-		agentName,
-		state.State{Status: state.Healthy},
-	)
-
-	return nil
-}
-
-// report failure is used when update process fails. action is acked so it won't be received again
-// and state is changed to FAILED
-func (u *Upgrader) reportFailure(ctx context.Context, action fleetapi.Action, err error) {
-	// ack action
-	u.acker.Ack(ctx, action)
-
-	// report failure
-	u.reporter.OnStateChange(
-		"",
-		agentName,
-		state.State{Status: state.Failed, Message: err.Error()},
-	)
-}
-
-// reportUpdating sets state of agent to updating.
-func (u *Upgrader) reportUpdating(version string) {
-	// report failure
-	u.reporter.OnStateChange(
-		"",
-		agentName,
-		state.State{Status: state.Updating, Message: fmt.Sprintf("Update to version '%s' started", version)},
-	)
-}
-
-func rollbackInstall(ctx context.Context, hash string) {
+func rollbackInstall(ctx context.Context, log *logger.Logger, hash string) {
 	os.RemoveAll(filepath.Join(paths.Data(), fmt.Sprintf("%s-%s", agentName, hash)))
-	ChangeSymlink(ctx, release.ShortCommit())
+	_ = ChangeSymlink(ctx, log, release.ShortCommit())
 }
 
-func copyActionStore(newHash string) error {
-	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreFile()}
+func copyActionStore(log *logger.Logger, newHash string) error {
+	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
+	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
+	newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
+	log.Debugw("Copying action store", "new_home_path", newHome)
 
 	for _, currentActionStorePath := range storePaths {
-		newHome := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash))
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
-
-		currentActionStore, err := ioutil.ReadFile(currentActionStorePath)
+		log.Debugw("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
+		currentActionStore, err := os.ReadFile(currentActionStorePath)
 		if os.IsNotExist(err) {
 			// nothing to copy
 			continue
@@ -281,9 +245,32 @@ func copyActionStore(newHash string) error {
 			return err
 		}
 
-		if err := ioutil.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
+		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func copyRunDirectory(log *logger.Logger, newHash string) error {
+	newRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash), "run")
+	oldRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, release.ShortCommit()), "run")
+
+	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
+
+	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
+		return errors.New(err, "failed to create run directory")
+	}
+
+	err := copyDir(log, oldRunPath, newRunPath, true)
+	if os.IsNotExist(err) {
+		// nothing to copy, operation ok
+		log.Debugw("Run directory not present", "old_run_path", oldRunPath)
+		return nil
+	}
+	if err != nil {
+		return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
 	}
 
 	return nil
@@ -292,7 +279,7 @@ func copyActionStore(newHash string) error {
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.
 // this goes through runtime directory of agent and copies all the state files created by processes to new versioned
 // home directory with updated process name to match new version.
-func shutdownCallback(log *logger.Logger, homePath, prevVersion, newVersion, newHash string) reexec.ShutdownCallbackFn {
+func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHash string) reexec.ShutdownCallbackFn {
 	if release.Snapshot() {
 		// SNAPSHOT is part of newVersion
 		prevVersion += "-SNAPSHOT"
@@ -300,7 +287,7 @@ func shutdownCallback(log *logger.Logger, homePath, prevVersion, newVersion, new
 
 	return func() error {
 		runtimeDir := filepath.Join(homePath, "run")
-		processDirs, err := readProcessDirs(log, runtimeDir)
+		processDirs, err := readProcessDirs(runtimeDir)
 		if err != nil {
 			return err
 		}
@@ -310,7 +297,7 @@ func shutdownCallback(log *logger.Logger, homePath, prevVersion, newVersion, new
 		for _, processDir := range processDirs {
 			newDir := strings.ReplaceAll(processDir, prevVersion, newVersion)
 			newDir = strings.ReplaceAll(newDir, oldHome, newHome)
-			if err := copyDir(processDir, newDir); err != nil {
+			if err := copyDir(l, processDir, newDir, true); err != nil {
 				return err
 			}
 		}
@@ -318,15 +305,15 @@ func shutdownCallback(log *logger.Logger, homePath, prevVersion, newVersion, new
 	}
 }
 
-func readProcessDirs(log *logger.Logger, runtimeDir string) ([]string, error) {
-	pipelines, err := readDirs(log, runtimeDir)
+func readProcessDirs(runtimeDir string) ([]string, error) {
+	pipelines, err := readDirs(runtimeDir)
 	if err != nil {
 		return nil, err
 	}
 
 	processDirs := make([]string, 0)
 	for _, p := range pipelines {
-		dirs, err := readDirs(log, p)
+		dirs, err := readDirs(p)
 		if err != nil {
 			return nil, err
 		}
@@ -338,7 +325,7 @@ func readProcessDirs(log *logger.Logger, runtimeDir string) ([]string, error) {
 }
 
 // readDirs returns list of absolute paths to directories inside specified path.
-func readDirs(log *logger.Logger, dir string) ([]string, error) {
+func readDirs(dir string) ([]string, error) {
 	dirEntries, err := os.ReadDir(dir)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
@@ -356,11 +343,26 @@ func readDirs(log *logger.Logger, dir string) ([]string, error) {
 	return dirs, nil
 }
 
-func copyDir(from, to string) error {
+func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
+	var onErr func(src, dst string, err error) error
+
+	if ignoreErrs {
+		onErr = func(src, dst string, err error) error {
+			if err == nil {
+				return nil
+			}
+
+			// ignore all errors, just log them
+			l.Infof("ignoring error: failed to copy %q to %q: %s", src, dst, err.Error())
+			return nil
+		}
+	}
+
 	return copy.Copy(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync: true,
+		Sync:    true,
+		OnError: onErr,
 	})
 }

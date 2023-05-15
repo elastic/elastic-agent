@@ -1,0 +1,73 @@
+inputs:
+    - name: filestream-hashicorp_vault
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.hashicorp_vault.audit.enabled} == true or ${kubernetes.hints.hashicorp_vault.enabled} == true
+          data_stream:
+            dataset: hashicorp_vault.audit
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.hashicorp_vault.audit.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - hashicorp-vault-audit
+        - condition: ${kubernetes.hints.hashicorp_vault.log.enabled} == true or ${kubernetes.hints.hashicorp_vault.enabled} == true
+          data_stream:
+            dataset: hashicorp_vault.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.hashicorp_vault.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - hashicorp-vault-log
+      data_stream.namespace: default
+    - name: tcp-hashicorp_vault
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.hashicorp_vault.audit.enabled} == true and ${kubernetes.hints.hashicorp_vault.enabled} == true
+          data_stream:
+            dataset: hashicorp_vault.audit
+            type: logs
+          host: localhost:9007
+          max_message_size: 1 MiB
+          tags:
+            - hashicorp-vault-audit
+            - forwarded
+      data_stream.namespace: default
+    - name: prometheus/metrics-hashicorp_vault
+      type: prometheus/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.hashicorp_vault.metrics.enabled} == true or ${kubernetes.hints.hashicorp_vault.enabled} == true
+          data_stream:
+            dataset: hashicorp_vault.metrics
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.hashicorp_vault.metrics.host|kubernetes.hints.hashicorp_vault.host|'http://localhost:8200'}
+          metrics_path: /v1/sys/metrics
+          metricsets:
+            - collector
+          period: ${kubernetes.hints.hashicorp_vault.metrics.period|kubernetes.hints.hashicorp_vault.period|'30s'}
+          query:
+            format: prometheus
+          rate_counters: true
+          use_types: true
+      data_stream.namespace: default

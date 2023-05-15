@@ -1,0 +1,129 @@
+version: 8.5.0
+entries:
+    - kind: bug-fix
+      summary: Fix a panic caused by a race condition when installing the Elastic Agent.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/823
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/806
+      timestamp: 1660139385
+      file:
+        name: 1660139385-Fix-a-panic-caused-by-a-race-condition-when-installing-the-Elastic-Agent.yaml
+        checksum: be820e85b12290a895bfd37c2c2245bfae5a70c9
+    - kind: breaking-change
+      summary: Upgrade to Go 1.18. Certificates signed with SHA-1 are now rejected. See the Go 1.18 https//tip.golang.org/doc/go1.18#sha1[release notes] for details.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/832
+      issue: []
+      timestamp: 1660158319
+      file:
+        name: 1660158319-Upgrade-to-Go-118-Certificates-signed-with-SHA-1-are-now-rejected-See-the-Go-118.yaml
+        checksum: 2b304d75a687ec7384f3011a55f243fef66e447b
+    - kind: feature
+      summary: Add `lumberjack` input type to the Filebeat spec.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/959
+      issue: []
+      timestamp: 1661188787
+      file:
+        name: 1661188787-Add-lumberjack-input-type-to-the-Filebeat-spec.yaml
+        checksum: ab7e3af045affbda1522c029cc56a9c5403340c3
+    - kind: feature
+      summary: Add support for hints' based autodiscovery in kubernetes provider.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/698
+      issue: []
+      timestamp: 1663143487
+      file:
+        name: 1663143487-Add-support-for-hints-based-autodiscovery-in-kubernetes-provider.yaml
+        checksum: 398470d14a8475e93aaf66f96407570653dde71e
+    - kind: bug-fix
+      summary: Fix unintended reset of source URI when downloading components
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1252
+      issue: []
+      timestamp: 1664177394
+      file:
+        name: 1664177394-Fix-unintended-reset-of-source-URI-when-downloading-components.yaml
+        checksum: 1040aceb00b70182c0bba621e15cfe711e32f9fe
+    - kind: bug-fix
+      summary: Create separate status reporter for local only events so that degraded fleet-checkins no longer affect health on successful fleet-checkins.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1285
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1157
+      timestamp: 1664212969
+      file:
+        name: 1664212969-Create-separate-status-reporter-for-local-only-events-so-that-degraded-fleet-che.yaml
+        checksum: 929f1ada47aeaaf9c631091c0f2732f631b3539f
+    - kind: feature
+      summary: Improve logging during upgrades.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1287
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1253
+      timestamp: 1664230732
+      file:
+        name: 1664230732-Improve-logging-during-upgrades.yaml
+        checksum: 13ab968324d342118c5a257d6c6cc0c5db161b46
+    - kind: bug-fix
+      summary: Add success log message after previous checkin failures
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1327
+      issue: []
+      timestamp: 1664360554
+      file:
+        name: 1664360554-Add-success-log-message-after-previous-checkin-failures.yaml
+        checksum: 819a22a452dddfa3b2976433d5cb4c8354a6ccc5
+    - kind: bug-fix
+      summary: Fix docker provider add_fields processors
+      description: ""
+      component: providers
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1420
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/29030
+      timestamp: 1664989867
+      file:
+        name: 1664989867-fix-docker-provider-processors.yaml
+        checksum: 45731791cd2e8f1d747abfc47bb256971a77d015
+    - kind: enhancement
+      summary: Improve logging of Fleet check-in errors.
+      description: Improve logging of Fleet check-in errors and only report the local state as degraded after two consecutive failed check-ins.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1477
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1154
+      timestamp: 1665517984
+      file:
+        name: 1665517984-improve-checkin-error-logging.yaml
+        checksum: 2d3dd39309def9a082f794eda815af459596c2e6
+    - kind: bug-fix
+      summary: Fix admin permission check on localized windows
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/1552
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/857
+      timestamp: 1666088774
+      file:
+        name: 1666088774-Fix-admin-permission-check-on-localized-windows.yaml
+        checksum: 16ee5909c319680b8d32045e74c38922eafc29ea

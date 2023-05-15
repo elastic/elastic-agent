@@ -1,0 +1,73 @@
+version: 2
+inputs:
+  - name: endpoint
+    description: "Endpoint Security"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - container/amd64
+      - container/arm64
+    outputs:
+      - elasticsearch
+      - logstash
+    runtime:
+      preventions:
+        - condition: ${runtime.user.root} == false
+          message: "Elastic Agent must be running as root"
+        - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
+          message: "No support for RHEL7 on arm64"
+    service:
+      cport: 6788
+      log:
+        path: "/opt/Elastic/Endpoint/state/log/endpoint-*.log"
+      operations: &operations
+        check:
+          args:
+            - "verify"
+            - "--log"
+            - "stderr"
+          timeout: 30
+        install:
+          args:
+            - "install"
+            - "--log"
+            - "stderr"
+            - "--upgrade"
+            - "--resources"
+            - "endpoint-security-resources.zip"
+          timeout: 600
+        uninstall:
+          args:
+            - "uninstall"
+            - "--log"
+            - "stderr"
+          timeout: 600
+  - name: endpoint
+    description: "Endpoint Security"
+    platforms:
+      - darwin/amd64
+      - darwin/arm64
+    outputs:
+      - elasticsearch
+      - logstash
+    service:
+      cport: 6788
+      log:
+        path: "/Library/Elastic/Endpoint/state/log/endpoint-*.log"
+      operations: *operations
+  - name: endpoint
+    description: "Endpoint Security"
+    platforms:
+      - windows/amd64
+    outputs:
+      - elasticsearch
+      - logstash
+    runtime:
+      preventions:
+        - condition: ${runtime.user.root} == false
+          message: "Elastic Agent must be running as Administrator or SYSTEM"
+    service:
+      cport: 6788
+      log:
+        path: "C:\\Program Files\\Elastic\\Endpoint\\state\\log\\endpoint-*.log"
+      operations: *operations

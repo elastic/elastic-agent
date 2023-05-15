@@ -15,22 +15,14 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/conv"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type dispatcher interface {
-	Dispatch(context.Context, FleetAcker, ...action) error
-}
-
 type store interface {
 	Save(io.Reader) error
-}
-
-// FleetAcker is an acker of actions to fleet.
-type FleetAcker interface {
-	Ack(ctx context.Context, action fleetapi.Action) error
-	Commit(ctx context.Context) error
 }
 
 type storeLoad interface {
@@ -59,9 +51,12 @@ type StateStore struct {
 type stateT struct {
 	action   action
 	ackToken string
+	queue    []action
 }
 
-// Combined yml serializer for the ActionPolicyChange and ActionUnenroll
+// actionSerializer is a combined yml serializer for the ActionPolicyChange and ActionUnenroll
+// it is used to read the yaml file and assign the action to stateT.action as we must provide the
+// underlying struct that provides the action interface.
 type actionSerializer struct {
 	ID         string                 `yaml:"action_id"`
 	Type       string                 `yaml:"action_type"`
@@ -69,9 +64,14 @@ type actionSerializer struct {
 	IsDetected *bool                  `yaml:"is_detected,omitempty"`
 }
 
+// stateSerializer is used to serialize the state to yaml.
+// action serialization is handled through the actionSerializer struct
+// queue serialization is handled through yaml struct tags or the actions unmarshaller defined in fleetapi
+// TODO clean up action serialization (have it be part of the fleetapi?)
 type stateSerializer struct {
 	Action   *actionSerializer `yaml:"action,omitempty"`
 	AckToken string            `yaml:"ack_token,omitempty"`
+	Queue    fleetapi.Actions  `yaml:"action_queue,omitempty"`
 }
 
 // NewStateStoreWithMigration creates a new state store and migrates the old one.
@@ -81,11 +81,11 @@ func NewStateStoreWithMigration(log *logger.Logger, actionStorePath, stateStoreP
 		return nil, err
 	}
 
-	return NewStateStore(log, storage.NewDiskStore(stateStorePath))
+	return NewStateStore(log, storage.NewEncryptedDiskStore(stateStorePath))
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
-func NewStateStoreActionAcker(acker FleetAcker, store *StateStore) *StateStoreActionAcker {
+func NewStateStoreActionAcker(acker acker.Acker, store *StateStore) *StateStoreActionAcker {
 	return &StateStoreActionAcker{acker: acker, store: store}
 }
 
@@ -95,6 +95,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 	// persisted and we return an empty store.
 	reader, err := store.Load()
 	if err != nil {
+		//nolint:nilerr // wad
 		return &StateStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
@@ -116,6 +117,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 
 	state := stateT{
 		ackToken: sr.AckToken,
+		queue:    sr.Queue,
 	}
 
 	if sr.Action != nil {
@@ -129,7 +131,7 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 			state.action = &fleetapi.ActionPolicyChange{
 				ActionID:   sr.Action.ID,
 				ActionType: sr.Action.Type,
-				Policy:     sr.Action.Policy,
+				Policy:     conv.YAMLMapToJSONMap(sr.Action.Policy), // Fix Policy, in order to make it consistent with the policy received from the fleet gateway as nested map[string]interface{}
 			}
 		}
 	}
@@ -144,11 +146,10 @@ func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
 func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath string) (err error) {
 	log = log.Named("state_migration")
 	actionDiskStore := storage.NewDiskStore(actionStorePath)
-	stateDiskStore := storage.NewDiskStore(stateStorePath)
+	stateDiskStore := storage.NewEncryptedDiskStore(stateStorePath)
 
 	stateStoreExits, err := stateDiskStore.Exists()
 	if err != nil {
-		log.With()
 		log.Errorf("failed to check if state store %s exists: %v", stateStorePath, err)
 		return err
 	}
@@ -181,14 +182,14 @@ func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath strin
 		return nil
 	}
 
-	actionStore, err := NewActionStore(log, actionDiskStore)
+	actionStore, err := newActionStore(log, actionDiskStore)
 	if err != nil {
 		log.Errorf("failed to create action store %s: %v", actionStorePath, err)
 		return err
 	}
 
 	// no actions stored nothing to migrate
-	if len(actionStore.Actions()) == 0 {
+	if len(actionStore.actions()) == 0 {
 		log.Debugf("no actions stored in the action store %s, nothing to migrate", actionStorePath)
 		return nil
 	}
@@ -199,7 +200,7 @@ func migrateStateStore(log *logger.Logger, actionStorePath, stateStorePath strin
 	}
 
 	// set actions from the action store to the state store
-	stateStore.Add(actionStore.Actions()[0])
+	stateStore.Add(actionStore.actions()[0])
 
 	err = stateStore.Save()
 	if err != nil {
@@ -237,6 +238,15 @@ func (s *StateStore) SetAckToken(ackToken string) {
 	s.state.ackToken = ackToken
 }
 
+// SetQueue sets the action_queue to agent state
+func (s *StateStore) SetQueue(q []action) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	s.state.queue = q
+	s.dirty = true
+
+}
+
 // Save saves the actions into a state store.
 func (s *StateStore) Save() error {
 	s.mx.Lock()
@@ -250,6 +260,7 @@ func (s *StateStore) Save() error {
 	var reader io.Reader
 	serialize := stateSerializer{
 		AckToken: s.state.ackToken,
+		Queue:    s.state.queue,
 	}
 
 	if s.state.action != nil {
@@ -272,6 +283,15 @@ func (s *StateStore) Save() error {
 	}
 	s.log.Debugf("save state on disk : %+v", s.state)
 	return nil
+}
+
+// Queue returns a copy of the queue
+func (s *StateStore) Queue() []action {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+	q := make([]action, len(s.state.queue))
+	copy(q, s.state.queue)
+	return q
 }
 
 // Actions returns a slice of action to execute in order, currently only a action policy change is
@@ -298,7 +318,7 @@ func (s *StateStore) AckToken() string {
 // its up to the action store to decide if we need to persist the event for future replay or just
 // discard the event.
 type StateStoreActionAcker struct {
-	acker FleetAcker
+	acker acker.Acker
 	store *StateStore
 }
 
@@ -315,23 +335,6 @@ func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action)
 // Commit commits acks.
 func (a *StateStoreActionAcker) Commit(ctx context.Context) error {
 	return a.acker.Commit(ctx)
-}
-
-// ReplayActions replays list of actions.
-func ReplayActions(
-	ctx context.Context,
-	log *logger.Logger,
-	dispatcher dispatcher,
-	acker FleetAcker,
-	actions ...action,
-) error {
-	log.Info("restoring current policy from disk")
-
-	if err := dispatcher.Dispatch(ctx, acker, actions...); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func yamlToReader(in interface{}) (io.Reader, error) {

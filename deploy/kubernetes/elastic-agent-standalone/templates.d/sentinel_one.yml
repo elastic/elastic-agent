@@ -1,0 +1,217 @@
+inputs:
+    - name: httpjson-sentinel_one
+      type: httpjson
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.sentinel_one.activity.enabled} == true or ${kubernetes.hints.sentinel_one.enabled} == true
+          config_version: 2
+          cursor:
+            last_create_at:
+                value: '[[.last_event.createdAt]]'
+          data_stream:
+            dataset: sentinel_one.activity
+            type: logs
+          interval: 1m
+          request.method: GET
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: 'ApiToken '
+            - set:
+                target: url.params.limit
+                value: "100"
+            - set:
+                target: url.params.sortBy
+                value: createdAt
+            - set:
+                target: url.params.sortOrder
+                value: asc
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]'
+                target: url.params.createdAt__gte
+                value: '[[formatDate (parseDate .cursor.last_create_at)]]'
+          request.url: /web/api/v2.1/activities
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.cursor
+                value: '[[if (ne .last_response.body.pagination.nextCursor nil)]][[.last_response.body.pagination.nextCursor]][[end]]'
+          response.split:
+            target: body.data
+          tags:
+            - forwarded
+            - sentinel_one-activity
+        - condition: ${kubernetes.hints.sentinel_one.agent.enabled} == true or ${kubernetes.hints.sentinel_one.enabled} == true
+          config_version: 2
+          cursor:
+            last_update_at:
+                value: '[[.last_event.updatedAt]]'
+          data_stream:
+            dataset: sentinel_one.agent
+            type: logs
+          interval: 5m
+          request.method: GET
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: 'ApiToken '
+            - set:
+                target: url.params.limit
+                value: "100"
+            - set:
+                target: url.params.sortBy
+                value: updatedAt
+            - set:
+                target: url.params.sortOrder
+                value: asc
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]'
+                target: url.params.updatedAt__gte
+                value: '[[formatDate (parseDate .cursor.last_update_at)]]'
+          request.url: /web/api/v2.1/agents
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.cursor
+                value: '[[if (ne .last_response.body.pagination.nextCursor nil)]][[.last_response.body.pagination.nextCursor]][[end]]'
+          response.split:
+            target: body.data
+          tags:
+            - forwarded
+            - sentinel_one-agent
+        - condition: ${kubernetes.hints.sentinel_one.alert.enabled} == true or ${kubernetes.hints.sentinel_one.enabled} == true
+          config_version: 2
+          cursor:
+            last_create_at:
+                value: '[[.last_event.alertInfo.createdAt]]'
+          data_stream:
+            dataset: sentinel_one.alert
+            type: logs
+          interval: 5m
+          request.method: GET
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: 'ApiToken '
+            - set:
+                target: url.params.limit
+                value: "100"
+            - set:
+                target: url.params.sortBy
+                value: alertInfoCreatedAt
+            - set:
+                target: url.params.sortOrder
+                value: asc
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]'
+                target: url.params.createdAt__gte
+                value: '[[formatDate (parseDate .cursor.last_create_at)]]'
+          request.url: /web/api/v2.1/cloud-detection/alerts
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.cursor
+                value: '[[if (ne .last_response.body.pagination.nextCursor nil)]][[.last_response.body.pagination.nextCursor]][[end]]'
+          response.split:
+            target: body.data
+          tags:
+            - forwarded
+            - sentinel_one-alert
+        - condition: ${kubernetes.hints.sentinel_one.group.enabled} == true or ${kubernetes.hints.sentinel_one.enabled} == true
+          config_version: 2
+          cursor:
+            last_update_at:
+                value: '[[.last_event.updatedAt]]'
+          data_stream:
+            dataset: sentinel_one.group
+            type: logs
+          interval: 5m
+          request.method: GET
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: 'ApiToken '
+            - set:
+                target: url.params.limit
+                value: "100"
+            - set:
+                target: url.params.sortBy
+                value: updatedAt
+            - set:
+                target: url.params.sortOrder
+                value: asc
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]'
+                target: url.params.updatedAt__gte
+                value: '[[formatDate (parseDate .cursor.last_update_at)]]'
+          request.url: /web/api/v2.1/groups
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.cursor
+                value: '[[if (ne .last_response.body.pagination.nextCursor nil)]][[.last_response.body.pagination.nextCursor]][[end]]'
+          response.split:
+            target: body.data
+          tags:
+            - forwarded
+            - sentinel_one-group
+        - condition: ${kubernetes.hints.sentinel_one.threat.enabled} == true or ${kubernetes.hints.sentinel_one.enabled} == true
+          config_version: 2
+          cursor:
+            last_update_at:
+                value: '[[.last_event.threatInfo.updatedAt]]'
+          data_stream:
+            dataset: sentinel_one.threat
+            type: logs
+          interval: 5m
+          request.method: GET
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: 'ApiToken '
+            - set:
+                target: url.params.limit
+                value: "100"
+            - set:
+                target: url.params.sortBy
+                value: updatedAt
+            - set:
+                target: url.params.sortOrder
+                value: asc
+            - set:
+                default: '[[formatDate (now (parseDuration "-24h"))]]'
+                target: url.params.updatedAt__gte
+                value: '[[formatDate (parseDate .cursor.last_update_at)]]'
+          request.url: /web/api/v2.1/threats
+          response.pagination:
+            - set:
+                fail_on_template_error: true
+                target: url.params.cursor
+                value: '[[if (ne .last_response.body.pagination.nextCursor nil)]][[.last_response.body.pagination.nextCursor]][[end]]'
+          response.split:
+            target: body.data
+          tags:
+            - forwarded
+            - sentinel_one-threat
+      data_stream.namespace: default
+    - name: filestream-sentinel_one
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.sentinel_one.container_logs.enabled} == true
+          data_stream:
+            dataset: sentinel_one.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default

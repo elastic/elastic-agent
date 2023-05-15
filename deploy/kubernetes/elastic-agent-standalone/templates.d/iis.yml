@@ -1,0 +1,73 @@
+inputs:
+    - name: filestream-iis
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.iis.access.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          data_stream:
+            dataset: iis.access
+            type: logs
+          exclude_files:
+            - .gz$
+          exclude_lines:
+            - ^#
+          ignore_older: 72h
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.iis.access.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - iis-access
+        - condition: ${kubernetes.hints.iis.error.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          data_stream:
+            dataset: iis.error
+            type: logs
+          exclude_files:
+            - .gz$
+          exclude_lines:
+            - ^#
+          ignore_older: 72h
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.iis.error.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - iis-error
+      data_stream.namespace: default
+    - name: iis/metrics-iis
+      type: iis/metrics
+      use_output: default
+      streams:
+        - application_pool.name: null
+          condition: ${kubernetes.hints.iis.application_pool.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          data_stream:
+            dataset: iis.application_pool
+            type: metrics
+          metricsets:
+            - application_pool
+          period: ${kubernetes.hints.iis.application_pool.period|kubernetes.hints.iis.period|'10s'}
+        - condition: ${kubernetes.hints.iis.webserver.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          data_stream:
+            dataset: iis.webserver
+            type: metrics
+          metricsets:
+            - webserver
+          period: ${kubernetes.hints.iis.webserver.period|kubernetes.hints.iis.period|'10s'}
+        - condition: ${kubernetes.hints.iis.website.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          data_stream:
+            dataset: iis.website
+            type: metrics
+          metricsets:
+            - website
+          period: ${kubernetes.hints.iis.website.period|kubernetes.hints.iis.period|'10s'}
+      data_stream.namespace: default

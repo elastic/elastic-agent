@@ -13,11 +13,12 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
@@ -25,7 +26,7 @@ import (
 type outputter func(io.Writer, interface{}) error
 
 var statusOutputs = map[string]outputter{
-	"human": humanStatusOutput,
+	"human": humanStateOutput,
 	"json":  jsonOutput,
 	"yaml":  yamlOutput,
 }
@@ -33,8 +34,8 @@ var statusOutputs = map[string]outputter{
 func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
-		Short: "Status returns the current status of the running Elastic Agent daemon.",
-		Long:  `Status returns the current status of the running Elastic Agent daemon.`,
+		Short: "Show the current status of the running Elastic Agent daemon",
+		Long:  `This command shows the current status of the running Elastic Agent daemon.`,
 		Run: func(c *cobra.Command, args []string) {
 			if err := statusCmd(streams, c, args); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
@@ -49,11 +50,6 @@ func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 }
 
 func statusCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
-	err := tryContainerLoadPaths()
-	if err != nil {
-		return err
-	}
-
 	output, _ := cmd.Flags().GetString("output")
 	outputFunc, ok := statusOutputs[output]
 	if !ok {
@@ -64,7 +60,7 @@ func statusCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error 
 	innerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	status, err := getDaemonStatus(innerCtx)
+	state, err := getDaemonState(innerCtx)
 	if errors.Is(err, context.DeadlineExceeded) {
 		return errors.New("timed out after 30 seconds trying to connect to Elastic Agent daemon")
 	} else if errors.Is(err, context.Canceled) {
@@ -73,12 +69,12 @@ func statusCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error 
 		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
 	}
 
-	err = outputFunc(streams.Out, status)
+	err = outputFunc(streams.Out, state)
 	if err != nil {
 		return err
 	}
 	// exit 0 only if the Elastic Agent daemon is healthy
-	if status.Status == client.Healthy {
+	if state.State == client.Healthy {
 		os.Exit(0)
 	} else {
 		os.Exit(1)
@@ -86,32 +82,38 @@ func statusCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error 
 	return nil
 }
 
-func humanStatusOutput(w io.Writer, obj interface{}) error {
-	status, ok := obj.(*client.AgentStatus)
+func humanStateOutput(w io.Writer, obj interface{}) error {
+	status, ok := obj.(*client.AgentState)
 	if !ok {
 		return fmt.Errorf("unable to cast %T as *client.AgentStatus", obj)
 	}
-	return outputStatus(w, status)
+	return outputState(w, status)
 }
 
-func outputStatus(w io.Writer, status *client.AgentStatus) error {
-	fmt.Fprintf(w, "Status: %s\n", status.Status)
-	if status.Message == "" {
+func outputState(w io.Writer, state *client.AgentState) error {
+	fmt.Fprintf(w, "State: %s\n", state.State)
+	if state.Message == "" {
 		fmt.Fprint(w, "Message: (no message)\n")
 	} else {
-		fmt.Fprintf(w, "Message: %s\n", status.Message)
+		fmt.Fprintf(w, "Message: %s\n", state.Message)
 	}
-	if len(status.Applications) == 0 {
-		fmt.Fprint(w, "Applications: (none)\n")
+	fmt.Fprintf(w, "Fleet State: %s\n", state.FleetState)
+	if state.FleetMessage == "" {
+		fmt.Fprint(w, "Fleet Message: (no message)\n")
 	} else {
-		fmt.Fprint(w, "Applications:\n")
+		fmt.Fprintf(w, "Fleet Message: %s\n", state.FleetMessage)
+	}
+	if len(state.Components) == 0 {
+		fmt.Fprint(w, "Components: (none)\n")
+	} else {
+		fmt.Fprint(w, "Components:\n")
 		tw := tabwriter.NewWriter(w, 4, 1, 2, ' ', 0)
-		for _, app := range status.Applications {
-			fmt.Fprintf(tw, "  * %s\t(%s)\n", app.Name, app.Status)
-			if app.Message == "" {
+		for _, comp := range state.Components {
+			fmt.Fprintf(tw, "  * %s\t(%s)\n", comp.Name, comp.State)
+			if comp.Message == "" {
 				fmt.Fprint(tw, "\t(no message)\n")
 			} else {
-				fmt.Fprintf(tw, "\t%s\n", app.Message)
+				fmt.Fprintf(tw, "\t%s\n", comp.Message)
 			}
 		}
 		tw.Flush()

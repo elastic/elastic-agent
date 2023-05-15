@@ -6,230 +6,319 @@ package application
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
-	"go.elastic.co/apm"
+	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/program"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/sorted"
-	"github.com/elastic/go-sysinfo"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filters"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/emitter/modifiers"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/router"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/pipeline/stream"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/operation"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring"
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/core/status"
-	reporting "github.com/elastic/elastic-agent/internal/pkg/reporter"
-	logreporter "github.com/elastic/elastic-agent/internal/pkg/reporter/log"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/core/server"
 )
 
-// FleetServerBootstrap application, does just enough to get a Fleet Server up and running so enrollment
-// can complete.
-type FleetServerBootstrap struct {
-	bgContext   context.Context
-	cancelCtxFn context.CancelFunc
-	log         *logger.Logger
-	Config      configuration.FleetAgentConfig
-	agentInfo   *info.AgentInfo
-	router      pipeline.Router
-	source      source
-	srv         *server.Server
+const (
+	elasticsearch = "elasticsearch"
+	fleetServer   = "fleet-server"
+	endpoint      = "endpoint"
+	apmServer     = "apm"
+)
+
+// ErrFleetServerNotBootstrapped set on fleet-server component and units when the Elastic Agent has not been
+// bootstrapped with the required command-line arguments for the Elastic Agent to be able to run the Fleet Server.
+var ErrFleetServerNotBootstrapped = errors.New("elastic-agent must be bootstrapped with a fleet-server; re-install or re-enroll with --fleet-server-* options")
+
+// injectFleetServerInput is the base configuration that is used plus the FleetServerComponentModifier that adjusts
+// the components before sending them to the runtime manager.
+var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
+	"outputs": map[string]interface{}{
+		"default": map[string]interface{}{
+			"type":  elasticsearch,
+			"hosts": []string{"localhost:9200"},
+		},
+	},
+	"inputs": []interface{}{
+		map[string]interface{}{
+			"id":   fleetServer,
+			"type": fleetServer,
+		},
+	},
+})
+
+// FleetServerComponentModifier modifies the comps to inject extra information from the policy into
+// the Fleet Server component and units needed to run Fleet Server correctly.
+func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) coordinator.ComponentsModifier {
+	return func(comps []component.Component, _ map[string]interface{}) ([]component.Component, error) {
+		for i, comp := range comps {
+			if comp.InputSpec != nil && comp.InputSpec.InputType == fleetServer && comp.Err == nil {
+				if serverCfg == nil {
+					// Elastic Agent was bootstrapped without a Fleet Server so enabling a Fleet Server is not
+					// supported. The Elastic Agent needs to be re-enrolled to run a Fleet Server.
+					comp.Err = ErrFleetServerNotBootstrapped
+					for j, unit := range comp.Units {
+						unit.Err = ErrFleetServerNotBootstrapped
+						comp.Units[j] = unit
+					}
+				} else {
+					for j, unit := range comp.Units {
+						if unit.Type == client.UnitTypeOutput && unit.Config.Type == elasticsearch {
+							unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &serverCfg.Output.Elasticsearch)
+							if err != nil {
+								return nil, err
+							}
+							fixOutputMap(unitCfgMap)
+							unitCfg, err := component.ExpectedConfig(unitCfgMap)
+							if err != nil {
+								return nil, err
+							}
+							unit.Config = unitCfg
+						} else if unit.Type == client.UnitTypeInput && unit.Config.Type == fleetServer {
+							unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), &inputFleetServer{
+								Policy: serverCfg.Policy,
+								Server: serverCfg,
+							})
+							if err != nil {
+								return nil, err
+							}
+							fixInputMap(unitCfgMap)
+							unitCfg, err := component.ExpectedConfig(unitCfgMap)
+							if err != nil {
+								return nil, err
+							}
+							unit.Config = unitCfg
+						}
+						comp.Units[j] = unit
+					}
+				}
+			}
+			comps[i] = comp
+		}
+		return comps, nil
+	}
 }
 
-func newFleetServerBootstrap(
-	ctx context.Context,
-	log *logger.Logger,
-	pathConfigFile string,
-	rawConfig *config.Config,
-	statusCtrl status.Controller,
-	agentInfo *info.AgentInfo,
-	tracer *apm.Tracer,
-) (*FleetServerBootstrap, error) {
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, err
+// InjectFleetConfigComponentModifier The modifier that injects the fleet configuration for the components
+// that need to be able to connect to fleet server.
+func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig, agentInfo *info.AgentInfo) coordinator.ComponentsModifier {
+	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+		hostsStr := fleetCfg.Client.GetHosts()
+		fleetHosts := make([]interface{}, 0, len(hostsStr))
+		for _, host := range hostsStr {
+			fleetHosts = append(fleetHosts, host)
+		}
+
+		for i, comp := range comps {
+			if comp.InputSpec != nil && (comp.InputSpec.InputType == endpoint || comp.InputSpec.InputType == apmServer) {
+				for j, unit := range comp.Units {
+					if unit.Type == client.UnitTypeInput && (unit.Config.Type == endpoint || unit.Config.Type == apmServer) {
+						unitCfgMap, err := toMapStr(unit.Config.Source.AsMap(), map[string]interface{}{"fleet": fleetCfg})
+						if err != nil {
+							return nil, err
+						}
+						// Set host.id for the host, assign the host from the top level config
+						// Endpoint expects this
+						// "host": {
+						// 	   "id": "b62e91be682a4108bbb080152cc5eeac"
+						// },
+						if v, ok := unitCfgMap["fleet"]; ok {
+							if m, ok := v.(map[string]interface{}); ok {
+								m["host"] = cfg["host"]
+								m["hosts"] = fleetHosts
+
+								// Inject agent log level
+								injectAgentLoggingLevel(m, agentInfo)
+							}
+						}
+						unitCfg, err := component.ExpectedConfig(unitCfgMap)
+						if err != nil {
+							return nil, err
+						}
+						unit.Config = unitCfg
+					}
+					comp.Units[j] = unit
+				}
+			}
+			comps[i] = comp
+		}
+		return comps, nil
+	}
+}
+
+type logLevelProvider interface {
+	LogLevel() string
+}
+
+func injectAgentLoggingLevel(cfg map[string]interface{}, llp logLevelProvider) {
+	if cfg == nil || llp == nil {
+		return
 	}
 
-	if log == nil {
-		log, err = logger.NewFromConfig("", cfg.Settings.LoggingConfig, false)
-		if err != nil {
-			return nil, err
+	var agentMap, loggingMap map[string]interface{}
+	if v, ok := cfg["agent"]; ok {
+		agentMap, _ = v.(map[string]interface{})
+	} else {
+		agentMap = make(map[string]interface{})
+		cfg["agent"] = agentMap
+	}
+
+	if agentMap != nil {
+		if v, ok := agentMap["logging"]; ok {
+			loggingMap, _ = v.(map[string]interface{})
+		} else {
+			loggingMap = make(map[string]interface{})
+			agentMap["logging"] = loggingMap
 		}
 	}
 
-	logR := logreporter.NewReporter(log)
-
-	sysInfo, err := sysinfo.Host()
-	if err != nil {
-		return nil, errors.New(err,
-			"fail to get system information",
-			errors.TypeUnexpected)
+	if loggingMap != nil {
+		loggingMap["level"] = llp.LogLevel()
 	}
-
-	bootstrapApp := &FleetServerBootstrap{
-		log:       log,
-		agentInfo: agentInfo,
-	}
-
-	bootstrapApp.bgContext, bootstrapApp.cancelCtxFn = context.WithCancel(ctx)
-	bootstrapApp.srv, err = server.NewFromConfig(log, cfg.Settings.GRPC, &operation.ApplicationStatusHandler{}, tracer)
-	if err != nil {
-		return nil, errors.New(err, "initialize GRPC listener")
-	}
-
-	reporter := reporting.NewReporter(bootstrapApp.bgContext, log, bootstrapApp.agentInfo, logR)
-
-	if cfg.Settings.MonitoringConfig != nil {
-		cfg.Settings.MonitoringConfig.Enabled = false
-	} else {
-		cfg.Settings.MonitoringConfig = &monitoringCfg.MonitoringConfig{Enabled: false}
-	}
-	monitor, err := monitoring.NewMonitor(cfg.Settings)
-	if err != nil {
-		return nil, errors.New(err, "failed to initialize monitoring")
-	}
-
-	router, err := router.New(log, stream.Factory(bootstrapApp.bgContext, agentInfo, cfg.Settings, bootstrapApp.srv, reporter, monitor, statusCtrl))
-	if err != nil {
-		return nil, errors.New(err, "fail to initialize pipeline router")
-	}
-	bootstrapApp.router = router
-
-	emit, err := bootstrapEmitter(
-		bootstrapApp.bgContext,
-		log,
-		agentInfo,
-		router,
-		&pipeline.ConfigModifiers{
-			Filters: []pipeline.FilterFunc{filters.StreamChecker, modifiers.InjectFleet(rawConfig, sysInfo.Info(), agentInfo)},
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	loader := config.NewLoader(log, "")
-	discover := discoverer(pathConfigFile, cfg.Settings.Path)
-	bootstrapApp.source = newOnce(log, discover, loader, emit)
-	return bootstrapApp, nil
 }
 
-// Routes returns a list of routes handled by server.
-func (b *FleetServerBootstrap) Routes() *sorted.Set {
-	return b.router.Routes()
+type fleetServerBootstrapManager struct {
+	log *logger.Logger
+
+	ch    chan coordinator.ConfigChange
+	errCh chan error
 }
 
-// Start starts a managed elastic-agent.
-func (b *FleetServerBootstrap) Start() error {
-	b.log.Info("Agent is starting")
-	defer b.log.Info("Agent is stopped")
-
-	if err := b.srv.Start(); err != nil {
-		return err
+func newFleetServerBootstrapManager(
+	log *logger.Logger,
+) *fleetServerBootstrapManager {
+	return &fleetServerBootstrapManager{
+		log:   log,
+		ch:    make(chan coordinator.ConfigChange),
+		errCh: make(chan error),
 	}
-	if err := b.source.Start(); err != nil {
-		return err
+}
+
+func (m *fleetServerBootstrapManager) Run(ctx context.Context) error {
+	m.log.Debugf("injecting fleet-server for bootstrap")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case m.ch <- &localConfigChange{injectFleetServerInput}:
 	}
 
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (m *fleetServerBootstrapManager) Errors() <-chan error {
+	return m.errCh
+}
+
+func (m *fleetServerBootstrapManager) ActionErrors() <-chan error {
 	return nil
 }
 
-// Stop stops a local agent.
-func (b *FleetServerBootstrap) Stop() error {
-	err := b.source.Stop()
-	b.cancelCtxFn()
-	b.router.Shutdown()
-	b.srv.Stop()
-	return err
+func (m *fleetServerBootstrapManager) Watch() <-chan coordinator.ConfigChange {
+	return m.ch
 }
 
-// AgentInfo retrieves elastic-agent information.
-func (b *FleetServerBootstrap) AgentInfo() *info.AgentInfo {
-	return b.agentInfo
+func fixOutputMap(m map[string]interface{}) {
+	// api_key cannot be present or Fleet Server will complain
+	delete(m, "api_key")
 }
 
-func bootstrapEmitter(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInfo, router pipeline.Router, modifiers *pipeline.ConfigModifiers) (pipeline.EmitterFunc, error) {
-	ch := make(chan *config.Config)
-
-	go func() {
-		for {
-			var c *config.Config
-			select {
-			case <-ctx.Done():
-				return
-			case c = <-ch:
-			}
-
-			err := emit(ctx, log, agentInfo, router, modifiers, c)
-			if err != nil {
-				log.Error(err)
-			}
-		}
-	}()
-
-	return func(ctx context.Context, c *config.Config) error {
-		span, _ := apm.StartSpan(ctx, "emit", "app.internal")
-		defer span.End()
-		ch <- c
-		return nil
-	}, nil
+type inputFleetServer struct {
+	Policy *configuration.FleetServerPolicyConfig `yaml:"policy,omitempty"`
+	Server *configuration.FleetServerConfig       `yaml:"server"`
 }
 
-func emit(ctx context.Context, log *logger.Logger, agentInfo transpiler.AgentInfo, router pipeline.Router, modifiers *pipeline.ConfigModifiers, c *config.Config) error {
-	if err := info.InjectAgentConfig(c); err != nil {
-		return err
-	}
-
-	// perform and verify ast translation
-	m, err := c.ToMapStr()
-	if err != nil {
-		return errors.New(err, "could not create the AST from the configuration", errors.TypeConfig)
-	}
-	ast, err := transpiler.NewAST(m)
-	if err != nil {
-		return errors.New(err, "could not create the AST from the configuration", errors.TypeConfig)
-	}
-	for _, filter := range modifiers.Filters {
-		if err := filter(log, ast); err != nil {
-			return errors.New(err, "failed to filter configuration", errors.TypeConfig)
+func fixInputMap(m map[string]interface{}) {
+	if srv, ok := m["server"]; ok {
+		if srvMap, ok := srv.(map[string]interface{}); ok {
+			// bootstrap is internal to Elastic Agent
+			delete(srvMap, "bootstrap")
+			// policy is present one level input when sent to Fleet Server
+			delete(srvMap, "policy")
+			// output is present in the output unit
+			delete(srvMap, "output")
 		}
 	}
+}
 
-	// overwrite the inputs to only have a single fleet-server input
-	transpiler.Insert(ast, transpiler.NewList([]transpiler.Node{
-		transpiler.NewDict([]transpiler.Node{
-			transpiler.NewKey("type", transpiler.NewStrVal("fleet-server")),
-		}),
-	}), "inputs")
-
-	spec, ok := program.SupportedMap["fleet-server"]
-	if !ok {
-		return errors.New("missing required fleet-server program specification")
+// toMapStr converts the input into a map[string]interface{}.
+//
+// This is done by using YAMl to marshal and then unmarshal it into the map[string]interface{}. YAML tags on the struct
+// match the loading and unloading of the configuration so this ensures that it will match what Fleet Server is
+// expecting.
+func toMapStr(input ...interface{}) (map[string]interface{}, error) {
+	m := map[interface{}]interface{}{}
+	for _, i := range input {
+		im, err := toMapInterface(i)
+		if err != nil {
+			return nil, err
+		}
+		m = mergeNestedMaps(m, im)
 	}
-	ok, err = program.DetectProgram(spec, agentInfo, ast)
+	// toMapInterface will set nested maps to a map[interface{}]interface{} which `component.ExpectedConfig` cannot
+	// handle they must be a map[string]interface{}.
+	fm := fixYamlMap(m)
+	r, ok := fm.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("expected map[string]interface{}, got %T", fm)
+	}
+	return r, nil
+}
+
+// toMapInterface converts the input into a map[interface{}]interface{} using YAML marshall and unmarshall.
+func toMapInterface(input interface{}) (map[interface{}]interface{}, error) {
+	var res map[interface{}]interface{}
+	raw, err := yaml.Marshal(input)
 	if err != nil {
-		return errors.New(err, "failed parsing the configuration")
+		return nil, err
 	}
-	if !ok {
-		return errors.New("bootstrap configuration is incorrect causing fleet-server to not be started")
+	err = yaml.Unmarshal(raw, &res)
+	if err != nil {
+		return nil, err
 	}
+	return res, nil
+}
 
-	return router.Route(ctx, ast.HashStr(), map[pipeline.RoutingKey][]program.Program{
-		pipeline.DefaultRK: {
-			{
-				Spec:   spec,
-				Config: ast,
-			},
-		},
-	})
+// mergeNestedMaps merges two map[interface{}]interface{} together deeply.
+func mergeNestedMaps(a, b map[interface{}]interface{}) map[interface{}]interface{} {
+	res := make(map[interface{}]interface{}, len(a))
+	for k, v := range a {
+		res[k] = v
+	}
+	for k, v := range b {
+		if v, ok := v.(map[interface{}]interface{}); ok {
+			if bv, ok := res[k]; ok {
+				if bv, ok := bv.(map[interface{}]interface{}); ok {
+					res[k] = mergeNestedMaps(bv, v)
+					continue
+				}
+			}
+		}
+		res[k] = v
+	}
+	return res
+}
+
+// fixYamlMap converts map[interface{}]interface{} into map[string]interface{} through out the entire map.
+func fixYamlMap(input interface{}) interface{} {
+	switch i := input.(type) {
+	case map[string]interface{}:
+		for k, v := range i {
+			i[k] = fixYamlMap(v)
+		}
+	case map[interface{}]interface{}:
+		m := map[string]interface{}{}
+		for k, v := range i {
+			if ks, ok := k.(string); ok {
+				m[ks] = fixYamlMap(v)
+			}
+		}
+		return m
+	case []interface{}:
+		for j, v := range i {
+			i[j] = fixYamlMap(v)
+		}
+	}
+	return input
 }

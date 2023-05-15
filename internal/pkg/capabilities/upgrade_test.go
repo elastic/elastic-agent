@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // duplicate code is in test cases
 package capabilities
 
 import (
@@ -14,11 +15,10 @@ import (
 )
 
 func TestUpgrade(t *testing.T) {
-	tr := &testReporter{}
 	l, _ := logger.New("test", false)
 	t.Run("invalid rule", func(t *testing.T) {
 		r := &inputCapability{}
-		cap, err := newUpgradeCapability(l, r, tr)
+		cap, err := newUpgradeCapability(l, r)
 		assert.NoError(t, err, "no error expected")
 		assert.Nil(t, cap, "cap should not be created")
 	})
@@ -33,7 +33,7 @@ func TestUpgrade(t *testing.T) {
 			},
 		}
 
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 	})
@@ -47,11 +47,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		ta := &testUpgradeAction{version: "8.0.0"}
+		ta := map[string]interface{}{
+			"version": "8.0.0",
+		}
 		outAfter, err := cap.Apply(ta)
 
 		assert.NoError(t, err, "should not be failing")
@@ -69,11 +71,13 @@ func TestUpgrade(t *testing.T) {
 			},
 		}
 
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		ta := &testUpgradeAction{version: "8.0.0"}
+		ta := map[string]interface{}{
+			"version": "8.0.0",
+		}
 		outAfter, err := cap.Apply(ta)
 
 		assert.Error(t, err, "should fail")
@@ -90,11 +94,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		ta := &testUpgradeAction{version: "9.0.0"}
+		ta := map[string]interface{}{
+			"version": "8.0.0",
+		}
 		outAfter, err := cap.Apply(ta)
 
 		assert.NotEqual(t, ErrBlocked, err, "should not be blocking")
@@ -111,11 +117,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		ta := &testUpgradeAction{version: "8.0.0"}
+		ta := map[string]interface{}{
+			"version": "8.0.0",
+		}
 		outAfter, err := cap.Apply(ta)
 
 		assert.Equal(t, ErrBlocked, err, "should be blocking")
@@ -132,11 +140,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		ta := &testUpgradeAction{version: "8.1.0"}
+		ta := map[string]interface{}{
+			"version": "8.1.0",
+		}
 		outAfter, err := cap.Apply(ta)
 
 		assert.Equal(t, ErrBlocked, err, "should be blocking")
@@ -153,11 +163,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		ta := &testUpgradeAction{version: "7.157.0"}
+		ta := map[string]interface{}{
+			"version": "7.157.0",
+		}
 		outAfter, err := cap.Apply(ta)
 
 		assert.Equal(t, ErrBlocked, err, "should be blocking")
@@ -174,11 +186,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		ta := &testUpgradeAction{version: "8.2.0"}
+		ta := map[string]interface{}{
+			"version": "8.2.0",
+		}
 		outAfter, err := cap.Apply(ta)
 
 		assert.NotEqual(t, ErrBlocked, err, "should not be blocking")
@@ -195,7 +209,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -221,13 +235,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		apiAction := &fleetapi.ActionUpgrade{
-			Version:   "9.0.0",
-			SourceURI: "http://artifacts.elastic.co",
+		apiAction := map[string]interface{}{
+			"version":    "9.0.0",
+			"source_uri": "http://artifacts.elastic.co",
 		}
 		outAfter, err := cap.Apply(apiAction)
 
@@ -245,13 +259,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		apiAction := fleetapi.ActionUpgrade{
-			Version:   "9.0.0",
-			SourceURI: "http://artifacts.elastic.co",
+		apiAction := map[string]interface{}{
+			"version":    "9.0.0",
+			"source_uri": "http://artifacts.elastic.co",
 		}
 		outAfter, err := cap.Apply(apiAction)
 
@@ -269,13 +283,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		apiAction := fleetapi.ActionUpgrade{
-			Version:   "9.0.0",
-			SourceURI: "https://artifacts.elastic.co",
+		apiAction := map[string]interface{}{
+			"version":    "9.0.0",
+			"source_uri": "https://artifacts.elastic.co",
 		}
 		outAfter, err := cap.Apply(apiAction)
 
@@ -293,13 +307,13 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
-		apiAction := fleetapi.ActionUpgrade{
-			Version:   "9.0.0",
-			SourceURI: "http://artifacts.elastic.co",
+		apiAction := map[string]interface{}{
+			"version":    "9.0.0",
+			"source_uri": "http://artifacts.elastic.co",
 		}
 		outAfter, err := cap.Apply(apiAction)
 
@@ -316,7 +330,7 @@ func TestUpgrade(t *testing.T) {
 				},
 			},
 		}
-		cap, err := newUpgradesCapability(l, rd, tr)
+		cap, err := newUpgradesCapability(l, rd)
 		assert.NoError(t, err, "error not expected, provided eql is valid")
 		assert.NotNil(t, cap, "cap should be created")
 
@@ -327,18 +341,4 @@ func TestUpgrade(t *testing.T) {
 		assert.NoError(t, err, "should not fail")
 		assert.Equal(t, apiAction, outAfter, "action should not be altered")
 	})
-}
-
-type testUpgradeAction struct {
-	version string
-}
-
-// Version to upgrade to.
-func (a *testUpgradeAction) Version() string {
-	return a.version
-}
-
-// SourceURI for download.
-func (a *testUpgradeAction) SourceURI() string {
-	return "http://artifacts.elastic.co"
 }

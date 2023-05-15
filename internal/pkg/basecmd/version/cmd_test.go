@@ -9,13 +9,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/server"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -57,7 +59,7 @@ func TestCmdBinaryOnlyYAML(t *testing.T) {
 }
 
 func TestCmdDaemon(t *testing.T) {
-	srv := server.New(newErrorLogger(t), nil, nil, nil, apmtest.DiscardTracer)
+	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer, nil, configuration.DefaultGRPCConfig())
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
@@ -73,7 +75,7 @@ func TestCmdDaemon(t *testing.T) {
 }
 
 func TestCmdDaemonYAML(t *testing.T) {
-	srv := server.New(newErrorLogger(t), nil, nil, nil, apmtest.DiscardTracer)
+	srv := server.New(newErrorLogger(t), nil, nil, apmtest.DiscardTracer, nil, configuration.DefaultGRPCConfig())
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
