@@ -2,12 +2,9 @@ package fleetserver
 
 import (
 	"context"
-	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-
-	"github.com/elastic/elastic-agent/testing/fleetserver/openapi"
 )
 
 // It was generated using https://openapi-generator.tech/
@@ -22,220 +19,192 @@ type API struct {
 	AckFn func(
 		ctx context.Context,
 		id string,
-		xRequestID string,
-		ackRequest openapi.AckRequest) (openapi.AckResponse, *openapi.ModelError)
+		ackRequest AckRequest) (*AckResponse, *HTTPError)
 
 	CheckinFn func(
 		ctx context.Context,
 		id string,
 		userAgent string,
 		acceptEncoding string,
-		xRequestID string,
-		checkinRequest openapi.CheckinRequest) (openapi.CheckinResponse, *openapi.ModelError)
+		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError)
 
 	EnrollFn func(
 		ctx context.Context,
 		id string,
 		userAgent string,
-		xRequestID string,
-		enrollRequest openapi.EnrollRequest) (openapi.EnrollResponse, *openapi.ModelError)
+		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
 
 	ArtifactFn func(
 		ctx context.Context,
 		id string,
-		sha2 string,
-		xRequestID string) (openapi.ImplResponse, *openapi.ModelError)
+		sha2 string) *HTTPError
 
 	StatusFn func(
-		ctx context.Context,
-		xRequestID string) (openapi.StatusResponse, *openapi.ModelError)
+		ctx context.Context) (*StatusResponse, *HTTPError)
 
 	UploadBeginFn func(
 		ctx context.Context,
-		requestBody map[string]interface{},
-		xRequestID string) (openapi.UploadBeginResponse, *openapi.ModelError)
+		requestBody UploadBeginRequest) (*UploadBeginResponse, *HTTPError)
 
 	UploadChunkFn func(
 		ctx context.Context,
 		id string,
 		chunkNum int32,
 		xChunkSHA2 string,
-		body *os.File,
-		xRequestID string) (openapi.ImplResponse, *openapi.ModelError)
+		body io.ReadCloser) *HTTPError
 
 	UploadCompleteFn func(
 		ctx context.Context,
 		id string,
-		uploadCompleteRequest openapi.UploadCompleteRequest,
-		xRequestID string) (openapi.UploadComplete200Response, *openapi.ModelError)
+		uploadCompleteRequest UploadCompleteRequest) *HTTPError
 }
 
 // NewTest returns a new started *httptest.Server mocking the Fleet Server API.
 // If a route is called and its handler (the *Fn field) is nil a.
 // http.StatusNotImplemented error will be returned.
-// If api is nil, NewTest panics
-func NewTest(api *API) *httptest.Server {
-	if api == nil {
-		panic("api cannot be nil")
-	}
-
-	r := openapi.NewDefaultApiController(api)
-	mux := openapi.NewRouter(r)
+func NewTest(api API) *httptest.Server {
+	mux := NewRouter(Handlers{api: api})
 
 	return httptest.NewServer(mux)
 }
 
 // AgentAcks -
-func (s *API) AgentAcks(
+func (a API) AgentAcks(
 	ctx context.Context,
 	id string,
-	xRequestID string,
-	ackRequest openapi.AckRequest) (openapi.ImplResponse, error) {
-	if s.AckFn == nil {
-		return openapi.Response(http.StatusNotImplemented, nil),
-			errors.New("agent acs API not implemented")
+	ackRequest AckRequest) (*AckResponse, *HTTPError) {
+	if a.AckFn == nil {
+		return nil,
+			&HTTPError{StatusCode: http.StatusNotImplemented,
+				Message: "agent acs API not implemented"}
 	}
 
-	resp, err := s.AckFn(ctx, id, xRequestID, ackRequest)
+	resp, err := a.AckFn(ctx, id, ackRequest)
 	if err != nil {
-		return openapi.Response(err.StatusCode, err), nil
+		return nil, err
 	}
 
-	return openapi.Response(http.StatusOK, resp), nil
+	return resp, nil
 }
 
 // AgentCheckin -
-func (s *API) AgentCheckin(
+func (a API) AgentCheckin(
 	ctx context.Context,
 	id string,
 	userAgent string,
 	acceptEncoding string,
-	xRequestID string,
-	checkinRequest openapi.CheckinRequest) (openapi.ImplResponse, error) {
-	if s.CheckinFn == nil {
-		return openapi.Response(http.StatusNotImplemented, nil),
-			errors.New("agent checkin API not implemented")
+	checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
+	if a.CheckinFn == nil {
+		return nil,
+			&HTTPError{StatusCode: http.StatusNotImplemented,
+				Message: "agent checkin API not implemented"}
 	}
 
-	resp, err := s.CheckinFn(
-		ctx, id, userAgent, acceptEncoding, xRequestID, checkinRequest)
+	resp, err := a.CheckinFn(
+		ctx, id, userAgent, acceptEncoding, checkinRequest)
 	if err != nil {
-		return openapi.Response(err.StatusCode, err), nil
+		return nil, err
 	}
 
-	return openapi.Response(http.StatusOK, resp), nil
+	return resp, nil
 }
 
 // AgentEnroll -
-func (s *API) AgentEnroll(
+func (a API) AgentEnroll(
 	ctx context.Context,
 	id string,
 	userAgent string,
-	xRequestID string,
-	enrollRequest openapi.EnrollRequest) (openapi.ImplResponse, error) {
-	if s.EnrollFn == nil {
-		return openapi.Response(http.StatusNotImplemented, nil),
-			errors.New("agent enroll API not implemented")
+	enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
+	if a.EnrollFn == nil {
+		return nil,
+			&HTTPError{StatusCode: http.StatusNotImplemented,
+				Message: "agent checkin API not implemented"}
 	}
 
-	resp, err := s.EnrollFn(ctx, id, userAgent, xRequestID, enrollRequest)
+	resp, err := a.EnrollFn(ctx, id, userAgent, enrollRequest)
 	if err != nil {
-		return openapi.Response(err.StatusCode, err), nil
+		return nil, err
 	}
 
-	return openapi.Response(http.StatusOK, resp), nil
+	return resp, nil
 }
 
 // Artifact -
-func (s *API) Artifact(
+func (a API) Artifact(
 	ctx context.Context,
 	id string,
-	sha2 string,
-	xRequestID string) (openapi.ImplResponse, error) {
-	if s.ArtifactFn == nil {
-		return openapi.Response(http.StatusNotImplemented, nil),
-			errors.New("artifact API not implemented")
+	sha2 string) *HTTPError {
+	if a.ArtifactFn == nil {
+		return &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "artifact API not implemented"}
 	}
 
-	resp, err := s.ArtifactFn(ctx, id, sha2, xRequestID)
-	if err != nil {
-		return openapi.Response(err.StatusCode, err), nil
-	}
-
-	return openapi.Response(http.StatusOK, resp), nil
+	return a.ArtifactFn(ctx, id, sha2)
 }
 
 // Status -
-func (s *API) Status(
-	ctx context.Context,
-	xRequestID string) (openapi.ImplResponse, error) {
-	if s.StatusFn == nil {
-		return openapi.Response(http.StatusNotImplemented, nil),
-			errors.New("status API not implemented")
+func (a API) Status(
+	ctx context.Context) (*StatusResponse, *HTTPError) {
+	if a.StatusFn == nil {
+		return nil, &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "status API not implemented"}
 	}
 
-	resp, err := s.StatusFn(ctx, xRequestID)
+	resp, err := a.StatusFn(ctx)
 	if err != nil {
-		return openapi.Response(err.StatusCode, err), nil
+		return nil, err
 	}
 
-	return openapi.Response(http.StatusOK, resp), nil
+	return resp, nil
 }
 
 // UploadBegin - Initiate a file upload process
-func (s *API) UploadBegin(
+func (a API) UploadBegin(
 	ctx context.Context,
-	requestBody map[string]interface{},
-	xRequestID string) (openapi.ImplResponse, error) {
-	if s.UploadBeginFn == nil {
-		return openapi.Response(http.StatusNotImplemented, nil),
-			errors.New("upload begin API not implemented")
+	requestBody UploadBeginRequest) (*UploadBeginResponse, *HTTPError) {
+	if a.UploadBeginFn == nil {
+		return nil, &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "upload begin API not implemented"}
+
 	}
 
-	resp, err := s.UploadBeginFn(ctx, requestBody, xRequestID)
+	resp, err := a.UploadBeginFn(ctx, requestBody)
 	if err != nil {
-		return openapi.Response(err.StatusCode, err), nil
+		return nil, err
 	}
 
-	return openapi.Response(http.StatusOK, resp), nil
+	return resp, nil
 }
 
 // UploadChunk - Upload a section of file data
-func (s *API) UploadChunk(
+func (a API) UploadChunk(
 	ctx context.Context,
 	id string,
 	chunkNum int32,
-	xChunkSHA2 string,
-	body *os.File,
-	xRequestID string) (openapi.ImplResponse, error) {
-	if s.UploadChunkFn == nil {
-		return openapi.Response(http.StatusNotImplemented, nil),
-			errors.New("upload chunk API not implemented")
+	chunkSHA2 string,
+	body io.ReadCloser) *HTTPError {
+	if a.UploadChunkFn == nil {
+		return &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "upload chunk API not implemented"}
 	}
 
-	resp, err := s.UploadChunkFn(ctx, id, chunkNum, xChunkSHA2, body, xRequestID)
-	if err != nil {
-		return openapi.Response(err.StatusCode, err), nil
-	}
-
-	return openapi.Response(http.StatusOK, resp), nil
+	return a.UploadChunkFn(ctx, id, chunkNum, chunkSHA2, body)
 }
 
 // UploadComplete - Complete a file upload process
-func (s *API) UploadComplete(
+func (a API) UploadComplete(
 	ctx context.Context,
 	id string,
-	uploadCompleteRequest openapi.UploadCompleteRequest,
-	xRequestID string) (openapi.ImplResponse, error) {
-	if s.UploadCompleteFn == nil {
-		return openapi.Response(http.StatusNotImplemented, nil),
-			errors.New("upload complete API not implemented")
+	uploadCompleteRequest UploadCompleteRequest) (*UploadComplete200Response, *HTTPError) {
+	if a.UploadCompleteFn == nil {
+		return nil, &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "upload complete API not implemented"}
 	}
 
-	resp, err := s.UploadCompleteFn(ctx, id, uploadCompleteRequest, xRequestID)
+	err := a.UploadCompleteFn(ctx, id, uploadCompleteRequest)
 	if err != nil {
-		return openapi.Response(err.StatusCode, err), nil
+		return nil, err
 	}
 
-	return openapi.Response(http.StatusOK, resp), nil
+	return &UploadComplete200Response{Status: "ok"}, nil
 }

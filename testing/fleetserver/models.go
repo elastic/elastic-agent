@@ -348,8 +348,8 @@ type UploadCompleteRequestTransithash struct {
 // ================================== Errors ===================================
 // =============================================================================
 
-// ModelError - Error processing request.
-type ModelError struct {
+// HTTPError is the HTTP error to be returned to the client.
+type HTTPError struct {
 
 	// The HTTP status code of the error.
 	StatusCode int `json:"statusCode"`
