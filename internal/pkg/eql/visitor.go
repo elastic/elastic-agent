@@ -268,7 +268,7 @@ func (v *expVisitor) VisitVariableExp(ctx *parser.VariableExpContext) interface{
 		names := []string{}
 		for _, entry := range ctx.AllVariable() {
 			// Wrap the name in quotes for use in error
-			names = append(names, fmt.Sprintf("\"%v\"", entry.GetText()))
+			names = append(names, fmt.Sprintf("%q", entry.GetText()))
 		}
 		// None of the variables could be resolved and allowMissingVars is
 		// false, generate an appropriate error.
