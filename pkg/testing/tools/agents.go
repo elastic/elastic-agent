@@ -13,7 +13,7 @@ import (
 )
 
 // GetAgentByHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
-func GetAgentByHostnameFromList(client *kibana.Client, hostname string) (*kibana.Agent, error) {
+func GetAgentByHostnameFromList(client *kibana.Client, hostname string) (*kibana.AgentExisting, error) {
 	listAgentsResp, err := client.ListAgents(kibana.ListAgentsRequest{})
 	if err != nil {
 		return nil, err
