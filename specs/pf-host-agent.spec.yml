@@ -11,7 +11,7 @@ inputs:
       - elasticsearch
     runtime:
       preventions:
-        - condition: ${runtime.user.root} == false
+        - condition: ${user.root} == false
           message: "Elastic Agent must be running as root"
     command:
       args:

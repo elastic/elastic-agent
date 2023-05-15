@@ -50,9 +50,10 @@ func TestEqlNewReportsBadSyntax(t *testing.T) {
 
 func TestEql(t *testing.T) {
 	testcases := []struct {
-		expression string
-		result     bool
-		err        bool
+		expression       string
+		allowMissingVars bool
+		result           bool
+		err              bool
 	}{
 		// variables
 		{expression: "${env.HOSTNAME|host.name|'fallback'} == 'my-hostname'", result: true},
@@ -62,6 +63,7 @@ func TestEql(t *testing.T) {
 		{expression: "${env.MISSING|host.MISSING|2.0} == 2.0", result: true},
 		{expression: "${env.MISSING|host.MISSING|true} == true", result: true},
 		{expression: "${env.MISSING|host.MISSING|false} == false", result: true},
+		{expression: "${env.MISSING|host.MISSING}", err: true},
 		{expression: "${'constant'} == 'constant'", result: true},
 		{expression: "${data.with-dash} == 'dash-value'", result: true},
 		{expression: "${'dash-value'} == 'dash-value'", result: true},
@@ -85,9 +87,12 @@ func TestEql(t *testing.T) {
 		{expression: "true == false", result: false},
 		{expression: "false == false", result: true},
 		{expression: "true == false", result: false},
-		{expression: "${missing} == ${missing}", result: true},
-		{expression: "${missing} == false", result: false},
-		{expression: "false == ${missing}", result: false},
+		{expression: "${missing} == ${missing}", allowMissingVars: true, result: true},
+		{expression: "${missing} == false", allowMissingVars: true, result: false},
+		{expression: "false == ${missing}", allowMissingVars: true, result: false},
+		{expression: "${missing} == ${missing}", err: true},
+		{expression: "${missing} == false", err: true},
+		{expression: "false == ${missing}", err: true},
 
 		// not equal
 		{expression: "'hello' != 'hello'", result: false},
@@ -103,9 +108,12 @@ func TestEql(t *testing.T) {
 		{expression: "true != false", result: true},
 		{expression: "false != false", result: false},
 		{expression: "true != false", result: true},
-		{expression: "${missing} != ${missing}", result: false},
-		{expression: "${missing} != false", result: true},
-		{expression: "false != ${missing}", result: true},
+		{expression: "${missing} != ${missing}", allowMissingVars: true, result: false},
+		{expression: "${missing} != false", allowMissingVars: true, result: true},
+		{expression: "false != ${missing}", allowMissingVars: true, result: true},
+		{expression: "${missing} != ${missing}", err: true},
+		{expression: "${missing} != false", err: true},
+		{expression: "false != ${missing}", err: true},
 
 		// gt
 		{expression: "1 > 5", result: false},
@@ -211,6 +219,14 @@ func TestEql(t *testing.T) {
 		{expression: "((1 == 1) AND (2 == 2)) OR (2 != 3)", result: true},
 		{expression: "1 == 1 OR 2 == 2 AND 2 != 3", result: true},
 
+		// evaluation doesn't use logical short-circuits
+		{expression: "${host.name} == 'asdf'", result: false},
+		{expression: "${host.name} == 'asdf' AND ${missing} == 'qwer'", err: true},
+		{expression: "${host.name} == 'asdf' AND ${missing} == 'qwer'", allowMissingVars: true, result: false},
+		{expression: "${host.name} == 'host-name'", result: true},
+		{expression: "${host.name} == 'host-name' OR ${missing} == 'qwer'", err: true},
+		{expression: "${host.name} == 'host-name' OR ${missing} == 'qwer'", allowMissingVars: true, result: true},
+
 		// arrays
 		{expression: "[true, false, 1, 1.0, 'test'] == [true, false, 1, 1.0, 'test']", result: true},
 		{expression: "[true, false, 1, 1.0, 'test'] == [true, false, 1, 1.1, 'test']", result: false},
@@ -233,7 +249,8 @@ func TestEql(t *testing.T) {
 		{expression: "arrayContains([true, 1, 3.5, 'str'], 'str')", result: true},
 		{expression: "arrayContains([true, 1, 3.5, 'str'], 'str2')", result: false},
 		{expression: "arrayContains([true, 1, 3.5, 'str'], 'str2', 3.5)", result: true},
-		{expression: "arrayContains(${null.data}, 'str2', 3.5)", result: false},
+		{expression: "arrayContains(${null.data}, 'str2', 3.5)", allowMissingVars: true, result: false},
+		{expression: "arrayContains(${null.data}, 'str2', 3.5)", err: true},
 		{expression: "arrayContains(${data.array}, 'array5', 'array2')", result: true},
 		{expression: "arrayContains('not array', 'str2')", err: true},
 
@@ -242,7 +259,8 @@ func TestEql(t *testing.T) {
 		{expression: "hasKey({key1: 'val1', key2: 'val2'}, 'other', 'key1')", result: true},
 		{expression: "hasKey({key1: 'val1', key2: 'val2'}, 'missing', 'still')", result: false},
 		{expression: "hasKey(${data.dict}, 'key3', 'still')", result: true},
-		{expression: "hasKey(${null}, 'key3', 'still')", result: false},
+		{expression: "hasKey(${null}, 'key3', 'still')", allowMissingVars: true, result: false},
+		{expression: "hasKey(${null}, 'key3', 'still')", err: true},
 		{expression: "hasKey(${data.dict})", err: true},
 		{expression: "hasKey(${data.array}, 'not present')", err: true},
 
@@ -251,7 +269,8 @@ func TestEql(t *testing.T) {
 		{expression: "length([true, 1, 3.5, 'str']) == 4", result: true},
 		{expression: "length({key: 'data', other: '2'}) == 2", result: true},
 		{expression: "length(${data.dict}) == 3", result: true},
-		{expression: "length(${null}) == 0", result: true},
+		{expression: "length(${null}) == 0", allowMissingVars: true, result: true},
+		{expression: "length(${null}) == 0", err: true},
 		{expression: "length(4) == 2", err: true},
 		{expression: "length('hello', 'too many args') == 2", err: true},
 
@@ -359,7 +378,7 @@ func TestEql(t *testing.T) {
 				debug(t, test.expression)
 			}
 
-			r, err := Eval(test.expression, store)
+			r, err := Eval(test.expression, store, test.allowMissingVars)
 
 			if test.err {
 				require.Error(t, err)
@@ -393,7 +412,7 @@ func BenchmarkEval(b *testing.B) {
 
 	var r bool
 	for n := 0; n < b.N; n++ {
-		r, _ = expression.Eval(nil)
+		r, _ = expression.Eval(nil, true)
 	}
 	result = r
 }
