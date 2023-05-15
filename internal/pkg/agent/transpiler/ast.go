@@ -266,7 +266,7 @@ func (k *Key) Apply(vars *Vars) (Node, error) {
 		case *BoolVal:
 			return k, nil
 		case *StrVal:
-			cond, err := eql.Eval(v.value, vars)
+			cond, err := eql.Eval(v.value, vars, true)
 			if err != nil {
 				return nil, fmt.Errorf(`condition "%s" evaluation failed: %w`, v.value, err)
 			}

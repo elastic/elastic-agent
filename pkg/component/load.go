@@ -92,7 +92,7 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 	for _, o := range opts {
 		o(&opt)
 	}
-	matches, err := filepath.Glob(filepath.Join(dir, specGlobPattern))
+	specFiles, err := specFilesForDirectory(dir)
 	if err != nil {
 		return RuntimeSpecs{}, err
 	}
@@ -101,29 +101,21 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 	inputAliases := make(map[string]string)
 	shipperSpecs := make(map[string]ShipperRuntimeSpec)
 	shipperOutputs := make(map[string][]string)
-	for _, match := range matches {
-		binaryName := filepath.Base(match[:len(match)-len(specGlobPattern)+1])
-		binaryPath := match[:len(match)-len(specGlobPattern)+1]
+	for path, spec := range specFiles {
+		binaryName := filepath.Base(path[:len(path)-len(specGlobPattern)+1])
+		binaryPath := path[:len(path)-len(specGlobPattern)+1]
 		if platform.OS == Windows {
 			binaryPath += ".exe"
 		}
 		if !opt.skipBinaryCheck {
 			info, err := os.Stat(binaryPath)
 			if errors.Is(err, os.ErrNotExist) {
-				return RuntimeSpecs{}, fmt.Errorf("missing matching binary for %s", match)
+				return RuntimeSpecs{}, fmt.Errorf("missing matching binary for %s", path)
 			} else if err != nil {
 				return RuntimeSpecs{}, fmt.Errorf("failed to stat %s: %w", binaryPath, err)
 			} else if info.IsDir() {
-				return RuntimeSpecs{}, fmt.Errorf("missing matching binary for %s", match)
+				return RuntimeSpecs{}, fmt.Errorf("missing matching binary for %s", path)
 			}
-		}
-		data, err := ioutil.ReadFile(match)
-		if err != nil {
-			return RuntimeSpecs{}, fmt.Errorf("failed reading spec %s: %w", match, err)
-		}
-		spec, err := LoadSpec(data)
-		if err != nil {
-			return RuntimeSpecs{}, fmt.Errorf("failed reading spec %s: %w", match, err)
 		}
 		for _, input := range spec.Inputs {
 			if !containsStr(inputTypes, input.Name) {
@@ -134,17 +126,17 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 				continue
 			}
 			if existing, exists := inputSpecs[input.Name]; exists {
-				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input '%s' already exists in spec '%s'", match, input.Name, existing.BinaryName)
+				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input '%s' already exists in spec '%s'", path, input.Name, existing.BinaryName)
 			}
 			if existing, exists := inputAliases[input.Name]; exists {
-				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input '%s' collides with an alias from another input '%s'", match, input.Name, existing)
+				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input '%s' collides with an alias from another input '%s'", path, input.Name, existing)
 			}
 			for _, alias := range input.Aliases {
 				if existing, exists := inputSpecs[alias]; exists {
-					return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input alias '%s' collides with an already defined input in spec '%s'", match, alias, existing.BinaryName)
+					return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input alias '%s' collides with an already defined input in spec '%s'", path, alias, existing.BinaryName)
 				}
 				if existing, exists := inputAliases[alias]; exists {
-					return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input alias '%s' collides with an already defined input alias for input '%s'", match, alias, existing)
+					return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input alias '%s' collides with an already defined input alias for input '%s'", path, alias, existing)
 				}
 			}
 			inputSpecs[input.Name] = InputRuntimeSpec{
@@ -160,7 +152,7 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 		for _, shipper := range spec.Shippers {
 			// map the native outputs that the shipper supports
 			for _, output := range shipper.Outputs {
-				shippers, _ := shipperOutputs[output]
+				shippers := shipperOutputs[output]
 				shippers = append(shippers, shipper.Name)
 				shipperOutputs[output] = shippers
 			}
@@ -169,7 +161,7 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 				continue
 			}
 			if existing, exists := shipperSpecs[shipper.Name]; exists {
-				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': shipper '%s' already exists in spec '%s'", match, shipper.Name, existing.BinaryName)
+				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': shipper '%s' already exists in spec '%s'", path, shipper.Name, existing.BinaryName)
 			}
 			shipperSpecs[shipper.Name] = ShipperRuntimeSpec{
 				ShipperType: shipper.Name,
@@ -187,6 +179,28 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 		shipperSpecs:   shipperSpecs,
 		shipperOutputs: shipperOutputs,
 	}, nil
+}
+
+// specFilesForDirectory loads all spec files in the target directory
+// into Spec structs and returns them in a map keyed by file path.
+func specFilesForDirectory(dir string) (map[string]Spec, error) {
+	specFiles := make(map[string]Spec)
+	matches, err := filepath.Glob(filepath.Join(dir, specGlobPattern))
+	if err != nil {
+		return nil, err
+	}
+	for _, match := range matches {
+		data, err := ioutil.ReadFile(match)
+		if err != nil {
+			return nil, fmt.Errorf("failed reading spec %s: %w", match, err)
+		}
+		spec, err := LoadSpec(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed reading spec %s: %w", match, err)
+		}
+		specFiles[match] = spec
+	}
+	return specFiles, nil
 }
 
 // NewRuntimeSpecs creates a RuntimeSpecs from already loaded input and shipper runtime specifications.
@@ -226,7 +240,7 @@ func NewRuntimeSpecs(platform PlatformDetail, inputSpecs []InputRuntimeSpec, shi
 	for _, shipperSpec := range shipperSpecs {
 		// map the native outputs that the shipper supports
 		for _, output := range shipperSpec.Spec.Outputs {
-			shippers, _ := shipperOutputs[output]
+			shippers := shipperOutputs[output]
 			shippers = append(shippers, shipperSpec.Spec.Name)
 			shipperOutputs[output] = shippers
 		}
