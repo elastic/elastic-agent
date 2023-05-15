@@ -14,7 +14,7 @@ import (
 // Once it's installed, call it using the fleet-server open api spec: fleet-server/model/openapi.yml
 // openapi-generator-cli generate  -i ../../../fleet-server/model/openapi.yml -g go-server -o ./
 
-// API holds the handlers for the fleet-api, see https://petstore.swagger.io/?url=https://raw.githubusercontent.com/elastic/fleet-server/main/model/openapi.yml#/default/uploadComplete
+// API holds the handlers for the fleet-api, see https://petstore.swagger.io/?url=https://raw.githubusercontent.com/elastic/fleet-server/main/model/openapi.yml
 // for rendered OpenAPI definition.
 // If any of the handlers are nil, a http.StatusNotImplemented is returned for
 // the route.
