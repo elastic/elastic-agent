@@ -6,7 +6,7 @@ Spec files are YML files that describe the capabilities of a component and when 
 
 ## Preventions
 
-Inputs may include a `runtime.preventions` section containing [EQL conditions](https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html#eql-syntax-conditions) which should prevent the use of that input if any are true. Each prevention should include a `condition` in EQL syntax and a `message` that will be displayed if that condition prevents the use of this input.
+Components may include a `runtime.preventions` section containing [EQL conditions](https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html#eql-syntax-conditions) which should prevent the use of that component if any are true. Each prevention should include a `condition` in EQL syntax and a `message` that will be displayed if the condition prevents the use of a component.
 
 Here are some example preventions taken from the Endpoint spec file:
 
