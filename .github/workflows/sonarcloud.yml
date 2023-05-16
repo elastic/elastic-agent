@@ -1,6 +1,10 @@
 name: SonarCloud
 
 on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
   workflow_run:
     workflows: ["CodeCoverage Build"]
     types:
@@ -16,7 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0
+          repository: '${{ github.event.workflow_run.head_repository.full_name }}'
+          ref: '${{ github.event.workflow_run.head_branch }}'
 
       - name: 'Download artifact'
         uses: actions/github-script@v3.1.0
@@ -38,11 +44,77 @@ jobs:
             });
             var fs = require('fs');
             fs.writeFileSync('${{github.workspace}}/test-coverage.zip', Buffer.from(download.data));
-      - run: unzip test-coverage.zip
+      - run: unzip -o test-coverage.zip -d build
+
+      - name: Retrieve the pr number
+        id: pr-number
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            var fs = require('fs');
+            var pr_number = Number(fs.readFileSync('./build/pull_request_number'));
+            return pr_number;
+
+      - name: Retrieve the pr base
+        id: pr-base
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            var fs = require('fs');
+            var pr_base = fs.readFileSync('./build/pull_request_base');
+            return pr_base;
+
+      - name: Retrieve the pr branch
+        id: pr-branch
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            var fs = require('fs');
+            var pr_base = fs.readFileSync('./build/pull_request_branch');
+            return pr_base;
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha }}
+            -Dsonar.pullrequest.key=${{ steps.pr-number.outputs.result }}
+            -Dsonar.pullrequest.branch=${{ steps.pr-branch.outputs.result }}
+            -Dsonar.pullrequest.base=${{ steps.pr-base.outputs.result }}
 
+  branch-coverage:
+    name: Branch SonarCloud
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Run Mage
+        uses: magefile/mage-action@v2
+        env:
+          TEST_COVERAGE: 'true'
+        with:
+          version: latest
+          args: unitTest
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

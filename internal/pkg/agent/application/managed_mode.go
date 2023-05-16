@@ -39,16 +39,17 @@ import (
 const dispatchFlushInterval = time.Minute * 5
 
 type managedConfigManager struct {
-	log         *logger.Logger
-	agentInfo   *info.AgentInfo
-	cfg         *configuration.Configuration
-	client      *remote.Client
-	store       storage.Store
-	stateStore  *store.StateStore
-	actionQueue *queue.ActionQueue
-	dispatcher  *dispatcher.ActionDispatcher
-	runtime     *runtime.Manager
-	coord       *coordinator.Coordinator
+	log              *logger.Logger
+	agentInfo        *info.AgentInfo
+	cfg              *configuration.Configuration
+	client           *remote.Client
+	store            storage.Store
+	stateStore       *store.StateStore
+	actionQueue      *queue.ActionQueue
+	dispatcher       *dispatcher.ActionDispatcher
+	runtime          *runtime.Manager
+	coord            *coordinator.Coordinator
+	fleetInitTimeout time.Duration
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
@@ -60,6 +61,7 @@ func newManagedConfigManager(
 	cfg *configuration.Configuration,
 	storeSaver storage.Store,
 	runtime *runtime.Manager,
+	fleetInitTimeout time.Duration,
 ) (*managedConfigManager, error) {
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
@@ -86,17 +88,18 @@ func newManagedConfigManager(
 	}
 
 	return &managedConfigManager{
-		log:         log,
-		agentInfo:   agentInfo,
-		cfg:         cfg,
-		client:      client,
-		store:       storeSaver,
-		stateStore:  stateStore,
-		actionQueue: actionQueue,
-		dispatcher:  actionDispatcher,
-		runtime:     runtime,
-		ch:          make(chan coordinator.ConfigChange),
-		errCh:       make(chan error),
+		log:              log,
+		agentInfo:        agentInfo,
+		cfg:              cfg,
+		client:           client,
+		store:            storeSaver,
+		stateStore:       stateStore,
+		actionQueue:      actionQueue,
+		dispatcher:       actionDispatcher,
+		runtime:          runtime,
+		fleetInitTimeout: fleetInitTimeout,
+		ch:               make(chan coordinator.ConfigChange),
+		errCh:            make(chan error),
 	}, nil
 }
 
@@ -169,7 +172,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
 		} else {
-			err = m.initFleetServer(ctx)
+			err = m.initFleetServer(ctx, m.cfg.Fleet.Server)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
@@ -259,14 +262,19 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 	return false
 }
 
-func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
+
+	if m.fleetInitTimeout == 0 {
+		m.fleetInitTimeout = 30 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, m.fleetInitTimeout)
 	defer cancel()
 
-	m.log.Debugf("injecting basic fleet-server for first start")
+	m.log.Debugf("injecting basic fleet-server for first start, will wait %s", m.fleetInitTimeout)
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("timeout while waiting for fleet server start: %w", ctx.Err())
 	case m.ch <- &localConfigChange{injectFleetServerInput}:
 	}
 

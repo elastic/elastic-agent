@@ -6,7 +6,6 @@ package component
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -145,6 +144,29 @@ func (r *RuntimeSpecs) ToComponents(
 	return components, nil
 }
 
+// varsForPlatform sets the runtime variables that are available in the
+// input specification runtime checks. This function should always be
+// edited in sync with the documentation in specs/README.md.
+func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return nil, err
+	}
+	return transpiler.NewVars("", map[string]interface{}{
+		"runtime": map[string]interface{}{
+			"platform": platform.String(),
+			"os":       platform.OS,
+			"arch":     platform.Arch,
+			"family":   platform.Family,
+			"major":    platform.Major,
+			"minor":    platform.Minor,
+		},
+		"user": map[string]interface{}{
+			"root": hasRoot,
+		},
+	}, nil)
+}
+
 // PolicyToComponents takes the policy and generated a component model along with providing
 // a mapping between component and the running binary.
 func (r *RuntimeSpecs) PolicyToComponents(
@@ -166,26 +188,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 		return nil, nil, nil
 	}
 
-	// set the runtime variables that are available in the input specification runtime checks
-	hasRoot, err := utils.HasRoot()
-	if err != nil {
-		return nil, nil, err
-	}
-	vars, err := transpiler.NewVars("", map[string]interface{}{
-		"runtime": map[string]interface{}{
-			"platform": r.platform.String(),
-			"os":       r.platform.OS,
-			"arch":     r.platform.Arch,
-			"family":   r.platform.Family,
-			"major":    r.platform.Major,
-			"minor":    r.platform.Minor,
-		},
-		"user": map[string]interface{}{
-			"uid":  os.Geteuid(),
-			"gid":  os.Getegid(),
-			"root": hasRoot,
-		},
-	}, nil)
+	vars, err := varsForPlatform(r.platform)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -403,7 +406,7 @@ func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitEx
 	return ExpectedConfig(cfg)
 }
 
-func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntimeSpec, vars *transpiler.Vars) (ShipperRuntimeSpec, bool) {
+func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntimeSpec, vars eql.VarStore) (ShipperRuntimeSpec, bool) {
 	const (
 		enabledKey = "enabled"
 	)
@@ -639,7 +642,7 @@ func validateRuntimeChecks(runtime *RuntimeSpec, store eql.VarStore) error {
 			// should never error; but just in-case we consider this a reason to prevent the running of the input
 			return NewErrInputRuntimeCheckFail(err.Error())
 		}
-		ok, err := expression.Eval(store)
+		ok, err := expression.Eval(store, false)
 		if err != nil {
 			// error is considered a failure and reported as a reason
 			return NewErrInputRuntimeCheckFail(err.Error())

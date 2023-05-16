@@ -107,7 +107,7 @@ func (c *upgradeCapability) Apply(upgradeMap map[string]interface{}) (map[string
 		return upgradeMap, nil
 	}
 
-	isSupported, err := c.upgradeEql.Eval(varStore)
+	isSupported, err := c.upgradeEql.Eval(varStore, true)
 	if err != nil {
 		c.log.Errorf("failed evaluating eql formula for capability '%s': %v", c.name(), err)
 		return upgradeMap, nil
