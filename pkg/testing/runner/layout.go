@@ -1,6 +1,11 @@
 package runner
 
-import "github.com/elastic/elastic-agent/pkg/testing/define"
+import (
+	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"path"
+	"strings"
+)
 
 const (
 	// LayoutIntegrationTag is the tag added to all layouts for the integration testing framework.
@@ -21,9 +26,21 @@ type LayoutBatch struct {
 
 // toOGC converts this layout batch into a layout for OGC.
 func (lb *LayoutBatch) toOGC() OGCLayout {
-	tags := []string{LayoutIntegrationTag, lb.LayoutOS.OS.Type, lb.LayoutOS.OS.Arch, lb.LayoutOS.OS.Distro}
+	tags := []string{
+		LayoutIntegrationTag,
+		lb.LayoutOS.OS.Type,
+		lb.LayoutOS.OS.Arch,
+		strings.ToLower(fmt.Sprintf("%s-%s", lb.LayoutOS.OS.Distro, strings.Replace(lb.LayoutOS.OS.Version, ".", "-", -1))),
+	}
 	if lb.Batch.Isolate {
 		tags = append(tags, "isolate")
+		var test define.BatchPackageTests
+		if len(lb.Batch.SudoTests) > 0 {
+			test = lb.Batch.SudoTests[0]
+		} else if len(lb.Batch.Tests) > 0 {
+			test = lb.Batch.Tests[0]
+		}
+		tags = append(tags, fmt.Sprintf("%s-%s", path.Base(test.Name), strings.ToLower(test.Tests[0])))
 	}
 	return OGCLayout{
 		Name:          lb.ID,

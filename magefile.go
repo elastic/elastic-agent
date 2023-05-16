@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/utils/strings/slices"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,6 +32,7 @@ import (
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 
@@ -1262,9 +1264,18 @@ func majorMinor() string {
 	return ""
 }
 
-func (Integration) Clean() {
+func (Integration) Clean(ctx context.Context) error {
 	_ = os.RemoveAll(".agent-testing")
-	mg.Deps()
+	r, err := createTestRunner()
+	if err != nil {
+		return err
+	}
+	err = r.Clean(ctx)
+	if err != nil {
+		return err
+	}
+	_ = os.RemoveAll(".ogc-cache")
+	return nil
 }
 
 func (Integration) Check() error {
@@ -1321,11 +1332,54 @@ func (Integration) Test(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to detemine batches: %w", err)
 	}
-	r, err := runner.NewRunner(batches...)
+	r, err := createTestRunner(batches...)
 	if err != nil {
-		return fmt.Errorf("failed to create runner: %w", err)
+		return err
 	}
 	return r.Run(ctx)
+}
+
+func createTestRunner(batches ...define.Batch) (*runner.Runner, error) {
+	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
+	if err != nil {
+		return nil, err
+	}
+	agentVersion := os.Getenv("AGENT_VERSION")
+	if agentVersion == "" {
+		agentVersion, err = mage.DefaultBeatBuildVariableSources.GetBeatVersion()
+		if err != nil {
+			return nil, err
+		}
+	}
+	agentBuildDir := os.Getenv("AGENT_BUILD_DIR")
+	if agentBuildDir == "" {
+		agentBuildDir = filepath.Join("build", "distributions")
+	}
+	serviceTokenPath, ok, err := getGCEServiceTokenPath()
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
+	}
+	datacenter := os.Getenv("TEST_INTEG_AUTH_GCP_DATACENTER")
+	if datacenter == "" {
+		datacenter = "us-central1-a"
+	}
+	r, err := runner.NewRunner(runner.Config{
+		AgentVersion: agentVersion,
+		BuildDir:     agentBuildDir,
+		GOVersion:    goVersion,
+		RepoDir:      ".",
+		GCE: &runner.GCEConfig{
+			ServiceTokenPath: serviceTokenPath,
+			Datacenter:       datacenter,
+		},
+	}, batches...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create runner: %w", err)
+	}
+	return r, nil
 }
 
 func shouldBuildAgent() bool {
@@ -1342,6 +1396,16 @@ func shouldBuildAgent() bool {
 
 // Pre-requisite: user must have the gcloud CLI installed
 func authGCP(ctx context.Context) error {
+	// We only need the service account token to exist.
+	tokenPath, ok, err := getGCEServiceTokenPath()
+	if err != nil {
+		return err
+	}
+	if ok {
+		// exists, so nothing to do
+		return nil
+	}
+
 	// Use OS-appropriate command to find executables
 	execFindCmd := "which"
 	cliName := "gcloud"
@@ -1411,24 +1475,104 @@ func authGCP(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to get project: %w", err)
 	}
-
 	project := strings.TrimSpace(string(output))
-	if project == expectedProject {
-		// We're all set!
-		return nil
+	if project != expectedProject {
+		// Attempt to select correct GCP project
+		fmt.Printf("Attempting to switch GCP project from [%s] to [%s]...\n", project, expectedProject)
+		cmd = exec.CommandContext(ctx, cliName, "config", "set", "core/project", expectedProject)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		if err = cmd.Run(); err != nil {
+			return fmt.Errorf("unable to switch project from [%s] to [%s]: %w", project, expectedProject, err)
+		}
+		project = expectedProject
 	}
 
-	// Attempt to select correct GCP project
-	fmt.Printf("Attempting to switch GCP project from [%s] to [%s]...\n", project, expectedProject)
-	cmd = exec.CommandContext(ctx, cliName, "config", "set", "core/project", expectedProject)
+	// Check that the service account exists for the user
+	var svcList []struct {
+		Email string `json:"email"`
+	}
+	serviceAcctName := fmt.Sprintf("%s-agent-testing", strings.Replace(parts[0], ".", "-", -1))
+	iamAcctName := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAcctName, project)
+	cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "list", "--format=json")
+	output, err = cmd.Output()
+	if err != nil {
+		return fmt.Errorf("unable to list service accounts: %w", err)
+	}
+	if err := json.Unmarshal(output, &svcList); err != nil {
+		return fmt.Errorf("unable to parse service accounts: %w", err)
+	}
+	var found = false
+	for _, svc := range svcList {
+		if svc.Email == iamAcctName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "create", serviceAcctName)
+		if err = cmd.Run(); err != nil {
+			return fmt.Errorf("unable to create service account %s: %w", serviceAcctName, err)
+		}
+	}
+
+	// Check that the service account has the required roles
+	cmd = exec.CommandContext(
+		ctx, cliName, "projects", "get-iam-policy", project,
+		"--flatten=bindings[].members",
+		fmt.Sprintf("--filter=bindings.members:serviceAccount:%s", iamAcctName),
+		"--format=value(bindings.role)")
+	output, err = cmd.Output()
+	if err != nil {
+		return fmt.Errorf("unable to get roles for service account %s: %w", serviceAcctName, err)
+	}
+	roles := strings.Split(string(output), ";")
+	missingRoles := gceFindMissingRoles(roles, []string{"roles/compute.admin", "roles/iam.serviceAccountUser"})
+	for _, role := range missingRoles {
+		cmd = exec.CommandContext(ctx, cliName, "projects", "add-iam-policy-binding", project,
+			fmt.Sprintf("--member=serviceAccount:%s", iamAcctName),
+			fmt.Sprintf("--role=%s", role))
+		if err = cmd.Run(); err != nil {
+			return fmt.Errorf("failed to add role %s to service account %s: %w", role, serviceAcctName, err)
+		}
+	}
+
+	// Create the key for the service account
+	cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "keys", "create", tokenPath,
+		fmt.Sprintf("--iam-account=%s", iamAcctName))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 	if err = cmd.Run(); err != nil {
-		return fmt.Errorf("unable to switch project from [%s] to [%s]: %w", project, expectedProject, err)
+		return fmt.Errorf("failed to create key %s for service account %s: %w", tokenPath, serviceAcctName, err)
 	}
 
 	return nil
+}
+
+func gceFindMissingRoles(actual []string, expected []string) []string {
+	var missing []string
+	for _, e := range expected {
+		if !slices.Contains(actual, e) {
+			missing = append(missing, e)
+		}
+	}
+	return missing
+}
+
+func getGCEServiceTokenPath() (string, bool, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", false, fmt.Errorf("unable to determine user's home directory: %w", err)
+	}
+	serviceTokenPath := filepath.Join(homeDir, ".config", "gcloud", "agent-testing-service-token.json")
+	_, err = os.Stat(serviceTokenPath)
+	if os.IsNotExist(err) {
+		return serviceTokenPath, false, nil
+	} else if err != nil {
+		return serviceTokenPath, false, fmt.Errorf("unable to check for service account key file at %s: %w", serviceTokenPath, err)
+	}
+	return serviceTokenPath, true, nil
 }
 
 func authESS(ctx context.Context) error {
