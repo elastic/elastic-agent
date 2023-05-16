@@ -432,8 +432,41 @@ func (s *ServiceRuntime) uninstall(ctx context.Context) error {
 }
 
 // UninstallService uninstalls the service
-func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component) error {
+func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string) error {
+	if comp.InputSpec.Spec.Service.Operations.Uninstall != nil {
+		// Resolve uninstall token parameter
+		comp.InputSpec.Spec.Service.Operations.Uninstall = resolveUninstallTokenArg(comp.InputSpec.Spec.Service.Operations.Uninstall, uninstallToken)
+	}
 	return uninstallService(ctx, log, comp, executeServiceCommand)
+}
+
+const uninstallTokenArg = "--uninstall-token"
+
+// resolveUninstallTokenArg Resolves the uninstall token parameter.
+// If the uninstall spec arguments contains the --uninstall-token then
+// 1. Remove the argument if the value of uninstallToken is empty
+// or
+// 2. Inject the value of uninstallToken after the --uninstall-token argument
+//
+// If args do not contain "--uninstall-token", older endpoint spec, do nothing
+func resolveUninstallTokenArg(uninstallSpec *component.ServiceOperationsCommandSpec, uninstallToken string) *component.ServiceOperationsCommandSpec {
+	if uninstallSpec == nil {
+		return nil
+	}
+
+	spec := *uninstallSpec
+	for i, arg := range spec.Args {
+		if arg == uninstallTokenArg {
+			if uninstallToken == "" { // Remove --uninstall-token argument if the token is empty
+				spec.Args = append(spec.Args[:i], spec.Args[i+1:]...)
+			} else { // Inject token value after --uninstall-token argument
+				args := append(spec.Args[:i+1], uninstallToken)
+				spec.Args = append(args, spec.Args[i+1:]...)
+			}
+			break
+		}
+	}
+	return &spec
 }
 
 func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc) error {
