@@ -55,6 +55,7 @@ linters:
     - unconvert # Remove unnecessary type conversions
     - wastedassign # wastedassign finds wasted assignment statements.
     - gomodguard # check for blocked dependencies
+    - gomoddirectives
 
 # all available settings of specific linters
 linters-settings:
@@ -98,6 +99,20 @@ linters-settings:
               - errors
               - fmt
             reason: "This package is deprecated, use `fmt.Errorf` with `%w` instead"
+
+  gomoddirectives:
+    # Forbid local `replace` directives
+    replace-local: false
+
+    # Forbid any `replace` directives that are intended temporarily only during
+    # development. The modules listed below are intended to be replaced permanently.
+    replace-allow-list:
+      - github.com/Microsoft/go-winio
+      - github.com/Shopify/sarama
+      - github.com/dop251/goja
+      - github.com/dop251/goja_nodejs
+      - github.com/fsnotify/fsnotify
+      - github.com/tonistiigi/fifo
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
