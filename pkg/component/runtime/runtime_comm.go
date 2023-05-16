@@ -169,7 +169,9 @@ func (c *runtimeComm) CheckinExpected(
 	c.initCheckinObservedMx.Unlock()
 
 	// not in the initial observed message path; send it over the standard channel
+	c.logger.Infof("CheckinExpected about to send event to checkinExpected, len: %d", len(c.checkinExpected))
 	c.checkinExpected <- expected
+	c.logger.Infof("CheckinExpected sent event to checkinExpected, len: %d", len(c.checkinExpected))
 }
 
 func (c *runtimeComm) CheckinObserved() <-chan *proto.CheckinObserved {
@@ -245,6 +247,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 			case <-recvDone:
 				return
 			case expected = <-c.checkinExpected:
+				c.logger.Infof("got event from checkinExpected in c.checkin(), len: %d", len(c.checkinExpected))
 				expected = c.latestCheckinExpected(expected)
 			}
 

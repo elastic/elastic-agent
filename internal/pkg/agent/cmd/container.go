@@ -268,11 +268,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-<<<<<<< HEAD
-		return run(logToStderr, isContainer)
-=======
-		return run(logToStderr, false, initTimeout, isContainer)
->>>>>>> 8a07dc8c0f (Increase timeout, add config for timeout in fleet setup (#2541))
+		return run(logToStderr, initTimeout, isContainer)
 	}
 
 	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
@@ -337,11 +333,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-<<<<<<< HEAD
-	return run(logToStderr, isContainer)
-=======
-	return run(logToStderr, false, initTimeout, isContainer)
->>>>>>> 8a07dc8c0f (Increase timeout, add config for timeout in fleet setup (#2541))
+	return run(logToStderr, initTimeout, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
