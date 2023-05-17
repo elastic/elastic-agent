@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, pgpBytes ...string) (_ string, err error) {
@@ -47,7 +48,12 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 		"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 
-	fetcher, err := newDownloader(version, u.log, &settings)
+	parsedVersion, err := agtversion.ParseVersion(version)
+	if err != nil {
+		return "", fmt.Errorf("error parsing version %q: %w", version, err)
+	}
+
+	fetcher, err := newDownloader(parsedVersion, u.log, &settings)
 	if err != nil {
 		return "", errors.New(err, "initiating fetcher")
 	}
@@ -56,7 +62,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
-	path, err := fetcher.Download(ctx, agentArtifact, version)
+	path, err := fetcher.Download(ctx, agentArtifact, parsedVersion.VersionWithPrerelease())
 	if err != nil {
 		return "", errors.New(err, "failed upgrade of agent binary")
 	}
@@ -65,22 +71,25 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		return path, nil
 	}
 
-	verifier, err := newVerifier(version, u.log, &settings)
+	verifier, err := newVerifier(parsedVersion, u.log, &settings)
 	if err != nil {
 		return "", errors.New(err, "initiating verifier")
 	}
 
-	if err := verifier.Verify(agentArtifact, version, pgpBytes...); err != nil {
+	if err := verifier.Verify(agentArtifact, parsedVersion.VersionWithPrerelease(), pgpBytes...); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
 
 	return path, nil
 }
 
-func newDownloader(version string, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
-	if !strings.HasSuffix(version, "-SNAPSHOT") {
+func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
+
+	if !version.IsSnapshot() {
 		return localremote.NewDownloader(log, settings)
 	}
+
+	// TODO since we know if it's a snapshot or not, shouldn't we add EITHER the snapshot downloader OR the release one ?
 
 	// try snapshot repo before official
 	snapDownloader, err := snapshot.NewDownloader(log, settings, version)
@@ -96,9 +105,10 @@ func newDownloader(version string, log *logger.Logger, settings *artifact.Config
 	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
 }
 
-func newVerifier(version string, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
 	allowEmptyPgp, pgp := release.PGP()
-	if !strings.HasSuffix(version, "-SNAPSHOT") {
+
+	if !version.IsSnapshot() {
 		return localremote.NewVerifier(log, settings, allowEmptyPgp, pgp)
 	}
 
