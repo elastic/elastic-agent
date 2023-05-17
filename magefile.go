@@ -1353,7 +1353,7 @@ func (Integration) Test(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf(">>> Testing completed successfully\n")
+	fmt.Printf(">>> Testing completed\n")
 	fmt.Printf(">>> Console output written here: build/TEST-go-integration.out\n")
 	fmt.Printf(">>> Console JSON output written here: build/TEST-go-integration.out.json\n")
 	fmt.Printf(">>> JUnit XML written here: build/TEST-go-integration.xml\n")
