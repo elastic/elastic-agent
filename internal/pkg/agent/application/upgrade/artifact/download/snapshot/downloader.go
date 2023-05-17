@@ -18,16 +18,19 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
+
+const snapshotURIFormat = "https://snapshots.elastic.co/%s-%s/downloads/"
 
 type Downloader struct {
 	downloader      download.Downloader
-	versionOverride string
+	versionOverride *agtversion.ParsedSemVer
 }
 
 // NewDownloader creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
-func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride string) (download.Downloader, error) {
+func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (download.Downloader, error) {
 	cfg, err := snapshotConfig(config, versionOverride)
 	if err != nil {
 		return nil, err
@@ -64,7 +67,7 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	return e.downloader.Download(ctx, a, version)
 }
 
-func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.Config, error) {
+func snapshotConfig(config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (*artifact.Config, error) {
 	snapshotURI, err := snapshotURI(versionOverride, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect remote snapshot repo, proceeding with configured: %w", err)
@@ -82,13 +85,19 @@ func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.
 	}, nil
 }
 
-func snapshotURI(versionOverride string, config *artifact.Config) (string, error) {
+func snapshotURI(versionOverride *agtversion.ParsedSemVer, config *artifact.Config) (string, error) {
+	// do we support upgrade without specifying a target version ?
 	version := release.Version()
-	if versionOverride != "" {
-		versionOverride = strings.TrimSuffix(versionOverride, "-SNAPSHOT")
-		version = versionOverride
+	if versionOverride != nil {
+		if versionOverride.BuildMetadata() != "" {
+			// we know exactly which snapshot build we want to target
+			return fmt.Sprintf(snapshotURIFormat, versionOverride.CoreVersion(), versionOverride.BuildMetadata()), nil
+		}
+
+		version = versionOverride.CoreVersion()
 	}
 
+	// we go through the artifact API to find the location of the latest snapshot build for the specified version
 	client, err := config.HTTPTransportSettings.Client(httpcommon.WithAPMHTTPInstrumentation())
 	if err != nil {
 		return "", err

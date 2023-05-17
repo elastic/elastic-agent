@@ -10,16 +10,17 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 type Verifier struct {
 	verifier        download.Verifier
-	versionOverride string
+	versionOverride *agtversion.ParsedSemVer
 }
 
 // NewVerifier creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
-func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte, versionOverride string) (download.Verifier, error) {
+func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool, pgp []byte, versionOverride *agtversion.ParsedSemVer) (download.Verifier, error) {
 	cfg, err := snapshotConfig(config, versionOverride)
 	if err != nil {
 		return nil, err
