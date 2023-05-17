@@ -142,7 +142,6 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string,
 		vars = extendVars(vars, env)
 		fmt.Printf(">>> Starting tests on %s\n", instanceName)
 		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage integration:testOnRemote`, vars)
-		fmt.Printf("script: %s\n", script)
 		execTest := strings.NewReader(script)
 
 		session, err := c.NewSession()
@@ -173,7 +172,6 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string,
 		vars = extendVars(vars, env)
 		fmt.Printf(">>> Starting sudo tests on %s\n", instanceName)
 		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage integration:testOnRemote`, vars)
-		fmt.Printf("script: %s\n", script)
 		execTest := strings.NewReader(script)
 
 		session, err := c.NewSession()
