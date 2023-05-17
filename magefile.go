@@ -1645,12 +1645,15 @@ func gceFindMissingRoles(actual []string, expected []string) []string {
 }
 
 func getGCEServiceTokenPath() (string, bool, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", false, fmt.Errorf("unable to determine user's home directory: %w", err)
+	serviceTokenPath := os.Getenv("TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE")
+	if serviceTokenPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", false, fmt.Errorf("unable to determine user's home directory: %w", err)
+		}
+		serviceTokenPath = filepath.Join(homeDir, ".config", "gcloud", "agent-testing-service-token.json")
 	}
-	serviceTokenPath := filepath.Join(homeDir, ".config", "gcloud", "agent-testing-service-token.json")
-	_, err = os.Stat(serviceTokenPath)
+	_, err := os.Stat(serviceTokenPath)
 	if os.IsNotExist(err) {
 		return serviceTokenPath, false, nil
 	} else if err != nil {
@@ -1660,12 +1663,10 @@ func getGCEServiceTokenPath() (string, bool, error) {
 }
 
 func authESS(ctx context.Context) error {
-	homeDir, err := os.UserHomeDir()
+	essAPIKeyFile, err := getESSAPIKeyFilePath()
 	if err != nil {
-		return fmt.Errorf("unable to determine user's home directory: %w", err)
+		return err
 	}
-	essAPIKeyFile := filepath.Join(homeDir, ".config", "ess", "api_key.txt")
-
 	_, err = os.Stat(essAPIKeyFile)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0700); err != nil {
@@ -1739,11 +1740,10 @@ func stringPrompt(prompt string) (string, error) {
 }
 
 func getESSAPIKey() (string, bool, error) {
-	homeDir, err := os.UserHomeDir()
+	essAPIKeyFile, err := getESSAPIKeyFilePath()
 	if err != nil {
-		return "", false, fmt.Errorf("unable to determine user's home directory: %w", err)
+		return "", false, err
 	}
-	essAPIKeyFile := filepath.Join(homeDir, ".config", "ess", "api_key.txt")
 	_, err = os.Stat(essAPIKeyFile)
 	if os.IsNotExist(err) {
 		return "", false, nil
@@ -1756,4 +1756,16 @@ func getESSAPIKey() (string, bool, error) {
 	}
 	essAPIKey := strings.TrimSpace(string(data))
 	return essAPIKey, true, nil
+}
+
+func getESSAPIKeyFilePath() (string, error) {
+	essAPIKeyFile := os.Getenv("TEST_INTEG_AUTH_ESS_APIKEY_FILE")
+	if essAPIKeyFile == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("unable to determine user's home directory: %w", err)
+		}
+		essAPIKeyFile = filepath.Join(homeDir, ".config", "ess", "api_key.txt")
+	}
+	return essAPIKeyFile, nil
 }
