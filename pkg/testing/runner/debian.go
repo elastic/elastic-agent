@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/define"
-
 	"golang.org/x/crypto/ssh"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 type DebianRunner struct{}
@@ -150,8 +150,8 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string,
 			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
 		}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> Executing tests on %s (stdout): ", instanceName))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> Executing tests on %s (stderr): ", instanceName))
+		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> Test output %s (stdout): ", instanceName))
+		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> Test output %s (stderr): ", instanceName))
 		session.Stdin = execTest
 		// allowed to fail because tests might fail
 		_ = session.Run("bash")
@@ -180,8 +180,8 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string,
 			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
 		}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> Executing sudo tests on %s (stdout): ", instanceName))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> Executing sudo tests on %s (stderr): ", instanceName))
+		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> Test output %s (sudo) (stdout): ", instanceName))
+		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> Test output %s (sudo) (stderr): ", instanceName))
 		session.Stdin = execTest
 		// allowed to fail because tests might fail
 		_ = session.Run("bash")
@@ -203,16 +203,16 @@ func getRunnerPackageResult(ctx context.Context, c *ssh.Client, pkg define.Batch
 	var err error
 	var resultPkg OSRunnerPackageResult
 	resultPkg.Name = pkg.Name
-	outputPath := fmt.Sprintf("$HOME/agent/build/TEST-go-remote-%s.%s.out", prefix, filepath.Base(pkg.Name))
-	resultPkg.Output, err = sshGetFileContents(ctx, c, outputPath)
+	outputPath := fmt.Sprintf("$HOME/agent/build/TEST-go-remote-%s.%s", prefix, filepath.Base(pkg.Name))
+	resultPkg.Output, err = sshGetFileContents(ctx, c, outputPath+".out")
 	if err != nil {
-		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s", outputPath)
+		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out", outputPath)
 	}
-	resultPkg.JSONOutput, err = sshGetFileContents(ctx, c, outputPath+".json")
+	resultPkg.JSONOutput, err = sshGetFileContents(ctx, c, outputPath+".out.json")
 	if err != nil {
-		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.json", outputPath)
+		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out.json", outputPath)
 	}
-	resultPkg.XMLOutput, err = sshGetFileContents(ctx, c, outputPath+".json")
+	resultPkg.XMLOutput, err = sshGetFileContents(ctx, c, outputPath+".xml")
 	if err != nil {
 		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.xml", outputPath)
 	}

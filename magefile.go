@@ -1334,7 +1334,30 @@ func (Integration) Test(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return r.Run(ctx)
+	results, err := r.Run(ctx)
+	if err != nil {
+		return err
+	}
+	_ = os.Remove("build/TEST-go-integration.out")
+	_ = os.Remove("build/TEST-go-integration.out.json")
+	_ = os.Remove("build/TEST-go-integration.xml")
+	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
+	if err != nil {
+		return err
+	}
+	err = writeFile("build/TEST-go-integration.out.json", results.Output, 0644)
+	if err != nil {
+		return err
+	}
+	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
+	if err != nil {
+		return err
+	}
+	fmt.Printf(">>> Testing completed successfully\n")
+	fmt.Printf(">>> Console output written here: build/TEST-go-integration.out\n")
+	fmt.Printf(">>> Console JSON output written here: build/TEST-go-integration.out.json\n")
+	fmt.Printf(">>> JUnit XML written here: build/TEST-go-integration.xml\n")
+	return nil
 }
 
 func (Integration) PrepareOnRemote() {
@@ -1768,4 +1791,12 @@ func getESSAPIKeyFilePath() (string, error) {
 		essAPIKeyFile = filepath.Join(homeDir, ".config", "ess", "api_key.txt")
 	}
 	return essAPIKeyFile, nil
+}
+
+func writeFile(name string, data []byte, perm os.FileMode) error {
+	err := os.WriteFile(name, data, perm)
+	if err != nil {
+		return fmt.Errorf("failed to write file %s: %w", name, err)
+	}
+	return nil
 }

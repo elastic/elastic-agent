@@ -57,6 +57,16 @@ type OSRunner interface {
 	Run(ctx context.Context, c *ssh.Client, instanceName string, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
 }
 
+// Result is the complete result from the runner.
+type Result struct {
+	// Output is the raw test output.
+	Output []byte
+	// XMLOutput is the XML Junit output.
+	XMLOutput []byte
+	// JSONOutput is the JSON output.
+	JSONOutput []byte
+}
+
 // Runner runs the tests on remote instances.
 type Runner struct {
 	cfg            Config
@@ -87,11 +97,11 @@ func NewRunner(cfg Config, batches ...define.Batch) (*Runner, error) {
 }
 
 // Run runs all the tests.
-func (r *Runner) Run(ctx context.Context) error {
+func (r *Runner) Run(ctx context.Context) (Result, error) {
 	// validate tests can even be performed
 	err := r.validate()
 	if err != nil {
-		return err
+		return Result{}, err
 	}
 
 	// prepare
@@ -99,13 +109,13 @@ func (r *Runner) Run(ctx context.Context) error {
 	defer prepareCancel()
 	sshAuth, repoArchive, err := r.prepare(prepareCtx)
 	if err != nil {
-		return err
+		return Result{}, err
 	}
 
 	// initiate the needed clouds
 	err = r.setupCloud(ctx)
 	if err != nil {
-		return err
+		return Result{}, err
 	}
 	defer func() {
 		// always clean
@@ -117,7 +127,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	defer importCancel()
 	err = r.ogcImport(importCtx)
 	if err != nil {
-		return err
+		return Result{}, err
 	}
 
 	// bring up all the instances
@@ -125,7 +135,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	defer upCancel()
 	upOutput, err := r.ogcUp(upCtx)
 	if err != nil {
-		return err
+		return Result{}, err
 	}
 	defer func() {
 		// always clean
@@ -135,16 +145,22 @@ func (r *Runner) Run(ctx context.Context) error {
 	// fetch the machines and run the batches on the machine
 	machines, err := r.ogcMachines(ctx)
 	if err != nil {
-		return err
+		return Result{}, err
 	}
 	if len(machines) == 0 {
 		// print the output so its clear what went wrong
 		// without this it's unclear where OGC went wrong it
 		// doesn't do a great job of reporting a clean error
 		fmt.Printf("%s\n", upOutput)
-		return fmt.Errorf("ogc didn't create any machines")
+		return Result{}, fmt.Errorf("ogc didn't create any machines")
 	}
-	return r.runMachines(ctx, sshAuth, repoArchive, machines)
+	results, err := r.runMachines(ctx, sshAuth, repoArchive, machines)
+	if err != nil {
+		return Result{}, err
+	}
+
+	// merge the results
+	return r.mergeResults(results)
 }
 
 // Clean performs a cleanup to ensure anything that could have been left running is removed.
@@ -155,8 +171,10 @@ func (r *Runner) Clean() error {
 }
 
 // runMachines runs the batch on each machine in parallel.
-func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, machines []OGCMachine) error {
+func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, machines []OGCMachine) (map[string]OSRunnerResult, error) {
 	g, ctx := errgroup.WithContext(ctx)
+	results := make(map[string]OSRunnerResult)
+	var resultsMx sync.Mutex
 	for _, m := range machines {
 		func(m OGCMachine) {
 			g.Go(func() error {
@@ -164,28 +182,34 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 				if !ok {
 					return fmt.Errorf("unable to find layout batch with ID: %s", m.Layout.Name)
 				}
-				err := r.runMachine(ctx, sshAuth, repoArchive, batch, m)
+				result, err := r.runMachine(ctx, sshAuth, repoArchive, batch, m)
 				if err != nil {
-					fmt.Printf(">>> Failed for instance %s @ %s (holding for 1 hour to debug)\n", m.InstanceName, m.PublicIP)
-					<-time.After(60 * time.Minute)
+					fmt.Printf(">>> Failed for instance %s @ %s: %s\n", m.InstanceName, m.PublicIP, err)
 					return err
 				}
+				resultsMx.Lock()
+				results[batch.ID] = result
+				resultsMx.Unlock()
 				return nil
 			})
 		}(m)
 	}
-	return g.Wait()
+	err := g.Wait()
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 // runMachine runs the batch on the machine.
-func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, batch LayoutBatch, machine OGCMachine) error {
+func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
 	fmt.Printf(">>> Starting SSH connection to instance %s @ %s\n", machine.InstanceName, machine.PublicIP)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	client, err := sshConnect(connectCtx, machine.PublicIP, machine.Layout.Username, sshAuth)
 	if err != nil {
 		fmt.Printf(">>> Failed to connect to instance %s @ %s: %s\n", machine.InstanceName, machine.PublicIP, err)
-		return fmt.Errorf("failed to connect to instance %s: %w", machine.InstanceName, err)
+		return OSRunnerResult{}, fmt.Errorf("failed to connect to instance %s: %w", machine.InstanceName, err)
 	}
 	defer client.Close()
 	fmt.Printf(">>> Connected over SSH to instance %s\n", machine.InstanceName)
@@ -195,7 +219,7 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArc
 	err = batch.LayoutOS.Runner.Prepare(ctx, client, machine.InstanceName, batch.LayoutOS.OS.Arch, r.cfg.GOVersion, repoArchive, r.getBuildPath(batch))
 	if err != nil {
 		fmt.Printf(">>> Failed to prepare instance %s: %s\n", machine.InstanceName, err)
-		return fmt.Errorf("failed to prepare instance %s: %w", machine.InstanceName, err)
+		return OSRunnerResult{}, fmt.Errorf("failed to prepare instance %s: %w", machine.InstanceName, err)
 	}
 
 	// ensure that we have all the requirements for the stack if required
@@ -203,7 +227,7 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArc
 	if batch.Batch.Stack != nil {
 		ch, err := r.getCloudForBatchID(batch.ID)
 		if err != nil {
-			return err
+			return OSRunnerResult{}, err
 		}
 		fmt.Printf(">>> Instance %s waiting for stack to be ready\n", machine.InstanceName)
 		resp := <-ch
@@ -227,12 +251,9 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArc
 	result, err := batch.LayoutOS.Runner.Run(ctx, client, machine.InstanceName, r.cfg.AgentVersion, prefix, batch.Batch, env)
 	if err != nil {
 		fmt.Printf(">>> Failed to execute tests on instance %s: %s\n", machine.InstanceName, err)
-		return fmt.Errorf("failed to execute tests on instance %s: %w", machine.InstanceName, err)
+		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", machine.InstanceName, err)
 	}
-	// TODO: Merge/write the results locally
-	_ = result
-
-	return nil
+	return result, nil
 }
 
 // validate ensures that required builds of Elastic Agent exist
@@ -679,6 +700,105 @@ func (r *Runner) getWorkDir() (string, error) {
 		return "", fmt.Errorf("failed to get absolute path to work directory: %w", err)
 	}
 	return wd, nil
+}
+
+func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error) {
+	// merge the results together
+	var rawOutput bytes.Buffer
+	var jsonOutput bytes.Buffer
+	var suites JUnitTestSuites
+	for id, res := range results {
+		batch, _ := findLayoutBatchByID(id, r.batches)
+		//if !ok {
+		//	return Result{}, fmt.Errorf("batch ID not found %s", id)
+		//}
+		batchName := fmt.Sprintf("%s/%s/%s/%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, batch.LayoutOS.OS.Version)
+		for _, pkg := range res.Packages {
+			if pkg.Output != nil {
+				pkgWriter := newPrefixOutput(&rawOutput, fmt.Sprintf("%s(%s): ", batchName, pkg.Name))
+				_, err := pkgWriter.Write(pkg.Output)
+				if err != nil {
+					return Result{}, fmt.Errorf("failed to write raw output from %s %s: %w", id, pkg.Name, err)
+				}
+			}
+			if pkg.JSONOutput != nil {
+				jsonSuffix, err := suffixJSONResults(pkg.JSONOutput, fmt.Sprintf("(%s)", batchName))
+				if err != nil {
+					return Result{}, fmt.Errorf("failed to suffix json output from %s %s: %w", id, pkg.Name, err)
+				}
+				_, err = jsonOutput.Write(jsonSuffix)
+				if err != nil {
+					return Result{}, fmt.Errorf("failed to write json output from %s %s: %w", id, pkg.Name, err)
+				}
+			}
+			if pkg.XMLOutput != nil {
+				pkgSuites, err := parseJUnit(pkg.XMLOutput)
+				if err != nil {
+					return Result{}, fmt.Errorf("failed to parse junit from %s %s: %w", id, pkg.Name, err)
+				}
+				for _, pkgSuite := range pkgSuites.Suites {
+					// append the batch information to the suite name
+					pkgSuite.Name = fmt.Sprintf("%s(%s)", pkgSuite.Name, batchName)
+					pkgSuite.Properties = append(pkgSuite.Properties, JUnitProperty{
+						Name:  "batch",
+						Value: batchName,
+					}, JUnitProperty{
+						Name:  "sudo",
+						Value: "false",
+					})
+					suites.Suites = append(suites.Suites, pkgSuite)
+				}
+			}
+		}
+		for _, pkg := range res.SudoPackages {
+			if pkg.Output != nil {
+				pkgWriter := newPrefixOutput(&rawOutput, fmt.Sprintf("%s(sudo)(%s): ", batchName, pkg.Name))
+				_, err := pkgWriter.Write(pkg.Output)
+				if err != nil {
+					return Result{}, fmt.Errorf("failed to write raw output %s/%s: %w", id, pkg.Name, err)
+				}
+			}
+			if pkg.JSONOutput != nil {
+				jsonSuffix, err := suffixJSONResults(pkg.JSONOutput, fmt.Sprintf("(%s)(sudo)", batchName))
+				if err != nil {
+					return Result{}, fmt.Errorf("failed to suffix json output from %s %s: %w", id, pkg.Name, err)
+				}
+				_, err = jsonOutput.Write(jsonSuffix)
+				if err != nil {
+					return Result{}, fmt.Errorf("failed to write json output from %s %s: %w", id, pkg.Name, err)
+				}
+			}
+			if pkg.XMLOutput != nil {
+				pkgSuites, err := parseJUnit(pkg.XMLOutput)
+				if err != nil {
+					return Result{}, fmt.Errorf("failed to parse junit from %s %s: %w", id, pkg.Name, err)
+				}
+				for _, pkgSuite := range pkgSuites.Suites {
+					// append the batch information to the suite name
+					pkgSuite.Name = fmt.Sprintf("%s(%s)(sudo)", pkgSuite.Name, batchName)
+					pkgSuite.Properties = append(pkgSuite.Properties, JUnitProperty{
+						Name:  "batch",
+						Value: batchName,
+					}, JUnitProperty{
+						Name:  "sudo",
+						Value: "true",
+					})
+					suites.Suites = append(suites.Suites, pkgSuite)
+				}
+			}
+		}
+	}
+	var junitBytes bytes.Buffer
+	err := writeJUnit(&junitBytes, suites)
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to marshal junit: %w", err)
+	}
+
+	var complete Result
+	complete.Output = rawOutput.Bytes()
+	complete.JSONOutput = jsonOutput.Bytes()
+	complete.XMLOutput = junitBytes.Bytes()
+	return complete, nil
 }
 
 func attachOut(w io.Writer) process.CmdOption {
