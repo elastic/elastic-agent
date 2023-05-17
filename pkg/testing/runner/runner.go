@@ -5,9 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"io"
-	"k8s.io/utils/strings/slices"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,9 +17,11 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
 )
 
 // OSRunnerPackageResult is the result for each package.

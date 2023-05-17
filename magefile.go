@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/utils/strings/slices"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,13 +19,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/ess"
-
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/otiai10/copy"
 	"github.com/pkg/errors"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
 
@@ -38,6 +36,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 
 	// mage:import
