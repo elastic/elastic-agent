@@ -440,6 +440,7 @@ func UninstallService(ctx context.Context, log *logger.Logger, comp component.Co
 	return uninstallService(ctx, log, comp, executeServiceCommand)
 }
 
+//nolint:gosec // was false flagged as hardcoded credentials by linter. it is not.
 const uninstallTokenArg = "--uninstall-token"
 
 // resolveUninstallTokenArg Resolves the uninstall token parameter.

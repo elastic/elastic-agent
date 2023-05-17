@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+
 	"github.com/google/go-cmp/cmp"
 )
 
