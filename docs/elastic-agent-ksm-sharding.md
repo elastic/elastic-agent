@@ -44,19 +44,23 @@ Additionally by default, one agent is elected as [**leader**](https://github.com
 
 ### HostNetwork:false Installation
 
-For this installation, users need to configure the two following agent policies : 
+For this installation, users need to configure the two following agent policies.
+
+**Agent policies:**
 
 - Leader Daemonset Policy:
 Keep enabled all the default datasets
 ![daemonset policy](./images/ksm01.png)
-Only change the kube-state-metrics endpoint url to point to `kube-state-metrics-0`
+- Only change the kube-state-metrics endpoint url to point to `kube-state-metrics-0`
 ![daemonset policy](./images/ksm-ksm01.png)
 
 - Deployment policy for rest of shards. **Repeat and create same policies for each shard you have created with KSM installation**
 Disable all the default datasets except KSM
 ![daemonset policy](./images/ksm02.png)
-Only change the kube-state-metrics endpoint url to point to `kube-state-metrics-1`
+- Change the kube-state-metrics endpoint url to point to `kube-state-metrics-1`
 ![daemonset policy](./images/ksm-ksm02.png)
+
+**Manifest Installation:**
 
 Deploy following manifests:
 
@@ -65,20 +69,34 @@ Deploy following manifests:
  kubectl apply -f elastic-agent-managed-deployment-ksm-1.yaml
 ```
 
-> **Note**: Above manifests exist under [manifests]((./manifests) folder)
+> **Note**: Above manifests exist under [manifests](./manifests) folder
 
-> **Note**: Make sure that `hostNetwork:false` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40)
+> **Note**: Make sure that `hostNetwork:false` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40).
 
 **Pros/Cons**:
-[+] Simplicity
-[-] You can not prevent execution of deployments in nodes where agents already running.
+
+- [+] Simplicity
+- [-] You can not prevent execution of deployments in nodes where agents already running.
 
 ### PodAntiAffinity Installation
 
-For this installation, users need to configure the same agent policies as described in previous scenario.
+For this installation, users need to configure the following agent policies:
+
+**Agent policies:**
+
+- Same agent policy (as described in previous scenario) for daeomonset with leader
+- Additional policy for any other extra ksm shard that they will like to collect metrics. Additionally in this policy user needs to enable any node-wide metric datasets they want (like kubelet, proxy, scheduler or controller). Reason is that now the deployment agent pods will run isolated in specific nodes without any co-located agent.
+Example of config:
+
+![Deployment policy in affinity config](./images/ksmaffinity.png)
+
+Still the KSM endpoints need to point to url of `kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080`
+
+**Manifest Installation:**
 
 1. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario
 2. Uncoment the following `affinity` block in both manifests [elastic-agent-managed-daemonset-ksm-0.yaml](./manifests/elastic-agent-managed-daemonset-ksm-0.yaml), [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/elastic-agent-managed-deployment-ksm-1.yaml)
+
    ```bash
     affinity:
         podAntiAffinity:  
@@ -92,20 +110,47 @@ For this installation, users need to configure the same agent policies as descri
             topologyKey: "kubernetes.io/hostname"
    ```
 
-The above configuration ensures that no more than one pod with `label="elastic-agent"` will be executed in each node
+The above configuration ensures that no more than one pod with `label="elastic-agent"` will be executed in each node.
+
+Then deploy manifests:
+
+```bash
+ kubectl apply -f elastic-agent-managed-deployment-ksm-1.yaml
+ kubectl apply -f elastic-agent-managed-daemonset-ksm-0.yaml
+```
+
+> **Note:** : Order of deploying manifests is important. You need first to install deployments and then daemonset, otherwise deployments will not find a node available for scheduling.
+
+Verify installation:
+
+```bash
+❯ kgp -A | grep elastic
+kube-system   elastic-agent-64ctk                                              1/1     Running   0          4m44s
+kube-system   elastic-agent-8db69556b-6t4qv                                    1/1     Running   0          4m48s
+kube-system   elastic-agent-cj2zk                                              1/1     Running   0          4m44s
+kube-system   elastic-agent-rlnqk                                              1/1     Running   0          4m44s
+kube-system   elastic-agent-tt5lg                                              1/1     Running   0          4m44s
+kube-system   elastic-agent-txxfp                                              0/1     Pending   0          4m44s
+```
+
+> **Note:**: Elastic agent from deployment has a diffrent naming, eg. `elastic-agent-8db69556b-6t4qv`
 
 **Pros/Cons**:
-[+] You **can* prevent execution of deployments in nodes where agents already running.
-[-] More complex than first method
-[-] It displays scheduled daemonset pods in state `Pending` where antiaffinity is triggered.
 
+- [+] You **can* prevent execution of deployments in nodes where agents already running.
+- [-] More complex than first method
+- [-] It displays scheduled daemonset pods in state `Pending` where antiaffinity is triggered.
 
 ### Tolerations Installation
 
-For this installation, users need to configure the same agent policies as described in first scenario.
+**Agent Policies:**
+For this installation, users need to configure the same agent policies as described in previous scenario.
+
+**Manifest Installation:**
 
 1. Revert any changes from previous scenarios. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario. Also verify that  `affinity` block is commented. 
 2. Uncoment the following `toleration` in  manifest[elastic-agent-managed-daemonset-ksm-0.yaml](./manifests/elastic-agent-managed-daemonset-ksm-0.yaml)
+
    ```bash
     tolerations:
         - key: "sharding"
