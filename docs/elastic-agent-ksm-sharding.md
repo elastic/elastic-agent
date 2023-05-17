@@ -1,6 +1,6 @@
 # Elastic Agent Manifests in order to support Kube-State-Metrics Sharding
 
-Kube-state-metrics (KSM) library supports horizontal sharding (more [information](https://github.com/kubernetes/kube-state-metrics#horizontal-sharding)). As Elastic-Agent collection from kube-state-metrics is proved to be resource intensive, we need to be able to support such horizontal scaling scenarios
+Kube-state-metrics (KSM) library provides horizontal sharding (more [information](https://github.com/kubernetes/kube-state-metrics#horizontal-sharding)) in order to support large kubernetes deployments. As Elastic-Agent collection from kube-state-metrics is proved to be resource intensive, we need to be able to support such horizontal scaling scenarios with our configuration. This doc aims to provide information on how to configure Elastic Agent with KSM horizontally sharded.
 
 ## Kube State Metrics Configuration
 
