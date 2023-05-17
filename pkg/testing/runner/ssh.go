@@ -13,7 +13,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -106,6 +105,8 @@ func sshRunCommand(ctx context.Context, c *ssh.Client, cmd string, args []string
 // sshRunCommandWithRetry runs the command on loop waiting the interval between calls
 func sshRunCommandWithRetry(ctx context.Context, c *ssh.Client, cmd string, args []string, interval time.Duration) ([]byte, []byte, error) {
 	var lastErr error
+	var lastStdout []byte
+	var lastStderr []byte
 	for {
 		// the length of time for running the command is not blocked on the interval
 		// don't create a new context with the interval as its timeout
@@ -114,12 +115,14 @@ func sshRunCommandWithRetry(ctx context.Context, c *ssh.Client, cmd string, args
 			return stdout, stderr, nil
 		}
 		lastErr = err
+		lastStdout = stdout
+		lastStderr = stderr
 
 		// wait for the interval or ctx to be cancelled
 		select {
 		case <-ctx.Done():
 			if lastErr != nil {
-				return nil, nil, lastErr
+				return lastStdout, lastStderr, lastErr
 			}
 			return nil, nil, ctx.Err()
 		case <-time.After(interval):
@@ -128,8 +131,7 @@ func sshRunCommandWithRetry(ctx context.Context, c *ssh.Client, cmd string, args
 }
 
 // sshSCP copies the filePath to the destination.
-func sshSCP(c *ssh.Client, filePath string) error {
-	dest := filepath.Base(filePath)
+func sshSCP(c *ssh.Client, filePath string, dest string) error {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -177,4 +179,25 @@ func sshSCP(c *ssh.Client, filePath string) error {
 	_, _ = fmt.Fprint(w, "\x00")
 	_ = w.Close()
 	return <-errCh
+}
+
+// sshGetFileContents returns the file content.
+func sshGetFileContents(ctx context.Context, c *ssh.Client, filename string) ([]byte, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	session, err := c.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()
+
+	var stdout bytes.Buffer
+	session.Stdout = &stdout
+	err = session.Run(fmt.Sprintf("cat %s", filename))
+	if err != nil {
+		return nil, err
+	}
+	return stdout.Bytes(), nil
 }

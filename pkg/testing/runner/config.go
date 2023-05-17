@@ -9,17 +9,22 @@ import (
 
 // Config provides the configuration for running the runner.
 type Config struct {
-	AgentVersion string
-	BuildDir     string
-	GOVersion    string
-	RepoDir      string
-	GCE          *GCEConfig
+	AgentVersion      string
+	AgentStackVersion string
+	BuildDir          string
+	GOVersion         string
+	RepoDir           string
+	ESS               *ESSConfig
+	GCE               *GCEConfig
 }
 
 // Validate returns an error if the information is invalid.
 func (c *Config) Validate() error {
 	if c.AgentVersion == "" {
 		return errors.New("AgentVersion must be set")
+	}
+	if c.AgentStackVersion == "" {
+		return errors.New("AgentStackVersion must be set")
 	}
 	if c.BuildDir == "" {
 		return errors.New("BuildDir must be set")
@@ -30,12 +35,42 @@ func (c *Config) Validate() error {
 	if c.RepoDir == "" {
 		return errors.New("RepoDir must be set")
 	}
+	if c.ESS == nil {
+		// in the future we could adjust to work on different providers
+		// making this selectable (at the moment we just do ESS)
+		return errors.New("config requires ESS to be set")
+	}
+	err := c.ESS.Validate()
+	if err != nil {
+		return fmt.Errorf("ESS error: %w", err)
+	}
 	if c.GCE == nil {
 		// in the future we could adjust to work on different providers
 		// making this selectable (at the moment we just do GCE)
 		return errors.New("config requires GCE to be set")
 	}
-	return c.GCE.Validate()
+	err = c.GCE.Validate()
+	if err != nil {
+		return fmt.Errorf("GCE error: %w", err)
+	}
+	return err
+}
+
+// ESSConfig is the configuration for communicating with ESS.
+type ESSConfig struct {
+	APIKey string
+	Region string
+}
+
+// Validate returns an error if the information is invalid.
+func (ess *ESSConfig) Validate() error {
+	if ess.APIKey == "" {
+		return errors.New("APIKey must be set")
+	}
+	if ess.Region == "" {
+		return errors.New("Region must be set")
+	}
+	return nil
 }
 
 // GCEConfig is the configuration for communicating with Google Compute Engine.

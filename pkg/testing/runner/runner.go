@@ -5,12 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"io"
 	"k8s.io/utils/strings/slices"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/xid"
@@ -22,10 +24,41 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
+// OSRunnerPackageResult is the result for each package.
+type OSRunnerPackageResult struct {
+	// Name is the package name.
+	Name string
+	// Output is the raw test output.
+	Output []byte
+	// XMLOutput is the XML Junit output.
+	XMLOutput []byte
+	// JSONOutput is the JSON output.
+	JSONOutput []byte
+}
+
+// OSRunnerResult is the result of the test run provided by a OSRunner.
+type OSRunnerResult struct {
+	// Packages is the results for each package.
+	Packages []OSRunnerPackageResult
+
+	// SudoPackages is the results for each package that need to run as sudo.
+	SudoPackages []OSRunnerPackageResult
+}
+
+// OSRunner provides an interface to run the tests on the OS.
+type OSRunner interface {
+	// Prepare prepares the runner to actual run on the host.
+	Prepare(ctx context.Context, c *ssh.Client, instanceName string, arch string, goVersion string, repoArchive string, buildPath string) error
+	// Run runs the actual tests and provides the result.
+	Run(ctx context.Context, c *ssh.Client, instanceName string, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
+}
+
 // Runner runs the tests on remote instances.
 type Runner struct {
-	cfg     Config
-	batches []LayoutBatch
+	cfg            Config
+	batches        []LayoutBatch
+	batchToCloud   map[string]*essCloudResponse
+	batchToCloudMx sync.RWMutex
 }
 
 // NewRunner creates a new runner based on the provided batches.
@@ -43,8 +76,9 @@ func NewRunner(cfg Config, batches ...define.Batch) (*Runner, error) {
 		layoutBatches = append(layoutBatches, lb)
 	}
 	return &Runner{
-		cfg:     cfg,
-		batches: layoutBatches,
+		cfg:          cfg,
+		batches:      layoutBatches,
+		batchToCloud: make(map[string]*essCloudResponse),
 	}, nil
 }
 
@@ -64,6 +98,16 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
+	// initiate the needed clouds
+	err = r.setupCloud(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// always clean
+		r.cleanupCloud()
+	}()
+
 	// import the calculated layouts
 	importCtx, importCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer importCancel()
@@ -75,13 +119,13 @@ func (r *Runner) Run(ctx context.Context) error {
 	// bring up all the instances
 	upCtx, upCancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer upCancel()
-	err = r.ogcUp(upCtx)
+	upOutput, err := r.ogcUp(upCtx)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		// always clean
-		_ = r.Clean(ctx)
+		_ = r.Clean()
 	}()
 
 	// fetch the machines and run the batches on the machine
@@ -89,11 +133,18 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if len(machines) == 0 {
+		// print the output so its clear what went wrong
+		// without this it's unclear where OGC went wrong it
+		// doesn't do a great job of reporting a clean error
+		fmt.Printf("%s\n", upOutput)
+		return fmt.Errorf("ogc didn't create any machines")
+	}
 	return r.runMachines(ctx, sshAuth, repoArchive, machines)
 }
 
 // Clean performs a cleanup to ensure anything that could have been left running is removed.
-func (r *Runner) Clean(ctx context.Context) error {
+func (r *Runner) Clean() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	return r.ogcDown(ctx)
@@ -111,8 +162,8 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 				}
 				err := r.runMachine(ctx, sshAuth, repoArchive, batch, m)
 				if err != nil {
-					fmt.Printf(">>> Failed for instance %s @ %s (holding for 10 minutes to debug)\n", m.InstanceID, m.PublicIP)
-					<-time.After(10 * time.Minute)
+					fmt.Printf(">>> Failed for instance %s @ %s (holding for 1 hour to debug)\n", m.InstanceName, m.PublicIP)
+					<-time.After(60 * time.Minute)
 					return err
 				}
 				return nil
@@ -124,24 +175,58 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 
 // runMachine runs the batch on the machine.
 func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, batch LayoutBatch, machine OGCMachine) error {
-	fmt.Printf(">>> Trying to create SSH connection to instance %s @ %s\n", machine.InstanceID, machine.PublicIP)
+	fmt.Printf(">>> Starting SSH connection to instance %s @ %s\n", machine.InstanceName, machine.PublicIP)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	client, err := sshConnect(connectCtx, machine.PublicIP, machine.Layout.Username, sshAuth)
 	if err != nil {
-		fmt.Printf(">>> Failed to connect to instance %s @ %s: %s\n", machine.InstanceID, machine.PublicIP, err)
-		return fmt.Errorf("failed to connect to instance %s: %w", machine.InstanceID, err)
+		fmt.Printf(">>> Failed to connect to instance %s @ %s: %s\n", machine.InstanceName, machine.PublicIP, err)
+		return fmt.Errorf("failed to connect to instance %s: %w", machine.InstanceName, err)
 	}
 	defer client.Close()
-	fmt.Printf(">>> Connected over SSH to instance %s\n", machine.InstanceID)
+	fmt.Printf(">>> Connected over SSH to instance %s\n", machine.InstanceName)
 
-	// run the tests on the host
-	fmt.Printf(">>> Preparing instance %s\n", machine.InstanceID)
-	err = batch.LayoutOS.Runner.Prepare(ctx, client, machine.InstanceID, batch.LayoutOS.OS.Arch, r.cfg.GOVersion, repoArchive, r.getBuildPath(batch))
+	// prepare the host to run the tests
+	fmt.Printf(">>> Preparing instance %s\n", machine.InstanceName)
+	err = batch.LayoutOS.Runner.Prepare(ctx, client, machine.InstanceName, batch.LayoutOS.OS.Arch, r.cfg.GOVersion, repoArchive, r.getBuildPath(batch))
 	if err != nil {
-		fmt.Printf(">>> Failed to prepare instance %s: %s\n", machine.InstanceID, err)
-		return fmt.Errorf("failed to prepare instance %s: %w", machine.InstanceID, err)
+		fmt.Printf(">>> Failed to prepare instance %s: %s\n", machine.InstanceName, err)
+		return fmt.Errorf("failed to prepare instance %s: %w", machine.InstanceName, err)
 	}
+
+	// ensure that we have all the requirements for the stack if required
+	var env map[string]string
+	if batch.Batch.Stack != nil {
+		ch, err := r.getCloudForBatchID(batch.ID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf(">>> Instance %s waiting for stack to be ready\n", machine.InstanceName)
+		resp := <-ch
+		if resp == nil {
+			fmt.Printf(">>> Instance %s cannot continue because stack never became ready\n", machine.InstanceName)
+		} else {
+			fmt.Printf(">>> Instance %s will continue stack is ready\n", machine.InstanceName)
+			env = map[string]string{
+				"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
+				"ELASTICSEARCH_USERNAME": resp.Username,
+				"ELASTICSEARCH_PASSWORD": resp.Password,
+				"KIBANA_HOST":            resp.KibanaEndpoint,
+				"KIBANA_USERNAME":        resp.Username,
+				"KIBANA_PASSWORD":        resp.Password,
+			}
+		}
+	}
+
+	// run the actual tests on the host
+	prefix := fmt.Sprintf("%s-%s-%s-%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, strings.Replace(batch.LayoutOS.OS.Version, ".", "", -1))
+	result, err := batch.LayoutOS.Runner.Run(ctx, client, machine.InstanceName, r.cfg.AgentVersion, prefix, batch.Batch, env)
+	if err != nil {
+		fmt.Printf(">>> Failed to execute tests on instance %s: %s\n", machine.InstanceName, err)
+		return fmt.Errorf("failed to execute tests on instance %s: %w", machine.InstanceName, err)
+	}
+	// TODO: Merge/write the results locally
+	_ = result
 
 	return nil
 }
@@ -151,18 +236,17 @@ func (r *Runner) validate() error {
 	var requiredFiles []string
 	for _, b := range r.batches {
 		if !b.Skip {
-			buildName := r.getBuildPath(b)
-			if !slices.Contains(requiredFiles, buildName) {
-				requiredFiles = append(requiredFiles, buildName)
+			buildPath := r.getBuildPath(b)
+			if !slices.Contains(requiredFiles, buildPath) {
+				requiredFiles = append(requiredFiles, buildPath)
 			}
 		}
 	}
 	var missingFiles []string
 	for _, file := range requiredFiles {
-		fullPath := filepath.Join(r.cfg.BuildDir, file)
-		_, err := os.Stat(fullPath)
+		_, err := os.Stat(file)
 		if os.IsNotExist(err) {
-			missingFiles = append(missingFiles, fullPath)
+			missingFiles = append(missingFiles, file)
 		} else if err != nil {
 			return err
 		}
@@ -183,7 +267,7 @@ func (r *Runner) getBuildPath(b LayoutBatch) string {
 	if b.LayoutOS.OS.Type == define.Windows {
 		ext = "zip"
 	}
-	return fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.LayoutOS.OS.Type, arch, ext)
+	return filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.LayoutOS.OS.Type, arch, ext))
 }
 
 // prepare prepares for the runner to run.
@@ -291,10 +375,10 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir string) (string, error) {
 	zipPath := filepath.Join(dir, "agent-repo.zip")
 	_ = os.Remove(zipPath) // start fresh
-	fmt.Printf(">>> Creating zip archive of repo to send to remove hosts\n")
+	fmt.Printf(">>> Creating zip archive of repo to send to remote hosts\n")
 	err := createRepoZipArchive(ctx, repoDir, zipPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create zip archive of repo: %w", err)
 	}
 	return zipPath, nil
 }
@@ -315,6 +399,139 @@ func (r *Runner) ogcPull(ctx context.Context) error {
 		return fmt.Errorf("failed to run ogc import: docker run exited with code: %d", ps.ExitCode())
 	}
 	return nil
+}
+
+// setupCloud creates the clouds required for the tests to run
+func (r *Runner) setupCloud(ctx context.Context) error {
+	var versions []string
+	batchToVersion := make(map[string]string)
+	for _, lb := range r.batches {
+		if !lb.Skip && lb.Batch.Stack != nil {
+			if lb.Batch.Stack.Version == "" {
+				// no version defined on the stack; set it to the defined stack version
+				lb.Batch.Stack.Version = r.cfg.AgentStackVersion
+			}
+			if !slices.Contains(versions, lb.Batch.Stack.Version) {
+				versions = append(versions, lb.Batch.Stack.Version)
+			}
+			batchToVersion[lb.ID] = lb.Batch.Stack.Version
+		}
+	}
+	// use GCE email to add uniqueness to deployment names
+	email, err := r.cfg.GCE.ClientEmail()
+	if err != nil {
+		return err
+	}
+	emailParts := strings.Split(email, "@")
+	essClient := ess.NewClient(ess.Config{
+		ApiKey: r.cfg.ESS.APIKey,
+	})
+	r.batchToCloudMx.Lock()
+	defer r.batchToCloudMx.Unlock()
+	for _, version := range versions {
+		name := fmt.Sprintf("at-%s-%s", strings.Replace(emailParts[0], ".", "-", -1), strings.Replace(version, ".", "", -1))
+		fmt.Printf(">>> Creating ESS cloud %s (%s)\n", version, name)
+		resp, err := essClient.CreateDeployment(ctx, ess.CreateDeploymentRequest{
+			Name:    name,
+			Region:  r.cfg.ESS.Region,
+			Version: version,
+		})
+		if err != nil {
+			fmt.Printf(">>> Failed to create ESS cloud %s: %s\n", version, err)
+			return fmt.Errorf("failed to create ESS cloud for version %s: %w", version, err)
+		}
+		essResp := &essCloudResponse{
+			resp:  resp,
+			ready: false,
+			subCh: nil,
+		}
+		for batchID, batchVersion := range batchToVersion {
+			if batchVersion == version {
+				r.batchToCloud[batchID] = essResp
+			}
+		}
+		go func(ctx context.Context, version string, resp *essCloudResponse) {
+			ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+			defer cancel()
+			ready, err := essClient.DeploymentIsReady(ctx, resp.resp.ID, 30*time.Second)
+			if err != nil {
+				fmt.Printf(">>> Failed to check for cloud %s to be ready: %s\n", version, err)
+			}
+			resp.subMx.RLock()
+			subs := make([]chan *ess.CreateDeploymentResponse, len(resp.subCh))
+			copy(subs, resp.subCh)
+			resp.subCh = make([]chan *ess.CreateDeploymentResponse, 0)
+			resp.done = true
+			resp.ready = ready
+			resp.subMx.RUnlock()
+			var send *ess.CreateDeploymentResponse
+			if ready {
+				send = resp.resp
+			}
+			for _, sub := range subs {
+				select {
+				case <-ctx.Done():
+					return
+				case sub <- send:
+				}
+			}
+		}(ctx, version, essResp)
+	}
+	return nil
+}
+
+func (r *Runner) cleanupCloud() {
+	r.batchToCloudMx.Lock()
+	defer r.batchToCloudMx.Unlock()
+
+	essClient := ess.NewClient(ess.Config{
+		ApiKey: r.cfg.ESS.APIKey,
+	})
+
+	var removed []string
+	for _, cloud := range r.batchToCloud {
+		if slices.Contains(removed, cloud.resp.ID) {
+			// already removed
+			continue
+		}
+		removed = append(removed, cloud.resp.ID)
+		err := func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			return essClient.ShutdownDeployment(ctx, cloud.resp.ID)
+		}()
+		if err != nil {
+			fmt.Printf(">>> Failed to cleanup cloud %s: %s\n", cloud.resp.ID, err)
+		}
+	}
+
+	r.batchToCloud = make(map[string]*essCloudResponse)
+}
+
+func (r *Runner) getCloudForBatchID(id string) (chan *ess.CreateDeploymentResponse, error) {
+	r.batchToCloudMx.RLock()
+	essResp, ok := r.batchToCloud[id]
+	if !ok {
+		r.batchToCloudMx.RUnlock()
+		return nil, fmt.Errorf("no batch with ID %s", id)
+	}
+	r.batchToCloudMx.RUnlock()
+
+	essResp.subMx.RLock()
+	subCh := make(chan *ess.CreateDeploymentResponse, 1)
+	if essResp.done {
+		if essResp.ready {
+			subCh <- essResp.resp
+		} else {
+			subCh <- nil
+		}
+		essResp.subMx.RUnlock()
+		return subCh, nil
+	}
+	essResp.subMx.RUnlock()
+	essResp.subMx.Lock()
+	essResp.subCh = append(essResp.subCh, subCh)
+	return subCh, nil
 }
 
 // ogcImport imports all the required batches into OGC.
@@ -354,17 +571,20 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 }
 
 // ogcUp brings up all the instances.
-func (r *Runner) ogcUp(ctx context.Context) error {
+func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
 	fmt.Printf(">>> Bring up instances through ogc\n")
-	proc, err := r.ogcRun(ctx, []string{"up", LayoutIntegrationTag}, false)
+	var output bytes.Buffer
+	proc, err := r.ogcRun(ctx, []string{"up", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
-		return fmt.Errorf("failed to run ogc up: %w", err)
+		return nil, fmt.Errorf("failed to run ogc up: %w", err)
 	}
 	ps := <-proc.Wait()
 	if ps.ExitCode() != 0 {
-		return fmt.Errorf("failed to run ogc up: docker run exited with code: %d", ps.ExitCode())
+		// print the output so its clear what went wrong
+		fmt.Printf("%s\n", output.Bytes())
+		return nil, fmt.Errorf("failed to run ogc up: docker run exited with code: %d", ps.ExitCode())
 	}
-	return nil
+	return output.Bytes(), nil
 }
 
 // ogcDown brings down all the instances.
@@ -457,16 +677,16 @@ func (r *Runner) getWorkDir() (string, error) {
 	return wd, nil
 }
 
-func attachOutErr(c *exec.Cmd) error {
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return nil
-}
-
 func attachOut(w io.Writer) process.CmdOption {
 	return func(c *exec.Cmd) error {
 		c.Stdout = w
-		c.Stderr = os.Stderr
+		return nil
+	}
+}
+
+func attachErr(w io.Writer) process.CmdOption {
+	return func(c *exec.Cmd) error {
+		c.Stderr = w
 		return nil
 	}
 }
@@ -503,4 +723,12 @@ func createBatch(batch define.Batch) (LayoutBatch, error) {
 		Batch:    batch,
 		Skip:     skip,
 	}, nil
+}
+
+type essCloudResponse struct {
+	resp  *ess.CreateDeploymentResponse
+	ready bool
+	done  bool
+	subCh []chan *ess.CreateDeploymentResponse
+	subMx sync.RWMutex
 }

@@ -1264,15 +1264,19 @@ func majorMinor() string {
 	return ""
 }
 
-func (Integration) Clean(ctx context.Context) error {
+func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
-	r, err := createTestRunner()
-	if err != nil {
-		return err
-	}
-	err = r.Clean(ctx)
-	if err != nil {
-		return err
+	_, err := os.Stat(".ogc-cache")
+	if err == nil {
+		// .ogc-cache exists; need to run `Clean` from the runner
+		r, err := createTestRunner()
+		if err != nil {
+			return err
+		}
+		err = r.Clean()
+		if err != nil {
+			return err
+		}
 	}
 	_ = os.RemoveAll(".ogc-cache")
 	return nil
@@ -1320,14 +1324,9 @@ func (Integration) Auth(ctx context.Context) error {
 	return nil
 }
 
+// run integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
-	//if shouldBuildAgent() {
-	//	// need only local package for current platform
-	//	devtools.Platforms = devtools.Platforms.Select(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
-	//	mg.Deps(Package)
-	//}
-	//mg.Deps(Build.TestBinaries)
-
+	mg.CtxDeps(ctx, Integration.Clean)
 	batches, err := define.DetermineBatches("testing/integration", "integration")
 	if err != nil {
 		return fmt.Errorf("failed to detemine batches: %w", err)
@@ -1339,21 +1338,98 @@ func (Integration) Test(ctx context.Context) error {
 	return r.Run(ctx)
 }
 
+func (Integration) PrepareOnRemote() {
+	mg.Deps(mage.InstallGoTestTools)
+}
+
+func (Integration) TestOnRemote(ctx context.Context) error {
+	mg.Deps(Build.TestBinaries)
+	version := os.Getenv("AGENT_VERSION")
+	if version == "" {
+		return errors.New("AGENT_VERSION environment variable must be set")
+	}
+	prefix := os.Getenv("TEST_DEFINE_PREFIX")
+	if prefix == "" {
+		return errors.New("TEST_DEFINE_PREFIX environment variable must be set")
+	}
+	testsStr := os.Getenv("TEST_DEFINE_TESTS")
+	if testsStr == "" {
+		return errors.New("TEST_DEFINE_TESTS environment variable must be set")
+	}
+	tests := strings.Split(testsStr, ",")
+	testsByPackage := make(map[string][]string)
+	for _, testStr := range tests {
+		testsStrSplit := strings.SplitN(testStr, ":", 2)
+		if len(testsStrSplit) != 2 {
+			return fmt.Errorf("%s is malformated it should be in the format of ${package}:${test_name}", testStr)
+		}
+		testsForPackage := testsByPackage[testsStrSplit[0]]
+		testsForPackage = append(testsForPackage, testsStrSplit[1])
+		testsByPackage[testsStrSplit[0]] = testsForPackage
+	}
+	smallPackageNames := make(map[string]string)
+	for packageName := range testsByPackage {
+		smallName := filepath.Base(packageName)
+		existingPackage, ok := smallPackageNames[smallName]
+		if ok {
+			return fmt.Errorf("%s package collides with %s, because the base package name is the same", packageName, existingPackage)
+		} else {
+			smallPackageNames[smallName] = packageName
+		}
+	}
+	for packageName, packageTests := range testsByPackage {
+		testPrefix := fmt.Sprintf("%s.%s", prefix, filepath.Base(packageName))
+		testName := fmt.Sprintf("remote-%s", testPrefix)
+		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
+		params := mage.GoTestArgs{
+			TestName:        testName,
+			OutputFile:      fileName + ".out",
+			JUnitReportFile: fileName + ".xml",
+			Packages:        []string{packageName},
+			Tags:            []string{"integration"},
+			ExtraFlags:      []string{"-test.run", strings.Join(packageTests, "|")},
+			Env: map[string]string{
+				"AGENT_VERSION":      version,
+				"TEST_DEFINE_PREFIX": testPrefix,
+			},
+		}
+		err := devtools.GoTest(ctx, params)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func createTestRunner(batches ...define.Batch) (*runner.Runner, error) {
 	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
 	if err != nil {
 		return nil, err
 	}
+	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
 	agentVersion := os.Getenv("AGENT_VERSION")
 	if agentVersion == "" {
 		agentVersion, err = mage.DefaultBeatBuildVariableSources.GetBeatVersion()
 		if err != nil {
 			return nil, err
 		}
+		if agentStackVersion == "" {
+			agentStackVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
+		}
+	}
+	if agentStackVersion == "" {
+		agentStackVersion = agentVersion
 	}
 	agentBuildDir := os.Getenv("AGENT_BUILD_DIR")
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
+	}
+	essToken, ok, err := getESSAPIKey()
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
 	}
 	serviceTokenPath, ok, err := getGCEServiceTokenPath()
 	if err != nil {
@@ -1366,11 +1442,20 @@ func createTestRunner(batches ...define.Batch) (*runner.Runner, error) {
 	if datacenter == "" {
 		datacenter = "us-central1-a"
 	}
+	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
+	if essRegion == "" {
+		essRegion = "gcp-us-central1"
+	}
 	r, err := runner.NewRunner(runner.Config{
-		AgentVersion: agentVersion,
-		BuildDir:     agentBuildDir,
-		GOVersion:    goVersion,
-		RepoDir:      ".",
+		AgentVersion:      agentVersion,
+		AgentStackVersion: agentStackVersion,
+		BuildDir:          agentBuildDir,
+		GOVersion:         goVersion,
+		RepoDir:           ".",
+		ESS: &runner.ESSConfig{
+			APIKey: essToken,
+			Region: essRegion,
+		},
 		GCE: &runner.GCEConfig{
 			ServiceTokenPath: serviceTokenPath,
 			Datacenter:       datacenter,
@@ -1652,4 +1737,24 @@ func stringPrompt(prompt string) (string, error) {
 	}
 
 	return "", nil
+}
+
+func getESSAPIKey() (string, bool, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", false, fmt.Errorf("unable to determine user's home directory: %w", err)
+	}
+	essAPIKeyFile := filepath.Join(homeDir, ".config", "ess", "api_key.txt")
+	_, err = os.Stat(essAPIKeyFile)
+	if os.IsNotExist(err) {
+		return "", false, nil
+	} else if err != nil {
+		return "", false, fmt.Errorf("unable to check if ESS config directory exists: %w", err)
+	}
+	data, err := os.ReadFile(essAPIKeyFile)
+	if err != nil {
+		return "", true, fmt.Errorf("unable to read ESS API key: %w", err)
+	}
+	essAPIKey := strings.TrimSpace(string(data))
+	return essAPIKey, true, nil
 }

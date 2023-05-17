@@ -1,11 +1,8 @@
 package runner
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/ssh"
-
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
@@ -22,12 +19,6 @@ var (
 	ErrOSNotSupported = errors.New("os/arch not current supported")
 )
 
-// LayoutOSRunner provides an interface to run the tests on the OS.
-type LayoutOSRunner interface {
-	// Prepare prepares the runner to actual run on the host.
-	Prepare(ctx context.Context, c *ssh.Client, instanceID string, arch string, goVersion string, repoArchive string, buildPath string) error
-}
-
 // LayoutOS defines the minimal information for a mapping of an OS to the
 // provider, instance size, and runs on for that OS.
 type LayoutOS struct {
@@ -37,7 +28,7 @@ type LayoutOS struct {
 	RunsOn       string
 	Username     string
 	RemotePath   string
-	Runner       LayoutOSRunner
+	Runner       OSRunner
 }
 
 // Supported defines the set of supported OS's the runner currently supports.
