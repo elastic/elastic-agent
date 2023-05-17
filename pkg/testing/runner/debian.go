@@ -18,10 +18,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const setupPath = `
-echo 'PATH=~/go/bin:$PATH' >> ~/.bashrc
-`
-
 type DebianRunner struct{}
 
 func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName string, arch string, goVersion string, repoArchive string, buildPath string) error {
