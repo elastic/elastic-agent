@@ -556,6 +556,7 @@ func (r *Runner) getCloudForBatchID(id string) (chan *ess.CreateDeploymentRespon
 	essResp.subMx.RUnlock()
 	essResp.subMx.Lock()
 	essResp.subCh = append(essResp.subCh, subCh)
+	essResp.subMx.Unlock()
 	return subCh, nil
 }
 
@@ -626,7 +627,7 @@ func (r *Runner) ogcDown(ctx context.Context) error {
 	return nil
 }
 
-// ogcMachines brings up all the instances.
+// ogcMachines lists all the instances.
 func (r *Runner) ogcMachines(ctx context.Context) ([]OGCMachine, error) {
 	var out bytes.Buffer
 	proc, err := r.ogcRun(ctx, []string{"ls", "--as-yaml"}, false, process.WithCmdOptions(attachOut(&out)))
@@ -703,88 +704,25 @@ func (r *Runner) getWorkDir() (string, error) {
 }
 
 func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error) {
-	// merge the results together
 	var rawOutput bytes.Buffer
 	var jsonOutput bytes.Buffer
 	var suites JUnitTestSuites
 	for id, res := range results {
-		batch, _ := findLayoutBatchByID(id, r.batches)
-		//if !ok {
-		//	return Result{}, fmt.Errorf("batch ID not found %s", id)
-		//}
+		batch, ok := findLayoutBatchByID(id, r.batches)
+		if !ok {
+			return Result{}, fmt.Errorf("batch ID not found %s", id)
+		}
 		batchName := fmt.Sprintf("%s/%s/%s/%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, batch.LayoutOS.OS.Version)
 		for _, pkg := range res.Packages {
-			if pkg.Output != nil {
-				pkgWriter := newPrefixOutput(&rawOutput, fmt.Sprintf("%s(%s): ", batchName, pkg.Name))
-				_, err := pkgWriter.Write(pkg.Output)
-				if err != nil {
-					return Result{}, fmt.Errorf("failed to write raw output from %s %s: %w", id, pkg.Name, err)
-				}
-			}
-			if pkg.JSONOutput != nil {
-				jsonSuffix, err := suffixJSONResults(pkg.JSONOutput, fmt.Sprintf("(%s)", batchName))
-				if err != nil {
-					return Result{}, fmt.Errorf("failed to suffix json output from %s %s: %w", id, pkg.Name, err)
-				}
-				_, err = jsonOutput.Write(jsonSuffix)
-				if err != nil {
-					return Result{}, fmt.Errorf("failed to write json output from %s %s: %w", id, pkg.Name, err)
-				}
-			}
-			if pkg.XMLOutput != nil {
-				pkgSuites, err := parseJUnit(pkg.XMLOutput)
-				if err != nil {
-					return Result{}, fmt.Errorf("failed to parse junit from %s %s: %w", id, pkg.Name, err)
-				}
-				for _, pkgSuite := range pkgSuites.Suites {
-					// append the batch information to the suite name
-					pkgSuite.Name = fmt.Sprintf("%s(%s)", pkgSuite.Name, batchName)
-					pkgSuite.Properties = append(pkgSuite.Properties, JUnitProperty{
-						Name:  "batch",
-						Value: batchName,
-					}, JUnitProperty{
-						Name:  "sudo",
-						Value: "false",
-					})
-					suites.Suites = append(suites.Suites, pkgSuite)
-				}
+			err := mergePackageResult(pkg, id, batchName, false, &rawOutput, &jsonOutput, &suites)
+			if err != nil {
+				return Result{}, err
 			}
 		}
 		for _, pkg := range res.SudoPackages {
-			if pkg.Output != nil {
-				pkgWriter := newPrefixOutput(&rawOutput, fmt.Sprintf("%s(sudo)(%s): ", batchName, pkg.Name))
-				_, err := pkgWriter.Write(pkg.Output)
-				if err != nil {
-					return Result{}, fmt.Errorf("failed to write raw output %s/%s: %w", id, pkg.Name, err)
-				}
-			}
-			if pkg.JSONOutput != nil {
-				jsonSuffix, err := suffixJSONResults(pkg.JSONOutput, fmt.Sprintf("(%s)(sudo)", batchName))
-				if err != nil {
-					return Result{}, fmt.Errorf("failed to suffix json output from %s %s: %w", id, pkg.Name, err)
-				}
-				_, err = jsonOutput.Write(jsonSuffix)
-				if err != nil {
-					return Result{}, fmt.Errorf("failed to write json output from %s %s: %w", id, pkg.Name, err)
-				}
-			}
-			if pkg.XMLOutput != nil {
-				pkgSuites, err := parseJUnit(pkg.XMLOutput)
-				if err != nil {
-					return Result{}, fmt.Errorf("failed to parse junit from %s %s: %w", id, pkg.Name, err)
-				}
-				for _, pkgSuite := range pkgSuites.Suites {
-					// append the batch information to the suite name
-					pkgSuite.Name = fmt.Sprintf("%s(%s)(sudo)", pkgSuite.Name, batchName)
-					pkgSuite.Properties = append(pkgSuite.Properties, JUnitProperty{
-						Name:  "batch",
-						Value: batchName,
-					}, JUnitProperty{
-						Name:  "sudo",
-						Value: "true",
-					})
-					suites.Suites = append(suites.Suites, pkgSuite)
-				}
+			err := mergePackageResult(pkg, id, batchName, true, &rawOutput, &jsonOutput, &suites)
+			if err != nil {
+				return Result{}, err
 			}
 		}
 	}
@@ -799,6 +737,51 @@ func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error)
 	complete.JSONOutput = jsonOutput.Bytes()
 	complete.XMLOutput = junitBytes.Bytes()
 	return complete, nil
+}
+
+func mergePackageResult(pkg OSRunnerPackageResult, id string, batchName string, sudo bool, rawOutput io.Writer, jsonOutput io.Writer, suites *JUnitTestSuites) error {
+	suffix := ""
+	sudoStr := "false"
+	if sudo {
+		suffix = "(sudo)"
+		sudoStr = "true"
+	}
+	if pkg.Output != nil {
+		pkgWriter := newPrefixOutput(rawOutput, fmt.Sprintf("%s(%s)%s: ", pkg.Name, batchName, suffix))
+		_, err := pkgWriter.Write(pkg.Output)
+		if err != nil {
+			return fmt.Errorf("failed to write raw output from %s %s: %w", id, pkg.Name, err)
+		}
+	}
+	if pkg.JSONOutput != nil {
+		jsonSuffix, err := suffixJSONResults(pkg.JSONOutput, fmt.Sprintf("(%s)%s", batchName, suffix))
+		if err != nil {
+			return fmt.Errorf("failed to suffix json output from %s %s: %w", id, pkg.Name, err)
+		}
+		_, err = jsonOutput.Write(jsonSuffix)
+		if err != nil {
+			return fmt.Errorf("failed to write json output from %s %s: %w", id, pkg.Name, err)
+		}
+	}
+	if pkg.XMLOutput != nil {
+		pkgSuites, err := parseJUnit(pkg.XMLOutput)
+		if err != nil {
+			return fmt.Errorf("failed to parse junit from %s %s: %w", id, pkg.Name, err)
+		}
+		for _, pkgSuite := range pkgSuites.Suites {
+			// append the batch information to the suite name
+			pkgSuite.Name = fmt.Sprintf("%s(%s)%s", pkgSuite.Name, batchName, suffix)
+			pkgSuite.Properties = append(pkgSuite.Properties, JUnitProperty{
+				Name:  "batch",
+				Value: batchName,
+			}, JUnitProperty{
+				Name:  "sudo",
+				Value: sudoStr,
+			})
+			suites.Suites = append(suites.Suites, pkgSuite)
+		}
+	}
+	return nil
 }
 
 func attachOut(w io.Writer) process.CmdOption {
