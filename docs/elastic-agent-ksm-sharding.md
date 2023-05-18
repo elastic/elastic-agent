@@ -19,13 +19,13 @@ The default dns entries for to access created ksm pods are (assuming namespace o
 
 ## Installation methods of elastic-agent
 
-This document suggests 3 different ways to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration:
+This document suggests **3 alternative configuration methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration:
 
 1. With `hostNetwork:false` for non-leader deployments of KSM shards
 2. With `podAntiAffinity` to isolate the daemonset pods from rest of deployments
 3. With `taint/tolerations` to isolate the daemonset pods from rest of deployments
 
-Each configuration includes specific pros and cons and user needs to choose what matches best their needs.
+Each configuration includes specific pros and cons and users may choose what best matches their needs.
 
 The Kubernetes observability is based on https://docs.elastic.co/en/integrations/kubernetes[kubernetes integration], which is fetching metrics from several components:
 
@@ -40,9 +40,11 @@ The Kubernetes observability is based on https://docs.elastic.co/en/integrations
 
 The Elastic Agent manifest is deployed by default as daemonset. That said, each elastic agent by default is being deployed on every node of kubernetes cluster.
 
-Additionally by default, one agent is elected as [**leader**](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L32) and this will be responsible for also collecting the cluster wide metrics. So let us discuss each configuration method above. We will provide relevant [manifests](./manifests) to assist installation. We will describe the managed agent installation scenario (for simplicity we would not mention standalone scenarios, but relevant [manifests](./manifests) will be provided for both scenarios)
+Additionally by default, one agent is elected as [**leader**](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L32) and this will be responsible for also collecting the cluster wide metrics.
 
-### HostNetwork:false Installation
+So let us discuss each alternative configuration method above. We will provide relevant [manifests](./manifests) to assist installation. We will describe the managed agent installation scenario (for simplicity we would not mention standalone scenarios, but relevant [manifests](./manifests) will be provided for both scenarios)
+
+### 1. HostNetwork:false Installation
 
 For this installation, users need to configure the two following agent policies.
 
@@ -78,19 +80,26 @@ Deploy following manifests:
 - [+] Simplicity
 - [-] You can not prevent execution of deployments in nodes where agents already running.
 
-### PodAntiAffinity Installation
+### 2. PodAntiAffinity Installation
 
 For this installation, users need to configure the following agent policies:
 
 **Agent policies:**
 
-- Same agent policy (as described in previous scenario) for daeomonset with leader
-- Additional policy for any other extra ksm shard that they will like to collect metrics. Additionally in this policy user needs to enable any node-wide metric datasets they want (like kubelet, proxy, scheduler or controller). Reason is that now the deployment agent pods will run isolated in specific nodes without any co-located agent.
-Example of config:
+- Create a policy for daeomonset resources. For this policy you need to:
+  - a) disable leader election from KSM (with url `kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster` ) and also
+  ![Deployment policy in affinity config](./images/affinitydaeonsetksm.png)
+  - b) disable the APiServer dataset
+  ![Deployment policy in affinity config](./images/affinitydaemonset.png)
+  - c) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller
+- Create a policy for deployment resources: 
+  - a) With Leader enabled for KSM metrics with URL `kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster`
+  ![Deployment policy in affinity config](./images/affinityksm01.png) 
+  - b) Enable APIServer dataset
+  - c) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller
+- (Additional policy for any other extra ksm shard that they would like to collect metrics).
 
-![Deployment policy in affinity config](./images/ksmaffinity.png)
-
-Still the KSM endpoints need to point to url of `kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080`
+Reason is that now the deployment agent pods will run isolated in specific nodes. This method actually implies that first agent that will be installed from deployment is the leader of your cluster.
 
 **Manifest Installation:**
 
@@ -144,7 +153,7 @@ kube-system   elastic-agent-txxfp                                              0
 ### Tolerations Installation
 
 **Agent Policies:**
-For this installation, users need to configure the same agent policies as described in previous scenario.
+For this installation, users need to configure the same agent policies as described in first scenario (aka hostnetwork configuration). Daemonset resources will incldue the leader ksm and apiserver.
 
 **Manifest Installation:**
 
@@ -162,7 +171,7 @@ For this installation, users need to configure the same agent policies as descri
 3. Taint a specific node that you want to exclude from being assigned to daemonset pods
 
 ```bash
- kubectl taint nodes gke-kubernetes-scale-kubernetes-scale-0f73d58f-4rt9 deployment=yes:NoExecute-
+ kubectl taint nodes gke-kubernetes-scale-kubernetes-scale-0f73d58f-4rt9 deployment=yes:NoExecute
 ```
 
 4. Deploy your daemonsets:
@@ -178,3 +187,9 @@ For this installation, users need to configure the same agent policies as descri
 ```bash
  kubectl apply -f elastic-agent-managed-deployment-ksm-1.yaml
 ```
+
+**Pros/Cons**:
+
+- [+] You **can* prevent execution of deployments in nodes where agents already running
+- [+] Gives possibilities to users to configure the pod scheduling exactly as they need
+- [-] More complex method of all and requires manual steps
