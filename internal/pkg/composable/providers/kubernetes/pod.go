@@ -25,16 +25,18 @@ import (
 )
 
 type pod struct {
-	watcher          kubernetes.Watcher
-	nodeWatcher      kubernetes.Watcher
-	comm             composable.DynamicProviderComm
-	metagen          metadata.MetaGen
-	namespaceWatcher kubernetes.Watcher
-	config           *Config
-	logger           *logp.Logger
-	scope            string
-	managed          bool
-	cleanupTimeout   time.Duration
+	watcher           kubernetes.Watcher
+	nodeWatcher       kubernetes.Watcher
+	comm              composable.DynamicProviderComm
+	metagen           metadata.MetaGen
+	namespaceWatcher  kubernetes.Watcher
+	replicasetWatcher kubernetes.Watcher
+	jobWatcher        kubernetes.Watcher
+	config            *Config
+	logger            *logp.Logger
+	scope             string
+	managed           bool
+	cleanupTimeout    time.Duration
 
 	// Mutex used by configuration updates not triggered by the main watcher,
 	// to avoid race conditions between cross updates and deletions.
@@ -66,6 +68,8 @@ func NewPodEventer(
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
 
+	var replicaSetWatcher, jobWatcher kubernetes.Watcher
+
 	options := kubernetes.WatchOptions{
 		SyncTimeout: cfg.SyncPeriod,
 		Node:        cfg.Node,
@@ -83,23 +87,46 @@ func NewPodEventer(
 		logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 	}
 
+	// Resource is Pod so we need to create watchers for Replicasets and Jobs that it might belongs to
+	// in order to be able to retrieve 2nd layer Owner metadata like in case of:
+	// Deployment -> Replicaset -> Pod
+	// CronJob -> job -> Pod
+	if metaConf.Deployment {
+		replicaSetWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_rs", client, &kubernetes.ReplicaSet{}, kubernetes.WatchOptions{
+			SyncTimeout: config.SyncPeriod,
+		}, nil)
+		if err != nil {
+			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
+		}
+	}
+	if metaConf.CronJob {
+		jobWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_job", client, &kubernetes.Job{}, kubernetes.WatchOptions{
+			SyncTimeout: config.SyncPeriod,
+		}, nil)
+		if err != nil {
+			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Job{}, err)
+		}
+	}
+
 	rawConfig, err := c.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
-	metaGen := metadata.GetPodMetaGen(rawConfig, watcher, nodeWatcher, namespaceWatcher, metaConf)
+	metaGen := metadata.GetPodMetaGen(rawConfig, watcher, nodeWatcher, namespaceWatcher, replicaSetWatcher, jobWatcher, metaConf)
 
 	p := &pod{
-		logger:           logger,
-		cleanupTimeout:   cfg.CleanupTimeout,
-		comm:             comm,
-		scope:            scope,
-		config:           cfg,
-		metagen:          metaGen,
-		watcher:          watcher,
-		nodeWatcher:      nodeWatcher,
-		namespaceWatcher: namespaceWatcher,
-		managed:          managed,
+		logger:            logger,
+		cleanupTimeout:    cfg.CleanupTimeout,
+		comm:              comm,
+		scope:             scope,
+		config:            cfg,
+		metagen:           metaGen,
+		watcher:           watcher,
+		nodeWatcher:       nodeWatcher,
+		namespaceWatcher:  namespaceWatcher,
+		replicasetWatcher: replicaSetWatcher,
+		jobWatcher:        jobWatcher,
+		managed:           managed,
 	}
 
 	watcher.AddEventHandler(p)
@@ -132,6 +159,18 @@ func (p *pod) Start() error {
 		}
 	}
 
+	if p.replicasetWatcher != nil {
+		if err := p.replicasetWatcher.Start(); err != nil {
+			return err
+		}
+	}
+
+	if p.jobWatcher != nil {
+		if err := p.jobWatcher.Start(); err != nil {
+			return err
+		}
+	}
+
 	return p.watcher.Start()
 }
 
@@ -145,6 +184,14 @@ func (p *pod) Stop() {
 
 	if p.nodeWatcher != nil {
 		p.nodeWatcher.Stop()
+	}
+
+	if p.replicasetWatcher != nil {
+		p.replicasetWatcher.Stop()
+	}
+
+	if p.jobWatcher != nil {
+		p.jobWatcher.Stop()
 	}
 }
 
