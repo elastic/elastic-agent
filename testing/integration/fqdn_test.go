@@ -37,6 +37,7 @@ func TestFQDN(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 		Local: false,
+		Sudo:  true,
 	})
 
 	suite.Run(t, &FQDN{requirementsInfo: info})
@@ -211,6 +212,7 @@ func getHostFQDN(ctx context.Context) (string, error) {
 
 	return strings.TrimSpace(string(out)), nil
 }
+
 func setHostFQDN(ctx context.Context, externalIP, fqdn string) error {
 	// Check if FQDN is already set in /etc/hosts
 	filename := string(filepath.Separator) + filepath.Join("etc", "hosts")

@@ -104,7 +104,7 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
 	}
-	if !req.Local && !local {
+	if !req.Local && local {
 		t.Skip("running local only tests and this test doesn't support local")
 		return nil
 	}
