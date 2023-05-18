@@ -19,23 +19,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/ess"
-
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/otiai10/copy"
 	"github.com/pkg/errors"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/runner"
 
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
@@ -1261,9 +1263,22 @@ func majorMinor() string {
 	return ""
 }
 
-func (Integration) Clean() {
+func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
-	mg.Deps()
+	_, err := os.Stat(".ogc-cache")
+	if err == nil {
+		// .ogc-cache exists; need to run `Clean` from the runner
+		r, err := createTestRunner()
+		if err != nil {
+			return err
+		}
+		err = r.Clean()
+		if err != nil {
+			return err
+		}
+	}
+	_ = os.RemoveAll(".ogc-cache")
+	return nil
 }
 
 func (Integration) Check() error {
@@ -1308,6 +1323,172 @@ func (Integration) Auth(ctx context.Context) error {
 	return nil
 }
 
+// run integration tests on remote hosts
+func (Integration) Test(ctx context.Context) error {
+	mg.CtxDeps(ctx, Integration.Clean)
+	batches, err := define.DetermineBatches("testing/integration", "integration")
+	if err != nil {
+		return fmt.Errorf("failed to detemine batches: %w", err)
+	}
+	r, err := createTestRunner(batches...)
+	if err != nil {
+		return err
+	}
+	results, err := r.Run(ctx)
+	if err != nil {
+		return err
+	}
+	_ = os.Remove("build/TEST-go-integration.out")
+	_ = os.Remove("build/TEST-go-integration.out.json")
+	_ = os.Remove("build/TEST-go-integration.xml")
+	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
+	if err != nil {
+		return err
+	}
+	err = writeFile("build/TEST-go-integration.out.json", results.Output, 0644)
+	if err != nil {
+		return err
+	}
+	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
+	if err != nil {
+		return err
+	}
+	fmt.Printf(">>> Testing completed\n")
+	fmt.Printf(">>> Console output written here: build/TEST-go-integration.out\n")
+	fmt.Printf(">>> Console JSON output written here: build/TEST-go-integration.out.json\n")
+	fmt.Printf(">>> JUnit XML written here: build/TEST-go-integration.xml\n")
+	return nil
+}
+
+func (Integration) PrepareOnRemote() {
+	mg.Deps(mage.InstallGoTestTools)
+}
+
+func (Integration) TestOnRemote(ctx context.Context) error {
+	mg.Deps(Build.TestBinaries)
+	version := os.Getenv("AGENT_VERSION")
+	if version == "" {
+		return errors.New("AGENT_VERSION environment variable must be set")
+	}
+	prefix := os.Getenv("TEST_DEFINE_PREFIX")
+	if prefix == "" {
+		return errors.New("TEST_DEFINE_PREFIX environment variable must be set")
+	}
+	testsStr := os.Getenv("TEST_DEFINE_TESTS")
+	if testsStr == "" {
+		return errors.New("TEST_DEFINE_TESTS environment variable must be set")
+	}
+	tests := strings.Split(testsStr, ",")
+	testsByPackage := make(map[string][]string)
+	for _, testStr := range tests {
+		testsStrSplit := strings.SplitN(testStr, ":", 2)
+		if len(testsStrSplit) != 2 {
+			return fmt.Errorf("%s is malformated it should be in the format of ${package}:${test_name}", testStr)
+		}
+		testsForPackage := testsByPackage[testsStrSplit[0]]
+		testsForPackage = append(testsForPackage, testsStrSplit[1])
+		testsByPackage[testsStrSplit[0]] = testsForPackage
+	}
+	smallPackageNames := make(map[string]string)
+	for packageName := range testsByPackage {
+		smallName := filepath.Base(packageName)
+		existingPackage, ok := smallPackageNames[smallName]
+		if ok {
+			return fmt.Errorf("%s package collides with %s, because the base package name is the same", packageName, existingPackage)
+		} else {
+			smallPackageNames[smallName] = packageName
+		}
+	}
+	for packageName, packageTests := range testsByPackage {
+		testPrefix := fmt.Sprintf("%s.%s", prefix, filepath.Base(packageName))
+		testName := fmt.Sprintf("remote-%s", testPrefix)
+		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
+		params := mage.GoTestArgs{
+			TestName:        testName,
+			OutputFile:      fileName + ".out",
+			JUnitReportFile: fileName + ".xml",
+			Packages:        []string{packageName},
+			Tags:            []string{"integration"},
+			ExtraFlags:      []string{"-test.run", strings.Join(packageTests, "|")},
+			Env: map[string]string{
+				"AGENT_VERSION":      version,
+				"TEST_DEFINE_PREFIX": testPrefix,
+			},
+		}
+		err := devtools.GoTest(ctx, params)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createTestRunner(batches ...define.Batch) (*runner.Runner, error) {
+	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
+	if err != nil {
+		return nil, err
+	}
+	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
+	agentVersion := os.Getenv("AGENT_VERSION")
+	if agentVersion == "" {
+		agentVersion, err = mage.DefaultBeatBuildVariableSources.GetBeatVersion()
+		if err != nil {
+			return nil, err
+		}
+		if agentStackVersion == "" {
+			agentStackVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
+		}
+	}
+	if agentStackVersion == "" {
+		agentStackVersion = agentVersion
+	}
+	agentBuildDir := os.Getenv("AGENT_BUILD_DIR")
+	if agentBuildDir == "" {
+		agentBuildDir = filepath.Join("build", "distributions")
+	}
+	essToken, ok, err := getESSAPIKey()
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
+	}
+	serviceTokenPath, ok, err := getGCEServiceTokenPath()
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
+	}
+	datacenter := os.Getenv("TEST_INTEG_AUTH_GCP_DATACENTER")
+	if datacenter == "" {
+		datacenter = "us-central1-a"
+	}
+	essRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
+	if essRegion == "" {
+		essRegion = "gcp-us-central1"
+	}
+	r, err := runner.NewRunner(runner.Config{
+		AgentVersion:      agentVersion,
+		AgentStackVersion: agentStackVersion,
+		BuildDir:          agentBuildDir,
+		GOVersion:         goVersion,
+		RepoDir:           ".",
+		ESS: &runner.ESSConfig{
+			APIKey: essToken,
+			Region: essRegion,
+		},
+		GCE: &runner.GCEConfig{
+			ServiceTokenPath: serviceTokenPath,
+			Datacenter:       datacenter,
+		},
+	}, batches...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create runner: %w", err)
+	}
+	return r, nil
+}
+
 func shouldBuildAgent() bool {
 	build := os.Getenv("BUILD_AGENT")
 	if build == "" {
@@ -1322,6 +1503,16 @@ func shouldBuildAgent() bool {
 
 // Pre-requisite: user must have the gcloud CLI installed
 func authGCP(ctx context.Context) error {
+	// We only need the service account token to exist.
+	tokenPath, ok, err := getGCEServiceTokenPath()
+	if err != nil {
+		return err
+	}
+	if ok {
+		// exists, so nothing to do
+		return nil
+	}
+
 	// Use OS-appropriate command to find executables
 	execFindCmd := "which"
 	cliName := "gcloud"
@@ -1391,33 +1582,114 @@ func authGCP(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to get project: %w", err)
 	}
-
 	project := strings.TrimSpace(string(output))
-	if project == expectedProject {
-		// We're all set!
-		return nil
+	if project != expectedProject {
+		// Attempt to select correct GCP project
+		fmt.Printf("Attempting to switch GCP project from [%s] to [%s]...\n", project, expectedProject)
+		cmd = exec.CommandContext(ctx, cliName, "config", "set", "core/project", expectedProject)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		if err = cmd.Run(); err != nil {
+			return fmt.Errorf("unable to switch project from [%s] to [%s]: %w", project, expectedProject, err)
+		}
+		project = expectedProject
 	}
 
-	// Attempt to select correct GCP project
-	fmt.Printf("Attempting to switch GCP project from [%s] to [%s]...\n", project, expectedProject)
-	cmd = exec.CommandContext(ctx, cliName, "config", "set", "core/project", expectedProject)
+	// Check that the service account exists for the user
+	var svcList []struct {
+		Email string `json:"email"`
+	}
+	serviceAcctName := fmt.Sprintf("%s-agent-testing", strings.Replace(parts[0], ".", "-", -1))
+	iamAcctName := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAcctName, project)
+	cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "list", "--format=json")
+	output, err = cmd.Output()
+	if err != nil {
+		return fmt.Errorf("unable to list service accounts: %w", err)
+	}
+	if err := json.Unmarshal(output, &svcList); err != nil {
+		return fmt.Errorf("unable to parse service accounts: %w", err)
+	}
+	var found = false
+	for _, svc := range svcList {
+		if svc.Email == iamAcctName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "create", serviceAcctName)
+		if err = cmd.Run(); err != nil {
+			return fmt.Errorf("unable to create service account %s: %w", serviceAcctName, err)
+		}
+	}
+
+	// Check that the service account has the required roles
+	cmd = exec.CommandContext(
+		ctx, cliName, "projects", "get-iam-policy", project,
+		"--flatten=bindings[].members",
+		fmt.Sprintf("--filter=bindings.members:serviceAccount:%s", iamAcctName),
+		"--format=value(bindings.role)")
+	output, err = cmd.Output()
+	if err != nil {
+		return fmt.Errorf("unable to get roles for service account %s: %w", serviceAcctName, err)
+	}
+	roles := strings.Split(string(output), ";")
+	missingRoles := gceFindMissingRoles(roles, []string{"roles/compute.admin", "roles/iam.serviceAccountUser"})
+	for _, role := range missingRoles {
+		cmd = exec.CommandContext(ctx, cliName, "projects", "add-iam-policy-binding", project,
+			fmt.Sprintf("--member=serviceAccount:%s", iamAcctName),
+			fmt.Sprintf("--role=%s", role))
+		if err = cmd.Run(); err != nil {
+			return fmt.Errorf("failed to add role %s to service account %s: %w", role, serviceAcctName, err)
+		}
+	}
+
+	// Create the key for the service account
+	cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "keys", "create", tokenPath,
+		fmt.Sprintf("--iam-account=%s", iamAcctName))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 	if err = cmd.Run(); err != nil {
-		return fmt.Errorf("unable to switch project from [%s] to [%s]: %w", project, expectedProject, err)
+		return fmt.Errorf("failed to create key %s for service account %s: %w", tokenPath, serviceAcctName, err)
 	}
 
 	return nil
 }
 
-func authESS(ctx context.Context) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("unable to determine user's home directory: %w", err)
+func gceFindMissingRoles(actual []string, expected []string) []string {
+	var missing []string
+	for _, e := range expected {
+		if !slices.Contains(actual, e) {
+			missing = append(missing, e)
+		}
 	}
-	essAPIKeyFile := filepath.Join(homeDir, ".config", "ess", "api_key.txt")
+	return missing
+}
 
+func getGCEServiceTokenPath() (string, bool, error) {
+	serviceTokenPath := os.Getenv("TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE")
+	if serviceTokenPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", false, fmt.Errorf("unable to determine user's home directory: %w", err)
+		}
+		serviceTokenPath = filepath.Join(homeDir, ".config", "gcloud", "agent-testing-service-token.json")
+	}
+	_, err := os.Stat(serviceTokenPath)
+	if os.IsNotExist(err) {
+		return serviceTokenPath, false, nil
+	} else if err != nil {
+		return serviceTokenPath, false, fmt.Errorf("unable to check for service account key file at %s: %w", serviceTokenPath, err)
+	}
+	return serviceTokenPath, true, nil
+}
+
+func authESS(ctx context.Context) error {
+	essAPIKeyFile, err := getESSAPIKeyFilePath()
+	if err != nil {
+		return err
+	}
 	_, err = os.Stat(essAPIKeyFile)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0700); err != nil {
@@ -1488,4 +1760,43 @@ func stringPrompt(prompt string) (string, error) {
 	}
 
 	return "", nil
+}
+
+func getESSAPIKey() (string, bool, error) {
+	essAPIKeyFile, err := getESSAPIKeyFilePath()
+	if err != nil {
+		return "", false, err
+	}
+	_, err = os.Stat(essAPIKeyFile)
+	if os.IsNotExist(err) {
+		return "", false, nil
+	} else if err != nil {
+		return "", false, fmt.Errorf("unable to check if ESS config directory exists: %w", err)
+	}
+	data, err := os.ReadFile(essAPIKeyFile)
+	if err != nil {
+		return "", true, fmt.Errorf("unable to read ESS API key: %w", err)
+	}
+	essAPIKey := strings.TrimSpace(string(data))
+	return essAPIKey, true, nil
+}
+
+func getESSAPIKeyFilePath() (string, error) {
+	essAPIKeyFile := os.Getenv("TEST_INTEG_AUTH_ESS_APIKEY_FILE")
+	if essAPIKeyFile == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("unable to determine user's home directory: %w", err)
+		}
+		essAPIKeyFile = filepath.Join(homeDir, ".config", "ess", "api_key.txt")
+	}
+	return essAPIKeyFile, nil
+}
+
+func writeFile(name string, data []byte, perm os.FileMode) error {
+	err := os.WriteFile(name, data, perm)
+	if err != nil {
+		return fmt.Errorf("failed to write file %s: %w", name, err)
+	}
+	return nil
 }
