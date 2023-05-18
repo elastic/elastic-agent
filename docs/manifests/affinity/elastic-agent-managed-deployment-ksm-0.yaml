@@ -1,9 +1,9 @@
----
+# Deployment 1 kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
 # For more information https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-managed-by-fleet.html
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
-  name: elastic-agent
+  name: elastic-agent-0
   namespace: kube-system
   labels:
     app: elastic-agent
@@ -16,18 +16,19 @@ spec:
       labels:
         app: elastic-agent
     spec:
-      # Affinity (aka PodAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
+      #nodeName: gke-kubernetes-scale-kubernetes-scale-0f73d58f-4rt9
+      # Affinity (aka podAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
       #This way we can prevent an elastic daemonset to be installed in the same node where elastic-agent deployment exists
-      # affinity:
-      #   podAntiAffinity:  
-      #     requiredDuringSchedulingIgnoredDuringExecution:
-      #     - labelSelector:
-      #         matchExpressions:                            
-      #         - key: app
-      #           operator: In
-      #           values:                          
-      #             - "elastic-agent"
-      #       topologyKey: "kubernetes.io/hostname"
+      affinity:
+        podAntiAffinity:  
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:                            
+              - key: app
+                operator: In
+                values:                          
+                  - "elastic-agent"
+            topologyKey: "kubernetes.io/hostname"
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
@@ -284,3 +285,4 @@ metadata:
   labels:
     k8s-app: elastic-agent
 ---
+

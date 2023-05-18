@@ -12,7 +12,7 @@ cd kube-state-metrics/examples/autosharding
 kubectl apply -k .
 ```
 
-The default dns entries for to access created ksm pods are (assuming namespace of installation of ksm remains default: `kube-system` ):
+The default dns entries for to access created ksm pods are (assuming namespace of installation of KSM remains default: `kube-system`):
 
 - **KSM Shard01:** kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
 - **KSM Shard02:** kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
@@ -71,7 +71,7 @@ Deploy following manifests:
  kubectl apply -f elastic-agent-managed-deployment-ksm-1.yaml
 ```
 
-> **Note**: Above manifests exist under [manifests](./manifests) folder
+> **Note**: Above manifests exist under [manifests/hostnetwork](./manifests/hostnetwork) folder
 
 > **Note**: Make sure that `hostNetwork:false` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40).
 
@@ -86,25 +86,25 @@ For this installation, users need to configure the following agent policies:
 
 **Agent policies:**
 
-- Create a policy for daeomonset resources. For this policy you need to:
-  - a) disable leader election from KSM (with url `kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster` ) and also
-  ![Deployment policy in affinity config](./images/affinitydaeonsetksm.png)
-  - b) disable the APiServer dataset
-  ![Deployment policy in affinity config](./images/affinitydaemonset.png)
+- Create a policy to be assigned to daemonset resources. 
+  - a) This policy will have enabled *only node-wide* metric datasets (like kubelet, proxy, scheduler or controller).
+  - b) **Disable KSM and Apiserver datasets**
+- Create a second policy for first KSM shard resources. For this policy you need to:
+  - a) Enable leader election from KSM (with url `kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster`) and also
+  ![Deployment policy in affinity config](./images/affinityksm0.png)
+  - b) Enable the APiServer dataset
+  ![Deployment policy in affinity config](./images/affinityksm0datasets.png)
   - c) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller
-- Create a policy for deployment resources: 
-  - a) With Leader enabled for KSM metrics with URL `kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster`
-  ![Deployment policy in affinity config](./images/affinityksm01.png) 
-  - b) Enable APIServer dataset
-  - c) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller
-- (Additional policy for any other extra ksm shard that they would like to collect metrics).
+(- Repeat policy creation for rest KSM shards. **One deployment needs to be assigned per KSM shard**:  
+  - a) Disable APIServer dataset
+  - b) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller)
 
 Reason is that now the deployment agent pods will run isolated in specific nodes. This method actually implies that first agent that will be installed from deployment is the leader of your cluster.
 
 **Manifest Installation:**
 
 1. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario
-2. Uncoment the following `affinity` block in both manifests [elastic-agent-managed-daemonset-ksm-0.yaml](./manifests/elastic-agent-managed-daemonset-ksm-0.yaml), [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/elastic-agent-managed-deployment-ksm-1.yaml)
+2. Uncomment the following `affinity` block in both manifests [elastic-agent-managed-daemonset-ksm-0.yaml](./manifests/affinity/elastic-agent-managed-daemonset-ksm-0.yaml), [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/affinity/elastic-agent-managed-deployment-ksm-1.yaml)
 
    ```bash
     affinity:
@@ -124,11 +124,15 @@ The above configuration ensures that no more than one pod with `label="elastic-a
 Then deploy manifests:
 
 ```bash
+ kubectl apply -f elastic-agent-managed-deployment-ksm-0.yaml
  kubectl apply -f elastic-agent-managed-deployment-ksm-1.yaml
- kubectl apply -f elastic-agent-managed-daemonset-ksm-0.yaml
+ kubectl apply -f elastic-agent-managed-daemonset.yaml
 ```
 
 > **Note:** : Order of deploying manifests is important. You need first to install deployments and then daemonset, otherwise deployments will not find a node available for scheduling.
+
+> **Note**: Above manifests exist under [manifests/affinty](./manifests/affinty) folder
+
 
 Verify installation:
 
@@ -142,7 +146,7 @@ kube-system   elastic-agent-tt5lg                                              1
 kube-system   elastic-agent-txxfp                                              0/1     Pending   0          4m44s
 ```
 
-> **Note:**: Elastic agent from deployment has a diffrent naming, eg. `elastic-agent-8db69556b-6t4qv`
+> **Note:**: Elastic agent from deployment has a different naming, eg. `elastic-agent-8db69556b-6t4qv`
 
 **Pros/Cons**:
 
@@ -153,43 +157,47 @@ kube-system   elastic-agent-txxfp                                              0
 ### Tolerations Installation
 
 **Agent Policies:**
-For this installation, users need to configure the same agent policies as described in first scenario (aka hostnetwork configuration). Daemonset resources will incldue the leader ksm and apiserver.
+For this installation, users need to configure the same agent policies as described in first scenario (aka hostnetwork configuration).
+
+- Daemonset resources will include the leader ksm and apiserver.
+  ![Deployment policy in tolerations config](./images/tolerationsksm0.png)
+  
+  ![Deployment policy in tolerations config](./images/tolerationsdaemonset.png)
+
+- **One Agent Policy per KSM shard URL endpoint needs to be assigned to a different deployment**
+  - a) Leader Election should be disabled in all deployments
 
 **Manifest Installation:**
 
-1. Revert any changes from previous scenarios. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario. Also verify that  `affinity` block is commented. 
-2. Uncoment the following `toleration` in  manifest[elastic-agent-managed-daemonset-ksm-0.yaml](./manifests/elastic-agent-managed-daemonset-ksm-0.yaml)
+1. Revert any changes from previous scenarios. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario. Also verify that  `affinity` block is commented.
+2. Uncomment the following `toleration` in  manifest[elastic-agent-managed-deployment-ksm-1.yaml](./manifests/tolerations/elastic-agent-managed-deployment-ksm-1.yaml). Only the deployments need to include tolerations
 
    ```bash
     tolerations:
-        - key: "sharding"
+        - key: "deployment"
             operator: "Equal"
             value: "yes"
-            effect: "NoExecute"
+            effect: "NoSchedule"
    ```
 
 3. Taint a specific node that you want to exclude from being assigned to daemonset pods
 
-```bash
- kubectl taint nodes gke-kubernetes-scale-kubernetes-scale-0f73d58f-4rt9 deployment=yes:NoExecute
-```
+    ```bash
+    kubectl taint nodes gke-kubernetes-scale-kubernetes-scale-0f73d58f-4rt9 deployment=yes:NoSchedule
+    ```
 
-4. Deploy your daemonsets:
+4. Deploy your manifests:
 
-```bash
- kubectl apply -f elastic-agent-managed-daemonset-ksm-0.yaml
-```
+    ```bash
+    kubectl apply -f elastic-agent-managed-daemonset-ksm-0.yaml
+    kubectl apply -f elastic-agent-managed-deployment-ksm-1.yaml
+    ```
 
-5. Edit Specify the spec.nodeName where your deployments need to be assigned in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/elastic-agent-managed-deployment-ksm-1.yaml)
+> **Note**: Above manifests exist under [manifests/tolerations](./manifests/tolerations) folder
 
-6. Deploy your deployments:
-
-```bash
- kubectl apply -f elastic-agent-managed-deployment-ksm-1.yaml
-```
 
 **Pros/Cons**:
 
 - [+] You **can* prevent execution of deployments in nodes where agents already running
 - [+] Gives possibilities to users to configure the pod scheduling exactly as they need
-- [-] More complex method of all and requires manual steps
+- [-] More complex method and requires manual steps

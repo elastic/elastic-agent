@@ -1,7 +1,7 @@
----
+# Deployment 1 kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
 # For more information https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-managed-by-fleet.html
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   name: elastic-agent
   namespace: kube-system
@@ -16,18 +16,18 @@ spec:
       labels:
         app: elastic-agent
     spec:
-      # Affinity (aka PodAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
+      # Affinity (aka podAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
       #This way we can prevent an elastic daemonset to be installed in the same node where elastic-agent deployment exists
-      affinity:
-        podAntiAffinity:  
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:                            
-              - key: app
-                operator: In
-                values:                          
-                  - "elastic-agent"
-            topologyKey: "kubernetes.io/hostname"
+      # affinity:
+      #   podAntiAffinity:  
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #     - labelSelector:
+      #         matchExpressions:                            
+      #         - key: app
+      #           operator: In
+      #           values:                          
+      #             - "elastic-agent"
+      #       topologyKey: "kubernetes.io/hostname"
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
@@ -35,10 +35,10 @@ spec:
           effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
-        # - key: "sharding"
-        #   operator: "Equal"
-        #   value: "yes"
-        #   effect: "NoExecute"
+        - key: "deployment"
+          operator: "Equal"
+          value: "yes"
+          effect: "NoSchedule"
       serviceAccountName: elastic-agent
       hostNetwork: true
       # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
@@ -62,7 +62,7 @@ spec:
             # Elasticsearch API key used to enroll Elastic Agents in Fleet (https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens)
             # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
             - name: FLEET_ENROLLMENT_TOKEN
-              value: "UmFWc0M0Z0JzN2VhYVJGT0prOE46QVUydHlBQ1pTenFOMFdzaGNuQzlXdw=="
+              value: "FLEET_API_TOKEN"
             - name: KIBANA_HOST
               value: "http://kibana:5601"
             # The basic authentication username used to connect to Kibana and retrieve a service_token to enable Fleet
@@ -288,3 +288,4 @@ metadata:
   labels:
     k8s-app: elastic-agent
 ---
+

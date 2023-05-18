@@ -3,7 +3,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: elastic-agent
+  name: elastic-agent-1
   namespace: kube-system
   labels:
     app: elastic-agent
@@ -37,7 +37,7 @@ spec:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       serviceAccountName: elastic-agent
-      hostNetwork: false
+      hostNetwork: true
       # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
       # Sharing the host process ID namespace gives visibility of all processes running on the same host.
       hostPID: true
@@ -59,7 +59,7 @@ spec:
             # Elasticsearch API key used to enroll Elastic Agents in Fleet (https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens)
             # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
             - name: FLEET_ENROLLMENT_TOKEN
-              value: "U3FWd0M0Z0JzN2VhYVJGT3lrOVQ6NTZHdDRVcTBUcHFjQmwxcm9rRmg5UQ=="
+              value: "FLEET_API_TOKEN"
             - name: KIBANA_HOST
               value: "http://kibana:5601"
             # The basic authentication username used to connect to Kibana and retrieve a service_token to enable Fleet

@@ -1,7 +1,7 @@
-# Deployment 1 kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
+---
 # For more information https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-managed-by-fleet.html
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: elastic-agent
   namespace: kube-system
@@ -16,8 +16,7 @@ spec:
       labels:
         app: elastic-agent
     spec:
-      #nodeName: gke-kubernetes-scale-kubernetes-scale-0f73d58f-4rt9
-      # Affinity (aka podAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
+      # Affinity (aka PodAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
       #This way we can prevent an elastic daemonset to be installed in the same node where elastic-agent deployment exists
       # affinity:
       #   podAntiAffinity:  
@@ -37,7 +36,7 @@ spec:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       serviceAccountName: elastic-agent
-      hostNetwork: false
+      hostNetwork: true
       # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
       # Sharing the host process ID namespace gives visibility of all processes running on the same host.
       hostPID: true
@@ -59,7 +58,7 @@ spec:
             # Elasticsearch API key used to enroll Elastic Agents in Fleet (https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens)
             # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
             - name: FLEET_ENROLLMENT_TOKEN
-              value: "U3FWd0M0Z0JzN2VhYVJGT3lrOVQ6NTZHdDRVcTBUcHFjQmwxcm9rRmg5UQ=="
+              value: "FLEET_API_TOKEN"
             - name: KIBANA_HOST
               value: "http://kibana:5601"
             # The basic authentication username used to connect to Kibana and retrieve a service_token to enable Fleet
@@ -285,4 +284,3 @@ metadata:
   labels:
     k8s-app: elastic-agent
 ---
-

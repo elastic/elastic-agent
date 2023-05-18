@@ -18,7 +18,7 @@ data:
         password: '${ES_PASSWORD}'
     inputs:
       - id: kubernetes/metrics-kubelet-08a8a05c-08a9-493f-845c-45de51e374f4
-        revision: 2
+        revision: 5
         name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy)
         type: kubernetes/metrics
         data_stream:
@@ -97,7 +97,7 @@ data:
             version: 1.36.0
       - id: >-
           kubernetes/metrics-kube-state-metrics-08a8a05c-08a9-493f-845c-45de51e374f4
-        revision: 2
+        revision: 5
         name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy)
         type: kubernetes/metrics
         data_stream:
@@ -306,7 +306,7 @@ data:
             name: kubernetes
             version: 1.36.0
       - id: kubernetes/metrics-kube-apiserver-08a8a05c-08a9-493f-845c-45de51e374f4
-        revision: 2
+        revision: 5
         name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy)
         type: kubernetes/metrics
         data_stream:
@@ -334,7 +334,7 @@ data:
             name: kubernetes
             version: 1.36.0
       - id: kubernetes/metrics-kube-proxy-08a8a05c-08a9-493f-845c-45de51e374f4
-        revision: 2
+        revision: 5
         name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy)
         type: kubernetes/metrics
         data_stream:
@@ -357,7 +357,7 @@ data:
             name: kubernetes
             version: 1.36.0
       - id: kubernetes/metrics-events-08a8a05c-08a9-493f-845c-45de51e374f4
-        revision: 2
+        revision: 5
         name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy)
         type: kubernetes/metrics
         data_stream:
@@ -380,7 +380,7 @@ data:
           package:
             name: kubernetes
             version: 1.36.0
-    revision: 2
+    revision: 6
     agent:
       download:
         sourceURI: 'https://artifacts.elastic.co/downloads/'
@@ -563,16 +563,16 @@ spec:
     spec:
       # Affinity (aka podAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
       #This way we can prevent an elastic daemonset to be installed in the same node where elastic-agent deployment exists
-      affinity:
-        podAntiAffinity:  
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:                            
-              - key: app
-                operator: In
-                values:                          
-                  - "elastic-agent"
-            topologyKey: "kubernetes.io/hostname"
+      # affinity:
+      #   podAntiAffinity:  
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #     - labelSelector:
+      #         matchExpressions:                            
+      #         - key: app
+      #           operator: In
+      #           values:                          
+      #             - "elastic-agent"
+      #       topologyKey: "kubernetes.io/hostname"
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
       tolerations:
@@ -580,10 +580,6 @@ spec:
           effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
-        # - key: "sharding"
-        #   operator: "Equal"
-        #   value: "yes"
-        #   effect: "NoExecute"
       serviceAccountName: elastic-agent
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
@@ -614,7 +610,7 @@ spec:
               value: "elastic"
             # The basic authentication password used to connect to Elasticsearch
             - name: ES_PASSWORD
-              value: "changeme"
+              value: "FLEET_API_TOKEN"
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

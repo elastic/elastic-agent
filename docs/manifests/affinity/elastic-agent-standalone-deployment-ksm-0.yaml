@@ -18,7 +18,7 @@ data:
         password: '${ES_PASSWORD}'
     inputs:
       - id: kubernetes/metrics-kubelet-f5d388e8-799b-42b3-bfd9-99a7c58b9874
-        revision: 4
+        revision: 7
         name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy 2)
         type: kubernetes/metrics
         data_stream:
@@ -97,7 +97,7 @@ data:
             version: 1.36.0
       - id: >-
           kubernetes/metrics-kube-state-metrics-f5d388e8-799b-42b3-bfd9-99a7c58b9874
-        revision: 4
+        revision: 7
         name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy 2)
         type: kubernetes/metrics
         data_stream:
@@ -111,10 +111,11 @@ data:
               type: metrics
               dataset: kubernetes.state_container
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_container
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -124,10 +125,11 @@ data:
               type: metrics
               dataset: kubernetes.state_cronjob
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_cronjob
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -137,10 +139,11 @@ data:
               type: metrics
               dataset: kubernetes.state_daemonset
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_daemonset
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -150,10 +153,11 @@ data:
               type: metrics
               dataset: kubernetes.state_deployment
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_deployment
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -163,10 +167,11 @@ data:
               type: metrics
               dataset: kubernetes.state_job
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_job
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -176,10 +181,11 @@ data:
               type: metrics
               dataset: kubernetes.state_node
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_node
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -189,10 +195,11 @@ data:
               type: metrics
               dataset: kubernetes.state_persistentvolume
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_persistentvolume
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -202,10 +209,11 @@ data:
               type: metrics
               dataset: kubernetes.state_persistentvolumeclaim
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_persistentvolumeclaim
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -215,10 +223,11 @@ data:
               type: metrics
               dataset: kubernetes.state_pod
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_pod
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -228,10 +237,11 @@ data:
               type: metrics
               dataset: kubernetes.state_replicaset
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_replicaset
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -241,10 +251,11 @@ data:
               type: metrics
               dataset: kubernetes.state_resourcequota
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_resourcequota
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -254,10 +265,11 @@ data:
               type: metrics
               dataset: kubernetes.state_service
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_service
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -267,10 +279,11 @@ data:
               type: metrics
               dataset: kubernetes.state_statefulset
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_statefulset
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -280,10 +293,11 @@ data:
               type: metrics
               dataset: kubernetes.state_storageclass
             period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
             add_metadata: true
             hosts:
               - >-
-                kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
+                kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
             metricsets:
               - state_storageclass
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -291,8 +305,36 @@ data:
           package:
             name: kubernetes
             version: 1.36.0
+      - id: kubernetes/metrics-kube-apiserver-f5d388e8-799b-42b3-bfd9-99a7c58b9874
+        revision: 7
+        name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy 2)
+        type: kubernetes/metrics
+        data_stream:
+          namespace: default
+        use_output: default
+        package_policy_id: f5d388e8-799b-42b3-bfd9-99a7c58b9874
+        streams:
+          - id: >-
+              kubernetes/metrics-kubernetes.apiserver-f5d388e8-799b-42b3-bfd9-99a7c58b9874
+            data_stream:
+              type: metrics
+              dataset: kubernetes.apiserver
+            period: 30s
+            condition: '${kubernetes_leaderelection.leader} == true'
+            hosts:
+              - >-
+                https://${env.KUBERNETES_SERVICE_HOST}:${env.KUBERNETES_SERVICE_PORT}
+            metricsets:
+              - apiserver
+            ssl.certificate_authorities:
+              - /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        meta:
+          package:
+            name: kubernetes
+            version: 1.36.0
       - id: kubernetes/metrics-kube-proxy-f5d388e8-799b-42b3-bfd9-99a7c58b9874
-        revision: 4
+        revision: 7
         name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy 2)
         type: kubernetes/metrics
         data_stream:
@@ -314,7 +356,31 @@ data:
           package:
             name: kubernetes
             version: 1.36.0
-    revision: 4
+      - id: kubernetes/metrics-events-f5d388e8-799b-42b3-bfd9-99a7c58b9874
+        revision: 7
+        name: kubernetes-decd6663-1471-4567-966c-dad7e719d69b (copy 2)
+        type: kubernetes/metrics
+        data_stream:
+          namespace: default
+        use_output: default
+        package_policy_id: f5d388e8-799b-42b3-bfd9-99a7c58b9874
+        streams:
+          - id: >-
+              kubernetes/metrics-kubernetes.event-f5d388e8-799b-42b3-bfd9-99a7c58b9874
+            data_stream:
+              type: metrics
+              dataset: kubernetes.event
+            period: 10s
+            condition: '${kubernetes_leaderelection.leader} == true'
+            add_metadata: true
+            metricsets:
+              - event
+            skip_older: true
+        meta:
+          package:
+            name: kubernetes
+            version: 1.36.0
+    revision: 8
     agent:
       download:
         sourceURI: 'https://artifacts.elastic.co/downloads/'
@@ -468,7 +534,13 @@ data:
                 - metrics-kubernetes.state_storageclass-default
               privileges: *ref_0
             - names:
+                - metrics-kubernetes.apiserver-default
+              privileges: *ref_0
+            - names:
                 - metrics-kubernetes.proxy-default
+              privileges: *ref_0
+            - names:
+                - metrics-kubernetes.event-default
               privileges: *ref_0
 
 ---
@@ -476,7 +548,7 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: elastic-agent
+  name: elastic-agent-0
   namespace: kube-system
   labels:
     app: elastic-agent
