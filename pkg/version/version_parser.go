@@ -81,6 +81,30 @@ func (psv ParsedSemVer) IsSnapshot() bool {
 	return psv.prerelease == "SNAPSHOT"
 }
 
+func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
+	// compare major version
+	if psv.major != other.major {
+		return psv.major < other.major
+	}
+
+	//same major, check minor
+	if psv.minor != other.minor {
+		return psv.minor < other.minor
+	}
+
+	//same minor, check patch
+	if psv.patch != other.patch {
+		return psv.patch < other.patch
+	}
+
+	// last resort check if one is prereleas and the other isn't
+	if psv.prerelease != "" && other.prerelease == "" {
+		return true
+	}
+
+	return false
+}
+
 func ParseVersion(version string) (*ParsedSemVer, error) {
 	matches := semVerFmtRegEx.FindStringSubmatch(strings.TrimSpace(version))
 	if matches == nil {
