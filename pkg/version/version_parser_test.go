@@ -278,3 +278,73 @@ func TestIsSnapshot(t *testing.T) {
 	}
 
 }
+
+func TestLess(t *testing.T) {
+	testcases := []struct {
+		name         string
+		leftVersion  string
+		rightVersion string
+		less         bool
+	}{
+		{
+			name:         "major version less than ours",
+			leftVersion:  "7.17.10",
+			rightVersion: "8.9.0",
+			less:         true,
+		},
+		{
+			name:         "minor version less than ours",
+			leftVersion:  "8.6.2",
+			rightVersion: "8.9.0",
+			less:         true,
+		},
+		{
+			name:         "patch version less than ours",
+			leftVersion:  "8.7.0",
+			rightVersion: "8.7.1",
+			less:         true,
+		},
+		{
+			name:         "prerelease is always less than non-prerelease",
+			leftVersion:  "8.9.0-SNAPSHOT",
+			rightVersion: "8.9.0",
+			less:         true,
+		},
+		{
+			name:         "2 prereleases have no specific order",
+			leftVersion:  "8.9.0-SNAPSHOT",
+			rightVersion: "8.9.0-er1",
+			less:         false,
+		},
+		{
+			name:         "2 prereleases have no specific order, reversed",
+			leftVersion:  "8.9.0-er1",
+			rightVersion: "8.9.0-SNAPSHOT",
+			less:         false,
+		},
+		{
+			name:         "build metadata have no influence on precedence",
+			leftVersion:  "8.9.0-SNAPSHOT+aaaaaa",
+			rightVersion: "8.9.0-SNAPSHOT+bbbbbb",
+			less:         false,
+		},
+		{
+			name:         "build metadata have no influence on precedence, reversed",
+			leftVersion:  "8.9.0-SNAPSHOT+bbbbbb",
+			rightVersion: "8.9.0-SNAPSHOT+aaaaaa",
+			less:         false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			left, err := ParseVersion(tc.leftVersion)
+			require.NoError(t, err)
+			require.NotNil(t, left)
+			right, err := ParseVersion(tc.rightVersion)
+			require.NoError(t, err)
+			require.NotNil(t, right)
+			assert.Equal(t, left.Less(*right), tc.less)
+		})
+	}
+}
