@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -116,6 +118,48 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 	newVersion, err := tools.GetAgentVersion(kibClient)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), s.agentEndVersion, newVersion)
+}
+
+func (s *UpgradeElasticAgent) TestUpgradeStandaloneElasticAgentToSnapshot() {
+
+	const minVersionString = "8.9.0-SNAPSHOT"
+	minVersion, _ := version.ParseVersion(minVersionString)
+	pv, err := version.ParseVersion(s.agentEndVersion)
+	if pv.Less(*minVersion) {
+		s.T().Skipf("Version %s is lower than min version %s", s.agentEndVersion, minVersionString)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	//TODO we probably need a policy and ES connection params
+	output, err := tools.InstallStandaloneElasticAgent(s.agentFixture)
+	if err != nil {
+		s.T().Log(string(output))
+	}
+	require.NoError(s.T(), err)
+
+	require.Eventually(s.T(), func() bool {
+		state, err := s.agentFixture.Client().State(ctx)
+		if err != nil {
+			s.T().Logf("error checking agent state: %v", err)
+			return false
+		}
+		return state.State == cproto.State_HEALTHY
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	// err = tools.UpgradeAgent(kibClient, s.agentEndVersion)
+	// require.NoError(s.T(), err)
+
+	// require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+
+	// // Wait until the upgrade marker is removed, indicating the end of the
+	// // upgrade process
+	// require.Eventually(s.T(), upgradeMarkerRemoved, 10*time.Minute, 20*time.Second)
+
+	// newVersion, err := tools.GetAgentVersion(kibClient)
+	// require.NoError(s.T(), err)
+	// require.Equal(s.T(), s.agentEndVersion, newVersion)
 }
 
 func (s *UpgradeElasticAgent) TearDownTest() {
