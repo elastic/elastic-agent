@@ -234,7 +234,6 @@ entries:
       description: ""
       component: ""
       pr:
-        - https://github.com/elastic/elastic-agent/pull/2617
         - https://github.com/elastic/elastic-agent/pull/2549
       issue:
         - https://github.com/elastic/elastic-agent/issues/2530
@@ -247,24 +246,12 @@ entries:
       description: ""
       component: ""
       pr:
-        - https://github.com/elastic/elastic-agent/pull/2617
         - https://github.com/elastic/elastic-agent/pull/2551
       issue: []
       timestamp: 1682455535
       file:
         name: 1682455535-Adding-Cloud-Defend-application-to-Elastic-Agent.yaml
         checksum: e2c53fe2bb4dec679c2b8be1e858f02843e69538
-    - kind: feature
-      summary: Disable policy and action signature validation in the Agent for 8.8.0 release
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/2562
-      issue: []
-      timestamp: 1682599444
-      file:
-        name: 1682599444-Disable-policy-and-action-signature-validation-in-the-Agent.yaml
-        checksum: d89b4f0d2491d89daaa6adcc7eb76dabd9a81fdb
     - kind: bug-fix
       summary: Fix container service token path issue
       description: |
@@ -291,3 +278,52 @@ entries:
       file:
         name: 1683748237-upgrade-install-marker.yaml
         checksum: b395497cc60dda4280483d5eaa6eaad7855223b0
+    - kind: bug-fix
+      summary: validate the --base-path value is an absolute path
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2567
+      issue: []
+      timestamp: 1684747237
+      file:
+        name: 1684747237-validate---base-path-for-install-command.yaml
+        checksum: e8f7ba2381f133ea505e968969550ca5ebada974
+    - kind: enhancement
+      summary: add hostPath to Kubernetes manifest to store the Elastic Agent state
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2550
+      issue: []
+      timestamp: 1684747663
+      file:
+        name: 1684747663-add-hostPath-to-Kubernetes-mainfest-to-store-the-Elastic-Agent-state.yaml
+        checksum: fdace615a0393bc65ea3dbc805ccec2c5d38c0a6
+    - kind: other
+      summary: use Go v1.19.8
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2531
+      issue: []
+      timestamp: 1684748302
+      file:
+        name: 1684748302-use-Go-v1.19.8.yaml
+        checksum: 52fe14aa32234b3687c736e65be1868cf920224b
+    - kind: enhancement
+      summary: change default logs folder and upgrade watcher logs are collected by diagnostics command
+      description: ""
+      component: |
+        Now the Elastic Agent logs to `logs/elastic-agent-{hash}` by default.
+        The upgrade watcher also logs to this folder with the `elastic-agent-watcher-[DATE]` suffix.
+        When collecting the logs, the diagnostics command also collects the watcher logs and the logs of
+        a possible new version if the agent which failed during upgrade and then it was rolled back to the
+        previous version.
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2518
+      issue: []
+      timestamp: 1684749098
+      file:
+        name: 1684749098-change-default-logs-folder-and-upgrade-watcher-logs-are-collected-by-diagnostics-command.yaml
+        checksum: e5186a6b12eda62ef6547ce245da2f3d19c8c293
