@@ -234,6 +234,7 @@ entries:
       description: ""
       component: ""
       pr:
+        - https://github.com/elastic/elastic-agent/pull/2617
         - https://github.com/elastic/elastic-agent/pull/2549
       issue:
         - https://github.com/elastic/elastic-agent/issues/2530
@@ -246,6 +247,7 @@ entries:
       description: ""
       component: ""
       pr:
+        - https://github.com/elastic/elastic-agent/pull/2617
         - https://github.com/elastic/elastic-agent/pull/2551
       issue: []
       timestamp: 1682455535
@@ -300,17 +302,6 @@ entries:
       file:
         name: 1684747663-add-hostPath-to-Kubernetes-mainfest-to-store-the-Elastic-Agent-state.yaml
         checksum: fdace615a0393bc65ea3dbc805ccec2c5d38c0a6
-    - kind: other
-      summary: use Go v1.19.8
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/2531
-      issue: []
-      timestamp: 1684748302
-      file:
-        name: 1684748302-use-Go-v1.19.8.yaml
-        checksum: 52fe14aa32234b3687c736e65be1868cf920224b
     - kind: enhancement
       summary: change default logs folder and upgrade watcher logs are collected by diagnostics command
       description: ""
