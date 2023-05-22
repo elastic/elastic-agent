@@ -11,17 +11,6 @@ entries:
       file:
         name: 1674840786-async-download-upgrade-artifacts.yaml
         checksum: 0aa7b1bb3810df922c917dc5015b16a5a4a6d965
-    - kind: feature
-      summary: Adds new StateWatch GRPC for watching the current state of the running Elastic Agent
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/2252
-      issue: []
-      timestamp: 1676571093
-      file:
-        name: 1676571093-control-state-watch.yaml
-        checksum: 6f7a04fdd535f0c6de37545408e1d4dc4ffde6f7
     - kind: bug-fix
       summary: Fix system config in example standalone config file
       description: ""
@@ -184,17 +173,6 @@ entries:
       file:
         name: 1681842199-re-add-lumberjack-input-spec.yaml
         checksum: a0bb03fb0a7739946d631eece1dc0c5a807038e6
-    - kind: feature
-      summary: Allow users to specify custom base paths during installation
-      description: ""
-      component: agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/2500
-      issue: []
-      timestamp: 1681940139
-      file:
-        name: 1681940139-Allow-users-to-specify-custom-base-paths-during-installation.yaml
-        checksum: 7f2cf8493a3d6cf61ff9f8117b965ff2ba327046
     - kind: bug-fix
       summary: Fix diagnostic zip file handling of sub-directories in logs/.
       description: ""
@@ -280,17 +258,6 @@ entries:
       file:
         name: 1683748237-upgrade-install-marker.yaml
         checksum: b395497cc60dda4280483d5eaa6eaad7855223b0
-    - kind: bug-fix
-      summary: validate the --base-path value is an absolute path
-      description: ""
-      component: ""
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/2567
-      issue: []
-      timestamp: 1684747237
-      file:
-        name: 1684747237-validate---base-path-for-install-command.yaml
-        checksum: e8f7ba2381f133ea505e968969550ca5ebada974
     - kind: enhancement
       summary: add hostPath to Kubernetes manifest to store the Elastic Agent state
       description: ""
