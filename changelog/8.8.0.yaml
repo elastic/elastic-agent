@@ -1,7 +1,7 @@
 version: 8.8.0
 entries:
     - kind: enhancement
-      summary: async download of elastic-agent upgrade artifacts during fleet managed upgrade
+      summary: Make download of Elastic Agent upgrade artifacts asynchronous during Fleet-managed upgrade and increase the download timeout to 2 hours
       description: ""
       component: agent
       pr:
@@ -81,7 +81,7 @@ entries:
         name: 1679986811-pf-elastic-collector.yaml
         checksum: c487db9995e37a1c485d0d922e4e71d62491ca00
     - kind: bug-fix
-      summary: Fix actions acks delay
+      summary: Fix action acknowledgements taking up to 5 minutes. Fixed OSQuery live query results taking up to five minutes to show up in Kibana
       description: ""
       component: ""
       pr:
@@ -104,7 +104,7 @@ entries:
         name: 1680203080-Add-support-for-fleet-server-secret-files.yaml
         checksum: 0beff457a00af62876793a98b564e366ae567ed4
     - kind: bug-fix
-      summary: Respecting logging.level settings coming whether from Fleet UI or config file.
+      summary: Fixes a bug that logging.level settings were not being respected, coming either from Fleet UI or a config file
       description: ""
       component: elastic-agent
       pr:
@@ -116,7 +116,7 @@ entries:
         name: 1680764383-Respecting-logging.level-settings.yaml
         checksum: b4c689aa41884020f23848adab7b586d886c3659
     - kind: bug-fix
-      summary: An empty proxy from the policy don't override the proxy set by --proxy-url.
+      summary: Fixes a bug that caused an empty proxy from a Fleet managed agent policy to override the proxy set by --proxy-url
       description: ""
       component: action handlers
       pr:
@@ -185,7 +185,7 @@ entries:
         name: 1681942680-fix-diag-zip-file.yaml
         checksum: ff3bd63aa3dfa8d9c7d8f708cf7d3febde4e5bae
     - kind: bug-fix
-      summary: Add local-config.yaml to diagnostics and merge together in inspect.
+      summary: Fixed an issue where inspect and diagnostics didn't include the local Elastic Agent configuration
       description: ""
       component: ""
       pr:
