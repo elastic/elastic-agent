@@ -246,18 +246,6 @@ entries:
       file:
         name: 1682953274-Fix-container-service-token-path-issue.yaml
         checksum: 2434964330fe5268c12b60c13db26064f4678bf3
-    - kind: bug-fix
-      summary: Create install marker file during upgrade from versions < 8.8.0
-      description: ""
-      component: agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/2655
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/2645
-      timestamp: 1683748237
-      file:
-        name: 1683748237-upgrade-install-marker.yaml
-        checksum: b395497cc60dda4280483d5eaa6eaad7855223b0
     - kind: enhancement
       summary: add hostPath to Kubernetes manifest to store the Elastic Agent state
       description: ""
