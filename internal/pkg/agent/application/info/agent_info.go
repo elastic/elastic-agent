@@ -13,7 +13,10 @@ import (
 type AgentInfo struct {
 	agentID  string
 	logLevel string
-	headers  map[string]string
+
+	// headers will be injected into the headers field of any elasticsearch
+	// output created by this agent (see component.toIntermediate).
+	headers map[string]string
 }
 
 // NewAgentInfoWithLog creates a new agent information.
