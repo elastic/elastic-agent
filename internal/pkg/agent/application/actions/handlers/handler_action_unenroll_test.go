@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,7 +99,7 @@ func TestActionUnenrollHandler(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case policyChange := <-ch:
-				policyChange.Ack()
+				_ = policyChange.Ack()
 			}
 		}
 	}()
