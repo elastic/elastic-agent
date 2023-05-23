@@ -204,6 +204,7 @@ func specFilesForDirectory(dir string) (map[string]Spec, error) {
 }
 
 // NewRuntimeSpecs creates a RuntimeSpecs from already loaded input and shipper runtime specifications.
+// Only used for testing.
 func NewRuntimeSpecs(platform PlatformDetail, inputSpecs []InputRuntimeSpec, shipperSpecs []ShipperRuntimeSpec) (RuntimeSpecs, error) {
 	var inputTypes []string
 	inputSpecsMap := make(map[string]InputRuntimeSpec)
@@ -286,19 +287,12 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 	return InputRuntimeSpec{}, ErrInputNotSupported
 }
 
-// GetShipper returns the shipper runtime specification for this shipper on this platform.
-func (r *RuntimeSpecs) GetShipper(shipperType string) (ShipperRuntimeSpec, bool) {
-	runtime, ok := r.shipperSpecs[shipperType]
-	return runtime, ok
-}
-
-// GetShippers returns the shippers that support the outputType.
-func (r *RuntimeSpecs) GetShippers(outputType string) ([]ShipperRuntimeSpec, error) {
-	shipperNames, ok := r.shipperOutputs[outputType]
-	if !ok {
-		// no shippers support that outputType
-		return nil, nil
-	}
+// ShippersForOutputType returns the shippers that support the outputType.
+// If the list is empty, then the returned error will be either
+// ErrOutputNotSupportedOnPlatform (output is supported but not on this
+// platform) or ErrOutputNotSupported (output isn't supported on any platform).
+func (r *RuntimeSpecs) ShippersForOutputType(outputType string) ([]ShipperRuntimeSpec, error) {
+	shipperNames := r.shipperOutputs[outputType]
 	platformErr := false
 	shippers := make([]ShipperRuntimeSpec, 0, len(shipperNames))
 	for _, name := range shipperNames {

@@ -299,7 +299,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 
 		// create the shipper components and units
 		for shipperType, connected := range shipperMap {
-			shipperSpec, _ := r.GetShipper(shipperType) // type always exists at this point
+			shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
 			shipperCompID := fmt.Sprintf("%s-%s", shipperType, outputName)
 
 			var shipperUnits []Unit
@@ -411,7 +411,7 @@ func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntime
 		enabledKey = "enabled"
 	)
 
-	shippers, err := r.GetShippers(output.outputType)
+	shippers, err := r.ShippersForOutputType(output.outputType)
 	if err != nil {
 		return ShipperRuntimeSpec{}, false
 	}

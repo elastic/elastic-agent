@@ -22,6 +22,9 @@ func (s *Spec) Validate() error {
 	if s.Version != 2 {
 		return errors.New("only version 2 is allowed")
 	}
+	if len(s.Inputs) > 0 && len(s.Shippers) > 0 {
+		return errors.New("a spec file must include either inputs or shippers, not both")
+	}
 	inputsToPlatforms := make(map[string][]string)
 	for i, input := range s.Inputs {
 		a, ok := inputsToPlatforms[input.Name]
