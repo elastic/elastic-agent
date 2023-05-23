@@ -14,9 +14,9 @@ type AgentInfo struct {
 	agentID  string
 	logLevel string
 
-	// headers will be injected into the headers field of any elasticsearch
+	// esHeaders will be injected into the esHeaders field of any elasticsearch
 	// output created by this agent (see component.toIntermediate).
-	headers map[string]string
+	esHeaders map[string]string
 }
 
 // NewAgentInfoWithLog creates a new agent information.
@@ -32,9 +32,9 @@ func NewAgentInfoWithLog(level string, createAgentID bool) (*AgentInfo, error) {
 	}
 
 	return &AgentInfo{
-		agentID:  agentInfo.ID,
-		logLevel: agentInfo.LogLevel,
-		headers:  agentInfo.Headers,
+		agentID:   agentInfo.ID,
+		logLevel:  agentInfo.LogLevel,
+		esHeaders: agentInfo.Headers,
 	}, nil
 }
 
@@ -92,5 +92,5 @@ func (*AgentInfo) Snapshot() bool {
 
 // Headers returns custom headers used to communicate with elasticsearch.
 func (i *AgentInfo) Headers() map[string]string {
-	return i.headers
+	return i.esHeaders
 }

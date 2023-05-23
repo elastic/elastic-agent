@@ -208,17 +208,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 			// skip; not enabled
 			continue
 		}
-
-		// merge aliases into same input type
-		inputsMap := make(map[string][]inputI)
-		for inputType, inputs := range output.inputs {
-			realInputType, ok := r.aliasMapping[inputType]
-			if ok {
-				inputsMap[realInputType] = append(inputsMap[realInputType], inputs...)
-			} else {
-				inputsMap[inputType] = append(inputsMap[inputType], inputs...)
-			}
-		}
+		inputsMap := output.inputs
 
 		shipperMap := make(map[string][]string)
 		for inputType, inputs := range inputsMap {
@@ -406,6 +396,9 @@ func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitEx
 	return ExpectedConfig(cfg)
 }
 
+// from inputSpec we only use inputSpec.Spec.Shippers
+// from r we only use r.ShippersForOutputType
+// from output we use output.outputType (in the call to ShippersForOutputType) and output.output (the raw output configuration from the policy, to check for an explicit "[shipper type].enabled" value)
 func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntimeSpec, vars eql.VarStore) (ShipperRuntimeSpec, bool) {
 	const (
 		enabledKey = "enabled"
@@ -456,12 +449,13 @@ func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntime
 // of components.
 func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
 	const (
-		outputsKey = "outputs"
-		enabledKey = "enabled"
-		inputsKey  = "inputs"
-		typeKey    = "type"
-		idKey      = "id"
-		useKey     = "use_output"
+		outputsKey    = "outputs"
+		enabledKey    = "enabled"
+		inputsKey     = "inputs"
+		typeKey       = "type"
+		idKey         = "id"
+		useOutputKey  = "use_output"
+		useShipperKey = "use_shipper"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
@@ -503,6 +497,15 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		if err != nil {
 			return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", name, err)
 		}
+		useShipper := false
+		if useShipperRaw, ok := output[useShipperKey]; ok {
+			useShipperVal, ok := useShipperRaw.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid 'outputs.%s.use_shipper', expected a bool not a %T", name, useShipperRaw)
+			}
+			useShipper = useShipperVal
+			delete(output, useShipperKey)
+		}
 
 		// inject headers configured during enroll
 		if t == elasticsearchType && headers != nil {
@@ -532,6 +535,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			outputType: t,
 			output:     output,
 			inputs:     make(map[string][]inputI),
+			useShipper: useShipper,
 		}
 	}
 
@@ -576,13 +580,13 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id %q. Please add a unique value for the 'id' key to each input in the agent policy", idx, id)
 		}
 		outputName := "default"
-		if outputRaw, ok := input[useKey]; ok {
+		if outputRaw, ok := input[useOutputKey]; ok {
 			outputNameVal, ok := outputRaw.(string)
 			if !ok {
 				return nil, fmt.Errorf("invalid 'inputs.%d.use_output', expected a string not a %T", idx, outputRaw)
 			}
 			outputName = outputNameVal
-			delete(input, useKey)
+			delete(input, useOutputKey)
 		}
 		output, ok := outputsMap[outputName]
 		if !ok {
@@ -621,7 +625,7 @@ type inputI struct {
 	id        string
 	enabled   bool
 	logLevel  client.UnitLogLevel
-	inputType string
+	inputType string // canonical (non-alias) type
 	input     map[string]interface{}
 }
 
@@ -630,8 +634,20 @@ type outputI struct {
 	enabled    bool
 	logLevel   client.UnitLogLevel
 	outputType string
-	output     map[string]interface{}
-	inputs     map[string][]inputI
+
+	// The raw configuration for this output, with small cleanups:
+	// - enabled key is removed
+	// - log_level key is removed
+	// - use_shipper key is removed
+	// - if outputType is "elasticsearch", headers key is extended by adding any
+	//   values in AgentInfo.esHeaders
+	output map[string]interface{}
+
+	// inputs directed at this output, keyed by canonical (non-alias) type.
+	inputs map[string][]inputI
+
+	// If true, RuntimeSpecs should use a shipper for this output.
+	useShipper bool
 }
 
 func validateRuntimeChecks(runtime *RuntimeSpec, store eql.VarStore) error {

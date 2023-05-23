@@ -273,7 +273,7 @@ func (r *RuntimeSpecs) Inputs() []string {
 	return inputs
 }
 
-// GetInput returns the input runtime specification for this input on this platform.
+// GetInput returns the input runtime specification for the specified input on this platform.
 func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 	runtime, ok := r.inputSpecs[inputType]
 	if ok {
