@@ -9,12 +9,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+// Interface for coordinator for unenroll handler testability
+type ActionCoordinator interface {
+	State() state.State
+	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
+}
 
 const (
 	unenrollTimeout = 15 * time.Second
@@ -32,6 +41,7 @@ type stateStore interface {
 // For it to be operational again it needs to be either enrolled or reconfigured.
 type Unenroll struct {
 	log        *logger.Logger
+	coord      ActionCoordinator
 	ch         chan coordinator.ConfigChange
 	closers    []context.CancelFunc
 	stateStore stateStore
@@ -40,12 +50,14 @@ type Unenroll struct {
 // NewUnenroll creates a new Unenroll handler.
 func NewUnenroll(
 	log *logger.Logger,
+	coord ActionCoordinator,
 	ch chan coordinator.ConfigChange,
 	closers []context.CancelFunc,
 	stateStore stateStore,
 ) *Unenroll {
 	return &Unenroll{
 		log:        log,
+		coord:      coord,
 		ch:         ch,
 		closers:    closers,
 		stateStore: stateStore,
@@ -60,11 +72,46 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		return fmt.Errorf("invalid type, expected ActionUnenroll and received %T", a)
 	}
 
+	// Find inputs that want to receive UNENROLL action
+	// Endpoint needs to receive a signed UNENROLL action in order to be able to uncontain itself
+	state := h.coord.State()
+	comps, units := findMatchingUnitsByActionType(state, a.Type())
+	if len(comps) > 0 {
+		// Iterate through founc components and forward the UNENROLL action
+		for i, comp := range comps {
+			unit := units[i]
+			// Deserialize the action into map[string]interface{} for dispatching over to the apps
+			params, err := action.MarshalMap()
+			if err != nil {
+				return err
+			}
+
+			h.log.Debugf("Dispatch %v action to %v", a.Type(), unit.Config.Type)
+
+			res, err := h.coord.PerformAction(ctx, comp, unit, unit.Config.Type, params)
+
+			// If Endpoint UNENROLL fails, continue with Agent UNENROLL
+			if err != nil {
+				// Log and continue
+				h.log.Warnf("UNENROLL failed to dispatch to %v, err: %v", comp.ID, err)
+			} else {
+				strErr := readMapString(res, "error", "")
+				if strErr != "" {
+					h.log.Warnf("UNENROLL failed for %v, err: %v", comp.ID, strErr)
+				}
+			}
+		}
+	} else {
+		// Log and continue
+		h.log.Debugf("No components running for %v action type", a.Type())
+	}
+
 	if action.IsDetected {
 		// not from Fleet; so we set it to nil so policyChange doesn't ack it
 		a = nil
 	}
 
+	// Generate empty policy change, this removing all the running components
 	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true)
 	h.ch <- unenrollPolicy
 
@@ -87,4 +134,31 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	}
 
 	return nil
+}
+
+func findMatchingUnitsByActionType(state state.State, typ string) ([]component.Component, []component.Unit) {
+	comps := make([]component.Component, 0)
+	units := make([]component.Unit, 0)
+	for _, comp := range state.Components {
+		if comp.Component.InputSpec != nil && contains(comp.Component.InputSpec.Spec.AgentActions, typ) {
+			name := comp.Component.InputSpec.Spec.Name
+
+			for _, unit := range comp.Component.Units {
+				if unit.Type == client.UnitTypeInput && unit.Config != nil && unit.Config.Type == name {
+					comps = append(comps, comp.Component)
+					units = append(units, unit)
+				}
+			}
+		}
+	}
+	return comps, units
+}
+
+func contains[T comparable](arr []T, val T) bool {
+	for _, v := range arr {
+		if v == val {
+			return true
+		}
+	}
+	return false
 }
