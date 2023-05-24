@@ -168,11 +168,6 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 }
 
 func unitForInput(input inputI, outputName string) Unit {
-
-	// Inject the top level fleet policy revision into each into configuration. This
-	// allows individual inputs (like endpoint) to detect policy changes more easily.
-	injectInputPolicyID(policy, input.config)
-
 	cfg, cfgErr := ExpectedConfig(input.config)
 	return Unit{
 		ID:       fmt.Sprintf("%s-%s-%s", input.inputType, outputName, input.id),
@@ -181,43 +176,28 @@ func unitForInput(input inputI, outputName string) Unit {
 		Config:   cfg,
 		Err:      cfgErr,
 	}
-
 }
 
 // Collect all inputs of a particular type going to a particular
 // output into a Component ready to be run
 func (r *RuntimeSpecs) componentForInputTypeNoShipper(
 	inputType string,
-	//inputs []inputI,
 	output outputI,
-	policy map[string]interface{},
 	featureFlags *features.Flags,
-	shipperMap map[string][]string,
-) (Component, error) {
+) Component {
 
 	inputSpec, err := r.GetInput(inputType)
-	if err != nil {
-		return Component{}, err
+
+	if err == nil && !containsStr(inputSpec.Spec.Outputs, output.outputType) {
+		err = ErrOutputNotSupported
+		inputSpec = InputRuntimeSpec{} // empty the spec
 	}
 
-	if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
-		return Component{}, ErrOutputNotSupported
-	} else {
-		err = validateRuntimeChecks(&inputSpec.Spec.Runtime, r.platform)
-		if err != nil {
-			inputSpec = InputRuntimeSpec{} // empty the spec
-		}
-	}
-	inputs := output.inputs[inputType]
-	units := make([]Unit, 0, len(inputs)+1)
-	for _, input := range inputs {
+	var units []Unit
+	for _, input := range output.inputs[inputType] {
 		if !input.enabled {
 			continue
 		}
-
-		// Inject the top level fleet policy revision into each into configuration. This
-		// allows individual inputs (like endpoint) to detect policy changes more easily.
-		injectInputPolicyID(policy, input.config)
 
 		cfg, cfgErr := ExpectedConfig(input.config)
 		units = append(units, Unit{
@@ -247,17 +227,16 @@ func (r *RuntimeSpecs) componentForInputTypeNoShipper(
 			InputSpec: &inputSpec,
 			Units:     units,
 			Features:  featureFlags.AsProto(),
-		}, nil
+		}
 		//componentIdsInputMap[componentID] = inputSpec.BinaryName
 	}
-	return Component{}, nil
+	return Component{Err: err}
 }
 
 func (r *RuntimeSpecs) componentForInputTypeYesShipper(
 	inputType string,
 	inputs []inputI,
 	output outputI,
-	policy map[string]interface{},
 	featureFlags *features.Flags,
 	shipperMap map[string][]string,
 ) (Component, error) {
@@ -286,10 +265,6 @@ func (r *RuntimeSpecs) componentForInputTypeYesShipper(
 			// skip; not enabled
 			continue
 		}
-
-		// Inject the top level fleet policy revision into each into configuration. This
-		// allows individual inputs (like endpoint) to detect policy changes more easily.
-		injectInputPolicyID(policy, input.config)
 
 		cfg, cfgErr := ExpectedConfig(input.config)
 		if cfg != nil {
@@ -373,12 +348,18 @@ func (r *RuntimeSpecs) PolicyToComponents(
 		}
 
 		shipperMap := make(map[string][]string)
-		for inputType, inputsForType := range output.inputs {
+		for inputType, _ := range output.inputs {
 			inputSpec, err := r.GetInput(inputType)
 			if err == nil && !containsStr(inputSpec.Spec.Outputs, output.outputType) {
 				err = ErrOutputNotSupported
 			}
-			component, err := r.componentForInputTypeYesShipper()
+			component := r.componentForInputTypeNoShipper(
+				inputType,
+				output,
+				featureFlags,
+			)
+			components = append(components, component)
+			componentIdsInputMap[component.ID] = inputSpec.BinaryName
 
 		} // end (inputType, inputsForType)
 
@@ -676,6 +657,11 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		if err != nil {
 			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
 		}
+
+		// Inject the top level fleet policy revision into each input configuration. This
+		// allows individual inputs (like endpoint) to detect policy changes more easily.
+		injectInputPolicyID(policy, input)
+
 		output.inputs[t] = append(output.inputs[t], inputI{
 			idx:       idx,
 			id:        id,

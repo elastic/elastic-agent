@@ -283,7 +283,7 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 		// supported but not on this platform
 		return InputRuntimeSpec{}, ErrInputNotSupportedOnPlatform
 	}
-	err := validateRuntimeChecks(runtimeSpec.Spec.Runtime.Preventions, r.platform)
+	err := validateRuntimeChecks(&runtimeSpec.Spec.Runtime, r.platform)
 	if err != nil {
 		return InputRuntimeSpec{}, err
 	}
