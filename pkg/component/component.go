@@ -167,6 +167,92 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 	}, nil)
 }
 
+func (r *RuntimeSpecs) componentForInputs(
+	inputType string,
+	inputs []inputI,
+	output outputI,
+	policy map[string]interface{},
+	featureFlags *features.Flags,
+) (Component, error) {
+	var supportedShipper ShipperRuntimeSpec
+	var usingShipper bool
+
+	vars, err := varsForPlatform(r.platform)
+	if err != nil {
+		return Component{}, err
+	}
+
+	inputSpec, err := r.GetInput(inputType)
+	if err == nil {
+		// determine if we are operating with shipper support
+		supportedShipper, usingShipper = getSupportedShipper(r, output, inputSpec, vars)
+		if !usingShipper {
+			if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
+				inputSpec = InputRuntimeSpec{} // empty the spec
+				err = ErrOutputNotSupported
+			} else {
+				err = validateRuntimeChecks(&inputSpec.Spec.Runtime, vars)
+				if err != nil {
+					inputSpec = InputRuntimeSpec{} // empty the spec
+				}
+			}
+		}
+	}
+	units := make([]Unit, 0, len(inputs)+1)
+	for _, input := range inputs {
+		if !input.enabled {
+			// skip; not enabled
+			continue
+		}
+
+		// Inject the top level fleet policy revision into each into configuration. This
+		// allows individual inputs (like endpoint) to detect policy changes more easily.
+		injectInputPolicyID(policy, input.config)
+
+		cfg, cfgErr := ExpectedConfig(input.config)
+		if cfg != nil {
+			cfg.Type = inputType // ensure alias is replaced in the ExpectedConfig to be non-alias type
+		}
+		units = append(units, Unit{
+			ID:       fmt.Sprintf("%s-%s-%s", inputType, output.name, input.id),
+			Type:     client.UnitTypeInput,
+			LogLevel: input.logLevel,
+			Config:   cfg,
+			Err:      cfgErr,
+		})
+	}
+	if len(units) > 0 {
+		componentID := fmt.Sprintf("%s-%s", inputType, output.name)
+		if usingShipper {
+			// using shipper for this component
+			connected := shipperMap[supportedShipper.ShipperType]
+			connected = append(connected, componentID)
+			shipperMap[supportedShipper.ShipperType] = connected
+		} else {
+			// using output inside the component
+			cfg, cfgErr := ExpectedConfig(output.config)
+			units = append(units, Unit{
+				ID:       componentID,
+				Type:     client.UnitTypeOutput,
+				LogLevel: output.logLevel,
+				Config:   cfg,
+				Err:      cfgErr,
+			})
+		}
+
+		//components = append(components, Component{
+		return Component{
+			ID:        componentID,
+			Err:       err,
+			InputSpec: &inputSpec,
+			Units:     units,
+			Features:  featureFlags.AsProto(),
+		}, nil
+		//componentIdsInputMap[componentID] = inputSpec.BinaryName
+	}
+	return Component{}, nil
+}
+
 // PolicyToComponents takes the policy and generated a component model along with providing
 // a mapping between component and the running binary.
 func (r *RuntimeSpecs) PolicyToComponents(
@@ -208,84 +294,10 @@ func (r *RuntimeSpecs) PolicyToComponents(
 			// skip; not enabled
 			continue
 		}
-		inputsMap := output.inputs
 
 		shipperMap := make(map[string][]string)
-		for inputType, inputs := range inputsMap {
-			var supportedShipper ShipperRuntimeSpec
-			var usingShipper bool
-
-			inputSpec, err := r.GetInput(inputType)
-			if err == nil {
-				// update the inputType to match the spec; as it could have been alias
-				inputType = inputSpec.InputType
-
-				// determine if we are operating with shipper support
-				supportedShipper, usingShipper = getSupportedShipper(r, output, inputSpec, vars)
-				if !usingShipper {
-					if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
-						inputSpec = InputRuntimeSpec{} // empty the spec
-						err = ErrOutputNotSupported
-					} else {
-						err = validateRuntimeChecks(&inputSpec.Spec.Runtime, vars)
-						if err != nil {
-							inputSpec = InputRuntimeSpec{} // empty the spec
-						}
-					}
-				}
-			}
-			units := make([]Unit, 0, len(inputs)+1)
-			for _, input := range inputs {
-				if !input.enabled {
-					// skip; not enabled
-					continue
-				}
-
-				// Inject the top level fleet policy revision into each into configuration. This
-				// allows individual inputs (like endpoint) to detect policy changes more easily.
-				injectInputPolicyID(policy, input.input)
-
-				cfg, cfgErr := ExpectedConfig(input.input)
-				if cfg != nil {
-					cfg.Type = inputType // ensure alias is replaced in the ExpectedConfig to be non-alias type
-				}
-				units = append(units, Unit{
-					ID:       fmt.Sprintf("%s-%s-%s", inputType, outputName, input.id),
-					Type:     client.UnitTypeInput,
-					LogLevel: input.logLevel,
-					Config:   cfg,
-					Err:      cfgErr,
-				})
-			}
-			if len(units) > 0 {
-				componentID := fmt.Sprintf("%s-%s", inputType, outputName)
-				if usingShipper {
-					// using shipper for this component
-					connected := shipperMap[supportedShipper.ShipperType]
-					connected = append(connected, componentID)
-					shipperMap[supportedShipper.ShipperType] = connected
-				} else {
-					// using output inside the component
-					cfg, cfgErr := ExpectedConfig(output.output)
-					units = append(units, Unit{
-						ID:       componentID,
-						Type:     client.UnitTypeOutput,
-						LogLevel: output.logLevel,
-						Config:   cfg,
-						Err:      cfgErr,
-					})
-				}
-
-				components = append(components, Component{
-					ID:        componentID,
-					Err:       err,
-					InputSpec: &inputSpec,
-					Units:     units,
-					Features:  featureFlags.AsProto(),
-				})
-				componentIdsInputMap[componentID] = inputSpec.BinaryName
-			}
-		}
+		for inputType, inputsForType := range output.inputs {
+		} // end (inputType, inputsForType)
 
 		// create the shipper components and units
 		for shipperType, connected := range shipperMap {
@@ -328,7 +340,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 			}
 
 			if len(shipperUnits) > 0 {
-				cfg, cfgErr := ExpectedConfig(output.output)
+				cfg, cfgErr := ExpectedConfig(output.config)
 				shipperUnits = append(shipperUnits, Unit{
 					ID:       shipperCompID,
 					Type:     client.UnitTypeOutput,
@@ -344,14 +356,14 @@ func (r *RuntimeSpecs) PolicyToComponents(
 				})
 			}
 		}
-	}
+	} // end outputName
 
 	return components, componentIdsInputMap, nil
 }
 
 // Injects or creates a policy.revision sub-object in the input map.
-func injectInputPolicyID(fleetPolicy map[string]interface{}, input map[string]interface{}) {
-	if input == nil {
+func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[string]interface{}) {
+	if inputConfig == nil {
 		return
 	}
 
@@ -362,8 +374,7 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, input map[string]in
 	}
 
 	// Check if a policy key exists with a non-nil policy object.
-	policyObj, exists := input["policy"]
-	if exists && policyObj != nil {
+	if policyObj := inputConfig["policy"]; policyObj != nil {
 		// If the policy object converts to map[string]interface{}, inject the revision key.
 		// Note that if the interface conversion here fails, we do nothing because we don't
 		// know what type of object exists with the policy key.
@@ -372,7 +383,7 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, input map[string]in
 		}
 	} else {
 		// If there was no policy key or the value was nil, then inject a policy object with a revision key.
-		input["policy"] = map[string]interface{}{
+		inputConfig["policy"] = map[string]interface{}{
 			"revision": revision,
 		}
 	}
@@ -404,45 +415,27 @@ func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntime
 		enabledKey = "enabled"
 	)
 
+	// beta-mode the shipper is not on by default, so we need to ensure that
+	// the output has opted in.
+	if !output.useShipper {
+		return ShipperRuntimeSpec{}, false
+	}
+
 	shippers, err := r.ShippersForOutputType(output.outputType)
 	if err != nil {
 		return ShipperRuntimeSpec{}, false
 	}
-	supportedShippers := make([]ShipperRuntimeSpec, 0, len(shippers))
 	for _, shipper := range shippers {
 		if containsStr(inputSpec.Spec.Shippers, shipper.ShipperType) {
 			// validate the runtime specification to determine if it can even run
 			err = validateRuntimeChecks(&shipper.Spec.Runtime, vars)
-			if err != nil {
-				// shipper cannot run
-				continue
-			}
-			// beta-mode the shipper is not on by default, so we need to ensure that this shipper type
-			// is enabled in the output configuration
-			shipperConfigRaw, ok := output.output[shipper.ShipperType]
-			if ok {
-				// key exists enabled by default unless explicitly disabled
-				enabled := true
-				if shipperConfig, ok := shipperConfigRaw.(map[string]interface{}); ok {
-					if enabledRaw, ok := shipperConfig[enabledKey]; ok {
-						if enabledVal, ok := enabledRaw.(bool); ok {
-							enabled = enabledVal
-						}
-					}
-				}
-				if enabled {
-					// inputs supports this shipper (and it's enabled)
-					supportedShippers = append(supportedShippers, shipper)
-				}
+			if err == nil {
+				// We found a valid shipper, return it
+				return shipper, true
 			}
 		}
 	}
-	if len(supportedShippers) == 0 {
-		return ShipperRuntimeSpec{}, false
-	}
-	// in the case of multiple shippers the first is taken from the input specification (this allows an input to
-	// prefer another shipper over a different shipper)
-	return supportedShippers[0], true
+	return ShipperRuntimeSpec{}, false
 }
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
@@ -533,7 +526,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			enabled:    enabled,
 			logLevel:   logLevel,
 			outputType: t,
-			output:     output,
+			config:     output,
 			inputs:     make(map[string][]inputI),
 			useShipper: useShipper,
 		}
@@ -611,7 +604,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			enabled:   enabled,
 			logLevel:  logLevel,
 			inputType: t,
-			input:     input,
+			config:    input,
 		})
 	}
 	if len(outputsMap) == 0 {
@@ -626,7 +619,12 @@ type inputI struct {
 	enabled   bool
 	logLevel  client.UnitLogLevel
 	inputType string // canonical (non-alias) type
-	input     map[string]interface{}
+
+	// The raw configuration for this input, with small cleanups:
+	// - enabled key is removed
+	// - the key "policy.revision" is set to the current fleet policy revision
+	// TODO: list incomplete
+	config map[string]interface{}
 }
 
 type outputI struct {
@@ -641,7 +639,7 @@ type outputI struct {
 	// - use_shipper key is removed
 	// - if outputType is "elasticsearch", headers key is extended by adding any
 	//   values in AgentInfo.esHeaders
-	output map[string]interface{}
+	config map[string]interface{}
 
 	// inputs directed at this output, keyed by canonical (non-alias) type.
 	inputs map[string][]inputI
@@ -658,12 +656,12 @@ func validateRuntimeChecks(runtime *RuntimeSpec, store eql.VarStore) error {
 			// should never error; but just in-case we consider this a reason to prevent the running of the input
 			return NewErrInputRuntimeCheckFail(err.Error())
 		}
-		ok, err := expression.Eval(store, false)
+		preventionTrigger, err := expression.Eval(store, false)
 		if err != nil {
 			// error is considered a failure and reported as a reason
 			return NewErrInputRuntimeCheckFail(err.Error())
 		}
-		if ok {
+		if preventionTrigger {
 			// true means the prevention valid (so input should not run)
 			return NewErrInputRuntimeCheckFail(prevention.Message)
 		}

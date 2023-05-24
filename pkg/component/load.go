@@ -293,21 +293,17 @@ func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
 // platform) or ErrOutputNotSupported (output isn't supported on any platform).
 func (r *RuntimeSpecs) ShippersForOutputType(outputType string) ([]ShipperRuntimeSpec, error) {
 	shipperNames := r.shipperOutputs[outputType]
-	platformErr := false
 	shippers := make([]ShipperRuntimeSpec, 0, len(shipperNames))
 	for _, name := range shipperNames {
 		shipper, ok := r.shipperSpecs[name]
-		if !ok {
-			// not supported on this platform
-			platformErr = true
-			continue
+		if ok {
+			shippers = append(shippers, shipper)
 		}
-		shippers = append(shippers, shipper)
 	}
 	if len(shippers) > 0 {
 		return shippers, nil
 	}
-	if platformErr {
+	if len(shipperNames) > 0 {
 		// supported by at least one shipper, but not on this platform
 		return nil, ErrOutputNotSupportedOnPlatform
 	}
