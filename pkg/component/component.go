@@ -48,12 +48,16 @@ func (e *ErrInputRuntimeCheckFail) Error() string {
 	return e.message
 }
 
-// ShipperReference provides a reference to the shipper component/unit that a component is connected to.
+// ShipperReference identifies a connection from a source component to
+// a shipper.
 type ShipperReference struct {
-	// ComponentID is the ID of the component that this component is connected to.
+	// ShipperType is the type of shipper being connected to.
+	ShipperType string `yaml:"shipper_type"`
+
+	// ComponentID is the component ID of the shipper being connected to.
 	ComponentID string `yaml:"component_id"`
 
-	// UnitID is the ID of the unit inside the component that this component is connected to.
+	// UnitID is the ID inside the shipper of the input unit corresponding to this connection.
 	UnitID string `yaml:"unit_id"`
 }
 
@@ -144,33 +148,10 @@ func (r *RuntimeSpecs) ToComponents(
 	return components, nil
 }
 
-// varsForPlatform sets the runtime variables that are available in the
-// input specification runtime checks. This function should always be
-// edited in sync with the documentation in specs/README.md.
-func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
-	hasRoot, err := utils.HasRoot()
-	if err != nil {
-		return nil, err
-	}
-	return transpiler.NewVars("", map[string]interface{}{
-		"runtime": map[string]interface{}{
-			"platform": platform.String(),
-			"os":       platform.OS,
-			"arch":     platform.Arch,
-			"family":   platform.Family,
-			"major":    platform.Major,
-			"minor":    platform.Minor,
-		},
-		"user": map[string]interface{}{
-			"root": hasRoot,
-		},
-	}, nil)
-}
-
-func unitForInput(input inputI, outputName string) Unit {
+func unitForInput(input inputI, id string) Unit {
 	cfg, cfgErr := ExpectedConfig(input.config)
 	return Unit{
-		ID:       fmt.Sprintf("%s-%s-%s", input.inputType, outputName, input.id),
+		ID:       id,
 		Type:     client.UnitTypeInput,
 		LogLevel: input.logLevel,
 		Config:   cfg,
@@ -178,136 +159,158 @@ func unitForInput(input inputI, outputName string) Unit {
 	}
 }
 
+func unitForOutput(output outputI, id string) Unit {
+	cfg, cfgErr := ExpectedConfig(output.config)
+	return Unit{
+		ID:       id,
+		Type:     client.UnitTypeOutput,
+		LogLevel: output.logLevel,
+		Config:   cfg,
+		Err:      cfgErr,
+	}
+}
+
+func unitForShipperOutput(output outputI, id string, shipperType string) Unit {
+	cfg, cfgErr := ExpectedConfig(map[string]interface{}{
+		"type": shipperType,
+	})
+	return Unit{
+		ID:       id,
+		Type:     client.UnitTypeOutput,
+		LogLevel: output.logLevel,
+		Config:   cfg,
+		Err:      cfgErr,
+	}
+}
+
 // Collect all inputs of a particular type going to a particular
-// output into a Component ready to be run
-func (r *RuntimeSpecs) componentForInputTypeNoShipper(
+// output into a Component
+func (r *RuntimeSpecs) componentForInputType(
 	inputType string,
 	output outputI,
 	featureFlags *features.Flags,
 ) Component {
+	componentID := fmt.Sprintf("%s-%s", inputType, output.name)
 
-	inputSpec, err := r.GetInput(inputType)
+	var shipperRef *ShipperReference
 
-	if err == nil && !containsStr(inputSpec.Spec.Outputs, output.outputType) {
-		err = ErrOutputNotSupported
-		inputSpec = InputRuntimeSpec{} // empty the spec
+	inputSpec, componentErr := r.GetInput(inputType)
+	if componentErr == nil {
+		if output.useShipper {
+			shipperRef, componentErr =
+				r.getSupportedShipperRef(inputSpec, output.outputType, componentID)
+		} else if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
+			// We aren't using the shipper, and this output type isn't in the
+			// input spec's supported list.
+			componentErr = ErrOutputNotSupported
+		}
 	}
+	// If there's an error at this point we still proceed with assembling the
+	// policy into a component, we just attach the error to its Err field to
+	// indicate that it can't be run.
 
 	var units []Unit
 	for _, input := range output.inputs[inputType] {
-		if !input.enabled {
-			continue
+		if input.enabled {
+			unitID := fmt.Sprintf("%s-%s", componentID, input.id)
+			units = append(units, unitForInput(input, unitID))
 		}
-
-		cfg, cfgErr := ExpectedConfig(input.config)
-		units = append(units, Unit{
-			ID:       fmt.Sprintf("%s-%s-%s", inputType, output.name, input.id),
-			Type:     client.UnitTypeInput,
-			LogLevel: input.logLevel,
-			Config:   cfg,
-			Err:      cfgErr,
-		})
 	}
 	if len(units) > 0 {
-		componentID := fmt.Sprintf("%s-%s", inputType, output.name)
-		// using output inside the component
-		cfg, cfgErr := ExpectedConfig(output.config)
-		units = append(units, Unit{
-			ID:       componentID,
-			Type:     client.UnitTypeOutput,
-			LogLevel: output.logLevel,
-			Config:   cfg,
-			Err:      cfgErr,
-		})
-
-		//components = append(components, Component{
-		return Component{
-			ID:        componentID,
-			Err:       err,
-			InputSpec: &inputSpec,
-			Units:     units,
-			Features:  featureFlags.AsProto(),
+		if output.useShipper {
+			if shipperRef != nil {
+				units = append(units,
+					unitForShipperOutput(output, componentID, shipperRef.ShipperType))
+			}
+		} else {
+			units = append(units, unitForOutput(output, componentID))
 		}
-		//componentIdsInputMap[componentID] = inputSpec.BinaryName
 	}
-	return Component{Err: err}
+	return Component{
+		ID:        componentID,
+		Err:       componentErr,
+		InputSpec: &inputSpec,
+		Units:     units,
+		Features:  featureFlags.AsProto(),
+		Shipper:   shipperRef,
+	}
 }
 
-func (r *RuntimeSpecs) componentForInputTypeYesShipper(
-	inputType string,
-	inputs []inputI,
-	output outputI,
-	featureFlags *features.Flags,
-	shipperMap map[string][]string,
-) (Component, error) {
-	var supportedShipper ShipperRuntimeSpec
-	var usingShipper bool
+func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags) []Component {
+	var components []Component
+	for inputType := range output.inputs {
+		// No need for error checking at this stage -- we are guaranteed
+		// to get a Component back. If there is an error that prevents it
+		// from running then it will be in the Component's Err field and
+		// we will report it later.
+		components = append(components,
+			r.componentForInputType(inputType, output, featureFlags))
+	}
 
-	inputSpec, err := r.GetInput(inputType)
-	if err == nil {
-		// determine if we are operating with shipper support
-		supportedShipper, usingShipper = getSupportedShipper(r, output, inputSpec)
-		if !usingShipper {
-			if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
-				inputSpec = InputRuntimeSpec{} // empty the spec
-				err = ErrOutputNotSupported
-			} else {
-				err = validateRuntimeChecks(&inputSpec.Spec.Runtime, r.platform)
-				if err != nil {
-					inputSpec = InputRuntimeSpec{} // empty the spec
+	shipperMap := make(map[string][]string)
+	for _, c := range components {
+		shipperType := c.ShipperSpec.ShipperType
+		shipperMap[shipperType] = append(shipperMap[shipperType], c.ID)
+	}
+
+	// create the shipper components and units
+	for shipperType, connected := range shipperMap {
+		shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
+		shipperCompID := fmt.Sprintf("%s-%s", shipperType, output.name)
+
+		var shipperUnits []Unit
+		for _, componentID := range connected {
+			for i, component := range components {
+				if component.ID == componentID && component.Err == nil {
+					cfg, cfgErr := componentToShipperConfig(shipperType, component)
+					shipperUnit := Unit{
+						ID:       componentID,
+						Type:     client.UnitTypeInput,
+						LogLevel: output.logLevel,
+						Config:   cfg,
+						Err:      cfgErr,
+					}
+					shipperUnits = append(shipperUnits, shipperUnit)
+					/*component.Shipper = &ShipperReference{
+						ComponentID: shipperCompID,
+						UnitID:      shipperUnit.ID,
+					}*/
+					cfg, cfgErr = ExpectedConfig(map[string]interface{}{
+						"type": shipperType,
+					})
+					component.Units = append(component.Units, Unit{
+						ID:       componentID,
+						Type:     client.UnitTypeOutput,
+						LogLevel: output.logLevel,
+						Config:   cfg,
+						Err:      cfgErr,
+					})
+					component.Features = featureFlags.AsProto()
+
+					components[i] = component
+					break
 				}
 			}
 		}
-	}
-	units := make([]Unit, 0, len(inputs)+1)
-	for _, input := range inputs {
-		if !input.enabled {
-			// skip; not enabled
-			continue
-		}
 
-		cfg, cfgErr := ExpectedConfig(input.config)
-		if cfg != nil {
-			cfg.Type = inputType // ensure alias is replaced in the ExpectedConfig to be non-alias type
-		}
-		units = append(units, Unit{
-			ID:       fmt.Sprintf("%s-%s-%s", inputType, output.name, input.id),
-			Type:     client.UnitTypeInput,
-			LogLevel: input.logLevel,
-			Config:   cfg,
-			Err:      cfgErr,
-		})
-	}
-	if len(units) > 0 {
-		componentID := fmt.Sprintf("%s-%s", inputType, output.name)
-		if usingShipper {
-			// using shipper for this component
-			connected := shipperMap[supportedShipper.ShipperType]
-			connected = append(connected, componentID)
-			shipperMap[supportedShipper.ShipperType] = connected
-		} else {
-			// using output inside the component
+		if len(shipperUnits) > 0 {
 			cfg, cfgErr := ExpectedConfig(output.config)
-			units = append(units, Unit{
-				ID:       componentID,
+			shipperUnits = append(shipperUnits, Unit{
+				ID:       shipperCompID,
 				Type:     client.UnitTypeOutput,
 				LogLevel: output.logLevel,
 				Config:   cfg,
 				Err:      cfgErr,
 			})
+			components = append(components, Component{
+				ID:          shipperCompID,
+				ShipperSpec: &shipperSpec,
+				Units:       shipperUnits,
+				Features:    featureFlags.AsProto(),
+			})
 		}
-
-		//components = append(components, Component{
-		return Component{
-			ID:        componentID,
-			Err:       err,
-			InputSpec: &inputSpec,
-			Units:     units,
-			Features:  featureFlags.AsProto(),
-		}, nil
-		//componentIdsInputMap[componentID] = inputSpec.BinaryName
 	}
-	return Component{}, nil
+	return components
 }
 
 // PolicyToComponents takes the policy and generated a component model along with providing
@@ -339,7 +342,6 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	sort.Strings(outputKeys)
 
 	var components []Component
-	componentIdsInputMap := make(map[string]string)
 	for _, outputName := range outputKeys {
 		output := outputsMap[outputName]
 		if !output.enabled {
@@ -347,80 +349,16 @@ func (r *RuntimeSpecs) PolicyToComponents(
 			continue
 		}
 
-		shipperMap := make(map[string][]string)
-		for inputType, _ := range output.inputs {
-			inputSpec, err := r.GetInput(inputType)
-			if err == nil && !containsStr(inputSpec.Spec.Outputs, output.outputType) {
-				err = ErrOutputNotSupported
-			}
-			component := r.componentForInputTypeNoShipper(
-				inputType,
-				output,
-				featureFlags,
-			)
-			components = append(components, component)
-			componentIdsInputMap[component.ID] = inputSpec.BinaryName
+		components = append(components, r.componentsForOutput(output, featureFlags)...)
 
-		} // end (inputType, inputsForType)
-
-		// create the shipper components and units
-		for shipperType, connected := range shipperMap {
-			shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
-			shipperCompID := fmt.Sprintf("%s-%s", shipperType, outputName)
-
-			var shipperUnits []Unit
-			for _, componentID := range connected {
-				for i, component := range components {
-					if component.ID == componentID && component.Err == nil {
-						cfg, cfgErr := componentToShipperConfig(shipperType, component)
-						shipperUnit := Unit{
-							ID:       componentID,
-							Type:     client.UnitTypeInput,
-							LogLevel: output.logLevel,
-							Config:   cfg,
-							Err:      cfgErr,
-						}
-						shipperUnits = append(shipperUnits, shipperUnit)
-						component.Shipper = &ShipperReference{
-							ComponentID: shipperCompID,
-							UnitID:      shipperUnit.ID,
-						}
-						cfg, cfgErr = ExpectedConfig(map[string]interface{}{
-							"type": shipperType,
-						})
-						component.Units = append(component.Units, Unit{
-							ID:       componentID,
-							Type:     client.UnitTypeOutput,
-							LogLevel: output.logLevel,
-							Config:   cfg,
-							Err:      cfgErr,
-						})
-						component.Features = featureFlags.AsProto()
-
-						components[i] = component
-						break
-					}
-				}
-			}
-
-			if len(shipperUnits) > 0 {
-				cfg, cfgErr := ExpectedConfig(output.config)
-				shipperUnits = append(shipperUnits, Unit{
-					ID:       shipperCompID,
-					Type:     client.UnitTypeOutput,
-					LogLevel: output.logLevel,
-					Config:   cfg,
-					Err:      cfgErr,
-				})
-				components = append(components, Component{
-					ID:          shipperCompID,
-					ShipperSpec: &shipperSpec,
-					Units:       shipperUnits,
-					Features:    featureFlags.AsProto(),
-				})
-			}
-		}
 	} // end outputName
+
+	componentIdsInputMap := make(map[string]string)
+	for _, component := range components {
+		if spec := component.InputSpec; spec != nil {
+			componentIdsInputMap[component.ID] = spec.BinaryName
+		}
+	}
 
 	return components, componentIdsInputMap, nil
 }
@@ -474,14 +412,12 @@ func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitEx
 // from inputSpec we only use inputSpec.Spec.Shippers
 // from r we only use r.ShippersForOutputType
 // from output we use output.outputType (in the call to ShippersForOutputType) and output.output (the raw output configuration from the policy, to check for an explicit "[shipper type].enabled" value)
-func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntimeSpec) (ShipperRuntimeSpec, bool) {
-	// beta-mode the shipper is not on by default, so we need to ensure that
-	// the output has opted in.
-	if !output.useShipper {
-		return ShipperRuntimeSpec{}, false
-	}
-
-	shippersForOutput := r.shipperOutputs[output.outputType]
+func (r *RuntimeSpecs) getSupportedShipperRef(
+	inputSpec InputRuntimeSpec,
+	outputType string,
+	componentID string,
+) (*ShipperReference, error) {
+	shippersForOutput := r.shipperOutputs[outputType]
 	// Traverse in the order given by the input spec. This lets inputs specify
 	// a preferred order if there is more than one option.
 	for _, name := range inputSpec.Spec.Shippers {
@@ -490,11 +426,22 @@ func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntime
 		}
 		shipper := r.shipperSpecs[name]
 		// make sure the runtime checks for this shipper pass
-		if validateRuntimeChecks(&shipper.Spec.Runtime, r.platform) == nil {
-			return shipper, true
+		err := validateRuntimeChecks(&shipper.Spec.Runtime, r.platform)
+		if err != nil {
+			return nil, err
 		}
+
+		// We've found a valid shipper, construct the reference
+		shipperCompID := fmt.Sprintf("%s-%s", shipper.ShipperType, outputType)
+		return &ShipperReference{
+			ShipperType: shipper.ShipperType,
+			ComponentID: shipperCompID,
+			// The unit ID of this connection in the shipper is the same as the
+			// input's component id.
+			UnitID: componentID,
+		}, nil
 	}
-	return ShipperRuntimeSpec{}, false
+	return nil, ErrOutputNotSupported
 }
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
@@ -710,6 +657,29 @@ type outputI struct {
 
 	// If true, RuntimeSpecs should use a shipper for this output.
 	useShipper bool
+}
+
+// varsForPlatform sets the runtime variables that are available in the
+// input specification runtime checks. This function should always be
+// edited in sync with the documentation in specs/README.md.
+func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return nil, err
+	}
+	return transpiler.NewVars("", map[string]interface{}{
+		"runtime": map[string]interface{}{
+			"platform": platform.String(),
+			"os":       platform.OS,
+			"arch":     platform.Arch,
+			"family":   platform.Family,
+			"major":    platform.Major,
+			"minor":    platform.Minor,
+		},
+		"user": map[string]interface{}{
+			"root": hasRoot,
+		},
+	}, nil)
 }
 
 func validateRuntimeChecks(
