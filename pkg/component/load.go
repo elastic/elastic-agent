@@ -273,18 +273,21 @@ func (r *RuntimeSpecs) Inputs() []string {
 	return inputs
 }
 
-// GetInput returns the input runtime specification for the specified input on this platform.
+// GetInput returns the input runtime specification for the given input type on this platform.
 func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
-	runtime, ok := r.inputSpecs[inputType]
-	if ok {
-		return runtime, nil
+	if !containsStr(r.inputTypes, inputType) {
+		return InputRuntimeSpec{}, ErrInputNotSupported
 	}
-	if containsStr(r.inputTypes, inputType) {
+	runtimeSpec, ok := r.inputSpecs[inputType]
+	if !ok {
 		// supported but not on this platform
 		return InputRuntimeSpec{}, ErrInputNotSupportedOnPlatform
 	}
-	// not supported at all
-	return InputRuntimeSpec{}, ErrInputNotSupported
+	err := validateRuntimeChecks(runtimeSpec.Spec.Runtime.Preventions, r.platform)
+	if err != nil {
+		return InputRuntimeSpec{}, err
+	}
+	return runtimeSpec, nil
 }
 
 // ShippersForOutputType returns the shippers that support the outputType.

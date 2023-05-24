@@ -167,31 +167,113 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 	}, nil)
 }
 
-func (r *RuntimeSpecs) componentForInputs(
+func unitForInput(input inputI, outputName string) Unit {
+
+	// Inject the top level fleet policy revision into each into configuration. This
+	// allows individual inputs (like endpoint) to detect policy changes more easily.
+	injectInputPolicyID(policy, input.config)
+
+	cfg, cfgErr := ExpectedConfig(input.config)
+	return Unit{
+		ID:       fmt.Sprintf("%s-%s-%s", input.inputType, outputName, input.id),
+		Type:     client.UnitTypeInput,
+		LogLevel: input.logLevel,
+		Config:   cfg,
+		Err:      cfgErr,
+	}
+
+}
+
+// Collect all inputs of a particular type going to a particular
+// output into a Component ready to be run
+func (r *RuntimeSpecs) componentForInputTypeNoShipper(
+	inputType string,
+	//inputs []inputI,
+	output outputI,
+	policy map[string]interface{},
+	featureFlags *features.Flags,
+	shipperMap map[string][]string,
+) (Component, error) {
+
+	inputSpec, err := r.GetInput(inputType)
+	if err != nil {
+		return Component{}, err
+	}
+
+	if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
+		return Component{}, ErrOutputNotSupported
+	} else {
+		err = validateRuntimeChecks(&inputSpec.Spec.Runtime, r.platform)
+		if err != nil {
+			inputSpec = InputRuntimeSpec{} // empty the spec
+		}
+	}
+	inputs := output.inputs[inputType]
+	units := make([]Unit, 0, len(inputs)+1)
+	for _, input := range inputs {
+		if !input.enabled {
+			continue
+		}
+
+		// Inject the top level fleet policy revision into each into configuration. This
+		// allows individual inputs (like endpoint) to detect policy changes more easily.
+		injectInputPolicyID(policy, input.config)
+
+		cfg, cfgErr := ExpectedConfig(input.config)
+		units = append(units, Unit{
+			ID:       fmt.Sprintf("%s-%s-%s", inputType, output.name, input.id),
+			Type:     client.UnitTypeInput,
+			LogLevel: input.logLevel,
+			Config:   cfg,
+			Err:      cfgErr,
+		})
+	}
+	if len(units) > 0 {
+		componentID := fmt.Sprintf("%s-%s", inputType, output.name)
+		// using output inside the component
+		cfg, cfgErr := ExpectedConfig(output.config)
+		units = append(units, Unit{
+			ID:       componentID,
+			Type:     client.UnitTypeOutput,
+			LogLevel: output.logLevel,
+			Config:   cfg,
+			Err:      cfgErr,
+		})
+
+		//components = append(components, Component{
+		return Component{
+			ID:        componentID,
+			Err:       err,
+			InputSpec: &inputSpec,
+			Units:     units,
+			Features:  featureFlags.AsProto(),
+		}, nil
+		//componentIdsInputMap[componentID] = inputSpec.BinaryName
+	}
+	return Component{}, nil
+}
+
+func (r *RuntimeSpecs) componentForInputTypeYesShipper(
 	inputType string,
 	inputs []inputI,
 	output outputI,
 	policy map[string]interface{},
 	featureFlags *features.Flags,
+	shipperMap map[string][]string,
 ) (Component, error) {
 	var supportedShipper ShipperRuntimeSpec
 	var usingShipper bool
 
-	vars, err := varsForPlatform(r.platform)
-	if err != nil {
-		return Component{}, err
-	}
-
 	inputSpec, err := r.GetInput(inputType)
 	if err == nil {
 		// determine if we are operating with shipper support
-		supportedShipper, usingShipper = getSupportedShipper(r, output, inputSpec, vars)
+		supportedShipper, usingShipper = getSupportedShipper(r, output, inputSpec)
 		if !usingShipper {
 			if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
 				inputSpec = InputRuntimeSpec{} // empty the spec
 				err = ErrOutputNotSupported
 			} else {
-				err = validateRuntimeChecks(&inputSpec.Spec.Runtime, vars)
+				err = validateRuntimeChecks(&inputSpec.Spec.Runtime, r.platform)
 				if err != nil {
 					inputSpec = InputRuntimeSpec{} // empty the spec
 				}
@@ -274,11 +356,6 @@ func (r *RuntimeSpecs) PolicyToComponents(
 		return nil, nil, nil
 	}
 
-	vars, err := varsForPlatform(r.platform)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// order output keys; ensures result is always the same order
 	outputKeys := make([]string, 0, len(outputsMap))
 	for k := range outputsMap {
@@ -297,6 +374,12 @@ func (r *RuntimeSpecs) PolicyToComponents(
 
 		shipperMap := make(map[string][]string)
 		for inputType, inputsForType := range output.inputs {
+			inputSpec, err := r.GetInput(inputType)
+			if err == nil && !containsStr(inputSpec.Spec.Outputs, output.outputType) {
+				err = ErrOutputNotSupported
+			}
+			component, err := r.componentForInputTypeYesShipper()
+
 		} // end (inputType, inputsForType)
 
 		// create the shipper components and units
@@ -410,29 +493,24 @@ func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitEx
 // from inputSpec we only use inputSpec.Spec.Shippers
 // from r we only use r.ShippersForOutputType
 // from output we use output.outputType (in the call to ShippersForOutputType) and output.output (the raw output configuration from the policy, to check for an explicit "[shipper type].enabled" value)
-func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntimeSpec, vars eql.VarStore) (ShipperRuntimeSpec, bool) {
-	const (
-		enabledKey = "enabled"
-	)
-
+func getSupportedShipper(r *RuntimeSpecs, output outputI, inputSpec InputRuntimeSpec) (ShipperRuntimeSpec, bool) {
 	// beta-mode the shipper is not on by default, so we need to ensure that
 	// the output has opted in.
 	if !output.useShipper {
 		return ShipperRuntimeSpec{}, false
 	}
 
-	shippers, err := r.ShippersForOutputType(output.outputType)
-	if err != nil {
-		return ShipperRuntimeSpec{}, false
-	}
-	for _, shipper := range shippers {
-		if containsStr(inputSpec.Spec.Shippers, shipper.ShipperType) {
-			// validate the runtime specification to determine if it can even run
-			err = validateRuntimeChecks(&shipper.Spec.Runtime, vars)
-			if err == nil {
-				// We found a valid shipper, return it
-				return shipper, true
-			}
+	shippersForOutput := r.shipperOutputs[output.outputType]
+	// Traverse in the order given by the input spec. This lets inputs specify
+	// a preferred order if there is more than one option.
+	for _, name := range inputSpec.Spec.Shippers {
+		if !containsStr(shippersForOutput, name) {
+			continue
+		}
+		shipper := r.shipperSpecs[name]
+		// make sure the runtime checks for this shipper pass
+		if validateRuntimeChecks(&shipper.Spec.Runtime, r.platform) == nil {
+			return shipper, true
 		}
 	}
 	return ShipperRuntimeSpec{}, false
@@ -648,7 +726,14 @@ type outputI struct {
 	useShipper bool
 }
 
-func validateRuntimeChecks(runtime *RuntimeSpec, store eql.VarStore) error {
+func validateRuntimeChecks(
+	runtime *RuntimeSpec,
+	platform PlatformDetail,
+) error {
+	vars, err := varsForPlatform(platform)
+	if err != nil {
+		return err
+	}
 	for _, prevention := range runtime.Preventions {
 		expression, err := eql.New(prevention.Condition)
 		if err != nil {
@@ -656,7 +741,7 @@ func validateRuntimeChecks(runtime *RuntimeSpec, store eql.VarStore) error {
 			// should never error; but just in-case we consider this a reason to prevent the running of the input
 			return NewErrInputRuntimeCheckFail(err.Error())
 		}
-		preventionTrigger, err := expression.Eval(store, false)
+		preventionTrigger, err := expression.Eval(vars, false)
 		if err != nil {
 			// error is considered a failure and reported as a reason
 			return NewErrInputRuntimeCheckFail(err.Error())
