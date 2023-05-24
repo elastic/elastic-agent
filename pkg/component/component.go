@@ -101,8 +101,8 @@ type Component struct {
 	// Features configuration the component should use.
 	Features *proto.Features `yaml:"features,omitempty"`
 
-	// Shipper references the component/unit that this component used as its output. (not set when ShipperSpec)
-	Shipper *ShipperReference `yaml:"shipper,omitempty"`
+	// ShipperRef references the component/unit that this component used as its output. (not set when ShipperSpec)
+	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
 }
 
 // Type returns the type of the component.
@@ -150,6 +150,9 @@ func (r *RuntimeSpecs) ToComponents(
 
 func unitForInput(input inputI, id string) Unit {
 	cfg, cfgErr := ExpectedConfig(input.config)
+	if cfg.GetType() == "" {
+		fmt.Printf("FAE WAS HERE\n")
+	}
 	return Unit{
 		ID:       id,
 		Type:     client.UnitTypeInput,
@@ -174,6 +177,9 @@ func unitForShipperOutput(output outputI, id string, shipperType string) Unit {
 	cfg, cfgErr := ExpectedConfig(map[string]interface{}{
 		"type": shipperType,
 	})
+	if cfg.GetType() == "" {
+		fmt.Printf("FAE WAS HERE\n")
+	}
 	return Unit{
 		ID:       id,
 		Type:     client.UnitTypeOutput,
@@ -184,7 +190,8 @@ func unitForShipperOutput(output outputI, id string, shipperType string) Unit {
 }
 
 // Collect all inputs of a particular type going to a particular
-// output into a Component
+// output into a Component. The returned Component may have no
+// units if no valid inputs were found.
 func (r *RuntimeSpecs) componentForInputType(
 	inputType string,
 	output outputI,
@@ -192,13 +199,24 @@ func (r *RuntimeSpecs) componentForInputType(
 ) Component {
 	componentID := fmt.Sprintf("%s-%s", inputType, output.name)
 
-	var shipperRef *ShipperReference
-
 	inputSpec, componentErr := r.GetInput(inputType)
+
+	var shipperType string
+	var shipperRef *ShipperReference
 	if componentErr == nil {
 		if output.useShipper {
-			shipperRef, componentErr =
-				r.getSupportedShipperRef(inputSpec, output.outputType, componentID)
+			shipperType, componentErr =
+				r.getSupportedShipperType(inputSpec, output.outputType)
+
+			// We've found a valid shipper, construct the reference
+			shipperRef = &ShipperReference{
+				ShipperType: shipperType,
+				ComponentID: fmt.Sprintf("%s-%s", shipperType, output.name),
+				// The unit ID of this connection in the shipper is the same as the
+				// input's component id.
+				UnitID: componentID,
+			}
+
 		} else if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
 			// We aren't using the shipper, and this output type isn't in the
 			// input spec's supported list.
@@ -218,21 +236,19 @@ func (r *RuntimeSpecs) componentForInputType(
 	}
 	if len(units) > 0 {
 		if output.useShipper {
-			if shipperRef != nil {
-				units = append(units,
-					unitForShipperOutput(output, componentID, shipperRef.ShipperType))
-			}
+			units = append(units,
+				unitForShipperOutput(output, componentID, shipperType))
 		} else {
 			units = append(units, unitForOutput(output, componentID))
 		}
 	}
 	return Component{
-		ID:        componentID,
-		Err:       componentErr,
-		InputSpec: &inputSpec,
-		Units:     units,
-		Features:  featureFlags.AsProto(),
-		Shipper:   shipperRef,
+		ID:         componentID,
+		Err:        componentErr,
+		InputSpec:  &inputSpec,
+		Units:      units,
+		Features:   featureFlags.AsProto(),
+		ShipperRef: shipperRef,
 	}
 }
 
@@ -242,24 +258,29 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 		// No need for error checking at this stage -- we are guaranteed
 		// to get a Component back. If there is an error that prevents it
 		// from running then it will be in the Component's Err field and
-		// we will report it later.
-		components = append(components,
-			r.componentForInputType(inputType, output, featureFlags))
+		// we will report it later. The only thing we skip is a component
+		// with no units.
+		component := r.componentForInputType(inputType, output, featureFlags)
+		if len(component.Units) > 0 {
+			components = append(components, component)
+		}
 	}
 
 	shipperMap := make(map[string][]string)
-	for _, c := range components {
-		shipperType := c.ShipperSpec.ShipperType
-		shipperMap[shipperType] = append(shipperMap[shipperType], c.ID)
+	for _, component := range components {
+		if component.ShipperRef != nil {
+			shipperType := component.ShipperRef.ShipperType
+			shipperMap[shipperType] = append(shipperMap[shipperType], component.ID)
+		}
 	}
 
 	// create the shipper components and units
-	for shipperType, connected := range shipperMap {
+	for shipperType, componentIDs := range shipperMap {
 		shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
 		shipperCompID := fmt.Sprintf("%s-%s", shipperType, output.name)
 
 		var shipperUnits []Unit
-		for _, componentID := range connected {
+		for _, componentID := range componentIDs {
 			for i, component := range components {
 				if component.ID == componentID && component.Err == nil {
 					cfg, cfgErr := componentToShipperConfig(shipperType, component)
@@ -275,7 +296,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 						ComponentID: shipperCompID,
 						UnitID:      shipperUnit.ID,
 					}*/
-					cfg, cfgErr = ExpectedConfig(map[string]interface{}{
+					/*cfg, cfgErr = ExpectedConfig(map[string]interface{}{
 						"type": shipperType,
 					})
 					component.Units = append(component.Units, Unit{
@@ -284,7 +305,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 						LogLevel: output.logLevel,
 						Config:   cfg,
 						Err:      cfgErr,
-					})
+					})*/
 					component.Features = featureFlags.AsProto()
 
 					components[i] = component
@@ -344,14 +365,11 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	var components []Component
 	for _, outputName := range outputKeys {
 		output := outputsMap[outputName]
-		if !output.enabled {
-			// skip; not enabled
-			continue
+		if output.enabled {
+			components = append(components,
+				r.componentsForOutput(output, featureFlags)...)
 		}
-
-		components = append(components, r.componentsForOutput(output, featureFlags)...)
-
-	} // end outputName
+	}
 
 	componentIdsInputMap := make(map[string]string)
 	for _, component := range components {
@@ -409,14 +427,13 @@ func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitEx
 	return ExpectedConfig(cfg)
 }
 
-// from inputSpec we only use inputSpec.Spec.Shippers
-// from r we only use r.ShippersForOutputType
-// from output we use output.outputType (in the call to ShippersForOutputType) and output.output (the raw output configuration from the policy, to check for an explicit "[shipper type].enabled" value)
-func (r *RuntimeSpecs) getSupportedShipperRef(
+// Scan the list of shippers looking for one that supports the given
+// input spec and output type. If one is found, return its type,
+// otherwise return an error.
+func (r *RuntimeSpecs) getSupportedShipperType(
 	inputSpec InputRuntimeSpec,
 	outputType string,
-	componentID string,
-) (*ShipperReference, error) {
+) (string, error) {
 	shippersForOutput := r.shipperOutputs[outputType]
 	// Traverse in the order given by the input spec. This lets inputs specify
 	// a preferred order if there is more than one option.
@@ -428,20 +445,12 @@ func (r *RuntimeSpecs) getSupportedShipperRef(
 		// make sure the runtime checks for this shipper pass
 		err := validateRuntimeChecks(&shipper.Spec.Runtime, r.platform)
 		if err != nil {
-			return nil, err
+			continue
 		}
 
-		// We've found a valid shipper, construct the reference
-		shipperCompID := fmt.Sprintf("%s-%s", shipper.ShipperType, outputType)
-		return &ShipperReference{
-			ShipperType: shipper.ShipperType,
-			ComponentID: shipperCompID,
-			// The unit ID of this connection in the shipper is the same as the
-			// input's component id.
-			UnitID: componentID,
-		}, nil
+		return shipper.ShipperType, nil
 	}
-	return nil, ErrOutputNotSupported
+	return "", ErrOutputNotSupported
 }
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set

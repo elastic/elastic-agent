@@ -978,11 +978,9 @@ func TestToComponents(t *testing.T) {
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
 					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
+						"type":        "elasticsearch",
+						"enabled":     true,
+						"use_shipper": true,
 					},
 				},
 				"inputs": []interface{}{
@@ -1025,7 +1023,8 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "filestream-default",
 					},
@@ -1044,9 +1043,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": true,
-								},
 							}),
 						},
 						{
@@ -1077,22 +1073,20 @@ func TestToComponents(t *testing.T) {
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
 					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"shipper": map[string]interface{}{},
+						"type":        "elasticsearch",
+						"use_shipper": true,
 					},
 					"other": map[string]interface{}{
-						"type": "elasticsearch",
-						"shipper": map[string]interface{}{
-							"enabled": false,
-						},
+						"type":        "elasticsearch",
+						"use_shipper": false,
 					},
 					"stashit": map[string]interface{}{
-						"type":    "logstash",
-						"shipper": map[string]interface{}{},
+						"type":        "logstash",
+						"use_shipper": true,
 					},
 					"redis": map[string]interface{}{
-						"type":    "redis",
-						"shipper": map[string]interface{}{},
+						"type":        "redis",
+						"use_shipper": true,
 					},
 				},
 				"inputs": []interface{}{
@@ -1186,7 +1180,8 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "filestream-default",
 					},
@@ -1205,9 +1200,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": false,
-								},
 							}),
 						},
 						{
@@ -1265,7 +1257,8 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "log-default",
 					},
@@ -1333,8 +1326,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "elasticsearch",
-								"shipper": map[string]interface{}{},
+								"type": "elasticsearch",
 							}),
 						},
 					},
@@ -1353,9 +1345,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": false,
-								},
 							}),
 						},
 						{
@@ -1395,7 +1384,8 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-stashit",
 						UnitID:      "log-stashit",
 					},
@@ -1431,8 +1421,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "logstash",
-								"shipper": map[string]interface{}{},
+								"type": "logstash",
 							}),
 						},
 					},
@@ -1463,7 +1452,8 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-redis",
 						UnitID:      "log-redis",
 					},
@@ -1499,8 +1489,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "redis",
-								"shipper": map[string]interface{}{},
+								"type": "redis",
 							}),
 						},
 					},
@@ -1518,8 +1507,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "elasticsearch",
-								"shipper": map[string]interface{}{},
+								"type": "elasticsearch",
 							}),
 						},
 						{
@@ -1834,10 +1822,10 @@ func TestToComponents(t *testing.T) {
 							assert.EqualValues(t, eu.Config, actual.Units[i].Config)
 						}
 						assert.EqualValues(t, expected.Units, actual.Units)
-						if expected.Shipper != nil {
-							assert.Equal(t, *expected.Shipper, *actual.Shipper)
+						if expected.ShipperRef != nil {
+							assert.Equal(t, *expected.ShipperRef, *actual.ShipperRef)
 						} else {
-							assert.Nil(t, actual.Shipper)
+							assert.Nil(t, actual.ShipperRef)
 						}
 					} else if expected.ShipperSpec != nil {
 						assert.Nil(t, actual.InputSpec)
@@ -1845,7 +1833,7 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
 						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
 
-						assert.Nil(t, actual.Shipper)
+						assert.Nil(t, actual.ShipperRef)
 						assert.Len(t, actual.Units, len(expected.Units))
 						for i := range expected.Units {
 							assertEqualUnitExpectedConfigs(t, &expected.Units[i], &actual.Units[i])
@@ -1977,6 +1965,9 @@ func assertEqualUnitExpectedConfigs(t *testing.T, expected *Unit, actual *Unit) 
 	assert.Equal(t, expected.LogLevel, actual.LogLevel)
 	assert.Equal(t, expected.Err, actual.Err)
 	diff := cmp.Diff(expected.Config, actual.Config, protocmp.Transform())
+	if diff != "" {
+		fmt.Printf("expected: %v, actual: %v\n", *expected, *actual)
+	}
 	assert.Empty(t, diff)
 }
 
