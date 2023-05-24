@@ -84,7 +84,8 @@ spec:
         build_pull_request_forks: false
         build_pull_requests: true # requires filter_enabled and filter_condition settings as below when used with buildkite-pr-bot
         publish_commit_status: false # do not update status of commits for this pipeline
-        build_tags: true
+        build_tags: false
+        build_branches: false
         filter_enabled: true
         filter_condition: |
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
