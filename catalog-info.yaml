@@ -83,6 +83,7 @@ spec:
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true # requires filter_enabled and filter_condition settings as below when used with buildkite-pr-bot
+        publish_commit_status: false # do not update status of commits for this pipeline
         build_tags: true
         filter_enabled: true
         filter_condition: |
