@@ -296,7 +296,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
 	err := f.ensurePrepared(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to prepare before exec: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -306,9 +306,10 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	cmd := exec.CommandContext(ctx, f.binaryPath(), args...)
 	for _, o := range opts {
 		if err := o(cmd); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error adding opts to Exec: %w", err)
 		}
 	}
+	f.t.Logf(">> running agent with: %v", cmd.Args)
 
 	return cmd.CombinedOutput()
 }

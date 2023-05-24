@@ -94,14 +94,14 @@ func (s *FQDN) TestFQDN() {
 	// Enroll agent in Fleet with a test policy
 	createPolicyReq := kibana.CreatePolicyRequest{
 		Name:        "test-policy-fqdn-" + strings.ReplaceAll(fqdn, ".", "-"),
-		Namespace:   s.requirementsInfo.Namespace,
+		Namespace:   "defualt",
 		Description: fmt.Sprintf("Test policy for FQDN E2E test (%s)", fqdn),
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policy, err := tools.EnrollAgentWithPolicy(s.T(), s.agentFixture, kibClient, createPolicyReq)
+	policy, err := tools.EnrollAgentWithPolicy(s.T(), true, s.agentFixture, kibClient, createPolicyReq)
 	require.NoError(s.T(), err)
 
 	// Verify that agent name is short hostname

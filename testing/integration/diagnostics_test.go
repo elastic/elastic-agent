@@ -40,6 +40,7 @@ var diagnosticsFiles = []string{
 	"heap.pprof.gz",
 	"mutex.pprof.gz",
 	"pre-config.yaml",
+	"local-config.yaml",
 	"state.yaml",
 	"threadcreate.pprof.gz",
 	"variables.yaml",
