@@ -208,15 +208,16 @@ func (r *RuntimeSpecs) componentForInputType(
 			shipperType, componentErr =
 				r.getSupportedShipperType(inputSpec, output.outputType)
 
-			// We've found a valid shipper, construct the reference
-			shipperRef = &ShipperReference{
-				ShipperType: shipperType,
-				ComponentID: fmt.Sprintf("%s-%s", shipperType, output.name),
-				// The unit ID of this connection in the shipper is the same as the
-				// input's component id.
-				UnitID: componentID,
+			if componentErr == nil {
+				// We've found a valid shipper, construct the reference
+				shipperRef = &ShipperReference{
+					ShipperType: shipperType,
+					ComponentID: fmt.Sprintf("%s-%s", shipperType, output.name),
+					// The unit ID of this connection in the shipper is the same as the
+					// input's component id.
+					UnitID: componentID,
+				}
 			}
-
 		} else if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
 			// We aren't using the shipper, and this output type isn't in the
 			// input spec's supported list.
@@ -441,7 +442,10 @@ func (r *RuntimeSpecs) getSupportedShipperType(
 		if !containsStr(shippersForOutput, name) {
 			continue
 		}
-		shipper := r.shipperSpecs[name]
+		shipper, ok := r.shipperSpecs[name]
+		if !ok {
+			continue
+		}
 		// make sure the runtime checks for this shipper pass
 		err := validateRuntimeChecks(&shipper.Spec.Runtime, r.platform)
 		if err != nil {
