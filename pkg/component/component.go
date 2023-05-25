@@ -57,7 +57,7 @@ type ShipperReference struct {
 	// ComponentID is the component ID of the shipper being connected to.
 	ComponentID string `yaml:"component_id"`
 
-	// UnitID is the ID inside the shipper of the input unit corresponding to this connection.
+	// UnitID is the ID inside the shipper of the input unit for this connection.
 	UnitID string `yaml:"unit_id"`
 }
 
@@ -183,9 +183,9 @@ func unitForShipperOutput(output outputI, id string, shipperType string) Unit {
 	}
 }
 
-// Collect all inputs of a particular type going to a particular
-// output into a Component. The returned Component may have no
-// units if no valid inputs were found.
+// Collect all inputs of the given type going to the given output and return
+// the resulting Component. The returned Component may have no units if no
+// active inputs were found.
 func (r *RuntimeSpecs) componentForInputType(
 	inputType string,
 	output outputI,
