@@ -80,9 +80,7 @@ inputs:
 
 Each output configuration is grouped under the output name, while input configurations appear in a list directly under the root `inputs` field.
 
-For the most part, each input and output configuration is passed directly to the underlying component when Agent runs it. However, a few configuration fields have special meanings or are modified by Agent, as detailed below.
-
-The following sections list the fields within input and output configurations that are handled specially by Agent. Fields not listed here are passed through unchanged. Fields marked "removed" are only used by agent and are removed from the output configuration.
+For the most part, input and output configurations are passed directly to the underlying components when Agent runs them. However, there are some fields with special meaning or behavior, listed in the following sections. Fields marked "removed" are only used by agent and are removed from the configuration before forwarding it to the client component. Any fields not included below are passed through unchanged.
 
 ## Input fields
 
