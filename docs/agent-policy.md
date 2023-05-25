@@ -82,23 +82,23 @@ Each output configuration is grouped under the output name, while input configur
 
 For the most part, input and output configurations are passed directly to the underlying components when Agent runs them. However, there are some fields with special meaning or behavior, listed in the following sections. Fields marked "removed" are only used by agent and are removed from the configuration before forwarding it to the client component. Any fields not included below are passed through unchanged.
 
-## Input fields
+### Input fields
 
 The following fields within input configurations are handled specially by Agent:
 
-### `type` (string, required)
+#### `type` (string, required)
 
 The type of the input. This must match the `name` or `aliases` field in component's [input specification](component-specs.md). If the given `type` is an alias, Agent replaces it with its canonical input type (the `name` field in the spec file).
 
-### `id` (string)
+#### `id` (string)
 
 The ID for this input. Each input must have a unique ID, which is used in logging and event metadata. This parameter _should_ be specified, but if it isn't present it defaults to the input type (note that this will be the canonical type, which may be different than the `type` field when using an alias).
 
-### `use_output` (string, removed)
+#### `use_output` (string, removed)
 
 The output this input should write to. This must match one of the output names from the same policy. Defaults to `default`.
 
-### `log_level` (string, removed)
+#### `log_level` (string, removed)
 
 The log level for this component. This field is not passed on to the underlying component; instead, Agent implements log level filtering itself. Possible values:
 - `error`
@@ -107,26 +107,26 @@ The log level for this component. This field is not passed on to the underlying 
 - `debug`
 - `trace`
 
-### `policy.revision` (string, overwritten)
+#### `policy.revision` (string, overwritten)
 
 If the overall policy has a `revision` field (inserted by Fleet to track policy changes), its value is copied into the input's `policy.revision` field. This allows individual inputs (like Endpoint) to detect policy changes more easily.
 
 
-## Output fields
+### Output fields
 
-### `enabled` (boolean, removed)
+#### `enabled` (boolean, removed)
 
 If present, this field determines whether the output is active. Defaults to true.
 
-### `type` (string, required)
+#### `type` (string, required)
 
 The output type. If `use_shipper` is `false`, this value must match one of the entries in the `outputs` field for its inputs' spec files. Otherwise, the `shippers` field for its inputs' spec file must include a shipper type that supports this output. See [Component Specs](component-specs.md) for more details.
 
-### `use_shipper` (boolean, removed)
+#### `use_shipper` (boolean, removed)
 
 If present, this field determines whether this output should be implemented by a Shipper component. Defaults to false.
 
-### `log_level` (string, removed)
+#### `log_level` (string, removed)
 
 The log level for this component. This field is not passed on to the underlying component; instead, Agent implements log level filtering itself. Possible values:
 - `error`
@@ -135,16 +135,16 @@ The log level for this component. This field is not passed on to the underlying 
 - `debug`
 - `trace`
 
-### `headers` (`map[string]string`)
+#### `headers` (`map[string]string`)
 
 Agent does not use this field itself, however if the output's `type` is `elasticsearch` then Agent will insert any headers it acquired during Fleet enrollment into this field.
 
 
-## Shipper-specific fields
+### Shipper-specific fields
 
 When components use the shipper, it results in units that don't correspond directly to a configuration entry in the policy. A component that writes to the shipper will be given an output unit that targets the shipper, and a shipper component will be given input units detailing the components that will connect to it.
 
-### Shipper output fields
+#### Shipper output fields
 
 The output unit of a component that writes to a shipper is given the following configuration:
 
@@ -154,7 +154,7 @@ The output unit of a component that writes to a shipper is given the following c
 - `ssl.certificate` (string): the certificate to present when connecting to the shipper, signed by the CA in `ssl.certificate_authorities`.
 - `ssl.key` (string): the key for `ssl.certificate`
 
-### Shipper input fields
+#### Shipper input fields
 
 For each component that writes to a shipper, the shipper will be given an input unit with the following configuration:
 
