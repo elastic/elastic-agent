@@ -82,9 +82,9 @@ func NewCommandRuntime(comp component.Component, log *logger.Logger, monitor Mon
 		current:     comp,
 		monitor:     monitor,
 		ch:          make(chan ComponentState),
-		actionCh:    make(chan actionMode),
+		actionCh:    make(chan actionMode, 1),
 		procCh:      make(chan procState),
-		compCh:      make(chan component.Component),
+		compCh:      make(chan component.Component, 1),
 		actionState: actionStop,
 		state:       newComponentState(&comp),
 	}
@@ -235,6 +235,11 @@ func (c *CommandRuntime) Watch() <-chan ComponentState {
 //
 // Non-blocking and never returns an error.
 func (c *CommandRuntime) Start() error {
+	// clear channel so it's the latest action
+	select {
+	case <-c.actionCh:
+	default:
+	}
 	c.actionCh <- actionStart
 	return nil
 }
@@ -243,6 +248,11 @@ func (c *CommandRuntime) Start() error {
 //
 // Non-blocking and never returns an error.
 func (c *CommandRuntime) Update(comp component.Component) error {
+	// clear channel so it's the latest component
+	select {
+	case <-c.compCh:
+	default:
+	}
 	c.compCh <- comp
 	return nil
 }
@@ -251,6 +261,11 @@ func (c *CommandRuntime) Update(comp component.Component) error {
 //
 // Non-blocking and never returns an error.
 func (c *CommandRuntime) Stop() error {
+	// clear channel so it's the latest action
+	select {
+	case <-c.actionCh:
+	default:
+	}
 	c.actionCh <- actionStop
 	return nil
 }
@@ -259,6 +274,11 @@ func (c *CommandRuntime) Stop() error {
 //
 // Non-blocking and never returns an error.
 func (c *CommandRuntime) Teardown() error {
+	// clear channel so it's the latest action
+	select {
+	case <-c.actionCh:
+	default:
+	}
 	c.actionCh <- actionTeardown
 	return nil
 }

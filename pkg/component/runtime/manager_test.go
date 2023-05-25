@@ -13,6 +13,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+<<<<<<< HEAD
+=======
+	"strings"
+	"sync"
+>>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 	"testing"
 	"time"
 
@@ -139,15 +144,8 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -261,15 +259,8 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -467,16 +458,8 @@ func TestManager_FakeInput_Features(t *testing.T) {
 	defer drainErrChan(managerErrCh)
 	defer drainErrChan(subscriptionErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-managerErrCh:
-		t.Fatalf("manager failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	timeout := 30 * time.Second
 	timeoutTimer := time.NewTimer(timeout)
@@ -643,15 +626,8 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -800,15 +776,8 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -826,6 +795,146 @@ LOOP:
 	}
 
 	subCancel()
+	cancel()
+
+	err = <-errCh
+	require.NoError(t, err)
+}
+
+func TestManager_FakeInput_NoDeadlock(t *testing.T) {
+	/*
+		NOTE: This is a long-running test that spams the runtime managers `Update` function to try and
+		trigger a deadlock. This test takes 2 minutes to run trying to re-produce issue:
+
+		https://github.com/elastic/elastic-agent/issues/2691
+	*/
+	testPaths(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ai, _ := info.NewAgentInfo(true)
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	require.NoError(t, err)
+	errCh := make(chan error)
+	go func() {
+		err := m.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
+	defer waitCancel()
+	if err := m.WaitForReady(waitCtx); err != nil {
+		require.NoError(t, err)
+	}
+
+	binaryPath := testBinary(t, "component")
+	comp := component.Component{
+		ID: "fake-default",
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryName: "",
+			BinaryPath: binaryPath,
+			Spec:       fakeInputSpec,
+		},
+		Units: []component.Unit{
+			{
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelError, // test log will get spammed with the constant updates (error to prevent spam)
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy",
+				}),
+			},
+		},
+	}
+
+	updatedCh := make(chan time.Time)
+	updatedErr := make(chan error)
+	updatedCtx, updatedCancel := context.WithCancel(context.Background())
+	defer updatedCancel()
+	go func() {
+		// spam update on component trying to cause a deadlock
+		comp := comp
+		i := 0
+		for {
+			if updatedCtx.Err() != nil {
+				return
+			}
+			updatedComp := comp
+			updatedComp.Units = make([]component.Unit, 1)
+			updatedComp.Units[0] = component.Unit{
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelError, // test log will get spammed with the constant updates (error to prevent spam)
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": fmt.Sprintf("Fake Healthy %d", i),
+				}),
+			}
+			i += 1
+			comp = updatedComp
+			err := m.Update([]component.Component{updatedComp})
+			if err != nil {
+				updatedErr <- err
+				return
+			}
+			updatedCh <- time.Now()
+		}
+	}()
+
+	deadlockErr := make(chan error)
+	go func() {
+		t := time.NewTimer(15 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-updatedCtx.Done():
+				return
+			case <-updatedCh:
+				// update did occur
+				t.Reset(15 * time.Second)
+			case <-t.C:
+				// timeout hit waiting for another update to work
+				deadlockErr <- errors.New("hit deadlock")
+				return
+			}
+		}
+	}()
+
+	defer drainErrChan(errCh)
+	defer drainErrChan(updatedErr)
+	defer drainErrChan(deadlockErr)
+
+	// wait 2 minutes for a deadlock to occur
+	endTimer := time.NewTimer(2 * time.Minute)
+	defer endTimer.Stop()
+LOOP:
+	for {
+		select {
+		case <-endTimer.C:
+			// no deadlock after timeout (all good stop the component)
+			updatedCancel()
+			_ = m.Update([]component.Component{})
+			break LOOP
+		case err := <-errCh:
+			require.NoError(t, err)
+		case err := <-updatedErr:
+			require.NoError(t, err)
+			break LOOP
+		case err := <-deadlockErr:
+			require.NoError(t, err)
+			break LOOP
+		}
+	}
+
+	updatedCancel()
 	cancel()
 
 	err = <-errCh
@@ -927,15 +1036,8 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -1087,15 +1189,8 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -1218,15 +1313,8 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -1360,15 +1448,8 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -1509,15 +1590,8 @@ func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(1 * time.Minute)
 	defer endTimer.Stop()
@@ -1658,15 +1732,8 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(1 * time.Minute)
 	defer endTimer.Stop()
@@ -1779,15 +1846,8 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -1903,15 +1963,8 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -2099,15 +2152,8 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	defer drainErrChan(subErrCh1)
 	defer drainErrChan(subErrCh2)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update(components)
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update(components)
+	require.NoError(t, err)
 
 	count := 0
 	endTimer := time.NewTimer(30 * time.Second)
@@ -2262,15 +2308,8 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update([]component.Component{comp})
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update([]component.Component{comp})
+	require.NoError(t, err)
 
 	endTimer := time.NewTimer(30 * time.Second)
 	defer endTimer.Stop()
@@ -2538,15 +2577,8 @@ func TestManager_FakeShipper(t *testing.T) {
 	defer drainErrChan(errCh)
 	defer drainErrChan(subErrCh)
 
-	startTimer := time.NewTimer(100 * time.Millisecond)
-	defer startTimer.Stop()
-	select {
-	case <-startTimer.C:
-		err = m.Update(comps)
-		require.NoError(t, err)
-	case err := <-errCh:
-		t.Fatalf("failed early: %s", err)
-	}
+	err = m.Update(comps)
+	require.NoError(t, err)
 
 	timeout := 2 * time.Minute
 	endTimer := time.NewTimer(timeout)
@@ -2706,10 +2738,13 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 		}
 	}()
 
+	var stateProgressionWG sync.WaitGroup
+	stateProgressionWG.Add(1)
 	go func() {
 		for step := range stateProgCh {
 			stateProgression = append(stateProgression, step)
 		}
+		stateProgressionWG.Done()
 	}()
 
 	defer drainErrChan(errCh)
@@ -2769,8 +2804,14 @@ LOOP:
 	subCancel()
 	cancel()
 
+<<<<<<< HEAD
 	// check progresstion, require stop fake-0 before start fake-1
 	wasStopped := false
+=======
+	// check progression, require stop fake-0 before start fake-1
+	stateProgressionWG.Wait()
+	comp0Stopped := false
+>>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 	for _, step := range stateProgression {
 		if step.componentID == "fake-0" && step.state.State == client.UnitStateStopped {
 			wasStopped = true
