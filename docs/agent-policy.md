@@ -165,7 +165,7 @@ For each component that writes to a shipper, the shipper will be given an input 
 - `units` (list): a list of all configuration units in the originating component, with each containing:
   * `id` (string): the unit id
   * `config`: the full configuration tree for that unit
-- `server` (string): the address the server should listen on for connections from this component (a named socket on Darwin/Linux, a named pipe on Windows). The value of `server` is the same for all units.
-- `ssl.certificate_authorities` (string list): a list with one entry, which is this shipper's assigned certificate authority. The value of `ssl.certificate_authorities` is the same for all units. Clients connecting to the shipper will present certificates signed by this CA.
+- `server` (string): the address the server should listen on for connections from this component (a named socket on Darwin/Linux, a named pipe on Windows). This value is the same for all units.
+- `ssl.certificate_authorities` (string list): a list with one entry, which is this shipper's assigned certificate authority. This value is the same for all units. Clients connecting to the shipper will present certificates signed by this CA.
 - `ssl.certificate` (string): the certificate this component will present when connecting to the shipper.
 - `ssl.key` (string): the private key for the client component's certificate `ssl.certificate`.
