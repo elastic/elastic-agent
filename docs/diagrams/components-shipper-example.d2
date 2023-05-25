@@ -5,42 +5,42 @@
 #   d2 --watch components-shipper-example.d2 components-shipper-example.svg
  
 filebeat1: {
-  input1 -> output
-  input2 -> output
+  filestream-1 -> output
+  filestream-2 -> output
 }
 
 filebeat2: {
-  input -> output
+  udp-1 -> output
 }
 
 metricbeat: {
-  input1 -> output
-  input2 -> output
+  metrics-1 -> output
+  metrics-2 -> output
 }
 
 endpoint: {
-  input -> output
+  endpoint-1 -> output
 }
 
 shipper1: {
-  input1 -> output
-  input2 -> output
+  filebeat1 -> output
+  metricbeat -> output
 }
 
 shipper2: {
-  input -> output
+  filebeat2 -> output
 }
 
 shipper3: {
-  input -> output
+  endpoint -> output
 }
 
-filebeat1.output -> shipper1.input1
-metricbeat.output -> shipper1.input2
+filebeat1.output -> shipper1.filebeat1
+metricbeat.output -> shipper1.metricbeat
 shipper1.output -> elasticsearch1
 
-filebeat2.output -> shipper2.input
+filebeat2.output -> shipper2.filebeat2
 shipper2.output -> logstash
 
-endpoint.output -> shipper3.input
+endpoint.output -> shipper3.endpoint
 shipper3.output -> elasticsearch2

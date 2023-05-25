@@ -20,7 +20,7 @@ shippers:
     ...
 ```
 
-The `version` key must be present and must equal 2 (to distinguish from the older version 1 schema that is no longer supported). `inputs` is a list of input types this component can run, and `shippers` is a list of shipper types this component can run.
+The `version` key must be present and must equal 2 (to distinguish from the older version 1 schema that is no longer supported). `inputs` is a list of input types this component can run, and `shippers` is a list of shipper types this component can run. Most configuration fields are shared between inputs and shippers,
 
 
 

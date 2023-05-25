@@ -1,21 +1,81 @@
-# Elastic Agent Policy Format
+# Elastic Agent Policies
 
 The policy of an Agent is the user-controlled portion of the Agent configuration that, together with [component spec files](component-specs.md), determines the components that Agent runs and their configuration.
+
+A __component__ is an executable that Agent runs or monitors. That component is divided into __units__ corresponding to its functional behavior. For example, Filebeat is a component, but Filebeat may be run with multiple `filestream` inputs, and each of those is a unit with its own configuration.
+
+Components run by Agent have one or more input units describing the data they collect, and one output unit describing where the data goes.
+
+## Example: policies mapped to running processes
+
+Here is an example policy, and a diagram of the resulting components.
+
+```yml
+version: 2
+outputs:
+  elasticsearch1.type: "elasticsearch"
+  elasticsearch2.type: "elasticsearch"
+  logstash.type: "logstash"
+inputs:
+  - type: filestream
+    id: filestream-1
+    use_output: elasticsearch1
+    ...
+  - type: filestream
+    id: filestream-2
+    use_output: elasticsearch1
+    ...
+  - type: metrics
+    id: metrics-1
+    use_output: elasticsearch1
+    ...
+  - type: metrics
+    id: metrics-2
+    use_output: elasticsearch1
+    ...
+  - type: udp
+    id: udp-1
+    use_output: logstash
+    ...
+  - type: endpoint
+    id: endpoint-1
+    use_output: elasticsearch2
+```
+
+![Example deployment without shipper](diagrams/components-example.svg)
+
+In this example, we have defined three outputs: `elasticsearch1`, `elasticsearch2`, and `logstash`. We have also defined 6 total inputs, four writing to `elasticsearch1` and one each writing to `elasticsearch2` and `logstash`.
+
+Agent has divided these inputs among four running processes according to their type. Each running process is one component. Each component has an output unit that sends its data to the appropriate destination, and some number of input units that provide data to the output.
+
+In this example there are four __components__. The `filebeat1` component has three __units__, two input and one output.
+
+![Example deployment with shipper](diagrams/components-shipper-example.svg)
+
+This example shows the same scenario, but with the shipper enabled. In this setup, there are shipper components whose job is to send the data upstream, and input components that send their data to a local shipper rather than managing their own independent queue and network connections.
+
+A shipper component also has one output unit and one or more input units, but its input units correspond to the components that write to it rather than to individual data sources.
+
+In this example there are _seven_ components, as Agent has created three shippers to manage the connections to each of the three outputs. The `shipper1` component has two input units, since it receives data from both `filebeat1` and `metricbeat` (with two individual data sources each). All this data is queued by the shipper and forwarded upstream to `elasticsearch1`.
+
+## Agent policy format
 
 The policy is specified in YML, and the basic layout is:
 
 ```yml
 outputs:
   outputName1:
-    type: <otype1>
+    type: <output type 1>
     ...
   outputName2:
-    type: <otype2>
+    type: <output type 2>
     ...
 inputs:
-  - type: <itype1>
+  - type: <input type 1>
+    id: <input id 1>
     ...
-  - type: <itype2>
+  - type: <input type 2>
+    id: <input id 2>
     ...
 ```
 
@@ -61,7 +121,7 @@ If the overall policy has a `revision` field (inserted by Fleet to track policy 
 
 If present, this field determines whether the output is active. Defaults to true.
 
-### `type` (string)
+### `type` (string, required)
 
 The output type. If `use_shipper` is `false`, this value must match one of the entries in the `outputs` field for its inputs' spec files. Otherwise, the `shippers` field for its inputs' spec file must include a shipper type that supports this output. See [Component Specs](component-specs.md) for more details.
 
@@ -110,3 +170,7 @@ For each component that writes to a shipper, the shipper will be given an input 
 - `ssl.certificate_authorities` (string list): a list with one entry, which is this shipper's assigned certificate authority. The value of `ssl.certificate_authorities` is the same for all units. Clients connecting to the shipper will present certificates signed by this CA.
 - `ssl.certificate` (string): the certificate this component will present when connecting to the shipper.
 - `ssl.key` (string): the private key for the client component's certificate `ssl.certificate`.
+
+
+# How agent policies map to running processes
+

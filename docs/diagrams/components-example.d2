@@ -5,21 +5,21 @@
 #   d2 --watch components-example.d2 components-example.svg
 
 filebeat1: {
-  input1 -> output
-  input2 -> output
+  filestream-1 -> output
+  filestream-2 -> output
 }
 
 filebeat2: {
-  input -> output
+  udp-1 -> output
 }
 
 metricbeat: {
-  input1 -> output
-  input2 -> output
+  metrics-1 -> output
+  metrics-2 -> output
 }
 
 endpoint: {
-  input -> output
+  endpoint-1 -> output
 }
 
 filebeat1.output -> elasticsearch1
