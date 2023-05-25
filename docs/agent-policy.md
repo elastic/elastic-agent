@@ -46,9 +46,8 @@ inputs:
 
 In this example, we have defined three outputs: `elasticsearch1`, `elasticsearch2`, and `logstash`. We have also defined 6 total inputs, four writing to `elasticsearch1` and one each writing to `elasticsearch2` and `logstash`.
 
-Agent has divided these inputs among four running processes according to their type. Each running process is one component. Each component has an output unit that sends its data to the appropriate destination, and some number of input units that provide data to the output.
+Agent has divided these inputs among four __components__ (running processes) according to their type. Each component is broken up into multiple __units__, an output unit that sends its data to the appropriate destination, and some number of input units that provide data to the output. For example the `filebeat1` component has three, two input and one output.
 
-In this example there are four __components__. The `filebeat1` component has three __units__, two input and one output.
 
 ![Example deployment with shipper](diagrams/components-shipper-example.svg)
 
