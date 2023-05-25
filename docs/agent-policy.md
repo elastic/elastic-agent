@@ -169,7 +169,3 @@ For each component that writes to a shipper, the shipper will be given an input 
 - `ssl.certificate_authorities` (string list): a list with one entry, which is this shipper's assigned certificate authority. The value of `ssl.certificate_authorities` is the same for all units. Clients connecting to the shipper will present certificates signed by this CA.
 - `ssl.certificate` (string): the certificate this component will present when connecting to the shipper.
 - `ssl.key` (string): the private key for the client component's certificate `ssl.certificate`.
-
-
-# How agent policies map to running processes
-
