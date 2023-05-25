@@ -2,8 +2,6 @@
 
 Spec files are YML files that describe the capabilities of a component and when / how to run it. They are used by Agent to convert a user-provided [policy](agent-policy.md) into a configured running process.
 
-A __component__ is an executable that Agent runs or monitors. That component is divided into __units__ corresponding to its functional behavior. For example, Filebeat is a component, but Filebeat may be run with multiple `filestream` inputs, and each of those is a unit with its own configuration. Components run by Agent have one or more input units and one output unit.
-
 ## Spec file layout
 
 A spec file corresponds to a specific executable, which must be in the same directory and have the same name -- for example `filebeat.spec.yml` would correspond to the executable `filebeat`, or `filebeat.exe` on Windows. The configuration is broken into sections:
@@ -20,18 +18,48 @@ shippers:
     ...
 ```
 
-The `version` key must be present and must equal 2 (to distinguish from the older version 1 schema that is no longer supported). `inputs` is a list of input types this component can run, and `shippers` is a list of shipper types this component can run. Most configuration fields are shared between inputs and shippers,
+The `version` key must be present and must equal 2 (to distinguish from the older version 1 schema that is no longer supported).
 
+`inputs` is a list of input types this component can run, and `shippers` is a list of shipper types this component can run.
 
+Most configuration fields are shared between inputs and shippers. The next section lists all valid fields, noting where there are differences between the two cases.
 
+## Input / Shipper configuration fields
 
-[This documentation should be expanded](https://github.com/elastic/elastic-agent/issues/2690)
+### `name` (string, required)
 
+The name of this input or shipper. This name must be unique for each platform, however two inputs or shippers that support different platforms can have the same name. This allows the configuration to vary between platforms.
 
+### `aliases` (list of strings, input only)
 
-## Preventions
+Inputs may specify a list of alternate names that policies can use to refer to them. Any occurrence of these aliases in a policy configuration will be replaced with the value of `name`.
 
-Components may include a `runtime.preventions` section containing [EQL conditions](https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html#eql-syntax-conditions) which should prevent the use of that component if any are true. Each prevention should include a `condition` in EQL syntax and a `message` that will be displayed if the condition prevents the use of a component.
+### `description` (string, required)
+
+A short description of this input or shipper.
+
+### `platforms` (list of strings, required)
+
+The platforms this input or shipper supports. Must contain one or more of the following:
+- `container/amd64`
+- `container/arm64`
+- `darwin/amd64`
+- `darwin/arm64`
+- `linux/amd64`
+- `linux/arm64`
+- `windows/amd64`
+
+### `outputs` (list of strings)
+
+The output types this input or shipper supports. If this is an input, then inputs of this type can only target (non-shipper) output types in this list. If this is a shipper, then this shipper can only implement output types in this list.
+
+### `shippers` (list of strings, input only)
+
+The shipper types this input supports. Inputs of this type can target any output type supported by the shippers in this list, as long as the output policy includes `use_shipper: true`. If an input supports more than one shipper implementing the same output type, then Agent will prefer the one that appears first in this list.
+
+### `runtime.preventions`
+
+The `runtime.preventions` field contains a list of [EQL conditions](https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html#eql-syntax-conditions) which should prevent the use of this input or shipper if any are true. Each prevention should include a `condition` in EQL syntax and a `message` that will be displayed if the condition prevents the use of a component.
 
 Here are some example preventions taken from the Endpoint spec file:
 
@@ -52,3 +80,91 @@ The variables that can be accessed by a condition are:
 - `runtime.family`: OS family, e.g. `"debian"`, `"redhat"`, `"windows"`, `"darwin"`
 - `runtime.major`, `runtime.minor`: the operating system version. Note that these are strings not integers, so they must be converted in order to use numeric comparison. For example to check if the OS major version is at most 12, use `number(runtime.major) <= 12`.
 - `user.root`: true if Agent is being run with root / administrator permissions.
+
+### `command` (required for shipper)
+
+The `command` field determines how the component will be run. Shippers must include this field, while inputs must include either `command` or `service`. `command` consists of the following subfields:
+
+#### `command.args` (list of strings)
+
+the command-line arguments to pass to this component when running it.
+
+#### `command.env`
+
+A list of environment variables to set when running this component. Each entry of the list consists of `name` and `value` pairs, for example:
+
+```yml
+command:
+  ...
+  env:
+    - name: DEBUG
+      value: "true"
+    - name: ELASTICSEARCH_HOST
+      value: "https://127.0.0.1:9200"
+```
+
+#### `command.timeouts`
+
+The timeout duration for various actions performed on this component:
+
+- `checkin`: Agent checkins
+- `restart`: Restarting the component
+- `stop`: Stopping the component
+
+For example:
+
+```yml
+command:
+  ...
+  timeouts:
+    checkin: 10s
+    restart: 30s
+```
+
+#### `command.log`
+
+#### `restart_monitoring_period`
+
+#### `maximum_restarts_per_period`
+
+### `service` (input only)
+
+Inputs that are run as a system service (like Endpoint Security) can use `service` instead of `command` to indicate that Agent should only monitor them, not manage their execution. `service` consists of the following subfields: 
+
+#### `service.cport` (int, required)
+
+#### `service.log.path` (string)
+
+#### `service.operations`  (required)
+
+`operations` gives instructions for performing three operations: `check`, `install`, and `uninstall`. Each of these operations has its own subconfiguration with the following fields:
+
+- `args` (identical to `command.args`): the command-line arguments to pass for this operation
+- `env` (identical to `command.env`): the environment variables to set for this operation
+- `timeout`: the timeout duration for this operation.
+
+For example:
+
+```yml
+operations:
+  check:
+    args:
+      - "verify"
+      - "--verbose"
+    timeout: 30
+  install:
+    args:
+      - "install"
+    env:
+      - name: DEBUG
+        value: "true"
+    timeout: 600
+  uninstall:
+    args:
+      - "uninstall"
+    timeout: 600
+```
+
+#### `service.timeouts.checkin`
+
+The timeout duration for checkins with this component
