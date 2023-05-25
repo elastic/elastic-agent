@@ -6,6 +6,7 @@ package mage
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -69,6 +70,7 @@ func BuildGoDaemon() error {
 // CrossBuildGoDaemon cross-build the go-daemon binary using the
 // golang-crossbuild environment.
 func CrossBuildGoDaemon(options ...CrossBuildOption) error {
+	fmt.Println("--- CrossBuildGoDaemon Elastic-Agent")
 	opts := append(defaultCrossBuildGoDaemon, options...)
 	return CrossBuild(opts...)
 }

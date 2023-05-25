@@ -1,5 +1,54 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  DOCKER_REGISTRY: "docker.elastic.co"
+  SETUP_GVM_VERSION: 'v0.5.0' # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
+  SETUP_MAGE_VERSION: '1.14.0'
+  # this is required in order to allow the build process to override the default PWD of the BEAT_NAME.
+  BEAT_NAME: "elastic-agent"
+  # after moving elastic-agent out of beats, we should update the URL of the packaging.
+  BEAT_URL: "https://www.elastic.co/elastic-agent"
 
 steps:
-  - label: "Example test"
-    command: echo "Hello!"
+  - input: "Build parameters"
+    if: build.env("ManifestURL") == null
+    fields:
+      - text: "ManifestURL"
+        key: "ManifestURL"
+        default: ""
+        required: true
+        hint: "Link to the build manifest URL."
+      - select: "DEV"
+        key: "DEV"
+        required: "true"
+        options:
+          - label: "True"
+            value: "true"
+          - label: "False"
+            value: "false"
+        hint: "If DEV=true should be set or the packaging is done with DEV=false"
+      - select: "Mage verbose"
+        key: "MAGEFILE_VERBOSE"
+        required: "false"
+        options:
+          - label: "True"
+            value: "1"
+          - label: "False"
+            value: "0"
+        hint: "Increase verbosity of the mage commands, defaults to 0"
+
+  - wait: ~
+    if: build.env("ManifestURL") == null
+
+  - label: "Package elastic-agent"
+    key: package_elastic-agent
+    agents:
+      provider: "gcp"
+      machineType: "c2-standard-16"
+    command: |
+      export DEV=$(buildkite-agent meta-data get DEV --default "true")
+      export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
+      export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+
+      .buildkite/scripts/package.sh
+    artifact_paths:
+      - "build/distributions/**"

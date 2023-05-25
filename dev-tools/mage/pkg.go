@@ -20,6 +20,7 @@ import (
 // Package packages the Beat for distribution. It generates packages based on
 // the set of target platforms and registered packaging specifications.
 func Package() error {
+	fmt.Println("--- Package artifact")
 	if len(Platforms) == 0 {
 		fmt.Println(">> package: Skipping because the platform list is empty")
 		return nil
@@ -194,6 +195,7 @@ func WithRootUserContainer() func(params *testPackagesParams) {
 // TestPackages executes the package tests on the produced binaries. These tests
 // inspect things like file ownership and mode.
 func TestPackages(options ...TestPackagesOption) error {
+	fmt.Println("--- TestPackages")
 	params := testPackagesParams{}
 	for _, opt := range options {
 		opt(&params)

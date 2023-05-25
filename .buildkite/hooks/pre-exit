@@ -1,19 +1,27 @@
+#!/bin/bash
+
 set -eo pipefail
 
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
   if test -f "$GOOGLE_APPLICATION_CREDENTIALS"; then
     rm $GOOGLE_APPLICATION_CREDENTIALS
-  fi  
+  fi
 fi
 
 if [ -n "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE" ]; then
   if test -f "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE"; then
     rm $TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE
-  fi  
+  fi
 fi
 
 unset GOOGLE_APPLICATION_GCP_SECRET API_KEY_TOKEN
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
   docker logout $DOCKER_REGISTRY
+fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
+    docker logout ${DOCKER_REGISTRY}
+  fi
 fi
