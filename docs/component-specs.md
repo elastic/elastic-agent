@@ -123,9 +123,17 @@ command:
 
 #### `command.log`
 
-#### `restart_monitoring_period`
+Agent expects commands it runs to write their logs to standard output as lines of JSON. Each log event has certain standard data like log level and timestamp, however the keys for these values may vary between different programs. `command.log` specifies the meaning of JSON log events. It has the following subfields:
 
-#### `maximum_restarts_per_period`
+- `level_key`: the JSON key for the event's log level
+- `time_key`: the JSON key for the event's timestamp
+- `time_format`: The format used for log timestamps. This field uses the definitions from [Golang's time formatting support](https://pkg.go.dev/time#Time.Format), which consists of providing an example string in the target format. Example values: `Mon, 02 Jan 2006 15:04:05 -0700`, `Mon Jan _2 15:04:05 MST 2006`.
+- `message_key`: the JSON key for the log message
+- `ignore_keys`: a list of JSON keys that should be skipped when reading log events from this command
+
+#### `restart_monitoring_period` (duration), `maximum_restarts_per_period` (integer)
+
+When a process fails, Agent will restart it. These parameters provide a rate limit, so Agent will not try to start the same component too many times in a short duration. If Agent restarts a process `maximum_restarts_per_period` times within `restart_monitoring_period`, then it will not try again until the monitoring period elapses.
 
 ### `service` (input only)
 
@@ -133,7 +141,11 @@ Inputs that are run as a system service (like Endpoint Security) can use `servic
 
 #### `service.cport` (int, required)
 
+The TCP port on localhost where the service listens for connections from Agent.
+
 #### `service.log.path` (string)
+
+The path to this service's logs directory.
 
 #### `service.operations`  (required)
 
