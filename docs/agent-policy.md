@@ -54,11 +54,6 @@ The log level for this component. This field is not passed on to the underlying 
 
 If the overall policy has a `revision` field (inserted by Fleet to track policy changes), its value is copied into the input's `policy.revision` field. This allows individual inputs (like Endpoint) to detect policy changes more easily.
 
-### shipper-specific fields
-
-The _input_ units of a shipper component have the following fields injected into their configuration:
-
-
 
 ## Output fields
 
@@ -66,14 +61,52 @@ The _input_ units of a shipper component have the following fields injected into
 
 If present, this field determines whether the output is active. Defaults to true.
 
-### `use_shipper` (boolean, removed)
-
-If present, this field determines whether this output should be implemented by a Shipper component. 
-
 ### `type` (string)
 
-The output type. If  This value must match one of the entries in the `outputs` field for its inputs
+The output type. If `use_shipper` is `false`, this value must match one of the entries in the `outputs` field for its inputs' spec files. Otherwise, the `shippers` field for its inputs' spec file must include a shipper type that supports this output. See [Component Specs](component-specs.md) for more details.
 
-### shipper-specific fields
+### `use_shipper` (boolean, removed)
 
-The _output_ unit of a component that writes to a shipper has the following fields injected into its configuration:
+If present, this field determines whether this output should be implemented by a Shipper component. Defaults to false.
+
+### `log_level` (string, removed)
+
+The log level for this component. This field is not passed on to the underlying component; instead, Agent implements log level filtering itself. Possible values:
+- `error`
+- `warn` / `warning`
+- `info`
+- `debug`
+- `trace`
+
+### `headers` (`map[string]string`)
+
+Agent does not use this field itself, however if the output's `type` is `elasticsearch` then Agent will insert any headers it acquired during Fleet enrollment into this field.
+
+
+## Shipper-specific fields
+
+When components use the shipper, it results in units that don't correspond directly to a configuration entry in the policy. A component that writes to the shipper will be given an output unit that targets the shipper, and a shipper component will be given input units detailing the components that will connect to it.
+
+### Shipper output fields
+
+The output unit of a component that writes to a shipper is given the following configuration:
+
+- `type` (string): the shipper type
+- `server` (string): the connection address of the shipper (a named socket on Darwin/Linux, a named pipe on Windows)
+- `ssl.certificate_authorities` (string list): a list consisting of one element, which is the certificate authority the shipper will use to verify clients that connect to it. Each shipper instance is assigned its own unique certificate authority on startup.
+- `ssl.certificate` (string): the certificate to present when connecting to the shipper, signed by the CA in `ssl.certificate_authorities`.
+- `ssl.key` (string): the key for `ssl.certificate`
+
+### Shipper input fields
+
+For each component that writes to a shipper, the shipper will be given an input unit with the following configuration:
+
+- `id` (string): the id of the input unit, which is also the id of the originating component.
+- `type` (string): the shipper type.
+- `units` (list): a list of all configuration units in the originating component, with each containing:
+  * `id` (string): the unit id
+  * `config`: the full configuration tree for that unit
+- `server` (string): the address the server should listen on for connections from this component (a named socket on Darwin/Linux, a named pipe on Windows). The value of `server` is the same for all units.
+- `ssl.certificate_authorities` (string list): a list with one entry, which is this shipper's assigned certificate authority. The value of `ssl.certificate_authorities` is the same for all units. Clients connecting to the shipper will present certificates signed by this CA.
+- `ssl.certificate` (string): the certificate this component will present when connecting to the shipper.
+- `ssl.key` (string): the private key for the client component's certificate `ssl.certificate`.

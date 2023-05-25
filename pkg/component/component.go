@@ -291,16 +291,16 @@ func (r *RuntimeSpecs) componentForShipper(
 	shipperCompID := fmt.Sprintf("%s-%s", shipperType, output.name)
 
 	var shipperUnits []Unit
-	for _, component := range inputComponents {
-		if component.Err != nil {
+	for _, input := range inputComponents {
+		if input.Err != nil {
 			continue
 		}
-		if component.ShipperRef == nil || component.ShipperRef.ShipperType != shipperType {
+		if input.ShipperRef == nil || input.ShipperRef.ShipperType != shipperType {
 			continue
 		}
-		cfg, cfgErr := componentToShipperConfig(shipperType, component)
+		cfg, cfgErr := componentToShipperConfig(shipperType, input)
 		shipperUnit := Unit{
-			ID:       component.ID,
+			ID:       input.ID,
 			Type:     client.UnitTypeInput,
 			LogLevel: output.logLevel,
 			Config:   cfg,
@@ -376,34 +376,6 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	return components, componentIdsInputMap, nil
 }
 
-// Injects or creates a policy.revision sub-object in the input map.
-func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[string]interface{}) {
-	if inputConfig == nil {
-		return
-	}
-
-	// If there is no top level fleet policy revision, there's nothing to inject.
-	revision, exists := fleetPolicy["revision"]
-	if !exists {
-		return
-	}
-
-	// Check if a policy key exists with a non-nil policy object.
-	if policyObj := inputConfig["policy"]; policyObj != nil {
-		// If the policy object converts to map[string]interface{}, inject the revision key.
-		// Note that if the interface conversion here fails, we do nothing because we don't
-		// know what type of object exists with the policy key.
-		if policyMap, ok := policyObj.(map[string]interface{}); ok {
-			policyMap["revision"] = revision
-		}
-	} else {
-		// If there was no policy key or the value was nil, then inject a policy object with a revision key.
-		inputConfig["policy"] = map[string]interface{}{
-			"revision": revision,
-		}
-	}
-}
-
 func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitExpectedConfig, error) {
 	cfgUnits := make([]interface{}, 0, len(comp.Units))
 	for _, unit := range comp.Units {
@@ -449,6 +421,34 @@ func (r *RuntimeSpecs) getSupportedShipperType(
 		return shipper.ShipperType, nil
 	}
 	return "", ErrOutputNotSupported
+}
+
+// Injects or creates a policy.revision sub-object in the input map.
+func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[string]interface{}) {
+	if inputConfig == nil {
+		return
+	}
+
+	// If there is no top level fleet policy revision, there's nothing to inject.
+	revision, exists := fleetPolicy["revision"]
+	if !exists {
+		return
+	}
+
+	// Check if a policy key exists with a non-nil policy object.
+	if policyObj := inputConfig["policy"]; policyObj != nil {
+		// If the policy object converts to map[string]interface{}, inject the revision key.
+		// Note that if the interface conversion here fails, we do nothing because we don't
+		// know what type of object exists with the policy key.
+		if policyMap, ok := policyObj.(map[string]interface{}); ok {
+			policyMap["revision"] = revision
+		}
+	} else {
+		// If there was no policy key or the value was nil, then inject a policy object with a revision key.
+		inputConfig["policy"] = map[string]interface{}{
+			"revision": revision,
+		}
+	}
 }
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
