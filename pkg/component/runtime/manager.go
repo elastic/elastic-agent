@@ -88,16 +88,23 @@ type Manager struct {
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
+	// netMx synchronizes the access to listener and server only
 	netMx    sync.RWMutex
 	listener net.Listener
 	server   *grpc.Server
 
+	// waitMx synchronizes the access to waitReady only
 	waitMx    sync.RWMutex
 	waitReady map[string]waitForReady
 
-	updateMx     sync.Mutex
-	currentMx    sync.RWMutex
-	current      map[string]*componentRuntimeState
+	// updateMx protects the call to update to ensure that
+	// only one call to update occurs at a time
+	updateMx sync.Mutex
+
+	// currentMx protects access to the current map only
+	currentMx sync.RWMutex
+	current   map[string]*componentRuntimeState
+
 	shipperConns map[string]*shipperConn
 
 	subMx         sync.RWMutex
