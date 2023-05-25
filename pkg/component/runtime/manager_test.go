@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2798,10 +2799,13 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 		}
 	}()
 
+	var stateProgressionWG sync.WaitGroup
+	stateProgressionWG.Add(1)
 	go func() {
 		for step := range stateProgressionCh {
 			stateProgression = append(stateProgression, step)
 		}
+		stateProgressionWG.Done()
 	}()
 
 	// Wait manager start running, then check if any error happened
@@ -2863,6 +2867,7 @@ LOOP:
 	cancel()
 
 	// check progression, require stop fake-0 before start fake-1
+	stateProgressionWG.Wait()
 	comp0Stopped := false
 	for _, step := range stateProgression {
 		if step.componentID == IDComp0 &&

@@ -332,7 +332,7 @@ func (m *Manager) State() []ComponentComponentState {
 			}
 		}
 		states = append(states, ComponentComponentState{
-			Component: crs.currComp,
+			Component: crs.getCurrent(),
 			State:     crs.latestState.Copy(),
 			LegacyPID: legacyPID,
 		})
@@ -414,7 +414,7 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 				})
 			} else {
 				results = append(results, ComponentUnitDiagnostic{
-					Component: r.currComp,
+					Component: r.getCurrent(),
 					Unit:      q.Unit,
 				})
 			}
@@ -422,22 +422,23 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 	} else {
 		m.currentMx.RLock()
 		for _, r := range m.current {
-			for _, u := range r.currComp.Units {
+			currComp := r.getCurrent()
+			for _, u := range currComp.Units {
 				var err error
-				if r.currComp.Err != nil {
-					err = r.currComp.Err
+				if currComp.Err != nil {
+					err = currComp.Err
 				} else if u.Err != nil {
 					err = u.Err
 				}
 				if err != nil {
 					results = append(results, ComponentUnitDiagnostic{
-						Component: r.currComp,
+						Component: currComp,
 						Unit:      u,
 						Err:       err,
 					})
 				} else {
 					results = append(results, ComponentUnitDiagnostic{
-						Component: r.currComp,
+						Component: currComp,
 						Unit:      u,
 					})
 				}
@@ -525,7 +526,7 @@ func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
 	latest := make([]ComponentComponentState, 0, len(m.current))
 	for _, comp := range m.current {
 		comp.latestMx.RLock()
-		latest = append(latest, ComponentComponentState{Component: comp.currComp, State: comp.latestState.Copy()})
+		latest = append(latest, ComponentComponentState{Component: comp.getCurrent(), State: comp.latestState.Copy()})
 		comp.latestMx.RUnlock()
 	}
 	m.currentMx.RUnlock()
@@ -681,7 +682,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		m.currentMx.RUnlock()
 		if ok {
 			// existing component; send runtime updated value
-			existing.currComp = comp
+			existing.setCurrent(comp)
 			if err := existing.runtime.Update(comp); err != nil {
 				return fmt.Errorf("failed to update component %s: %w", comp.ID, err)
 			}
@@ -740,25 +741,32 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 	if comp == nil {
 		return
 	}
-	compID := comp.currComp.ID
+	currComp := comp.getCurrent()
+	compID := currComp.ID
 	timeout := defaultStopTimeout
-	if comp.currComp.InputSpec != nil &&
-		comp.currComp.InputSpec.Spec.Service != nil &&
-		comp.currComp.InputSpec.Spec.Service.Operations.Uninstall != nil &&
-		comp.currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout > 0 {
+	if currComp.InputSpec != nil &&
+		currComp.InputSpec.Spec.Service != nil &&
+		currComp.InputSpec.Spec.Service.Operations.Uninstall != nil &&
+		currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout > 0 {
 		// if component is a service and timeout is defined, use the one defined
-		timeout = comp.currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout
+		timeout = currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout
 	}
 
 	timeoutCh := time.After(timeout)
 	for {
-		if comp.latestState.State == client.UnitStateStopped {
+		comp.latestMx.RLock()
+		latestState := comp.latestState
+		comp.latestMx.RUnlock()
+		if latestState.State == client.UnitStateStopped {
 			return
 		}
 
+		m.currentMx.RLock()
 		if _, exists := m.current[compID]; !exists {
+			m.currentMx.RUnlock()
 			return
 		}
+		m.currentMx.RUnlock()
 
 		select {
 		case <-timeoutCh:
@@ -793,7 +801,7 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 		select {
 		case <-sub.ctx.Done():
 		case sub.ch <- ComponentComponentState{
-			Component: state.currComp,
+			Component: state.getCurrent(),
 			State:     latest,
 		}:
 		}
@@ -801,7 +809,7 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 	m.subAllMx.RUnlock()
 
 	m.subMx.RLock()
-	subs, ok := m.subscriptions[state.currComp.ID]
+	subs, ok := m.subscriptions[state.id]
 	if ok {
 		for _, sub := range subs {
 			select {
@@ -816,7 +824,7 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 	if shutdown && latest.State == client.UnitStateStopped {
 		// shutdown is complete; remove from currComp
 		m.currentMx.Lock()
-		delete(m.current, state.currComp.ID)
+		delete(m.current, state.id)
 		m.currentMx.Unlock()
 
 		exit = true
@@ -870,8 +878,9 @@ func (m *Manager) getRuntimeFromUnit(comp component.Component, unit component.Un
 	m.currentMx.RLock()
 	defer m.currentMx.RUnlock()
 	for _, c := range m.current {
-		if c.currComp.ID == comp.ID {
-			for _, u := range c.currComp.Units {
+		if c.id == comp.ID {
+			currComp := c.getCurrent()
+			for _, u := range currComp.Units {
 				if u.Type == unit.Type && u.ID == unit.ID {
 					return c
 				}
