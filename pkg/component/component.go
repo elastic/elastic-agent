@@ -252,6 +252,7 @@ func (r *RuntimeSpecs) componentForInputType(
 
 func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags) []Component {
 	var components []Component
+	shipperTypes := make(map[string]bool)
 	for inputType := range output.inputs {
 		// No need for error checking at this stage -- we are guaranteed
 		// to get a Component back. If there is an error that prevents it
@@ -260,76 +261,71 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 		// with no units.
 		component := r.componentForInputType(inputType, output, featureFlags)
 		if len(component.Units) > 0 {
+			if component.ShipperRef != nil {
+				shipperTypes[component.ShipperRef.ShipperType] = true
+			}
 			components = append(components, component)
 		}
 	}
 
-	shipperMap := make(map[string][]string)
-	for _, component := range components {
-		if component.ShipperRef != nil {
-			shipperType := component.ShipperRef.ShipperType
-			shipperMap[shipperType] = append(shipperMap[shipperType], component.ID)
-		}
-	}
-
-	// create the shipper components and units
-	for shipperType, componentIDs := range shipperMap {
-		shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
-		shipperCompID := fmt.Sprintf("%s-%s", shipperType, output.name)
-
-		var shipperUnits []Unit
-		for _, componentID := range componentIDs {
-			for i, component := range components {
-				if component.ID == componentID && component.Err == nil {
-					cfg, cfgErr := componentToShipperConfig(shipperType, component)
-					shipperUnit := Unit{
-						ID:       componentID,
-						Type:     client.UnitTypeInput,
-						LogLevel: output.logLevel,
-						Config:   cfg,
-						Err:      cfgErr,
-					}
-					shipperUnits = append(shipperUnits, shipperUnit)
-					/*component.Shipper = &ShipperReference{
-						ComponentID: shipperCompID,
-						UnitID:      shipperUnit.ID,
-					}*/
-					/*cfg, cfgErr = ExpectedConfig(map[string]interface{}{
-						"type": shipperType,
-					})
-					component.Units = append(component.Units, Unit{
-						ID:       componentID,
-						Type:     client.UnitTypeOutput,
-						LogLevel: output.logLevel,
-						Config:   cfg,
-						Err:      cfgErr,
-					})*/
-					component.Features = featureFlags.AsProto()
-
-					components[i] = component
-					break
-				}
-			}
-		}
-
-		if len(shipperUnits) > 0 {
-			cfg, cfgErr := ExpectedConfig(output.config)
-			shipperUnits = append(shipperUnits, Unit{
-				ID:       shipperCompID,
-				Type:     client.UnitTypeOutput,
-				LogLevel: output.logLevel,
-				Config:   cfg,
-				Err:      cfgErr,
-			})
-			components = append(components, Component{
-				ID:          shipperCompID,
-				ShipperSpec: &shipperSpec,
-				Units:       shipperUnits,
-				Features:    featureFlags.AsProto(),
-			})
+	// create the shipper components to go with the inputs
+	for shipperType := range shipperTypes {
+		shipperComponent, ok :=
+			r.componentForShipper(shipperType, output, components, featureFlags)
+		if ok {
+			components = append(components, shipperComponent)
 		}
 	}
 	return components
+}
+
+func (r *RuntimeSpecs) componentForShipper(
+	shipperType string,
+	output outputI,
+	inputComponents []Component,
+	featureFlags *features.Flags,
+) (Component, bool) {
+
+	shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
+	shipperCompID := fmt.Sprintf("%s-%s", shipperType, output.name)
+
+	var shipperUnits []Unit
+	for _, component := range inputComponents {
+		if component.Err != nil {
+			continue
+		}
+		if component.ShipperRef == nil || component.ShipperRef.ShipperType != shipperType {
+			continue
+		}
+		cfg, cfgErr := componentToShipperConfig(shipperType, component)
+		shipperUnit := Unit{
+			ID:       component.ID,
+			Type:     client.UnitTypeInput,
+			LogLevel: output.logLevel,
+			Config:   cfg,
+			Err:      cfgErr,
+		}
+		shipperUnits = append(shipperUnits, shipperUnit)
+
+	}
+
+	if len(shipperUnits) > 0 {
+		cfg, cfgErr := ExpectedConfig(output.config)
+		shipperUnits = append(shipperUnits, Unit{
+			ID:       shipperCompID,
+			Type:     client.UnitTypeOutput,
+			LogLevel: output.logLevel,
+			Config:   cfg,
+			Err:      cfgErr,
+		})
+		return Component{
+			ID:          shipperCompID,
+			ShipperSpec: &shipperSpec,
+			Units:       shipperUnits,
+			Features:    featureFlags.AsProto(),
+		}, true
+	}
+	return Component{}, false
 }
 
 // PolicyToComponents takes the policy and generated a component model along with providing
