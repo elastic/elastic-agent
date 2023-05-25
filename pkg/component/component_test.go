@@ -1818,10 +1818,10 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
 						assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
 						assert.Equal(t, expected.InputSpec.BinaryPath, actual.InputSpec.BinaryPath)
-						for i, eu := range expected.Units {
-							assert.EqualValues(t, eu.Config, actual.Units[i].Config)
-						}
 						assert.EqualValues(t, expected.Units, actual.Units)
+						/*for i, eu := range expected.Units {
+							assert.EqualValues(t, eu.Config, actual.Units[i].Config)
+						}*/
 						if expected.ShipperRef != nil {
 							assert.Equal(t, *expected.ShipperRef, *actual.ShipperRef)
 						} else {
