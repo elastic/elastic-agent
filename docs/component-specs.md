@@ -1,8 +1,33 @@
 # Spec files for agent-managed components
 
-Spec files are YML files that describe the capabilities of a component and when / how to run it. They are used by Agent to convert a user-provided policy into a configured running process.
+Spec files are YML files that describe the capabilities of a component and when / how to run it. They are used by Agent to convert a user-provided [policy](agent-policy.md) into a configured running process.
+
+A __component__ is an executable that Agent runs or monitors. That component is divided into __units__ corresponding to its functional behavior. For example, Filebeat is a component, but Filebeat may be run with multiple `filestream` inputs, and each of those is a unit with its own configuration. Components run by Agent have one or more input units and one output unit.
+
+## Spec file layout
+
+A spec file corresponds to a specific executable, which must be in the same directory and have the same name -- for example `filebeat.spec.yml` would correspond to the executable `filebeat`, or `filebeat.exe` on Windows. The configuration is broken into sections:
+
+```yml
+version: 2
+inputs:
+  - name: <input name 1>
+    ...
+  - name: <input name 2>
+    ...
+shippers:
+  - name: <shipper name 1>
+    ...
+```
+
+The `version` key must be present and must equal 2 (to distinguish from the older version 1 schema that is no longer supported). `inputs` is a list of input types this component can run, and `shippers` is a list of shipper types this component can run.
+
+
+
 
 [This documentation should be expanded](https://github.com/elastic/elastic-agent/issues/2690)
+
+
 
 ## Preventions
 
