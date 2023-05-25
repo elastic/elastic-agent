@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -51,17 +52,19 @@ import (
 )
 
 const (
-	agentName = "elastic-agent"
+	agentName            = "elastic-agent"
+	fleetInitTimeoutName = "FLEET_SERVER_INIT_TIMEOUT"
 )
 
 type cfgOverrider func(cfg *configuration.Configuration)
 
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Start the elastic-agent.",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
+			if err := run(nil, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 
 				return err
@@ -69,9 +72,12 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
+	return cmd
 }
 
-func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
+func run(override cfgOverrider, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -207,7 +213,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}

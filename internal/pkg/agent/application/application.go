@@ -6,6 +6,7 @@ package application
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -36,6 +37,7 @@ func New(
 	agentInfo *info.AgentInfo,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
+	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, composable.Controller, error) {
@@ -125,7 +127,7 @@ func New(
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
 				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo))
 
-			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
+			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime, fleetInitTimeout)
 			if err != nil {
 				return nil, nil, err
 			}

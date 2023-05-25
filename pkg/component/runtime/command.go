@@ -19,6 +19,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -140,13 +141,16 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				}
 			}
 		case newComp := <-c.compCh:
+			logp.L().Infof("in CommandRuntime.Run, got c.compCh event")
 			c.current = newComp
 			c.syncLogLevels()
 
 			sendExpected := c.state.syncExpected(&newComp)
 			changed := c.state.syncUnits(&newComp)
 			if sendExpected || c.state.unsettled() {
+				logp.L().Infof("in CommandRuntime.Run, about to send comm.CheckinExpected")
 				comm.CheckinExpected(c.state.toCheckinExpected(), nil)
+				logp.L().Infof("in CommandRuntime.Run, sent comm.CheckinExpected")
 			}
 
 			if changed {
