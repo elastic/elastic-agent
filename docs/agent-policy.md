@@ -8,7 +8,7 @@ Components run by Agent have one or more input units describing the data they co
 
 ## Example: policies mapped to running processes
 
-Here is an example policy, and a diagram of the resulting components.
+Here is an example policy, and a diagram of the resulting components. (This is a simplified example, for details on the meaning of various fields see the next section.)
 
 ```yml
 version: 2
