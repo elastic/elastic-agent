@@ -150,9 +150,6 @@ func (r *RuntimeSpecs) ToComponents(
 
 func unitForInput(input inputI, id string) Unit {
 	cfg, cfgErr := ExpectedConfig(input.config)
-	if cfg.GetType() == "" {
-		fmt.Printf("FAE WAS HERE\n")
-	}
 	return Unit{
 		ID:       id,
 		Type:     client.UnitTypeInput,
@@ -177,9 +174,6 @@ func unitForShipperOutput(output outputI, id string, shipperType string) Unit {
 	cfg, cfgErr := ExpectedConfig(map[string]interface{}{
 		"type": shipperType,
 	})
-	if cfg.GetType() == "" {
-		fmt.Printf("FAE WAS HERE\n")
-	}
 	return Unit{
 		ID:       id,
 		Type:     client.UnitTypeOutput,
@@ -200,10 +194,6 @@ func (r *RuntimeSpecs) componentForInputType(
 	componentID := fmt.Sprintf("%s-%s", inputType, output.name)
 
 	inputSpec, componentErr := r.GetInput(inputType)
-	if componentErr != nil {
-		fmt.Printf("FAE WAS HERE getting input spec for type %v: %v\n", inputType, componentErr.Error())
-
-	}
 	var shipperType string
 	var shipperRef *ShipperReference
 	if componentErr == nil {
@@ -245,8 +235,6 @@ func (r *RuntimeSpecs) componentForInputType(
 			if componentErr == nil {
 				units = append(units,
 					unitForShipperOutput(output, componentID, shipperType))
-			} else {
-				fmt.Printf("FAE WAS HERE componentErr = %v\n", componentErr)
 			}
 		} else {
 			units = append(units, unitForOutput(output, componentID))
@@ -444,34 +432,20 @@ func (r *RuntimeSpecs) getSupportedShipperType(
 	inputSpec InputRuntimeSpec,
 	outputType string,
 ) (string, error) {
-	debug := inputSpec.InputType == "apm" && outputType == "elasticsearch"
 	shippersForOutput := r.shipperOutputs[outputType]
-	if debug {
-		fmt.Printf("shippers for output type elasticsearch: %v\n", shippersForOutput)
-		fmt.Printf("shippers for input type %v: %v\n", inputSpec.InputType, inputSpec.Spec.Shippers)
-	}
 	// Traverse in the order given by the input spec. This lets inputs specify
 	// a preferred order if there is more than one option.
 	for _, name := range inputSpec.Spec.Shippers {
-		if debug {
-			fmt.Printf("checking shipper '%v'\n", name)
-		}
 		if !containsStr(shippersForOutput, name) {
 			continue
 		}
 		shipper, ok := r.shipperSpecs[name]
 		if !ok {
-			if debug {
-				fmt.Printf("couldn't get shipper specs for %v\n", name)
-			}
 			continue
 		}
 		// make sure the runtime checks for this shipper pass
 		err := validateRuntimeChecks(&shipper.Spec.Runtime, r.platform)
 		if err != nil {
-			if debug {
-				fmt.Printf("runtime checks failed: %v\n", err)
-			}
 			continue
 		}
 

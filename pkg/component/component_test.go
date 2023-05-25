@@ -1503,14 +1503,6 @@ func TestToComponents(t *testing.T) {
 					},
 					Units: []Unit{
 						{
-							ID:       "apm-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
 							ID:       "apm-default-apm-server-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
@@ -1965,9 +1957,6 @@ func assertEqualUnitExpectedConfigs(t *testing.T, expected *Unit, actual *Unit) 
 	assert.Equal(t, expected.LogLevel, actual.LogLevel)
 	assert.Equal(t, expected.Err, actual.Err)
 	diff := cmp.Diff(expected.Config, actual.Config, protocmp.Transform())
-	if diff != "" {
-		fmt.Printf("expected: %v, actual: %v\n", *expected, *actual)
-	}
 	assert.Empty(t, diff)
 }
 
