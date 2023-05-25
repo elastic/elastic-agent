@@ -262,6 +262,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 		component := r.componentForInputType(inputType, output, featureFlags)
 		if len(component.Units) > 0 {
 			if component.ShipperRef != nil {
+				// If this component uses a shipper, mark that shipper type as active
 				shipperTypes[component.ShipperRef.ShipperType] = true
 			}
 			components = append(components, component)
