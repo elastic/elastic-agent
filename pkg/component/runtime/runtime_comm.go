@@ -169,15 +169,12 @@ func (c *runtimeComm) CheckinExpected(
 	c.initCheckinObservedMx.Unlock()
 
 	// not in the initial observed message path; send it over the standard channel
-<<<<<<< HEAD
 	c.logger.Infof("CheckinExpected about to send event to checkinExpected, len: %d", len(c.checkinExpected))
-=======
 	// clear channel making it the latest expected message
 	select {
 	case <-c.checkinExpected:
 	default:
 	}
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 	c.checkinExpected <- expected
 	c.logger.Infof("CheckinExpected sent event to checkinExpected, len: %d", len(c.checkinExpected))
 }
@@ -243,11 +240,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 			case <-recvDone:
 				return
 			case expected = <-c.checkinExpected:
-<<<<<<< HEAD
 				c.logger.Infof("got event from checkinExpected in c.checkin(), len: %d", len(c.checkinExpected))
-				expected = c.latestCheckinExpected(expected)
-=======
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 			}
 
 			err := server.Send(expected)
