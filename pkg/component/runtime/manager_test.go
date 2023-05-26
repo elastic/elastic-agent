@@ -13,11 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-<<<<<<< HEAD
-=======
-	"strings"
 	"sync"
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 	"testing"
 	"time"
 
@@ -2804,14 +2800,9 @@ LOOP:
 	subCancel()
 	cancel()
 
-<<<<<<< HEAD
-	// check progresstion, require stop fake-0 before start fake-1
-	wasStopped := false
-=======
 	// check progression, require stop fake-0 before start fake-1
 	stateProgressionWG.Wait()
-	comp0Stopped := false
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
+	wasStopped := false
 	for _, step := range stateProgression {
 		if step.componentID == "fake-0" && step.state.State == client.UnitStateStopped {
 			wasStopped = true
