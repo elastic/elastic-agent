@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -77,7 +78,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	state := h.coord.State()
 	comps, units := findMatchingUnitsByActionType(state, a.Type())
 	if len(comps) > 0 {
-		// Iterate through founc components and forward the UNENROLL action
+		// Iterate through found components and forward the UNENROLL action
 		for i, comp := range comps {
 			unit := units[i]
 			// Deserialize the action into map[string]interface{} for dispatching over to the apps
@@ -94,10 +95,12 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 			if err != nil {
 				// Log and continue
 				h.log.Warnf("UNENROLL failed to dispatch to %v, err: %v", comp.ID, err)
+				return err
 			} else {
 				strErr := readMapString(res, "error", "")
 				if strErr != "" {
 					h.log.Warnf("UNENROLL failed for %v, err: %v", comp.ID, strErr)
+					return errors.New(strErr)
 				}
 			}
 		}
