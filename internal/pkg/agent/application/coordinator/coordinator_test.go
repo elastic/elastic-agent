@@ -314,6 +314,63 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCoordinator_StateSubscribe_BlockedSubscriber(t *testing.T) {
+	// Test that state subscribers cannot block each other by creating idle
+	// subscribers that never read from their channel and confirming that the
+	// active subscriber still receives state updates.
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	coord, _, _ := createCoordinator(t)
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	subCh := make(chan error)
+	go func() {
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		// Create three anonymous subscribers that will never be read, and one
+		// active subscriber that will. This is to test that congestion in some
+		// subscribers will not block state updates to others.
+		coord.StateSubscribe(ctx)
+		activeSub := coord.StateSubscribe(ctx)
+		stateChangeCount := 0
+		for {
+			select {
+			case <-ctx.Done():
+				subCh <- ctx.Err()
+				return
+			case <-activeSub.Ch():
+				stateChangeCount++
+				if stateChangeCount >= 10 {
+					// We have received 10 state updates even though one subscriber is
+					// not listening at all, return success
+					subCh <- nil
+				} else {
+					// The error type here isn't important, this is just an easy way
+					// to trigger a state update notification.
+					coord.state.SetConfigManagerError(nil)
+				}
+			}
+		}
+	}()
+
+	err := <-subCh
+	require.NoError(t, err)
+	cancel()
+
+	err = <-coordCh
+	require.NoError(t, err)
+}
+
 func TestCoordinatorWithErrors(t *testing.T) {
 	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
 
