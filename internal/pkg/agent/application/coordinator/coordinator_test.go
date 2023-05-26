@@ -341,6 +341,8 @@ func TestCoordinator_StateSubscribe_BlockedSubscriber(t *testing.T) {
 		// active subscriber that will. This is to test that congestion in some
 		// subscribers will not block state updates to others.
 		coord.StateSubscribe(ctx)
+		coord.StateSubscribe(ctx)
+		coord.StateSubscribe(ctx)
 		activeSub := coord.StateSubscribe(ctx)
 		stateChangeCount := 0
 		for {
