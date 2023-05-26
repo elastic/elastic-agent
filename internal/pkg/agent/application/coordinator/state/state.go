@@ -342,6 +342,7 @@ func (cs *CoordinatorState) stateReporter() {
 			reflect.SelectCase{
 				Dir:  reflect.SelectSend,
 				Chan: reflect.ValueOf(subscriber.ch),
+				Send: reflect.ValueOf(currentState),
 			})
 	}
 
