@@ -427,10 +427,8 @@ func (f *fakeInput) parseConfig(config *proto.UnitExpectedConfig) {
 	_, killOnInterval := cfg["kill_on_interval"]
 	f.logger.Trace().Bool("kill_on_interval", killOnInterval).Msg("kill_on_interval config set value")
 	if killOnInterval {
-		f.logger.Info().Msg("starting interval killer")
 		f.runKiller()
 	} else {
-		f.logger.Info().Msg("stopping interval killer")
 		f.stopKiller()
 	}
 }
@@ -451,6 +449,7 @@ func (f *fakeInput) runKiller() {
 		// already running
 		return
 	}
+	f.logger.Info().Msg("starting interval killer")
 	ctx, canceller := context.WithCancel(context.Background())
 	f.killerCanceller = canceller
 	go func() {
@@ -468,6 +467,7 @@ func (f *fakeInput) runKiller() {
 
 func (f *fakeInput) stopKiller() {
 	if f.killerCanceller != nil {
+		f.logger.Trace().Msg("stopping interval killer")
 		f.killerCanceller()
 		f.killerCanceller = nil
 	}
