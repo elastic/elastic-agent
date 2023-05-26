@@ -13,11 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-<<<<<<< HEAD
-=======
-	"strings"
 	"sync"
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 	"testing"
 	"time"
 
@@ -276,206 +272,6 @@ LOOP:
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
-<<<<<<< HEAD
-=======
-func TestManager_FakeInput_Features(t *testing.T) {
-	testPaths(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	agentInfo, _ := info.NewAgentInfo(true)
-	m, err := NewManager(
-		newDebugLogger(t),
-		newDebugLogger(t),
-		"localhost:0",
-		agentInfo,
-		apmtest.DiscardTracer,
-		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig())
-	require.NoError(t, err)
-
-	managerErrCh := make(chan error)
-	go func() {
-		err := m.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		managerErrCh <- err
-	}()
-
-	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
-	defer waitCancel()
-	if err := m.WaitForReady(waitCtx); err != nil {
-		require.NoError(t, err)
-	}
-
-	binaryPath := testBinary(t, "component")
-	const compID = "fake-default"
-	comp := component.Component{
-		ID: compID,
-		InputSpec: &component.InputRuntimeSpec{
-			InputType:  "fake",
-			BinaryName: "",
-			BinaryPath: binaryPath,
-			Spec:       fakeInputSpec,
-		},
-		Units: []component.Unit{
-			{
-				ID:       "fake-input",
-				Type:     client.UnitTypeInput,
-				LogLevel: client.UnitLogLevelTrace,
-				Config: component.MustExpectedConfig(map[string]interface{}{
-					"type":    "fake",
-					"state":   int(client.UnitStateHealthy),
-					"message": "Fake Healthy",
-				}),
-			},
-		},
-	}
-
-	subscriptionCtx, subCancel := context.WithCancel(context.Background())
-	defer subCancel()
-	subscriptionErrCh := make(chan error)
-	doneCh := make(chan struct{})
-
-	go func() {
-		sub := m.Subscribe(subscriptionCtx, compID)
-		var healthIteration int
-
-		for {
-			select {
-			case <-subscriptionCtx.Done():
-				return
-			case componentState := <-sub.Ch():
-				t.Logf("component state changed: %+v", componentState)
-
-				if componentState.State == client.UnitStateFailed {
-					subscriptionErrCh <- fmt.Errorf("component failed: %s", componentState.Message)
-					return
-				}
-
-				unit, ok := componentState.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
-				if !ok {
-					subscriptionErrCh <- errors.New("unit missing: fake-input")
-					return
-				}
-
-				switch unit.State {
-				case client.UnitStateFailed:
-					subscriptionErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-
-				case client.UnitStateHealthy:
-					healthIteration++
-					switch healthIteration {
-					case 1: // yes, it's starting on 1
-						comp.Features = &proto.Features{
-							Fqdn: &proto.FQDNFeature{Enabled: true},
-						}
-
-						err := m.Update([]component.Component{comp})
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
-								healthIteration, err)
-							return
-						}
-
-					// check if config sent on iteration 1 was set
-					case 2:
-						// In the previous iteration, the (fake) component has received a CheckinExpected
-						// message to enable the feature flag for FQDN.  In this iteration we are about to
-						// retrieve the feature flags information from the same component via the retrieve_features
-						// action. Within the component, which is running as a separate process, actions
-						// and CheckinExpected messages are processed concurrently.  We need some way to wait
-						// a reasonably short amount of time for the CheckinExpected message to be applied by the
-						// component (thus setting the FQDN feature flag to true) before we as the same component
-						// for feature flags information.  We accomplish this via assert.Eventually.
-						assert.Eventuallyf(t, func() bool {
-							// check the component
-							res, err := m.PerformAction(
-								context.Background(),
-								comp,
-								comp.Units[0],
-								fakecmp.ActionRetrieveFeatures,
-								nil)
-							if err != nil {
-								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to PerformAction %s: %w",
-									healthIteration, fakecmp.ActionRetrieveFeatures, err)
-								return false
-							}
-
-							ff, err := features.Parse(map[string]any{"agent": res})
-							if err != nil {
-								subscriptionErrCh <- fmt.Errorf("[case %d]: failed to parse action %s response as features config: %w",
-									healthIteration, fakecmp.ActionRetrieveFeatures, err)
-								return false
-							}
-
-							return ff.FQDN()
-						}, 1*time.Second, 100*time.Millisecond, "failed to assert that FQDN feature flag was enabled by component")
-
-						doneCh <- struct{}{}
-					}
-
-				case client.UnitStateStarting:
-					// acceptable
-
-				case client.UnitStateConfiguring:
-					// set unit back to healthy, so other cases will run.
-					comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
-						"type":    "fake",
-						"state":   int(client.UnitStateHealthy),
-						"message": "Fake Healthy",
-					})
-
-					err := m.Update([]component.Component{comp})
-					if err != nil {
-						t.Logf("error updating component state to health: %v", err)
-
-						subscriptionErrCh <- fmt.Errorf("failed to update component: %w", err)
-					}
-
-				default:
-					// unexpected state that should not have occurred
-					subscriptionErrCh <- fmt.Errorf("unit reported unexpected state: %v",
-						unit.State)
-				}
-
-			}
-		}
-	}()
-
-	defer drainErrChan(managerErrCh)
-	defer drainErrChan(subscriptionErrCh)
-
-	err = m.Update([]component.Component{comp})
-	require.NoError(t, err)
-
-	timeout := 30 * time.Second
-	timeoutTimer := time.NewTimer(timeout)
-	defer timeoutTimer.Stop()
-
-	// Wait for a success, an error or time out
-	for {
-		select {
-		case <-timeoutTimer.C:
-			t.Fatalf("timed out after %s", timeout)
-		case err := <-managerErrCh:
-			require.NoError(t, err)
-		case err := <-subscriptionErrCh:
-			require.NoError(t, err)
-		case <-doneCh:
-			subCancel()
-			cancel()
-
-			err = <-managerErrCh
-			require.NoError(t, err)
-			return
-		}
-	}
-}
-
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	testPaths(t)
 
@@ -2784,14 +2580,9 @@ LOOP:
 	subCancel()
 	cancel()
 
-<<<<<<< HEAD
-	// check progresstion, require stop fake-0 before start fake-1
-	wasStopped := false
-=======
 	// check progression, require stop fake-0 before start fake-1
 	stateProgressionWG.Wait()
-	comp0Stopped := false
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
+	wasStopped := false
 	for _, step := range stateProgression {
 		if step.componentID == "fake-0" && step.state.State == client.UnitStateStopped {
 			wasStopped = true

@@ -506,13 +506,8 @@ func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscripti
 func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
 	sub := newSubscriptionAll(ctx, m)
 
-<<<<<<< HEAD
-	// add latest states
-	m.mx.RLock()
-=======
 	// add the latest states
 	m.currentMx.RLock()
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 	latest := make([]ComponentComponentState, 0, len(m.current))
 	for _, comp := range m.current {
 		comp.latestMx.RLock()
@@ -667,14 +662,10 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 	newComponents := make([]component.Component, 0, len(components))
 	for _, comp := range components {
 		touched[comp.ID] = true
-<<<<<<< HEAD
-		if existing, ok := m.current[comp.ID]; ok {
-=======
 		m.currentMx.RLock()
 		existing, ok := m.current[comp.ID]
 		m.currentMx.RUnlock()
 		if ok {
->>>>>>> 4c97652719 (Fix deadlock in RuntimeManager (#2729))
 			// existing component; send runtime updated value
 			existing.setCurrent(comp)
 			if err := existing.runtime.Update(comp); err != nil {
