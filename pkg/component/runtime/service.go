@@ -64,8 +64,8 @@ func NewServiceRuntime(comp component.Component, logger *logger.Logger) (Compone
 		comp:                      comp,
 		log:                       logger.Named("service_runtime"),
 		ch:                        make(chan ComponentState),
-		actionCh:                  make(chan actionMode),
-		compCh:                    make(chan component.Component),
+		actionCh:                  make(chan actionMode, 1),
+		compCh:                    make(chan component.Component, 1),
 		statusCh:                  make(chan service.Status),
 		state:                     state,
 		executeServiceCommandImpl: executeServiceCommand,
@@ -347,6 +347,11 @@ func (s *ServiceRuntime) Watch() <-chan ComponentState {
 //
 // Non-blocking and never returns an error.
 func (s *ServiceRuntime) Start() error {
+	// clear channel so it's the latest action
+	select {
+	case <-s.actionCh:
+	default:
+	}
 	s.actionCh <- actionStart
 	return nil
 }
@@ -355,6 +360,11 @@ func (s *ServiceRuntime) Start() error {
 //
 // Non-blocking and never returns an error.
 func (s *ServiceRuntime) Update(comp component.Component) error {
+	// clear channel so it's the latest component
+	select {
+	case <-s.compCh:
+	default:
+	}
 	s.compCh <- comp
 	return nil
 }
@@ -363,6 +373,11 @@ func (s *ServiceRuntime) Update(comp component.Component) error {
 //
 // Non-blocking and never returns an error.
 func (s *ServiceRuntime) Stop() error {
+	// clear channel so it's the latest action
+	select {
+	case <-s.actionCh:
+	default:
+	}
 	s.actionCh <- actionStop
 	return nil
 }
@@ -371,6 +386,11 @@ func (s *ServiceRuntime) Stop() error {
 //
 // Non-blocking and never returns an error.
 func (s *ServiceRuntime) Teardown() error {
+	// clear channel so it's the latest action
+	select {
+	case <-s.actionCh:
+	default:
+	}
 	s.actionCh <- actionTeardown
 	return nil
 }
