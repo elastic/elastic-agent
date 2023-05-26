@@ -232,7 +232,7 @@ func (c *Coordinator) State() state.State {
 // results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Coordinator to block.
-func (c *Coordinator) StateSubscribe(ctx context.Context) *state.StateSubscription {
+func (c *Coordinator) StateSubscribe(ctx context.Context) state.StateSubscription {
 	return c.state.Subscribe(ctx)
 }
 

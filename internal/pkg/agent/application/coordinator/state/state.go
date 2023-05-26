@@ -6,8 +6,8 @@ package state
 
 import (
 	"context"
+	"reflect"
 	"sync"
-	"time"
 
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
@@ -50,8 +50,13 @@ type CoordinatorState struct {
 	actionsErr    error
 	varsMgrErr    error
 
-	subMx     sync.RWMutex
-	subscribe []*StateSubscription
+	// StateSubscriptions sent to subscribeChan will receive state updates from
+	// stateReporter until their context is cancelled.
+	subscribeChan chan StateSubscription
+
+	// (*CoordinatorState).changed sends on this channel to notify stateReporter
+	// when the state changes.
+	stateChangedChan chan struct{}
 }
 
 type coordinatorOverrideState struct {
@@ -71,13 +76,24 @@ type stateSetterOpt func(ss *stateSetter)
 
 // NewCoordinatorState creates the coordinator state manager.
 func NewCoordinatorState(state agentclient.State, msg string, fleetState agentclient.State, fleetMsg string, logLevel logp.Level) *CoordinatorState {
-	return &CoordinatorState{
+	cs := &CoordinatorState{
 		state:        state,
 		message:      msg,
 		fleetState:   fleetState,
 		fleetMessage: fleetMsg,
 		logLevel:     logLevel,
+
+		// subscribeChan is synchronous: once Subscribe returns, the caller is
+		// guaranteed to be included in future state change notifications.
+		subscribeChan: make(chan StateSubscription),
+
+		// stateChangedChan is asynchronous with buffer size 1: this guarantees
+		// that state changes will propagate but multiple simultaneous changes
+		// will not accumulate.
+		stateChangedChan: make(chan struct{}, 1),
 	}
+	go cs.stateReporter()
+	return cs
 }
 
 // UpdateState updates the state triggering a change notification to subscribers.
@@ -192,20 +208,26 @@ func (cs *CoordinatorState) UpdateComponentState(state runtime.ComponentComponen
 
 // State returns the current state for the coordinator.
 func (cs *CoordinatorState) State() (s State) {
+	// We need to claim all three mutexes simultaneously, otherwise we may
+	// collect inconsistent states from the different components if one of them
+	// changes during this function call.
 	cs.mx.RLock()
+	cs.compStatesMx.RLock()
+	cs.mgrMx.RLock()
+	defer cs.mx.RUnlock()
+	defer cs.compStatesMx.RUnlock()
+	defer cs.mgrMx.RUnlock()
+
 	s.State = cs.state
 	s.Message = cs.message
 	s.FleetState = cs.fleetState
 	s.FleetMessage = cs.fleetMessage
 	s.LogLevel = cs.logLevel
 	overrideState := cs.overrideState
-	cs.mx.RUnlock()
 
 	// copy component states for PIT
-	cs.compStatesMx.RLock()
 	compStates := make([]runtime.ComponentComponentState, len(cs.compStates))
 	copy(compStates, cs.compStates)
-	cs.compStatesMx.RUnlock()
 	s.Components = compStates
 
 	if overrideState != nil {
@@ -217,8 +239,6 @@ func (cs *CoordinatorState) State() (s State) {
 		// or
 		// coordinator overall is reported is healthy; in the case any component or unit is not healthy then we report
 		// as degraded because we are not fully healthy
-		cs.mgrMx.RLock()
-		defer cs.mgrMx.RUnlock()
 		if cs.runtimeMgrErr != nil {
 			s.State = agentclient.Failed
 			s.Message = cs.runtimeMgrErr.Error()
@@ -246,79 +266,140 @@ func (cs *CoordinatorState) State() (s State) {
 //
 // This provides the current state at the time of first subscription. Cancelling the context
 // results in the subscription being unsubscribed.
-//
-// Note: Not reading from a subscription channel will cause the Coordinator to block.
-func (cs *CoordinatorState) Subscribe(ctx context.Context) *StateSubscription {
-	sub := newStateSubscription(ctx, cs)
-
-	// send initial state
-	state := cs.State()
-	go func() {
-		select {
-		case <-ctx.Done():
-			return
-		case sub.ch <- state:
-		}
-	}()
-
-	// add subscription for future changes
-	cs.subMx.Lock()
-	cs.subscribe = append(cs.subscribe, sub)
-	cs.subMx.Unlock()
-
-	go func() {
-		<-ctx.Done()
-
-		// unsubscribe
-		cs.subMx.Lock()
-		defer cs.subMx.Unlock()
-		for i, s := range cs.subscribe {
-			if sub == s {
-				cs.subscribe = append(cs.subscribe[:i], cs.subscribe[i+1:]...)
-				return
-			}
-		}
-	}()
-
+func (cs *CoordinatorState) Subscribe(ctx context.Context) StateSubscription {
+	sub := newStateSubscription(ctx)
+	cs.subscribeChan <- sub
 	return sub
 }
 
 func (cs *CoordinatorState) changed() {
-	cs.sendState(cs.State())
+	// Try to send to stateChangedChan but don't block -- if its buffer is full
+	// then an update is already pending, and the changes we're reporting will
+	// be included.
+	select {
+	case cs.stateChangedChan <- struct{}{}:
+	default:
+	}
 }
 
-func (cs *CoordinatorState) sendState(state State) {
-	cs.subMx.RLock()
-	defer cs.subMx.RUnlock()
+func (cs *CoordinatorState) stateReporter() {
+	var subscribers []StateSubscription
+	// We support a variable number of subscribers and we don't want any of them
+	// to block each other or the CoordinatorState as a whole, so we need to
+	// listen with reflect.Select, which selects on an array of cases.
+	// Unfortunately this means we need to track the active select cases
+	// ourselves, including their position in the array.
+	//
+	// The ordering we use is:
+	// - first, the listener on subscribeChan
+	// - second, the listener on stateChangedChan
+	// - after that, two cases for each subscriber, in the same order as the
+	//   subscribers array: first its done channel, then its listener channel.
+	//
+	// All subscribers are included in the array of select cases even when some
+	// have already been updated, that way we don't need to worry about the
+	// order changing. Instead, subscribers that have already been updated have
+	// the listener channel of their select case set to nil.
+	selectCases := []reflect.SelectCase{
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(cs.subscribeChan),
+		},
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(cs.stateChangedChan),
+		},
+	}
+	const newSubscriberIndex = 0
+	const stateChangedIndex = 1
+	const firstSubscriberIndex = 2
 
-	send := func(sub *StateSubscription) {
-		t := time.NewTimer(time.Second)
-		defer t.Stop()
-		select {
-		case <-sub.ctx.Done():
-		case sub.ch <- state:
-		case <-t.C:
-			// subscriber didn't read from the channel after 1 second; so we unblock
+	currentState := cs.State()
+
+	// resetListeners is called when a state change notification arrives, to
+	// reactivate the listener channels of all subscribers and update their
+	// select case to the new state value.
+	resetListeners := func() {
+		currentState = cs.State()
+		for i, subscriber := range subscribers {
+			listenerIndex := firstSubscriberIndex + 2*i + 1
+			selectCases[listenerIndex].Chan = reflect.ValueOf(subscriber.ch)
+			selectCases[listenerIndex].Send = reflect.ValueOf(currentState)
 		}
 	}
 
-	for _, sub := range cs.subscribe {
-		send(sub)
+	// addSubscriber is a helper to add a new subscriber and its select
+	// cases to our lists.
+	addSubscriber := func(subscriber StateSubscription) {
+		subscribers = append(subscribers, subscriber)
+		selectCases = append(selectCases,
+			// Add a select case receiving from the subscriber's done channel
+			reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(subscriber.ctx.Done()),
+			},
+			// Add a select case sending to the subscriber's listener channel
+			reflect.SelectCase{
+				Dir:  reflect.SelectSend,
+				Chan: reflect.ValueOf(subscriber.ch),
+			})
+	}
+
+	for {
+		// Always try a standalone receive on the state changed channel first, so
+		// it gets priority over other updates.
+		select {
+		case <-cs.stateChangedChan:
+			resetListeners()
+		default:
+		}
+
+		chosen, value, _ := reflect.Select(selectCases)
+		if chosen == stateChangedIndex {
+			resetListeners()
+		} else if chosen == newSubscriberIndex {
+			subscriber, ok := value.Interface().(StateSubscription)
+			if ok {
+				addSubscriber(subscriber)
+			}
+		} else {
+			subscriberIndex := (chosen - firstSubscriberIndex) / 2
+			if (chosen-firstSubscriberIndex)%2 == 0 {
+				// The subscriber's done channel has been closed, remove
+				// them from our lists
+				subscribers = append(
+					subscribers[:subscriberIndex],
+					subscribers[subscriberIndex+1:]...)
+				selectCases = append(
+					selectCases[:chosen],
+					selectCases[chosen+2:]...)
+			} else {
+				// We successfully sent a state update to this subscriber, turn off
+				// its listener channel until we receive a new state change.
+				selectCases[chosen].Chan = reflect.ValueOf(nil)
+			}
+		}
 	}
 }
 
 // StateSubscription provides a channel for notifications of state changes.
 type StateSubscription struct {
+	// When this context expires the subscription will be cancelled by
+	// CoordinatorState.stateReporter.
 	ctx context.Context
-	cs  *CoordinatorState
-	ch  chan State
+
+	// When the state changes, the new state will be sent to this channel.
+	// If multiple state changes accumulate before the receiver reads from this
+	// channel, then only the most recent one will be sent.
+	ch chan State
 }
 
-func newStateSubscription(ctx context.Context, cs *CoordinatorState) *StateSubscription {
-	return &StateSubscription{
+func newStateSubscription(ctx context.Context) StateSubscription {
+	return StateSubscription{
 		ctx: ctx,
-		cs:  cs,
-		ch:  make(chan State),
+		// The subscriber channel is unbuffered so it always gets the most recent
+		// state at the time it receives from the channel.
+		ch: make(chan State),
 	}
 }
 
