@@ -14,7 +14,7 @@ type AgentInfo struct {
 	agentID  string
 	logLevel string
 
-	// esHeaders will be injected into the esHeaders field of any elasticsearch
+	// esHeaders will be injected into the headers field of any elasticsearch
 	// output created by this agent (see component.toIntermediate).
 	esHeaders map[string]string
 }
