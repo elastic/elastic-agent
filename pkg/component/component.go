@@ -396,31 +396,47 @@ func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitEx
 
 // Scan the list of shippers looking for one that supports the given
 // input spec and output type. If one is found, return its type,
-// otherwise return an error.
+// otherwise return an error describing the problem.
 func (r *RuntimeSpecs) getSupportedShipperType(
 	inputSpec InputRuntimeSpec,
 	outputType string,
 ) (string, error) {
 	shippersForOutput := r.shipperOutputs[outputType]
+	if len(shippersForOutput) == 0 {
+		return "", ErrOutputShipperNotSupported
+	}
+	if len(inputSpec.Spec.Shippers) == 0 {
+		return "", ErrInputShipperNotSupported
+	}
 	// Traverse in the order given by the input spec. This lets inputs specify
 	// a preferred order if there is more than one option.
+	var runtimeErr error
+	var missingShipper string
 	for _, name := range inputSpec.Spec.Shippers {
 		if !containsStr(shippersForOutput, name) {
 			continue
 		}
 		shipper, ok := r.shipperSpecs[name]
 		if !ok {
+			missingShipper = name
 			continue
 		}
 		// make sure the runtime checks for this shipper pass
 		err := validateRuntimeChecks(&shipper.Spec.Runtime, r.platform)
 		if err != nil {
+			runtimeErr = err
 			continue
 		}
 
 		return shipper.ShipperType, nil
 	}
-	return "", ErrOutputNotSupported
+	if runtimeErr != nil {
+		return "", fmt.Errorf("shipper blocked by runtime checks: %w", runtimeErr)
+	}
+	if missingShipper != "" {
+		return "", fmt.Errorf("couldn't find spec for target shipper '%v'", missingShipper)
+	}
+	return "", ErrShipperOutputNotSupported
 }
 
 // Injects or creates a policy.revision sub-object in the input map.

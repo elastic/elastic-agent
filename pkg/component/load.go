@@ -28,6 +28,12 @@ var (
 	ErrOutputNotSupported = newError("output not supported")
 	// ErrOutputNotSupportedOnPlatform is returned when the input is supported but not on this platform
 	ErrOutputNotSupportedOnPlatform = newError("output not supported on this platform")
+	// ErrInputShipperNotSupported is returned when an input that does not support any shippers targets a shipper output
+	ErrInputShipperNotSupported = newError("this input does not support shipper outputs")
+	// ErrOutputShipperNotSupported is returned when shipper output is enabled on an output type that no shipper supports
+	ErrOutputShipperNotSupported = newError("no shipper supports this output type")
+	// ErrShipperOutputNotSupported is returned when an input supports at least one shipper, but none of them support the target output type.
+	ErrShipperOutputNotSupported = newError("the input does not support a shipper for this output type")
 )
 
 // InputRuntimeSpec returns the specification for running this input on the current platform.
