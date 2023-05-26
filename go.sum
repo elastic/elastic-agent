@@ -399,6 +399,8 @@ github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0 h1:dTrVPE6H
 github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0/go.mod h1:hzqVK19fiowHGWldLoKRHl3eXLErKyP89o7L/R3aHsk=
 github.com/elastic/elastic-agent-autodiscover v0.2.1 h1:Nbeayh3vq2FNm6xaFo34mhUdOu0EVlpj53CqCsbU0E4=
 github.com/elastic/elastic-agent-autodiscover v0.2.1/go.mod h1:gPnzzfdYNdgznAb+iG9eyyXaQXBbAMHa+Y6Z8hXfcGY=
+github.com/elastic/elastic-agent-autodiscover v0.6.0 h1:IFCpStz6/FQk8n3VMHVD5XaovpzScx0Y/uoFg+R3/dU=
+github.com/elastic/elastic-agent-autodiscover v0.6.0/go.mod h1:gPnzzfdYNdgznAb+iG9eyyXaQXBbAMHa+Y6Z8hXfcGY=
 github.com/elastic/elastic-agent-client/v7 v7.1.0 h1:3+4GCzYV1kjdECrvCvNCrwnsVN/dt/VPi7UfSY3fJLs=
 github.com/elastic/elastic-agent-client/v7 v7.1.0/go.mod h1:UlVOHSDvTA4Mfdhdg+BE7aqOsUR3ab+x2Zl0aHlBXs4=
 github.com/elastic/elastic-agent-libs v0.2.5/go.mod h1:chO3rtcLyGlKi9S0iGVZhYCzDfdDsAQYBc+ui588AFE=
