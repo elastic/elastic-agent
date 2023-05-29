@@ -168,6 +168,38 @@ func TestParseVersion(t *testing.T) {
 			},
 		},
 		{
+			name:  "Almost semver string version, with double extra meta separator",
+			input: "1.2.3++",
+			expected: expected{
+				parsed: nil,
+				err:    ErrNoMatch,
+			},
+		},
+		{
+			name:  "Almost semver string version, with empty minor version",
+			input: "1..2+ab",
+			expected: expected{
+				parsed: nil,
+				err:    ErrNoMatch,
+			},
+		},
+		{
+			name:  "Almost semver string version, with patch containing non-digits",
+			input: "1.2.5ab0",
+			expected: expected{
+				parsed: nil,
+				err:    ErrNoMatch,
+			},
+		},
+		{
+			name:  "Almost semver string version, with double prerelease separator",
+			input: "1.2.5ab0",
+			expected: expected{
+				parsed: nil,
+				err:    ErrNoMatch,
+			},
+		},
+		{
 			name:  "Split string version",
 			input: "4.5\r\n.6",
 			expected: expected{

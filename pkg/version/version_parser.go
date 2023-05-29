@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// regexp taken from https://semver.org/ (see the FAQ section/Is there a suggested regular expression (RegEx) to check a SemVer string?) with the addition of the coreversion group
 const semVerFormat = `^(?P<coreversion>(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*))(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
 
 var semVerFmtRegEx *regexp.Regexp
