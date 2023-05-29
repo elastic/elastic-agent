@@ -7,6 +7,7 @@ updates:
       interval: "daily"
     labels:
       - automation
+      - skip-changelog
       - Team:Elastic-Agent-Control-Plane
     allow:
       - dependency-name: "github.com/elastic/*"
