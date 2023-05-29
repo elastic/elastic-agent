@@ -170,8 +170,8 @@ func GoTestIntegrationForModule(ctx context.Context) error {
 }
 
 // InstallGoTestTools installs additional tools that are required to run unit and integration tests.
-func InstallGoTestTools() {
-	gotool.Install(
+func InstallGoTestTools() error {
+	return gotool.Install(
 		gotool.Install.Package("gotest.tools/gotestsum"),
 	)
 }
