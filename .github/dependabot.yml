@@ -1,0 +1,15 @@
+---
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    labels:
+      - automation
+      - Team:Elastic-Agent-Control-Plane
+    allow:
+      - dependency-name: "github.com/elastic/*"
+    reviewers:
+      - "elastic/elastic-agent-control-plane"
+    open-pull-requests-limit: 10
