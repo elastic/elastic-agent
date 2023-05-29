@@ -89,7 +89,7 @@ func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.Cert
 		token:           token.String(),
 		cert:            pair,
 		checkinConn:     true,
-		checkinExpected: make(chan *proto.CheckinExpected, 10), // size of 10 gives a buffer for expected, only last is used
+		checkinExpected: make(chan *proto.CheckinExpected, 1),
 		checkinObserved: make(chan *proto.CheckinObserved),
 		actionsConn:     true,
 		actionsRequest:  make(chan *proto.ActionRequest),
@@ -169,23 +169,16 @@ func (c *runtimeComm) CheckinExpected(
 	c.initCheckinObservedMx.Unlock()
 
 	// not in the initial observed message path; send it over the standard channel
+	// clear channel making it the latest expected message
+	select {
+	case <-c.checkinExpected:
+	default:
+	}
 	c.checkinExpected <- expected
 }
 
 func (c *runtimeComm) CheckinObserved() <-chan *proto.CheckinObserved {
 	return c.checkinObserved
-}
-
-// latestCheckinExpected ensures that the latest expected checkin is used
-func (c *runtimeComm) latestCheckinExpected(exp *proto.CheckinExpected) *proto.CheckinExpected {
-	latest := exp
-	for {
-		select {
-		case latest = <-c.checkinExpected:
-		default:
-			return latest
-		}
-	}
 }
 
 func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *proto.CheckinObserved) error {
@@ -245,7 +238,6 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 			case <-recvDone:
 				return
 			case expected = <-c.checkinExpected:
-				expected = c.latestCheckinExpected(expected)
 			}
 
 			err := server.Send(expected)
@@ -266,7 +258,11 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 	c.initCheckinObservedMx.Lock()
 	c.initCheckinObserved = init
 	c.initCheckinExpectedCh = initExp
-	c.latestCheckinExpected(nil) // clears all queued expected messages
+	// clears the latest queued expected message
+	select {
+	case <-c.checkinExpected:
+	default:
+	}
 	c.initCheckinObservedMx.Unlock()
 
 	// send the initial message (manager then calls `CheckinExpected` method with the result)
