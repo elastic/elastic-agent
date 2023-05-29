@@ -11,10 +11,10 @@ resources:
   - service-account.yaml
   - service.yaml
   - statefulset.yaml
-  - ./elastic-agent
+  - ./elastic-agent-kustomize
 
 
 patches:
-- path: elastic-agent/agent-statefulset.yaml
+- path: elastic-agent-kustomize/agent-statefulset.yaml
   target:
     kind: StatefulSet

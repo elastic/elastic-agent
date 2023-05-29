@@ -8,17 +8,17 @@ Follow below instructions to install Elastic Agent as side-container with Kube S
 git clone git@github.com:kubernetes/kube-state-metrics.git
 ```
 
-1. Naviagte to the directory of Autosharding example
+1. Navigate to the directory of Autosharding example
 
 ```bash
 cd kube-state-metrics/examples/autosharding
 ```
 
-1. Copy the [`./elastic-agent`](./elastic-agent) folder inside the same folder 
+1. Download the [`./elastic-agent-kustomize`](./elastic-agent-kustomize) folder inside the same folder
 
 1. Edit or replace the already existing kustomization.yaml file with the example [kustomization.yaml](./kustomization.yaml)
 
-The new `kustomization.yaml` should inlcude:
+The new `kustomization.yaml` should include:
 
 ```yaml
 [outut truncated ...]
@@ -30,16 +30,16 @@ resources:
   - service-account.yaml
   - service.yaml
   - statefulset.yaml
-  - ./elastic-agent
+  - ./elastic-agent-kustomize
 
 
 patches:
-- path: elastic-agent/agent-statefulset.yaml
+- path: elastic-agent-kustomize/agent-statefulset.yaml
   target:
     kind: StatefulSet
 ```
 
-1. Update number of Replicasets  and rerun:
+1. Update number of ReplicaSets and re-apply:
 
 ```bash
 kubectl apply -k .
