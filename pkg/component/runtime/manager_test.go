@@ -1727,6 +1727,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 					Timeouts: component.CommandTimeoutSpec{
 						// very low checkin timeout so we can cause missed check-ins
 						Checkin: 100 * time.Millisecond,
+						Restart: 10 * time.Second,
 						Stop:    30 * time.Second,
 					},
 				},
