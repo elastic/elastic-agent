@@ -93,7 +93,7 @@ func NewPodEventer(
 	// CronJob -> job -> Pod
 	if metaConf.Deployment {
 		replicaSetWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_rs", client, &kubernetes.ReplicaSet{}, kubernetes.WatchOptions{
-			SyncTimeout: config.SyncPeriod,
+			SyncTimeout: cfg.SyncPeriod,
 		}, nil)
 		if err != nil {
 			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
@@ -101,7 +101,7 @@ func NewPodEventer(
 	}
 	if metaConf.CronJob {
 		jobWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_job", client, &kubernetes.Job{}, kubernetes.WatchOptions{
-			SyncTimeout: config.SyncPeriod,
+			SyncTimeout: cfg.SyncPeriod,
 		}, nil)
 		if err != nil {
 			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Job{}, err)
