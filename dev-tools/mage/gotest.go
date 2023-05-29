@@ -7,6 +7,7 @@ package mage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
@@ -146,7 +146,7 @@ func GoTestIntegrationForModule(ctx context.Context) error {
 		passThroughEnvs(env, IntegrationTestEnvVars()...)
 		runners, err := NewIntegrationRunners(path.Join("./module", fi.Name()), env)
 		if err != nil {
-			return errors.Wrapf(err, "test setup failed for module %s", fi.Name())
+			return fmt.Errorf("test setup failed for module %s: %w", fi.Name(), err)
 		}
 		err = runners.Test("goIntegTest", func() error {
 			err := GoTest(ctx, GoTestIntegrationArgsForModule(fi.Name()))
@@ -245,7 +245,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	if params.OutputFile != "" {
 		fileOutput, err := os.Create(createDir(params.OutputFile))
 		if err != nil {
-			return errors.Wrap(err, "failed to create go test output file")
+			return fmt.Errorf("failed to create go test output file: %w", err)
 		}
 		defer fileOutput.Close()
 		outputs = append(outputs, fileOutput)
@@ -266,7 +266,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		// Command ran.
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
-			return errors.Wrap(err, "failed to execute go")
+			return fmt.Errorf("failed to execute go: %w", err)
 		}
 
 		// Command ran but failed. Process the output.
@@ -275,7 +275,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 
 	if goTestErr != nil {
 		// No packages were tested. Probably the code didn't compile.
-		return errors.Wrap(goTestErr, "go test returned a non-zero value")
+		return fmt.Errorf("go test returned a non-zero value: %w", goTestErr)
 	}
 
 	// Generate a HTML code coverage report.
@@ -287,7 +287,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 			"-html="+params.CoverageProfileFile,
 			"-o", htmlCoverReport)
 		if err = coverToHTML(); err != nil {
-			return errors.Wrap(err, "failed to write HTML code coverage report")
+			return fmt.Errorf("failed to write HTML code coverage report: %w", err)
 		}
 	}
 
@@ -300,7 +300,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		// install pre-requisites
 		installCobertura := sh.RunCmd("go", "install", "github.com/boumenot/gocover-cobertura@latest")
 		if err = installCobertura(); err != nil {
-			return errors.Wrap(err, "failed to install gocover-cobertura")
+			return fmt.Errorf("failed to install gocover-cobertura: %w", err)
 		}
 
 		codecovReport = strings.TrimSuffix(params.CoverageProfileFile,
@@ -308,7 +308,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 
 		coverage, err := ioutil.ReadFile(params.CoverageProfileFile)
 		if err != nil {
-			return errors.Wrap(err, "failed to read code coverage report")
+			return fmt.Errorf("failed to read code coverage report: %w", err)
 		}
 
 		coberturaFile, err := os.Create(codecovReport)
@@ -322,7 +322,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		coverToXML.Stderr = os.Stderr
 		coverToXML.Stdin = bytes.NewReader(coverage)
 		if err = coverToXML.Run(); err != nil {
-			return errors.Wrap(err, "failed to write XML code coverage report")
+			return fmt.Errorf("failed to write XML code coverage report: %w", err)
 		}
 		fmt.Println(">> go run gocover-cobertura:", params.CoverageProfileFile, "Created")
 	}
@@ -330,7 +330,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
 		fmt.Println(">> go test:", params.TestName, "Test Failed")
-		return errors.Wrap(goTestErr, "go test returned a non-zero value")
+		return fmt.Errorf("go test returned a non-zero value: %w", goTestErr)
 	}
 
 	fmt.Println(">> go test:", params.TestName, "Test Passed")
