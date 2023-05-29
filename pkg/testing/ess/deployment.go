@@ -114,10 +114,18 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 				Password string `json:"password"`
 			} `json:"credentials"`
 		} `json:"resources"`
+		Errors []struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
 	}
 
 	if err := json.NewDecoder(createResp.Body).Decode(&createRespBody); err != nil {
 		return nil, fmt.Errorf("error parsing deployment creation API response: %w", err)
+	}
+
+	if len(createRespBody.Errors) > 0 {
+		return nil, fmt.Errorf("failed to create: (%s) %s", createRespBody.Errors[0].Code, createRespBody.Errors[0].Message)
 	}
 
 	r := CreateDeploymentResponse{
