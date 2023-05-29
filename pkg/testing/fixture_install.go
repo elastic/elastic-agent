@@ -68,7 +68,9 @@ func (i InstallOpts) toCmdArgs() []string {
 // Install installs the prepared Elastic Agent binary
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	installArgs := []string{"install"}
-	installArgs = append(installArgs, installOpts.toCmdArgs()...)
+	if installOpts != nil {
+		installArgs = append(installArgs, installOpts.toCmdArgs()...)
+	}
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
 		return nil, err
@@ -111,7 +113,9 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	}
 
 	uninstallArgs := []string{"uninstall"}
-	uninstallArgs = append(uninstallArgs, uninstallOpts.toCmdArgs()...)
+	if uninstallOpts != nil {
+		uninstallArgs = append(uninstallArgs, uninstallOpts.toCmdArgs()...)
+	}
 	out, err := f.Exec(ctx, uninstallArgs, opts...)
 	if err != nil {
 		return nil, err
