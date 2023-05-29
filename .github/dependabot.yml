@@ -8,7 +8,7 @@ updates:
     labels:
       - automation
       - skip-changelog
-      - Team:Elastic-Agent-Control-Plane
+      - Team:Elastic-Agent
     allow:
       - dependency-name: "github.com/elastic/*"
     reviewers:
