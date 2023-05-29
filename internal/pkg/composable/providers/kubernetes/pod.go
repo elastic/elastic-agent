@@ -87,7 +87,7 @@ func NewPodEventer(
 		logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 	}
 
-	// Resource is Pod so we need to create watchers for Replicasets and Jobs that it might belongs to
+	// Resource is Pod so we need to create watchers for Replicasets and Jobs that it might belong to
 	// in order to be able to retrieve 2nd layer Owner metadata like in case of:
 	// Deployment -> Replicaset -> Pod
 	// CronJob -> job -> Pod
