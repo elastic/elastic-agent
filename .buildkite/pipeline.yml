@@ -3,7 +3,7 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 agents:
-  image: docker.elastic.co/observability-ci/elastic-agent-build-image:latest
+  image: "docker.elastic.co/observability-ci/elastic-agent-build-image:latest"
   ephemeralStorage: "10G"
   memory: "4G"
 steps:

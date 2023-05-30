@@ -19,5 +19,4 @@ RUN go install github.com/magefile/mage@latest
 ENV GO111MODULE=on
 WORKDIR ./code
 
-COPY . .
 USER root
