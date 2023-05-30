@@ -54,6 +54,38 @@ func TestGetLogFilenames(t *testing.T) {
 		require.Equal(t, expected, names)
 	})
 
+	t.Run("returns the correct sorted filelist for multi-day logs", func(t *testing.T) {
+		dir := t.TempDir()
+
+		prevDayFile := "elastic-agent-20230529.ndjson"
+		prevDayFile1 := "elastic-agent-20230529-1.ndjson"
+		prevDayFile2 := "elastic-agent-20230529-2.ndjson"
+		prevDayFile3 := "elastic-agent-20230529-3.ndjson"
+
+		createFile(t, dir, file2)
+		createFile(t, dir, file)
+		createFile(t, dir, prevDayFile1)
+		createFile(t, dir, file1)
+		createFile(t, dir, prevDayFile)
+		createFile(t, dir, prevDayFile2)
+		createFile(t, dir, file3)
+		createFile(t, dir, prevDayFile3)
+
+		names, err := getLogFilenames(dir)
+		require.NoError(t, err)
+		expected := []string{
+			path.Join(dir, prevDayFile),
+			path.Join(dir, prevDayFile1),
+			path.Join(dir, prevDayFile2),
+			path.Join(dir, prevDayFile3),
+			path.Join(dir, file),
+			path.Join(dir, file1),
+			path.Join(dir, file2),
+			path.Join(dir, file3),
+		}
+		require.Equal(t, expected, names)
+	})
+
 	t.Run("does not return directory entries", func(t *testing.T) {
 		dir := t.TempDir()
 		err := os.Mkdir(path.Join(dir, "should_exclude"), 0777)
@@ -86,6 +118,33 @@ func TestGetLogFilenames(t *testing.T) {
 		}
 		require.Equal(t, expected, names)
 	})
+}
+
+func TestSortLogFilenames(t *testing.T) {
+	list := []string{
+		"elastic-agent-20230529.ndjson",
+		"elastic-agent-20230529-1.ndjson",
+		"elastic-agent-20230528.ndjson",
+		"elastic-agent-20230529-3.ndjson",
+		"elastic-agent-20230529-2.ndjson",
+		"elastic-agent-20230530-2.ndjson",
+		"elastic-agent-20230530-1.ndjson",
+		"elastic-agent-20230530.ndjson",
+		"elastic-agent-20230528-1.ndjson",
+	}
+	expected := []string{
+		"elastic-agent-20230528.ndjson",
+		"elastic-agent-20230528-1.ndjson",
+		"elastic-agent-20230529.ndjson",
+		"elastic-agent-20230529-1.ndjson",
+		"elastic-agent-20230529-2.ndjson",
+		"elastic-agent-20230529-3.ndjson",
+		"elastic-agent-20230530.ndjson",
+		"elastic-agent-20230530-1.ndjson",
+		"elastic-agent-20230530-2.ndjson",
+	}
+	sortLogFilenames(list)
+	require.Equal(t, expected, list)
 }
 
 func TestPrintLogs(t *testing.T) {

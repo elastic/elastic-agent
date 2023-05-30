@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -30,8 +31,7 @@ const (
 )
 
 var (
-	firstLogFilePattern   = regexp.MustCompile(`^elastic-agent-\d+\.ndjson$`)
-	rotatedLogFilePattern = regexp.MustCompile(`^elastic-agent-\d+-\d+\.ndjson$`)
+	logFilePattern = regexp.MustCompile(`elastic-agent-(\d+)(-\d+)?\.ndjson$`)
 )
 
 // filter for each log line, returns `true` if we print the line
@@ -293,30 +293,45 @@ func getLogFilenames(dir string) ([]string, error) {
 		return nil, fmt.Errorf("failed to list logs directory: %w", err)
 	}
 
-	// the first index is reserved for the initial file (without `-xxx` suffix),
-	// so we don't have to sort the entire slice again
-	paths := make([]string, len(entries)+1)
-	i := 1
+	paths := make([]string, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() {
+		if e.IsDir() || !logFilePattern.MatchString(e.Name()) {
 			continue
 		}
-		if firstLogFilePattern.MatchString(e.Name()) {
-			paths[0] = path.Join(dir, e.Name())
-		}
-		if rotatedLogFilePattern.MatchString(e.Name()) {
-			paths[i] = path.Join(dir, e.Name())
-			i++
-		}
+		paths = append(paths, path.Join(dir, e.Name()))
 	}
 
-	paths = paths[:i]
-
-	if paths[0] == "" {
-		paths = paths[1:]
-	}
+	sortLogFilenames(paths)
 
 	return paths, nil
+}
+
+// sortLogFilenames sorts filenames in the order of log rotation
+func sortLogFilenames(filenames []string) {
+	sort.Slice(filenames, func(i, j int) bool {
+		// e.g. elastic-agent-20230515.ndjson => ["elastic-agent-20230515-1.ndjson", "20230515", "-1"]
+		iGroups := logFilePattern.FindStringSubmatch(filenames[i])
+		jGroups := logFilePattern.FindStringSubmatch(filenames[j])
+
+		switch {
+
+		// e.g. elastic-agent-20230515-1.ndjson vs elastic-agent-20230515-2.ndjson
+		case iGroups[1] == jGroups[1] && iGroups[2] != "" && jGroups[2] != "":
+			return iGroups[2] < jGroups[2]
+
+		// e.g. elastic-agent-20230515.ndjson vs elastic-agent-20230515-1.ndjson
+		case iGroups[1] == jGroups[1] && iGroups[2] != "":
+			return false
+
+		// e.g. elastic-agent-20230515-1.ndjson vs elastic-agent-20230515.ndjson
+		case iGroups[1] == jGroups[1] && jGroups[2] != "":
+			return true
+
+		// e.g. elastic-agent-20230515.ndjson vs elastic-agent-20230516.ndjson
+		default:
+			return iGroups[1] < jGroups[1]
+		}
+	})
 }
 
 // watchLogsDir watches the log directory `dir` for new log lines, starting with the given `startFile` at
