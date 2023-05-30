@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -120,48 +122,6 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 	require.Equal(s.T(), s.agentEndVersion, newVersion)
 }
 
-func (s *UpgradeElasticAgent) TestUpgradeStandaloneElasticAgentToSnapshot() {
-
-	const minVersionString = "8.9.0-SNAPSHOT"
-	minVersion, _ := version.ParseVersion(minVersionString)
-	pv, err := version.ParseVersion(s.agentEndVersion)
-	if pv.Less(*minVersion) {
-		s.T().Skipf("Version %s is lower than min version %s", s.agentEndVersion, minVersionString)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	//TODO we probably need a policy and ES connection params
-	output, err := tools.InstallStandaloneElasticAgent(s.agentFixture)
-	if err != nil {
-		s.T().Log(string(output))
-	}
-	require.NoError(s.T(), err)
-
-	require.Eventually(s.T(), func() bool {
-		state, err := s.agentFixture.Client().State(ctx)
-		if err != nil {
-			s.T().Logf("error checking agent state: %v", err)
-			return false
-		}
-		return state.State == cproto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
-
-	// err = tools.UpgradeAgent(kibClient, s.agentEndVersion)
-	// require.NoError(s.T(), err)
-
-	// require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
-
-	// // Wait until the upgrade marker is removed, indicating the end of the
-	// // upgrade process
-	// require.Eventually(s.T(), upgradeMarkerRemoved, 10*time.Minute, 20*time.Second)
-
-	// newVersion, err := tools.GetAgentVersion(kibClient)
-	// require.NoError(s.T(), err)
-	// require.Equal(s.T(), s.agentEndVersion, newVersion)
-}
-
 func (s *UpgradeElasticAgent) TearDownTest() {
 	s.T().Log("Un-enrolling elastic agent")
 	assert.NoError(s.T(), tools.UnEnrollAgent(s.requirementsInfo.KibanaClient))
@@ -200,4 +160,89 @@ func getPreviousMinorVersion(v string) (string, error) {
 	}
 
 	return "", fmt.Errorf("unable to determine previous minor version for [%s]", v)
+}
+
+func TestElasticAgentStandaloneUpgrade(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		// Stack:   &define.Stack{},
+		Local:   true, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+	})
+
+	testSuite := &UpgradeStandaloneElasticAgent{
+		requirementsInfo: info,
+		agentVersion:     define.Version(),
+	}
+
+	suite.Run(t, testSuite)
+}
+
+type UpgradeStandaloneElasticAgent struct {
+	suite.Suite
+
+	requirementsInfo *define.Info
+	agentVersion     string
+	agentFixture     *atesting.Fixture
+}
+
+// Before suite
+func (s *UpgradeStandaloneElasticAgent) SetupSuite() {
+
+	agentFixture, err := atesting.NewFixture(
+		s.T(),
+		s.agentVersion,
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(s.T(), err)
+	s.agentFixture = agentFixture
+}
+
+func (s *UpgradeStandaloneElasticAgent) TestUpgradeStandaloneElasticAgentToSnapshot() {
+
+	const minVersionString = "8.9.0-SNAPSHOT"
+	minVersion, _ := version.ParseVersion(minVersionString)
+	pv, err := version.ParseVersion(s.agentVersion)
+	if pv.Less(*minVersion) {
+		s.T().Skipf("Version %s is lower than min version %s", s.agentVersion, minVersionString)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	//TODO we probably need a policy and ES connection params
+	output, err := tools.InstallStandaloneElasticAgent(s.agentFixture)
+	s.T().Logf("Agent installation output: %q", string(output))
+	require.NoError(s.T(), err)
+
+	require.Eventually(s.T(), func() bool {
+		// FIXME the client should come from the fixture but we have a proble with calculating the path of the socket ---> see fixture_install.go
+		// c := s.agentFixture.Client()
+		c := client.New(client.WithAddress(paths.ControlSocketPath))
+		err := c.Connect(ctx)
+		if err != nil {
+			s.T().Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+		state, err := c.State(ctx)
+		if err != nil {
+			s.T().Logf("error getting the agent state: %v", err)
+			return false
+		}
+		return state.State == cproto.State_HEALTHY
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	// err = tools.UpgradeAgent(kibClient, s.agentEndVersion)
+	// require.NoError(s.T(), err)
+
+	// require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+
+	// // Wait until the upgrade marker is removed, indicating the end of the
+	// // upgrade process
+	// require.Eventually(s.T(), upgradeMarkerRemoved, 10*time.Minute, 20*time.Second)
+
+	// newVersion, err := tools.GetAgentVersion(kibClient)
+	// require.NoError(s.T(), err)
+	// require.Equal(s.T(), s.agentEndVersion, newVersion)
 }
