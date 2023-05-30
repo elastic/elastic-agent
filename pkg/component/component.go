@@ -5,6 +5,7 @@
 package component
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -76,6 +77,60 @@ type Unit struct {
 	Err error `yaml:"error,omitempty"`
 }
 
+type Signed struct {
+	Data      string `yaml:"data"`
+	Signature string `yaml:"signature"`
+}
+
+// Checks if the signature exists, safe to call on nil
+func (s *Signed) IsSigned() bool {
+	return (s != nil && (len(s.Signature) > 0))
+}
+
+var ErrNotFound = errors.New("not found")
+
+func SignedFromPolicy(policy map[string]interface{}) (*Signed, error) {
+	v, ok := policy["signed"]
+	if !ok {
+		return nil, fmt.Errorf("policy is not signed: %w", ErrNotFound)
+	}
+
+	signed, ok := v.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("policy \"signed\" is not map: %w", ErrNotFound)
+	}
+
+	data, err := getStringValue(signed, "data")
+	if err != nil {
+		return nil, err
+	}
+
+	signature, err := getStringValue(signed, "signature")
+	if err != nil {
+		return nil, err
+	}
+
+	res := &Signed{
+		Data:      data,
+		Signature: signature,
+	}
+	return res, nil
+}
+
+func getStringValue(m map[string]interface{}, key string) (string, error) {
+	v, ok := m[key]
+	if !ok {
+		return "", fmt.Errorf("missing signed \"%s\": %w", key, ErrNotFound)
+	}
+
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("signed \"%s\" is not string: %w", key, ErrNotFound)
+	}
+
+	return s, nil
+}
+
 // Component is a set of units that needs to run.
 type Component struct {
 	// ID is the unique ID of the component.
@@ -109,6 +164,12 @@ func (c *Component) Type() string {
 		return c.ShipperSpec.ShipperType
 	}
 	return ""
+}
+
+// Model components model
+type Model struct {
+	Components []Component `yaml:"components,omitempty"`
+	Signed     *Signed     `yaml:"signed,omitempty"`
 }
 
 // ToComponents returns the components that should be running based on the policy and
