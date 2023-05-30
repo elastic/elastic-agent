@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"time"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -117,7 +118,11 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		filter = createComponentFilter(component)
 	}
 
-	err := printLogs(cmd.Context(), streams.Out, paths.Logs(), lines, follow, filter)
+	logsDir := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	// uncomment for debugging
+	// fmt.Fprintf(streams.Err, "logs dir: %q", logsDir)
+
+	err := printLogs(cmd.Context(), streams.Out, logsDir, lines, follow, filter)
 	if err != nil {
 		return fmt.Errorf("failed to get logs: %w", err)
 	}
@@ -298,7 +303,7 @@ func getLogFilenames(dir string) ([]string, error) {
 		if e.IsDir() || !logFilePattern.MatchString(e.Name()) {
 			continue
 		}
-		paths = append(paths, path.Join(dir, e.Name()))
+		paths = append(paths, filepath.Join(dir, e.Name()))
 	}
 
 	sortLogFilenames(paths)

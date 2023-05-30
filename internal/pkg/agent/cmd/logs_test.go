@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -46,10 +46,10 @@ func TestGetLogFilenames(t *testing.T) {
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
 		expected := []string{
-			path.Join(dir, file),
-			path.Join(dir, file1),
-			path.Join(dir, file2),
-			path.Join(dir, file3),
+			filepath.Join(dir, file),
+			filepath.Join(dir, file1),
+			filepath.Join(dir, file2),
+			filepath.Join(dir, file3),
 		}
 		require.Equal(t, expected, names)
 	})
@@ -74,21 +74,21 @@ func TestGetLogFilenames(t *testing.T) {
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
 		expected := []string{
-			path.Join(dir, prevDayFile),
-			path.Join(dir, prevDayFile1),
-			path.Join(dir, prevDayFile2),
-			path.Join(dir, prevDayFile3),
-			path.Join(dir, file),
-			path.Join(dir, file1),
-			path.Join(dir, file2),
-			path.Join(dir, file3),
+			filepath.Join(dir, prevDayFile),
+			filepath.Join(dir, prevDayFile1),
+			filepath.Join(dir, prevDayFile2),
+			filepath.Join(dir, prevDayFile3),
+			filepath.Join(dir, file),
+			filepath.Join(dir, file1),
+			filepath.Join(dir, file2),
+			filepath.Join(dir, file3),
 		}
 		require.Equal(t, expected, names)
 	})
 
 	t.Run("does not return directory entries", func(t *testing.T) {
 		dir := t.TempDir()
-		err := os.Mkdir(path.Join(dir, "should_exclude"), 0777)
+		err := os.Mkdir(filepath.Join(dir, "should_exclude"), 0777)
 		require.NoError(t, err)
 
 		names, err := getLogFilenames(dir)
@@ -114,7 +114,7 @@ func TestGetLogFilenames(t *testing.T) {
 		names, err := getLogFilenames(dir)
 		require.NoError(t, err)
 		expected := []string{
-			path.Join(dir, file1),
+			filepath.Join(dir, file1),
 		}
 		require.Equal(t, expected, names)
 	})
@@ -267,7 +267,7 @@ func TestPrintLogs(t *testing.T) {
 		})
 
 		t.Run("detects new lines and prints them", func(t *testing.T) {
-			f, err := os.OpenFile(path.Join(dir, file1), os.O_WRONLY|os.O_APPEND, 0)
+			f, err := os.OpenFile(filepath.Join(dir, file1), os.O_WRONLY|os.O_APPEND, 0)
 			require.NoError(t, err)
 			_, err = f.WriteString(generateLines(line1, 11, 20))
 			require.NoError(t, err)
@@ -365,7 +365,7 @@ func TestPrintLogFile(t *testing.T) {
 
 			buf := make([]byte, testBufferSize)
 
-			printed, err := printLogFile(path.Join(dir, filename), tc.lines, sw, buf, nil)
+			printed, err := printLogFile(filepath.Join(dir, filename), tc.lines, sw, buf, nil)
 			require.NoError(t, err)
 
 			result := bytes.NewBuffer(nil)
@@ -393,7 +393,7 @@ func TestPrintLogFile(t *testing.T) {
 
 		result := bytes.NewBuffer(nil)
 		testBuffer := make([]byte, 16) // so the buffer is not aligned
-		_, err := printLogFile(path.Join(dir, "test.ndjson"), 2, result, testBuffer, createComponentFilter(matchingID))
+		_, err := printLogFile(filepath.Join(dir, "test.ndjson"), 2, result, testBuffer, createComponentFilter(matchingID))
 		require.NoError(t, err)
 
 		var expected []byte
@@ -414,7 +414,7 @@ func TestPrintLogFile(t *testing.T) {
 
 		result := bytes.NewBuffer(nil)
 		testBuffer := make([]byte, 16) // so the buffer is not aligned
-		_, err := printLogFile(path.Join(dir, "test.ndjson"), 2, result, testBuffer, createComponentFilter(matchingID))
+		_, err := printLogFile(filepath.Join(dir, "test.ndjson"), 2, result, testBuffer, createComponentFilter(matchingID))
 		require.NoError(t, err)
 
 		var expected []byte
@@ -470,7 +470,7 @@ func createFile(t *testing.T, dir, name string) {
 }
 
 func createFileContent(t *testing.T, dir, name string, content io.Reader) {
-	f, err := os.Create(path.Join(dir, name))
+	f, err := os.Create(filepath.Join(dir, name))
 	require.NoError(t, err)
 	defer f.Close()
 	if content != nil {
