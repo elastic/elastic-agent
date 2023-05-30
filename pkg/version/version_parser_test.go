@@ -5,6 +5,7 @@
 package version
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,6 @@ func TestSemVerRegexpCompiles(t *testing.T) {
 	assert.Contains(t, namedGroups, "major")
 	assert.Contains(t, namedGroups, "minor")
 	assert.Contains(t, namedGroups, "patch")
-	assert.Contains(t, namedGroups, "coreversion")
 	assert.Contains(t, namedGroups, "prerelease")
 	assert.Contains(t, namedGroups, "buildmetadata")
 }
@@ -42,7 +42,6 @@ func TestParseVersion(t *testing.T) {
 					major:         1,
 					minor:         2,
 					patch:         3,
-					coreVersion:   "1.2.3",
 					prerelease:    "",
 					buildMetadata: "",
 				},
@@ -59,7 +58,6 @@ func TestParseVersion(t *testing.T) {
 					major:         1111,
 					minor:         2222,
 					patch:         3333,
-					coreVersion:   "1111.2222.3333",
 					prerelease:    "",
 					buildMetadata: "",
 				},
@@ -76,7 +74,6 @@ func TestParseVersion(t *testing.T) {
 					major:         1,
 					minor:         2,
 					patch:         3,
-					coreVersion:   "1.2.3",
 					prerelease:    "",
 					buildMetadata: "",
 				},
@@ -93,7 +90,6 @@ func TestParseVersion(t *testing.T) {
 					major:         1,
 					minor:         2,
 					patch:         3,
-					coreVersion:   "1.2.3",
 					prerelease:    "SNAPSHOT",
 					buildMetadata: "",
 				},
@@ -110,7 +106,6 @@ func TestParseVersion(t *testing.T) {
 					major:         1,
 					minor:         2,
 					patch:         3,
-					coreVersion:   "1.2.3",
 					prerelease:    "er.1",
 					buildMetadata: "abcdef",
 				},
@@ -127,7 +122,6 @@ func TestParseVersion(t *testing.T) {
 					major:         1,
 					minor:         2,
 					patch:         3,
-					coreVersion:   "1.2.3",
 					prerelease:    "SNAPSHOT",
 					buildMetadata: "abcdef",
 				},
@@ -225,11 +219,12 @@ func TestParseVersion(t *testing.T) {
 			assert.Equal(t, tc.expected.parsed.major, actualParsed.Major())
 			assert.Equal(t, tc.expected.parsed.minor, actualParsed.Minor())
 			assert.Equal(t, tc.expected.parsed.patch, actualParsed.Patch())
-			assert.Equal(t, tc.expected.parsed.coreVersion, actualParsed.CoreVersion())
 			assert.Equal(t, tc.expected.parsed.prerelease, actualParsed.Prerelease())
 			assert.Equal(t, tc.expected.parsed.buildMetadata, actualParsed.BuildMetadata())
 			assert.Equal(t, tc.expected.versionPrerelease, actualParsed.VersionWithPrerelease())
 
+			// verify that String() method returns the same input string (after trimming)
+			assert.Equal(t, strings.TrimSpace(tc.input), actualParsed.String())
 		})
 	}
 }

@@ -12,8 +12,10 @@ import (
 	"strings"
 )
 
-// regexp taken from https://semver.org/ (see the FAQ section/Is there a suggested regular expression (RegEx) to check a SemVer string?) with the addition of the coreversion group
-const semVerFormat = `^(?P<coreversion>(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*))(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+// regexp taken from https://semver.org/ (see the FAQ section/Is there a suggested regular expression (RegEx) to check a SemVer string?)
+const semVerFormat = `^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+const preReleaseSeparator = "-"
+const metadataSeparator = "+"
 
 var semVerFmtRegEx *regexp.Regexp
 var namedGroups map[string]int
@@ -35,7 +37,6 @@ type ParsedSemVer struct {
 	major         int
 	minor         int
 	patch         int
-	coreVersion   string
 	prerelease    string
 	buildMetadata string
 }
@@ -57,7 +58,7 @@ func (psv ParsedSemVer) Patch() int {
 }
 
 func (psv ParsedSemVer) CoreVersion() string {
-	return psv.coreVersion
+	return fmt.Sprintf("%d.%d.%d", psv.Major(), psv.Minor(), psv.Patch())
 }
 
 func (psv ParsedSemVer) Prerelease() string {
@@ -70,7 +71,7 @@ func (psv ParsedSemVer) BuildMetadata() string {
 
 func (psv ParsedSemVer) VersionWithPrerelease() string {
 	b := new(strings.Builder)
-	b.WriteString(psv.coreVersion)
+	b.WriteString(psv.CoreVersion())
 	if psv.prerelease != "" {
 		b.WriteString("-")
 		b.WriteString(psv.prerelease)
@@ -106,6 +107,30 @@ func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 	return false
 }
 
+func (psv ParsedSemVer) String() string {
+	b := new(strings.Builder)
+	b.WriteString(psv.CoreVersion())
+	if psv.Prerelease() != "" {
+		b.WriteString(preReleaseSeparator)
+		b.WriteString(psv.Prerelease())
+	}
+	if psv.BuildMetadata() != "" {
+		b.WriteString(metadataSeparator)
+		b.WriteString(psv.buildMetadata)
+	}
+	return b.String()
+}
+
+func NewParsedSemVer(major int, minor int, patch int, prerelease string, metadata string) *ParsedSemVer {
+	return &ParsedSemVer{
+		major:         major,
+		minor:         minor,
+		patch:         patch,
+		prerelease:    prerelease,
+		buildMetadata: metadata,
+	}
+}
+
 func ParseVersion(version string) (*ParsedSemVer, error) {
 	matches := semVerFmtRegEx.FindStringSubmatch(strings.TrimSpace(version))
 	if matches == nil {
@@ -131,8 +156,13 @@ func ParseVersion(version string) (*ParsedSemVer, error) {
 		major:         major,
 		minor:         minor,
 		patch:         patch,
-		coreVersion:   matches[namedGroups["coreversion"]],
 		prerelease:    matches[namedGroups["prerelease"]],
 		buildMetadata: matches[namedGroups["buildmetadata"]],
 	}, nil
 }
+
+type SortableParsedVersions []*ParsedSemVer
+
+func (spv SortableParsedVersions) Len() int           { return len(spv) }
+func (spv SortableParsedVersions) Swap(i, j int)      { spv[i], spv[j] = spv[j], spv[i] }
+func (spv SortableParsedVersions) Less(i, j int) bool { return spv[i].Less(*spv[j]) }
