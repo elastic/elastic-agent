@@ -88,20 +88,23 @@ func (s stackWriter) PopAll(w io.Writer) error {
 	return nil
 }
 
+// newFilteringWriter create a writer proxy that filters out log lines according to the given `filter`
 func newFilteringWriter(ctx context.Context, w io.Writer, filter filterFunc) io.Writer {
 	pr, pw := io.Pipe()
 	scanner := bufio.NewScanner(pr)
 	go func() {
 		for scanner.Scan() {
-			if ctx.Err() != nil {
+			select {
+			case <-ctx.Done():
 				return
+			default:
+				line := scanner.Bytes()
+				if !filter(line) {
+					continue
+				}
+				_, _ = w.Write(line)
+				_, _ = w.Write([]byte{'\n'})
 			}
-			line := scanner.Bytes()
-			if !filter(line) {
-				continue
-			}
-			_, _ = w.Write(line)
-			_, _ = w.Write([]byte{'\n'})
 		}
 	}()
 
