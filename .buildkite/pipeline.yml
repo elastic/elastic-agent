@@ -1,5 +1,17 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
+env:
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+agents:
+  image: docker.elastic.co/observability-ci/elastic-agent-build-image:latest
+  ephemeralStorage: "10G"
+  memory: "4G"
 steps:
-  - label: "Example test"
-    command: echo "Hello!"
+  - label: "Build"
+    command: mage build
+    artifact_paths:
+      - "./build/elastic-agent"
+  - label: "Unit tests"
+    command: mage test
+    artifact_paths:
+      - "./build/TEST-go-unit.xml"

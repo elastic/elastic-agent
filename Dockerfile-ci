@@ -1,0 +1,23 @@
+# Tmp Dockerfile for the CI builds. Will be moved to the ci-images repo later 
+ARG GO_VERSION=1.19.9
+FROM golang:${GO_VERSION}-alpine
+
+RUN apk update && apk add --no-cache \
+    openssh-client \
+    git \
+    bash \
+    curl \
+    ca-certificates \
+    make \
+    gcc \
+    g++
+
+
+# Install mage
+RUN go install github.com/magefile/mage@latest
+
+ENV GO111MODULE=on
+WORKDIR ./code
+
+COPY . .
+USER root
