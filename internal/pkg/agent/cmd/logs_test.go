@@ -309,6 +309,91 @@ func TestPrintLogs(t *testing.T) {
 			require.ErrorIs(t, printErr, context.Canceled)
 		})
 	})
+
+	t.Run("returns tail and then follows the logs with filter", func(t *testing.T) {
+		dir := t.TempDir()
+		content := []byte(`{"component":{"id":"match"}, "message":"test1"}
+{"component":{"id":"non-match"}, "message":"test2"}
+{"component":{"id":"match"}, "message":"test3"}
+{"component":{"id":"match"}, "message":"test4"}
+{"component":{"id":"non-match"}, "message":"test5"}
+{"component":{"id":"match"}, "message":"test6"}
+`)
+		createFileContent(t, dir, file1, bytes.NewBuffer(content))
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		result := bytes.NewBuffer(nil)
+		var printErr error
+		go func() {
+			printErr = printLogs(ctx, result, dir, 3, true, createComponentFilter("match"))
+		}()
+
+		var expected string
+
+		t.Run("tails filtering the file", func(t *testing.T) {
+			expected = `{"component":{"id":"match"}, "message":"test3"}
+{"component":{"id":"match"}, "message":"test4"}
+{"component":{"id":"match"}, "message":"test6"}
+`
+
+			require.Eventuallyf(t, func() bool {
+				return result.String() == expected
+			}, time.Second, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+		})
+
+		t.Run("detects new lines and prints them with filter", func(t *testing.T) {
+			f, err := os.OpenFile(filepath.Join(dir, file1), os.O_WRONLY|os.O_APPEND, 0)
+			require.NoError(t, err)
+
+			content := `{"component":{"id":"match"}, "message":"test7"}
+{"component":{"id":"non-match"}, "message":"test8"}
+{"component":{"id":"match"}, "message":"test9"}
+{"component":{"id":"match"}, "message":"test10"}
+{"component":{"id":"non-match"}, "message":"test11"}
+{"component":{"id":"match"}, "message":"test12"}
+`
+
+			_, err = f.WriteString(content)
+			require.NoError(t, err)
+			f.Close()
+
+			time.Sleep(watchInterval)
+
+			expected += `{"component":{"id":"match"}, "message":"test7"}
+{"component":{"id":"match"}, "message":"test9"}
+{"component":{"id":"match"}, "message":"test10"}
+{"component":{"id":"match"}, "message":"test12"}
+`
+			require.Eventuallyf(t, func() bool {
+				return result.String() == expected
+			}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+		})
+
+		t.Run("detects a new file and switches to it with filter", func(t *testing.T) {
+			content := `{"component":{"id":"match"}, "message":"test13"}
+{"component":{"id":"non-match"}, "message":"test14"}
+{"component":{"id":"match"}, "message":"test15"}
+`
+
+			createFileContent(t, dir, file2, bytes.NewBuffer([]byte(content)))
+
+			time.Sleep(watchInterval)
+
+			expected += `{"component":{"id":"match"}, "message":"test13"}
+{"component":{"id":"match"}, "message":"test15"}
+`
+
+			require.Eventuallyf(t, func() bool {
+				return result.String() == expected
+			}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+		})
+
+		t.Run("handles interruption correctly", func(t *testing.T) {
+			cancel()
+			require.Eventuallyf(t, func() bool { return printErr != nil }, time.Second, time.Millisecond, "context must stop logs following")
+			require.ErrorIs(t, printErr, context.Canceled)
+		})
+	})
 }
 
 func TestPrintLogFile(t *testing.T) {

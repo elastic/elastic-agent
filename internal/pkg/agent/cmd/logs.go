@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -85,6 +86,26 @@ func (s stackWriter) PopAll(w io.Writer) error {
 	}
 
 	return nil
+}
+
+func newFilteringWriter(ctx context.Context, w io.Writer, filter filterFunc) io.Writer {
+	pr, pw := io.Pipe()
+	scanner := bufio.NewScanner(pr)
+	go func() {
+		for scanner.Scan() {
+			if ctx.Err() != nil {
+				return
+			}
+			line := scanner.Bytes()
+			if !filter(line) {
+				continue
+			}
+			_, _ = w.Write(line)
+			_, _ = w.Write([]byte{'\n'})
+		}
+	}()
+
+	return pw
 }
 
 func newLogsCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -188,7 +209,11 @@ func printLogs(ctx context.Context, w io.Writer, dir string, lines int, follow b
 	}
 
 	if follow {
-		err = watchLogsDir(ctx, dir, fileToFollow, followOffset, w)
+		output := w
+		if filter != nil {
+			output = newFilteringWriter(ctx, w, filter)
+		}
+		err = watchLogsDir(ctx, dir, fileToFollow, followOffset, output)
 		if err != nil {
 			return fmt.Errorf("failed to follow the logs: %w", err)
 		}
