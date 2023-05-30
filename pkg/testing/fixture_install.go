@@ -10,11 +10,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
@@ -79,15 +82,41 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.installed = true
 	f.installOpts = installOpts
 
+	if installOpts.BasePath == "" {
+		var defaultBasePath string
+		switch runtime.GOOS {
+		case "darwin":
+			defaultBasePath = `/Library`
+		case "linux":
+			defaultBasePath = `/opt`
+		case "windows":
+			defaultBasePath = `C:\Program Files`
+		}
+
+		f.workDir = filepath.Join(defaultBasePath, "Elastic", "Agent")
+	} else {
+		f.workDir = installOpts.BasePath
+	}
+
+	// FIXME: this returns the wrong path for an installed agend even after setting the wowrkdir correctly
+	cAddr, err := control.AddressFromPath(f.operatingSystem, f.workDir)
+	if err != nil {
+		return out, fmt.Errorf("failed to get control protcol address: %w", err)
+	}
+	client.WithAddress(cAddr)
+	c := client.New()
+	f.setClient(c)
+
 	f.t.Cleanup(func() {
-		_, err := f.Uninstall(ctx, nil)
+		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
+		f.setClient(nil)
 		if errors.Is(err, ErrNotInstalled) {
 			// Agent fixture has already been uninstalled, perhaps by
 			// an explicit call to fixture.Uninstall, so nothing needs
 			// to be done here.
 			return
 		}
-		require.NoError(f.t, err)
+		require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
 	})
 
 	return out, nil
@@ -118,7 +147,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	}
 	out, err := f.Exec(ctx, uninstallArgs, opts...)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	// Check that Elastic Agent files are actually removed
@@ -132,7 +161,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
 	}
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	return out, nil
