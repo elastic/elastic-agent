@@ -4,7 +4,7 @@ The policy of an Agent is the user-controlled portion of the Agent configuration
 
 A __component__ is an executable that Agent runs or monitors. That component is divided into __units__ corresponding to its functional behavior. For example, Filebeat is a component, but Filebeat may be run with multiple `filestream` inputs, and each of those is a unit with its own configuration.
 
-Components run by Agent have one or more input units describing the data they collect, and one output unit describing where the data goes.
+Components run by Agent have one or more input units describing the data they collect, and one output unit describing where the data goes. For more on these distinctions see the Agent architecture's [compute model](architecture.md#compute-model).
 
 ## Example: policies mapped to running processes
 
