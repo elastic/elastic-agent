@@ -1,11 +1,21 @@
 package tools
 
-const defaultArtifactAPIURL = "https://artifacts-api.elastic.co"
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
 
-const artifactsAPIV1VersionsEndpoint = "v1/versions/"
-const artifactsAPIV1VersionBuildsEndpoint = "v1/versions/%s/builds/"
-const artifactAPIV1BuildDetailsEndpoint = "v1/versions/%s/builds/%s"
-const artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
+const (
+	defaultArtifactAPIURL = "https://artifacts-api.elastic.co/"
+
+	artifactsAPIV1VersionsEndpoint      = "v1/versions/"
+	artifactsAPIV1VersionBuildsEndpoint = "v1/versions/%s/builds/"
+	artifactAPIV1BuildDetailsEndpoint   = "v1/versions/%s/builds/%s"
+	//artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
+)
 
 type VersionList struct {
 	Versions  []string `json:"versions"`
@@ -73,4 +83,125 @@ type SearchPackageResult struct {
 		LastUpdateTime         string `json:"last-update-time"`
 		SecondsSinceLastUpdate int    `json:"seconds-since-last-update"`
 	} `json:"manifests"`
+}
+
+type ArtifactAPIClient struct {
+	http.Client
+	apiURL string
+}
+
+func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aac.apiURL+artifactsAPIV1VersionsEndpoint, nil)
+
+	if err != nil {
+		err = fmt.Errorf("composing request for getting versions: %w", err)
+		return
+	}
+
+	resp, err := aac.Client.Do(req)
+	if err != nil {
+		err = fmt.Errorf("executing http request %v: %w", req, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		err = fmt.Errorf("reading response body: %w", err)
+		return
+	}
+	list = new(VersionList)
+	err = json.Unmarshal(respBytes, list)
+
+	if err != nil {
+		err = fmt.Errorf("unmarshaling version list: %w", err)
+		return
+	}
+
+	return
+}
+
+func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version string) (builds *VersionBuilds, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aac.apiURL+fmt.Sprintf(artifactsAPIV1VersionBuildsEndpoint, version), nil)
+
+	if err != nil {
+		err = fmt.Errorf("composing request for getting versions: %w", err)
+		return
+	}
+
+	resp, err := aac.Client.Do(req)
+	if err != nil {
+		err = fmt.Errorf("executing http request %v: %w", req, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		err = fmt.Errorf("reading response body: %w", err)
+		return
+	}
+	builds = new(VersionBuilds)
+	err = json.Unmarshal(respBytes, builds)
+
+	if err != nil {
+		err = fmt.Errorf("unmarshaling build list: %w", err)
+		return
+	}
+
+	return
+}
+
+func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string, buildID string) (buildDetails *BuildDetails, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aac.apiURL+fmt.Sprintf(artifactAPIV1BuildDetailsEndpoint, version, buildID), nil)
+
+	if err != nil {
+		err = fmt.Errorf("composing request for getting build details: %w", err)
+		return
+	}
+
+	resp, err := aac.Client.Do(req)
+	if err != nil {
+		err = fmt.Errorf("executing http request %v: %w", req, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		err = fmt.Errorf("reading response body: %w", err)
+		return
+	}
+	buildDetails = new(BuildDetails)
+	err = json.Unmarshal(respBytes, buildDetails)
+
+	if err != nil {
+		err = fmt.Errorf("unmarshaling build details: %w", err)
+		return
+	}
+
+	return
+}
+
+type ArtifactAPIClientOpt func(aac *ArtifactAPIClient)
+
+func WithUrl(url string) ArtifactAPIClientOpt {
+	return func(aac *ArtifactAPIClient) { aac.apiURL = url }
+}
+
+func WithHttpClient(url string) ArtifactAPIClientOpt {
+	return func(aac *ArtifactAPIClient) { aac.apiURL = url }
+}
+
+func NewArtifactAPIClient(opts ...ArtifactAPIClientOpt) *ArtifactAPIClient {
+	c := &ArtifactAPIClient{
+		apiURL: defaultArtifactAPIURL,
+		Client: http.Client{},
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }
