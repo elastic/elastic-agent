@@ -20,7 +20,7 @@ shippers:
 
 The `version` key must be present and must equal 2 (to distinguish from the older version 1 schema that is no longer supported).
 
-`inputs` is a list of input types this component can run, and `shippers` is a list of shipper types this component can run.
+`inputs` is a list of input types this component can run, and `shippers` is a list of shipper types this component can run. Each configured input and shipper also has its own list of `outputs` that it supports, but the spec file only tracks the list of supported types, and the rest comes from the [Agent policy](agent-policy.md).
 
 Most configuration fields are shared between inputs and shippers. The next section lists all valid fields, noting where there are differences between the two cases.
 
