@@ -48,10 +48,26 @@ In this example, we have defined three outputs: `elasticsearch1`, `elasticsearch
 
 Agent has divided these inputs among four __components__ (running processes) according to their type. Each component is broken up into multiple __units__, an output unit that sends its data to the appropriate destination, and some number of input units that provide data to the output. For example the `filebeat1` component has three, two input and one output.
 
+Now let's look at the same setup with the shipper enabled. The output configuration becomes:
+
+```yml
+outputs:
+  elasticsearch1:
+    type: "elasticsearch"
+    use_shipper: true
+  elasticsearch2:
+    type: "elasticsearch"
+    use_shipper: true
+  logstash:
+    type: "logstash"
+    use_shipper: true
+```
+
+and the rest of the configuration is unchanged.
 
 ![Example deployment with shipper](diagrams/components-shipper-example.svg)
 
-This example shows the same scenario, but with the shipper enabled. In this setup, there are shipper components whose job is to send the data upstream, and input components that send their data to a local shipper rather than managing their own independent queue and network connections.
+This is the same as the previous scenario, but all outputs are configured to use the shipper. In this setup, there are shipper components whose job is to send the data upstream, and input components that send their data to a local shipper rather than managing their own independent queue and network connections.
 
 A shipper component also has one output unit and one or more input units, but its input units correspond to the components that write to it rather than to individual data sources.
 
