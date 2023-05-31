@@ -961,7 +961,7 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
 	}
 	if combinedErr != nil {
-		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error())
+		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
 	}
 	// if there's no component errors, continue to pass along the context error
 	return ctx.Err()
