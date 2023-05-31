@@ -5,7 +5,9 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
 	"github.com/elastic/elastic-agent/pkg/component"
+
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -25,7 +27,7 @@ func makeComponent(name string, config map[string]interface{}) (component.Compon
 	}
 	unitCfg, err := component.ExpectedConfig(config)
 	if err != nil {
-		return c, nil
+		return c, err
 	}
 	c.Units[0].Config = unitCfg
 	return c, nil

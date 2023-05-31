@@ -826,7 +826,7 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 		}
 
 		// Some "signed" properties are not found, continue.
-		c.logger.Debugf("Continue with missing \"signed\" propeties: %v", err)
+		c.logger.Debugf("Continue with missing \"signed\" properties: %v", err)
 	}
 
 	model := component.Model{
@@ -961,7 +961,7 @@ func (c *Coordinator) handleCoordinatorDone(ctx context.Context, varsErrCh, runt
 		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars Watcher: %w", varsErr))
 	}
 	if combinedErr != nil {
-		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error()) //nolint:errorlint //errors.Is() won't work if we pass through the combined errors with %w
+		return fmt.Errorf("%w: %s", ErrFatalCoordinator, combinedErr.Error())
 	}
 	// if there's no component errors, continue to pass along the context error
 	return ctx.Err()

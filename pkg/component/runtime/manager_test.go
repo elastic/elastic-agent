@@ -877,7 +877,7 @@ func TestManager_FakeInput_NoDeadlock(t *testing.T) {
 			}
 			i += 1
 			comp = updatedComp
-			err := m.Update([]component.Component{updatedComp})
+			err := m.Update(component.Model{Components: []component.Component{updatedComp}})
 			if err != nil {
 				updatedErr <- err
 				return
@@ -918,7 +918,7 @@ LOOP:
 		case <-endTimer.C:
 			// no deadlock after timeout (all good stop the component)
 			updatedCancel()
-			_ = m.Update([]component.Component{})
+			_ = m.Update(component.Model{Components: []component.Component{}})
 			break LOOP
 		case err := <-errCh:
 			require.NoError(t, err)
