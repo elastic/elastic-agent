@@ -342,14 +342,14 @@ type RuntimeManager_Update_Call struct {
 }
 
 // Update is a helper method to define mock.On call
-//   - _a0 []component.Component
+//   - _a0 component.Model
 func (_e *RuntimeManager_Expecter) Update(_a0 interface{}) *RuntimeManager_Update_Call {
 	return &RuntimeManager_Update_Call{Call: _e.mock.On("Update", _a0)}
 }
 
-func (_c *RuntimeManager_Update_Call) Run(run func(_a0 []component.Component)) *RuntimeManager_Update_Call {
+func (_c *RuntimeManager_Update_Call) Run(run func(_a0 component.Model)) *RuntimeManager_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]component.Component))
+		run(args[0].(component.Model))
 	})
 	return _c
 }
@@ -359,7 +359,7 @@ func (_c *RuntimeManager_Update_Call) Return(_a0 error) *RuntimeManager_Update_C
 	return _c
 }
 
-func (_c *RuntimeManager_Update_Call) RunAndReturn(run func([]component.Component) error) *RuntimeManager_Update_Call {
+func (_c *RuntimeManager_Update_Call) RunAndReturn(run func(component.Model) error) *RuntimeManager_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }
