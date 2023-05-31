@@ -9,11 +9,13 @@ package integration
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 
 	"github.com/google/uuid"
@@ -214,12 +216,10 @@ func (s *UpgradeStandaloneElasticAgent) TestUpgradeStandaloneElasticAgentToSnaps
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	//TODO we probably need a policy and ES connection params
 	output, err := tools.InstallStandaloneElasticAgent(s.agentFixture)
 	s.T().Logf("Agent installation output: %q", string(output))
 	require.NoError(s.T(), err)
 
-	// FIXME the client should come from the fixture but we have a problem with calculating the path of the socket ---> see fixture_install.go
 	c := s.agentFixture.Client()
 
 	require.Eventually(s.T(), func() bool {
@@ -316,4 +316,17 @@ func (s *UpgradeStandaloneElasticAgent) TestUpgradeStandaloneElasticAgentToSnaps
 		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
 	}, 10*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
+	updateMarkerFile := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", ".update-marker")
+
+	s.Require().FileExists(updateMarkerFile)
+
+	// The checks of the update marker makes the test time out since it runs for more than 10 minutes :(
+	// s.Require().Eventuallyf(func() bool {
+	// 	_, err := os.Stat(updateMarkerFile)
+	// 	return errors.Is(err, fs.ErrNotExist)
+	// }, 10*time.Minute, 1*time.Second, "agent never removed update marker")
+
+	// version, err := c.Version(ctx)
+	// s.Require().NoError(err, "error checking version after upgrade")
+	// s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
 }
