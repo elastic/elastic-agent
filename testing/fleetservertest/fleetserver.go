@@ -1,4 +1,4 @@
-package fleetserver
+package fleetservertest
 
 import (
 	"context"
@@ -59,10 +59,10 @@ type API struct {
 		uploadCompleteRequest UploadCompleteRequest) *HTTPError
 }
 
-// NewTest returns a new started *httptest.Server mocking the Fleet Server API.
+// NewServer returns a new started *httptest.Server mocking the Fleet Server API.
 // If a route is called and its handler (the *Fn field) is nil a.
 // http.StatusNotImplemented error will be returned.
-func NewTest(api API) *httptest.Server {
+func NewServer(api API) *httptest.Server {
 	mux := NewRouter(Handlers{api: api})
 
 	return httptest.NewServer(mux)

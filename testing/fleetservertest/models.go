@@ -1,4 +1,4 @@
-package fleetserver
+package fleetservertest
 
 // =============================================================================
 // ================================== Ack ======================================
@@ -257,7 +257,7 @@ type StatusResponse struct {
 	// A Unit state that fleet-server may report. Unit state is defined in the elastic-agent-client specification.
 	Status string `json:"status"`
 
-	Version StatusResponseVersion `json:"version,omitempty"`
+	Version *StatusResponseVersion `json:"version,omitempty"`
 }
 
 // StatusResponseVersion - Version information included in the response to an authorized status request.

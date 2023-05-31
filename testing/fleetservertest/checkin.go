@@ -1,41 +1,65 @@
-package fleetserver
+package fleetservertest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"testing"
+	"net/http"
 )
 
-func NewCheckinResponsePolicySystemIntegration(
-	t *testing.T, agentID, ackToken string) CheckinResponse {
+func NewCheckinHandler(agentID, ackToken string, withEndpoint bool) func(
+	ctx context.Context,
+	id string,
+	userAgent string,
+	acceptEncoding string,
+	checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
 
-	resp := CheckinResponse{}
-	err := json.Unmarshal(
-		[]byte(fmt.Sprintf(checkinResponseJSONPolicySystemIntegration,
-			ackToken, agentID)),
-		&resp)
-	if err != nil {
-		t.Fatalf("could not unmarshal checkinResponseJSONPolicySystemIntegration: %v",
-			err)
+	policy := checkinResponseJSONPolicySystemIntegration
+	if withEndpoint {
+		policy = checkinResponseJSONPolicySystemIntegrationAndEndpoint
 	}
 
-	return resp
+	return func(
+		ctx context.Context,
+		id string,
+		userAgent string,
+		acceptEncoding string,
+		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
+
+		resp := CheckinResponse{}
+		err := json.Unmarshal(
+			[]byte(fmt.Sprintf(policy, ackToken, agentID)),
+			&resp)
+		if err != nil {
+			return nil, &HTTPError{
+				StatusCode: http.StatusInternalServerError,
+				Error:      err.Error(),
+				Message:    "failed to unmarshal policy",
+			}
+		}
+
+		return &resp, nil
+	}
 }
 
-func NewCheckinResponsePolicySystemIntegrationAndEndpoint(
-	t *testing.T, agentID, ackToken string) CheckinResponse {
-
-	resp := CheckinResponse{}
-	err := json.Unmarshal(
-		[]byte(fmt.Sprintf(checkinResponseJSONPolicySystemIntegrationAndEndpoint,
-			ackToken, agentID)),
-		&resp)
-	if err != nil {
-		t.Fatalf("could not unmarshal checkinResponseJSONPolicySystemIntegrationAndEndpoint: %v",
-			err)
+func NewStatusHandlerHealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
+	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
+		return &StatusResponse{
+			Name:   "fleet-server",
+			Status: "HEALTHY",
+			// fleet-server does not respond with version information
+		}, nil
 	}
+}
 
-	return resp
+func NewStatusHandlerUnhealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
+	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
+		return &StatusResponse{
+			Name:   "fleet-server",
+			Status: "UNHEALTHY",
+			// fleet-server does not respond with version information
+		}, &HTTPError{StatusCode: http.StatusInternalServerError}
+	}
 }
 
 const (

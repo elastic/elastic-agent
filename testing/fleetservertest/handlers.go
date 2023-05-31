@@ -1,4 +1,4 @@
-package fleetserver
+package fleetservertest
 
 import (
 	"encoding/json"
@@ -15,7 +15,9 @@ const (
 	PathAgentCheckin = "/api/fleet/agents/{id}/checkin"
 	PathAgentEnroll  = "/api/fleet/agents/{id}"
 
-	PathArtifact       = "/api/fleet/artifacts/{id}/{sha2}"
+	PathArtifact = "/api/fleet/artifacts/{id}/{sha2}"
+	PathStatus   = "/api/status"
+
 	PathUploadBegin    = "/api/fleet/uploads"
 	PathUploadChunk    = "/api/fleet/uploads/{id}/{chunkNum}"
 	PathUploadComplete = "/api/fleet/uploads/{id}"
@@ -113,7 +115,7 @@ func (h *Handlers) Routes() []Route {
 		{
 			Name:        "Status",
 			Method:      http.MethodGet,
-			Pattern:     "/api/status",
+			Pattern:     PathStatus,
 			HandlerFunc: h.Status,
 		},
 		{
@@ -247,6 +249,9 @@ func (h *Handlers) Artifact(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) Status(w http.ResponseWriter, r *http.Request) {
 	result, err := h.api.Status(r.Context())
 	if err != nil {
+		if result != nil {
+			respondAsJSON(err.StatusCode, result, w)
+		}
 		respondAsJSON(err.StatusCode, err, w)
 		return
 	}

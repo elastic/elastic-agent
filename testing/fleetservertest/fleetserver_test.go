@@ -1,4 +1,4 @@
-package fleetserver
+package fleetservertest
 
 import (
 	"context"
@@ -7,27 +7,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"testing"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
-func ExampleNewTest_status() {
-	ts := NewTest(API{
-		StatusFn: func(ctx context.Context) (*StatusResponse, *HTTPError) {
-			return &StatusResponse{
-				Name:   "fleet-server-test-api",
-				Status: "it works!",
-				Version: StatusResponseVersion{
-					Number:    "1",
-					BuildHash: "aHash",
-					BuildTime: "now",
-				},
-			}, nil
-		},
+func ExampleNewServer_status() {
+	ts := NewServer(API{
+		StatusFn: NewStatusHandlerHealth(),
 	})
 
-	resp, err := http.Get(ts.URL + "/api/status")
+	resp, err := http.Get(ts.URL + PathStatus)
 	if err != nil {
 		panic(fmt.Sprintf("could not make request to fleet-test-server: %v", err))
 	}
@@ -41,7 +30,7 @@ func ExampleNewTest_status() {
 	fmt.Printf("%s", body)
 
 	// Output:
-	// {"name":"fleet-server-test-api","status":"it works!","version":{"number":"1","build_hash":"aHash","build_time":"now"}}
+	// {"name":"fleet-server","status":"HEALTHY"}
 }
 
 type agentInfo string
@@ -73,24 +62,11 @@ func (s sender) URI() string {
 	return s.url + s.path
 }
 
-func ExampleNewTest_checkin() {
-	t := &testing.T{}
+func ExampleNewServer_checkin() {
 	agentID := "agentID"
 
-	ts := NewTest(API{
-		CheckinFn: func(
-			ctx context.Context,
-			id string,
-			userAgent string,
-			acceptEncoding string,
-			checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
-
-			resp := NewCheckinResponsePolicySystemIntegration(t,
-				agentID,
-				"ackToken")
-
-			return &resp, nil
-		},
+	ts := NewServer(API{
+		CheckinFn: NewCheckinHandler(agentID, "", false),
 	})
 
 	cmd := fleetapi.NewCheckinCmd(
