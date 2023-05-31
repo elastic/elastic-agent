@@ -8,6 +8,11 @@ ELASTIC_AGENT_REPO_PATH=x-pack/plugins/fleet/server/services/
 FILE_REPO=elastic_agent_manifest.ts
 ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 
+#variable needed for kustomize build
+KUSTOMIZE=elastic-agent-kustomize
+KUSTOMIZE_DEFAULT=elastic-agent-kustomize/default
+KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
+
 .PHONY: generate-k8s $(ALL)
 generate-k8s: $(ALL)
 
@@ -85,3 +90,27 @@ else
 	echo "No differences found with kibana git repository"
 endif
 
+
+## ci-create-kustomize-default : Create default kustomize folder 
+.PHONY: ci-create-kustomize-default $(ALL)
+ci-create-kustomize-default: $(ALL)
+
+$(ALL):
+	@echo "Generating $@ kustomize-default files"
+	@for f in $(shell ls $@/*.yaml); do \
+		mkdir -p $(KUSTOMIZE_DEFAULT)/$@; \
+		cp -r $$f  $(KUSTOMIZE_DEFAULT)/$@/; \
+		cp -r $(KUSTOMIZE)/kustomization-default.yaml $(KUSTOMIZE_DEFAULT)/$@/kustomization.yaml; \
+	done
+
+## ci-create-kustomize-ksm-autosharding : Create ksm-autosharding kustomize folder 
+.PHONY: ci-create-kustomize-ksm-autosharding $(ALL)
+ci-create-kustomize-ksm-autosharding: $(ALL)
+
+$(ALL):
+	@echo "Generating $@ kustomize-ksm-autosharding files"
+	@for f in $(shell ls $@/*.yaml | grep -v daemonset.yaml); do \
+		mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@; \
+		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/; \
+		cp -r $(KUSTOMIZE)/$@-kustomization-default.yaml $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/kustomization.yaml; \
+	done
