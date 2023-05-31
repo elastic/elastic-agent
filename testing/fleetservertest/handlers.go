@@ -1,8 +1,10 @@
 package fleetservertest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -61,7 +63,7 @@ func NewPathUploadComplete(agentID string) string {
 
 // Handlers binds http requests to an api service and writes the service results to the http response
 type Handlers struct {
-	api API
+	api FleetAPI
 }
 
 type Route struct {
@@ -69,6 +71,18 @@ type Route struct {
 	Method      string
 	Pattern     string
 	HandlerFunc http.HandlerFunc
+}
+
+// TODO: move the server to the internal package
+type FleetAPI interface {
+	AgentAcks(ctx context.Context, id string, ackRequest AckRequest) (*AckResponse, *HTTPError)
+	AgentCheckin(ctx context.Context, id string, userAgent string, acceptEncoding string, checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError)
+	AgentEnroll(ctx context.Context, id string, userAgent string, enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
+	Artifact(ctx context.Context, id string, sha2 string) *HTTPError
+	Status(ctx context.Context) (*StatusResponse, *HTTPError)
+	UploadBegin(ctx context.Context, requestBody UploadBeginRequest) (*UploadBeginResponse, *HTTPError)
+	UploadChunk(ctx context.Context, id string, chunkNum int32, chunkSHA2 string, body io.ReadCloser) *HTTPError
+	UploadComplete(ctx context.Context, id string, uploadCompleteRequest UploadCompleteRequest) (*UploadComplete200Response, *HTTPError)
 }
 
 // NewRouter creates a new router for any number of api routers
