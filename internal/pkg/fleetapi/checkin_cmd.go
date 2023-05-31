@@ -9,13 +9,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"net/http/httputil"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const checkingPath = "/api/fleet/agents/%s/checkin"
@@ -120,7 +122,7 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 
 	cp := fmt.Sprintf(checkingPath, e.info.AgentID())
 	sendStart := time.Now()
-	resp, err := e.client.Send(ctx, "POST", cp, nil, nil, bytes.NewBuffer(b))
+	resp, err := e.client.Send(ctx, http.MethodPost, cp, nil, nil, bytes.NewBuffer(b))
 	sendDuration := time.Since(sendStart)
 	if err != nil {
 		return nil, sendDuration, errors.New(err,
@@ -134,7 +136,18 @@ func (e *CheckinCmd) Execute(ctx context.Context, r *CheckinRequest) (*CheckinRe
 		return nil, sendDuration, client.ExtractError(resp.Body)
 	}
 
-	rs, err := ioutil.ReadAll(resp.Body)
+	bs, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		panic(fmt.Sprintf("could not dump checkin response: %v", err))
+	}
+	l, err := logger.New("dumper", true)
+	if err != nil {
+		panic(fmt.Sprintf("could not create logger to dump response: %v", err))
+	}
+	l.With("checkin.response", fmt.Sprintf("%s", bs)).
+		Info("checkin response dump")
+
+	rs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, sendDuration, errors.New(err, "failed to read checkin response")
 	}

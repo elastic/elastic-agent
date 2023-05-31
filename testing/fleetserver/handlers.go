@@ -5,9 +5,57 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
+
+const (
+	PathAgentAcks    = "/api/fleet/agents/{id}/acks"
+	PathAgentCheckin = "/api/fleet/agents/{id}/checkin"
+	PathAgentEnroll  = "/api/fleet/agents/{id}"
+
+	PathArtifact       = "/api/fleet/artifacts/{id}/{sha2}"
+	PathUploadBegin    = "/api/fleet/uploads"
+	PathUploadChunk    = "/api/fleet/uploads/{id}/{chunkNum}"
+	PathUploadComplete = "/api/fleet/uploads/{id}"
+)
+
+func NewPathAgentAcks(agentID string) string {
+	return strings.Replace(PathAgentAcks, "{id}", agentID, 1)
+}
+
+func NewPathCheckin(agentID string) string {
+	return strings.Replace(PathAgentCheckin, "{id}", agentID, 1)
+}
+
+func NewPathAgentEnroll(agentID string) string {
+	return strings.Replace(PathAgentEnroll, "{id}", agentID, 1)
+}
+
+func NewPathArtifact(agentID, sha2 string) string {
+	return strings.Replace(
+		strings.Replace(PathArtifact, "{id}", agentID, 1),
+		"{sha2}",
+		sha2,
+		1)
+}
+
+func NewPathUploadBegin() string {
+	return PathUploadBegin
+}
+
+func NewPathUploadChunk(agentID, chunkNum string) string {
+	return strings.Replace(
+		strings.Replace(PathUploadChunk, "{id}", agentID, 1),
+		"{chunkNum}",
+		chunkNum,
+		1)
+}
+
+func NewPathUploadComplete(agentID string) string {
+	return strings.Replace(PathUploadComplete, "{id}", agentID, 1)
+}
 
 // Handlers binds http requests to an api service and writes the service results to the http response
 type Handlers struct {
@@ -36,61 +84,61 @@ func NewRouter(hs Handlers) *mux.Router {
 }
 
 // Routes returns all the api routes for the Handlers
-func (c *Handlers) Routes() []Route {
+func (h *Handlers) Routes() []Route {
 	return []Route{
 		{
 			Name:        "AgentAcks",
 			Method:      http.MethodPost,
-			Pattern:     "/api/fleet/agents/{id}/acks",
-			HandlerFunc: c.AgentAcks,
+			Pattern:     PathAgentAcks,
+			HandlerFunc: h.AgentAcks,
 		},
 		{
 			Name:        "AgentCheckin",
 			Method:      http.MethodPost,
-			Pattern:     "/api/fleet/agents/{id}/checkin",
-			HandlerFunc: c.AgentCheckin,
+			Pattern:     PathAgentCheckin,
+			HandlerFunc: h.AgentCheckin,
 		},
 		{
 			Name:        "AgentEnroll",
 			Method:      http.MethodPost,
-			Pattern:     "/api/fleet/agents/{id}",
-			HandlerFunc: c.AgentEnroll,
+			Pattern:     PathAgentEnroll,
+			HandlerFunc: h.AgentEnroll,
 		},
 		{
 			Name:        "Artifact",
 			Method:      http.MethodGet,
-			Pattern:     "/api/fleet/artifacts/{id}/{sha2}",
-			HandlerFunc: c.Artifact,
+			Pattern:     PathArtifact,
+			HandlerFunc: h.Artifact,
 		},
 		{
 			Name:        "Status",
 			Method:      http.MethodGet,
 			Pattern:     "/api/status",
-			HandlerFunc: c.Status,
+			HandlerFunc: h.Status,
 		},
 		{
 			Name:        "UploadBegin",
 			Method:      http.MethodPost,
-			Pattern:     "/api/fleet/uploads",
-			HandlerFunc: c.UploadBegin,
+			Pattern:     PathUploadBegin,
+			HandlerFunc: h.UploadBegin,
 		},
 		{
 			Name:        "UploadChunk",
 			Method:      http.MethodPut,
-			Pattern:     "/api/fleet/uploads/{id}/{chunkNum}",
-			HandlerFunc: c.UploadChunk,
+			Pattern:     PathUploadChunk,
+			HandlerFunc: h.UploadChunk,
 		},
 		{
 			Name:        "UploadComplete",
 			Method:      http.MethodPost,
-			Pattern:     "/api/fleet/uploads/{id}",
-			HandlerFunc: c.UploadComplete,
+			Pattern:     PathUploadComplete,
+			HandlerFunc: h.UploadComplete,
 		},
 	}
 }
 
 // AgentAcks -
-func (c *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	idParam := params["id"]
 
@@ -105,7 +153,7 @@ func (c *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := c.api.AgentAcks(r.Context(), idParam, ackRequestParam)
+	result, err := h.api.AgentAcks(r.Context(), idParam, ackRequestParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -115,7 +163,7 @@ func (c *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 }
 
 // AgentCheckin -
-func (c *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	idParam := params["id"]
 	userAgentParam := r.Header.Get("User-Agent")
@@ -137,7 +185,7 @@ func (c *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := c.api.AgentCheckin(
+	result, err := h.api.AgentCheckin(
 		r.Context(),
 		idParam,
 		userAgentParam,
@@ -152,7 +200,7 @@ func (c *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 }
 
 // AgentEnroll -
-func (c *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	idParam := params["id"]
 	userAgentParam := r.Header.Get("User-Agent")
@@ -167,7 +215,7 @@ func (c *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := c.api.AgentEnroll(
+	result, err := h.api.AgentEnroll(
 		r.Context(),
 		idParam,
 		userAgentParam,
@@ -181,12 +229,12 @@ func (c *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 }
 
 // Artifact -
-func (c *Handlers) Artifact(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) Artifact(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	idParam := params["id"]
 	sha2Param := params["sha2"]
 
-	err := c.api.Artifact(r.Context(), idParam, sha2Param)
+	err := h.api.Artifact(r.Context(), idParam, sha2Param)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -196,8 +244,8 @@ func (c *Handlers) Artifact(w http.ResponseWriter, r *http.Request) {
 }
 
 // Status -
-func (c *Handlers) Status(w http.ResponseWriter, r *http.Request) {
-	result, err := c.api.Status(r.Context())
+func (h *Handlers) Status(w http.ResponseWriter, r *http.Request) {
+	result, err := h.api.Status(r.Context())
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -206,7 +254,7 @@ func (c *Handlers) Status(w http.ResponseWriter, r *http.Request) {
 }
 
 // UploadBegin - Initiate a file upload process
-func (c *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
 	requestBodyParam := UploadBeginRequest{}
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&requestBodyParam); err != nil {
@@ -218,7 +266,7 @@ func (c *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := c.api.UploadBegin(r.Context(), requestBodyParam)
+	result, err := h.api.UploadBegin(r.Context(), requestBodyParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -228,7 +276,7 @@ func (c *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
 }
 
 // UploadChunk - Upload a section of file data
-func (c *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	idParam := params["id"]
 
@@ -251,7 +299,7 @@ func (c *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 	// Currently fleet-server limits the size of each chunk to 4 MiB.
 	body := http.MaxBytesReader(w, r.Body, 4194304 /*4 MiB*/)
 
-	uerr := c.api.UploadChunk(
+	uerr := h.api.UploadChunk(
 		r.Context(),
 		idParam,
 		int32(chunkNum),
@@ -265,7 +313,7 @@ func (c *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 }
 
 // UploadComplete - Complete a file upload process
-func (c *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	idParam := params["id"]
 	uploadCompleteRequestParam := UploadCompleteRequest{}
@@ -279,7 +327,7 @@ func (c *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := c.api.UploadComplete(r.Context(), idParam, uploadCompleteRequestParam)
+	result, err := h.api.UploadComplete(r.Context(), idParam, uploadCompleteRequestParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
