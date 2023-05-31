@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 
 	"github.com/google/uuid"
@@ -25,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -167,8 +165,8 @@ func getPreviousMinorVersion(v string) (string, error) {
 func TestElasticAgentStandaloneUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		// Stack:   &define.Stack{},
-		Local:   true, // requires Agent installation
-		Isolate: false,
+		Local:   false, // requires Agent installation
+		Isolate: true,
 		Sudo:    true, // requires Agent installation
 	})
 
@@ -191,10 +189,8 @@ type UpgradeStandaloneElasticAgent struct {
 // Before suite
 func (s *UpgradeStandaloneElasticAgent) SetupSuite() {
 
-	agentFixture, err := atesting.NewFixture(
+	agentFixture, err := define.NewFixture(
 		s.T(),
-		s.agentVersion,
-		// atesting.WithFetcher(atesting.LocalFetcher("build/distributions"),
 	)
 
 	require.NoError(s.T(), err)
@@ -224,8 +220,7 @@ func (s *UpgradeStandaloneElasticAgent) TestUpgradeStandaloneElasticAgentToSnaps
 	require.NoError(s.T(), err)
 
 	// FIXME the client should come from the fixture but we have a problem with calculating the path of the socket ---> see fixture_install.go
-	// c := s.agentFixture.Client()
-	c := client.New(client.WithAddress(paths.ControlSocketPath))
+	c := s.agentFixture.Client()
 
 	require.Eventually(s.T(), func() bool {
 		err := c.Connect(ctx)
@@ -318,6 +313,7 @@ func (s *UpgradeStandaloneElasticAgent) TestUpgradeStandaloneElasticAgentToSnaps
 			return false
 		}
 		s.T().Logf("current agent state: %+v", state)
-		return state.Info.Commit == expectedAgentHashAfterUpgrade
+		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
 	}, 10*time.Minute, 1*time.Second, "agent never upgraded to expected version")
+
 }
