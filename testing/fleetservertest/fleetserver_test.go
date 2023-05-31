@@ -20,6 +20,7 @@ func ExampleNewServer_status() {
 	if err != nil {
 		panic(fmt.Sprintf("could not make request to fleet-test-server: %v", err))
 	}
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -31,6 +32,26 @@ func ExampleNewServer_status() {
 
 	// Output:
 	// {"name":"fleet-server","status":"HEALTHY"}
+}
+
+func ExampleNewServer_checkin() {
+	agentID := "agentID"
+
+	ts := NewServer(API{
+		CheckinFn: NewCheckinHandler(agentID, "", false),
+	})
+
+	cmd := fleetapi.NewCheckinCmd(
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	if err != nil {
+		panic(fmt.Sprintf("failed executing checkin: %v", err))
+	}
+
+	fmt.Println(resp.Actions)
+
+	// Output:
+	// [action_id: policy:24e4d030-ffa7-11ed-b040-9debaa5fecb8:2:1, type: POLICY_CHANGE]
 }
 
 type agentInfo string
@@ -60,23 +81,4 @@ func (s sender) Send(
 
 func (s sender) URI() string {
 	return s.url + s.path
-}
-
-func ExampleNewServer_checkin() {
-	agentID := "agentID"
-
-	ts := NewServer(API{
-		CheckinFn: NewCheckinHandler(agentID, "", false),
-	})
-
-	cmd := fleetapi.NewCheckinCmd(
-		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
-	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
-	if err != nil {
-		panic(fmt.Sprintf("failed executing checkin: %v", err))
-	}
-	fmt.Println(resp.Actions)
-
-	// Output:
-	// [action_id: policy:24e4d030-ffa7-11ed-b040-9debaa5fecb8:2:1, type: POLICY_CHANGE]
 }
