@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func makeComponentState(name string, agentActions []string) runtime.ComponentComponentState {
+func makeComponentState(name string, optionalActions []string) runtime.ComponentComponentState {
 	return runtime.ComponentComponentState{
 		Component: component.Component{
 			Units: []component.Unit{
@@ -31,8 +31,8 @@ func makeComponentState(name string, agentActions []string) runtime.ComponentCom
 			},
 			InputSpec: &component.InputRuntimeSpec{
 				Spec: component.InputSpec{
-					Name:         name,
-					AgentActions: agentActions,
+					Name:            name,
+					OptionalActions: optionalActions,
 				},
 			},
 		},

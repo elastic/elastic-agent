@@ -143,7 +143,7 @@ func findMatchingUnitsByActionType(state state.State, typ string) ([]component.C
 	comps := make([]component.Component, 0)
 	units := make([]component.Unit, 0)
 	for _, comp := range state.Components {
-		if comp.Component.InputSpec != nil && contains(comp.Component.InputSpec.Spec.AgentActions, typ) {
+		if comp.Component.InputSpec != nil && contains(comp.Component.InputSpec.Spec.OptionalActions, typ) {
 			name := comp.Component.InputSpec.Spec.Name
 
 			for _, unit := range comp.Component.Units {
