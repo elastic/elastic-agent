@@ -8,15 +8,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
-	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -83,28 +82,13 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.installOpts = installOpts
 
 	if installOpts.BasePath == "" {
-		var defaultBasePath string
-		switch runtime.GOOS {
-		case "darwin":
-			defaultBasePath = `/Library`
-		case "linux":
-			defaultBasePath = `/opt`
-		case "windows":
-			defaultBasePath = `C:\Program Files`
-		}
-
-		f.workDir = filepath.Join(defaultBasePath, "Elastic", "Agent")
+		f.workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
 	} else {
-		f.workDir = installOpts.BasePath
+		f.workDir = filepath.Join(installOpts.BasePath, "Elastic", "Agent")
 	}
 
-	// FIXME: this returns the wrong path for an installed agend even after setting the wowrkdir correctly
-	cAddr, err := control.AddressFromPath(f.operatingSystem, f.workDir)
-	if err != nil {
-		return out, fmt.Errorf("failed to get control protcol address: %w", err)
-	}
-	client.WithAddress(cAddr)
-	c := client.New()
+	//we just installed agent, the control socket is at a well-known location
+	c := client.New(client.WithAddress(paths.ControlSocketPath))
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
@@ -156,12 +140,18 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 		basePath = paths.DefaultBasePath
 	}
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	_, err = os.Stat(topPath)
-	if os.IsExist(err) {
-		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
+	topPathStats, err := os.Stat(topPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		// the path does not exist anymore, all good!
+		return out, nil
 	}
+
 	if err != nil {
 		return out, err
+	}
+
+	if err != nil && topPathStats != nil {
+		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
 	}
 
 	return out, nil
