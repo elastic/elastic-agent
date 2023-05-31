@@ -107,10 +107,14 @@ $(ALL):
 .PHONY: ci-create-kustomize-ksm-autosharding $(ALL)
 ci-create-kustomize-ksm-autosharding: $(ALL)
 
+ 
+
 $(ALL):
 	@echo "Generating $@ kustomize-ksm-autosharding files"
-	@for f in $(shell ls $@/*.yaml | grep -v daemonset.yaml); do \
+	@for f in $(shell ls $@/*.yaml ); do \
 		mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@; \
 		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/; \
 		cp -r $(KUSTOMIZE)/$@-kustomization-default.yaml $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/kustomization.yaml; \
 	done
+
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/'hostNetwork: true'/'hostNetwork: false'/g" -e "s/DaemonSet/StatefulSet/g" $@/$@-daemonset.yaml >> $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/$@-statefulset.yaml
