@@ -122,7 +122,7 @@ func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList
 		return
 	}
 
-	return
+	return list, nil
 }
 
 func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version string) (builds *VersionBuilds, err error) {
@@ -153,7 +153,7 @@ func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version st
 		return
 	}
 
-	return
+	return builds, nil
 }
 
 func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string, buildID string) (buildDetails *BuildDetails, err error) {
@@ -184,7 +184,7 @@ func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string
 		return
 	}
 
-	return
+	return buildDetails, nil
 }
 
 type ArtifactAPIClientOpt func(aac *ArtifactAPIClient)
