@@ -13,7 +13,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 
-	"github.com/Masterminds/semver"
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -25,6 +24,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 func TestElasticAgentUpgrade(t *testing.T) {
@@ -132,14 +132,14 @@ func upgradeMarkerRemoved() bool {
 	return marker == nil
 }
 
-func getPreviousMinorVersion(version string) (string, error) {
-	v, err := semver.NewVersion(version)
+func getPreviousMinorVersion(v string) (string, error) {
+	pv, err := version.ParseVersion(v)
 	if err != nil {
-		return "", fmt.Errorf("error parsing version [%s]: %w", version, err)
+		return "", fmt.Errorf("error parsing version [%s]: %w", v, err)
 	}
 
-	major := v.Major()
-	minor := v.Minor()
+	major := pv.Major()
+	minor := pv.Minor()
 
 	if minor > 0 {
 		// We have at least one previous minor version in the current
@@ -155,5 +155,5 @@ func getPreviousMinorVersion(version string) (string, error) {
 		return "7.17.10", nil
 	}
 
-	return "", fmt.Errorf("unable to determine previous minor version for [%s]", version)
+	return "", fmt.Errorf("unable to determine previous minor version for [%s]", v)
 }
