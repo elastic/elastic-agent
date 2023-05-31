@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
