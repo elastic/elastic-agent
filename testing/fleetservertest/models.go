@@ -15,7 +15,7 @@ type AckResponse struct {
 	// The action result. Will have the value \"acks\".
 	Action string `json:"action"`
 
-	// A flag to indicate if one or more errors occured when proccessing events.
+	// A flag to indicate if one or more errors occurred when processing events.
 	Errors bool `json:"errors"`
 
 	// The in-order list of results from processing events.
@@ -77,10 +77,10 @@ type Event struct {
 	// The action response for the input action being acknowledged.
 	ActionResponse string `json:"action_response,omitempty"`
 
-	// An embedded JSON object that has the data about the ack.  Used by REQUEST_DIAGNOSTICS actions. Contains a `upload_id` attribute used to communicate the successfullly uploaded diagnostics ID.
+	// An embedded JSON object that has the data about the ack.  Used by REQUEST_DIAGNOSTICS actions. Contains a `upload_id` attribute used to communicate the successfully uploaded diagnostics ID.
 	Data string `json:"data,omitempty"`
 
-	// An error message. If this is non-empty an error has occured when executing the action. For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
+	// An error message. If this is non-empty an error has occurred when executing the action. For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
 	Error string `json:"error,omitempty"`
 }
 
@@ -120,7 +120,7 @@ type CheckinResponse struct {
 	Actions []Action `json:"actions,omitempty"`
 }
 
-// Action - An action for an elastic-agent. The actions are defined in generic terms on the fleet-server. The elastic-agent will have additional details for what is expected when a specific action-type is recieved. Many attributes in this schema also contain yaml tags so the elastic-agent may serialize them. The structure of the `data` attribute will vary between action types.  An additional consideration is Scheduled Actions. Scheduled actions are currently defined as actions that have non-empty values for both the `start_time` and `expiration` attributes.
+// Action - An action for an elastic-agent. The actions are defined in generic terms on the fleet-server. The elastic-agent will have additional details for what is expected when a specific action-type is received. Many attributes in this schema also contain yaml tags so the elastic-agent may serialize them. The structure of the `data` attribute will vary between action types.  An additional consideration is Scheduled Actions. Scheduled actions are currently defined as actions that have non-empty values for both the `start_time` and `expiration` attributes.
 type Action struct {
 
 	// The agent ID.

@@ -444,6 +444,7 @@ func respondAsJSON(status int, body interface{}, w http.ResponseWriter) {
 	}
 
 	if err := json.NewEncoder(w).Encode(body); err != nil {
+		//nolint:forbidigo // it's to be used in tests
 		fmt.Printf("could not write response body: %v\n", err)
 	}
 }

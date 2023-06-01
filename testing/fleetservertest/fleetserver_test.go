@@ -16,7 +16,7 @@ func ExampleNewServer_status() {
 		StatusFn: NewStatusHandlerHealth(),
 	})
 
-	resp, err := http.Get(ts.URL + PathStatus)
+	resp, err := http.Get(ts.URL + PathStatus) //nolint:noctx // it's fine on a test
 	if err != nil {
 		panic(fmt.Sprintf("could not make request to fleet-test-server: %v", err))
 	}
