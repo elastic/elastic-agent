@@ -45,6 +45,13 @@ else
   echo "mage is already installed."
 fi
 
+
+# 
+# PACKAGE
+# 
+
+DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
+
 #ESS
 vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa > ./apiKey
 export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)

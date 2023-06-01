@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -euo pipefail
+
+
+DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
+    export DOCKER_USERNAME_SECRET=$(vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
+    export DOCKER_PASSWORD_SECRET=$(vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
+    docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+    unset DOCKER_USERNAME_SECRET DOCKER_PASSWORD_SECRET
+  fi
+fi
