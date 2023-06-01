@@ -16,3 +16,18 @@ vault kv get -format=json -field=data kv/ci-shared/observability-ingest/cloud/gc
 export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
 export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)  
 gcloud auth activate-service-account --key-file $GOOGLE_APPLICATION_CREDENTIALS 2> /dev/null
+
+if ! command -v mage &>/dev/null; then
+  echo "mage is not installed. Installing mage..."
+
+  # Download and install mage
+  go get -u github.com/magefile/mage
+
+  echo "mage has been installed."
+else
+  echo "mage is already installed."
+fi
+
+# Run integration tests
+mage integration:auth
+mage integration:test
