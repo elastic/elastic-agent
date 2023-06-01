@@ -30,6 +30,9 @@ type Downloader struct {
 
 // NewDownloader creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
+// We need to pass the versionOverride separately from the config as
+// artifact.Config struct is part of agent configuration and a version
+// override makes no sense there
 func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (download.Downloader, error) {
 	cfg, err := snapshotConfig(config, versionOverride)
 	if err != nil {

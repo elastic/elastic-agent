@@ -152,7 +152,9 @@ func (u *Upgrader) downloadWithRetries(
 		if err != nil {
 			return fmt.Errorf("unable to create fetcher: %w", err)
 		}
-
+		// All download artifacts expect a name that includes <major>.<minor.<patch>[-SNAPSHOT] so we have to
+		// make sure not to include build metadata we might have in the parsed version (for snapshots we already
+		// used that to configure the URL we download the files from)
 		path, err = downloader.Download(cancelCtx, agentArtifact, version.VersionWithPrerelease())
 		if err != nil {
 			return fmt.Errorf("unable to download package: %w", err)
