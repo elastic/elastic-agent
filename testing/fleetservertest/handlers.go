@@ -4,12 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strconv"
 	"strings"
-
-	"github.com/gorilla/mux"
 )
 
 const (
@@ -61,310 +57,57 @@ func NewPathUploadComplete(agentID string) string {
 	return strings.Replace(PathUploadComplete, "{id}", agentID, 1)
 }
 
-// Handlers binds http requests to an api service and writes the service results to the http response
-type Handlers struct {
-	api FleetAPI
-}
+func NewCheckinHandler(agentID, ackToken string, withEndpoint bool) func(
+	ctx context.Context,
+	id string,
+	userAgent string,
+	acceptEncoding string,
+	checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
 
-type Route struct {
-	Name        string
-	Method      string
-	Pattern     string
-	HandlerFunc http.HandlerFunc
-}
-
-// TODO: move the server to the internal package
-type FleetAPI interface {
-	AgentAcks(ctx context.Context, id string, ackRequest AckRequest) (*AckResponse, *HTTPError)
-	AgentCheckin(ctx context.Context, id string, userAgent string, acceptEncoding string, checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError)
-	AgentEnroll(ctx context.Context, id string, userAgent string, enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
-	Artifact(ctx context.Context, id string, sha2 string) *HTTPError
-	Status(ctx context.Context) (*StatusResponse, *HTTPError)
-	UploadBegin(ctx context.Context, requestBody UploadBeginRequest) (*UploadBeginResponse, *HTTPError)
-	UploadChunk(ctx context.Context, id string, chunkNum int32, chunkSHA2 string, body io.ReadCloser) *HTTPError
-	UploadComplete(ctx context.Context, id string, uploadCompleteRequest UploadCompleteRequest) (*UploadComplete200Response, *HTTPError)
-}
-
-// NewRouter creates a new router for any number of api routers
-func NewRouter(hs Handlers) *mux.Router {
-	router := mux.NewRouter().StrictSlash(true)
-	for _, route := range hs.Routes() {
-		router.
-			Methods(route.Method).
-			Path(route.Pattern).
-			Name(route.Name).
-			Handler(route.HandlerFunc)
+	policy := checkinResponseJSONPolicySystemIntegration
+	if withEndpoint {
+		policy = checkinResponseJSONPolicySystemIntegrationAndEndpoint
 	}
 
-	return router
-}
+	return func(
+		ctx context.Context,
+		id string,
+		userAgent string,
+		acceptEncoding string,
+		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
 
-// Routes returns all the api routes for the Handlers
-func (h *Handlers) Routes() []Route {
-	return []Route{
-		{
-			Name:        "AgentAcks",
-			Method:      http.MethodPost,
-			Pattern:     PathAgentAcks,
-			HandlerFunc: h.AgentAcks,
-		},
-		{
-			Name:        "AgentCheckin",
-			Method:      http.MethodPost,
-			Pattern:     PathAgentCheckin,
-			HandlerFunc: h.AgentCheckin,
-		},
-		{
-			Name:        "AgentEnroll",
-			Method:      http.MethodPost,
-			Pattern:     PathAgentEnroll,
-			HandlerFunc: h.AgentEnroll,
-		},
-		{
-			Name:        "Artifact",
-			Method:      http.MethodGet,
-			Pattern:     PathArtifact,
-			HandlerFunc: h.Artifact,
-		},
-		{
-			Name:        "Status",
-			Method:      http.MethodGet,
-			Pattern:     PathStatus,
-			HandlerFunc: h.Status,
-		},
-		{
-			Name:        "UploadBegin",
-			Method:      http.MethodPost,
-			Pattern:     PathUploadBegin,
-			HandlerFunc: h.UploadBegin,
-		},
-		{
-			Name:        "UploadChunk",
-			Method:      http.MethodPut,
-			Pattern:     PathUploadChunk,
-			HandlerFunc: h.UploadChunk,
-		},
-		{
-			Name:        "UploadComplete",
-			Method:      http.MethodPost,
-			Pattern:     PathUploadComplete,
-			HandlerFunc: h.UploadComplete,
-		},
-	}
-}
-
-// AgentAcks -
-func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	idParam := params["id"]
-
-	ackRequestParam := AckRequest{}
-	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&ackRequestParam); err != nil {
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
-			Message:    fmt.Sprintf("%v", err),
-		}, w)
-		return
-	}
-
-	result, err := h.api.AgentAcks(r.Context(), idParam, ackRequestParam)
-	if err != nil {
-		respondAsJSON(err.StatusCode, err, w)
-		return
-	}
-
-	respondAsJSON(http.StatusOK, result, w)
-}
-
-// AgentCheckin -
-func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	idParam := params["id"]
-	userAgentParam := r.Header.Get("User-Agent")
-	acceptEncodingParam := r.Header.Get("Accept-Encoding")
-	checkinRequestParam := CheckinRequest{}
-
-	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&checkinRequestParam); err != nil {
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
-			Message:    fmt.Sprintf("%v", err),
-		}, w)
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
-			Message:    fmt.Sprintf("%v", err),
-		}, w)
-		return
-	}
-
-	result, err := h.api.AgentCheckin(
-		r.Context(),
-		idParam,
-		userAgentParam,
-		acceptEncodingParam,
-		checkinRequestParam)
-	if err != nil {
-		respondAsJSON(err.StatusCode, err, w)
-		return
-	}
-
-	respondAsJSON(http.StatusOK, result, w)
-}
-
-// AgentEnroll -
-func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	idParam := params["id"]
-	userAgentParam := r.Header.Get("User-Agent")
-	enrollRequestParam := EnrollRequest{}
-	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&enrollRequestParam); err != nil {
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
-			Message:    fmt.Sprintf("%v", err),
-		}, w)
-		return
-	}
-
-	result, err := h.api.AgentEnroll(
-		r.Context(),
-		idParam,
-		userAgentParam,
-		enrollRequestParam)
-	if err != nil {
-		respondAsJSON(err.StatusCode, err, w)
-		return
-	}
-
-	respondAsJSON(http.StatusOK, result, w)
-}
-
-// Artifact -
-func (h *Handlers) Artifact(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	idParam := params["id"]
-	sha2Param := params["sha2"]
-
-	err := h.api.Artifact(r.Context(), idParam, sha2Param)
-	if err != nil {
-		respondAsJSON(err.StatusCode, err, w)
-		return
-	}
-
-	respondAsJSON(http.StatusOK, nil, w)
-}
-
-// Status -
-func (h *Handlers) Status(w http.ResponseWriter, r *http.Request) {
-	result, err := h.api.Status(r.Context())
-	if err != nil {
-		if result != nil {
-			respondAsJSON(err.StatusCode, result, w)
+		resp := CheckinResponse{}
+		err := json.Unmarshal(
+			[]byte(fmt.Sprintf(policy, ackToken, agentID)),
+			&resp)
+		if err != nil {
+			return nil, &HTTPError{
+				StatusCode: http.StatusInternalServerError,
+				Error:      err.Error(),
+				Message:    "failed to unmarshal policy",
+			}
 		}
-		respondAsJSON(err.StatusCode, err, w)
-		return
+
+		return &resp, nil
 	}
-	respondAsJSON(http.StatusOK, result, w)
 }
 
-// UploadBegin - Initiate a file upload process
-func (h *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
-	requestBodyParam := UploadBeginRequest{}
-	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&requestBodyParam); err != nil {
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
-			Message:    fmt.Sprintf("%v", err),
-		}, w)
-		return
+func NewStatusHandlerHealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
+	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
+		return &StatusResponse{
+			Name:   "fleet-server",
+			Status: "HEALTHY",
+			// fleet-server does not respond with version information
+		}, nil
 	}
-
-	result, err := h.api.UploadBegin(r.Context(), requestBodyParam)
-	if err != nil {
-		respondAsJSON(err.StatusCode, err, w)
-		return
-	}
-
-	respondAsJSON(http.StatusOK, result, w)
 }
 
-// UploadChunk - Upload a section of file data
-func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	idParam := params["id"]
-
-	chunkNumParam := params["chunkNum"]
-	if chunkNumParam == "" {
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "chunkNum is empty",
-		}, w)
-	}
-	chunkNum, err := strconv.ParseInt(chunkNumParam, 10, 32)
-	if err != nil {
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("%v", err),
-		}, w)
-	}
-
-	chunkSHA2 := r.Header.Get("X-Chunk-SHA2")
-	// Currently fleet-server limits the size of each chunk to 4 MiB.
-	body := http.MaxBytesReader(w, r.Body, 4194304 /*4 MiB*/)
-
-	uerr := h.api.UploadChunk(
-		r.Context(),
-		idParam,
-		int32(chunkNum),
-		chunkSHA2,
-		body)
-	if err != nil {
-		respondAsJSON(uerr.StatusCode, err, w)
-		return
-	}
-	respondAsJSON(http.StatusOK, nil, w)
-}
-
-// UploadComplete - Complete a file upload process
-func (h *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	idParam := params["id"]
-	uploadCompleteRequestParam := UploadCompleteRequest{}
-	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&uploadCompleteRequestParam); err != nil {
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
-			Message:    fmt.Sprintf("%v", err),
-		}, w)
-		return
-	}
-
-	result, err := h.api.UploadComplete(r.Context(), idParam, uploadCompleteRequestParam)
-	if err != nil {
-		respondAsJSON(err.StatusCode, err, w)
-		return
-	}
-
-	respondAsJSON(http.StatusOK, result, w)
-}
-
-// respondAsJSON uses the json encoder to write an interface to the http response with an optional status code
-func respondAsJSON(status int, body interface{}, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(status)
-
-	if body == nil {
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(body); err != nil {
-		fmt.Printf("could not write response body: %v\n", err)
+func NewStatusHandlerUnhealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
+	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
+		return &StatusResponse{
+			Name:   "fleet-server",
+			Status: "UNHEALTHY",
+			// fleet-server does not respond with version information
+		}, &HTTPError{StatusCode: http.StatusInternalServerError}
 	}
 }
