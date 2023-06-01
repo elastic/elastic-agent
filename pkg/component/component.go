@@ -451,7 +451,7 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 		return
 	}
 
-	// Check if a policy key exists with a non-nil policy object.
+	// Check if the input configuration defines a policy section.
 	if policyObj := inputConfig["policy"]; policyObj != nil {
 		// If the policy object converts to map[string]interface{}, inject the revision key.
 		// Note that if the interface conversion here fails, we do nothing because we don't
@@ -460,7 +460,7 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 			policyMap["revision"] = revision
 		}
 	} else {
-		// If there was no policy key or the value was nil, then inject a policy object with a revision key.
+		// If there was no policy object, then inject one with a revision key.
 		inputConfig["policy"] = map[string]interface{}{
 			"revision": revision,
 		}
