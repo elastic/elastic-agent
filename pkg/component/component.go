@@ -57,7 +57,7 @@ type ShipperReference struct {
 	// ComponentID is the component ID of the shipper being connected to.
 	ComponentID string `yaml:"component_id"`
 
-	// UnitID is the ID inside the shipper of the input unit for this connection.
+	// UnitID is the ID of this connection's input unit within the shipper being connected to.
 	UnitID string `yaml:"unit_id"`
 }
 
