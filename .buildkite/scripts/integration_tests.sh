@@ -17,6 +17,17 @@ export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
 export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)  
 gcloud auth activate-service-account --key-file $GOOGLE_APPLICATION_CREDENTIALS 2> /dev/null
 
+if ! command -v go &>/dev/null; then
+  echo "Go is not installed. Installing Go..."    
+  curl -O https://dl.google.com/go/go1.19.9.linux-amd64.tar.gz
+  sudo tar -xvf go1.19.9.linux-amd64.tar.gz -C /usr/local
+  echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+  source ~/.bashrc
+  echo "Go has been installed."
+else
+  echo "Go is already installed."
+fi
+
 if ! command -v mage &>/dev/null; then
   echo "mage is not installed. Installing mage..."
 
