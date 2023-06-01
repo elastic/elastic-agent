@@ -4,4 +4,9 @@ kind: Kustomization
 namespace: kube-system
 
 resources:
-  - ./*.yaml
+  - ./base
+
+patches:
+- path: extra/elastic-agent-managed-statefulset.yaml
+  target:
+    kind: StatefulSet

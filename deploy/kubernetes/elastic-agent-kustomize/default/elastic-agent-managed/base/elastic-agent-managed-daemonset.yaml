@@ -1,19 +1,19 @@
-# For more information refer https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
+# For more information https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-managed-by-fleet.html
 apiVersion: apps/v1
-kind: StatefulSet
+kind: DaemonSet
 metadata:
-  name: elastic-agent-standalone
+  name: elastic-agent
   namespace: kube-system
   labels:
-    app: elastic-agent-standalone
+    app: elastic-agent
 spec:
   selector:
     matchLabels:
-      app: elastic-agent-standalone
+      app: elastic-agent
   template:
     metadata:
       labels:
-        app: elastic-agent-standalone
+        app: elastic-agent
     spec:
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
@@ -22,37 +22,38 @@ spec:
           effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
-      serviceAccountName: elastic-agent-standalone
+      serviceAccountName: elastic-agent
       hostNetwork: true
+      # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
+      # Sharing the host process ID namespace gives visibility of all processes running on the same host.
+      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
-      # Uncomment if using hints feature
-      #initContainers:
-      #  - name: k8s-templates-downloader
-      #    image: busybox:1.28
-      #    command: ['sh']
-      #    args:
-      #      - -c
-      #      - >-
-      #        mkdir -p /etc/elastic-agent/inputs.d &&
-      #        wget -O - https://github.com/elastic/elastic-agent/archive/main.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-main/deploy/kubernetes/elastic-agent-standalone/templates.d"
-      #    volumeMounts:
-      #      - name: external-inputs
-      #        mountPath: /etc/elastic-agent/inputs.d
       containers:
-        - name: elastic-agent-standalone
+        - name: elastic-agent
           image: docker.elastic.co/beats/elastic-agent:8.3.0
-          args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           env:
-            # The basic authentication username used to connect to Elasticsearch
-            # This user needs the privileges required to publish events to Elasticsearch.
-            - name: ES_USERNAME
+            # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
+            - name: FLEET_ENROLL
+              value: "1"
+            # Set to true to communicate with Fleet with either insecure HTTP or unverified HTTPS
+            - name: FLEET_INSECURE
+              value: "true"
+            # Fleet Server URL to enroll the Elastic Agent into
+            # FLEET_URL can be found in Kibana, go to Management > Fleet > Settings
+            - name: FLEET_URL
+              value: "https://fleet-server:8220"
+            # Elasticsearch API key used to enroll Elastic Agents in Fleet (https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens)
+            # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
+            - name: FLEET_ENROLLMENT_TOKEN
+              value: "token-id"
+            - name: KIBANA_HOST
+              value: "http://kibana:5601"
+            # The basic authentication username used to connect to Kibana and retrieve a service_token to enable Fleet
+            - name: KIBANA_FLEET_USERNAME
               value: "elastic"
-            # The basic authentication password used to connect to Elasticsearch
-            - name: ES_PASSWORD
+            # The basic authentication password used to connect to Kibana and retrieve a service_token to enable Fleet
+            - name: KIBANA_FLEET_PASSWORD
               value: "changeme"
-            # The Elasticsearch host to communicate with
-            - name: ES_HOST
-              value: ""
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -61,8 +62,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: STATE_PATH
-              value: "/etc/elastic-agent"
           securityContext:
             runAsUser: 0
             # The following capabilities are needed for 'Defend for containers' integration (cloud-defend)
@@ -79,13 +78,6 @@ spec:
               cpu: 100m
               memory: 400Mi
           volumeMounts:
-            - name: datastreams
-              mountPath: /etc/elastic-agent/agent.yml
-              readOnly: true
-              subPath: agent.yml
-            # Uncomment if using hints feature
-            #- name: external-inputs
-            #  mountPath: /etc/elastic-agent/inputs.d
             - name: proc
               mountPath: /hostfs/proc
               readOnly: true
@@ -104,18 +96,14 @@ spec:
             - name: var-lib
               mountPath: /hostfs/var/lib
               readOnly: true
+            - name: etc-mid
+              mountPath: /etc/machine-id
+              readOnly: true
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
             - name: elastic-agent-state
               mountPath: /usr/share/elastic-agent/state
       volumes:
-        - name: datastreams
-          configMap:
-            defaultMode: 0640
-            name: agent-node-datastreams
-        # Uncomment if using hints feature
-        #- name: external-inputs
-        #  emptyDir: {}
         - name: proc
           hostPath:
             path: /proc
@@ -137,6 +125,12 @@ spec:
         - name: var-lib
           hostPath:
             path: /var/lib
+        # Mount /etc/machine-id from the host to determine host ID
+        # Needed for Elastic Security integration
+        - name: etc-mid
+          hostPath:
+            path: /etc/machine-id
+            type: File
         # Needed for 'Defend for containers' integration (cloud-defend)
         # If you are not using this integration, then these volumes and the corresponding
         # mounts can be removed.
@@ -147,5 +141,5 @@ spec:
         # Update 'kube-system' with the namespace of your agent installation
         - name: elastic-agent-state
           hostPath:
-            path: /var/lib/elastic-agent-standalone/kube-system/state
+            path: /var/lib/elastic-agent-managed/kube-system/state
             type: DirectoryOrCreate
