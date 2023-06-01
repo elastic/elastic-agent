@@ -27,7 +27,7 @@ This document suggests **3 alternative configuration methods** to deploy elastic
 
 Each configuration includes specific pros and cons and users may choose what best matches their needs.
 
-The Kubernetes observability is based on https://docs.elastic.co/en/integrations/kubernetes[kubernetes integration], which is fetching metrics from several components:
+The Kubernetes observability is based on [kubernetes integration](https://docs.elastic.co/en/integrations/kubernetes), which is fetching metrics from several components:
 
 - **Per node:**
   - kubelet
