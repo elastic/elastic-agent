@@ -21,8 +21,9 @@ if ! command -v go &>/dev/null; then
   echo "Go is not installed. Installing Go..."    
   curl -O https://dl.google.com/go/go1.19.9.linux-amd64.tar.gz
   sudo tar -xvf go1.19.9.linux-amd64.tar.gz -C /usr/local
-  echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+  echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc  
   source ~/.bashrc
+  export PATH=$PATH:/usr/local/go/bin
   echo "Go has been installed."
 else
   echo "Go is already installed."
