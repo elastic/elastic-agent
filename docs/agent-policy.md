@@ -42,7 +42,7 @@ inputs:
     use_output: elasticsearch2
 ```
 
-![Example deployment without shipper](diagrams/components-example.svg)
+![Example deployment without shipper](images/components-example.svg)
 
 In this example, we have defined three outputs: `elasticsearch1`, `elasticsearch2`, and `logstash`. We have also defined 6 total inputs, four writing to `elasticsearch1` and one each writing to `elasticsearch2` and `logstash`.
 
@@ -65,7 +65,7 @@ outputs:
 
 and the rest of the configuration is unchanged.
 
-![Example deployment with shipper](diagrams/components-shipper-example.svg)
+![Example deployment with shipper](images/components-shipper-example.svg)
 
 This is the same as the previous scenario, but all outputs are configured to use the shipper. In this setup, there are shipper components whose job is to send the data upstream, and input components that send their data to a local shipper rather than managing their own independent queue and network connections.
 
