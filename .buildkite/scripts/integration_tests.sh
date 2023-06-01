@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -exuo pipefail
 
+export WORKSPACE=`pwd`
+
 if ! command -v gcloud &>/dev/null; then
   echo "Google Cloud SDK is not installed. Installing Google Cloud SDK..."
   echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
@@ -23,22 +25,25 @@ if ! command -v go &>/dev/null; then
   sudo tar -xvf go1.19.9.linux-amd64.tar.gz -C /usr/local
   echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc  
   source ~/.bashrc
+  mkdir $HOME/go
+  mkdir $HOME/go/bin
   export PATH=$PATH:/usr/local/go/bin
   echo "Go has been installed."
 else
   echo "Go is already installed."
 fi
 
-make mage
-# if ! command -v mage &>/dev/null; then
-#   echo "mage is not installed. Installing mage..."
-#   go get -u -d github.com/magefile/mage
-#   cd mage
-#   go run bootstrap.go
-#   echo "mage has been installed."
-# else
-#   echo "mage is already installed."
-# fi
+if ! command -v mage &>/dev/null; then
+  echo "mage is not installed. Installing mage..."
+  git clone https://github.com/magefile/mage $HOME/magesrc
+  cd $HOME/magesrc
+  go run bootstrap.go
+  cd $WORKSPACE  
+  export PATH=$PATH:$HOME/go/bin
+  echo "mage has been installed."
+else
+  echo "mage is already installed."
+fi
 
 # Run integration tests
 mage integration:auth
