@@ -24,28 +24,29 @@ The Kubernetes Observability journey comprises from the following distinct phase
   - kube-state-metrics deployed
   
   Number of nodes:
+ 
 |===
-| No of Pods in K8s Cluster | No of Nodes |  
-| 1000 | 11  
+| No of Pods in K8s Cluster | No of Nodes
+| 1000 | 11
 | 3000 | 18
-| 5000 | 46  
-| 10000 | 99
+| 5000 | 46
 |===
 
-ESS cluster:
+- ESS cluster:
+  - Production | us-west2 region
+  - Stack: Tests conducted with 8.6.2, 8.7.x and 8.8.0 with TSDB
+  - Elasticsearch: 5.63 TB storage | 128 GB RAM | 32 vCPU
+  - Kibana: 8 GB RAM | Up to 8 vCPU
+  - Integrations Server: 8 GB RAM | Up to 8 vCPU
+  - Kubernetes integration >=v1.31.2
 
-- Production | us-west2 region
-- Stack: Tests conducted with 8.6.2, 8.7.x and 8.8.0 with TSDB
-- Elasticsearch: 5.63 TB storage | 128 GB RAM | 32 vCPU
-- Kibana: 8 GB RAM | Up to 8 vCPU
-- Integrations Server: 8 GB RAM | Up to 8 vCPU
-- Kubernetes integration >=v1.31.2
+- Steps for testing:
 
 1. Install Elastic Agent on the k8s cluster as DaemonSet using the Kubernetes manifest (get the manifest from the Fleet page of your ESS cluster). Make sure agent enrollment is confirmed before proceeding with next steps.
 2. Add Kubernetes integration to a policy that in use by k8s agents.
 3. Deploy **10000** pods using [stress_test_k8s script](https://github.com/elastic/k8s-integration-infra#put-load-on-the-cluster).
 `./stress_test_k8s -kubeconfig=/home/andrei_bialenik/.kube/config -deployments=10 -namespaces=1000 -podlabels=4 -podannotations=4`
-4. Ensure all pods are created
+1. Ensure all pods are created
 
 ```bash
 kubectl get pods -A | grep -i running | wc -l
@@ -56,7 +57,7 @@ kubectl get pods -A | grep -iv running | wc -l
 5. Ingest data for at least 2 hours. Leave the Application pods
 6. Request the count of kube-state metrics from the last 15 minutes / 2 hours in Kibana Dev Tools by running the following query:
 
-```
+```bash
 GET /metrics-kubernetes.state_pod-default/_count
 {
   "query": {
