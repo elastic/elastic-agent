@@ -150,7 +150,7 @@ kube-system   elastic-agent-txxfp                                              0
 
 **Pros/Cons**:
 
-- [+] You **can* prevent execution of deployments in nodes where agents already running.
+- [+] You *can* prevent execution of deployments in nodes where agents already running.
 - [-] More complex than first method
 - [-] It displays scheduled daemonset pods in state `Pending` where antiaffinity is triggered.
 
