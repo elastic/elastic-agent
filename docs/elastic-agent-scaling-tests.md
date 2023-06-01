@@ -25,12 +25,12 @@ The Kubernetes Observability journey comprises from the following distinct phase
   
   Number of nodes:
  
-|===
-| No of Pods in K8s Cluster | No of Nodes
-| 1000 | 11
-| 3000 | 18
-| 5000 | 46
-|===
+| No of Pods in K8s Cluster  |  No of Nodes |
+|---|---|
+| 1000  | 11  |
+| 3000  |  18 |
+| 5000  | 46  |
+| 10000  | 99 |
 
 - ESS cluster:
   - Production | us-west2 region
