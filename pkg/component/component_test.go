@@ -344,9 +344,13 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID:        "fleet-server-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       ErrOutputNotSupported,
+					ID:  "fleet-server-default",
+					Err: ErrOutputNotSupported,
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "fleet-server",
+						BinaryName: "fleet-server",
+						BinaryPath: "../../specs/fleet-server",
+					},
 					Units: []Unit{
 						{
 							ID:       "fleet-server-default",
@@ -1495,7 +1499,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "apm-default",
+					ID:  "apm-default",
+					Err: &errorReason{reason: "this input does not support shipper outputs"},
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "apm",
 						BinaryName: "apm-server",
@@ -1805,7 +1810,10 @@ func TestToComponents(t *testing.T) {
 					if expected.Err != nil {
 						assert.Equal(t, expected.Err, actual.Err)
 						assert.EqualValues(t, expected.Units, actual.Units)
-					} else if expected.InputSpec != nil {
+					} else {
+						assert.NoError(t, actual.Err, "Expected no error for component "+actual.ID)
+					}
+					if expected.InputSpec != nil {
 						assert.Nil(t, actual.ShipperSpec)
 						assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
 						assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
