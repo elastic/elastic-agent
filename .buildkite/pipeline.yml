@@ -2,10 +2,10 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-agents:
-  image: "docker.elastic.co/observability-ci/elastic-agent-build-image:latest"
-  ephemeralStorage: "10G"
-  memory: "4G"
+# agents:
+#   image: "docker.elastic.co/observability-ci/elastic-agent-build-image:latest"
+#   ephemeralStorage: "10G"
+#   memory: "4G"
 steps:
   - label: "Integration tests"
     command: ".buildkite/scripts/bk-commands.sh init_gcloud"
