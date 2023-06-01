@@ -3,9 +3,11 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 const (
@@ -16,6 +18,8 @@ const (
 	artifactAPIV1BuildDetailsEndpoint   = "v1/versions/%s/builds/%s"
 	//artifactAPIV1SearchVersionPackage = "v1/search/%s/%s"
 )
+
+var ErrBadHTTPStatusCode = errors.New("bad http status code")
 
 type VersionList struct {
 	Versions  []string `json:"versions"`
@@ -95,7 +99,12 @@ type ArtifactAPIClient struct {
 }
 
 func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aac.apiURL+artifactsAPIV1VersionsEndpoint, nil)
+	joinedURL, err := url.JoinPath(aac.apiURL, artifactsAPIV1VersionsEndpoint)
+	if err != nil {
+		err = fmt.Errorf("composing URL with %q %q: %w", aac.apiURL, artifactsAPIV1VersionsEndpoint, err)
+		return
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, joinedURL, nil)
 
 	if err != nil {
 		err = fmt.Errorf("composing request for getting versions: %w", err)
@@ -108,6 +117,11 @@ func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("%d: %w", resp.StatusCode, ErrBadHTTPStatusCode)
+		return
+	}
 
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -126,7 +140,12 @@ func (aac ArtifactAPIClient) GetVersions(ctx context.Context) (list *VersionList
 }
 
 func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version string) (builds *VersionBuilds, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aac.apiURL+fmt.Sprintf(artifactsAPIV1VersionBuildsEndpoint, version), nil)
+	joinedURL, err := url.JoinPath(aac.apiURL, fmt.Sprintf(artifactsAPIV1VersionBuildsEndpoint, version))
+	if err != nil {
+		err = fmt.Errorf("composing URL with %q %q: %w", aac.apiURL, fmt.Sprintf(artifactsAPIV1VersionBuildsEndpoint, version), err)
+		return
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, joinedURL, nil)
 
 	if err != nil {
 		err = fmt.Errorf("composing request for getting versions: %w", err)
@@ -139,6 +158,11 @@ func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version st
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("%d: %w", resp.StatusCode, ErrBadHTTPStatusCode)
+		return
+	}
 
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -157,7 +181,13 @@ func (aac ArtifactAPIClient) GetBuildsForVersion(ctx context.Context, version st
 }
 
 func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string, buildID string) (buildDetails *BuildDetails, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aac.apiURL+fmt.Sprintf(artifactAPIV1BuildDetailsEndpoint, version, buildID), nil)
+	joinedURL, err := url.JoinPath(aac.apiURL, fmt.Sprintf(artifactAPIV1BuildDetailsEndpoint, version, buildID))
+	if err != nil {
+		err = fmt.Errorf("composing URL with %q %q: %w", aac.apiURL, fmt.Sprintf(artifactAPIV1BuildDetailsEndpoint, version, buildID), err)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, joinedURL, nil)
 
 	if err != nil {
 		err = fmt.Errorf("composing request for getting build details: %w", err)
@@ -170,6 +200,11 @@ func (aac ArtifactAPIClient) GetBuildDetails(ctx context.Context, version string
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("%d: %w", resp.StatusCode, ErrBadHTTPStatusCode)
+		return
+	}
 
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
