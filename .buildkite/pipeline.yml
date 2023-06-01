@@ -11,4 +11,3 @@ steps:
     command: ".buildkite/scripts/bk-commands.sh init_gcloud"
     agents:
       provider: "gcp"
-      image: "ubuntu-1804-bionic-v20230510"
