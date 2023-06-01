@@ -58,4 +58,4 @@ export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
 
 # Run integration tests
 mage integration:auth
-mage integration:test
+AGENT_VERSION=8.9.0-SNAPSHOT mage integration:test
