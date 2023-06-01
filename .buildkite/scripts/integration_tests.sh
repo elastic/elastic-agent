@@ -31,10 +31,9 @@ fi
 
 if ! command -v mage &>/dev/null; then
   echo "mage is not installed. Installing mage..."
-
-  # Download and install mage
-  go get -u github.com/magefile/mage
-
+  go get -u -d github.com/magefile/mage
+  cd mage
+  go run bootstrap.go
   echo "mage has been installed."
 else
   echo "mage is already installed."
