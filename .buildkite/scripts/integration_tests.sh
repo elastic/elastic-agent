@@ -46,7 +46,7 @@ else
 fi
 
 #ESS
-vault kv get -field apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod > ./apiKey
+vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa > ./apiKey
 export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
 
 # Run integration tests
