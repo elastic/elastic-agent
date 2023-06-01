@@ -198,6 +198,6 @@ For this installation, users need to configure the same agent policies as descri
 
 **Pros/Cons**:
 
-- [+] You **can* prevent execution of deployments in nodes where agents already running
+- [+] You *can* prevent execution of deployments in nodes where agents already running
 - [+] Gives possibilities to users to configure the pod scheduling exactly as they need
 - [-] More complex method and requires manual steps
