@@ -29,15 +29,16 @@ else
   echo "Go is already installed."
 fi
 
-if ! command -v mage &>/dev/null; then
-  echo "mage is not installed. Installing mage..."
-  go get -u -d github.com/magefile/mage
-  cd mage
-  go run bootstrap.go
-  echo "mage has been installed."
-else
-  echo "mage is already installed."
-fi
+make mage
+# if ! command -v mage &>/dev/null; then
+#   echo "mage is not installed. Installing mage..."
+#   go get -u -d github.com/magefile/mage
+#   cd mage
+#   go run bootstrap.go
+#   echo "mage has been installed."
+# else
+#   echo "mage is already installed."
+# fi
 
 # Run integration tests
 mage integration:auth
