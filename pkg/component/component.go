@@ -655,9 +655,8 @@ type inputI struct {
 	inputType string // canonical (non-alias) type
 
 	// The raw configuration for this input, with small cleanups:
-	// - enabled key is removed
+	// - the "enabled", "use_output", and "log_level" keys are removed
 	// - the key "policy.revision" is set to the current fleet policy revision
-	// TODO: list incomplete
 	config map[string]interface{}
 }
 
