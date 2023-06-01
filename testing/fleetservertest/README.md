@@ -6,10 +6,11 @@ control of it to test even edge cases such as error handling.
 
 ## tl;dr
 
-- See [`fleetservertest_test.go`](fleetserver_test.go) for examples
+- See [`fleetservertest_test.go`](fleetserver_test.go) for examples.
 
-- `fleetservertest.API` defines a `handlernameFn` property for each available handlers. By default, any not implemented handler returns a `http.StatusNotImplemented`
-- Use `fleetservertest.NewServer(fleetservertest.API{})` to create a new test server. It's a `*httptest.Server`.
+- `fleetservertest.API` defines a `handlernameFn` property for each available handlers. By default, any not implemented handler returns a `http.StatusNotImplemented`.
+
+- Use `fleetservertest.NewServer(fleetservertest.API{})` to create a new test server. It's a `*httptest.Server`:
 
 ```go
 	NewServer(API{
@@ -24,8 +25,7 @@ control of it to test even edge cases such as error handling.
 	})
 ```
 
-
-- Use the `fleetservertest.NewPATHNAME(args)` functions to get the path ready to be used:
+- Use the `fleetservertest.NewPATHNAME(args)` functions to get a path ready to be used:
 ```go
 p := NewPathAgentAcks("my-agent-id")
 // p = "/api/fleet/agents/my-agent-id/acks"
