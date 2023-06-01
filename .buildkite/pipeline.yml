@@ -8,6 +8,6 @@ env:
 #   memory: "4G"
 steps:
   - label: "Integration tests"
-    command: ".buildkite/scripts/bk-commands.sh init_gcloud"
+    command: ".buildkite/scripts/integration_tests.sh"
     agents:
       provider: "gcp"
