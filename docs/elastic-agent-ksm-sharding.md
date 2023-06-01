@@ -19,11 +19,12 @@ The default dns entries for to access created ksm pods are (assuming namespace o
 
 ## Installation methods of elastic-agent
 
-This document suggests **3 alternative configuration methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration:
+This document suggests **the 4 alternative configuration methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration:
 
-1. With `hostNetwork:false` for non-leader deployments of KSM shards
-2. With `podAntiAffinity` to isolate the daemonset pods from rest of deployments
-3. With `taint/tolerations` to isolate the daemonset pods from rest of deployments
+1. Elastic Agent as side-container with KSM Shard pods. The Elastic Agent will part of Statefulset with `hostNetwork:false`
+2. With `hostNetwork:false` for non-leader Elastic Agent deployments that will collect from KSM Shards
+3. With `podAntiAffinity` to isolate the Elastic Agent daemonset pods from rest of Elastic Agent deployments
+4. With `taint/tolerations` to isolate the Elastic Agent daemonset pods from rest of Elastic Agent deployments
 
 Each configuration includes specific pros and cons and users may choose what best matches their needs.
 
@@ -44,7 +45,28 @@ Additionally by default, one agent is elected as [**leader**](https://github.com
 
 So let us discuss each alternative configuration method above. We will provide relevant [manifests](./manifests) to assist installation. We will describe the managed agent installation scenario (for simplicity we would not mention standalone scenarios, but relevant [manifests](./manifests) will be provided for both scenarios)
 
-### 1. HostNetwork:false Installation
+### 1. Elastic Agent with HostNetwork:false and side container of KSM
+
+For this installation, users need to configure the two following agent policies.
+
+**Agent policies:**
+
+- One main policy where the KSM will be disabled. This policy will be used from the daemonset Elastic Agent manifest
+- One policy with only KSM enabled.
+  - Leader Election will be disabled
+  - KSM Url endpoint: `localhost:8080`
+
+**Manifest Installation:**
+
+Follow steps of [KSM Autosharding with Side Container](./manifests/kustomize-autosharding/README.md)
+
+**Pros/Cons**:
+
+- [+] Simplicity. Only one policy is required for all KSM shards. Easy solution to scale
+- [+] Localhost communication between KSM and Elastic Agent
+- [-] Users need to patch the Statefuleset of KSM in order to create Elastic Agent as side container
+
+### 2. HostNetwork:false Installation for non-leader Elastic Agent deployments
 
 For this installation, users need to configure the two following agent policies.
 
@@ -80,7 +102,7 @@ Deploy following manifests:
 - [+] Simplicity
 - [-] You can not prevent execution of deployments in nodes where agents already running.
 
-### 2. PodAntiAffinity Installation
+### 3. PodAntiAffinity Installation
 
 For this installation, users need to configure the following agent policies:
 
@@ -154,7 +176,7 @@ kube-system   elastic-agent-txxfp                                              0
 - [-] More complex than first method
 - [-] It displays scheduled daemonset pods in state `Pending` where antiaffinity is triggered.
 
-### Tolerations Installation
+### 4. Tolerations Installation
 
 **Agent Policies:**
 For this installation, users need to configure the same agent policies as described in first scenario (aka hostnetwork configuration).
