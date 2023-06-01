@@ -7,11 +7,8 @@ agents:
   ephemeralStorage: "10G"
   memory: "4G"
 steps:
-  - label: "Build"
-    command: mage build
-    artifact_paths:
-      - "./build/elastic-agent"
-  - label: "Unit tests"
-    command: mage test
-    artifact_paths:
-      - "./build/TEST-go-unit.xml"
+  - label: "Integration tests"
+    command: ".buildkite/scripts/bk-commands.sh init_gcloud"
+    agents:
+      provider: "gcp"
+      image: "ubuntu-1804-bionic-v20230510"
