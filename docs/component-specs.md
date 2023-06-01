@@ -133,7 +133,7 @@ Agent expects commands it runs to write their logs to standard output as lines o
 
 #### `restart_monitoring_period` (duration), `maximum_restarts_per_period` (integer)
 
-When a process fails, Agent will restart it. These parameters provide a rate limit, so Agent will not try to start the same component too many times in a short duration. If Agent restarts a process `maximum_restarts_per_period` times within `restart_monitoring_period`, then it will not try again until the monitoring period elapses.
+Some components (particularly Beats) terminate when they receive a new configuration that can't be applied dynamically. Ordinarily, termination of a process that is supposed to be running is considered an error. These configuration flags prevent termination from being immediately reported as failure in the UI. Agent will only report a component as failed if it restarts more than `maximum_restarts_per_period` times within `restart_monitoring_period`.
 
 ### `service` (input only)
 

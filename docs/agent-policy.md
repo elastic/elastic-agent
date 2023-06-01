@@ -2,7 +2,7 @@
 
 The policy of an Agent is the user-controlled portion of the Agent configuration that, together with [component spec files](component-specs.md), determines the components that Agent runs and their configuration.
 
-A __component__ is an executable that Agent runs or monitors. That component is divided into __units__ corresponding to its functional behavior. For example, Filebeat is a component, but Filebeat may be run with multiple `filestream` inputs, and each of those is a unit with its own configuration.
+A __component__ is an executable that Agent runs and/or monitors. That component is divided into __units__ corresponding to its functional behavior. For example, Filebeat is a component, but Filebeat may be run with multiple `filestream` inputs, and each of those is a unit with its own configuration.
 
 Components run by Agent have one or more input units describing the data they collect, and one output unit describing where the data goes. For more on these distinctions see the Agent architecture's [compute model](architecture.md#compute-model).
 
@@ -116,7 +116,7 @@ The output this input should write to. This must match one of the output names f
 
 #### `log_level` (string, removed)
 
-The log level for this component. This field is not passed on to the underlying component; instead, Agent implements log level filtering itself. Possible values:
+The log level for this component. This field is removed from the raw configuration, and is instead passed as a top-level field on each input `Unit` configuration passed to the component. Additionally, Agent itself filters logs that don't meet the configured level. Possible values:
 - `error`
 - `warn` / `warning`
 - `info`
@@ -144,7 +144,7 @@ If present, this field determines whether this output should be implemented by a
 
 #### `log_level` (string, removed)
 
-The log level for this component. This field is not passed on to the underlying component; instead, Agent implements log level filtering itself. Possible values:
+The log level for this component. This field is removed from the raw configuration, and is instead passed as a top-level field on the output `Unit` configuration passed to the component. Additionally, Agent itself filters logs that don't meet the configured level. Possible values:
 - `error`
 - `warn` / `warning`
 - `info`
