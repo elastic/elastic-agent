@@ -9,5 +9,7 @@ env:
 steps:
   - label: "Integration tests"
     command: ".buildkite/scripts/integration_tests.sh"
+    artifact_paths:
+      - "build/**/*"
     agents:
       provider: "gcp"

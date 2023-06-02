@@ -50,7 +50,7 @@ fi
 # PACKAGE
 # 
 
-DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage -v package
+DEV=true EXTERNAL=true SNAPSHOT=true PACKAGES=tar.gz mage -v package
 
 #ESS
 vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa > ./apiKey
