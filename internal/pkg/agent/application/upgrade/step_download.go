@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 
 	"go.elastic.co/apm"
 
@@ -24,6 +27,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+// const downloadBackoffInit = 30 * time.Second
+const downloadBackoffInit = 10 * time.Second // FIXME: for testing only
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
@@ -47,18 +53,13 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 		"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 
-	fetcher, err := newDownloader(version, u.log, &settings)
-	if err != nil {
-		return "", errors.New(err, "initiating fetcher")
-	}
-
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
-	path, err := fetcher.Download(ctx, agentArtifact, version)
+	path, err := u.downloadWithRetries(ctx, newDownloader, version, &settings)
 	if err != nil {
-		return "", errors.New(err, "failed upgrade of agent binary")
+		return "", err
 	}
 
 	if skipVerifyOverride {
@@ -118,4 +119,74 @@ func newVerifier(version string, log *logger.Logger, settings *artifact.Config) 
 	}
 
 	return composed.NewVerifier(fsVerifier, snapshotVerifier, remoteVerifier), nil
+}
+
+func (u *Upgrader) downloadWithRetries(
+	ctx context.Context,
+	downloaderCtor func(string, *logger.Logger, *artifact.Config) (download.Downloader, error),
+	version string,
+	settings *artifact.Config,
+) (string, error) {
+	signal := make(chan struct{})
+	backExp := backoff.NewExpBackoff(signal, downloadBackoffInit, u.settings.Timeout)
+
+	startTime := time.Now()
+	stopRetrying := func(i int) bool {
+		// Figure out if we've waited long enough. This ensures we only wait
+		// for as long as settings.Timeout across _all_ download attempts
+		// in total.
+		now := time.Now()
+		nextAttemptTime := now.Add(backExp.NextWait())
+		waitedLongEnough := nextAttemptTime.Sub(startTime) > settings.Timeout
+
+		if i == 1 || waitedLongEnough {
+			// We've unsuccessfully attempted downloading the maximum number of
+			// times or we've spent enough time waiting across download attempts.
+			// Give up and return the error.
+			close(signal)
+			u.log.Debugf(
+				"attempted downloading %d times over a period of %s.",
+				(settings.RetryMaxCount-i)+1,
+				now.Sub(startTime).String(),
+			)
+			return true
+		}
+
+		return false
+	}
+
+	for i := u.settings.RetryMaxCount; i >= 1; i-- {
+		if i < u.settings.RetryMaxCount {
+			// Don't wait before the very first attempt
+			backExp.Wait()
+		}
+
+		downloader, err := downloaderCtor(version, u.log, settings)
+		if err != nil {
+			if stopRetrying(i) {
+				return "", fmt.Errorf("initiating fetcher: %w", err)
+			}
+
+			// Retry
+			u.log.Warnf("initializing fetcher failed with error [%s]; retrying in %s.", err.Error(), backExp.NextWait().String())
+			continue
+		}
+
+		path, err := downloader.Download(ctx, agentArtifact, version)
+		if err == nil {
+			// Download succeeded; we're done here.
+			return path, nil
+		}
+
+		if stopRetrying(i) {
+			return "", fmt.Errorf("downloading: %w", err)
+		}
+
+		// Retry
+		u.log.Warnf("download attempt failed with error [%s]; retrying in %s.", err.Error(), backExp.NextWait().String())
+		backExp.Wait()
+	}
+	close(signal)
+
+	return "", nil
 }

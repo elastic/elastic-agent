@@ -54,6 +54,9 @@ type Config struct {
 	// If not provided FileSystem Downloader will fallback to /beats subfolder of elastic-agent directory.
 	DropPath string `yaml:"dropPath" config:"drop_path"`
 
+	// RetryMaxCount: the maximum number of attempts to make at downloading packages.
+	RetryMaxCount int `config:"retry_max_count"`
+
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
 
@@ -154,12 +157,14 @@ func DefaultConfig() *Config {
 	// Elastic Agent binary is rather large and based on the network bandwidth it could take some time
 	// to download the full file. 120 minutes is a very large value, but we really want it to finish.
 	// The HTTP download will log progress in the case that it is taking a while to download.
-	transport.Timeout = 120 * time.Minute
+	//transport.Timeout = 120 * time.Minute
+	transport.Timeout = 1 * time.Minute // FIXME: for testing only
 
 	return &Config{
 		SourceURI:             DefaultSourceURI,
 		TargetDirectory:       paths.Downloads(),
 		InstallPath:           paths.Install(),
+		RetryMaxCount:         6,
 		HTTPTransportSettings: transport,
 	}
 }
