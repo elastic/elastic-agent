@@ -12,9 +12,15 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-autodiscover v0.2.1
 	github.com/elastic/elastic-agent-client/v7 v7.1.0
 	github.com/elastic/elastic-agent-libs v0.3.6
+=======
+	github.com/elastic/elastic-agent-autodiscover v0.6.1
+	github.com/elastic/elastic-agent-client/v7 v7.1.2
+	github.com/elastic/elastic-agent-libs v0.3.8-0.20230512004837-d6a37d929cd6
+>>>>>>> fd9e00f8d2 (Bump elastic-agent-client to v7.1.2 (#2763))
 	github.com/elastic/elastic-agent-system-metrics v0.6.0
 	github.com/elastic/go-licenser v0.4.0
 	github.com/elastic/go-sysinfo v1.10.0
@@ -22,7 +28,12 @@ require (
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/google/go-cmp v0.5.9
+<<<<<<< HEAD
 	github.com/google/pprof v0.0.0-20230406165453-00490a63f317
+=======
+	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc
+	github.com/google/uuid v1.3.0
+>>>>>>> fd9e00f8d2 (Bump elastic-agent-client to v7.1.2 (#2763))
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
