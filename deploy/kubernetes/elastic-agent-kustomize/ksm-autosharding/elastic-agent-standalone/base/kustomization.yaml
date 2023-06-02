@@ -6,7 +6,7 @@ namespace: kube-system
 resources:
   - elastic-agent-standalone-ksm-daemonset-configmap.yaml
   - elastic-agent-standalone-ksm-statefulset-configmap.yaml
-  # - elastic-agent-standalone-daemonset.yaml
+  - elastic-agent-standalone-daemonset.yaml
   - elastic-agent-standalone-role-binding.yaml
   - elastic-agent-standalone-role.yaml
   - elastic-agent-standalone-service-account.yaml
