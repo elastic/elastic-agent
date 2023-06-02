@@ -1970,11 +1970,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearc
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-licenser
-Version: v0.4.0
+Version: v0.4.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-licenser@v0.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-licenser@v0.4.1/LICENSE:
 
 
                                  Apache License
