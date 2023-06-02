@@ -349,7 +349,7 @@ func TestToComponents(t *testing.T) {
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "fleet-server",
 						BinaryName: "fleet-server",
-						BinaryPath: "../../specs/fleet-server",
+						BinaryPath: filepath.Join("..", "..", "specs", "fleet-server"),
 					},
 					Units: []Unit{
 						{
