@@ -92,29 +92,22 @@ endif
 
 
 ## ci-create-kustomize-default : Create default kustomize folder 
-.PHONY: ci-create-kustomize-default $(ALL)
-ci-create-kustomize-default: $(ALL)
+.PHONY: ci-create-kustomize $(ALL)
+ci-create-kustomize: $(ALL)
 
 $(ALL):
 	@echo "Generating $@ kustomize-default files"
 	@for f in $(shell ls $@/*.yaml); do \
-		mkdir -p $(KUSTOMIZE_DEFAULT)/$@; \
-		cp -r $$f  $(KUSTOMIZE_DEFAULT)/$@/; \
-		cp -r $(KUSTOMIZE)/kustomization-default.yaml $(KUSTOMIZE_DEFAULT)/$@/kustomization.yaml; \
+		cp -r $$f  $(KUSTOMIZE_DEFAULT)/$@/base; \
 	done
 
-## ci-create-kustomize-ksm-autosharding : Create ksm-autosharding kustomize folder 
-.PHONY: ci-create-kustomize-ksm-autosharding $(ALL)
-ci-create-kustomize-ksm-autosharding: $(ALL)
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $@/$@-daemonset.yaml > $(KUSTOMIZE_DEFAULT)/$@/base/$@-daemonset.yaml
 
- 
-
-$(ALL):
 	@echo "Generating $@ kustomize-ksm-autosharding files"
-	@for f in $(shell ls $@/*.yaml ); do \
-		mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@; \
-		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/; \
-		cp -r $(KUSTOMIZE)/$@-kustomization-default.yaml $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/kustomization.yaml; \
+	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
+		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base; \
 	done
 
-	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/'hostNetwork: true'/'hostNetwork: false'/g" -e "s/DaemonSet/StatefulSet/g" $@/$@-daemonset.yaml >> $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/$@-statefulset.yaml
+	mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base/$@-daemonset.yaml
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/hostNetwork: true/hostNetwork: false/g" -e "s/DaemonSet/StatefulSet/g" -e "s/agent-node-datastreams/agent-ksm-datastreams/g"  $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/$@-statefulset.yaml

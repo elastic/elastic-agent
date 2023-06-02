@@ -6,9 +6,9 @@ This is the list of [kustomize](https://github.com/kubernetes-sigs/kustomize) te
 
 Beat | Description
 ---- | ----
-[Elastic Agent Default managed](./default/kustomization-default-managed.yaml) | Default Elastic Agent managed by Fleet setup
-[Elastic Agent Default standalone](./default/kustomization-default-standalone.yaml) | Default Standalone Elastic Agent setup
-[Elastic Agent Default managed](./default/kustomization-default-managed.yaml) | Elastic Agent managed by Fleet setup with KSM autosharded
-[Elastic Agent Default standalone](./default/kustomization-default-standalone.yaml) | Standalone Elastic Agent setup with KSM autosharded
+[Elastic Agent Default managed](./default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup
+[Elastic Agent Default standalone](./default/elastic-agent-standalone/) | Default Standalone Elastic Agent setup
+[Elastic Agent Default managed](./ksm-autosharding/elastic-agent-managed/) | Elastic Agent managed by Fleet setup with KSM autosharded
+[Elastic Agent Default standalone](./ksm-autosharding/elastic-agent-standalone/) | Standalone Elastic Agent setup with KSM autosharded
 
 *(KSM = Kube State Metrics)

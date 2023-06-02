@@ -5,8 +5,13 @@ namespace: kube-system
 
 resources:
   - ./base
-
+  - https://github.com/kubernetes/kube-state-metrics/examples/autosharding
+replicas:
+  - name: kube-state-metrics
+    count: 2
+    
 patches:
-- path: extra/elastic-agent-managed-statefulset.yaml
+- path: extra/elastic-agent-standalone-statefulset.yaml
   target:
     kind: StatefulSet
+
