@@ -158,7 +158,7 @@ func DefaultConfig() *Config {
 	// to download the full file. 120 minutes is a very large value, but we really want it to finish.
 	// The HTTP download will log progress in the case that it is taking a while to download.
 	//transport.Timeout = 120 * time.Minute
-	transport.Timeout = 1 * time.Minute // FIXME: for testing only
+	transport.Timeout = 10 * time.Minute // FIXME: for testing only
 
 	return &Config{
 		SourceURI:             DefaultSourceURI,

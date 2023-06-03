@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -24,12 +22,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/localremote"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/snapshot"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// const downloadBackoffInit = 30 * time.Second
-const downloadBackoffInit = 10 * time.Second // FIXME: for testing only
+const downloadBackoffInit = 30 * time.Second
+
+//const downloadBackoffInit = 10 * time.Second // FIXME: for testing only
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
