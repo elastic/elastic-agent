@@ -29,8 +29,6 @@ import (
 
 const downloadBackoffInit = 30 * time.Second
 
-//const downloadBackoffInit = 10 * time.Second // FIXME: for testing only
-
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
