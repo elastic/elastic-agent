@@ -184,7 +184,6 @@ func (u *Upgrader) downloadWithRetries(
 
 		// Retry
 		u.log.Warnf("download attempt failed with error [%s]; retrying in %s.", err.Error(), backExp.NextWait().String())
-		backExp.Wait()
 	}
 	close(signal)
 
