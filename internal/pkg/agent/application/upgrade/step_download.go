@@ -128,7 +128,7 @@ func (u *Upgrader) downloadWithRetries(
 	defer cancel()
 
 	expBo := backoff.NewExponentialBackOff()
-	expBo.InitialInterval = settings.RetryBackoffInitDuration
+	expBo.InitialInterval = settings.RetrySleepInitDuration
 
 	boMaxRetries := backoff.WithMaxRetries(expBo, uint64(settings.RetryMaxCount))
 	boCtx := backoff.WithContext(boMaxRetries, ctx)

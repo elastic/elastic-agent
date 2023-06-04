@@ -57,9 +57,9 @@ type Config struct {
 	// RetryMaxCount: the maximum number of attempts to make at downloading packages.
 	RetryMaxCount uint `config:"retry_max_count"`
 
-	// RetryBackoffInitDuration: the duration to wait for before the very first retry attempt. This wait
+	// RetrySleepInitDuration: the duration to sleep for before the first retry attempt. This wait
 	// duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
-	RetryBackoffInitDuration time.Duration `config:"retry_backoff_init_duration"`
+	RetrySleepInitDuration time.Duration `config:"retry_sleep_init_duration"`
 
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
@@ -165,12 +165,12 @@ func DefaultConfig() *Config {
 	transport.Timeout = 10 * time.Minute // FIXME: for testing only
 
 	return &Config{
-		SourceURI:                DefaultSourceURI,
-		TargetDirectory:          paths.Downloads(),
-		InstallPath:              paths.Install(),
-		RetryMaxCount:            6,
-		RetryBackoffInitDuration: 30 * time.Second,
-		HTTPTransportSettings:    transport,
+		SourceURI:              DefaultSourceURI,
+		TargetDirectory:        paths.Downloads(),
+		InstallPath:            paths.Install(),
+		RetryMaxCount:          6,
+		RetrySleepInitDuration: 30 * time.Second,
+		HTTPTransportSettings:  transport,
 	}
 }
 

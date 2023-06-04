@@ -35,8 +35,8 @@ func TestDownloadWithRetries(t *testing.T) {
 	testLogger, obs := logger.NewTesting("TestDownloadWithRetries")
 
 	settings := artifact.Config{
-		RetryMaxCount:            5,
-		RetryBackoffInitDuration: 20 * time.Millisecond,
+		RetryMaxCount:          5,
+		RetrySleepInitDuration: 20 * time.Millisecond,
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: 2 * time.Second,
 		},
