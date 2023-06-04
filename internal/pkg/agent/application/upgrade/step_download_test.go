@@ -28,7 +28,7 @@ func (md *mockDownloader) Download(ctx context.Context, agentArtifact artifact.A
 }
 
 func TestDownloadWithRetries(t *testing.T) {
-	testLogger, _ := logger.NewTesting("TestDownloadWithRetries")
+	testLogger, obs := logger.NewTesting("TestDownloadWithRetries")
 
 	// Successful immediately (no retries)
 	t.Run("successful_immediately", func(t *testing.T) {
@@ -51,6 +51,10 @@ func TestDownloadWithRetries(t *testing.T) {
 		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, "8.9.0", &settings)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
+
+		logs := obs.All()
+		require.Len(t, logs, 1)
+		require.Equal(t, "download attempt 1 of 11", logs[0].Message)
 	})
 
 	// Successful after first attempt (at least one retry) with
