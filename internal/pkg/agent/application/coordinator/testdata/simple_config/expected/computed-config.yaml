@@ -1,6 +1,8 @@
 agent:
   download:
     sourceURI: https://artifacts.elastic.co/downloads/
+    retry_max_count: 6
+    retry_sleep_init_duration: 30s
   features:
     fqdn:
       enabled: true

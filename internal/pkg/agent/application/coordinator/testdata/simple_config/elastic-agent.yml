@@ -147,6 +147,8 @@ output_permissions:
 agent:
   download:
     sourceURI: 'https://artifacts.elastic.co/downloads/'
+    retry_max_count: 6
+    retry_sleep_init_duration: 30s
   monitoring:
     enabled: true
     use_output: default
