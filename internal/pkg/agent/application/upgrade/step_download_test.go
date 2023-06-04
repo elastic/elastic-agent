@@ -3,7 +3,7 @@ package upgrade
 import "testing"
 
 func TestDownloadWithRetries(t *testing.T) {
-	// Successful on first attempt
-	// Successful after first attempt
-	// Unsuccessful
+	// Successful immediately (no retries)
+	// Successful after first attempt (at least one retry)
+	// Unsuccessful (all retries exhausted)
 }
