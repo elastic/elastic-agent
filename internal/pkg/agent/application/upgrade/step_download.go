@@ -28,8 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const downloadBackoffInit = 30 * time.Second
-
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
@@ -130,7 +128,7 @@ func (u *Upgrader) downloadWithRetries(
 	defer cancel()
 
 	expBo := backoff.NewExponentialBackOff()
-	expBo.InitialInterval = downloadBackoffInit
+	expBo.InitialInterval = settings.RetryBackoffInitDuration
 
 	boMaxRetries := backoff.WithMaxRetries(expBo, uint64(settings.RetryMaxCount))
 	boCtx := backoff.WithContext(boMaxRetries, ctx)
