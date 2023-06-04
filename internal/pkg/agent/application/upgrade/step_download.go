@@ -124,7 +124,7 @@ func (u *Upgrader) downloadWithRetries(
 	version string,
 	settings *artifact.Config,
 ) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), u.settings.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, u.settings.Timeout)
 	defer cancel()
 
 	expBo := backoff.NewExponentialBackOff()
