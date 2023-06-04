@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
+
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -22,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/localremote"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/snapshot"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -125,65 +126,43 @@ func (u *Upgrader) downloadWithRetries(
 	version string,
 	settings *artifact.Config,
 ) (string, error) {
-	signal := make(chan struct{})
-	backExp := backoff.NewExpBackoff(signal, downloadBackoffInit, u.settings.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), u.settings.Timeout)
+	defer cancel()
 
-	startTime := time.Now()
-	stopRetrying := func(i int) bool {
-		// Figure out if we've waited long enough. This ensures we only wait
-		// for as long as settings.Timeout across _all_ download attempts
-		// in total.
-		now := time.Now()
-		nextAttemptTime := now.Add(backExp.NextWait())
-		waitedLongEnough := nextAttemptTime.Sub(startTime) > settings.Timeout
+	expBo := backoff.NewExponentialBackOff()
+	expBo.InitialInterval = downloadBackoffInit
 
-		if i == 1 || waitedLongEnough {
-			// We've unsuccessfully attempted downloading the maximum number of
-			// times or we've spent enough time waiting across download attempts.
-			// Give up and return the error.
-			close(signal)
-			u.log.Debugf(
-				"attempted downloading %d times over a period of %s.",
-				(settings.RetryMaxCount-i)+1,
-				now.Sub(startTime).String(),
-			)
-			return true
-		}
+	boMaxRetries := backoff.WithMaxRetries(expBo, uint64(settings.RetryMaxCount))
+	boCtx := backoff.WithContext(boMaxRetries, ctx)
 
-		return false
-	}
+	var path string
+	var attempt uint
 
-	for i := u.settings.RetryMaxCount; i >= 1; i-- {
-		if i < u.settings.RetryMaxCount {
-			// Don't wait before the very first attempt
-			backExp.Wait()
-		}
+	opFn := func() error {
+		attempt++
+		u.log.Debugf("download attempt %d of %d", attempt, settings.RetryMaxCount+1)
 
 		downloader, err := downloaderCtor(version, u.log, settings)
 		if err != nil {
-			if stopRetrying(i) {
-				return "", fmt.Errorf("initiating fetcher: %w", err)
-			}
-
-			// Retry
-			u.log.Warnf("initializing fetcher failed with error [%s]; retrying in %s.", err.Error(), backExp.NextWait().String())
-			continue
+			return fmt.Errorf("unable to create fetcher: %w", err)
 		}
 
-		path, err := downloader.Download(ctx, agentArtifact, version)
-		if err == nil {
-			// Download succeeded; we're done here.
-			return path, nil
+		path, err = downloader.Download(ctx, agentArtifact, version)
+		if err != nil {
+			return fmt.Errorf("unable to download package: %w", err)
 		}
 
-		if stopRetrying(i) {
-			return "", fmt.Errorf("downloading: %w", err)
-		}
-
-		// Retry
-		u.log.Warnf("download attempt failed with error [%s]; retrying in %s.", err.Error(), backExp.NextWait().String())
+		// Download successful
+		return nil
 	}
-	close(signal)
 
-	return "", nil
+	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
+		u.log.Warnf("%s; retrying (will be retry %d of %d) in %s.", err.Error(), attempt, settings.RetryMaxCount, retryAfter)
+	}
+
+	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
+		return "", err
+	}
+
+	return path, nil
 }

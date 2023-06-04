@@ -55,7 +55,7 @@ type Config struct {
 	DropPath string `yaml:"dropPath" config:"drop_path"`
 
 	// RetryMaxCount: the maximum number of attempts to make at downloading packages.
-	RetryMaxCount int `config:"retry_max_count"`
+	RetryMaxCount uint `config:"retry_max_count"`
 
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
