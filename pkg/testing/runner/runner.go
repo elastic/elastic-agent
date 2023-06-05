@@ -99,9 +99,7 @@ func NewRunner(cfg Config, batches ...define.Batch) (*Runner, error) {
 		if err != nil {
 			return nil, err
 		}
-		for _, lb := range lbs {
-			layoutBatches = append(layoutBatches, lb)
-		}
+		layoutBatches = append(layoutBatches, lbs...)
 	}
 	if cfg.SingleTest != "" {
 		layoutBatches, err = filterSingleTest(layoutBatches, cfg.SingleTest)
