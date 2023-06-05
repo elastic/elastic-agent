@@ -127,6 +127,9 @@ inputs:
 #   # install_path describes the location of installed packages/programs. It is also used
 #   # for reading program specifications.
 #   install_path: "${path.data}/install"
+#   # retry_sleep_init_duration is the duration to sleep for before the first retry attempt. This
+#   # duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
+#   retry_sleep_init_duration: 30s
 
 # agent.process:
 #   # timeout for creating new processes. when process is not successfully created by this timeout
