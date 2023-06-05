@@ -50,7 +50,7 @@ type ComponentRuntime interface {
 	//
 	// Used to tell control the difference between stopping a component to restart it or upgrade it, versus
 	// the component being completely removed.
-	Teardown() error
+	Teardown(signed *component.Signed) error
 }
 
 // NewComponentRuntime creates the proper runtime based on the input specification for the component.
@@ -181,10 +181,10 @@ func (s *componentRuntimeState) start() error {
 	return s.runtime.Start()
 }
 
-func (s *componentRuntimeState) stop(teardown bool) error {
+func (s *componentRuntimeState) stop(teardown bool, signed *component.Signed) error {
 	s.shuttingDown.Store(true)
 	if teardown {
-		return s.runtime.Teardown()
+		return s.runtime.Teardown(signed)
 	}
 	return s.runtime.Stop()
 }

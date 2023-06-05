@@ -18,6 +18,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+type actionModeSigned struct {
+	actionMode
+	signed *component.Signed
+}
+
 const (
 	defaultCheckServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
 )
@@ -37,7 +42,7 @@ type ServiceRuntime struct {
 	log  *logger.Logger
 
 	ch       chan ComponentState
-	actionCh chan actionMode
+	actionCh chan actionModeSigned
 	compCh   chan component.Component
 	statusCh chan service.Status
 
@@ -64,7 +69,7 @@ func NewServiceRuntime(comp component.Component, logger *logger.Logger) (Compone
 		comp:                      comp,
 		log:                       logger.Named("service_runtime"),
 		ch:                        make(chan ComponentState),
-		actionCh:                  make(chan actionMode, 1),
+		actionCh:                  make(chan actionModeSigned, 1),
 		compCh:                    make(chan component.Component, 1),
 		statusCh:                  make(chan service.Status),
 		state:                     state,
@@ -81,7 +86,31 @@ func NewServiceRuntime(comp component.Component, logger *logger.Logger) (Compone
 // Called by Manager inside a goroutine. Run does not return until the passed in context is done. Run is always
 // called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
+//
+// ==================================================================================================
+//
+// Updated teardown sequence:
+//
+//  1. if tearing down already (tearingDown == true), continue with stop/uninstall
+//
+//  2. if not tearing down already (tearingDown == false)
+//     a. inject new signed payload for component
+//     b. reset check-in timer
+//     c. set teardown timeout timer
+//     d. set tearingDown=true
+//     c. send component update (with new signed payload)
+//     d. await for check-in after update or teardown timeout
+//     e. upon receiving check-in if (tearingDown == true), send teardown action to itself
+//
+// ==================================================================================================
 func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error) {
+	// The teardownCheckingTimeout is set to the same amount as the checkin timeout for now
+	teardownCheckinTimeout := s.checkinPeriod()
+	teardownCheckinTimer := time.NewTimer(teardownCheckinTimeout)
+	defer teardownCheckinTimer.Stop()
+	// Stop teardown checkin timeout timer initially
+	teardownCheckinTimer.Stop()
+
 	checkinTimer := time.NewTimer(s.checkinPeriod())
 	defer checkinTimer.Stop()
 
@@ -92,6 +121,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		cis            *connInfoServer
 		lastCheckin    time.Time
 		missedCheckins int
+		tearingDown    bool
 	)
 
 	cisStop := func() {
@@ -102,6 +132,38 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	}
 	defer cisStop()
 
+	processStop := func(am actionMode) {
+		// Stop check-in timer
+		s.log.Debugf("stop check-in timer for %s service", s.name())
+		checkinTimer.Stop()
+
+		// Stop connection info
+		s.log.Debugf("stop connection info for %s service", s.name())
+		cisStop()
+
+		// Stop service
+		s.stop(ctx, comm, lastCheckin, am == actionTeardown)
+	}
+
+	processTeardown := func(am actionMode, signed *component.Signed) error {
+		s.log.Infof("start teardown for %s service", s.name())
+		// Inject new signed
+		newComp, err := injectSigned(s.comp, signed)
+		if err != nil {
+			s.log.Errorf("failed to inject signed configuration for %s service, err: %v", s.name(), err)
+			return err
+		}
+
+		// Set teardown timeout timer
+		teardownCheckinTimer.Reset(teardownCheckinTimeout)
+
+		// Process newComp update
+		// This should send component update that should cause service checkin
+		s.log.Debugf("process new comp config for %s service", s.name())
+		s.processNewComp(newComp, comm)
+		return nil
+	}
+
 	for {
 		var err error
 		select {
@@ -109,7 +171,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			s.log.Debug("context is done. exiting.")
 			return ctx.Err()
 		case as := <-s.actionCh:
-			switch as {
+			switch as.actionMode {
 			case actionStart:
 				// Initial state on start
 				lastCheckin = time.Time{}
@@ -135,17 +197,14 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 				// Start check-in timer
 				checkinTimer.Reset(s.checkinPeriod())
-			case actionStop, actionTeardown:
-				// Stop check-in timer
-				s.log.Debugf("stop check-in timer for %s service", s.name())
-				checkinTimer.Stop()
-
-				// Stop connection info
-				s.log.Debugf("stop connection info for %s service", s.name())
-				cisStop()
-
-				// Stop service
-				s.stop(ctx, comm, lastCheckin, as == actionTeardown)
+			case actionStop:
+				processStop(as.actionMode)
+			case actionTeardown:
+				s.log.Debugf("got teardown for %s service, tearingDown==%v", s.name(), tearingDown)
+				if !tearingDown {
+					tearingDown = true
+					err = processTeardown(as.actionMode, as.signed)
+				}
 			}
 			if err != nil {
 				s.forceCompState(client.UnitStateFailed, err.Error())
@@ -153,12 +212,54 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		case newComp := <-s.compCh:
 			s.processNewComp(newComp, comm)
 		case checkin := <-comm.CheckinObserved():
+			s.log.Debugf("got checkin for %s service, tearingDown==%v", s.name(), tearingDown)
 			s.processCheckin(checkin, comm, &lastCheckin)
+			// Got check-in upon teardown update
+			if tearingDown {
+				tearingDown = false
+				teardownCheckinTimer.Stop()
+				processStop(actionTeardown)
+			}
 		case <-checkinTimer.C:
 			s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
 			checkinTimer.Reset(s.checkinPeriod())
+		case <-teardownCheckinTimer.C:
+			s.log.Debugf("got teardown timeout for %s service", s.name())
+			// teardown timed out
+			if tearingDown {
+				tearingDown = false
+				processStop(actionTeardown)
+			}
 		}
 	}
+}
+
+func injectSigned(comp component.Component, signed *component.Signed) (component.Component, error) {
+	if signed == nil {
+		return comp, nil
+	}
+
+	const signedKey = "signed"
+	for i, unit := range comp.Units {
+		if unit.Type == client.UnitTypeInput {
+			unitCfgMap := unit.Config.Source.AsMap()
+
+			unitCfgMap[signedKey] = map[string]interface{}{
+				"data":      signed.Data,
+				"signature": signed.Signature,
+			}
+
+			unitCfg, err := component.ExpectedConfig(unitCfgMap)
+			if err != nil {
+				return comp, err
+			}
+
+			unit.Config = unitCfg
+			comp.Units[i] = unit
+		}
+	}
+
+	return comp, nil
 }
 
 func (s *ServiceRuntime) start(ctx context.Context) (err error) {
@@ -352,7 +453,7 @@ func (s *ServiceRuntime) Start() error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionStart
+	s.actionCh <- actionModeSigned{actionStart, nil}
 	return nil
 }
 
@@ -378,20 +479,20 @@ func (s *ServiceRuntime) Stop() error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionStop
+	s.actionCh <- actionModeSigned{actionStop, nil}
 	return nil
 }
 
 // Teardown stop and uninstall the service.
 //
 // Non-blocking and never returns an error.
-func (s *ServiceRuntime) Teardown() error {
+func (s *ServiceRuntime) Teardown(signed *component.Signed) error {
 	// clear channel so it's the latest action
 	select {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionTeardown
+	s.actionCh <- actionModeSigned{actionTeardown, signed}
 	return nil
 }
 

@@ -269,7 +269,7 @@ func (c *CommandRuntime) Stop() error {
 // Teardown tears down the component.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Teardown() error {
+func (c *CommandRuntime) Teardown(_ *component.Signed) error {
 	// clear channel so it's the latest action
 	select {
 	case <-c.actionCh:

@@ -222,7 +222,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			componentsUpdateChannel := make(chan runtime.ComponentComponentState)
 			subscriptionAll := runtime.NewSubscriptionAllWithChannel(ctx, componentsUpdateChannel)
 			helper.runtimeManager.EXPECT().SubscribeAll(mock.Anything).Return(subscriptionAll)
-			helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
+			helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("component.Model")).Return(nil)
 
 			sut := helper.coordinator
 			coordinatorWg := new(sync.WaitGroup)
