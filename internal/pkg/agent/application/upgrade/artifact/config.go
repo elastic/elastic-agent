@@ -55,7 +55,7 @@ type Config struct {
 	DropPath string `yaml:"dropPath" config:"drop_path"`
 
 	// RetryMaxCount: the maximum number of attempts to make at downloading packages.
-	RetryMaxCount uint `config:"retry_max_count"`
+	RetryMaxCount uint `yaml:"retry_max_count" config:"retry_max_count"` 
 
 	// RetrySleepInitDuration: the duration to sleep for before the first retry attempt. This wait
 	// duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
