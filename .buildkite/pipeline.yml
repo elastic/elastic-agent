@@ -2,14 +2,14 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-# agents:
-#   image: "docker.elastic.co/observability-ci/elastic-agent-build-image:latest"
-#   ephemeralStorage: "10G"
-#   memory: "4G"
+agents:
+  provider: "gcp"
 steps:
+  - label: "Setup integration tests"
+    command: ".buildkite/scripts/setup_integration_tests.sh"
+  - label: "Package"
+    command: ".buildkite/scripts/package.sh"
   - label: "Integration tests"
     command: ".buildkite/scripts/integration_tests.sh"
     artifact_paths:
       - "build/TEST-**"
-    agents:
-      provider: "gcp"
