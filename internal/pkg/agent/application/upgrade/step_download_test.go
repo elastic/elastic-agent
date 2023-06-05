@@ -144,4 +144,29 @@ func TestDownloadWithRetries(t *testing.T) {
 		}
 		require.Equal(t, fmt.Sprintf("download attempt %d of %d", settings.RetryMaxCount+1, settings.RetryMaxCount+1), logs[10].Message)
 	})
+
+	// Download timeout expired
+	t.Run("download_timeout_expired", func(t *testing.T) {
+		testCaseSettings := settings
+		testCaseSettings.Timeout = 200 * time.Millisecond
+		testCaseSettings.RetrySleepInitDuration = 100 * time.Millisecond
+		testCaseSettings.RetryMaxCount = 5
+
+		mockDownloaderCtor := func(version string, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
+			return &mockDownloader{"", errors.New("download failed")}, nil
+		}
+
+		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, "8.9.0", &testCaseSettings)
+		require.Equal(t, "context deadline exceeded", err.Error())
+		require.Equal(t, "", path)
+
+		numExpectedAttempts := int(testCaseSettings.Timeout / testCaseSettings.RetrySleepInitDuration)
+		logs := obs.TakeAll()
+		require.Len(t, logs, numExpectedAttempts*2)
+		for i := 0; i < numExpectedAttempts; i++ {
+			require.Equal(t, fmt.Sprintf("download attempt %d of %d", i+1, settings.RetryMaxCount+1), logs[(2*i)].Message)
+			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d of %d)", (i+1), settings.RetryMaxCount))
+		}
+	})
 }

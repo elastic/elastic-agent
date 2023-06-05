@@ -124,14 +124,14 @@ func (u *Upgrader) downloadWithRetries(
 	version string,
 	settings *artifact.Config,
 ) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, u.settings.Timeout)
+	cancelCtx, cancel := context.WithTimeout(ctx, settings.Timeout)
 	defer cancel()
 
 	expBo := backoff.NewExponentialBackOff()
 	expBo.InitialInterval = settings.RetrySleepInitDuration
 
 	boMaxRetries := backoff.WithMaxRetries(expBo, uint64(settings.RetryMaxCount))
-	boCtx := backoff.WithContext(boMaxRetries, ctx)
+	boCtx := backoff.WithContext(boMaxRetries, cancelCtx)
 
 	var path string
 	var attempt uint
@@ -145,7 +145,7 @@ func (u *Upgrader) downloadWithRetries(
 			return fmt.Errorf("unable to create fetcher: %w", err)
 		}
 
-		path, err = downloader.Download(ctx, agentArtifact, version)
+		path, err = downloader.Download(cancelCtx, agentArtifact, version)
 		if err != nil {
 			return fmt.Errorf("unable to download package: %w", err)
 		}
