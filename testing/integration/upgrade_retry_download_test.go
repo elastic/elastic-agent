@@ -155,7 +155,6 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) TestUpgradeStandaloneElasti
 	s.Eventually(func() bool {
 		agentDirName := fmt.Sprintf("elastic-agent-%s", release.TrimCommit(version.Daemon.Commit))
 		logsPath := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", agentDirName, "logs")
-		s.T().Log("Logs path:", logsPath)
 
 		cmd := exec.Command("grep",
 			"download.*retrying",
