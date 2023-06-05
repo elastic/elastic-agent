@@ -8,6 +8,7 @@ require (
 	github.com/billgraziano/dpapi v0.4.0
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliercoder/go-rpm v0.0.0-20190131055624-7a9c54e3d83e
+	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/coreos/go-systemd/v22 v22.3.3-0.20220203105225-a9a7ef127534
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
@@ -73,7 +74,6 @@ require (
 	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
-	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
