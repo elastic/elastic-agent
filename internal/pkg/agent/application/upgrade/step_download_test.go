@@ -10,19 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/stretchr/testify/require"
 )
 
 type mockDownloader struct {
