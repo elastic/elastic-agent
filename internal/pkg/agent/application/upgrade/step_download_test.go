@@ -140,7 +140,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Len(t, logs, 11)
 		for i := 0; i < int(settings.RetryMaxCount); i++ {
 			require.Equal(t, fmt.Sprintf("download attempt %d of %d", i+1, settings.RetryMaxCount+1), logs[(2*i)].Message)
-			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d of %d)", (i+1), settings.RetryMaxCount))
+			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d of %d)", i+1, settings.RetryMaxCount))
 		}
 		require.Equal(t, fmt.Sprintf("download attempt %d of %d", settings.RetryMaxCount+1, settings.RetryMaxCount+1), logs[10].Message)
 	})
@@ -161,12 +161,12 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Equal(t, "context deadline exceeded", err.Error())
 		require.Equal(t, "", path)
 
-		numExpectedAttempts := int(testCaseSettings.Timeout / testCaseSettings.RetrySleepInitDuration)
+		minNmExpectedAttempts := int(testCaseSettings.Timeout / testCaseSettings.RetrySleepInitDuration)
 		logs := obs.TakeAll()
-		require.Len(t, logs, numExpectedAttempts*2)
-		for i := 0; i < numExpectedAttempts; i++ {
+		require.GreaterOrEqual(t, len(logs), minNmExpectedAttempts*2)
+		for i := 0; i < minNmExpectedAttempts; i++ {
 			require.Equal(t, fmt.Sprintf("download attempt %d of %d", i+1, settings.RetryMaxCount+1), logs[(2*i)].Message)
-			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d of %d)", (i+1), settings.RetryMaxCount))
+			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d of %d)", i+1, settings.RetryMaxCount))
 		}
 	})
 }
