@@ -33,6 +33,7 @@ func newActionStore(log *logger.Logger, store storeLoad) (*actionStore, error) {
 	// persisted and we return an empty store.
 	reader, err := store.Load()
 	if err != nil {
+		//nolint:nilerr // ignore the error, this is expected
 		return &actionStore{log: log, store: store}, nil
 	}
 	defer reader.Close()
@@ -144,9 +145,10 @@ var _ actionPolicyChangeSerializer = actionPolicyChangeSerializer(fleetapi.Actio
 
 // actionUnenrollSerializer is a struct that adds a YAML serialization,
 type actionUnenrollSerializer struct {
-	ActionID   string `yaml:"action_id"`
-	ActionType string `yaml:"action_type"`
-	IsDetected bool   `yaml:"is_detected"`
+	ActionID   string           `yaml:"action_id"`
+	ActionType string           `yaml:"action_type"`
+	IsDetected bool             `yaml:"is_detected"`
+	Signed     *fleetapi.Signed `yaml:"signed,omitempty"`
 }
 
 // add a guards between the serializer structs and the original struct.
