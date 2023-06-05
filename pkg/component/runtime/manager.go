@@ -153,6 +153,7 @@ func NewManager(
 }
 
 // Run runs the manager.
+// Called on its own goroutine from Coordinator.runner.
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
@@ -228,10 +229,11 @@ func (m *Manager) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// WaitForReady waits until the manager is ready to be used.
+// waitForReady waits until the manager is ready to be used.
+// Used for testing.
 //
 // This verifies that the GRPC server is up and running.
-func (m *Manager) WaitForReady(ctx context.Context) error {
+func (m *Manager) waitForReady(ctx context.Context) error {
 	tk, err := uuid.NewV4()
 	if err != nil {
 		return err
@@ -300,6 +302,7 @@ func (m *Manager) Errors() <-chan error {
 }
 
 // Update updates the currComp state of the running components.
+// Called from the main Coordinator goroutine.
 //
 // This returns as soon as possible, the work is performed in the background.
 func (m *Manager) Update(components []component.Component) error {
@@ -612,7 +615,7 @@ func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 }
 
 // Actions is the actions stream used to broker actions between Elastic Agent and components.
-func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
+func (m *Manager) Actdsfions(server proto.ElasticAgent_ActionsServer) error {
 	initRespChan := make(chan *proto.ActionResponse)
 	go func() {
 		// go func will not be leaked, because when the main function
@@ -659,6 +662,7 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 }
 
 // update updates the current state of the running components.
+// Called from the main Coordinator goroutine.
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(components []component.Component, teardown bool) error {
@@ -809,13 +813,11 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 	m.subAllMx.RUnlock()
 
 	m.subMx.RLock()
-	subs, ok := m.subscriptions[state.id]
-	if ok {
-		for _, sub := range subs {
-			select {
-			case <-sub.ctx.Done():
-			case sub.ch <- latest:
-			}
+	subs := m.subscriptions[state.id]
+	for _, sub := range subs {
+		select {
+		case <-sub.ctx.Done():
+		case sub.ch <- latest:
 		}
 	}
 	m.subMx.RUnlock()
