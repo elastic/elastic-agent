@@ -54,11 +54,11 @@ type Config struct {
 	// If not provided FileSystem Downloader will fallback to /beats subfolder of elastic-agent directory.
 	DropPath string `yaml:"dropPath" config:"drop_path"`
 
-	// RetryMaxCount: the maximum number of attempts to make at downloading packages.
+	// RetryMaxCount: the maximum number of retries to make at downloading packages.
 	RetryMaxCount uint `yaml:"retry_max_count" config:"retry_max_count"`
 
-	// RetrySleepInitDuration: the duration to sleep for before the first retry attempt. This wait
-	// duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
+	// RetrySleepInitDuration: the duration to sleep for before the first retry attempt. This duration
+	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
 	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
 
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
