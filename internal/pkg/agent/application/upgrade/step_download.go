@@ -129,16 +129,14 @@ func (u *Upgrader) downloadWithRetries(
 
 	expBo := backoff.NewExponentialBackOff()
 	expBo.InitialInterval = settings.RetrySleepInitDuration
-
-	boMaxRetries := backoff.WithMaxRetries(expBo, uint64(settings.RetryMaxCount))
-	boCtx := backoff.WithContext(boMaxRetries, cancelCtx)
+	boCtx := backoff.WithContext(expBo, cancelCtx)
 
 	var path string
 	var attempt uint
 
 	opFn := func() error {
 		attempt++
-		u.log.Debugf("download attempt %d of %d", attempt, settings.RetryMaxCount+1)
+		u.log.Debugf("download attempt %d", attempt)
 
 		downloader, err := downloaderCtor(version, u.log, settings)
 		if err != nil {
@@ -155,7 +153,7 @@ func (u *Upgrader) downloadWithRetries(
 	}
 
 	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
-		u.log.Warnf("%s; retrying (will be retry %d of %d) in %s.", err.Error(), attempt, settings.RetryMaxCount, retryAfter)
+		u.log.Warnf("%s; retrying (will be retry %d) in %s.", err.Error(), attempt, retryAfter)
 	}
 
 	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {

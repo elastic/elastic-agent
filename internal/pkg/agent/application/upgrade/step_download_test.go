@@ -34,7 +34,6 @@ func TestDownloadWithRetries(t *testing.T) {
 	testLogger, obs := logger.NewTesting("TestDownloadWithRetries")
 
 	settings := artifact.Config{
-		RetryMaxCount:          5,
 		RetrySleepInitDuration: 20 * time.Millisecond,
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: 2 * time.Second,
@@ -54,7 +53,7 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 1)
-		require.Equal(t, fmt.Sprintf("download attempt 1 of %d", settings.RetryMaxCount+1), logs[0].Message)
+		require.Equal(t, "download attempt 1", logs[0].Message)
 	})
 
 	// Downloader constructor failing on first attempt, but succeeding on second attempt (= first retry)
@@ -86,9 +85,9 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
-		require.Equal(t, fmt.Sprintf("download attempt 1 of %d", settings.RetryMaxCount+1), logs[0].Message)
-		require.Contains(t, logs[1].Message, fmt.Sprintf("unable to create fetcher: failed to construct downloader; retrying (will be retry 1 of %d)", settings.RetryMaxCount))
-		require.Equal(t, fmt.Sprintf("download attempt 2 of %d", settings.RetryMaxCount+1), logs[2].Message)
+		require.Equal(t, "download attempt 1", logs[0].Message)
+		require.Contains(t, logs[1].Message, "unable to create fetcher: failed to construct downloader; retrying (will be retry 1)")
+		require.Equal(t, "download attempt 2", logs[2].Message)
 	})
 
 	// Download failing on first attempt, but succeeding on second attempt (= first retry)
@@ -120,29 +119,9 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
-		require.Equal(t, fmt.Sprintf("download attempt 1 of %d", settings.RetryMaxCount+1), logs[0].Message)
-		require.Contains(t, logs[1].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry 1 of %d)", settings.RetryMaxCount))
-		require.Equal(t, fmt.Sprintf("download attempt 2 of %d", settings.RetryMaxCount+1), logs[2].Message)
-	})
-
-	// Download unsuccessful (all retries exhausted)
-	t.Run("download_unsuccessful", func(t *testing.T) {
-		mockDownloaderCtor := func(version string, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
-			return &mockDownloader{"", errors.New("download failed")}, nil
-		}
-
-		u := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, "8.9.0", &settings)
-		require.Equal(t, "unable to download package: download failed", err.Error())
-		require.Equal(t, "", path)
-
-		logs := obs.TakeAll()
-		require.Len(t, logs, 11)
-		for i := 0; i < int(settings.RetryMaxCount); i++ {
-			require.Equal(t, fmt.Sprintf("download attempt %d of %d", i+1, settings.RetryMaxCount+1), logs[(2*i)].Message)
-			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d of %d)", i+1, settings.RetryMaxCount))
-		}
-		require.Equal(t, fmt.Sprintf("download attempt %d of %d", settings.RetryMaxCount+1, settings.RetryMaxCount+1), logs[10].Message)
+		require.Equal(t, "download attempt 1", logs[0].Message)
+		require.Contains(t, logs[1].Message, "unable to download package: download failed; retrying (will be retry 1)")
+		require.Equal(t, "download attempt 2", logs[2].Message)
 	})
 
 	// Download timeout expired (before all retries are exhausted)
@@ -150,7 +129,6 @@ func TestDownloadWithRetries(t *testing.T) {
 		testCaseSettings := settings
 		testCaseSettings.Timeout = 200 * time.Millisecond
 		testCaseSettings.RetrySleepInitDuration = 100 * time.Millisecond
-		testCaseSettings.RetryMaxCount = 5
 
 		mockDownloaderCtor := func(version string, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
@@ -165,8 +143,8 @@ func TestDownloadWithRetries(t *testing.T) {
 		logs := obs.TakeAll()
 		require.GreaterOrEqual(t, len(logs), minNmExpectedAttempts*2)
 		for i := 0; i < minNmExpectedAttempts; i++ {
-			require.Equal(t, fmt.Sprintf("download attempt %d of %d", i+1, settings.RetryMaxCount+1), logs[(2*i)].Message)
-			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d of %d)", i+1, settings.RetryMaxCount))
+			require.Equal(t, fmt.Sprintf("download attempt %d", i+1), logs[(2*i)].Message)
+			require.Contains(t, logs[(2*i+1)].Message, fmt.Sprintf("unable to download package: download failed; retrying (will be retry %d)", i+1))
 		}
 	})
 }
