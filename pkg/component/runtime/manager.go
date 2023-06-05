@@ -152,7 +152,10 @@ func NewManager(
 	return m, nil
 }
 
-// Run runs the manager.
+// Run runs the manager's grpc server, implementing the
+// calls CheckinV2 and Actions (with a legacy handler for Checkin
+// that returns an error).
+//
 // Called on its own goroutine from Coordinator.runner.
 //
 // Blocks until the context is done.
@@ -197,7 +200,6 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.server = server
 	m.netMx.Unlock()
 	proto.RegisterElasticAgentServer(m.server, m)
-	m.shuttingDown.Store(false)
 
 	// start serving GRPC connections
 	var wg sync.WaitGroup
@@ -218,6 +220,7 @@ func (m *Manager) Run(ctx context.Context) error {
 
 	<-ctx.Done()
 	m.running.Store(false)
+	m.shuttingDown.Store(true)
 	m.shutdown()
 
 	server.Stop()
@@ -662,7 +665,6 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 }
 
 // update updates the current state of the running components.
-// Called from the main Coordinator goroutine.
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(components []component.Component, teardown bool) error {
@@ -779,9 +781,9 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 		}
 	}
 }
-func (m *Manager) shutdown() {
-	m.shuttingDown.Store(true)
 
+// Called from Manager's Run goroutine.
+func (m *Manager) shutdown() {
 	// don't tear down as this is just a shutdown, so components most likely will come back
 	// on next start of the manager
 	_ = m.update([]component.Component{}, false)
