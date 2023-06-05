@@ -145,7 +145,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("download attempt %d of %d", settings.RetryMaxCount+1, settings.RetryMaxCount+1), logs[10].Message)
 	})
 
-	// Download timeout expired
+	// Download timeout expired (before all retries are exhausted)
 	t.Run("download_timeout_expired", func(t *testing.T) {
 		testCaseSettings := settings
 		testCaseSettings.Timeout = 200 * time.Millisecond
