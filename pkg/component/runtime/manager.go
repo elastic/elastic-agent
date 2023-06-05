@@ -615,7 +615,7 @@ func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 }
 
 // Actions is the actions stream used to broker actions between Elastic Agent and components.
-func (m *Manager) Actdsfions(server proto.ElasticAgent_ActionsServer) error {
+func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 	initRespChan := make(chan *proto.ActionResponse)
 	go func() {
 		// go func will not be leaked, because when the main function
@@ -864,6 +864,7 @@ func (m *Manager) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, er
 	return nil, errors.New("no supported TLS certificate")
 }
 
+// Called from GRPC listeners
 func (m *Manager) getRuntimeFromToken(token string) *componentRuntimeState {
 	m.currentMx.RLock()
 	defer m.currentMx.RUnlock()
