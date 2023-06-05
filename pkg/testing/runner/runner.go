@@ -203,12 +203,13 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 					return fmt.Errorf("unable to find layout batch with ID: %s", m.Layout.Name)
 				}
 				loggerPrefix := fmt.Sprintf(
-					"%s[%s/%s/%s/%s]",
-					batch.ID[len(batch.ID)-5:len(batch.ID)-1],
+					"%s/%s/%s/%s[%s]",
 					batch.LayoutOS.OS.Type,
 					batch.LayoutOS.OS.Arch,
 					batch.LayoutOS.OS.Distro,
-					batch.LayoutOS.OS.Version)
+					batch.LayoutOS.OS.Version,
+					batch.ID[len(batch.ID)-5:len(batch.ID)-1],
+				)
 				logger := &batchLogger{prefix: loggerPrefix}
 				result, err := r.runMachine(ctx, sshAuth, logger, repoArchive, batch, m)
 				if err != nil {
