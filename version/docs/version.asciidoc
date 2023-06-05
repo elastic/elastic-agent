@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 :stack-version: 8.3.0
 :doc-branch: main
+=======
+:stack-version: 8.8.1
+:doc-branch: 8.8
+>>>>>>> b87d7fc611 (docs: update docs versions 8.8.1 (#2777))
 // FIXME: once elastic.co docs have been switched over to use `main`, remove
 // the `doc-site-branch` line below as well as any references to it in the code.
 :doc-site-branch: master
