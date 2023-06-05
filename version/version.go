@@ -4,5 +4,4 @@
 
 package version
 
-// FIXME: for testing only
-const defaultBeatVersion = "8.7.2"
+const defaultBeatVersion = "8.9.0"
