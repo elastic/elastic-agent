@@ -2,14 +2,10 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-agents:
-  provider: "gcp"
 steps:
-  - label: "Setup integration tests"
-    command: ".buildkite/scripts/setup_integration_tests.sh"
-  - label: "Package"
-    command: ".buildkite/scripts/package.sh"
   - label: "Integration tests"
     command: ".buildkite/scripts/integration_tests.sh"
     artifact_paths:
       - "build/TEST-**"
+    agents:
+      provider: "gcp"
