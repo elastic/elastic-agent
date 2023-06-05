@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -18,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"golang.org/x/sync/errgroup"
 )
 
 // Interface for coordinator for unenroll handler testability
@@ -65,6 +67,49 @@ func NewUnenroll(
 	}
 }
 
+type performActionFunc func(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
+
+func dispatchUnenrollInParallel(ctx context.Context, log *logp.Logger, action *fleetapi.ActionUnenroll, comps []component.Component, units []component.Unit, performAction performActionFunc) error {
+	if action == nil {
+		return nil
+	}
+
+	// Deserialize the action into map[string]interface{} for dispatching over to the apps
+	params, err := action.MarshalMap()
+	if err != nil {
+		return err
+	}
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Iterate through found components and forward the UNENROLL action
+	for i := 0; i < len(comps); i++ {
+		g.Go(func(idx int) func() error {
+			comp := comps[i]
+			unit := units[i]
+			return func() error {
+				log.Debugf("Dispatch %v action to %v", action.Type(), unit.Config.Type)
+				res, err := performAction(ctx, comp, unit, unit.Config.Type, params)
+				// If Endpoint UNENROLL fails, continue with Agent UNENROLL
+				if err != nil {
+					// Log and continue
+					log.Warnf("UNENROLL failed to dispatch to %v, err: %v", comp.ID, err)
+					return err
+				} else {
+					strErr := readMapString(res, "error", "")
+					if strErr != "" {
+						log.Warnf("UNENROLL failed for %v, err: %v", comp.ID, strErr)
+						return errors.New(strErr)
+					}
+				}
+				return nil
+			}
+		}(i))
+	}
+
+	return g.Wait()
+}
+
 // Handle handles UNENROLL action.
 func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	h.log.Debugf("handlerUnenroll: action '%+v' received", a)
@@ -78,31 +123,9 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	state := h.coord.State()
 	comps, units := findMatchingUnitsByActionType(state, a.Type())
 	if len(comps) > 0 {
-		// Iterate through found components and forward the UNENROLL action
-		for i, comp := range comps {
-			unit := units[i]
-			// Deserialize the action into map[string]interface{} for dispatching over to the apps
-			params, err := action.MarshalMap()
-			if err != nil {
-				return err
-			}
-
-			h.log.Debugf("Dispatch %v action to %v", a.Type(), unit.Config.Type)
-
-			res, err := h.coord.PerformAction(ctx, comp, unit, unit.Config.Type, params)
-
-			// If Endpoint UNENROLL fails, continue with Agent UNENROLL
-			if err != nil {
-				// Log and continue
-				h.log.Warnf("UNENROLL failed to dispatch to %v, err: %v", comp.ID, err)
-				return err
-			} else {
-				strErr := readMapString(res, "error", "")
-				if strErr != "" {
-					h.log.Warnf("UNENROLL failed for %v, err: %v", comp.ID, strErr)
-					return errors.New(strErr)
-				}
-			}
+		err := dispatchUnenrollInParallel(ctx, h.log, action, comps, units, h.coord.PerformAction)
+		if err != nil {
+			return err
 		}
 	} else {
 		// Log and continue
