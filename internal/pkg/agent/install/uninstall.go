@@ -29,7 +29,7 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath string) error {
+func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	// uninstall the current service
 	svc, err := newService(topPath)
 	if err != nil {
@@ -47,7 +47,7 @@ func Uninstall(cfgFile, topPath string) error {
 	}
 	_ = svc.Uninstall()
 
-	if err := uninstallComponents(context.Background(), cfgFile); err != nil {
+	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken); err != nil {
 		return err
 	}
 
@@ -152,7 +152,7 @@ func delayedRemoval(path string) {
 
 }
 
-func uninstallComponents(ctx context.Context, cfgFile string) error {
+func uninstallComponents(ctx context.Context, cfgFile, uninstallToken string) error {
 	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 	if err != nil {
 		return err
@@ -190,7 +190,7 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 
 	// remove each service component
 	for _, comp := range comps {
-		if err := uninstallComponent(ctx, log, comp); err != nil {
+		if err := uninstallComponent(ctx, log, comp, uninstallToken); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
 	}
@@ -198,8 +198,8 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 	return nil
 }
 
-func uninstallComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
-	return comprt.UninstallService(ctx, log, comp)
+func uninstallComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string) error {
+	return comprt.UninstallService(ctx, log, comp, uninstallToken)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {

@@ -41,6 +41,7 @@ inputs:
             - "uninstall"
             - "--log"
             - "stderr"
+            - "--uninstall-token"
           timeout: 600
   - name: endpoint
     description: "Endpoint Security"
