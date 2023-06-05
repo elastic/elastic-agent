@@ -15,7 +15,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -36,12 +35,12 @@ type Downloader struct {
 func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (download.Downloader, error) {
 	cfg, err := snapshotConfig(config, versionOverride)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating snapshot config: %w", err)
 	}
 
 	httpDownloader, err := http.NewDownloader(log, cfg)
 	if err != nil {
-		return nil, errors.New(err, "failed to create snapshot downloader")
+		return nil, fmt.Errorf("failed to create snapshot downloader: %w", err)
 	}
 
 	return &Downloader{
@@ -58,7 +57,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 	cfg, err := snapshotConfig(c, e.versionOverride)
 	if err != nil {
-		return errors.New(err, "snapshot.downloader: failed to generate snapshot config")
+		return fmt.Errorf("snapshot.downloader: failed to generate snapshot config: %w", err)
 	}
 
 	return reloader.Reload(cfg)
@@ -89,7 +88,9 @@ func snapshotConfig(config *artifact.Config, versionOverride *agtversion.ParsedS
 }
 
 func snapshotURI(versionOverride *agtversion.ParsedSemVer, config *artifact.Config) (string, error) {
-	// do we support upgrade without specifying a target version ?
+	// snapshot downloader is used also by the 'localremote' impl in case of agent currently running off a snapshot build:
+	// the 'localremote' downloader does not pass a specific version, implying that we should update to the latest snapshot
+	// build of the same <major>.<minor>.<patch>-SNAPSHOT version
 	version := release.Version()
 	if versionOverride != nil {
 		if versionOverride.BuildMetadata() != "" {

@@ -21,8 +21,9 @@ func NewDownloader(log *logger.Logger, config *artifact.Config) (download.Downlo
 	downloaders := make([]download.Downloader, 0, 3)
 	downloaders = append(downloaders, fs.NewDownloader(config))
 
-	// if the current build is a snapshot we use this downloader to update to the latest snapshot of the same version
-	// useful for testing with a snapshot version of fleet for example
+	// if the current build is a snapshot we use this downloader to update
+	// to the latest snapshot of the same version useful for testing with
+	// a snapshot version of fleet for example
 	// try snapshot repo before official
 	if release.Snapshot() {
 		snapDownloader, err := snapshot.NewDownloader(log, config, nil)
