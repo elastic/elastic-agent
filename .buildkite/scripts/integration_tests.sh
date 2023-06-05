@@ -45,7 +45,6 @@ else
   echo "mage is already installed."
 fi
 
-
 # 
 # PACKAGE
 # 
