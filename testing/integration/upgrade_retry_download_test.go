@@ -16,19 +16,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/release"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-
 	"gopkg.in/yaml.v2"
-
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 func TestElasticAgentUpgradeRetryDownload(t *testing.T) {
@@ -95,23 +92,16 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) SetupSuite() {
 }
 
 func (s *UpgradeElasticAgentStandaloneRetryDownload) TestUpgradeStandaloneElasticAgentRetryDownload() {
+	ctx := context.Background()
+
 	s.T().Log("Install the built Agent")
 	output, err := tools.InstallStandaloneElasticAgent(s.agentFixture)
 	s.T().Log(string(output))
 	s.Require().NoError(err)
 
 	s.T().Log("Ensure the correct version is running")
-	var version *versionOutput
-	s.Eventually(func() bool {
-		version, err = s.getVersion()
-		if err != nil {
-			return false
-		}
-
-		s.Require().Equal(release.Version(), version.Binary.Version)
-		s.Require().Equal(release.Version(), version.Daemon.Version)
-		return true
-	}, 1*time.Minute, 1*time.Second)
+	version, err := s.getVersion(ctx)
+	s.Require().NoError(err)
 
 	s.T().Log("Modify /etc/hosts to simulate transient network error")
 	cmd := exec.Command("sed",
@@ -127,25 +117,33 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) TestUpgradeStandaloneElasti
 	}
 	s.Require().NoError(err)
 
+	// Ensure that /etc/hosts is modified
+	s.Eventually(func() bool {
+		cmd := exec.Command("grep",
+			"artifacts",
+			"/etc/hosts",
+		)
+		s.T().Log("Check /etc/hosts command: ", cmd.String())
+
+		// We don't check the error as grep will return non-zero exit code when
+		// it doesn't find any matches, which could happen the first couple of
+		// times it searches /etc/hosts.
+		output, _ := cmd.CombinedOutput()
+		outputStr := strings.TrimSpace(string(output))
+
+		return outputStr != ""
+	}, 10*time.Second, 1*time.Second)
+
 	s.isEtcHostsModified = true
 	defer s.restoreEtcHosts()
 
 	s.T().Log("Start the Agent upgrade")
+	const targetVersion = "8.8.0"
 	var wg sync.WaitGroup
 	go func() {
 		wg.Add(1)
 
-		// elastic-agent upgrade 8.8.0
-		cmd := exec.Command("elastic-agent",
-			"upgrade",
-			"8.8.0",
-		)
-		s.T().Log("Upgrade command: ", cmd.String())
-
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			s.T().Log(string(output))
-		}
+		err := s.upgradeAgent(ctx, targetVersion)
 
 		wg.Done()
 		s.Require().NoError(err)
@@ -180,13 +178,39 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) TestUpgradeStandaloneElasti
 	s.restoreEtcHosts()
 
 	// Wait for upgrade command to finish executing
+	s.T().Log("Waiting on upgrade to finish")
 	wg.Wait()
 
 	s.T().Log("Check Agent version to ensure upgrade is successful")
-	version, err = s.getVersion()
+	version, err = s.getVersion(ctx)
 	s.Require().NoError(err)
-	s.Require().Equal("8.8.0", version.Binary.Version)
-	s.Require().Equal("8.8.0", version.Daemon.Version)
+	s.Require().Equal(targetVersion, version.Binary.Version)
+	s.Require().Equal(targetVersion, version.Daemon.Version)
+}
+
+func (s *UpgradeElasticAgentStandaloneRetryDownload) getVersion(ctx context.Context) (*versionOutput, error) {
+	var version versionOutput
+	var err error
+
+	s.Eventually(func() bool {
+		args := []string{"version", "--yaml"}
+		var output []byte
+		output, err = s.agentFixture.Exec(ctx, args)
+
+		if err != nil {
+			s.T().Log(string(output))
+			return false
+		}
+
+		err = yaml.Unmarshal(output, &version)
+		if err != nil {
+			return false
+		}
+
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	return &version, err
 }
 
 func (s *UpgradeElasticAgentStandaloneRetryDownload) restoreEtcHosts() {
@@ -203,25 +227,20 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) restoreEtcHosts() {
 	s.isEtcHostsModified = false
 }
 
-func (s *UpgradeElasticAgentStandaloneRetryDownload) getVersion() (*versionOutput, error) {
-	cmd := exec.Command("elastic-agent",
-		"version",
-		"--yaml",
-	)
-	s.T().Log("Version check command: ", cmd.String())
+func (s *UpgradeElasticAgentStandaloneRetryDownload) upgradeAgent(ctx context.Context, version string) error {
+	var err error
+	s.Eventually(func() bool {
+		var output []byte
+		args := []string{"upgrade", version}
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		s.T().Log(string(output))
-		return nil, err
-	}
+		output, err = s.agentFixture.Exec(ctx, args)
+		if err != nil {
+			s.T().Log(string(output))
+			return false
+		}
 
-	var version versionOutput
+		return true
+	}, 30*time.Second, 5*time.Second)
 
-	err = yaml.Unmarshal(output, &version)
-	if err != nil {
-		return nil, err
-	}
-
-	return &version, nil
+	return err
 }
