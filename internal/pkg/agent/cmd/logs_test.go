@@ -303,13 +303,12 @@ func TestPrintLogs(t *testing.T) {
 	t.Run("returns tail and then follows the logs with filter", func(t *testing.T) {
 		dir := t.TempDir()
 		content := []byte(`{"component":{"id":"match"}, "message":"test1"}
-
-	   {"component":{"id":"non-match"}, "message":"test2"}
-	   {"component":{"id":"match"}, "message":"test3"}
-	   {"component":{"id":"match"}, "message":"test4"}
-	   {"component":{"id":"non-match"}, "message":"test5"}
-	   {"component":{"id":"match"}, "message":"test6"}
-	   `)
+{"component":{"id":"non-match"}, "message":"test2"}
+{"component":{"id":"match"}, "message":"test3"}
+{"component":{"id":"match"}, "message":"test4"}
+{"component":{"id":"non-match"}, "message":"test5"}
+{"component":{"id":"match"}, "message":"test6"}
+`)
 
 		createFileContent(t, dir, file1, bytes.NewBuffer(content))
 		ctx, cancel := context.WithCancel(context.Background())
@@ -324,10 +323,9 @@ func TestPrintLogs(t *testing.T) {
 
 		t.Run("tails filtering the file", func(t *testing.T) {
 			expected = `{"component":{"id":"match"}, "message":"test3"}
-
-	   {"component":{"id":"match"}, "message":"test4"}
-	   {"component":{"id":"match"}, "message":"test6"}
-	   `
+{"component":{"id":"match"}, "message":"test4"}
+{"component":{"id":"match"}, "message":"test6"}
+`
 			logResult.waitUntilMatch(t, expected, time.Second)
 		})
 
@@ -336,13 +334,12 @@ func TestPrintLogs(t *testing.T) {
 			require.NoError(t, err)
 
 			content := `{"component":{"id":"match"}, "message":"test7"}
-
-	   {"component":{"id":"non-match"}, "message":"test8"}
-	   {"component":{"id":"match"}, "message":"test9"}
-	   {"component":{"id":"match"}, "message":"test10"}
-	   {"component":{"id":"non-match"}, "message":"test11"}
-	   {"component":{"id":"match"}, "message":"test12"}
-	   `
+{"component":{"id":"non-match"}, "message":"test8"}
+{"component":{"id":"match"}, "message":"test9"}
+{"component":{"id":"match"}, "message":"test10"}
+{"component":{"id":"non-match"}, "message":"test11"}
+{"component":{"id":"match"}, "message":"test12"}
+`
 
 			_, err = f.WriteString(content)
 			require.NoError(t, err)
@@ -351,30 +348,27 @@ func TestPrintLogs(t *testing.T) {
 			time.Sleep(watchInterval)
 
 			expected += `{"component":{"id":"match"}, "message":"test7"}
-
-	   {"component":{"id":"match"}, "message":"test9"}
-	   {"component":{"id":"match"}, "message":"test10"}
-	   {"component":{"id":"match"}, "message":"test12"}
-	   `
+{"component":{"id":"match"}, "message":"test9"}
+{"component":{"id":"match"}, "message":"test10"}
+{"component":{"id":"match"}, "message":"test12"}
+`
 
 			logResult.waitUntilMatch(t, expected, 2*watchInterval)
 		})
 
 		t.Run("detects a new file and switches to it with filter", func(t *testing.T) {
 			content := `{"component":{"id":"match"}, "message":"test13"}
-
-	   {"component":{"id":"non-match"}, "message":"test14"}
-	   {"component":{"id":"match"}, "message":"test15"}
-	   `
+{"component":{"id":"non-match"}, "message":"test14"}
+{"component":{"id":"match"}, "message":"test15"}
+`
 
 			createFileContent(t, dir, file2, bytes.NewBuffer([]byte(content)))
 
 			time.Sleep(watchInterval)
 
 			expected += `{"component":{"id":"match"}, "message":"test13"}
-
-	   {"component":{"id":"match"}, "message":"test15"}
-	   `
+{"component":{"id":"match"}, "message":"test15"}
+`
 
 			logResult.waitUntilMatch(t, expected, 2*watchInterval)
 		})
