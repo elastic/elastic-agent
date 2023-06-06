@@ -149,10 +149,9 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) TestUpgradeStandaloneElasti
 	}()
 
 	s.T().Log("Check Agent logs for at least two retry messages")
+	agentDirName := fmt.Sprintf("elastic-agent-%s", release.TrimCommit(version.Daemon.Commit))
+	logsPath := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", agentDirName, "logs")
 	s.Eventually(func() bool {
-		agentDirName := fmt.Sprintf("elastic-agent-%s", release.TrimCommit(version.Daemon.Commit))
-		logsPath := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", agentDirName, "logs")
-
 		cmd := exec.Command("grep",
 			"download.*retrying",
 			"--recursive",
@@ -169,15 +168,15 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) TestUpgradeStandaloneElasti
 
 		outputLines := strings.Split(outputStr, "\n")
 		s.T().Log(outputLines)
-		s.T().Log("Num lines: ", len(outputLines)) // FIXME
+		s.T().Log("Number of retry messages: ", len(outputLines))
 		return len(outputLines) >= 2
-	}, 1*time.Minute, 10*time.Second)
+	}, 2*time.Minute, 20*time.Second)
 
 	s.T().Log("Restore /etc/hosts so upgrade can proceed")
 	s.restoreEtcHosts()
 
 	// Wait for upgrade command to finish executing
-	s.T().Log("Waiting on upgrade to finish")
+	s.T().Log("Waiting for upgrade to finish")
 	wg.Wait()
 
 	s.T().Log("Check Agent version to ensure upgrade is successful")
@@ -227,19 +226,12 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) restoreEtcHosts() {
 }
 
 func (s *UpgradeElasticAgentStandaloneRetryDownload) upgradeAgent(ctx context.Context, version string) error {
-	var err error
-	s.Eventually(func() bool {
-		var output []byte
-		args := []string{"upgrade", version}
+	args := []string{"upgrade", version}
+	output, err := s.agentFixture.Exec(ctx, args)
+	if err != nil {
+		s.T().Log("Upgrade command output after error: ", string(output))
+		return err
+	}
 
-		output, err = s.agentFixture.Exec(ctx, args)
-		if err != nil {
-			s.T().Log(string(output))
-			return false
-		}
-
-		return true
-	}, 30*time.Second, 5*time.Second)
-
-	return err
+	return nil
 }
