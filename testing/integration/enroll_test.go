@@ -22,7 +22,7 @@ func TestEnrollAndLog(t *testing.T) {
 			{Type: define.Linux},
 		},
 		Stack: &define.Stack{},
-		Local: true,
+		Local: false,
 		Sudo:  false,
 	})
 	t.Logf("got namespace: %s", info.Namespace)
@@ -48,7 +48,7 @@ func (runner *EnrollRunner) SetupTest() {
 func (runner *EnrollRunner) TestEnroll() {
 	kibClient := runner.requirementsInfo.KibanaClient
 	// Enroll agent in Fleet with a test policy
-	createPolicyReq := kibana.CreatePolicyRequest{
+	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
 		Namespace:   "enrolltest",
 		Description: "test policy for agent enrollment",
@@ -58,12 +58,12 @@ func (runner *EnrollRunner) TestEnroll() {
 		},
 		AgentFeatures: []map[string]interface{}{
 			{
-				"name":    "fqdn",
+				"name":    "test_enroll",
 				"enabled": true,
 			},
 		},
 	}
-	policy, err := tools.EnrollAgentWithPolicy(runner.T(), false, runner.agentFixture, kibClient, createPolicyReq)
+	policy, err := tools.EnrollAgentWithPolicy(runner.T(), true, runner.agentFixture, kibClient, createPolicyReq)
 	require.NoError(runner.T(), err)
 	runner.T().Logf("got policy: %#v", policy)
 }

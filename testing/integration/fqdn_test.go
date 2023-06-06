@@ -100,6 +100,12 @@ func (s *FQDN) TestFQDN() {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
+		AgentFeatures: []map[string]interface{}{
+			{
+				"name":    "fqdn",
+				"enabled": false,
+			},
+		},
 	}
 	policy, err := tools.EnrollAgentWithPolicy(s.T(), true, s.agentFixture, kibClient, createPolicyReq)
 	require.NoError(s.T(), err)

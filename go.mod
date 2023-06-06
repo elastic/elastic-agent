@@ -16,7 +16,7 @@ require (
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
 	github.com/elastic/elastic-agent-autodiscover v0.6.1
 	github.com/elastic/elastic-agent-client/v7 v7.1.0
-	github.com/elastic/elastic-agent-libs v0.3.8-0.20230512004837-d6a37d929cd6
+	github.com/elastic/elastic-agent-libs v0.3.9-0.20230606211614-a752b18efc9e
 	github.com/elastic/elastic-agent-system-metrics v0.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.0.0-20210317102009-a9d74cec0186
 	github.com/elastic/go-licenser v0.4.0
@@ -34,7 +34,7 @@ require (
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901
 	github.com/josephspurrier/goversioninfo v0.0.0-20190209210621-63e6d1acd3dd
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
-	github.com/magefile/mage v1.14.0
+	github.com/magefile/mage v1.15.0
 	github.com/mitchellh/gox v1.0.1
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/mitchellh/mapstructure v1.5.0
@@ -52,7 +52,7 @@ require (
 	go.elastic.co/apm/module/apmgorilla v1.15.0
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0
-	go.uber.org/zap v1.21.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.5.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/sync v0.1.0
@@ -165,8 +165,8 @@ require (
 	go.elastic.co/apm/module/apmhttp/v2 v2.0.0 // indirect
 	go.elastic.co/apm/v2 v2.0.0 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.9.0 // indirect
@@ -203,7 +203,6 @@ replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
-	github.com/elastic/elastic-agent-libs => ../elastic-agent-libs
 	github.com/fsnotify/fsnotify => github.com/adriansr/fsnotify v1.4.8-0.20211018144411-a81f2b630e7c
 	github.com/tonistiigi/fifo => github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c
 )

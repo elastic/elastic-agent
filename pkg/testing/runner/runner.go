@@ -621,6 +621,7 @@ func (r *Runner) ogcDown(ctx context.Context) error {
 		return fmt.Errorf("failed to run ogc down: %w", err)
 	}
 	ps := <-proc.Wait()
+
 	if ps.ExitCode() != 0 {
 		return fmt.Errorf("failed to run ogc down: docker run exited with code: %d", ps.ExitCode())
 	}
@@ -688,6 +689,7 @@ func (r *Runner) ogcRun(ctx context.Context, args []string, interactive bool, pr
 	runArgs = append(runArgs, args...)
 	opts := []process.StartOption{process.WithContext(ctx), process.WithArgs(runArgs)}
 	opts = append(opts, processOpts...)
+	fmt.Printf("Got: %v", runArgs)
 	return process.Start("docker", opts...)
 }
 
