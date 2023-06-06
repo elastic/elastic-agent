@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/cenkalti/backoff/v4"
 
 	"go.elastic.co/apm"
 
@@ -47,18 +50,13 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 		"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 
-	fetcher, err := newDownloader(version, u.log, &settings)
-	if err != nil {
-		return "", errors.New(err, "initiating fetcher")
-	}
-
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
-	path, err := fetcher.Download(ctx, agentArtifact, version)
+	path, err := u.downloadWithRetries(ctx, newDownloader, version, &settings)
 	if err != nil {
-		return "", errors.New(err, "failed upgrade of agent binary")
+		return "", err
 	}
 
 	if skipVerifyOverride {
@@ -118,4 +116,49 @@ func newVerifier(version string, log *logger.Logger, settings *artifact.Config) 
 	}
 
 	return composed.NewVerifier(fsVerifier, snapshotVerifier, remoteVerifier), nil
+}
+
+func (u *Upgrader) downloadWithRetries(
+	ctx context.Context,
+	downloaderCtor func(string, *logger.Logger, *artifact.Config) (download.Downloader, error),
+	version string,
+	settings *artifact.Config,
+) (string, error) {
+	cancelCtx, cancel := context.WithTimeout(ctx, settings.Timeout)
+	defer cancel()
+
+	expBo := backoff.NewExponentialBackOff()
+	expBo.InitialInterval = settings.RetrySleepInitDuration
+	boCtx := backoff.WithContext(expBo, cancelCtx)
+
+	var path string
+	var attempt uint
+
+	opFn := func() error {
+		attempt++
+		u.log.Debugf("download attempt %d", attempt)
+
+		downloader, err := downloaderCtor(version, u.log, settings)
+		if err != nil {
+			return fmt.Errorf("unable to create fetcher: %w", err)
+		}
+
+		path, err = downloader.Download(cancelCtx, agentArtifact, version)
+		if err != nil {
+			return fmt.Errorf("unable to download package: %w", err)
+		}
+
+		// Download successful
+		return nil
+	}
+
+	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
+		u.log.Warnf("%s; retrying (will be retry %d) in %s.", err.Error(), attempt, retryAfter)
+	}
+
+	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
+		return "", err
+	}
+
+	return path, nil
 }

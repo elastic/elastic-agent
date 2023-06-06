@@ -10,6 +10,7 @@ updates:
       - skip-changelog
       - Team:Elastic-Agent
     allow:
+      # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
     reviewers:
       - "elastic/elastic-agent-control-plane"
