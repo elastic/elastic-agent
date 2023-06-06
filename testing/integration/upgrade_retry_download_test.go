@@ -30,10 +30,9 @@ import (
 
 func TestElasticAgentUpgradeRetryDownload(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		// FIXME: only for testing on remote VM
-		Local:   true, // requires Agent installation
-		Isolate: true, // requires Agent installation and modifying /etc/hosts
-		Sudo:    true, // requires Agent installation and modifying /etc/hosts
+		Local:   false, // requires Agent installation
+		Isolate: true,  // requires Agent installation and modifying /etc/hosts
+		Sudo:    true,  // requires Agent installation and modifying /etc/hosts
 		OS: []define.OS{
 			{Type: define.Linux},
 			{Type: define.Darwin},
