@@ -1,0 +1,30 @@
+version: 8.8.1
+entries:
+    - kind: bug-fix
+      summary: Fix deadlock condition in RuntimeManager
+      description: |
+        In some cases it was possible that a running component would lose connection to the Elastic Agent and
+        unable to re-connect because of a concurrent updated component model. With it being unable to re-connect
+        and the Elastic Agent unable to send it latest component model it results in the Elastic Agent hitting
+        a deadlock where it cannot run properly.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2729
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2691
+      timestamp: 1685029627
+      file:
+        name: 1685029627-Fix-deadlock-condition-in-RuntimeManager.yaml
+        checksum: 62f26a6fee8ea9756fe69f902bc7c366d5914f6a
+    - kind: bug-fix
+      summary: Retry download step in upgrade process
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2776
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/0
+      timestamp: 1685751999
+      file:
+        name: 1685751999-retry-download-step-in-upgrade-process.yaml
+        checksum: fc59952b01eafab2c1b36c7a164c0da2420b88a2
