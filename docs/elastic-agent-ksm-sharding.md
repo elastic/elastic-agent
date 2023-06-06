@@ -21,9 +21,9 @@ The default dns entries for to access created ksm pods are (assuming namespace o
 
 ## Installation methods of elastic-agent
 
-This document suggests **the 4 alternative configuration methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration. In general, we use a `daemonset Leader Elastic Agent` that collects both node-wide metrics and Kubernetes API Server metrics and `deployment Elastic Agents` that collect from the different KSM Shard endpoints.
+This document suggests **the 4 alternative configuration methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration. In general, we split the agent installation. We use a `daemonset Leader Elastic Agent` that collects both node-wide metrics and Kubernetes API Server metrics and `deployment (or statefuleset) Elastic Agents` that collect metrics from the different KSM Shard endpoints.
 
-1. Elastic Agent as side-container with KSM Shard pods. The Elastic Agent will be installed as Statefulset with `hostNetwork:false` and will be a side container of Kube-state-metrics. Meaning that KSM and Elastic Agent will share the same localhost network to communicate.
+1. Elastic Agent as side-container with KSM Shard pods. The Elastic Agent will be installed as `Statefulset` with `hostNetwork:false` and will be a side container of Kube-state-metrics. Meaning that KSM and Elastic Agent will share the same localhost network to communicate.
 2. With `hostNetwork:false` for non-leader Elastic Agent deployments that will collect from KSM Shards. In this configuration Elastic Agent will be installed as deployments and we will need one deployment for every KSM Shard collection endpoint. An additional Elastic Agent Leader wi
 3. With `podAntiAffinity` to isolate the Elastic Agent daemonset pods from rest of Elastic Agent deployments that will collect metrics from KSM Shard endpoints. The podAntiAffinity will ensure that no Elastic Deployment Pod will be in the same node with the Elastic Agent Daemonset pods. So Elastic Agent Daemonset pods will run only to those nodes where no Elastic Agent that collect KSM run.
 4. With `taint/tolerations` to isolate the Elastic Agent daemonset pods from rest of Elastic Agent deployments. Same as above, only that tolerations is the mean to exclude Daemonset pods from the nodes where the Elastic Agent KSM pods run.
@@ -32,10 +32,10 @@ Each configuration includes specific pros and cons and users may choose what bes
 
 | Installation Method  | No of Policies  | Who can Use it  | Notes |   
 |---|---|---|---|
-| Elastic Agent Deployment + KSM Side Container  | 2 (1 Policy for Leader Daemonset + 1 Policy for all KSM Elastic Agents) | Suggested for K8s clusters more than 2K pods. When latency problems occur (see relevant [Latency section](https://github.com/elastic/ingest-docs/blob/325a46d475f4446199955c6acbf8f372535ed57b/docs/en/ingest-management/elastic-agent/scaling-on-kubernetes.asciidoc))  | Easiest to configure. Suitable for automation scenarios  |
+| Elastic Agent `Statefulset + KSM as Side Container`  | 2 (1 Policy for Leader Daemonset + 1 Policy for all KSM Elastic Agents) | Suggested for K8s clusters more than 2K pods. When latency problems occur (see relevant [Latency section](https://github.com/elastic/ingest-docs/blob/325a46d475f4446199955c6acbf8f372535ed57b/docs/en/ingest-management/elastic-agent/scaling-on-kubernetes.asciidoc))  | Easiest to configure. Suitable for automation scenarios  |
 | Elastic Agent Deployment with `hostNetwork:false` | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  |  Same as above, for k8s clusters more than 2k pods | More manual steps needed comparing to previous method. The KSM and Elastic Agents are in different pods  |
-| Elastic Agents with podAntiAffinity  | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  | Suitable for setups where users need more granularity and need to protect node resource consumption  | Complex method but gives more scheduling abilities to users  |
-| Elastic Agents with taint/tolerations  | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  | When users need to fix the nodes of Elastic Agent  | Complex method but gives more scheduling abilities to users |
+| Elastic Agents with podAntiAffinity  | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  | Suitable for setups where users need more granularity and need to protect node resource consumption  | More complex method but gives more scheduling abilities to users  |
+| Elastic Agents with taint/tolerations  | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  | When users need to specify the nodes of Elastic Agent  | More complex method but gives more scheduling abilities to users |
 
 
 The Kubernetes observability is based on [kubernetes integration](https://docs.elastic.co/en/integrations/kubernetes), which is fetching metrics from several components:
