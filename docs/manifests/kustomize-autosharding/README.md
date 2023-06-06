@@ -44,3 +44,31 @@ patches:
 ```bash
 kubectl apply -k .
 ```
+
+The `elastic-agent-kustomize/agent-statefulset.yaml` is the same as daemonset manifest except:
+- `kind: StatefulSet`
+- `hostNetwork: false`
+
+The Statefulset points to a Fleet policy where only KSM is enabled with URL endpoint of `localhost:8080` and leader election disabled.
+
+![statefulset policy](../../images/ksm-sidecontainer.png)
+
+For node-wide metrics user needs to deploy the following policy:
+
+![daemonset policy](../../images/leader-ksm-sidecontainer.png)
+
+Then deploy:
+
+```bash
+kubectl apply -f elastic-agent-managed-kubernetes.yaml
+```
+
+> (Update Enrollment details pointing to above policy)
+
+
+## For Elastic Agent Standalone
+
+Relevant manifests provided as examples:
+
+- For Daemonset Leader: `kubectl apply -f elastic-agent-standalone-kubernetes-side-leader.yaml`
+- For Statefulset: Update the agent-statefulset.yaml with `elastic-agent-standalone-statefulset-side-ksm.yaml` 
