@@ -29,8 +29,10 @@ func TestContextProvider(t *testing.T) {
 	starting["idx"] = 0
 	require.NoError(t, err)
 
+	const checkInterval = 50 * time.Millisecond
+	const testTimeout = 500 * time.Millisecond
 	c, err := config.NewConfigFrom(map[string]interface{}{
-		"check_interval": 100 * time.Millisecond,
+		"check_interval": checkInterval,
 	})
 	require.NoError(t, err)
 	builder, _ := composable.Providers.GetContextProvider("host")
@@ -39,7 +41,7 @@ func TestContextProvider(t *testing.T) {
 
 	hostProvider, _ := provider.(*contextProvider)
 	hostProvider.fetcher = returnHostMapping(log)
-	require.Equal(t, 100*time.Millisecond, hostProvider.CheckInterval)
+	require.Equal(t, checkInterval, hostProvider.CheckInterval)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -54,14 +56,22 @@ func TestContextProvider(t *testing.T) {
 	comm.CallOnSet(func() {
 		setChan <- struct{}{}
 	})
-	<-setChan
+	select {
+	case <-setChan:
+	case <-time.After(testTimeout):
+		require.FailNow(t, "timeout waiting for provider to call Set")
+	}
 
 	starting, err = ctesting.CloneMap(starting)
 	require.NoError(t, err)
 	require.Equal(t, starting, comm.Current())
 
 	// wait for it to be called again
-	<-setChan
+	select {
+	case <-setChan:
+	case <-time.After(testTimeout):
+		require.FailNow(t, "timeout waiting for provider to call Set")
+	}
 	cancel()
 
 	// next should have been set idx to 1
