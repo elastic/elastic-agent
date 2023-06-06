@@ -420,8 +420,8 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 func (c *Coordinator) Run(ctx context.Context) error {
 	// log all changes in the state of the runtime and update the coordinator state
 	// TODO: nothing cancels this listener goroutine when Run returns.
-        watchCtx, watchCanceller := context.WithCancel(ctx)
-        defer watchCanceller()
+	watchCtx, watchCanceller := context.WithCancel(ctx)
+	defer watchCanceller()
 	go c.watchRuntimeComponents(watchCtx)
 
 	for {
