@@ -420,7 +420,9 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 func (c *Coordinator) Run(ctx context.Context) error {
 	// log all changes in the state of the runtime and update the coordinator state
 	// TODO: nothing cancels this listener goroutine when Run returns.
-	go c.watchRuntimeComponents(ctx)
+        watchCtx, watchCanceller := context.WithCancel(ctx)
+        defer watchCanceller()
+	go c.watchRuntimeComponents(watchCtx)
 
 	for {
 		c.state.UpdateState(state.WithState(agentclient.Starting, "Waiting for initial configuration and composable variables"))
