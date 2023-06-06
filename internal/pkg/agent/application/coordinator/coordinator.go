@@ -419,7 +419,6 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 // In the case that either of the above managers fail, they will all be restarted unless the context was explicitly cancelled or timed out.
 func (c *Coordinator) Run(ctx context.Context) error {
 	// log all changes in the state of the runtime and update the coordinator state
-	// TODO: nothing cancels this listener goroutine when Run returns.
 	watchCtx, watchCanceller := context.WithCancel(ctx)
 	defer watchCanceller()
 	go c.watchRuntimeComponents(watchCtx)
