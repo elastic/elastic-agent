@@ -54,6 +54,10 @@ type Config struct {
 	// If not provided FileSystem Downloader will fallback to /beats subfolder of elastic-agent directory.
 	DropPath string `yaml:"dropPath" config:"drop_path"`
 
+	// RetrySleepInitDuration: the duration to sleep for before the first retry attempt. This duration
+	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
+	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
+
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
 
@@ -157,10 +161,11 @@ func DefaultConfig() *Config {
 	transport.Timeout = 120 * time.Minute
 
 	return &Config{
-		SourceURI:             DefaultSourceURI,
-		TargetDirectory:       paths.Downloads(),
-		InstallPath:           paths.Install(),
-		HTTPTransportSettings: transport,
+		SourceURI:              DefaultSourceURI,
+		TargetDirectory:        paths.Downloads(),
+		InstallPath:            paths.Install(),
+		RetrySleepInitDuration: 30 * time.Second,
+		HTTPTransportSettings:  transport,
 	}
 }
 
