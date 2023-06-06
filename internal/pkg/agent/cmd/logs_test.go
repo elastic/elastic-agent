@@ -585,6 +585,7 @@ func (cw *chanWriter) waitUntilMatch(
 	expected string,
 	timeout time.Duration,
 ) {
+	t.Helper()
 	timeoutChan := time.After(timeout)
 	for string(cw.result) != expected {
 		select {
