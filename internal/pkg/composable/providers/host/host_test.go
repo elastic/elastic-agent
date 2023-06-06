@@ -6,11 +6,8 @@ package host
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
-
-	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,6 +16,7 @@ import (
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 func TestContextProvider(t *testing.T) {
@@ -48,30 +46,22 @@ func TestContextProvider(t *testing.T) {
 	comm := ctesting.NewContextComm(ctx)
 
 	go func() {
-		err = provider.Run(comm)
+		_ = provider.Run(comm)
 	}()
 
 	// wait for it to be called once
-	var wg sync.WaitGroup
-	wg.Add(1)
+	setChan := make(chan struct{}, 1)
 	comm.CallOnSet(func() {
-		wg.Done()
+		setChan <- struct{}{}
 	})
-	wg.Wait()
-	comm.CallOnSet(nil)
+	<-setChan
 
-	require.NoError(t, err)
 	starting, err = ctesting.CloneMap(starting)
 	require.NoError(t, err)
 	require.Equal(t, starting, comm.Current())
 
 	// wait for it to be called again
-	wg.Add(1)
-	comm.CallOnSet(func() {
-		wg.Done()
-	})
-	wg.Wait()
-	comm.CallOnSet(nil)
+	<-setChan
 	cancel()
 
 	// next should have been set idx to 1
@@ -114,10 +104,12 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}()
 	comm := ctesting.NewContextComm(ctx)
 
-	// Track the number of times hostProvider.fetcher is called.
-	numCalled := 0
+	calledChan := make(chan struct{})
+	const expectedCalledCount = 2
+	// Send to calledChan when called, so we can detect the number
+	// of calls below.
 	hostProvider.fetcher = func() (map[string]interface{}, error) {
-		numCalled++
+		calledChan <- struct{}{}
 		return nil, nil
 	}
 
@@ -133,14 +125,20 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	// Wait long enough for the FQDN feature flag onChange
-	// callback to be called.
-	require.Eventually(t, func() bool {
-		// hostProvider.fetcher should be called twice:
-		// - once, right after the provider is run, and
-		// - once again, when the FQDN feature flag callback is triggered
-		return numCalled == 2
-	}, 10*time.Second, 100*time.Millisecond)
+	timeoutChan := time.After(100 * time.Millisecond)
+	calledCount := 0
+waitLoop:
+	// Wait until we get the expected number of calls or the timeout
+	// expires, whichever comes first.
+	for calledCount < expectedCalledCount {
+		select {
+		case <-calledChan:
+			calledCount++
+		case <-timeoutChan:
+			break waitLoop
+		}
+	}
+	require.Equal(t, expectedCalledCount, calledCount)
 }
 
 func returnHostMapping(log *logger.Logger) infoFetcher {
