@@ -253,9 +253,9 @@ func TestPrintLogs(t *testing.T) {
 		defer cancel()
 
 		logResult := newChanWriter()
-		errResultChan := make(chan error)
+		errChan := make(chan error)
 		go func() {
-			errResultChan <- printLogs(ctx, logResult, dir, 5, true, nil)
+			errChan <- printLogs(ctx, logResult, dir, 5, true, nil)
 		}()
 
 		var expected string
@@ -292,17 +292,17 @@ func TestPrintLogs(t *testing.T) {
 		t.Run("handles interruption correctly", func(t *testing.T) {
 			cancel()
 			select {
-			case err := <-errResultChan:
+			case err := <-errChan:
 				require.ErrorIs(t, err, context.Canceled)
 			case <-time.After(time.Second):
 				require.FailNow(t, "context must stop logs following")
 			}
 		})
 	})
-	/*
-	   	t.Run("returns tail and then follows the logs with filter", func(t *testing.T) {
-	   		dir := t.TempDir()
-	   		content := []byte(`{"component":{"id":"match"}, "message":"test1"}
+
+	t.Run("returns tail and then follows the logs with filter", func(t *testing.T) {
+		dir := t.TempDir()
+		content := []byte(`{"component":{"id":"match"}, "message":"test1"}
 
 	   {"component":{"id":"non-match"}, "message":"test2"}
 	   {"component":{"id":"match"}, "message":"test3"}
@@ -311,34 +311,31 @@ func TestPrintLogs(t *testing.T) {
 	   {"component":{"id":"match"}, "message":"test6"}
 	   `)
 
-	   	createFileContent(t, dir, file1, bytes.NewBuffer(content))
-	   	ctx, cancel := context.WithCancel(context.Background())
-	   	defer cancel()
-	   	result := bytes.NewBuffer(nil)
-	   	var printErr error
-	   	go func() {
-	   		printErr = printLogs(ctx, result, dir, 3, true, createComponentFilter("match"))
-	   	}()
+		createFileContent(t, dir, file1, bytes.NewBuffer(content))
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		logResult := newChanWriter()
+		errChan := make(chan error)
+		go func() {
+			errChan <- printLogs(ctx, logResult, dir, 3, true, createComponentFilter("match"))
+		}()
 
-	   	var expected string
+		var expected string
 
-	   	t.Run("tails filtering the file", func(t *testing.T) {
-	   		expected = `{"component":{"id":"match"}, "message":"test3"}
+		t.Run("tails filtering the file", func(t *testing.T) {
+			expected = `{"component":{"id":"match"}, "message":"test3"}
 
 	   {"component":{"id":"match"}, "message":"test4"}
 	   {"component":{"id":"match"}, "message":"test6"}
 	   `
+			logResult.waitUntilMatch(t, expected, time.Second)
+		})
 
-	   		require.Eventuallyf(t, func() bool {
-	   			return result.String() == expected
-	   		}, time.Second, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
-	   	})
+		t.Run("detects new lines and prints them with filter", func(t *testing.T) {
+			f, err := os.OpenFile(filepath.Join(dir, file1), os.O_WRONLY|os.O_APPEND, 0)
+			require.NoError(t, err)
 
-	   	t.Run("detects new lines and prints them with filter", func(t *testing.T) {
-	   		f, err := os.OpenFile(filepath.Join(dir, file1), os.O_WRONLY|os.O_APPEND, 0)
-	   		require.NoError(t, err)
-
-	   		content := `{"component":{"id":"match"}, "message":"test7"}
+			content := `{"component":{"id":"match"}, "message":"test7"}
 
 	   {"component":{"id":"non-match"}, "message":"test8"}
 	   {"component":{"id":"match"}, "message":"test9"}
@@ -347,52 +344,51 @@ func TestPrintLogs(t *testing.T) {
 	   {"component":{"id":"match"}, "message":"test12"}
 	   `
 
-	   	_, err = f.WriteString(content)
-	   	require.NoError(t, err)
-	   	f.Close()
+			_, err = f.WriteString(content)
+			require.NoError(t, err)
+			f.Close()
 
-	   	time.Sleep(watchInterval)
+			time.Sleep(watchInterval)
 
-	   	expected += `{"component":{"id":"match"}, "message":"test7"}
+			expected += `{"component":{"id":"match"}, "message":"test7"}
 
 	   {"component":{"id":"match"}, "message":"test9"}
 	   {"component":{"id":"match"}, "message":"test10"}
 	   {"component":{"id":"match"}, "message":"test12"}
 	   `
 
-	   		require.Eventuallyf(t, func() bool {
-	   			return result.String() == expected
-	   		}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
-	   	})
+			logResult.waitUntilMatch(t, expected, 2*watchInterval)
+		})
 
-	   	t.Run("detects a new file and switches to it with filter", func(t *testing.T) {
-	   		content := `{"component":{"id":"match"}, "message":"test13"}
+		t.Run("detects a new file and switches to it with filter", func(t *testing.T) {
+			content := `{"component":{"id":"match"}, "message":"test13"}
 
 	   {"component":{"id":"non-match"}, "message":"test14"}
 	   {"component":{"id":"match"}, "message":"test15"}
 	   `
 
-	   	createFileContent(t, dir, file2, bytes.NewBuffer([]byte(content)))
+			createFileContent(t, dir, file2, bytes.NewBuffer([]byte(content)))
 
-	   	time.Sleep(watchInterval)
+			time.Sleep(watchInterval)
 
-	   	expected += `{"component":{"id":"match"}, "message":"test13"}
+			expected += `{"component":{"id":"match"}, "message":"test13"}
 
 	   {"component":{"id":"match"}, "message":"test15"}
 	   `
 
-	   			require.Eventuallyf(t, func() bool {
-	   				return result.String() == expected
-	   			}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
-	   		})
+			logResult.waitUntilMatch(t, expected, 2*watchInterval)
+		})
 
-	   		t.Run("handles interruption correctly", func(t *testing.T) {
-	   			cancel()
-	   			require.Eventuallyf(t, func() bool { return printErr != nil }, time.Second, time.Millisecond, "context must stop logs following")
-	   			require.ErrorIs(t, printErr, context.Canceled)
-	   		})
-	   	})
-	*/
+		t.Run("handles interruption correctly", func(t *testing.T) {
+			cancel()
+			select {
+			case err := <-errChan:
+				require.ErrorIs(t, err, context.Canceled)
+			case <-time.After(time.Second):
+				require.FailNow(t, "context must stop logs following")
+			}
+		})
+	})
 }
 
 func TestPrintLogFile(t *testing.T) {
@@ -601,7 +597,7 @@ func (cw *chanWriter) waitUntilMatch(
 		case data := <-cw.ch:
 			cw.result = append(cw.result, data...)
 		case <-timeoutChan:
-			require.FailNow(t, fmt.Sprintf("output %q does not match expected %q", string(cw.result), expected))
+			require.FailNow(t, fmt.Sprintf("output does not match. got:\n%v\nexpected:\n%v", string(cw.result), expected))
 		}
 	}
 }
