@@ -7,7 +7,7 @@ entries:
         unable to re-connect because of a concurrent updated component model. With it being unable to re-connect
         and the Elastic Agent unable to send it latest component model it results in the Elastic Agent hitting
         a deadlock where it cannot run properly.
-      component: ""
+      component: "agent"
       pr:
         - https://github.com/elastic/elastic-agent/pull/2729
       issue:
