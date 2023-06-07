@@ -100,14 +100,18 @@ var supported = []LayoutOS{
 	},
 }
 
-// getSupported returns the supported layout based on the provided OS profile.
-func getSupported(os define.OS) (LayoutOS, error) {
+// getSupported returns all the supported layout based on the provided OS profile.
+func getSupported(os define.OS) ([]LayoutOS, error) {
+	var match []LayoutOS
 	for _, s := range supported {
 		if osMatch(s.OS, os) {
-			return s, nil
+			match = append(match, s)
 		}
 	}
-	return LayoutOS{}, fmt.Errorf("%w: %s/%s", ErrOSNotSupported, os.Type, os.Arch)
+	if len(match) > 0 {
+		return match, nil
+	}
+	return nil, fmt.Errorf("%w: %s/%s", ErrOSNotSupported, os.Type, os.Arch)
 }
 
 // osMatch returns true when the specific OS is a match for a non-specific OS.
