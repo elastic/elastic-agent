@@ -8,7 +8,7 @@ resources:
   - https://github.com/kubernetes/kube-state-metrics/examples/autosharding
 replicas:
   - name: kube-state-metrics
-    count: 2
+    count: 3
     
 patches:
 - path: extra/elastic-agent-managed-statefulset.yaml

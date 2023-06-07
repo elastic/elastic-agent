@@ -30,7 +30,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
-          image: docker.elastic.co/beats/elastic-agent:8.3.0
+          image: docker.elastic.co/beats/elastic-agent:8.8.0
           env:
             # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
             - name: FLEET_ENROLL
@@ -41,11 +41,11 @@ spec:
             # Fleet Server URL to enroll the Elastic Agent into
             # FLEET_URL can be found in Kibana, go to Management > Fleet > Settings
             - name: FLEET_URL
-              value: "https://fleet-server:8220"
+              value: "https://1351b4f589814c17bf9befcc8f6f341d.fleet.us-central1.gcp.cloud.es.io:443"
             # Elasticsearch API key used to enroll Elastic Agents in Fleet (https://www.elastic.co/guide/en/fleet/current/fleet-enrollment-tokens.html#fleet-enrollment-tokens)
             # If FLEET_ENROLLMENT_TOKEN is empty then KIBANA_HOST, KIBANA_FLEET_USERNAME, KIBANA_FLEET_PASSWORD are needed
             - name: FLEET_ENROLLMENT_TOKEN
-              value: "token-id"
+              value: "cW50emxZZ0JpaUFqRWNKWnY2OGg6Nkt0RjRJbWVUR1NzQlZJWUdBQXZFUQ=="
             - name: KIBANA_HOST
               value: "http://kibana:5601"
             # The basic authentication username used to connect to Kibana and retrieve a service_token to enable Fleet
@@ -101,8 +101,8 @@ spec:
               readOnly: true
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
-            - name: elastic-agent-state
-              mountPath: /usr/share/elastic-agent/state
+#            - name: elastic-agent-state
+#              mountPath: /usr/share/elastic-agent/state
       volumes:
         - name: proc
           hostPath:
@@ -139,7 +139,7 @@ spec:
             path: /sys/kernel/debug
         # Mount /var/lib/elastic-agent-managed/kube-system/state to store elastic-agent state
         # Update 'kube-system' with the namespace of your agent installation
-        - name: elastic-agent-state
-          hostPath:
-            path: /var/lib/elastic-agent-managed/kube-system/state
-            type: DirectoryOrCreate
+#        - name: elastic-agent-state
+#          hostPath:
+#            path: /var/lib/elastic-agent-managed/kube-system/state
+#            type: DirectoryOrCreate
