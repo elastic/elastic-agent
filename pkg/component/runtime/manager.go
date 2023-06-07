@@ -322,7 +322,7 @@ func (m *Manager) State() []ComponentComponentState {
 		crs.latestMx.RLock()
 		var legacyPID string
 		if crs.runtime != nil {
-			if commandRuntime, ok := crs.runtime.(*CommandRuntime); ok {
+			if commandRuntime, ok := crs.runtime.(*commandRuntime); ok {
 				if commandRuntime != nil {
 					procInfo := commandRuntime.proc
 					if procInfo != nil {
