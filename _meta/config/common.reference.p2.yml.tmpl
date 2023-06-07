@@ -32,6 +32,17 @@ inputs:
         - filesystem
         data_stream.dataset: system.filesystem
 
+#   # Collecting log files
+#   - type: filestream
+#     id: your-input-id
+#     streams:
+#       # Unique ID for this data stream used to track the state of the ingested files.
+#       - id: your-filestream-stream-id
+#         data_stream:
+#           dataset: generic
+#         paths:
+#           - /var/log/*.log
+
 # management:
 #   # Mode of management, the Elastic Agent support two modes of operation:
 #   #
