@@ -4,6 +4,7 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 steps:
   - label: "Integration tests"
+    key: "integration-tests"
     command: ".buildkite/scripts/integration_tests.sh"
     # branches: "main"
     artifact_paths:

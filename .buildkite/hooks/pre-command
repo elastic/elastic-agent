@@ -14,11 +14,15 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
   fi
 fi
 
-# Set GCP credentials
-vault kv get -format=json -field=data kv/ci-shared/observability-ingest/cloud/gcp > ./gcp.json
-export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
-export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)  
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
+  # Set GCP credentials
+  export GOOGLE_APPLICATION_GCP_SECRET=$(vault kv get -format=json -field=data/kv/ci-shared/observability-ingest/cloud/gcp)
+  echo "${GOOGLE_APPLICATION_GCP_SECRET}" > ./gcp.json
+  export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
+  export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)
 
-# ESS credentials
-vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa > ./apiKey
-export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
+  # ESS credentials
+  export API_KEY_TOKEN=$(vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa)
+  echo ${API_KEY_TOKEN}" > ./apiKey
+  export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
+ fi 
