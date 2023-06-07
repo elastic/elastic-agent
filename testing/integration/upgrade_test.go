@@ -321,6 +321,8 @@ func (s *UpgradeStandaloneElasticAgent) TestUpgradeStandaloneElasticAgentToSnaps
 	s.Require().FileExists(updateMarkerFile)
 
 	// The checks of the update marker makes the test time out since it runs for more than 10 minutes :(
+	// A dedicated issue to address this has been opened: https://github.com/elastic/elastic-agent/issues/2796
+
 	// s.Require().Eventuallyf(func() bool {
 	// 	_, err := os.Stat(updateMarkerFile)
 	// 	return errors.Is(err, fs.ErrNotExist)
