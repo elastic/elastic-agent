@@ -463,6 +463,17 @@ func CrossBuildGoDaemon() error {
 	return devtools.CrossBuildGoDaemon()
 }
 
+func PackageAgentBinary() {
+	start := time.Now()
+	defer func() { fmt.Println("packageAgentBinary ran for", time.Since(start)) }()
+
+	mg.Deps(CrossBuild, CrossBuildGoDaemon)
+
+	devtools.UseElasticAgentBinaryPackaging()
+
+	mg.Deps(devtools.Package)
+}
+
 // Config generates both the short/reference/docker.
 func Config() {
 	mg.Deps(configYML)
