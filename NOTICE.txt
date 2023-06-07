@@ -2212,11 +2212,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-licenser@v0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-sysinfo
-Version: v1.10.1
+Version: v1.11.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-sysinfo@v1.10.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-sysinfo@v1.11.0/LICENSE.txt:
 
 
                                  Apache License
