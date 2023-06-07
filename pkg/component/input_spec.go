@@ -12,14 +12,14 @@ import (
 
 // InputSpec is the specification for an input type.
 type InputSpec struct {
-	Name            string      `config:"name" yaml:"name"  validate:"required"`
-	Aliases         []string    `config:"aliases,omitempty" yaml:"aliases,omitempty"`
-	Description     string      `config:"description" yaml:"description" validate:"required"`
-	Platforms       []string    `config:"platforms" yaml:"platforms" validate:"required,min=1"`
-	Outputs         []string    `config:"outputs,omitempty" yaml:"outputs,omitempty"`
-	OptionalActions []string    `config:"optional_actions,omitempty" yaml:"optional_actions,omitempty"`
-	Shippers        []string    `config:"shippers,omitempty" yaml:"shippers,omitempty"`
-	Runtime         RuntimeSpec `config:"runtime,omitempty" yaml:"runtime,omitempty"`
+	Name           string      `config:"name" yaml:"name"  validate:"required"`
+	Aliases        []string    `config:"aliases,omitempty" yaml:"aliases,omitempty"`
+	Description    string      `config:"description" yaml:"description" validate:"required"`
+	Platforms      []string    `config:"platforms" yaml:"platforms" validate:"required,min=1"`
+	Outputs        []string    `config:"outputs,omitempty" yaml:"outputs,omitempty"`
+	ProxiedActions []string    `config:"proxied_actions,omitempty" yaml:"proxied_actions,omitempty"`
+	Shippers       []string    `config:"shippers,omitempty" yaml:"shippers,omitempty"`
+	Runtime        RuntimeSpec `config:"runtime,omitempty" yaml:"runtime,omitempty"`
 
 	Command *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
 	Service *ServiceSpec `config:"service,omitempty" yaml:"service,omitempty"`
