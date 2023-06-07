@@ -839,8 +839,8 @@ func findLayoutBatchByID(id string, batches []LayoutBatch) (LayoutBatch, bool) {
 }
 
 func createBatches(batch define.Batch, matrix bool) ([]LayoutBatch, error) {
-	specifics, err := getSupported(batch.OS)
 	var batches []LayoutBatch
+	specifics, err := getSupported(batch.OS)
 	if errors.Is(err, ErrOSNotSupported) {
 		var s LayoutOS
 		s.OS.Type = batch.OS.Type

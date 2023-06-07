@@ -1438,7 +1438,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 		return err
 	}
 	if results.Failures > 0 {
-		fmt.Printf(">>> Testing completed (%d failures)\n", results.Failures)
+		fmt.Printf(">>> Testing completed (%d failures, %d successful)\n", results.Failures, results.Tests-results.Failures)
 	} else {
 		fmt.Printf(">>> Testing completed (%d successful)\n", results.Tests)
 	}
