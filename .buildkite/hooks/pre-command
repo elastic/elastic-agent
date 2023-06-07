@@ -21,7 +21,4 @@ export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)
 
 # ESS credentials
 vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa > ./apiKey
-export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
-
-# Install mage
-make mage
+export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)s

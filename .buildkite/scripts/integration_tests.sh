@@ -17,6 +17,9 @@ else
   echo "Go is already installed."
 fi
 
+# Install mage
+make mage
+
 # PACKAGE
 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage -v package
 
