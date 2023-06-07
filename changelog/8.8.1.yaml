@@ -22,8 +22,6 @@ entries:
       component: agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/2776
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/0
       timestamp: 1685751999
       file:
         name: 1685751999-retry-download-step-in-upgrade-process.yaml
