@@ -91,9 +91,7 @@ func dispatchUnenrollInParallel(ctx context.Context, log *logp.Logger, action *f
 			return func() error {
 				log.Debugf("Dispatch %v action to %v", action.Type(), unit.Config.Type)
 				res, err := performAction(ctx, comp, unit, unit.Config.Type, params)
-				// If Endpoint UNENROLL fails, continue with Agent UNENROLL
 				if err != nil {
-					// Log and continue
 					log.Warnf("UNENROLL failed to dispatch to %v, err: %v", comp.ID, err)
 					return err
 				} else {
