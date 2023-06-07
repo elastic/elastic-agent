@@ -463,6 +463,8 @@ func CrossBuildGoDaemon() error {
 	return devtools.CrossBuildGoDaemon()
 }
 
+// PackageAgentBinary cross-builds and packages distribution artifacts containing
+// only elastic-agent binaries with no extra files or dependencies.
 func PackageAgentBinary() {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentBinary ran for", time.Since(start)) }()
