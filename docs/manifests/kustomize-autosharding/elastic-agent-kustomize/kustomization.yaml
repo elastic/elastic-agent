@@ -9,4 +9,3 @@ resources:
   - agent-cluster-role.yaml
   - agent-role-binding.yaml
   - agent-role.yaml
-  #- agent-statefulset.yaml

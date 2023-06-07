@@ -12,7 +12,9 @@ resources:
   - service.yaml
   - statefulset.yaml
   - ./elastic-agent-kustomize
-
+replicas:
+  - name: kube-state-metrics
+    count: 2
 
 patches:
 - path: elastic-agent-kustomize/agent-statefulset.yaml

@@ -8,15 +8,26 @@ Follow below instructions to install Elastic Agent as side-container with Kube S
 git clone git@github.com:kubernetes/kube-state-metrics.git
 ```
 
-1. Navigate to the directory of Autosharding example
+2. Navigate to the directory of Autosharding example
 
 ```bash
 cd kube-state-metrics/examples/autosharding
 ```
 
-1. Download the [`./elastic-agent-kustomize`](./elastic-agent-kustomize) folder inside the same folder
+3. Download the [`./elastic-agent-kustomize`](./elastic-agent-kustomize) folder inside the above folder `kube-state-metrics/examples/autosharding`.
 
-1. Edit or replace the already existing kustomization.yaml file with the example [kustomization.yaml](./kustomization.yaml)
+Your folder structure should look like the below:
+
+```bash
+ls -lrt
+total 64
+drwxr-xr-x 9    288 Jun  6 14:00 elastic-agent-kustomize
+-rw-r--r-- 1    378 Jun  6 14:00 kustomization.yaml
+-rw-r--r-- 1   7948 Jun  6 15:40 elastic-agent-managed-kubernetes.yaml
+-rw-r--r-- 1   1957 Jun  6 15:59 README.md
+```
+
+4. Edit or replace the already existing `kube-state-metrics/examples/autosharding/kustomization.yaml` file with the example [kustomization.yaml](./kustomization.yaml)
 
 The new `kustomization.yaml` should include:
 
@@ -31,7 +42,9 @@ resources:
   - service.yaml
   - statefulset.yaml
   - ./elastic-agent-kustomize
-
+replicas:
+  - name: kube-state-metrics
+    count: 2
 
 patches:
 - path: elastic-agent-kustomize/agent-statefulset.yaml
@@ -39,7 +52,7 @@ patches:
     kind: StatefulSet
 ```
 
-1. Update number of ReplicaSets and re-apply:
+1. Update number of ReplicaSets in `kube-state-metrics/examples/autosharding/kustomization.yaml` and re-apply:
 
 ```bash
 kubectl apply -k .
