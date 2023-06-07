@@ -77,18 +77,21 @@ type Unit struct {
 	Err error `yaml:"error,omitempty"`
 }
 
+// Signed Strongly typed configuration for the signed data
 type Signed struct {
 	Data      string `yaml:"data"`
 	Signature string `yaml:"signature"`
 }
 
-// Checks if the signature exists, safe to call on nil
+// IsSigned Checks if the signature exists, safe to call on nil
 func (s *Signed) IsSigned() bool {
 	return (s != nil && (len(s.Signature) > 0))
 }
 
+// ErrNotFound is returned if the expected "signed" property itself or it's expected properties are missing or not a valid data type
 var ErrNotFound = errors.New("not found")
 
+// SignedFromPolicy Returns Signed instance from the nested map representation of the agent configuration
 func SignedFromPolicy(policy map[string]interface{}) (*Signed, error) {
 	v, ok := policy["signed"]
 	if !ok {
