@@ -12,7 +12,6 @@ inputs:
       - logstash
     proxied_actions:
       - UNENROLL
-      - UPGRADE
     runtime:
       preventions:
         - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == '7'
@@ -55,7 +54,6 @@ inputs:
       - logstash
     proxied_actions:
       - UNENROLL
-      - UPGRADE
     service:
       cport: 6788
       log:
@@ -70,7 +68,6 @@ inputs:
       - logstash
     proxied_actions:
       - UNENROLL
-      - UPGRADE
     runtime:
       preventions:
         - condition: ${user.root} == false
