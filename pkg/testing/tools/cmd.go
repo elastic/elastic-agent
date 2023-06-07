@@ -20,3 +20,11 @@ func EnrollElasticAgent(fleetUrl string, enrollmentToken string, agentFixture *a
 	}
 	return agentFixture.Install(context.Background(), &installOpts)
 }
+
+func InstallStandaloneElasticAgent(agentFixture *atesting.Fixture) ([]byte, error) {
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	return agentFixture.Install(context.Background(), &installOpts)
+}

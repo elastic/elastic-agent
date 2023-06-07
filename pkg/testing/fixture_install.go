@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -15,6 +16,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
@@ -79,15 +81,26 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.installed = true
 	f.installOpts = installOpts
 
+	if installOpts.BasePath == "" {
+		f.workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+	} else {
+		f.workDir = filepath.Join(installOpts.BasePath, "Elastic", "Agent")
+	}
+
+	//we just installed agent, the control socket is at a well-known location
+	c := client.New(client.WithAddress(paths.ControlSocketPath))
+	f.setClient(c)
+
 	f.t.Cleanup(func() {
-		_, err := f.Uninstall(ctx, nil)
+		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
+		f.setClient(nil)
 		if errors.Is(err, ErrNotInstalled) {
 			// Agent fixture has already been uninstalled, perhaps by
 			// an explicit call to fixture.Uninstall, so nothing needs
 			// to be done here.
 			return
 		}
-		require.NoError(f.t, err)
+		require.NoErrorf(f.t, err, "uninstalling agent failed. Output: %q", out)
 	})
 
 	return out, nil
@@ -118,7 +131,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	}
 	out, err := f.Exec(ctx, uninstallArgs, opts...)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	// Check that Elastic Agent files are actually removed
@@ -127,12 +140,18 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 		basePath = paths.DefaultBasePath
 	}
 	topPath := filepath.Join(basePath, "Elastic", "Agent")
-	_, err = os.Stat(topPath)
-	if os.IsExist(err) {
-		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
+	topPathStats, err := os.Stat(topPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		// the path does not exist anymore, all good!
+		return out, nil
 	}
+
 	if err != nil {
-		return nil, err
+		return out, err
+	}
+
+	if err != nil && topPathStats != nil {
+		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
 	}
 
 	return out, nil

@@ -26,9 +26,11 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, allowEmptyPgp bool
 	}
 	verifiers = append(verifiers, fsVer)
 
+	// if the current build is a snapshot we use this downloader to update to the latest snapshot of the same version
+	// useful for testing with a snapshot version of fleet for example
 	// try snapshot repo before official
 	if release.Snapshot() {
-		snapshotVerifier, err := snapshot.NewVerifier(log, config, allowEmptyPgp, pgp, "")
+		snapshotVerifier, err := snapshot.NewVerifier(log, config, allowEmptyPgp, pgp, nil)
 		if err != nil {
 			log.Error(err)
 		} else {
