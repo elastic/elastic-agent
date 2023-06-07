@@ -2,7 +2,8 @@
 
 Kube-state-metrics (KSM) library provides [horizontal sharding](https://github.com/kubernetes/kube-state-metrics#horizontal-sharding) in order to support large kubernetes deployments. As Elastic-Agent collection from kube-state-metrics is proved to be resource intensive, we need to be able to support such horizontal scaling scenarios with our configuration. This doc aims to provide information on how to configure Elastic Agent with KSM horizontally sharded.
 
-IMPORTANT: Please review the relevant [Scaling Elastic Agent in Kubernetes document](https://github.com/elastic/ingest-docs/blob/325a46d475f4446199955c6acbf8f372535ed57b/docs/en/ingest-management/elastic-agent/scaling-on-kubernetes.asciidoc) before you continue. The documentation explains in more details why and how we concluded in the below configurations.
+*IMPORTANT*: Please review the relevant [Scaling Elastic Agent in Kubernetes document](https://github.com/elastic/ingest-docs/blob/325a46d475f4446199955c6acbf8f372535ed57b/docs/en/ingest-management/elastic-agent/scaling-on-kubernetes.asciidoc) before you continue. The documentation explains in more details why and how we concluded in the below configurations.
+
 
 ## Kube State Metrics Configuration
 
@@ -59,6 +60,8 @@ So let us discuss each alternative configuration method above. We will provide r
 
 For this installation, users need to configure the two following agent policies.
 
+*Note*: The mount point of /var/lib/elastic-agent-managed/kube-system/state to [store elastic-agent state](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-managed-kubernetes.yaml#L104), creates conflicts between Leader Elastic Agent and KSM Agents. This is the reason that it should be removed in `HostNetwork:false` scenarios.
+
 **Agent policies:**
 
 - One main policy where the KSM will be disabled. This policy will be used from the daemonset Elastic Agent manifest
@@ -79,6 +82,8 @@ Follow steps of [KSM Autosharding with Side Container](./manifests/kustomize-aut
 ### 2. HostNetwork:false Installation for non-leader Elastic Agent deployments
 
 For this installation, users need to configure the two following agent policies.
+
+*Note*: The mount point of /var/lib/elastic-agent-managed/kube-system/state to [store elastic-agent state](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-managed-kubernetes.yaml#L104), creates conflicts between Leader Elastic Agent and KSM Agents. This is the reason that it should be removed in `HostNetwork:false` scenarios
 
 **Agent policies:**
 
