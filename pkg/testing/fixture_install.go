@@ -14,7 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+<<<<<<< HEAD
 
+=======
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+>>>>>>> 742dc2d957 (E2E test for Elastic Agent retrying downloads (#2783))
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
