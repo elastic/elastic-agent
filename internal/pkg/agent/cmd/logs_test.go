@@ -251,19 +251,17 @@ func TestPrintLogs(t *testing.T) {
 		createFileContent(t, dir, file1, bytes.NewBuffer([]byte(generateLines(line1, 1, 10))))
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		result := bytes.NewBuffer(nil)
-		var printErr error
+
+		logResult := newChanWriter()
+		errChan := make(chan error)
 		go func() {
-			printErr = printLogs(ctx, result, dir, 5, true, nil)
+			errChan <- printLogs(ctx, logResult, dir, 5, true, nil)
 		}()
 
 		var expected string
-
 		t.Run("tails the file", func(t *testing.T) {
 			expected = generateLines(line1, 6, 10)
-			require.Eventuallyf(t, func() bool {
-				return result.String() == expected
-			}, time.Second, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+			logResult.waitUntilMatch(t, expected, time.Second)
 		})
 
 		t.Run("detects new lines and prints them", func(t *testing.T) {
@@ -273,40 +271,32 @@ func TestPrintLogs(t *testing.T) {
 			require.NoError(t, err)
 			f.Close()
 
-			time.Sleep(watchInterval)
-
 			expected += generateLines(line1, 11, 20)
-			require.Eventuallyf(t, func() bool {
-				return result.String() == expected
-			}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+			logResult.waitUntilMatch(t, expected, 3*watchInterval)
 		})
 
 		t.Run("detects a new file and switches to it", func(t *testing.T) {
 			createFileContent(t, dir, file2, bytes.NewBuffer([]byte(generateLines(line2, 1, 20))))
 
-			time.Sleep(watchInterval)
-
 			expected += generateLines(line2, 1, 20)
-			require.Eventuallyf(t, func() bool {
-				return result.String() == expected
-			}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+			logResult.waitUntilMatch(t, expected, 3*watchInterval)
 		})
 
 		t.Run("detects another file and switches to it", func(t *testing.T) {
 			createFileContent(t, dir, file3, bytes.NewBuffer([]byte(generateLines(line3, 1, 30))))
 
-			time.Sleep(watchInterval)
-
 			expected += generateLines(line3, 1, 30)
-			require.Eventuallyf(t, func() bool {
-				return result.String() == expected
-			}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+			logResult.waitUntilMatch(t, expected, 3*watchInterval)
 		})
 
 		t.Run("handles interruption correctly", func(t *testing.T) {
 			cancel()
-			require.Eventuallyf(t, func() bool { return printErr != nil }, time.Second, time.Millisecond, "context must stop logs following")
-			require.ErrorIs(t, printErr, context.Canceled)
+			select {
+			case err := <-errChan:
+				require.ErrorIs(t, err, context.Canceled)
+			case <-time.After(time.Second):
+				require.FailNow(t, "context must stop logs following")
+			}
 		})
 	})
 
@@ -319,13 +309,14 @@ func TestPrintLogs(t *testing.T) {
 {"component":{"id":"non-match"}, "message":"test5"}
 {"component":{"id":"match"}, "message":"test6"}
 `)
+
 		createFileContent(t, dir, file1, bytes.NewBuffer(content))
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		result := bytes.NewBuffer(nil)
-		var printErr error
+		logResult := newChanWriter()
+		errChan := make(chan error)
 		go func() {
-			printErr = printLogs(ctx, result, dir, 3, true, createComponentFilter("match"))
+			errChan <- printLogs(ctx, logResult, dir, 3, true, createComponentFilter("match"))
 		}()
 
 		var expected string
@@ -335,10 +326,7 @@ func TestPrintLogs(t *testing.T) {
 {"component":{"id":"match"}, "message":"test4"}
 {"component":{"id":"match"}, "message":"test6"}
 `
-
-			require.Eventuallyf(t, func() bool {
-				return result.String() == expected
-			}, time.Second, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+			logResult.waitUntilMatch(t, expected, time.Second)
 		})
 
 		t.Run("detects new lines and prints them with filter", func(t *testing.T) {
@@ -364,9 +352,8 @@ func TestPrintLogs(t *testing.T) {
 {"component":{"id":"match"}, "message":"test10"}
 {"component":{"id":"match"}, "message":"test12"}
 `
-			require.Eventuallyf(t, func() bool {
-				return result.String() == expected
-			}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+
+			logResult.waitUntilMatch(t, expected, 2*watchInterval)
 		})
 
 		t.Run("detects a new file and switches to it with filter", func(t *testing.T) {
@@ -383,15 +370,17 @@ func TestPrintLogs(t *testing.T) {
 {"component":{"id":"match"}, "message":"test15"}
 `
 
-			require.Eventuallyf(t, func() bool {
-				return result.String() == expected
-			}, 2*watchInterval, 10*time.Millisecond, "output %q does not match expected %q", result.String(), expected)
+			logResult.waitUntilMatch(t, expected, 2*watchInterval)
 		})
 
 		t.Run("handles interruption correctly", func(t *testing.T) {
 			cancel()
-			require.Eventuallyf(t, func() bool { return printErr != nil }, time.Second, time.Millisecond, "context must stop logs following")
-			require.ErrorIs(t, printErr, context.Canceled)
+			select {
+			case err := <-errChan:
+				require.ErrorIs(t, err, context.Canceled)
+			case <-time.After(time.Second):
+				require.FailNow(t, "context must stop logs following")
+			}
 		})
 	})
 }
@@ -561,5 +550,49 @@ func createFileContent(t *testing.T, dir, name string, content io.Reader) {
 	if content != nil {
 		_, err = io.Copy(f, content)
 		require.NoError(t, err)
+	}
+}
+
+// chanWriter is a simple implementation of the io.Writer interface that
+// directs written data at the given channel. This lets us safely monitor
+// what is being written during an asynchronous test where printLogs
+// is still actively writing to the target io.Writer.
+type chanWriter struct {
+	ch chan []byte
+
+	// result contains the concatenation of all data that has come through
+	// the channel so far. It should only be accessed on the main test
+	// goroutine, preferably via the helper function waitUntilMatch, to
+	// avoid race conditions.
+	result []byte
+}
+
+func newChanWriter() *chanWriter {
+	return &chanWriter{ch: make(chan []byte)}
+}
+
+// Implements the io.Writer interface, to listen for new data
+func (cw *chanWriter) Write(p []byte) (int, error) {
+	cw.ch <- p
+	return len(p), nil
+}
+
+// Waits until the combined data written to this object matches the expected
+// string (after conversion), or the timeout expires, whichever comes first.
+// Reports a fatal test error if the match fails.
+func (cw *chanWriter) waitUntilMatch(
+	t *testing.T,
+	expected string,
+	timeout time.Duration,
+) {
+	t.Helper()
+	timeoutChan := time.After(timeout)
+	for string(cw.result) != expected {
+		select {
+		case data := <-cw.ch:
+			cw.result = append(cw.result, data...)
+		case <-timeoutChan:
+			require.FailNow(t, fmt.Sprintf("output does not match. got:\n%v\nexpected:\n%v", string(cw.result), expected))
+		}
 	}
 }
