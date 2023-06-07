@@ -69,7 +69,6 @@
 - Send datastreams fields {pull-beats}[20416]
 - Agent supports capabilities definition {pull-beats}[23848]
 - Restart process on output change {pull-beats}[24907]
-- Add `mage packageAgentBinary` that builds distributions with only the `elastic-agent` binary {pull}[2798]
 
 === Docs
 
