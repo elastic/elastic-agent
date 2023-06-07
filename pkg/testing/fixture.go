@@ -374,7 +374,7 @@ func (f *Fixture) getFetcherCache() *fetcherCache {
 
 func (f *Fixture) prepareComponents(workDir string, components ...UsableComponent) error {
 	if len(components) == 0 {
-		f.t.Logf("Components where not modified from the fetched artifact")
+		f.t.Logf("Components were not modified from the fetched artifact")
 		return nil
 	}
 
