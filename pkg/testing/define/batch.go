@@ -89,6 +89,7 @@ func DetermineBatches(dir string, buildTags ...string) ([]Batch, error) {
 	testCmd := exec.Command("go", cmdArgs...)
 	output, err := testCmd.Output()
 	if err != nil {
+		// format cmdArgs to make the error message more coherentß
 		cmdArgs = append([]string{"go"}, cmdArgs...)
 		return nil, fmt.Errorf("error running go test: (%w), got: %s, tried to run: %v", err, string(output), cmdArgs)
 	}
