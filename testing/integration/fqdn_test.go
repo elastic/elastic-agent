@@ -1,6 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
+
 //go:build integration
 
 package integration
@@ -91,7 +92,7 @@ func (s *FQDN) TestFQDN() {
 	require.NoError(s.T(), err)
 
 	// Enroll agent in Fleet with a test policy
-	createPolicyReq := kibana.AgentPolicy{
+	createPolicyReq := kibana.CreatePolicyRequest{
 		Name:        "test-policy-fqdn-" + strings.ReplaceAll(fqdn, ".", "-"),
 		Namespace:   s.requirementsInfo.Namespace,
 		Description: fmt.Sprintf("Test policy for FQDN E2E test (%s)", fqdn),
@@ -119,8 +120,8 @@ func (s *FQDN) TestFQDN() {
 			"enabled": true,
 		},
 	}
-	updatePolicyReq := kibana.AgentPolicyUpdateRequest{AgentFeatures: policy.AgentFeatures}
-	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
+	updatePolicyReq := kibana.UpdatePolicyRequest(*policy)
+	_, err = kibClient.UpdatePolicy(updatePolicyReq)
 	require.NoError(s.T(), err)
 
 	// Wait until policy has been applied by Agent
@@ -148,8 +149,8 @@ func (s *FQDN) TestFQDN() {
 			"enabled": false,
 		},
 	}
-	updatePolicyReq = kibana.AgentPolicyUpdateRequest{AgentFeatures: policy.AgentFeatures}
-	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
+	updatePolicyReq = kibana.UpdatePolicyRequest(*policy)
+	_, err = kibClient.UpdatePolicy(updatePolicyReq)
 	require.NoError(s.T(), err)
 
 	// Wait until policy has been applied by Agent

@@ -1270,11 +1270,11 @@ func (Integration) Clean() error {
 		// .ogc-cache exists; need to run `Clean` from the runner
 		r, err := createTestRunner()
 		if err != nil {
-			return fmt.Errorf("error creating test runner: %w", err)
+			return err
 		}
 		err = r.Clean()
 		if err != nil {
-			return fmt.Errorf("error running clean: %w", err)
+			return err
 		}
 	}
 	_ = os.RemoveAll(".ogc-cache")
@@ -1423,49 +1423,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	return nil
 }
 
-func integRunner(ctx context.Context, matrix bool, singleTest string) error {
-	batches, err := define.DetermineBatches("testing/integration", "integration")
-	if err != nil {
-		return fmt.Errorf("failed to detemine batches: %w", err)
-	}
-	r, err := createTestRunner(matrix, singleTest, batches...)
-	if err != nil {
-		return fmt.Errorf("error creating test runner: %w", err)
-	}
-	results, err := r.Run(ctx)
-	if err != nil {
-		return fmt.Errorf("error running test: %w", err)
-	}
-	_ = os.Remove("build/TEST-go-integration.out")
-	_ = os.Remove("build/TEST-go-integration.out.json")
-	_ = os.Remove("build/TEST-go-integration.xml")
-	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
-	if err != nil {
-		return fmt.Errorf("error writing test out file: %w", err)
-	}
-	err = writeFile("build/TEST-go-integration.out.json", results.Output, 0644)
-	if err != nil {
-		return fmt.Errorf("error writing test out json file: %w", err)
-	}
-	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
-	if err != nil {
-		return fmt.Errorf("error writing test out xml file: %w", err)
-	}
-	if results.Failures > 0 {
-		fmt.Printf(">>> Testing completed (%d failures, %d successful)\n", results.Failures, results.Tests-results.Failures)
-	} else {
-		fmt.Printf(">>> Testing completed (%d successful)\n", results.Tests)
-	}
-	fmt.Printf(">>> Console output written here: build/TEST-go-integration.out\n")
-	fmt.Printf(">>> Console JSON output written here: build/TEST-go-integration.out.json\n")
-	fmt.Printf(">>> JUnit XML written here: build/TEST-go-integration.xml\n")
-	if results.Failures > 0 {
-		os.Exit(1)
-	}
-	return nil
-}
-
-func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(batches ...define.Batch) (*runner.Runner, error) {
 	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
 	if err != nil {
 		return nil, err
