@@ -57,3 +57,7 @@ the `mage package` command OR set the `AGENT_VERSION` environment variable to a 
 that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 `mage integration:local`.
 
+### OGC-related errors
+If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
+re-running whatever `mage integration:*` target you were trying to run originally when you
+encountered the error.

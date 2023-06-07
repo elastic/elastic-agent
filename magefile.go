@@ -1266,6 +1266,10 @@ func majorMinor() string {
 // cleans up the integration testing leftovers
 func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
+
+	// Clean out .ogc-cache always
+	defer os.RemoveAll(".ogc-cache")
+
 	_, err := os.Stat(".ogc-cache")
 	if err == nil {
 		// .ogc-cache exists; need to run `Clean` from the runner
@@ -1278,7 +1282,7 @@ func (Integration) Clean() error {
 			return err
 		}
 	}
-	_ = os.RemoveAll(".ogc-cache")
+
 	return nil
 }
 
