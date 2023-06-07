@@ -520,7 +520,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				if c.ast == nil || c.vars == nil {
 					return []byte("error: failed no configuration or variables received by the coordinator")
 				}
-				cfg, err := c.recomputeConfig()
+				cfg, _, err := c.recomputeConfigAndComponents()
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -540,7 +540,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				if c.ast == nil || c.vars == nil {
 					return []byte("error: failed no configuration or variables received by the coordinator")
 				}
-				comps, err := c.recomputeComponents()
+				_, comps, err := c.recomputeConfigAndComponents()
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -835,7 +835,7 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 		span.End()
 	}()
 
-	comps, err := c.recomputeComponents()
+	_, comps, err := c.recomputeConfigAndComponents()
 	if err != nil {
 		return err
 	}
@@ -850,41 +850,28 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	return nil
 }
 
-// recomputeConfig regenerates the configuration tree from the current
-// AST and vars and returns the result.
+// recomputeConfigAndComponents regenerates the configuration tree and
+// components from the current AST and vars and returns the result.
 // Called from both the main Coordinator goroutine and from external
 // goroutines via diagnostics hooks.
-func (c *Coordinator) recomputeConfig() (map[string]interface{}, error) {
+func (c *Coordinator) recomputeConfigAndComponents() (map[string]interface{}, []component.Component, error) {
 	ast := c.ast.Clone()
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
 		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
 		if err != nil {
-			return nil, fmt.Errorf("rendering inputs failed: %w", err)
+			return nil, nil, fmt.Errorf("rendering inputs failed: %w", err)
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
-			return nil, fmt.Errorf("inserting rendered inputs failed: %w", err)
+			return nil, nil, fmt.Errorf("inserting rendered inputs failed: %w", err)
 		}
 	}
 
 	cfg, err := ast.Map()
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+		return nil, nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
-	return cfg, nil
-}
-
-// recomputeComponents regenerates the components from the current
-// configuration (as returned by regenerateConfig) and returns the result.
-// Called from both the main Coordinator goroutine and from external
-// goroutines via diagnostics hooks.
-func (c *Coordinator) recomputeComponents() ([]component.Component, error) {
-	cfg, err := c.recomputeConfig()
-	if err != nil {
-		return nil, err
-	}
-
 	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr.Enabled() {
 		configInjector = c.monitorMgr.MonitoringConfig
@@ -897,17 +884,17 @@ func (c *Coordinator) recomputeComponents() ([]component.Component, error) {
 		c.agentInfo,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to render components: %w", err)
+		return nil, nil, fmt.Errorf("failed to render components: %w", err)
 	}
 
 	for _, modifier := range c.modifiers {
 		comps, err = modifier(comps, cfg)
 		if err != nil {
-			return nil, fmt.Errorf("failed to modify components: %w", err)
+			return nil, nil, fmt.Errorf("failed to modify components: %w", err)
 		}
 	}
 
-	return comps, nil
+	return cfg, comps, nil
 }
 
 // handleCoordinatorDone is called when the Coordinator's context is
