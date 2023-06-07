@@ -270,6 +270,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 
 	appDone := make(chan bool)
 	appErr := make(chan error)
+	// Spawn the main Coordinator goroutine
 	go func() {
 		err := coord.Run(ctx)
 		close(appDone)

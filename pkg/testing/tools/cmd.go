@@ -29,3 +29,11 @@ func EnrollWithoutInstall(fleetURL string, enrollmentToken string, agentFixture 
 	}
 	return agentFixture.Enroll(context.Background(), &enrollOpts)
 }
+
+func InstallStandaloneElasticAgent(agentFixture *atesting.Fixture) ([]byte, error) {
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	return agentFixture.Install(context.Background(), &installOpts)
+}

@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, pgpBytes ...string) (_ string, err error) {
@@ -50,35 +51,43 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 		"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 		"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 
+	parsedVersion, err := agtversion.ParseVersion(version)
+	if err != nil {
+		return "", fmt.Errorf("error parsing version %q: %w", version, err)
+	}
+
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
-	path, err := u.downloadWithRetries(ctx, newDownloader, version, &settings)
+	path, err := u.downloadWithRetries(ctx, newDownloader, parsedVersion, &settings)
 	if err != nil {
-		return "", err
+		return "", errors.New(err, "failed download of agent binary")
 	}
 
 	if skipVerifyOverride {
 		return path, nil
 	}
 
-	verifier, err := newVerifier(version, u.log, &settings)
+	verifier, err := newVerifier(parsedVersion, u.log, &settings)
 	if err != nil {
 		return "", errors.New(err, "initiating verifier")
 	}
 
-	if err := verifier.Verify(agentArtifact, version, pgpBytes...); err != nil {
+	if err := verifier.Verify(agentArtifact, parsedVersion.VersionWithPrerelease(), pgpBytes...); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
 
 	return path, nil
 }
 
-func newDownloader(version string, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
-	if !strings.HasSuffix(version, "-SNAPSHOT") {
+func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
+
+	if !version.IsSnapshot() {
 		return localremote.NewDownloader(log, settings)
 	}
+
+	// TODO since we know if it's a snapshot or not, shouldn't we add EITHER the snapshot downloader OR the release one ?
 
 	// try snapshot repo before official
 	snapDownloader, err := snapshot.NewDownloader(log, settings, version)
@@ -94,9 +103,10 @@ func newDownloader(version string, log *logger.Logger, settings *artifact.Config
 	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
 }
 
-func newVerifier(version string, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
 	allowEmptyPgp, pgp := release.PGP()
-	if !strings.HasSuffix(version, "-SNAPSHOT") {
+
+	if !version.IsSnapshot() {
 		return localremote.NewVerifier(log, settings, allowEmptyPgp, pgp)
 	}
 
@@ -120,8 +130,8 @@ func newVerifier(version string, log *logger.Logger, settings *artifact.Config) 
 
 func (u *Upgrader) downloadWithRetries(
 	ctx context.Context,
-	downloaderCtor func(string, *logger.Logger, *artifact.Config) (download.Downloader, error),
-	version string,
+	downloaderCtor func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config) (download.Downloader, error),
+	version *agtversion.ParsedSemVer,
 	settings *artifact.Config,
 ) (string, error) {
 	cancelCtx, cancel := context.WithTimeout(ctx, settings.Timeout)
@@ -142,8 +152,10 @@ func (u *Upgrader) downloadWithRetries(
 		if err != nil {
 			return fmt.Errorf("unable to create fetcher: %w", err)
 		}
-
-		path, err = downloader.Download(cancelCtx, agentArtifact, version)
+		// All download artifacts expect a name that includes <major>.<minor.<patch>[-SNAPSHOT] so we have to
+		// make sure not to include build metadata we might have in the parsed version (for snapshots we already
+		// used that to configure the URL we download the files from)
+		path, err = downloader.Download(cancelCtx, agentArtifact, version.VersionWithPrerelease())
 		if err != nil {
 			return fmt.Errorf("unable to download package: %w", err)
 		}
