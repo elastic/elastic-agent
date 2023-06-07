@@ -314,52 +314,13 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCoordinatorWithErrors(t *testing.T) {
-	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
-
-	close(runtime)
-	close(varWatcher)
-	cfgErrStr := "configWatcher error"
-	config <- errors.New(cfgErrStr)
-
-	// All the multierror stuff breaks errors.Is
-	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
-
-}
-
-func TestCoordinatorShutdownClosedChannels(t *testing.T) {
-	CoordinatorShutdownTimeout = time.Second * 5
-	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
-
-	close(runtime)
-	close(varWatcher)
-	close(config)
-
-	waitAndTestError(t, func(err error) bool { return errors.Is(err, context.Canceled) }, handlerChan)
-
-}
-
 func TestCoordinatorShutdownTimeout(t *testing.T) {
 	CoordinatorShutdownTimeout = time.Millisecond
 	handlerChan, _, _, _ := setupAndWaitCoordinatorDone()
 	waitAndTestError(t, func(err error) bool { return errors.Is(err, context.Canceled) }, handlerChan)
 }
 
-func TestCoordinatorShutdownErrorWithClose(t *testing.T) {
-	CoordinatorShutdownTimeout = time.Second * 5
-	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
-	// return an error, then close the channel
-	cfgErrStr := "config watcher error"
-	config <- errors.New(cfgErrStr)
-	close(config)
-
-	close(runtime)
-	close(varWatcher)
-
-	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
-}
-
-func TestCoordinatorShutdownErrorWithoutClose(t *testing.T) {
+func TestCoordinatorShutdownErrorOneResponse(t *testing.T) {
 	CoordinatorShutdownTimeout = time.Millisecond
 	handlerChan, _, _, config := setupAndWaitCoordinatorDone()
 
@@ -369,16 +330,31 @@ func TestCoordinatorShutdownErrorWithoutClose(t *testing.T) {
 	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
 }
 
-func TestCoordinatorShutdownErrorCloseTimeout(t *testing.T) {
-	CoordinatorShutdownTimeout = time.Second
-	handlerChan, _, varWatcher, config := setupAndWaitCoordinatorDone()
-	// return an error on one chanel, close another, let another time out
-	cfgErrStr := "config watcher error"
-	config <- errors.New(cfgErrStr)
+func TestCoordinatorShutdownErrorAllResponses(t *testing.T) {
+	CoordinatorShutdownTimeout = time.Millisecond
+	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
+	runtimeErrStr := "runtime error"
+	varsErrStr := "vars error"
+	runtime <- errors.New(runtimeErrStr)
+	varWatcher <- errors.New(varsErrStr)
+	config <- nil
 
-	close(varWatcher)
+	waitAndTestError(t, func(err error) bool {
+		return strings.Contains(err.Error(), runtimeErrStr) &&
+			strings.Contains(err.Error(), varsErrStr)
+	}, handlerChan)
+}
 
-	waitAndTestError(t, func(err error) bool { return strings.Contains(err.Error(), cfgErrStr) }, handlerChan)
+func TestCoordinatorShutdownAllResponsesNoErrors(t *testing.T) {
+	CoordinatorShutdownTimeout = time.Millisecond
+	handlerChan, runtime, varWatcher, config := setupAndWaitCoordinatorDone()
+	runtime <- nil
+	varWatcher <- nil
+	config <- nil
+
+	waitAndTestError(t, func(err error) bool {
+		return errors.Is(err, context.Canceled)
+	}, handlerChan)
 }
 
 func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan error) {
