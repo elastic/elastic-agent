@@ -1,7 +1,5 @@
 set -euo pipefail
 
-docker logout ${DOCKER_REGISTRY}
-
 rm $GOOGLE_APPLICATION_CREDENTIALS
 rm $TEST_INTEG_AUTH_ESS_APIKEY_FILE
 
