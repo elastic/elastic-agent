@@ -20,6 +20,13 @@ type Config struct {
 	RepoDir           string
 	ESS               *ESSConfig
 	GCE               *GCEConfig
+
+	// Matrix enables matrix testing. This explodes each test to
+	// run on all supported platforms the runner supports.
+	Matrix bool
+
+	// SingleTest only has the runner run that specific test.
+	SingleTest string
 }
 
 // Validate returns an error if the information is invalid.
