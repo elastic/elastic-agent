@@ -136,3 +136,4 @@
 - More clear output of inspect command {pull-beats}[18405]
 - When not port are specified and the https is used fallback to 443 {pull-beats}[18844]
 - Basic upgrade process {pull-beats}[21002]
+- Upgrade version of elastic-agent-autodiscover to v0.6.1 for improved memory consumption on k8s. {pull}2711[2711]

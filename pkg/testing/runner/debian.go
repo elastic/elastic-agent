@@ -20,7 +20,7 @@ import (
 
 type DebianRunner struct{}
 
-func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName string, arch string, goVersion string, repoArchive string, buildPath string) error {
+func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
 	// prepare build-essential and unzip
 	//
 	// apt-get update and install are so terrible that we have to place this in a loop, because in some cases the
@@ -30,7 +30,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName str
 		err = func() error {
 			updateCtx, updateCancel := context.WithTimeout(ctx, 3*time.Minute)
 			defer updateCancel()
-			fmt.Printf(">>> Running apt-get update on %s\n", instanceName)
+			logger.Logf("Running apt-get update")
 			// `-o APT::Update::Error-Mode=any` ensures that any warning is tried as an error, so the retry
 			// will occur (without this we get random failures)
 			stdOut, errOut, err := sshRunCommandWithRetry(updateCtx, c, "sudo", []string{"apt-get", "update", "-o APT::Update::Error-Mode=any"}, 15*time.Second)
@@ -42,7 +42,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName str
 				// of golang is used for the running of the test
 				installCtx, installCancel := context.WithTimeout(ctx, 1*time.Minute)
 				defer installCancel()
-				fmt.Printf(">>> Install build-essential and unzip on %s\n", instanceName)
+				logger.Logf("Install build-essential and unzip")
 				stdOut, errOut, err = sshRunCommandWithRetry(installCtx, c, "sudo", []string{"apt-get", "install", "-y", "build-essential", "unzip"}, 5*time.Second)
 				if err != nil {
 					return fmt.Errorf("failed to install build-essential and unzip: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
@@ -54,7 +54,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName str
 			// installation was successful
 			break
 		}
-		fmt.Printf(">>> Failed to install build-essential and unzip on %s; will wait 15 seconds and try again\n", instanceName)
+		logger.Logf("Failed to install build-essential and unzip; will wait 15 seconds and try again")
 		<-time.After(15 * time.Second)
 	}
 	if err != nil {
@@ -63,7 +63,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName str
 	}
 
 	// prepare golang
-	fmt.Printf(">>> Install golang %s (%s) on %s\n", goVersion, arch, instanceName)
+	logger.Logf("Install golang %s (%s)", goVersion, arch)
 	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.linux-%s.tar.gz", goVersion, arch)
 	filename := path.Base(downloadURL)
 	stdOut, errOut, err := sshRunCommand(ctx, c, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)
@@ -84,7 +84,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName str
 	}
 
 	// copy the archive and extract it on the host
-	fmt.Printf(">>> Copying repo to %s\n", instanceName)
+	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
 	err = sshSCP(c, repoArchive, destRepoName)
 	if err != nil {
@@ -96,7 +96,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName str
 	}
 
 	// install mage and prepare for testing
-	fmt.Printf(">>> Running make mage and prepareOnRemote on %s\n", instanceName)
+	logger.Logf("Running make mage and prepareOnRemote")
 	envs := `GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH"`
 	installMage := strings.NewReader(fmt.Sprintf(`cd agent && %s make mage && %s mage integration:prepareOnRemote`, envs, envs))
 	stdOut, errOut, err = sshRunCommand(ctx, c, "bash", nil, installMage)
@@ -105,7 +105,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName str
 	}
 
 	// place the build for the agent on the host
-	fmt.Printf(">>> Copying agent build %s to %s\n", filepath.Base(buildPath), instanceName)
+	logger.Logf("Copying agent build %s", filepath.Base(buildPath))
 	err = sshSCP(c, buildPath, filepath.Base(buildPath))
 	if err != nil {
 		return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
@@ -123,7 +123,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, instanceName str
 	return nil
 }
 
-func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
+func (DebianRunner) Run(ctx context.Context, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {
@@ -141,7 +141,7 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string,
 	if len(tests) > 0 {
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(tests, ","))
 		vars = extendVars(vars, env)
-		fmt.Printf(">>> Starting tests on %s\n", instanceName)
+		logger.Logf("Starting tests")
 		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage integration:testOnRemote`, vars)
 		execTest := strings.NewReader(script)
 
@@ -150,8 +150,8 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string,
 			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
 		}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> Test output %s (stdout): ", instanceName))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> Test output %s (stderr): ", instanceName))
+		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (stdout): ", logger.Prefix()))
+		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (stderr): ", logger.Prefix()))
 		session.Stdin = execTest
 		// allowed to fail because tests might fail
 		_ = session.Run("bash")
@@ -171,7 +171,7 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string,
 		prefix := fmt.Sprintf("%s-sudo", prefix)
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(sudoTests, ","))
 		vars = extendVars(vars, env)
-		fmt.Printf(">>> Starting sudo tests on %s\n", instanceName)
+		logger.Logf("Starting sudo tests")
 		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage integration:testOnRemote`, vars)
 		execTest := strings.NewReader(script)
 
@@ -180,8 +180,8 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, instanceName string,
 			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
 		}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> Test output %s (sudo) (stdout): ", instanceName))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> Test output %s (sudo) (stderr): ", instanceName))
+		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (sudo) (stdout): ", logger.Prefix()))
+		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (sudo) (stderr): ", logger.Prefix()))
 		session.Stdin = execTest
 		// allowed to fail because tests might fail
 		_ = session.Run("bash")

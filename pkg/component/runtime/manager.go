@@ -88,15 +88,23 @@ type Manager struct {
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
+	// netMx synchronizes the access to listener and server only
 	netMx    sync.RWMutex
 	listener net.Listener
 	server   *grpc.Server
 
+	// waitMx synchronizes the access to waitReady only
 	waitMx    sync.RWMutex
 	waitReady map[string]waitForReady
 
-	mx           sync.RWMutex
-	current      map[string]*componentRuntimeState
+	// updateMx protects the call to update to ensure that
+	// only one call to update occurs at a time
+	updateMx sync.Mutex
+
+	// currentMx protects access to the current map only
+	currentMx sync.RWMutex
+	current   map[string]*componentRuntimeState
+
 	shipperConns map[string]*shipperConn
 
 	subMx         sync.RWMutex
@@ -144,7 +152,11 @@ func NewManager(
 	return m, nil
 }
 
-// Run runs the manager.
+// Run runs the manager's grpc server, implementing the
+// calls CheckinV2 and Actions (with a legacy handler for Checkin
+// that returns an error).
+//
+// Called on its own goroutine from Coordinator.runner.
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
@@ -188,7 +200,6 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.server = server
 	m.netMx.Unlock()
 	proto.RegisterElasticAgentServer(m.server, m)
-	m.shuttingDown.Store(false)
 
 	// start serving GRPC connections
 	var wg sync.WaitGroup
@@ -209,6 +220,7 @@ func (m *Manager) Run(ctx context.Context) error {
 
 	<-ctx.Done()
 	m.running.Store(false)
+	m.shuttingDown.Store(true)
 	m.shutdown()
 
 	server.Stop()
@@ -220,10 +232,11 @@ func (m *Manager) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// WaitForReady waits until the manager is ready to be used.
+// waitForReady waits until the manager is ready to be used.
+// Used for testing.
 //
 // This verifies that the GRPC server is up and running.
-func (m *Manager) WaitForReady(ctx context.Context) error {
+func (m *Manager) waitForReady(ctx context.Context) error {
 	tk, err := uuid.NewV4()
 	if err != nil {
 		return err
@@ -292,6 +305,7 @@ func (m *Manager) Errors() <-chan error {
 }
 
 // Update updates the currComp state of the running components.
+// Called from the main Coordinator goroutine.
 //
 // This returns as soon as possible, the work is performed in the background.
 func (m *Manager) Update(components []component.Component) error {
@@ -307,8 +321,8 @@ func (m *Manager) Update(components []component.Component) error {
 
 // State returns the current component states.
 func (m *Manager) State() []ComponentComponentState {
-	m.mx.RLock()
-	defer m.mx.RUnlock()
+	m.currentMx.RLock()
+	defer m.currentMx.RUnlock()
 	states := make([]ComponentComponentState, 0, len(m.current))
 	for _, crs := range m.current {
 		crs.latestMx.RLock()
@@ -324,7 +338,7 @@ func (m *Manager) State() []ComponentComponentState {
 			}
 		}
 		states = append(states, ComponentComponentState{
-			Component: crs.currComp,
+			Component: crs.getCurrent(),
 			State:     crs.latestState.Copy(),
 			LegacyPID: legacyPID,
 		})
@@ -406,36 +420,37 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 				})
 			} else {
 				results = append(results, ComponentUnitDiagnostic{
-					Component: r.currComp,
+					Component: r.getCurrent(),
 					Unit:      q.Unit,
 				})
 			}
 		}
 	} else {
-		m.mx.RLock()
+		m.currentMx.RLock()
 		for _, r := range m.current {
-			for _, u := range r.currComp.Units {
+			currComp := r.getCurrent()
+			for _, u := range currComp.Units {
 				var err error
-				if r.currComp.Err != nil {
-					err = r.currComp.Err
+				if currComp.Err != nil {
+					err = currComp.Err
 				} else if u.Err != nil {
 					err = u.Err
 				}
 				if err != nil {
 					results = append(results, ComponentUnitDiagnostic{
-						Component: r.currComp,
+						Component: currComp,
 						Unit:      u,
 						Err:       err,
 					})
 				} else {
 					results = append(results, ComponentUnitDiagnostic{
-						Component: r.currComp,
+						Component: currComp,
 						Unit:      u,
 					})
 				}
 			}
 		}
-		m.mx.RUnlock()
+		m.currentMx.RUnlock()
 	}
 
 	for i, r := range results {
@@ -464,9 +479,9 @@ func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscripti
 	sub := newSubscription(ctx)
 
 	// add latestState to channel
-	m.mx.RLock()
+	m.currentMx.RLock()
 	comp, ok := m.current[componentID]
-	m.mx.RUnlock()
+	m.currentMx.RUnlock()
 	if ok {
 		comp.latestMx.RLock()
 		latestState := comp.latestState.Copy()
@@ -513,14 +528,14 @@ func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
 	sub := newSubscriptionAll(ctx)
 
 	// add the latest states
-	m.mx.RLock()
+	m.currentMx.RLock()
 	latest := make([]ComponentComponentState, 0, len(m.current))
 	for _, comp := range m.current {
 		comp.latestMx.RLock()
-		latest = append(latest, ComponentComponentState{Component: comp.currComp, State: comp.latestState.Copy()})
+		latest = append(latest, ComponentComponentState{Component: comp.getCurrent(), State: comp.latestState.Copy()})
 		comp.latestMx.RUnlock()
 	}
-	m.mx.RUnlock()
+	m.currentMx.RUnlock()
 	if len(latest) > 0 {
 		go func() {
 			for _, l := range latest {
@@ -653,8 +668,9 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(components []component.Component, teardown bool) error {
-	m.mx.Lock()
-	defer m.mx.Unlock()
+	// ensure that only one `update` can occur at the same time
+	m.updateMx.Lock()
+	defer m.updateMx.Unlock()
 
 	// prepare the components to add consistent shipper connection information between
 	// the connected components in the model
@@ -667,10 +683,12 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 	newComponents := make([]component.Component, 0, len(components))
 	for _, comp := range components {
 		touched[comp.ID] = true
+		m.currentMx.RLock()
 		existing, ok := m.current[comp.ID]
+		m.currentMx.RUnlock()
 		if ok {
 			// existing component; send runtime updated value
-			existing.currComp = comp
+			existing.setCurrent(comp)
 			if err := existing.runtime.Update(comp); err != nil {
 				return fmt.Errorf("failed to update component %s: %w", comp.ID, err)
 			}
@@ -679,25 +697,32 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		newComponents = append(newComponents, comp)
 	}
 
-	var stoppedWg sync.WaitGroup
+	var stop []*componentRuntimeState
+	m.currentMx.RLock()
 	for id, existing := range m.current {
 		// skip if already touched (meaning it still existing)
 		if _, done := touched[id]; done {
 			continue
 		}
 		// component was removed (time to clean it up)
-		_ = existing.stop(teardown)
-		// stop is async, wait for operation to finish,
-		// otherwise new instance may be started and components
-		// may fight for resources (e.g ports, files, locks)
-		stoppedWg.Add(1)
-		go func(state *componentRuntimeState) {
-			m.waitForStopped(state)
-			stoppedWg.Done()
-		}(existing)
+		stop = append(stop, existing)
 	}
-
-	stoppedWg.Wait()
+	m.currentMx.RUnlock()
+	if len(stop) > 0 {
+		var stoppedWg sync.WaitGroup
+		stoppedWg.Add(len(stop))
+		for _, existing := range stop {
+			_ = existing.stop(teardown)
+			// stop is async, wait for operation to finish,
+			// otherwise new instance may be started and components
+			// may fight for resources (e.g ports, files, locks)
+			go func(state *componentRuntimeState) {
+				m.waitForStopped(state)
+				stoppedWg.Done()
+			}(existing)
+		}
+		stoppedWg.Wait()
+	}
 
 	// start all not started
 	for _, comp := range newComponents {
@@ -707,7 +732,9 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}
+		m.currentMx.Lock()
 		m.current[comp.ID] = state
+		m.currentMx.Unlock()
 		if err = state.start(); err != nil {
 			return fmt.Errorf("failed to start component %s: %w", comp.ID, err)
 		}
@@ -720,25 +747,32 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 	if comp == nil {
 		return
 	}
-	compID := comp.currComp.ID
+	currComp := comp.getCurrent()
+	compID := currComp.ID
 	timeout := defaultStopTimeout
-	if comp.currComp.InputSpec != nil &&
-		comp.currComp.InputSpec.Spec.Service != nil &&
-		comp.currComp.InputSpec.Spec.Service.Operations.Uninstall != nil &&
-		comp.currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout > 0 {
+	if currComp.InputSpec != nil &&
+		currComp.InputSpec.Spec.Service != nil &&
+		currComp.InputSpec.Spec.Service.Operations.Uninstall != nil &&
+		currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout > 0 {
 		// if component is a service and timeout is defined, use the one defined
-		timeout = comp.currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout
+		timeout = currComp.InputSpec.Spec.Service.Operations.Uninstall.Timeout
 	}
 
 	timeoutCh := time.After(timeout)
 	for {
-		if comp.latestState.State == client.UnitStateStopped {
+		comp.latestMx.RLock()
+		latestState := comp.latestState
+		comp.latestMx.RUnlock()
+		if latestState.State == client.UnitStateStopped {
 			return
 		}
 
+		m.currentMx.RLock()
 		if _, exists := m.current[compID]; !exists {
+			m.currentMx.RUnlock()
 			return
 		}
+		m.currentMx.RUnlock()
 
 		select {
 		case <-timeoutCh:
@@ -747,18 +781,18 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 		}
 	}
 }
-func (m *Manager) shutdown() {
-	m.shuttingDown.Store(true)
 
+// Called from Manager's Run goroutine.
+func (m *Manager) shutdown() {
 	// don't tear down as this is just a shutdown, so components most likely will come back
 	// on next start of the manager
 	_ = m.update([]component.Component{}, false)
 
 	// wait until all components are removed
 	for {
-		m.mx.Lock()
+		m.currentMx.RLock()
 		length := len(m.current)
-		m.mx.Unlock()
+		m.currentMx.RUnlock()
 		if length <= 0 {
 			return
 		}
@@ -773,7 +807,7 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 		select {
 		case <-sub.ctx.Done():
 		case sub.ch <- ComponentComponentState{
-			Component: state.currComp,
+			Component: state.getCurrent(),
 			State:     latest,
 		}:
 		}
@@ -781,13 +815,11 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 	m.subAllMx.RUnlock()
 
 	m.subMx.RLock()
-	subs, ok := m.subscriptions[state.currComp.ID]
-	if ok {
-		for _, sub := range subs {
-			select {
-			case <-sub.ctx.Done():
-			case sub.ch <- latest:
-			}
+	subs := m.subscriptions[state.id]
+	for _, sub := range subs {
+		select {
+		case <-sub.ctx.Done():
+		case sub.ch <- latest:
 		}
 	}
 	m.subMx.RUnlock()
@@ -795,9 +827,9 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 	shutdown := state.shuttingDown.Load()
 	if shutdown && latest.State == client.UnitStateStopped {
 		// shutdown is complete; remove from currComp
-		m.mx.Lock()
-		delete(m.current, state.currComp.ID)
-		m.mx.Unlock()
+		m.currentMx.Lock()
+		delete(m.current, state.id)
+		m.currentMx.Unlock()
 
 		exit = true
 	}
@@ -807,14 +839,14 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 func (m *Manager) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	var cert *tls.Certificate
 
-	m.mx.RLock()
+	m.currentMx.RLock()
 	for _, runtime := range m.current {
 		if runtime.comm.name == chi.ServerName {
 			cert = runtime.comm.cert.Certificate
 			break
 		}
 	}
-	m.mx.RUnlock()
+	m.currentMx.RUnlock()
 	if cert != nil {
 		return cert, nil
 	}
@@ -834,9 +866,10 @@ func (m *Manager) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, er
 	return nil, errors.New("no supported TLS certificate")
 }
 
+// Called from GRPC listeners
 func (m *Manager) getRuntimeFromToken(token string) *componentRuntimeState {
-	m.mx.RLock()
-	defer m.mx.RUnlock()
+	m.currentMx.RLock()
+	defer m.currentMx.RUnlock()
 
 	for _, runtime := range m.current {
 		if runtime.comm.token == token {
@@ -847,11 +880,12 @@ func (m *Manager) getRuntimeFromToken(token string) *componentRuntimeState {
 }
 
 func (m *Manager) getRuntimeFromUnit(comp component.Component, unit component.Unit) *componentRuntimeState {
-	m.mx.RLock()
-	defer m.mx.RUnlock()
+	m.currentMx.RLock()
+	defer m.currentMx.RUnlock()
 	for _, c := range m.current {
-		if c.currComp.ID == comp.ID {
-			for _, u := range c.currComp.Units {
+		if c.id == comp.ID {
+			currComp := c.getCurrent()
+			for _, u := range currComp.Units {
 				if u.Type == unit.Type && u.ID == unit.ID {
 					return c
 				}
