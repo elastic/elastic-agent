@@ -1263,12 +1263,13 @@ func majorMinor() string {
 	return ""
 }
 
+// cleans up the integration testing leftovers
 func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
 	_, err := os.Stat(".ogc-cache")
 	if err == nil {
 		// .ogc-cache exists; need to run `Clean` from the runner
-		r, err := createTestRunner()
+		r, err := createTestRunner(false, "")
 		if err != nil {
 			return fmt.Errorf("error creating test runner: %w", err)
 		}
@@ -1281,11 +1282,13 @@ func (Integration) Clean() error {
 	return nil
 }
 
+// checks that integration tests are using define.Require
 func (Integration) Check() error {
 	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
 	return define.ValidateDir("testing/integration")
 }
 
+// runs only the integration tests that support local mode
 func (Integration) Local(ctx context.Context) error {
 	if shouldBuildAgent() {
 		// need only local package for current platform
@@ -1326,44 +1329,27 @@ func (Integration) Auth(ctx context.Context) error {
 // run integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
 	mg.CtxDeps(ctx, Integration.Clean)
-	batches, err := define.DetermineBatches("testing/integration", "integration")
-	if err != nil {
-		return fmt.Errorf("failed to detemine batches: %w", err)
-	}
-	r, err := createTestRunner(batches...)
-	if err != nil {
-		return err
-	}
-	results, err := r.Run(ctx)
-	if err != nil {
-		return err
-	}
-	_ = os.Remove("build/TEST-go-integration.out")
-	_ = os.Remove("build/TEST-go-integration.out.json")
-	_ = os.Remove("build/TEST-go-integration.xml")
-	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
-	if err != nil {
-		return err
-	}
-	err = writeFile("build/TEST-go-integration.out.json", results.Output, 0644)
-	if err != nil {
-		return err
-	}
-	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
-	if err != nil {
-		return err
-	}
-	fmt.Printf(">>> Testing completed\n")
-	fmt.Printf(">>> Console output written here: build/TEST-go-integration.out\n")
-	fmt.Printf(">>> Console JSON output written here: build/TEST-go-integration.out.json\n")
-	fmt.Printf(">>> JUnit XML written here: build/TEST-go-integration.xml\n")
-	return nil
+	return integRunner(ctx, false, "")
 }
 
+// run integration tests on a matrix of all supported remote hosts
+func (Integration) Matrix(ctx context.Context) error {
+	mg.CtxDeps(ctx, Integration.Clean)
+	return integRunner(ctx, true, "")
+}
+
+// run single integration test on remote host
+func (Integration) Single(ctx context.Context, testName string) error {
+	mg.CtxDeps(ctx, Integration.Clean)
+	return integRunner(ctx, false, testName)
+}
+
+// don't call locally (called on remote host to prepare it for testing)
 func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
 }
 
+// don't call locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	mg.Deps(Build.TestBinaries)
 	version := os.Getenv("AGENT_VERSION")
@@ -1524,6 +1510,8 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 			ServiceTokenPath: serviceTokenPath,
 			Datacenter:       datacenter,
 		},
+		Matrix:     matrix,
+		SingleTest: singleTest,
 	}, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)

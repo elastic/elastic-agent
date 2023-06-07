@@ -81,6 +81,7 @@ func NewCoordinatorState(state agentclient.State, msg string, fleetState agentcl
 }
 
 // UpdateState updates the state triggering a change notification to subscribers.
+// Always called on the main Coordinator goroutine.
 func (cs *CoordinatorState) UpdateState(setters ...stateSetterOpt) {
 	var setter stateSetter
 	for _, ss := range setters {
@@ -108,6 +109,7 @@ func (cs *CoordinatorState) UpdateState(setters ...stateSetterOpt) {
 }
 
 // SetRuntimeManagerError updates the error state for the runtime manager.
+// Called on the main Coordinator goroutine.
 func (cs *CoordinatorState) SetRuntimeManagerError(err error) {
 	cs.mgrMx.Lock()
 	cs.runtimeMgrErr = err
@@ -116,6 +118,7 @@ func (cs *CoordinatorState) SetRuntimeManagerError(err error) {
 }
 
 // SetConfigManagerError updates the error state for the config manager.
+// Called on the main Coordinator goroutine.
 func (cs *CoordinatorState) SetConfigManagerError(err error) {
 	cs.mgrMx.Lock()
 	cs.configMgrErr = err
@@ -124,6 +127,7 @@ func (cs *CoordinatorState) SetConfigManagerError(err error) {
 }
 
 // SetConfigManagerActionsError updates the error state for the config manager actions errors.
+// Called on the main Coordinator goroutine.
 func (cs *CoordinatorState) SetConfigManagerActionsError(err error) {
 	cs.mgrMx.Lock()
 	cs.actionsErr = err
@@ -132,6 +136,7 @@ func (cs *CoordinatorState) SetConfigManagerActionsError(err error) {
 }
 
 // SetVarsManagerError updates the error state for the variables manager.
+// Called on the main Coordinator goroutine.
 func (cs *CoordinatorState) SetVarsManagerError(err error) {
 	cs.mgrMx.Lock()
 	cs.varsMgrErr = err
@@ -140,6 +145,8 @@ func (cs *CoordinatorState) SetVarsManagerError(err error) {
 }
 
 // SetOverrideState sets the override state triggering a change notification to subscribers.
+// This is currently used when handling upgrades.
+// Called from external goroutines.
 func (cs *CoordinatorState) SetOverrideState(state agentclient.State, message string) {
 	cs.mx.Lock()
 	cs.overrideState = &coordinatorOverrideState{
@@ -151,6 +158,8 @@ func (cs *CoordinatorState) SetOverrideState(state agentclient.State, message st
 }
 
 // ClearOverrideState clears the override state triggering a change notification to subscribers.
+// This is currently used when handling upgrades.
+// Called from external goroutines.
 func (cs *CoordinatorState) ClearOverrideState() {
 	cs.mx.Lock()
 	cs.overrideState = nil
@@ -159,6 +168,7 @@ func (cs *CoordinatorState) ClearOverrideState() {
 }
 
 // UpdateComponentState updates the component state triggering a change notification to subscribers.
+// Called only on the Coordinator's watchRuntimeComponents goroutine.
 func (cs *CoordinatorState) UpdateComponentState(state runtime.ComponentComponentState) {
 	cs.compStatesMx.Lock()
 	found := false
@@ -243,6 +253,7 @@ func (cs *CoordinatorState) State() (s State) {
 }
 
 // Subscribe subscribes to changes in the coordinator state.
+// Called by external goroutines (currently just the StateWatch RPC).
 //
 // This provides the current state at the time of first subscription. Cancelling the context
 // results in the subscription being unsubscribed.
@@ -283,10 +294,13 @@ func (cs *CoordinatorState) Subscribe(ctx context.Context) *StateSubscription {
 	return sub
 }
 
+// Called from both internal and external goroutines.
 func (cs *CoordinatorState) changed() {
 	cs.sendState(cs.State())
 }
 
+// sendState tries to forward the given state to the current subscribers.
+// Called from both internal and external goroutines.
 func (cs *CoordinatorState) sendState(state State) {
 	cs.subMx.RLock()
 	defer cs.subMx.RUnlock()

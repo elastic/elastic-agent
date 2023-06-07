@@ -85,8 +85,10 @@ type componentRuntimeState struct {
 	logger  *logger.Logger
 	comm    *runtimeComm
 
-	currComp component.Component
-	runtime  ComponentRuntime
+	id         string
+	currCompMx sync.RWMutex
+	currComp   component.Component
+	runtime    ComponentRuntime
 
 	shuttingDown atomic.Bool
 
@@ -111,6 +113,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 		manager:  m,
 		logger:   logger,
 		comm:     comm,
+		id:       comp.ID,
 		currComp: comp,
 		runtime:  runtime,
 		latestState: ComponentState{
@@ -129,15 +132,13 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 	})
 
 	// start the go-routine that watches for updates from the component
-	runner.Start(context.Background(), func(ctx context.Context) error {
+	go func() {
 		for {
 			select {
-			case <-ctx.Done():
-				runtimeRunner.Stop()
 			case <-runtimeRunner.Done():
 				// Exit from the watcher loop only when the runner is done
 				// This is the same behaviour as before this change, just refactored and cleaned up
-				return nil
+				return
 			case s := <-runtime.Watch():
 				state.latestMx.Lock()
 				state.latestState = s
@@ -157,9 +158,21 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 				}
 			}
 		}
-	})
+	}()
 
 	return state, nil
+}
+
+func (s *componentRuntimeState) getCurrent() component.Component {
+	s.currCompMx.RLock()
+	defer s.currCompMx.RUnlock()
+	return s.currComp
+}
+
+func (s *componentRuntimeState) setCurrent(current component.Component) {
+	s.currCompMx.Lock()
+	s.currComp = current
+	s.currCompMx.Unlock()
 }
 
 func (s *componentRuntimeState) start() error {

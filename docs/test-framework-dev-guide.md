@@ -31,6 +31,10 @@ Run `mage integration:local` to execute only those tests under the
 `testing/integration` folder that set `Local: true`. These tests are executed
 on your local machine.
 
+Run `mage integration:single [testName]` to execute a single test under the `testing/integration` folder. Only the selected test will be executed on remote VMs.
+
+Run `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
+
 ## Troubleshooting Tips
 
 ### Error: GCE service token missing; run 'mage integration:auth'
