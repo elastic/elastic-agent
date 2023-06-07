@@ -152,7 +152,11 @@ func NewManager(
 	return m, nil
 }
 
-// Run runs the manager.
+// Run runs the manager's grpc server, implementing the
+// calls CheckinV2 and Actions (with a legacy handler for Checkin
+// that returns an error).
+//
+// Called on its own goroutine from Coordinator.runner.
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
@@ -196,7 +200,6 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.server = server
 	m.netMx.Unlock()
 	proto.RegisterElasticAgentServer(m.server, m)
-	m.shuttingDown.Store(false)
 
 	// start serving GRPC connections
 	var wg sync.WaitGroup
@@ -217,6 +220,7 @@ func (m *Manager) Run(ctx context.Context) error {
 
 	<-ctx.Done()
 	m.running.Store(false)
+	m.shuttingDown.Store(true)
 	m.shutdown()
 
 	server.Stop()
@@ -228,10 +232,11 @@ func (m *Manager) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// WaitForReady waits until the manager is ready to be used.
+// waitForReady waits until the manager is ready to be used.
+// Used for testing.
 //
 // This verifies that the GRPC server is up and running.
-func (m *Manager) WaitForReady(ctx context.Context) error {
+func (m *Manager) waitForReady(ctx context.Context) error {
 	tk, err := uuid.NewV4()
 	if err != nil {
 		return err
@@ -300,6 +305,7 @@ func (m *Manager) Errors() <-chan error {
 }
 
 // Update updates the currComp state of the running components.
+// Called from the main Coordinator goroutine.
 //
 // This returns as soon as possible, the work is performed in the background.
 func (m *Manager) Update(components []component.Component) error {
@@ -775,9 +781,9 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 		}
 	}
 }
-func (m *Manager) shutdown() {
-	m.shuttingDown.Store(true)
 
+// Called from Manager's Run goroutine.
+func (m *Manager) shutdown() {
 	// don't tear down as this is just a shutdown, so components most likely will come back
 	// on next start of the manager
 	_ = m.update([]component.Component{}, false)
@@ -809,13 +815,11 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 	m.subAllMx.RUnlock()
 
 	m.subMx.RLock()
-	subs, ok := m.subscriptions[state.id]
-	if ok {
-		for _, sub := range subs {
-			select {
-			case <-sub.ctx.Done():
-			case sub.ch <- latest:
-			}
+	subs := m.subscriptions[state.id]
+	for _, sub := range subs {
+		select {
+		case <-sub.ctx.Done():
+		case sub.ch <- latest:
 		}
 	}
 	m.subMx.RUnlock()
@@ -862,6 +866,7 @@ func (m *Manager) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, er
 	return nil, errors.New("no supported TLS certificate")
 }
 
+// Called from GRPC listeners
 func (m *Manager) getRuntimeFromToken(token string) *componentRuntimeState {
 	m.currentMx.RLock()
 	defer m.currentMx.RUnlock()
