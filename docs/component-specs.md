@@ -55,7 +55,7 @@ The output types this input or shipper supports. If this is an input, then input
 
 ### `shippers` (list of strings, input only)
 
-The shipper types this input supports. Inputs of this type can target any output type supported by the shippers in this list, as long as the output policy includes `use_shipper: true`. If an input supports more than one shipper implementing the same output type, then Agent will prefer the one that appears first in this list.
+The shipper types this input supports. Inputs of this type can target any output type supported by the shippers in this list, as long as the output policy includes `shipper.enabled: true`. If an input supports more than one shipper implementing the same output type, then Agent will prefer the one that appears first in this list.
 
 ### `runtime.preventions`
 

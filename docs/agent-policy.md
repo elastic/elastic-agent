@@ -54,13 +54,13 @@ Now let's look at the same setup with the shipper enabled. The output configurat
 outputs:
   elasticsearch1:
     type: "elasticsearch"
-    use_shipper: true
+    shipper.enabled: true
   elasticsearch2:
     type: "elasticsearch"
-    use_shipper: true
+    shipper.enabled: true
   logstash:
     type: "logstash"
-    use_shipper: true
+    shipper.enabled: true
 ```
 
 and the rest of the configuration is unchanged.
@@ -136,11 +136,15 @@ If present, this field determines whether the output is active. Defaults to true
 
 #### `type` (string, required)
 
-The output type. If `use_shipper` is `false`, this value must match one of the entries in the `outputs` field for its inputs' spec files. Otherwise, the `shippers` field for its inputs' spec file must include a shipper type that supports this output. See [Component Specs](component-specs.md) for more details.
+The output type. If `shipper.enabled: true` isn't set, this value must match one of the entries in the `outputs` field for its inputs' spec files. Otherwise, the `shippers` field for its inputs' spec file must include a shipper type that supports this output. See [Component Specs](component-specs.md) for more details.
 
-#### `use_shipper` (boolean, removed)
+#### `shipper.enabled` (boolean, removed)
 
-If present, this field determines whether this output should be implemented by a Shipper component. Defaults to false.
+If present, this field determines whether this output should be implemented by a Shipper component. Defaults to false. If `shipper.enabled` is `true` and some inputs targeting this output don't support the shipper, a warning should be displayed in the logs and in Fleet UI.
+
+#### `shipper.*` (removed)
+
+All configuration fields under `shipper` except `enabled` are reserved for possible future use, and cannot appear in output configurations. In the future, shipper outputs will be the default, and should be presented to the user as just "the output configuration," so the preference with new shipper features should be to evolve configurations by adding unique top-level fields as with any new output feature, rather than exposing the implementation. (However, this configuration subtree is reserved specifically so that we can revisit this policy if our needs change in the future.)
 
 #### `log_level` (string, removed)
 

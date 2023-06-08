@@ -197,7 +197,7 @@ func (r *RuntimeSpecs) componentForInputType(
 	var shipperType string
 	var shipperRef *ShipperReference
 	if componentErr == nil {
-		if output.useShipper {
+		if output.shipperEnabled {
 			shipperType, componentErr =
 				r.getSupportedShipperType(inputSpec, output.outputType)
 
@@ -229,7 +229,7 @@ func (r *RuntimeSpecs) componentForInputType(
 		}
 	}
 	if len(units) > 0 {
-		if output.useShipper {
+		if output.shipperEnabled {
 			// Shipper units are skipped if componentErr isn't nil, because in that
 			// case we generally don't have a valid shipper type to base it on.
 			if componentErr == nil {
@@ -471,13 +471,13 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 // of components.
 func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
 	const (
-		outputsKey    = "outputs"
-		enabledKey    = "enabled"
-		inputsKey     = "inputs"
-		typeKey       = "type"
-		idKey         = "id"
-		useOutputKey  = "use_output"
-		useShipperKey = "use_shipper"
+		outputsKey   = "outputs"
+		enabledKey   = "enabled"
+		inputsKey    = "inputs"
+		typeKey      = "type"
+		idKey        = "id"
+		useOutputKey = "use_output"
+		shipperKey   = "shipper"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
@@ -519,14 +519,20 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		if err != nil {
 			return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", name, err)
 		}
-		useShipper := false
-		if useShipperRaw, ok := output[useShipperKey]; ok {
-			useShipperVal, ok := useShipperRaw.(bool)
+		shipperEnabled := false
+		if shipperRaw, ok := output[shipperKey]; ok {
+			shipperVal, ok := shipperRaw.(map[string]interface{})
 			if !ok {
-				return nil, fmt.Errorf("invalid 'outputs.%s.use_shipper', expected a bool not a %T", name, useShipperRaw)
+				return nil, fmt.Errorf("invalid 'outputs.%s.shipper', expected a map not a %T", name, shipperRaw)
 			}
-			useShipper = useShipperVal
-			delete(output, useShipperKey)
+			if shipperEnabledRaw, ok := shipperVal[enabledKey]; ok {
+				shipperEnabledVal, ok := shipperEnabledRaw.(bool)
+				if !ok {
+					return nil, fmt.Errorf("invalid 'outputs.%s.shipper.enabled', expected a bool not a %T", name, shipperEnabledRaw)
+				}
+				shipperEnabled = shipperEnabledVal
+			}
+			delete(output, shipperKey)
 		}
 
 		// inject headers configured during enroll
@@ -551,13 +557,13 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		}
 
 		outputsMap[name] = outputI{
-			name:       name,
-			enabled:    enabled,
-			logLevel:   logLevel,
-			outputType: t,
-			config:     output,
-			inputs:     make(map[string][]inputI),
-			useShipper: useShipper,
+			name:           name,
+			enabled:        enabled,
+			logLevel:       logLevel,
+			outputType:     t,
+			config:         output,
+			inputs:         make(map[string][]inputI),
+			shipperEnabled: shipperEnabled,
 		}
 	}
 
@@ -669,7 +675,7 @@ type outputI struct {
 	// The raw configuration for this output, with small cleanups:
 	// - enabled key is removed
 	// - log_level key is removed
-	// - use_shipper key is removed
+	// - shipper key and anything under it is removed
 	// - if outputType is "elasticsearch", headers key is extended by adding any
 	//   values in AgentInfo.esHeaders
 	config map[string]interface{}
@@ -678,7 +684,7 @@ type outputI struct {
 	inputs map[string][]inputI
 
 	// If true, RuntimeSpecs should use a shipper for this output.
-	useShipper bool
+	shipperEnabled bool
 }
 
 // varsForPlatform sets the runtime variables that are available in the

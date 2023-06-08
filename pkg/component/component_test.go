@@ -982,9 +982,11 @@ func TestToComponents(t *testing.T) {
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
 					"default": map[string]interface{}{
-						"type":        "elasticsearch",
-						"enabled":     true,
-						"use_shipper": true,
+						"type":    "elasticsearch",
+						"enabled": true,
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 				},
 				"inputs": []interface{}{
@@ -1077,20 +1079,28 @@ func TestToComponents(t *testing.T) {
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
 					"default": map[string]interface{}{
-						"type":        "elasticsearch",
-						"use_shipper": true,
+						"type": "elasticsearch",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"other": map[string]interface{}{
-						"type":        "elasticsearch",
-						"use_shipper": false,
+						"type": "elasticsearch",
+						"shipper": map[string]interface{}{
+							"enabled": false,
+						},
 					},
 					"stashit": map[string]interface{}{
-						"type":        "logstash",
-						"use_shipper": true,
+						"type": "logstash",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"redis": map[string]interface{}{
-						"type":        "redis",
-						"use_shipper": true,
+						"type": "redis",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 				},
 				"inputs": []interface{}{
