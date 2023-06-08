@@ -1,4 +1,5 @@
-# For more information https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
+# Configmap for Statefulset Agents. It includes only Kube-State-metrics datastream. The URL is set to localhost:8080 for all datasets and Leader Election is disabled
+# For more information https://github.com/elastic/elastic-agent/blob/main/docs/elastic-agent-ksm-sharding.md
 apiVersion: v1
 kind: ConfigMap
 metadata:
