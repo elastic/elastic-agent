@@ -45,11 +45,24 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 				errors.M("service", paths.ServiceName))
 		}
 	}
-	_ = svc.Uninstall()
 
+	// Uninstall components first
 	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken); err != nil {
+		// If service status was running it was stopped to uninstall the components.
+		// If the components uninstall failed start the service again
+		if status == service.StatusRunning {
+			if startErr := svc.Start(); startErr != nil {
+				return errors.New(
+					err,
+					fmt.Sprintf("failed to restart service (%s), after failed components uninstall: %v", paths.ServiceName, startErr),
+					errors.M("service", paths.ServiceName))
+			}
+		}
 		return err
 	}
+
+	// Uninstall service only after components were uninstalled successfully
+	_ = svc.Uninstall()
 
 	// remove, if present on platform
 	if paths.ShellWrapperPath != "" {
@@ -192,6 +205,11 @@ func uninstallComponents(ctx context.Context, cfgFile, uninstallToken string) er
 	for _, comp := range comps {
 		if err := uninstallComponent(ctx, log, comp, uninstallToken); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
+			// The descision was made to change the behavour and leave the Agent installed
+			// if Endpoint uninstall fails
+			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
+			// Thus returning error here.
+			return err
 		}
 	}
 
