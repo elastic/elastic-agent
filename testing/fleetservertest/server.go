@@ -5,156 +5,13 @@
 package fleetservertest
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
 )
-
-// AgentAcks -
-func (a API) AgentAcks(
-	ctx context.Context,
-	id string,
-	ackRequest AckRequest) (*AckResponse, *HTTPError) {
-	if a.AckFn == nil {
-		return nil,
-			&HTTPError{StatusCode: http.StatusNotImplemented,
-				Message: "agent acs API not implemented"}
-	}
-
-	resp, err := a.AckFn(ctx, id, ackRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-// AgentCheckin -
-func (a API) AgentCheckin(
-	ctx context.Context,
-	id string,
-	userAgent string,
-	acceptEncoding string,
-	checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
-	if a.CheckinFn == nil {
-		return nil,
-			&HTTPError{StatusCode: http.StatusNotImplemented,
-				Message: "agent checkin API not implemented"}
-	}
-
-	resp, err := a.CheckinFn(
-		ctx, id, userAgent, acceptEncoding, checkinRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-// AgentEnroll -
-func (a API) AgentEnroll(
-	ctx context.Context,
-	id string,
-	userAgent string,
-	enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
-	if a.EnrollFn == nil {
-		return nil,
-			&HTTPError{StatusCode: http.StatusNotImplemented,
-				Message: "agent checkin API not implemented"}
-	}
-
-	resp, err := a.EnrollFn(ctx, id, userAgent, enrollRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-// Artifact -
-func (a API) Artifact(
-	ctx context.Context,
-	id string,
-	sha2 string) *HTTPError {
-	if a.ArtifactFn == nil {
-		return &HTTPError{StatusCode: http.StatusNotImplemented,
-			Message: "artifact API not implemented"}
-	}
-
-	return a.ArtifactFn(ctx, id, sha2)
-}
-
-// Status -
-func (a API) Status(
-	ctx context.Context) (*StatusResponse, *HTTPError) {
-	if a.StatusFn == nil {
-		return nil, &HTTPError{StatusCode: http.StatusNotImplemented,
-			Message: "status API not implemented"}
-	}
-
-	resp, err := a.StatusFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-// UploadBegin - Initiate a file upload process
-func (a API) UploadBegin(
-	ctx context.Context,
-	requestBody UploadBeginRequest) (*UploadBeginResponse, *HTTPError) {
-	if a.UploadBeginFn == nil {
-		return nil, &HTTPError{StatusCode: http.StatusNotImplemented,
-			Message: "upload begin API not implemented"}
-
-	}
-
-	resp, err := a.UploadBeginFn(ctx, requestBody)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-// UploadChunk - Upload a section of file data
-func (a API) UploadChunk(
-	ctx context.Context,
-	id string,
-	chunkNum int32,
-	chunkSHA2 string,
-	body io.ReadCloser) *HTTPError {
-	if a.UploadChunkFn == nil {
-		return &HTTPError{StatusCode: http.StatusNotImplemented,
-			Message: "upload chunk API not implemented"}
-	}
-
-	return a.UploadChunkFn(ctx, id, chunkNum, chunkSHA2, body)
-}
-
-// UploadComplete - Complete a file upload process
-func (a API) UploadComplete(
-	ctx context.Context,
-	id string,
-	uploadCompleteRequest UploadCompleteRequest) (*UploadComplete200Response, *HTTPError) {
-	if a.UploadCompleteFn == nil {
-		return nil, &HTTPError{StatusCode: http.StatusNotImplemented,
-			Message: "upload complete API not implemented"}
-	}
-
-	err := a.UploadCompleteFn(ctx, id, uploadCompleteRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	return &UploadComplete200Response{Status: "ok"}, nil
-}
 
 // Handlers binds http requests to an api service and writes the service results to the http response
 type Handlers struct {
@@ -162,10 +19,11 @@ type Handlers struct {
 }
 
 type Route struct {
-	Name        string
-	Method      string
-	Pattern     string
-	HandlerFunc http.HandlerFunc
+	Name    string
+	Method  string
+	Pattern string
+	AuthKey string
+	Handler http.Handler
 }
 
 // NewRouter creates a new router for any number of api routers
@@ -176,7 +34,7 @@ func NewRouter(hs Handlers) *mux.Router {
 			Methods(route.Method).
 			Path(route.Pattern).
 			Name(route.Name).
-			Handler(route.HandlerFunc)
+			Handler(AuthenticationMiddleware(route.AuthKey, route.Handler))
 	}
 
 	return router
@@ -186,52 +44,60 @@ func NewRouter(hs Handlers) *mux.Router {
 func (h *Handlers) Routes() []Route {
 	return []Route{
 		{
-			Name:        "AgentAcks",
-			Method:      http.MethodPost,
-			Pattern:     PathAgentAcks,
-			HandlerFunc: h.AgentAcks,
+			Name:    "AgentAcks",
+			Method:  http.MethodPost,
+			Pattern: PathAgentAcks,
+			AuthKey: h.api.APIKey,
+			Handler: http.HandlerFunc(h.AgentAcks),
 		},
 		{
-			Name:        "AgentCheckin",
-			Method:      http.MethodPost,
-			Pattern:     PathAgentCheckin,
-			HandlerFunc: h.AgentCheckin,
+			Name:    "AgentCheckin",
+			Method:  http.MethodPost,
+			Pattern: PathAgentCheckin,
+			AuthKey: h.api.APIKey,
+			Handler: http.HandlerFunc(h.AgentCheckin),
 		},
 		{
-			Name:        "AgentEnroll",
-			Method:      http.MethodPost,
-			Pattern:     PathAgentEnroll,
-			HandlerFunc: h.AgentEnroll,
+			Name:    "AgentEnroll",
+			Method:  http.MethodPost,
+			Pattern: PathAgentEnroll,
+			AuthKey: h.api.EnrollmentToken,
+			Handler: http.HandlerFunc(h.AgentEnroll),
 		},
 		{
-			Name:        "Artifact",
-			Method:      http.MethodGet,
-			Pattern:     PathArtifact,
-			HandlerFunc: h.Artifact,
+			Name:    "Artifact",
+			Method:  http.MethodGet,
+			Pattern: PathArtifact,
+			AuthKey: h.api.APIKey,
+			Handler: http.HandlerFunc(h.Artifact),
 		},
 		{
-			Name:        "Status",
-			Method:      http.MethodGet,
-			Pattern:     PathStatus,
-			HandlerFunc: h.Status,
+			Name:    "Status",
+			Method:  http.MethodGet,
+			Pattern: PathStatus,
+			AuthKey: h.api.APIKey,
+			Handler: http.HandlerFunc(h.Status),
 		},
 		{
-			Name:        "UploadBegin",
-			Method:      http.MethodPost,
-			Pattern:     PathUploadBegin,
-			HandlerFunc: h.UploadBegin,
+			Name:    "UploadBegin",
+			Method:  http.MethodPost,
+			Pattern: PathUploadBegin,
+			AuthKey: h.api.APIKey,
+			Handler: http.HandlerFunc(h.UploadBegin),
 		},
 		{
-			Name:        "UploadChunk",
-			Method:      http.MethodPut,
-			Pattern:     PathUploadChunk,
-			HandlerFunc: h.UploadChunk,
+			Name:    "UploadChunk",
+			Method:  http.MethodPut,
+			Pattern: PathUploadChunk,
+			AuthKey: h.api.APIKey,
+			Handler: http.HandlerFunc(h.UploadChunk),
 		},
 		{
-			Name:        "UploadComplete",
-			Method:      http.MethodPost,
-			Pattern:     PathUploadComplete,
-			HandlerFunc: h.UploadComplete,
+			Name:    "UploadComplete",
+			Method:  http.MethodPost,
+			Pattern: PathUploadComplete,
+			AuthKey: h.api.APIKey,
+			Handler: http.HandlerFunc(h.UploadComplete),
 		},
 	}
 }
@@ -246,7 +112,6 @@ func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&ackRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
 			Message:    fmt.Sprintf("%v", err),
 		}, w)
 		return
@@ -273,12 +138,10 @@ func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&checkinRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
 			Message:    fmt.Sprintf("%v", err),
 		}, w)
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
 			Message:    fmt.Sprintf("%v", err),
 		}, w)
 		return
@@ -308,7 +171,6 @@ func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&enrollRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
 			Message:    fmt.Sprintf("%v", err),
 		}, w)
 		return
@@ -362,7 +224,6 @@ func (h *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&requestBodyParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
 			Message:    fmt.Sprintf("%v", err),
 		}, w)
 		return
@@ -423,7 +284,6 @@ func (h *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&uploadCompleteRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Error:      http.StatusText(http.StatusBadRequest),
 			Message:    fmt.Sprintf("%v", err),
 		}, w)
 		return

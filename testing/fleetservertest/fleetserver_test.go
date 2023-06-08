@@ -10,17 +10,24 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 func ExampleNewServer_status() {
+	apiKey := "aAPIKey"
 	ts := NewServer(API{
+		APIKey:   apiKey,
 		StatusFn: NewStatusHandlerHealth(),
 	})
 
-	resp, err := http.Get(ts.URL + PathStatus) //nolint:noctx // it's fine on a test
+	r, err := http.NewRequest(http.MethodGet, ts.URL+PathStatus, nil)
+	if err != nil {
+		panic(fmt.Sprintf("could not create new request to fleet-test-server: %v", err))
+	}
+	r.Header.Set(NewAuthorizationHeader(apiKey))
+
+	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		panic(fmt.Sprintf("could not make request to fleet-test-server: %v", err))
 	}
@@ -61,7 +68,7 @@ func ExampleNewServer_checkin() {
 type agentInfo string
 
 func (a agentInfo) AgentID() string {
-	return ""
+	return string(a)
 }
 
 type sender struct {
@@ -75,12 +82,14 @@ func (s sender) Send(
 	params url.Values,
 	headers http.Header,
 	body io.Reader) (*http.Response, error) {
-	return &http.Response{
-		Status:     http.StatusText(http.StatusOK),
-		StatusCode: http.StatusOK,
-		Body: io.NopCloser(strings.NewReader(
-			checkinResponseJSONPolicySystemIntegration)),
-	}, nil
+
+	r, err := http.NewRequest(method, s.url+path, body)
+	if err != nil {
+		panic(fmt.Sprintf("could not create new request to fleet-test-server: %v", err))
+	}
+	r.Header.Set(NewAuthorizationHeader(""))
+
+	return http.DefaultClient.Do(r)
 }
 
 func (s sender) URI() string {

@@ -4,6 +4,12 @@
 
 package fleetservertest
 
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
 // =============================================================================
 // ================================== Ack ======================================
 // =============================================================================
@@ -204,7 +210,7 @@ type EnrollResponseItem struct {
 	// If the agent is active in fleet. Will be set to true upon enrollment.
 	Active bool `json:"active"`
 
-	// The policy ID that the agent is enrolled with. Decoded from the API key used in the request.
+	// The policy ID that the agent is enrolled with. Decoded from the Handlers key used in the request.
 	PolicyId string `json:"policy_id"`
 
 	// The enrollment request type.
@@ -214,16 +220,16 @@ type EnrollResponseItem struct {
 	EnrolledAt string `json:"enrolled_at"`
 
 	// A copy of the user provided metadata from the enrollment request. Currently will be empty.
-	UserProvidedMetadata string `json:"user_provided_metadata"`
+	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata"`
 
 	// A copy of the (updated) local metadata provided in the enrollment request.
-	LocalMetadata string `json:"local_metadata"`
+	LocalMetadata json.RawMessage `json:"local_metadata"`
 
 	// Defined in fleet-server and elastic-agent as `[]interface{}` but never used.
 	Actions []map[string]interface{} `json:"actions"`
 
 	// The id of the ApiKey that fleet-server has generated for the enrolling agent.
-	AccessApiKeyId string `json:"access_api_key_id"`
+	AccessApiKeyID string `json:"access_api_key_id"`
 
 	// The ApiKey token that fleet-server has generated for the enrolling agent.
 	AccessApiKey string `json:"access_api_key"`
@@ -358,9 +364,46 @@ type HTTPError struct {
 	// The HTTP status code of the error.
 	StatusCode int `json:"statusCode"`
 
-	// Error type.
-	Error string `json:"error"`
+	// Error is the Status Code as text.
+	Status string `json:"error"`
 
 	// (optional) Error message.
 	Message string `json:"message,omitempty"`
+}
+
+func (e HTTPError) Error() string {
+	return e.String()
+}
+
+func (e HTTPError) String() string {
+	statusCode := e.StatusCode
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
+
+	status := e.Status
+	if status == "" {
+		status = http.StatusText(statusCode)
+	}
+
+	return fmt.Sprintf("%d - %s: %s", statusCode, status, e.Message)
+}
+
+func (e HTTPError) MarshalJSON() ([]byte, error) {
+	statusCode := e.StatusCode
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
+
+	status := e.Status
+	if status == "" {
+		status = http.StatusText(statusCode)
+	}
+
+	type tmp HTTPError
+	return json.Marshal(tmp(HTTPError{
+		StatusCode: statusCode,
+		Status:     status,
+		Message:    e.Message,
+	}))
 }
