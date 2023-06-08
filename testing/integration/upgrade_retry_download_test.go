@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/version"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/stretchr/testify/require"
@@ -39,20 +41,26 @@ func TestElasticAgentUpgradeRetryDownload(t *testing.T) {
 		}, // modifying /etc/hosts
 	})
 
-	currentVersion := define.Version()
-	previousVersion, err := getPreviousMinorVersion(currentVersion)
+	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	suite.Run(t, newUpgradeElasticAgentStandaloneRetryDownloadTestSuite(info, currentVersion, previousVersion))
+	previousVersion, err := currentVersion.GetPreviousMinor()
+	require.NoError(t, err)
+
+	// For testing the upgrade we actually perform a downgrade
+	upgradeFromVersion := currentVersion
+	upgradeToVersion := previousVersion
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
+	suite.Run(t, newUpgradeElasticAgentStandaloneRetryDownloadTestSuite(info, upgradeToVersion))
 }
 
 type UpgradeElasticAgentStandaloneRetryDownload struct {
 	suite.Suite
 
-	requirementsInfo  *define.Info
-	agentStartVersion string
-	agentEndVersion   string
-	agentFixture      *atesting.Fixture
+	requirementsInfo *define.Info
+	toVersion        *version.ParsedSemVer
+	agentFixture     *atesting.Fixture
 
 	isEtcHostsModified bool
 }
@@ -67,11 +75,10 @@ type versionOutput struct {
 	Daemon versionInfo `yaml:"daemon"`
 }
 
-func newUpgradeElasticAgentStandaloneRetryDownloadTestSuite(info *define.Info, startVersion, endVersion string) *UpgradeElasticAgentStandaloneRetryDownload {
+func newUpgradeElasticAgentStandaloneRetryDownloadTestSuite(info *define.Info, toVersion *version.ParsedSemVer) *UpgradeElasticAgentStandaloneRetryDownload {
 	return &UpgradeElasticAgentStandaloneRetryDownload{
-		requirementsInfo:  info,
-		agentStartVersion: startVersion,
-		agentEndVersion:   endVersion,
+		requirementsInfo: info,
+		toVersion:        toVersion,
 	}
 }
 
@@ -137,12 +144,12 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) TestUpgradeStandaloneElasti
 	defer s.restoreEtcHosts()
 
 	s.T().Log("Start the Agent upgrade")
-	const targetVersion = "8.8.0"
+	var toVersion = s.toVersion.String()
 	var wg sync.WaitGroup
 	go func() {
 		wg.Add(1)
 
-		err := s.upgradeAgent(ctx, targetVersion)
+		err := s.upgradeAgent(ctx, toVersion)
 
 		wg.Done()
 		s.Require().NoError(err)
@@ -182,8 +189,8 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) TestUpgradeStandaloneElasti
 	s.T().Log("Check Agent version to ensure upgrade is successful")
 	version, err = s.getVersion(ctx)
 	s.Require().NoError(err)
-	s.Require().Equal(targetVersion, version.Binary.Version)
-	s.Require().Equal(targetVersion, version.Daemon.Version)
+	s.Require().Equal(toVersion, version.Binary.Version)
+	s.Require().Equal(toVersion, version.Daemon.Version)
 }
 
 func (s *UpgradeElasticAgentStandaloneRetryDownload) getVersion(ctx context.Context) (*versionOutput, error) {
@@ -234,4 +241,30 @@ func (s *UpgradeElasticAgentStandaloneRetryDownload) upgradeAgent(ctx context.Co
 	}
 
 	return nil
+}
+
+func getPreviousMinorVersion(v string) (string, error) {
+	pv, err := version.ParseVersion(v)
+	if err != nil {
+		return "", fmt.Errorf("error parsing version [%s]: %w", v, err)
+	}
+
+	major := pv.Major()
+	minor := pv.Minor()
+
+	if minor > 0 {
+		// We have at least one previous minor version in the current
+		// major version series
+		return fmt.Sprintf("%d.%d.%d", major, minor-1, 0), nil
+	}
+
+	// We are at the first minor of the current major version series. To
+	// figure out the previous minor, we need to rely on knowledge of
+	// the release versions from the past major series'.
+	switch major {
+	case 8:
+		return "7.17.10", nil
+	}
+
+	return "", fmt.Errorf("unable to determine previous minor version for [%s]", v)
 }
