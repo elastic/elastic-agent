@@ -33,7 +33,7 @@ func newActionStore(log *logger.Logger, store storeLoad) (*actionStore, error) {
 	// and return an empty store.
 	reader, err := store.Load()
 	if err != nil {
-		log.Errorf("failed to load action store, resetting its contents: %v", err.Error())
+		log.Errorf("failed to load action store, returning empty contents: %v", err.Error())
 		return &actionStore{log: log, store: store}, nil
 	}
 	defer reader.Close()

@@ -91,8 +91,8 @@ func NewStateStoreActionAcker(acker acker.Acker, store *StateStore) *StateStoreA
 
 // NewStateStore creates a new state store.
 func NewStateStore(log *logger.Logger, store storeLoad) (*StateStore, error) {
-	// If the store exists we will read it, if any errors is returned we log an
-	// error and return an empty store.
+	// If the store exists we will read it, if an error is returned we log it
+	// and return an empty store.
 	reader, err := store.Load()
 	if err != nil {
 		log.Errorf("failed to load state store, returning empty contents: %v", err.Error())
