@@ -5,3 +5,4 @@ namespace: kube-system
 
 resources:
   - ./base
+  - https://github.com/kubernetes/kube-state-metrics
