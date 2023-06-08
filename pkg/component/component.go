@@ -194,10 +194,10 @@ func (r *RuntimeSpecs) componentForInputType(
 	componentID := fmt.Sprintf("%s-%s", inputType, output.name)
 
 	inputSpec, componentErr := r.GetInput(inputType)
-	var shipperType string
 	var shipperRef *ShipperReference
 	if componentErr == nil {
 		if output.shipperEnabled {
+			var shipperType string
 			shipperType, componentErr =
 				r.getSupportedShipperType(inputSpec, output.outputType)
 
@@ -211,10 +211,18 @@ func (r *RuntimeSpecs) componentForInputType(
 					UnitID: componentID,
 				}
 			}
-		} else if !containsStr(inputSpec.Spec.Outputs, output.outputType) {
-			// We aren't using the shipper, and this output type isn't in the
-			// input spec's supported list.
-			componentErr = ErrOutputNotSupported
+		}
+		if shipperRef == nil {
+			// The shipper is disabled or we couldn't find a supported one.
+			if containsStr(inputSpec.Spec.Outputs, output.outputType) {
+				// We found a fallback output, clear componentErr in case it was
+				// set during shipper selection.
+				componentErr = nil
+			} else if componentErr == nil {
+				// This output is unsupported -- set an error if needed, but don't
+				// overwrite an existing error.
+				componentErr = ErrOutputNotSupported
+			}
 		}
 	}
 	// If there's an error at this point we still proceed with assembling the
@@ -229,12 +237,12 @@ func (r *RuntimeSpecs) componentForInputType(
 		}
 	}
 	if len(units) > 0 {
-		if output.shipperEnabled {
+		if shipperRef != nil {
 			// Shipper units are skipped if componentErr isn't nil, because in that
 			// case we generally don't have a valid shipper type to base it on.
 			if componentErr == nil {
 				units = append(units,
-					unitForShipperOutput(output, componentID, shipperType))
+					unitForShipperOutput(output, componentID, shipperRef.ShipperType))
 			}
 		} else {
 			units = append(units, unitForOutput(output, componentID))
@@ -683,7 +691,9 @@ type outputI struct {
 	// inputs directed at this output, keyed by canonical (non-alias) type.
 	inputs map[string][]inputI
 
-	// If true, RuntimeSpecs should use a shipper for this output.
+	// If true, RuntimeSpecs should use a shipper for this output when
+	// possible. Inputs that don't support a matching shipper will fall back
+	// to a legacy output.
 	shipperEnabled bool
 }
 

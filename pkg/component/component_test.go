@@ -1509,14 +1509,21 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID:  "apm-default",
-					Err: &errorReason{reason: "this input does not support shipper outputs"},
+					ID: "apm-default",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "apm",
 						BinaryName: "apm-server",
 						BinaryPath: filepath.Join("..", "..", "specs", "apm-server"),
 					},
 					Units: []Unit{
+						{
+							ID:       "apm-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
 						{
 							ID:       "apm-default-apm-server-0",
 							Type:     client.UnitTypeInput,
