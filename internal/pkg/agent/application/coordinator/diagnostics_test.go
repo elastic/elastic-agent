@@ -249,8 +249,13 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 
 			initialConf := config.MustNewConfigFrom(configBytes)
 
+			// These flags are set in callbacks from the Coordinator goroutine
+			// when the mocked functions are invoked, so we can tell in the
+			// assertions below when it's safe to advance to the next stage of
+			// the test.
 			configCalled := atomic.NewBool(false)
 			ackCalled := atomic.NewBool(false)
+
 			initialConfChange := mocks.NewConfigChange(t)
 			initialConfChange.EXPECT().Config().RunAndReturn(func() *config.Config {
 				configCalled.Store(true)
