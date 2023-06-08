@@ -25,13 +25,10 @@ DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=
 
 # Run integration tests
 AGENT_VERSION=8.9.0-SNAPSHOT mage integration:test
+TESTS_EXIT_STATUS=$?
 
 # HTML report
 go install github.com/alexec/junit2html@latest
 junit2html < build/TEST-go-integration.xml > build/TEST-report.html
 
-# A HORRIBLE hack to detect test failures
-if grep "<failure" build/TEST-go-integration.xml; then  
-  echo "Tests failed."
-  exit 1
-fi
+exit $TESTS_EXIT_STATUS
