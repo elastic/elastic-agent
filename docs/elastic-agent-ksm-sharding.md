@@ -132,6 +132,8 @@ For this installation, users need to configure the following agent policies:
   - b) Enable the APiServer dataset
   ![Deployment policy in affinity config](./images/affinityksm0datasets.png)
   - c) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller
+
+
 (- Repeat policy creation for rest KSM shards. **One deployment needs to be assigned per KSM shard**:  
   - a) Disable APIServer dataset
   - b) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller)
