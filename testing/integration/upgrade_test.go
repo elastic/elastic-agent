@@ -46,10 +46,14 @@ func TestFleetManagedUpgrade(t *testing.T) {
 		Sudo:    true, // requires Agent installation
 	})
 
+	// Get version of this Agent build and ensure that it has a `-SNAPSHOT` suffix. We
+	// do this by first removing the `-SNAPSHOT` suffix if it exists, and then appending
+	// it. We use the `-SNAPSHOT`-suffixed version because it is guaranteed to exist, even
+	// for unreleased versions.
 	currentVersion := define.Version()
+	currentVersion = strings.TrimRight(currentVersion, "-SNAPSHOT") + "-SNAPSHOT"
 
-	// TODO: remove -SNAPSHOT suffix once 8.8.1 is released.
-	upgradeFromVersion := "8.8.1-SNAPSHOT"
+	upgradeFromVersion := "8.8.1"
 	upgradeToVersion := currentVersion
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
@@ -135,7 +139,11 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 	s.T().Log("Getting Agent version...")
 	newVersion, err := tools.GetAgentVersion(kibClient)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), s.agentToVersion, newVersion)
+
+	// We remove the `-SNAPSHOT` suffix because, post-upgrade, the version reported
+	// by the Agent will not contain this suffix, even if a `-SNAPSHOT`-suffixed
+	// version was used as the target version for the upgrade.
+	require.Equal(s.T(), strings.TrimRight(s.agentToVersion, `-SNAPSHOT`), newVersion)
 }
 
 func (s *FleetManagedUpgradeTestSuite) TearDownTest() {
