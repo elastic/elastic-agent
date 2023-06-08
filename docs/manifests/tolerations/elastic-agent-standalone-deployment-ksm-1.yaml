@@ -489,6 +489,7 @@ spec:
       labels:
         app: elastic-agent
     spec:
+      nodeName: gke-kubernetes-scale-kubernetes-scale-0f73d58f-8cz4
       # Affinity (aka podAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
       #This way we can prevent an elastic daemonset to be installed in the same node where elastic-agent deployment exists
       # affinity:
