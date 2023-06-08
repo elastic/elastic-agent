@@ -133,10 +133,10 @@ For this installation, users need to configure the following agent policies:
   ![Deployment policy in affinity config](./images/affinityksm0datasets.png)
   - c) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller
 
-
 (- Repeat policy creation for rest KSM shards. **One deployment needs to be assigned per KSM shard**:  
-  - a) Disable APIServer dataset
-  - b) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller)
+
+- a) Disable APIServer dataset
+- b) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller)
 
 Reason is that now the deployment agent pods will run isolated in specific nodes. This method actually implies that first agent that will be installed from deployment is the leader of your cluster.
 
@@ -171,7 +171,6 @@ Then deploy manifests:
 > **Note:** : Order of deploying manifests is important. You need first to install deployments and then daemonset, otherwise deployments will not find a node available for scheduling.
 
 > **Note**: Above manifests exist under [manifests/affinty](./manifests/affinty) folder
-
 
 Verify installation:
 
