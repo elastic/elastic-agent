@@ -14,7 +14,7 @@ Agent Mode | Description
 
 ## Kustomize Templates
 
-Additional to the above manifests, the list below includes the official [kustomize](https://github.com/kubernetes-sigs/kustomize) templates to run them in kubernetes:
+In addition to the above manifests, the list below includes the official [kustomize](https://github.com/kubernetes-sigs/kustomize) templates to run them in kubernetes:
 
 Agent Scenario | Description
 ---- | ----
