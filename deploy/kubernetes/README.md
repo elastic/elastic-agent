@@ -23,7 +23,6 @@ Agent Scenario | Description
 [Elastic Agent managed - With KSM in autosharding configuration ](./ksm-autosharding/elastic-agent-managed/) | Elastic Agent managed by Fleet setup with [KSM in autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 [Elastic Agent standalone - With KSM in autosharding configuration](./ksm-autosharding/elastic-agent-standalone/) | Standalone Elastic Agent setup with [KSM in autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 
-*(KSM = Kube State Metrics)
 
 ### How to use the kustomize templates
 
