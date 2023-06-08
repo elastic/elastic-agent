@@ -205,8 +205,7 @@ func uninstallComponents(ctx context.Context, cfgFile, uninstallToken string) er
 	for _, comp := range comps {
 		if err := uninstallComponent(ctx, log, comp, uninstallToken); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
-			// The descision was made to change the behavour and leave the Agent installed
-			// if Endpoint uninstall fails
+			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
 			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
 			// Thus returning error here.
 			return err
