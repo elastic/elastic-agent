@@ -24,7 +24,7 @@ make mage
 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
 
 # Run integration tests
-SNAPSHOT=true mage integration:test
+AGENT_VERSION=8.9.0-SNAPSHOT mage integration:test
 
 # HTML report
 go install github.com/alexec/junit2html@latest
