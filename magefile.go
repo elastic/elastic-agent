@@ -1468,7 +1468,13 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 			return nil, err
 		}
 		if agentStackVersion == "" {
+			// always use snapshot for stack version
 			agentStackVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
+		}
+		if hasSnapshotEnv() {
+			// in the case that SNAPSHOT=true is set in the environment the
+			// default version of the agent is used, but as a snapshot build
+			agentVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
 		}
 	}
 	if agentStackVersion == "" {
@@ -1833,4 +1839,13 @@ func writeFile(name string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("failed to write file %s: %w", name, err)
 	}
 	return nil
+}
+
+func hasSnapshotEnv() bool {
+	snapshot := os.Getenv(snapshotEnv)
+	if snapshot == "" {
+		return false
+	}
+	b, _ := strconv.ParseBool(snapshot)
+	return b
 }
