@@ -10,7 +10,7 @@ Agent Mode | Description
 [Elastic Agent managed](elastic-agent-managed) | Elastic Agent managed by Fleet setup
 [Elastic Agent standalone](elastic-agent-standalone) | Standalone Elastic Agent setup
 
-> Note: Kube State Metrics Library is not installed as part of the above manifests and needs to be installed additionally
+> Note: The kube-state-metrics (KSM) simple service is not installed as part of the above manifests and needs to be installed from [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics).
 
 ## Kustomize Templates
 
