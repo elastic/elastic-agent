@@ -8,11 +8,17 @@ package integration
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"gopkg.in/yaml.v1"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -32,7 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
-func TestElasticAgentUpgrade(t *testing.T) {
+func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
@@ -47,10 +53,10 @@ func TestElasticAgentUpgrade(t *testing.T) {
 	upgradeToVersion := currentVersion
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
-	suite.Run(t, newUpgradeElasticAgentTestSuite(info, upgradeFromVersion, upgradeToVersion))
+	suite.Run(t, newFleetManagedUpgradeTestSuite(info, upgradeFromVersion, upgradeToVersion))
 }
 
-type UpgradeElasticAgent struct {
+type FleetManagedUpgradeTestSuite struct {
 	suite.Suite
 
 	requirementsInfo *define.Info
@@ -59,8 +65,8 @@ type UpgradeElasticAgent struct {
 	agentFixture     *atesting.Fixture
 }
 
-func newUpgradeElasticAgentTestSuite(info *define.Info, fromVersion, toVersion string) *UpgradeElasticAgent {
-	return &UpgradeElasticAgent{
+func newFleetManagedUpgradeTestSuite(info *define.Info, fromVersion, toVersion string) *FleetManagedUpgradeTestSuite {
+	return &FleetManagedUpgradeTestSuite{
 		requirementsInfo: info,
 		agentFromVersion: fromVersion,
 		agentToVersion:   toVersion,
@@ -68,7 +74,7 @@ func newUpgradeElasticAgentTestSuite(info *define.Info, fromVersion, toVersion s
 }
 
 // Before suite
-func (s *UpgradeElasticAgent) SetupSuite() {
+func (s *FleetManagedUpgradeTestSuite) SetupSuite() {
 	agentFixture, err := atesting.NewFixture(
 		s.T(),
 		s.agentFromVersion,
@@ -78,7 +84,7 @@ func (s *UpgradeElasticAgent) SetupSuite() {
 	s.agentFixture = agentFixture
 }
 
-func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
+func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 	kibClient := s.requirementsInfo.KibanaClient
 	policyUUID := uuid.New().String()
 
@@ -132,7 +138,7 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 	require.Equal(s.T(), s.agentToVersion, newVersion)
 }
 
-func (s *UpgradeElasticAgent) TearDownTest() {
+func (s *FleetManagedUpgradeTestSuite) TearDownTest() {
 	s.T().Log("Un-enrolling Elastic Agent...")
 	assert.NoError(s.T(), tools.UnEnrollAgent(s.requirementsInfo.KibanaClient))
 }
@@ -146,7 +152,7 @@ func upgradeMarkerRemoved() bool {
 	return marker == nil
 }
 
-func TestElasticAgentStandaloneUpgrade(t *testing.T) {
+func TestStandaloneUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		// Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
@@ -154,7 +160,7 @@ func TestElasticAgentStandaloneUpgrade(t *testing.T) {
 		Sudo:    true, // requires Agent installation
 	})
 
-	testSuite := &UpgradeStandaloneElasticAgent{
+	testSuite := &StandaloneUpgradeTestSuite{
 		requirementsInfo: info,
 		agentVersion:     define.Version(),
 	}
@@ -162,7 +168,7 @@ func TestElasticAgentStandaloneUpgrade(t *testing.T) {
 	suite.Run(t, testSuite)
 }
 
-type UpgradeStandaloneElasticAgent struct {
+type StandaloneUpgradeTestSuite struct {
 	suite.Suite
 
 	requirementsInfo *define.Info
@@ -171,7 +177,7 @@ type UpgradeStandaloneElasticAgent struct {
 }
 
 // Before suite
-func (s *UpgradeStandaloneElasticAgent) SetupSuite() {
+func (s *StandaloneUpgradeTestSuite) SetupSuite() {
 
 	agentFixture, err := define.NewFixture(
 		s.T(),
@@ -186,7 +192,7 @@ func (s *UpgradeStandaloneElasticAgent) SetupSuite() {
 	s.agentFixture = agentFixture
 }
 
-func (s *UpgradeStandaloneElasticAgent) TestUpgradeStandaloneElasticAgentToSnapshot() {
+func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot() {
 
 	const minVersionString = "8.9.0-SNAPSHOT"
 	minVersion, _ := version.ParseVersion(minVersionString)
@@ -313,4 +319,217 @@ func (s *UpgradeStandaloneElasticAgent) TestUpgradeStandaloneElasticAgentToSnaps
 	// version, err := c.Version(ctx)
 	// s.Require().NoError(err, "error checking version after upgrade")
 	// s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+}
+
+func TestStandaloneUpgradeRetryDownload(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation and modifying /etc/hosts
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		}, // modifying /etc/hosts
+	})
+
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	previousVersion, err := currentVersion.GetPreviousMinor()
+	require.NoError(t, err)
+
+	// For testing the upgrade we actually perform a downgrade
+	upgradeFromVersion := currentVersion
+	upgradeToVersion := previousVersion
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
+	suite.Run(t, newStandaloneUpgradeRetryDownloadTestSuite(info, upgradeToVersion))
+}
+
+type StandaloneUpgradeRetryDownloadTestSuite struct {
+	suite.Suite
+
+	requirementsInfo *define.Info
+	toVersion        *version.ParsedSemVer
+	agentFixture     *atesting.Fixture
+
+	isEtcHostsModified bool
+}
+
+type versionInfo struct {
+	Version string `yaml:"version"`
+	Commit  string `yaml:"commit"`
+}
+
+type versionOutput struct {
+	Binary versionInfo `yaml:"binary"`
+	Daemon versionInfo `yaml:"daemon"`
+}
+
+func newStandaloneUpgradeRetryDownloadTestSuite(info *define.Info, toVersion *version.ParsedSemVer) *StandaloneUpgradeRetryDownloadTestSuite {
+	return &StandaloneUpgradeRetryDownloadTestSuite{
+		requirementsInfo: info,
+		toVersion:        toVersion,
+	}
+}
+
+// Before suite
+func (s *StandaloneUpgradeRetryDownloadTestSuite) SetupSuite() {
+	agentFixture, err := define.NewFixture(
+		s.T(),
+	)
+	s.Require().NoError(err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err = agentFixture.Prepare(ctx)
+	s.Require().NoError(err, "error preparing agent fixture")
+	s.agentFixture = agentFixture
+}
+
+func (s *StandaloneUpgradeRetryDownloadTestSuite) TestUpgradeStandaloneElasticAgentRetryDownload() {
+	ctx := context.Background()
+
+	s.T().Log("Install the built Agent")
+	output, err := tools.InstallStandaloneElasticAgent(s.agentFixture)
+	s.T().Log(string(output))
+	s.Require().NoError(err)
+
+	s.T().Log("Ensure the correct version is running")
+	currentVersion, err := s.getVersion(ctx)
+	s.Require().NoError(err)
+
+	s.T().Log("Modify /etc/hosts to simulate transient network error")
+	cmd := exec.Command("sed",
+		"-i.bak",
+		"s/localhost/localhost artifacts.elastic.co artifacts-api.elastic.co/g",
+		"/etc/hosts",
+	)
+	s.T().Log("/etc/hosts modify command: ", cmd.String())
+
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		s.T().Log(string(output))
+	}
+	s.Require().NoError(err)
+
+	// Ensure that /etc/hosts is modified
+	s.Eventually(func() bool {
+		cmd := exec.Command("grep",
+			"artifacts",
+			"/etc/hosts",
+		)
+		s.T().Log("Check /etc/hosts command: ", cmd.String())
+
+		// We don't check the error as grep will return non-zero exit code when
+		// it doesn't find any matches, which could happen the first couple of
+		// times it searches /etc/hosts.
+		output, _ := cmd.CombinedOutput()
+		outputStr := strings.TrimSpace(string(output))
+
+		return outputStr != ""
+	}, 10*time.Second, 1*time.Second)
+
+	s.isEtcHostsModified = true
+	defer s.restoreEtcHosts()
+
+	s.T().Log("Start the Agent upgrade")
+	var toVersion = s.toVersion.String()
+	var wg sync.WaitGroup
+	go func() {
+		wg.Add(1)
+
+		err := s.upgradeAgent(ctx, toVersion)
+
+		wg.Done()
+		s.Require().NoError(err)
+	}()
+
+	s.T().Log("Check Agent logs for at least two retry messages")
+	agentDirName := fmt.Sprintf("elastic-agent-%s", release.TrimCommit(currentVersion.Daemon.Commit))
+	logsPath := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", agentDirName, "logs")
+	s.Eventually(func() bool {
+		cmd := exec.Command("grep",
+			"download.*retrying",
+			"--recursive",
+			"--include", "*.ndjson",
+			logsPath,
+		)
+		s.T().Log("Find logs command: ", cmd.String())
+
+		// We don't check the error as grep will return non-zero exit code when
+		// it doesn't find any matches, which could happen the first couple of
+		// times it searches the Elastic Agent logs.
+		output, _ := cmd.CombinedOutput()
+		outputStr := strings.TrimSpace(string(output))
+
+		outputLines := strings.Split(outputStr, "\n")
+		s.T().Log(outputLines)
+		s.T().Log("Number of retry messages: ", len(outputLines))
+		return len(outputLines) >= 2
+	}, 2*time.Minute, 20*time.Second)
+
+	s.T().Log("Restore /etc/hosts so upgrade can proceed")
+	s.restoreEtcHosts()
+
+	// Wait for upgrade command to finish executing
+	s.T().Log("Waiting for upgrade to finish")
+	wg.Wait()
+
+	s.T().Log("Check Agent version to ensure upgrade is successful")
+	currentVersion, err = s.getVersion(ctx)
+	s.Require().NoError(err)
+	s.Require().Equal(toVersion, currentVersion.Binary.Version)
+	s.Require().Equal(toVersion, currentVersion.Daemon.Version)
+}
+
+func (s *StandaloneUpgradeRetryDownloadTestSuite) getVersion(ctx context.Context) (*versionOutput, error) {
+	var currentVersion versionOutput
+	var err error
+
+	s.Eventually(func() bool {
+		args := []string{"version", "--yaml"}
+		var output []byte
+		output, err = s.agentFixture.Exec(ctx, args)
+
+		if err != nil {
+			s.T().Log(string(output))
+			return false
+		}
+
+		err = yaml.Unmarshal(output, &currentVersion)
+		if err != nil {
+			return false
+		}
+
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	return &currentVersion, err
+}
+
+func (s *StandaloneUpgradeRetryDownloadTestSuite) restoreEtcHosts() {
+	if !s.isEtcHostsModified {
+		return
+	}
+
+	cmd := exec.Command("mv",
+		"/etc/hosts.bak",
+		"/etc/hosts",
+	)
+	err := cmd.Run()
+	s.Require().NoError(err)
+	s.isEtcHostsModified = false
+}
+
+func (s *StandaloneUpgradeRetryDownloadTestSuite) upgradeAgent(ctx context.Context, version string) error {
+	args := []string{"upgrade", version}
+	output, err := s.agentFixture.Exec(ctx, args)
+	if err != nil {
+		s.T().Log("Upgrade command output after error: ", string(output))
+		return err
+	}
+
+	return nil
 }
