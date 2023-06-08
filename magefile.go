@@ -1275,11 +1275,11 @@ func (Integration) Clean() error {
 		// .ogc-cache exists; need to run `Clean` from the runner
 		r, err := createTestRunner(false, "")
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating test runner: %w", err)
 		}
 		err = r.Clean()
 		if err != nil {
-			return err
+			return fmt.Errorf("error running clean: %w", err)
 		}
 	}
 
@@ -1420,26 +1420,26 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	}
 	r, err := createTestRunner(matrix, singleTest, batches...)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating test runner: %w", err)
 	}
 	results, err := r.Run(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("error running test: %w", err)
 	}
 	_ = os.Remove("build/TEST-go-integration.out")
 	_ = os.Remove("build/TEST-go-integration.out.json")
 	_ = os.Remove("build/TEST-go-integration.xml")
 	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("error writing test out file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.out.json", results.Output, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("error writing test out json file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("error writing test out xml file: %w", err)
 	}
 	if results.Failures > 0 {
 		fmt.Printf(">>> Testing completed (%d failures, %d successful)\n", results.Failures, results.Tests-results.Failures)
