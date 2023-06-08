@@ -18,7 +18,7 @@ In addition to the above manifests, the list below includes the official [kustom
 
 Agent Scenario | Description
 ---- | ----
-[Elastic Agent managed - Default ](./default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup. Includes the installation of Kube State Metrics (KSM) in default configuration.
+[Elastic Agent managed - Default ](./default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup. Includes the installation of kube-state-metrics (KSM) in default configuration.
 [Elastic Agent standalone Default ](./default/elastic-agent-standalone/) | Default Standalone Elastic Agent setup
 [Elastic Agent managed - With KSM in autosharding configuration ](./ksm-autosharding/elastic-agent-managed/) | Elastic Agent managed by Fleet setup with [KSM in autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 [Elastic Agent standalone - With KSM in autosharding configuration](./ksm-autosharding/elastic-agent-standalone/) | Standalone Elastic Agent setup with [KSM in autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
