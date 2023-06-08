@@ -11,21 +11,21 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: async download of elastic-agent upgrade artifacts during fleet managed upgrade
+summary: Lowercase reported hostnames per Elastic Common Schema (ECS) guidelines for the host.name field.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: Upgraded github.com/elastic/go-sysinfo from 1.10.0 to 1.11.0.
 
 # Affected component; a word indicating the component this changeset affects.
-component: agent
+component: Elastic Agent
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-#pr: https://github.com/owner/repo/1234
+pr: https://github.com/elastic/elastic-agent/pull/2767
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
