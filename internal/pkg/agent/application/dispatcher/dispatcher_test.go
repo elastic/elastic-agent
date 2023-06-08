@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -227,7 +226,10 @@ func TestActionDispatcher(t *testing.T) {
 
 	t.Run("Cancel queued action", func(t *testing.T) {
 		def := &mockHandler{}
-		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		handleCalledChan := make(chan struct{})
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once().Run(func(args mock.Arguments) {
+			handleCalledChan <- struct{}{}
+		})
 
 		queue := &mockQueue{}
 		queue.On("Save").Return(nil).Once()
@@ -248,10 +250,11 @@ func TestActionDispatcher(t *testing.T) {
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		case <-time.After(200 * time.Microsecond):
-			// we're not expecting any reset,
+		case <-time.After(100 * time.Millisecond):
+			t.Fatalf("mock handler for cancel actions has not been called")
+		case <-handleCalledChan:
 		}
-		assert.Eventuallyf(t, func() bool { return len(def.Calls) > 0 }, 100*time.Millisecond, 100*time.Microsecond, "mock handler for cancel actions has not been called")
+
 		def.AssertExpectations(t)
 		queue.AssertExpectations(t)
 	})

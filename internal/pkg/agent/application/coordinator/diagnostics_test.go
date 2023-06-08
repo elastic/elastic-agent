@@ -24,6 +24,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -248,13 +249,25 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 
 			initialConf := config.MustNewConfigFrom(configBytes)
 
+			configCalled := atomic.NewBool(false)
+			ackCalled := atomic.NewBool(false)
 			initialConfChange := mocks.NewConfigChange(t)
-			initialConfChange.EXPECT().Config().Return(initialConf)
-			initialConfChange.EXPECT().Ack().Return(nil).Times(1)
+			initialConfChange.EXPECT().Config().RunAndReturn(func() *config.Config {
+				configCalled.Store(true)
+				return initialConf
+			})
+			initialConfChange.EXPECT().Ack().RunAndReturn(func() error {
+				ackCalled.Store(true)
+				return nil
+			}).Times(1)
 			mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
 
-			assert.Eventually(t, func() bool { return sut.State().State == cproto.State_HEALTHY }, 1*time.Second, 50*time.Millisecond)
-			assert.Eventually(t, func() bool { return len(initialConfChange.Calls) > 1 /*both Config and Ack have been called)*/ }, 1*time.Second, 50*time.Millisecond)
+			assert.Eventually(t, func() bool {
+				return sut.State().State == cproto.State_HEALTHY
+			}, 1*time.Second, 50*time.Millisecond)
+			assert.Eventually(t, func() bool {
+				return configCalled.Load() && ackCalled.Load()
+			}, 1*time.Second, 50*time.Millisecond)
 			t.Logf("Agent state: %s", sut.State().State)
 
 			// Send runtime component state
