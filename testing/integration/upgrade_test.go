@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"gopkg.in/yaml.v1"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
