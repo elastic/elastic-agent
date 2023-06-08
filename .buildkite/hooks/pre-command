@@ -16,7 +16,7 @@ fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
   # Set GCP credentials
-  export GOOGLE_APPLICATION_GCP_SECRET=$(vault kv get -format=json -field=data/kv/ci-shared/observability-ingest/cloud/gcp)
+  export GOOGLE_APPLICATION_GCP_SECRET=$(vault kv get -format=json -field=data kv/ci-shared/observability-ingest/cloud/gcp)
   echo "${GOOGLE_APPLICATION_GCP_SECRET}" > ./gcp.json
   export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
   export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)
