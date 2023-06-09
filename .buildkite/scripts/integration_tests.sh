@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -exuo pipefail
+set -uo pipefail
 
 # Install Go TODO: mode to makefile
 if ! command -v go &>/dev/null; then  
@@ -24,10 +24,11 @@ make mage
 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
 
 # Run integration tests
-SNAPSHOT=true mage integration:single TestFleetManagedUpgrade || TESTS_EXIT_STATUS=$?
+SNAPSHOT=true mage integration:single TestFleetManagedUpgrade
+TESTS_EXIT_STATUS=$?
 
 # HTML report
 go install github.com/alexec/junit2html@latest
 junit2html < build/TEST-go-integration.xml > build/TEST-report.html
 
-exit "${TESTS_EXIT_STATUS}:-0"
+exit $TESTS_EXIT_STATUS
