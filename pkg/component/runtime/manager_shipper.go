@@ -52,7 +52,7 @@ func (m *Manager) connectShippers(components []component.Component) error {
 
 			// cleanup any pairs that are no-longer used
 			for pairID := range conn.pairs {
-				touch, _ := pairsTouched[pairID]
+				touch := pairsTouched[pairID]
 				if !touch {
 					delete(conn.pairs, pairID)
 				}
@@ -63,7 +63,7 @@ func (m *Manager) connectShippers(components []component.Component) error {
 
 	// cleanup any shippers that are no-longer used
 	for shipperID := range m.shipperConns {
-		touch, _ := shippersTouched[shipperID]
+		touch := shippersTouched[shipperID]
 		if !touch {
 			delete(m.shipperConns, shipperID)
 		}
@@ -71,14 +71,14 @@ func (m *Manager) connectShippers(components []component.Component) error {
 
 	// connect the output units with the same connection information
 	for i, comp := range components {
-		if comp.Shipper != nil {
-			conn, ok := m.shipperConns[comp.Shipper.ComponentID]
+		if comp.ShipperRef != nil {
+			conn, ok := m.shipperConns[comp.ShipperRef.ComponentID]
 			if !ok {
-				return fmt.Errorf("component %q references a non-existing shipper %q", comp.ID, comp.Shipper.ComponentID)
+				return fmt.Errorf("component %q references a non-existing shipper %q", comp.ID, comp.ShipperRef.ComponentID)
 			}
 			pair, ok := conn.pairs[comp.ID]
 			if !ok {
-				return fmt.Errorf("component %q references shipper %q that doesn't know about the component", comp.ID, comp.Shipper.ComponentID)
+				return fmt.Errorf("component %q references shipper %q that doesn't know about the component", comp.ID, comp.ShipperRef.ComponentID)
 			}
 			for j, unit := range comp.Units {
 				if unit.Type == client.UnitTypeOutput {

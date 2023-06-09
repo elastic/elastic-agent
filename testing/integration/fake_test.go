@@ -25,7 +25,6 @@ var fakeComponent = atesting.UsableComponent{
 	Name:       "fake",
 	BinaryPath: mustAbs(filepath.Join("..", "..", "pkg", "component", "fake", "component", osExt("component"))),
 	Spec: &component.Spec{
-		Name:    "fake",
 		Version: 2,
 		Inputs: []component.InputSpec{
 			{
@@ -53,7 +52,6 @@ var fakeShipper = atesting.UsableComponent{
 	Name:       "fake-shipper",
 	BinaryPath: mustAbs(filepath.Join("..", "..", "pkg", "component", "fake", "shipper", osExt("shipper"))),
 	Spec: &component.Spec{
-		Name:    "fake-shipper",
 		Version: 2,
 		Shippers: []component.ShipperSpec{
 			{

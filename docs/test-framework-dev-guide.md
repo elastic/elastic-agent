@@ -1,5 +1,19 @@
 # Developer Guide for the Integration and E2E Testing Framework
 
+## Prerequisites
+
+### Dependencies
+
+Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository
+
+[GCloud CLI](https://cloud.google.com/sdk/gcloud)
+
+### Configuration
+
+ESS (QA) API Key to create on https://console.qa.cld.elstc.co/deployment-features/keys
+
+Warning: if you never created a deployment on it, you won't have permission to get this key so you will need to create one first.
+
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
@@ -57,3 +71,7 @@ the `mage package` command OR set the `AGENT_VERSION` environment variable to a 
 that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 `mage integration:local`.
 
+### OGC-related errors
+If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
+re-running whatever `mage integration:*` target you were trying to run originally when you
+encountered the error.

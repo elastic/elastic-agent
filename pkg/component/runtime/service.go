@@ -31,8 +31,8 @@ var (
 
 type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error
 
-// ServiceRuntime provides the command runtime for running a component as a service.
-type ServiceRuntime struct {
+// serviceRuntime provides the command runtime for running a component as a service.
+type serviceRuntime struct {
 	comp component.Component
 	log  *logger.Logger
 
@@ -46,8 +46,8 @@ type ServiceRuntime struct {
 	executeServiceCommandImpl executeServiceCommandFunc
 }
 
-// NewServiceRuntime creates a new command runtime for the provided component.
-func NewServiceRuntime(comp component.Component, logger *logger.Logger) (ComponentRuntime, error) {
+// newServiceRuntime creates a new command runtime for the provided component.
+func newServiceRuntime(comp component.Component, logger *logger.Logger) (*serviceRuntime, error) {
 	if comp.ShipperSpec != nil {
 		return nil, errors.New("service runtime not supported for a shipper specification")
 	}
@@ -60,7 +60,7 @@ func NewServiceRuntime(comp component.Component, logger *logger.Logger) (Compone
 
 	state := newComponentState(&comp)
 
-	s := &ServiceRuntime{
+	s := &serviceRuntime{
 		comp:                      comp,
 		log:                       logger.Named("service_runtime"),
 		ch:                        make(chan ComponentState),
@@ -81,7 +81,7 @@ func NewServiceRuntime(comp component.Component, logger *logger.Logger) (Compone
 // Called by Manager inside a goroutine. Run does not return until the passed in context is done. Run is always
 // called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
-func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error) {
+func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error) {
 	checkinTimer := time.NewTimer(s.checkinPeriod())
 	defer checkinTimer.Stop()
 
@@ -114,7 +114,10 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				// Initial state on start
 				lastCheckin = time.Time{}
 				missedCheckins = 0
-				checkinTimer.Stop()
+				// Stop timer safely, see https://pkg.go.dev/time#Timer.Stop
+				if !checkinTimer.Stop() {
+					<-checkinTimer.C
+				}
 				cisStop()
 
 				// Start connection info
@@ -138,7 +141,10 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			case actionStop, actionTeardown:
 				// Stop check-in timer
 				s.log.Debugf("stop check-in timer for %s service", s.name())
-				checkinTimer.Stop()
+				// Stop timer safely, see https://pkg.go.dev/time#Timer.Stop
+				if !checkinTimer.Stop() {
+					<-checkinTimer.C
+				}
 
 				// Stop connection info
 				s.log.Debugf("stop connection info for %s service", s.name())
@@ -161,7 +167,7 @@ func (s *ServiceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	}
 }
 
-func (s *ServiceRuntime) start(ctx context.Context) (err error) {
+func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	name := s.name()
 
 	// Set state to starting
@@ -184,7 +190,7 @@ func (s *ServiceRuntime) start(ctx context.Context) (err error) {
 	return nil
 }
 
-func (s *ServiceRuntime) stop(ctx context.Context, comm Communicator, lastCheckin time.Time, teardown bool) {
+func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastCheckin time.Time, teardown bool) {
 	name := s.name()
 
 	s.log.Debugf("stopping %s service runtime", name)
@@ -224,7 +230,7 @@ func (s *ServiceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 }
 
 // awaitCheckin awaits checkin with timeout.
-func (s *ServiceRuntime) awaitCheckin(ctx context.Context, comm Communicator, timeout time.Duration) bool {
+func (s *serviceRuntime) awaitCheckin(ctx context.Context, comm Communicator, timeout time.Duration) bool {
 	name := s.name()
 	t := time.NewTimer(timeout)
 	defer t.Stop()
@@ -245,7 +251,7 @@ func (s *ServiceRuntime) awaitCheckin(ctx context.Context, comm Communicator, ti
 	}
 }
 
-func (s *ServiceRuntime) processNewComp(newComp component.Component, comm Communicator) {
+func (s *serviceRuntime) processNewComp(newComp component.Component, comm Communicator) {
 	s.log.Debugf("observed component update for %s service", s.name())
 	sendExpected := s.state.syncExpected(&newComp)
 	changed := s.state.syncUnits(&newComp)
@@ -257,7 +263,7 @@ func (s *ServiceRuntime) processNewComp(newComp component.Component, comm Commun
 	}
 }
 
-func (s *ServiceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Communicator, lastCheckin *time.Time) {
+func (s *serviceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Communicator, lastCheckin *time.Time) {
 	name := s.name()
 
 	s.log.Debugf("observed check-in for %s service: %v", name, checkin)
@@ -298,13 +304,13 @@ func (s *ServiceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Com
 }
 
 // isRunning returns true is the service is running
-func (s *ServiceRuntime) isRunning() bool {
+func (s *serviceRuntime) isRunning() bool {
 	return s.state.State != client.UnitStateStopping &&
 		s.state.State != client.UnitStateStopped
 }
 
 // checkStatus checks check-ins state, called on timer
-func (s *ServiceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *time.Time, missedCheckins *int) {
+func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *time.Time, missedCheckins *int) {
 	if s.isRunning() {
 		now := time.Now().UTC()
 		if lastCheckin.IsZero() {
@@ -328,7 +334,7 @@ func (s *ServiceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *t
 	}
 }
 
-func (s *ServiceRuntime) checkinPeriod() time.Duration {
+func (s *serviceRuntime) checkinPeriod() time.Duration {
 	checkinPeriod := s.comp.InputSpec.Spec.Service.Timeouts.Checkin
 	if checkinPeriod == 0 {
 		checkinPeriod = defaultCheckServiceStatusInterval
@@ -339,14 +345,14 @@ func (s *ServiceRuntime) checkinPeriod() time.Duration {
 // Watch returns a channel to watch for component state changes.
 //
 // A new state is sent anytime the state for a unit or the whole component changes.
-func (s *ServiceRuntime) Watch() <-chan ComponentState {
+func (s *serviceRuntime) Watch() <-chan ComponentState {
 	return s.ch
 }
 
 // Start starts the service.
 //
 // Non-blocking and never returns an error.
-func (s *ServiceRuntime) Start() error {
+func (s *serviceRuntime) Start() error {
 	// clear channel so it's the latest action
 	select {
 	case <-s.actionCh:
@@ -359,7 +365,7 @@ func (s *ServiceRuntime) Start() error {
 // Update updates the currComp runtime with a new-revision for the component definition.
 //
 // Non-blocking and never returns an error.
-func (s *ServiceRuntime) Update(comp component.Component) error {
+func (s *serviceRuntime) Update(comp component.Component) error {
 	// clear channel so it's the latest component
 	select {
 	case <-s.compCh:
@@ -372,7 +378,7 @@ func (s *ServiceRuntime) Update(comp component.Component) error {
 // Stop stops the service.
 //
 // Non-blocking and never returns an error.
-func (s *ServiceRuntime) Stop() error {
+func (s *serviceRuntime) Stop() error {
 	// clear channel so it's the latest action
 	select {
 	case <-s.actionCh:
@@ -385,7 +391,7 @@ func (s *ServiceRuntime) Stop() error {
 // Teardown stop and uninstall the service.
 //
 // Non-blocking and never returns an error.
-func (s *ServiceRuntime) Teardown() error {
+func (s *serviceRuntime) Teardown() error {
 	// clear channel so it's the latest action
 	select {
 	case <-s.actionCh:
@@ -395,17 +401,17 @@ func (s *ServiceRuntime) Teardown() error {
 	return nil
 }
 
-func (s *ServiceRuntime) forceCompState(state client.UnitState, msg string) {
+func (s *serviceRuntime) forceCompState(state client.UnitState, msg string) {
 	if s.state.forceState(state, msg) {
 		s.sendObserved()
 	}
 }
 
-func (s *ServiceRuntime) sendObserved() {
+func (s *serviceRuntime) sendObserved() {
 	s.ch <- s.state.Copy()
 }
 
-func (s *ServiceRuntime) compState(state client.UnitState, missedCheckins int) {
+func (s *serviceRuntime) compState(state client.UnitState, missedCheckins int) {
 	name := s.name()
 	msg := stateUnknownMessage
 	if state == client.UnitStateHealthy {
@@ -422,12 +428,12 @@ func (s *ServiceRuntime) compState(state client.UnitState, missedCheckins int) {
 	}
 }
 
-func (s *ServiceRuntime) name() string {
+func (s *serviceRuntime) name() string {
 	return s.comp.InputSpec.Spec.Name
 }
 
 // check executes the service check command
-func (s *ServiceRuntime) check(ctx context.Context) error {
+func (s *serviceRuntime) check(ctx context.Context) error {
 	if s.comp.InputSpec.Spec.Service.Operations.Check == nil {
 		s.log.Errorf("missing check spec for %s service", s.comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
@@ -437,7 +443,7 @@ func (s *ServiceRuntime) check(ctx context.Context) error {
 }
 
 // install executes the service install command
-func (s *ServiceRuntime) install(ctx context.Context) error {
+func (s *serviceRuntime) install(ctx context.Context) error {
 	if s.comp.InputSpec.Spec.Service.Operations.Install == nil {
 		s.log.Errorf("missing install spec for %s service", s.comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
@@ -447,7 +453,7 @@ func (s *ServiceRuntime) install(ctx context.Context) error {
 }
 
 // uninstall executes the service uninstall command
-func (s *ServiceRuntime) uninstall(ctx context.Context) error {
+func (s *serviceRuntime) uninstall(ctx context.Context) error {
 	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl)
 }
 

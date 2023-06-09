@@ -1266,19 +1266,23 @@ func majorMinor() string {
 // cleans up the integration testing leftovers
 func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
+
+	// Clean out .ogc-cache always
+	defer os.RemoveAll(".ogc-cache")
+
 	_, err := os.Stat(".ogc-cache")
 	if err == nil {
 		// .ogc-cache exists; need to run `Clean` from the runner
 		r, err := createTestRunner(false, "")
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating test runner: %w", err)
 		}
 		err = r.Clean()
 		if err != nil {
-			return err
+			return fmt.Errorf("error running clean: %w", err)
 		}
 	}
-	_ = os.RemoveAll(".ogc-cache")
+
 	return nil
 }
 
@@ -1412,30 +1416,30 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	batches, err := define.DetermineBatches("testing/integration", "integration")
 	if err != nil {
-		return fmt.Errorf("failed to detemine batches: %w", err)
+		return fmt.Errorf("failed to determine batches: %w", err)
 	}
 	r, err := createTestRunner(matrix, singleTest, batches...)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating test runner: %w", err)
 	}
 	results, err := r.Run(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("error running test: %w", err)
 	}
 	_ = os.Remove("build/TEST-go-integration.out")
 	_ = os.Remove("build/TEST-go-integration.out.json")
 	_ = os.Remove("build/TEST-go-integration.xml")
 	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("error writing test out file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.out.json", results.Output, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("error writing test out json file: %w", err)
 	}
 	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("error writing test out xml file: %w", err)
 	}
 	if results.Failures > 0 {
 		fmt.Printf(">>> Testing completed (%d failures, %d successful)\n", results.Failures, results.Tests-results.Failures)
@@ -1464,7 +1468,13 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 			return nil, err
 		}
 		if agentStackVersion == "" {
+			// always use snapshot for stack version
 			agentStackVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
+		}
+		if hasSnapshotEnv() {
+			// in the case that SNAPSHOT=true is set in the environment the
+			// default version of the agent is used, but as a snapshot build
+			agentVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
 		}
 	}
 	if agentStackVersion == "" {
@@ -1829,4 +1839,13 @@ func writeFile(name string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("failed to write file %s: %w", name, err)
 	}
 	return nil
+}
+
+func hasSnapshotEnv() bool {
+	snapshot := os.Getenv(snapshotEnv)
+	if snapshot == "" {
+		return false
+	}
+	b, _ := strconv.ParseBool(snapshot)
+	return b
 }
