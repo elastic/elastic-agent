@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -90,10 +91,16 @@ func (s *FQDN) TestFQDN() {
 	err := setHostFQDN(ctx, s.externalIP, fqdn)
 	require.NoError(s.T(), err)
 
+	// Fleet API requires the namespace to be lowercased and not contain
+	// special characters.
+	policyNamespace := strings.ToLower(s.requirementsInfo.Namespace)
+	policyNamespace = regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(policyNamespace, "")
+	s.T().Logf("Using policy namespace: %s", policyNamespace)
+
 	// Enroll agent in Fleet with a test policy
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-fqdn-" + strings.ReplaceAll(fqdn, ".", "-"),
-		Namespace:   s.requirementsInfo.Namespace,
+		Namespace:   policyNamespace,
 		Description: fmt.Sprintf("Test policy for FQDN E2E test (%s)", fqdn),
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
