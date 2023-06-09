@@ -88,7 +88,7 @@ func WithAllowErrors() FixtureOpt {
 	}
 }
 
-// WithConnectTimeout adjusts the timeout for connecting to the spawned Elastic Agent control protocol.
+// WithConnectTimeout changes the timeout for connecting to the spawned Elastic Agent control protocol.
 // By default, the timeout is 5 seconds.
 func WithConnectTimeout(timeout time.Duration) FixtureOpt {
 	return func(f *Fixture) {
