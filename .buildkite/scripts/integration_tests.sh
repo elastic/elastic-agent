@@ -30,4 +30,4 @@ SNAPSHOT=true mage integration:single TestFleetManagedUpgrade || TESTS_EXIT_STAT
 go install github.com/alexec/junit2html@latest
 junit2html < build/TEST-go-integration.xml > build/TEST-report.html
 
-exit $TESTS_EXIT_STATUS
+exit "${TESTS_EXIT_STATUS}:-0"
