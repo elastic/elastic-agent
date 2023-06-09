@@ -498,18 +498,13 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) getVersion(ctx context.Context
 		args := []string{"version", "--yaml"}
 		var output []byte
 		output, err = s.agentFixture.Exec(ctx, args)
-
 		if err != nil {
 			s.T().Log(string(output))
 			return false
 		}
 
 		err = yaml.Unmarshal(output, &currentVersion)
-		if err != nil {
-			return false
-		}
-
-		return true
+		return err == nil
 	}, 1*time.Minute, 1*time.Second)
 
 	return &currentVersion, err
