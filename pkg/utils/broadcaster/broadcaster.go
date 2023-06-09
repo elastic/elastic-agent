@@ -11,7 +11,7 @@ type Broadcaster[T any] struct {
 type subscriber[T any] struct {
 }
 
-func NewBroadcaster[T any](value T, maxBuffer int) *Broadcaster[T] {
+func New[T any](value T, maxBuffer int) *Broadcaster[T] {
 	return nil
 }
 

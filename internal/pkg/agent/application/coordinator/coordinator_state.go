@@ -22,12 +22,6 @@ type State struct {
 	LogLevel     logp.Level                        `yaml:"log_level"`
 }
 
-// StateFetcher provides an interface to fetch the current state of the coordinator.
-type StasdfateFetcher interface {
-	// State returns the current state of the coordinator.
-	State() State
-}
-
 type coordinatorOverrideState struct {
 	state   agentclient.State
 	message string
@@ -70,6 +64,14 @@ func (c *Coordinator) SetOverrideState(state agentclient.State, message string) 
 		state:   state,
 		message: message,
 	}
+}
+
+// setOverrideState is the internal helper to set the override state and
+// set stateNeedsRefresh.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) setOverrideState(overrideState *coordinatorOverrideState) {
+	c.overrideState = overrideState
+	c.stateNeedsRefresh = true
 }
 
 // ClearOverrideState clears the override state, reverting to reporting Coordinator's
@@ -165,28 +167,6 @@ func (c *Coordinator) generateReportableState() (s State) {
 	return s
 }
 
-/*
-// StateSubscription provides a channel for notifications of state changes.
-type StateSubscription struct {
-	ctx context.Context
-	cs  *CoordinatorState
-	ch  chan State
-}
-
-func newStateSubscription(ctx context.Context, cs *CoordinatorState) *StateSubscription {
-	return &StateSubscription{
-		ctx: ctx,
-		cs:  cs,
-		ch:  make(chan State),
-	}
-}
-
-// Ch provides the channel to get state changes.
-func (s *StateSubscription) Ch() <-chan State {
-	return s.ch
-}
-*/
-
 // setState changes the overall state of the coordinator.
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) setState(state agentclient.State, message string) {
@@ -210,6 +190,8 @@ func (c *Coordinator) setLogLevel(logLevel logp.Level) {
 	c.stateNeedsRefresh = true
 }
 
+// Returns true if any component in the given list, or any unit in one of
+// those components, matches the given state.
 func hasState(components []runtime.ComponentComponentState, state client.UnitState) bool {
 	for _, comp := range components {
 		if comp.State.State == state {

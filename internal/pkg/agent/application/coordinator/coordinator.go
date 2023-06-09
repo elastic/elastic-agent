@@ -189,12 +189,10 @@ type Coordinator struct {
 	// waiting for the end of the iteration can call stateRefresh() directly,
 	// but this should be rare.
 	//
-	// state should never be directly read or written from outside the
-	// main Coordinator goroutine. Callers who need to access or modify the
-	// state should do so via the public accessors like State(),
-	// SetOverrideState(), etc.
-	state State
-	// TODO: initialize stateBroadcaster
+	// state should never be directly read or written outside the Coordinator
+	// goroutine. Callers who need to access or modify the state should use the
+	// public accessors like State(), SetLogLevel(), etc.
+	state             State
 	stateBroadcaster  *broadcaster.Broadcaster[State]
 	stateNeedsRefresh bool
 
@@ -204,7 +202,6 @@ type Coordinator struct {
 
 	// overrideStateChan forwards override states from the publicly accessible
 	// SetOverrideState helper to the Coordinator goroutine.
-	// TODO: intialize overrideStateChan and read it from the main loop.
 	overrideStateChan chan *coordinatorOverrideState
 
 	// componentStateChan is used by watchRuntimeComponents, an internal helper
@@ -212,7 +209,6 @@ type Coordinator struct {
 	// avoid congesting the Coordinator. When an update is ready,
 	// watchRuntimeComponents sends it on this channel so the main Coordinator
 	// goroutine can apply it.
-	// TODO: initialize componentStateChan and read it from the run loop
 	componentStateChan chan runtime.ComponentComponentState
 
 	// Top-level errors reported by managers / actions. These will be folded
@@ -247,28 +243,33 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		fleetState = agentclient.Stopped
 		fleetMessage = "Not enrolled into Fleet"
 	}
+	state := State{
+		State:        agentclient.Starting,
+		Message:      "Starting",
+		FleetState:   fleetState,
+		FleetMessage: fleetMessage,
+		LogLevel:     logLevel,
+	}
 	return &Coordinator{
-		logger:     logger,
-		cfg:        cfg,
-		agentInfo:  agentInfo,
-		isManaged:  isManaged,
-		specs:      specs,
-		logLevelCh: make(chan logp.Level),
-		reexecMgr:  reexecMgr,
-		upgradeMgr: upgradeMgr,
-		monitorMgr: monitorMgr,
-		runtimeMgr: runtimeMgr,
-		configMgr:  configMgr,
-		varsMgr:    varsMgr,
-		caps:       caps,
-		modifiers:  modifiers,
-		state: State{
-			State:        agentclient.Starting,
-			Message:      "Starting",
-			FleetState:   fleetState,
-			FleetMessage: fleetMessage,
-			LogLevel:     logLevel,
-		},
+		logger:           logger,
+		cfg:              cfg,
+		agentInfo:        agentInfo,
+		isManaged:        isManaged,
+		specs:            specs,
+		reexecMgr:        reexecMgr,
+		upgradeMgr:       upgradeMgr,
+		monitorMgr:       monitorMgr,
+		runtimeMgr:       runtimeMgr,
+		configMgr:        configMgr,
+		varsMgr:          varsMgr,
+		caps:             caps,
+		modifiers:        modifiers,
+		state:            state,
+		stateBroadcaster: broadcaster.New(state, 64),
+
+		logLevelCh:         make(chan logp.Level),
+		overrideStateChan:  make(chan *coordinatorOverrideState),
+		componentStateChan: make(chan runtime.ComponentComponentState),
 	}
 }
 
@@ -458,7 +459,13 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 			if s.State.State == client.UnitStateStopped {
 				delete(state, s.Component.ID)
 			}
-			c.componentStateChan <- s
+			// Forward the final changes back to Coordinator, unless our context
+			// has ended.
+			select {
+			case c.componentStateChan <- s:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}
 }
@@ -478,7 +485,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	for {
 		c.setState(agentclient.Starting, "Waiting for initial configuration and composable variables")
 		// The usual state refresh happens in the main run loop in Coordinator.runner,
-		// so state change broadcasts when there is no runner have to be triggered
+		// so before/after the runner call we need to trigger state change broadcasts
 		// manually.
 		c.refreshState()
 		err := c.runner(ctx)
@@ -753,6 +760,10 @@ func (c *Coordinator) runner(ctx context.Context) error {
 			c.setConfigManagerActionsError(actionsErr)
 		case varsErr := <-c.varsMgr.Errors():
 			c.setVarsManagerError(varsErr)
+		case overrideState := <-c.overrideStateChan:
+			c.setOverrideState(overrideState)
+		case componentState := <-c.componentStateChan:
+			c.applyComponentState(componentState)
 		case change := <-configWatcher.Watch():
 			if ctx.Err() == nil {
 				if err := c.processConfig(ctx, change.Config()); err != nil {
