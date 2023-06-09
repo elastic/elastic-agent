@@ -8,7 +8,7 @@ package integration
 
 import (
 	"context"
-	"net/http/httptest"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -20,12 +20,24 @@ import (
 
 type ProxyURL struct {
 	suite.Suite
-	f *integrationtest.Fixture
+	fixture *integrationtest.Fixture
 
-	fleet httptest.Server
+	fleet *fleetservertest.Server
+	stack *define.Info
 }
 
-func (s *ProxyURL) SetupSuite() {
+func TestProxyURL(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+	})
+
+	suite.Run(t, &ProxyURL{stack: info})
+}
+
+func (p *ProxyURL) SetupSuite() {
+	// agentVersion := "8.9.0-SNAPSHOT"
 	agentID := "proxy-url-agent-id"
 	policyID := "bedf2f42-a252-40bb-ab2b-8a7e1b874c7a"
 	enrollmentToken := "enrollmentToken"
@@ -43,24 +55,37 @@ func (s *ProxyURL) SetupSuite() {
 		},
 		agentID, policyID, ackToken)
 	defer fleet.Close()
+	p.fleet = fleet
 
-	f, err := define.NewFixture(s.T(),
+	f, err := define.NewFixture(p.T(),
 		integrationtest.WithAllowErrors(),
 		integrationtest.WithLogOutput())
-	s.Require().NoError(err)
+	p.Require().NoError(err, "SetupSuite: NewFixture failed")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err = f.Prepare(ctx, fakeComponent)
-	s.Require().NoError(err)
-	s.f = f
+	err = f.Prepare(ctx)
+	p.Require().NoError(err, "SetupSuite: fixture.Prepare failed")
+
+	p.fixture = f
 }
 
-func TestProxyURL(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Local: false,
-		Sudo:  true,
-	})
-	suite.Run(t, &ProxyURL{})
+func (p *ProxyURL) Test1() {
+	out, err := p.fixture.Install(
+		context.Background(),
+		&integrationtest.InstallOpts{
+			Force:          true,
+			NonInteractive: true,
+			EnrollOpts: integrationtest.EnrollOpts{
+				URL:             p.fleet.URL,
+				EnrollmentToken: p.fleet.EnrollmentToken,
+			}})
+
+	fmt.Println("========================================== Agent output ==========================================")
+	fmt.Println(out)
+	if err != nil {
+		fmt.Println("========================================== Agent ERROR ==========================================")
+		fmt.Printf("%v\n", err)
+	}
 }

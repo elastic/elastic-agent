@@ -72,14 +72,32 @@ type API struct {
 		uploadCompleteRequest UploadCompleteRequest) *HTTPError
 }
 
+type Server struct {
+	*httptest.Server
+
+	// APIKey is the API key to authenticate with Fleet Server.
+	APIKey string
+	// APIKeyID is the API ID key to authenticate with Fleet Server.
+	APIKeyID string
+
+	// EnrollmentToken is the enrollment the agent should use to enroll with
+	// Fleet Server.
+	EnrollmentToken string
+}
+
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
 // If a route is called and its handler (the *Fn field) is nil a.
 // http.StatusNotImplemented error will be returned.
 // If insecure is set, no authorization check will be performed.
-func NewServer(api API) *httptest.Server {
+func NewServer(api API) *Server {
 	mux := NewRouter(Handlers{api: api})
 
-	return httptest.NewServer(mux)
+	return &Server{
+		Server:          httptest.NewServer(mux),
+		APIKey:          api.APIKey,
+		APIKeyID:        api.APIKeyID,
+		EnrollmentToken: api.EnrollmentToken,
+	}
 }
 
 // NewServerWithFakeComponent returns mock Fleet Server ready to use for Agent's
@@ -89,7 +107,7 @@ func NewServer(api API) *httptest.Server {
 // the fake input and if useShipper is true, it'll use the shipper.
 // TODO: it needs to receive output configuration throug a WithEs/WithShipper
 // function //
-func NewServerWithFakeComponent(api API, agentID, policyID, ackToken string) *httptest.Server {
+func NewServerWithFakeComponent(api API, agentID, policyID, ackToken string) *Server {
 	if api.StatusFn == nil {
 		api.StatusFn = NewStatusHandlerHealth()
 	}
@@ -107,7 +125,12 @@ func NewServerWithFakeComponent(api API, agentID, policyID, ackToken string) *ht
 	}
 
 	mux := NewRouter(Handlers{api: api})
-	return httptest.NewServer(mux)
+	return &Server{
+		Server:          httptest.NewServer(mux),
+		APIKey:          api.APIKey,
+		APIKeyID:        api.APIKeyID,
+		EnrollmentToken: api.EnrollmentToken,
+	}
 }
 
 // TODO: Make a NewFullyFunctional fleet-server:
