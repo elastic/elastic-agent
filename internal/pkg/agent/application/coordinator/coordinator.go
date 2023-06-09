@@ -17,7 +17,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -33,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
 // ErrNotUpgradable error is returned when upgrade cannot be performed.
@@ -164,8 +164,10 @@ type Coordinator struct {
 	cfg   *configuration.Configuration
 	specs component.RuntimeSpecs
 
+	logLevel logp.Level
+	// loglevelCh forwards log level changes from the public API (SetLogLevel)
+	// to the run loop in Coordinator's main goroutine.
 	logLevelCh chan logp.Level
-	logLevel   logp.Level
 
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
@@ -178,7 +180,50 @@ type Coordinator struct {
 	caps      capabilities.Capability
 	modifiers []ComponentsModifier
 
-	state  *state.CoordinatorState
+	// The current state of the Coordinator. This value and its subfields are
+	// safe to read directly from within the main Coordinator goroutine.
+	// Changes are also safe but must set the stateNeedsRefresh flag to ensure
+	// an update is broadcast at the end of the current iteration (so it is
+	// recommended to make changes via helper funtions like setCoordinatorState,
+	// setFleetState, etc). Changes that need to broadcast immediately without
+	// waiting for the end of the iteration can call stateRefresh() directly,
+	// but this should be rare.
+	//
+	// state should never be directly read or written from outside the
+	// main Coordinator goroutine. Callers who need to access or modify the
+	// state should do so via the public accessors like State(),
+	// SetOverrideState(), etc.
+	state State
+	// TODO: initialize stateBroadcaster
+	stateBroadcaster  *broadcaster.Broadcaster[State]
+	stateNeedsRefresh bool
+
+	// overrideState is used during the update process to report the overall
+	// upgrade progress instead of the Coordinator's baseline internal state.
+	overrideState *coordinatorOverrideState
+
+	// overrideStateChan forwards override states from the publicly accessible
+	// SetOverrideState helper to the Coordinator goroutine.
+	// TODO: intialize overrideStateChan and read it from the main loop.
+	overrideStateChan chan *coordinatorOverrideState
+
+	// componentStateChan is used by watchRuntimeComponents, an internal helper
+	// goroutine that handles processing and logging of component updates to
+	// avoid congesting the Coordinator. When an update is ready,
+	// watchRuntimeComponents sends it on this channel so the main Coordinator
+	// goroutine can apply it.
+	// TODO: initialize componentStateChan and read it from the run loop
+	componentStateChan chan runtime.ComponentComponentState
+
+	// Top-level errors reported by managers / actions. These will be folded
+	// into the reported state before broadcasting -- State() will report
+	// agentclient.Failed if one of these is set, even if the underlying
+	// coordinator state is agentclient.Healthy.
+	runtimeMgrErr error
+	configMgrErr  error
+	actionsErr    error
+	varsMgrErr    error
+
 	config *config.Config
 	ast    *transpiler.AST
 	vars   []*transpiler.Vars
@@ -217,14 +262,20 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		varsMgr:    varsMgr,
 		caps:       caps,
 		modifiers:  modifiers,
-		state:      state.NewCoordinatorState(agentclient.Starting, "Starting", fleetState, fleetMessage, logLevel),
+		state: State{
+			State:        agentclient.Starting,
+			Message:      "Starting",
+			FleetState:   fleetState,
+			FleetMessage: fleetMessage,
+			LogLevel:     logLevel,
+		},
 	}
 }
 
 // State returns the current state for the coordinator.
 // Called by external goroutines.
-func (c *Coordinator) State() state.State {
-	return c.state.State()
+func (c *Coordinator) State() State {
+	return c.stateBroadcaster.Get()
 }
 
 // StateSubscribe subscribes to changes in the coordinator state.
@@ -234,8 +285,8 @@ func (c *Coordinator) State() state.State {
 // results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Coordinator to block.
-func (c *Coordinator) StateSubscribe(ctx context.Context) *state.StateSubscription {
-	return c.state.Subscribe(ctx)
+func (c *Coordinator) StateSubscribe(ctx context.Context, bufferLen int) chan State {
+	return c.stateBroadcaster.Subscribe(ctx, bufferLen)
 }
 
 // Disabled for 8.8.0 release in order to limit the surface
@@ -260,7 +311,7 @@ func (c *Coordinator) StateSubscribe(ctx context.Context) *state.StateSubscripti
 // Called from external goroutines.
 func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string) {
 	// override the overall state to stopping until the re-execution is complete
-	c.state.SetOverrideState(agentclient.Stopping, "Re-executing")
+	c.SetOverrideState(agentclient.Stopping, "Re-executing")
 	c.reexecMgr.ReExec(callback, argOverrides...)
 }
 
@@ -286,7 +337,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	// run the callback to clear the state
 	var err error
 	for i := 0; i < 5; i++ {
-		s := c.state.State()
+		s := c.State()
 		if s.State != agentclient.Upgrading {
 			err = nil
 			break
@@ -299,10 +350,10 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	}
 
 	// override the overall state to upgrading until the re-execution is complete
-	c.state.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
+	c.SetOverrideState(agentclient.Upgrading, fmt.Sprintf("Upgrading to version %s", version))
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, skipVerifyOverride, pgpBytes...)
 	if err != nil {
-		c.state.ClearOverrideState()
+		c.ClearOverrideState()
 		return err
 	}
 	if cb != nil {
@@ -407,7 +458,7 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 			if s.State.State == client.UnitStateStopped {
 				delete(state, s.Component.ID)
 			}
-			c.state.UpdateComponentState(s)
+			c.componentStateChan <- s
 		}
 	}
 }
@@ -421,23 +472,33 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// log all changes in the state of the runtime and update the coordinator state
 	watchCtx, watchCanceller := context.WithCancel(ctx)
 	defer watchCanceller()
+
 	go c.watchRuntimeComponents(watchCtx)
 
 	for {
-		c.state.UpdateState(state.WithState(agentclient.Starting, "Waiting for initial configuration and composable variables"))
+		c.setState(agentclient.Starting, "Waiting for initial configuration and composable variables")
+		// The usual state refresh happens in the main run loop in Coordinator.runner,
+		// so state change broadcasts when there is no runner have to be triggered
+		// manually.
+		c.refreshState()
 		err := c.runner(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				c.state.UpdateState(state.WithState(agentclient.Stopped, "Requested to be stopped"), state.WithFleetState(agentclient.Stopped, "Requested to be stopped"))
+				c.setState(agentclient.Stopped, "Requested to be stopped")
+				c.setFleetState(agentclient.Stopped, "Requested to be stopped")
+				c.refreshState()
 				// do not restart
 				return err
 			}
 			if errors.Is(err, ErrFatalCoordinator) {
-				c.state.UpdateState(state.WithState(agentclient.Failed, "Fatal coordinator error"), state.WithFleetState(agentclient.Stopped, "Fatal coordinator error"))
+				c.setState(agentclient.Failed, "Fatal coordinator error")
+				c.setFleetState(agentclient.Stopped, "Fatal coordinator error")
+				c.refreshState()
 				return err
 			}
 		}
-		c.state.UpdateState(state.WithState(agentclient.Failed, fmt.Sprintf("Coordinator failed and will be restarted: %s", err)))
+		c.setState(agentclient.Failed, fmt.Sprintf("Coordinator failed and will be restarted: %s", err))
+		c.refreshState()
 		c.logger.Errorf("coordinator failed and will be restarted: %s", err)
 	}
 }
@@ -676,47 +737,48 @@ func (c *Coordinator) runner(ctx context.Context) error {
 				cancel()
 			}
 		case runtimeErr := <-c.runtimeMgr.Errors():
-			c.state.SetRuntimeManagerError(runtimeErr)
+			c.setRuntimeManagerError(runtimeErr)
 		case configErr := <-c.configMgr.Errors():
 			if c.isManaged {
 				if configErr == nil {
-					c.state.UpdateState(state.WithFleetState(agentclient.Healthy, "Connected"))
+					c.setFleetState(agentclient.Healthy, "Connected")
 				} else {
-					c.state.UpdateState(state.WithFleetState(agentclient.Failed, configErr.Error()))
+					c.setFleetState(agentclient.Failed, configErr.Error())
 				}
 			} else {
 				// not managed gets sets as an overall error for the agent
-				c.state.SetConfigManagerError(configErr)
+				c.setConfigManagerError(configErr)
 			}
 		case actionsErr := <-c.configMgr.ActionErrors():
-			c.state.SetConfigManagerActionsError(actionsErr)
+			c.setConfigManagerActionsError(actionsErr)
 		case varsErr := <-c.varsMgr.Errors():
-			c.state.SetVarsManagerError(varsErr)
+			c.setVarsManagerError(varsErr)
 		case change := <-configWatcher.Watch():
 			if ctx.Err() == nil {
 				if err := c.processConfig(ctx, change.Config()); err != nil {
-					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
+					c.setState(agentclient.Failed, err.Error())
 					c.logger.Errorf("%s", err)
 					change.Fail(err)
 				} else {
 					if err := change.Ack(); err != nil {
 						err = fmt.Errorf("failed to ack configuration change: %w", err)
-						c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
+						c.setState(agentclient.Failed, err.Error())
 						c.logger.Errorf("%s", err)
 					}
 				}
 			}
+
 		case vars := <-varsWatcher.Watch():
 			if ctx.Err() == nil {
 				if err := c.processVars(ctx, vars); err != nil {
-					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
+					c.setState(agentclient.Failed, err.Error())
 					c.logger.Errorf("%s", err)
 				}
 			}
 		case ll := <-c.logLevelCh:
 			if ctx.Err() == nil {
 				if err := c.processLogLevel(ctx, ll); err != nil {
-					c.state.UpdateState(state.WithState(agentclient.Failed, err.Error()))
+					c.setState(agentclient.Failed, err.Error())
 					c.logger.Errorf("%s", err)
 				}
 			}
@@ -819,7 +881,7 @@ func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) (err e
 	}()
 
 	c.logLevel = ll
-	c.state.UpdateState(state.WithLogLevel(ll))
+	c.setLogLevel(ll)
 
 	if c.ast != nil && c.vars != nil {
 		return c.process(ctx)
@@ -846,7 +908,7 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	c.state.UpdateState(state.WithState(agentclient.Healthy, "Running"))
+	c.setState(agentclient.Healthy, "Running")
 	return nil
 }
 

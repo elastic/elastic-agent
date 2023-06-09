@@ -259,13 +259,13 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
-		sub := coord.StateSubscribe(ctx)
+		subChan := coord.StateSubscribe(ctx, 32)
 		for {
 			select {
 			case <-ctx.Done():
 				subCh <- ctx.Err()
 				return
-			case state := <-sub.Ch():
+			case state := <-subChan:
 				t.Logf("%+v", state)
 				if len(state.Components) == 2 {
 					compState := getComponentState(state.Components, "fake-default")
