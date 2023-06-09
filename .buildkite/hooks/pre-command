@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -euo pipefail
+
+
+DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
+    export DOCKER_USERNAME_SECRET=$(vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
+    export DOCKER_PASSWORD_SECRET=$(vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
+    docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+    unset DOCKER_USERNAME_SECRET DOCKER_PASSWORD_SECRET
+  fi
+fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
+  # Set GCP credentials
+  export GOOGLE_APPLICATION_GCP_SECRET=$(vault kv get -format=json -field=data kv/ci-shared/observability-ingest/cloud/gcp)
+  echo "${GOOGLE_APPLICATION_GCP_SECRET}" > ./gcp.json
+  export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
+  export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)
+
+  # ESS credentials
+  export API_KEY_TOKEN=$(vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa)
+  echo ${API_KEY_TOKEN} > ./apiKey
+  export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
+ fi 
