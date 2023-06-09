@@ -25,7 +25,7 @@ DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=
 
 # Run integration tests
 set +e
-SNAPSHOT=true mage integration:single TestFleetManagedUpgrade
+SNAPSHOT=true mage integration:test
 TESTS_EXIT_STATUS=$?
 set -e
 
