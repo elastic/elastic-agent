@@ -27,6 +27,23 @@ type coordinatorOverrideState struct {
 	message string
 }
 
+// SetOverrideState sets the override state, so the Coordinator will report the
+// given values instead of its usual internal state. This is used during upgrades.
+// Coordinator will forward the overridden state to any state subscribers.
+// Callers should follow up with ClearOverrideState as soon as it is safe to do so.
+func (c *Coordinator) SetOverrideState(state agentclient.State, message string) {
+	c.overrideStateChan <- &coordinatorOverrideState{
+		state:   state,
+		message: message,
+	}
+}
+
+// ClearOverrideState clears the override state, reverting to reporting Coordinator's
+// real internal state based on the health of its managers.
+func (c *Coordinator) ClearOverrideState() {
+	c.overrideStateChan <- nil
+}
+
 // setRuntimeManagerError updates the error state for the runtime manager.
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) setRuntimeManagerError(err error) {
@@ -55,29 +72,12 @@ func (c *Coordinator) setVarsManagerError(err error) {
 	c.stateNeedsRefresh = true
 }
 
-// SetOverrideState sets the override state, so the Coordinator will report the
-// given values instead of its usual internal state. This is used during upgrades.
-// Coordinator will forward the overridden state to any state subscribers.
-// Callers should follow up with ClearOverrideState as soon as it is safe to do so.
-func (c *Coordinator) SetOverrideState(state agentclient.State, message string) {
-	c.overrideStateChan <- &coordinatorOverrideState{
-		state:   state,
-		message: message,
-	}
-}
-
 // setOverrideState is the internal helper to set the override state and
 // set stateNeedsRefresh.
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) setOverrideState(overrideState *coordinatorOverrideState) {
 	c.overrideState = overrideState
 	c.stateNeedsRefresh = true
-}
-
-// ClearOverrideState clears the override state, reverting to reporting Coordinator's
-// real internal state based on the health of its managers.
-func (c *Coordinator) ClearOverrideState() {
-	c.overrideStateChan <- nil
 }
 
 // Forward the current state to the broadcaster and clear the stateNeedsRefresh
