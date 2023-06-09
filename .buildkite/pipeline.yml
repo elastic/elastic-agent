@@ -2,6 +2,7 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+  DOCKER_REGISTRY: "docker.elastic.co"
 steps:
   - label: "Integration tests"
     key: "integration-tests"
