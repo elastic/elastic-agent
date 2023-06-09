@@ -159,7 +159,11 @@ func (s *FQDN) TestFQDN() {
 			"enabled": false,
 		},
 	}
-	updatePolicyReq = kibana.AgentPolicyUpdateRequest{AgentFeatures: policy.AgentFeatures}
+	updatePolicyReq = kibana.AgentPolicyUpdateRequest{
+		Name:          policy.Name,
+		Namespace:     policyNamespace,
+		AgentFeatures: policy.AgentFeatures,
+	}
 	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
 	require.NoError(s.T(), err)
 
