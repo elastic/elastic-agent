@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -89,9 +90,18 @@ func DetermineBatches(dir string, buildTags ...string) ([]Batch, error) {
 	testCmd := exec.Command("go", cmdArgs...)
 	output, err := testCmd.Output()
 	if err != nil {
-		// format cmdArgs to make the error message more coherentß
+		// format cmdArgs to make the error message more coherent
 		cmdArgs = append([]string{"go"}, cmdArgs...)
-		return nil, fmt.Errorf("error running go test: (%w), got: %s, tried to run: %v", err, string(output), cmdArgs)
+
+		var errExit *exec.ExitError
+		if errors.As(err, &errExit) {
+			b := bytes.NewBuffer(errExit.Stderr)
+			b.Write(output)
+			output = b.Bytes()
+		}
+		return nil, fmt.Errorf(
+			"error running go test: (%w), got:\n\n%s\ntried to run: %v",
+			err, string(output), cmdArgs)
 	}
 
 	// parses each test and determine the batches that each test belongs in

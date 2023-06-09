@@ -1416,7 +1416,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	batches, err := define.DetermineBatches("testing/integration", "integration")
 	if err != nil {
-		return fmt.Errorf("failed to detemine batches: %w", err)
+		return fmt.Errorf("failed to determine batches: %w", err)
 	}
 	r, err := createTestRunner(matrix, singleTest, batches...)
 	if err != nil {
