@@ -24,7 +24,7 @@ make mage
 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
 
 # Run integration tests
-mage integration:test
+SNAPSHOT=true mage integration:test
 TESTS_EXIT_STATUS=$?
 
 # HTML report
