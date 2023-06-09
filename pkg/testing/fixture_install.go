@@ -66,7 +66,9 @@ func (i InstallOpts) toCmdArgs() []string {
 	return args
 }
 
-// Install installs the prepared Elastic Agent binary
+// Install installs the prepared Elastic Agent binary and returns:
+//   - the combined output of stdout and stderr
+//   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
 	installArgs := []string{"install"}
 	if installOpts != nil {
@@ -74,7 +76,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	}
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	f.installed = true
@@ -86,7 +88,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 		f.workDir = filepath.Join(installOpts.BasePath, "Elastic", "Agent")
 	}
 
-	//we just installed agent, the control socket is at a well-known location
+	// we just installed agent, the control socket is at a well-known location
 	c := client.New(client.WithAddress(paths.ControlSocketPath))
 	f.setClient(c)
 
