@@ -12,7 +12,6 @@ import (
 
 // Spec a components specification.
 type Spec struct {
-	Name     string        `yaml:"name,omitempty"`
 	Version  int           `config:"version" yaml:"version" validate:"required"`
 	Inputs   []InputSpec   `config:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Shippers []ShipperSpec `config:"shippers,omitempty" yaml:"shippers,omitempty"`

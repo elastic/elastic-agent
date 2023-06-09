@@ -290,8 +290,10 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]interface{}{
 		"outputs": map[string]interface{}{
 			"default": map[string]interface{}{
-				"type":         "fake-action-output",
-				"fake-shipper": map[string]interface{}{},
+				"type": "fake-action-output",
+				"shipper": map[string]interface{}{
+					"enabled": true,
+				},
 			},
 		},
 		"inputs": []interface{}{
