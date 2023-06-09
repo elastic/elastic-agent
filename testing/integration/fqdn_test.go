@@ -85,7 +85,7 @@ func (s *FQDN) TestFQDN() {
 	ctx := context.Background()
 	kibClient := s.requirementsInfo.KibanaClient
 
-	// Set FQDN on host
+	s.T().Log("Set FQDN on host")
 	shortName := randStr(6)
 	fqdn := shortName + ".baz.io"
 	err := setHostFQDN(ctx, s.externalIP, fqdn)
@@ -97,7 +97,7 @@ func (s *FQDN) TestFQDN() {
 	policyNamespace = regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(policyNamespace, "")
 	s.T().Logf("Using policy namespace: %s", policyNamespace)
 
-	// Enroll agent in Fleet with a test policy
+	s.T().Log("Enroll agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-fqdn-" + strings.ReplaceAll(fqdn, ".", "-"),
 		Namespace:   policyNamespace,
@@ -110,16 +110,16 @@ func (s *FQDN) TestFQDN() {
 	policy, err := tools.InstallAgentWithPolicy(s.T(), s.agentFixture, kibClient, createPolicyReq)
 	require.NoError(s.T(), err)
 
-	// Verify that agent name is short hostname
+	s.T().Log("Verify that agent name is short hostname")
 	agent, err := tools.GetAgentByHostnameFromList(kibClient, shortName)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), agent)
 
-	// Verify that hostname in `logs-*` and `metrics-*` is short hostname
+	s.T().Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname")
 	s.verifyHostNameInIndices("logs-*", shortName)
 	s.verifyHostNameInIndices("metrics-*", shortName)
 
-	// Update Agent policy to enable FQDN
+	s.T().Log("Update Agent policy to enable FQDN")
 	policy.AgentFeatures = []map[string]interface{}{
 		{
 			"name":    "fqdn",
@@ -130,7 +130,7 @@ func (s *FQDN) TestFQDN() {
 	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
 	require.NoError(s.T(), err)
 
-	// Wait until policy has been applied by Agent
+	s.T().Log("Wait until policy has been applied by Agent")
 	expectedAgentPolicyRevision := agent.PolicyRevision + 1
 	require.Eventually(
 		s.T(),
@@ -139,16 +139,16 @@ func (s *FQDN) TestFQDN() {
 		1*time.Second,
 	)
 
-	// Verify that agent name is FQDN
+	s.T().Log("Verify that agent name is FQDN")
 	agent, err = tools.GetAgentByHostnameFromList(kibClient, fqdn)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), agent)
 
-	// Verify that hostname in `logs-*` and `metrics-*` is FQDN
+	s.T().Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
 	s.verifyHostNameInIndices("logs-*", fqdn)
 	s.verifyHostNameInIndices("metrics-*", fqdn)
 
-	// Update Agent policy to disable FQDN
+	s.T().Log("Update Agent policy to disable FQDN")
 	policy.AgentFeatures = []map[string]interface{}{
 		{
 			"name":    "fqdn",
@@ -159,7 +159,7 @@ func (s *FQDN) TestFQDN() {
 	_, err = kibClient.UpdatePolicy(policy.ID, updatePolicyReq)
 	require.NoError(s.T(), err)
 
-	// Wait until policy has been applied by Agent
+	s.T().Log(" Wait until policy has been applied by Agent")
 	expectedAgentPolicyRevision++
 	require.Eventually(
 		s.T(),
@@ -168,12 +168,12 @@ func (s *FQDN) TestFQDN() {
 		1*time.Second,
 	)
 
-	// Verify that agent name is short hostname again
+	s.T().Log("Verify that agent name is short hostname again")
 	agent, err = tools.GetAgentByHostnameFromList(kibClient, shortName)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), agent)
 
-	// Verify that hostname in `logs-*` and `metrics-*` is short hostname again
+	s.T().Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname again")
 	s.verifyHostNameInIndices("logs-*", shortName)
 	s.verifyHostNameInIndices("metrics-*", shortName)
 }
