@@ -935,15 +935,16 @@ specs:
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
 
-  elastic_agent_binary:
+  elastic_agent_core:
     ###
-    # Elastic Licensed Binary Packages
+    # Elastic Licensed Core Packages
     ###
     - os: windows
       types: [zip]
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -953,6 +954,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -962,6 +964,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -971,6 +974,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}

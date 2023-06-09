@@ -20,10 +20,10 @@ const packageSpecFile = "dev-tools/packaging/packages.yml"
 // executed.
 var Packages []OSPackageArgs
 
-// UseElasticAgentBinaryPackaging configures the package target to build binary packages
+// UseElasticAgentCorePackaging configures the package target to build binary packages
 // for an Elastic Agent.
-func UseElasticAgentBinaryPackaging() {
-	MustUsePackaging("elastic_agent_binary", packageSpecFile)
+func UseElasticAgentCorePackaging() {
+	MustUsePackaging("elastic_agent_core", packageSpecFile)
 }
 
 // UseCommunityBeatPackaging configures the package target to build packages for
