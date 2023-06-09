@@ -1,5 +1,19 @@
 # Developer Guide for the Integration and E2E Testing Framework
 
+## Prerequisites
+
+### Dependencies
+
+Go version >= Go 1.19
+
+GCloud CLI
+
+### Configuration
+
+ESS (QA) API Key to create on https://console.qa.cld.elstc.co/deployment-features/keys
+
+Warning: if you never created a deployment on it, you won't have permission to get this key so you will need to create one first.
+
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
