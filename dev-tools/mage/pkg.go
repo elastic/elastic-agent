@@ -236,7 +236,7 @@ func TestPackages(options ...TestPackagesOption) error {
 	args = append(args, "-files", MustExpand("{{.PWD}}/build/distributions/*"))
 
 	if out, err := goTest(args...); err != nil {
-		if !mg.Verbose() {
+		if mg.Verbose() {
 			fmt.Println(out)
 		}
 		return err
