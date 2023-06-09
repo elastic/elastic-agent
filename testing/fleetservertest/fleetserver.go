@@ -22,6 +22,8 @@ import (
 type API struct {
 	// APIKey is the API key to authenticate with Fleet Server.
 	APIKey string
+	// APIKeyID is the API ID key to authenticate with Fleet Server.
+	APIKeyID string
 
 	// EnrollmentToken is the enrollment the agent should use to enroll with
 	// Fleet Server.
@@ -86,9 +88,26 @@ func NewServer(api API) *httptest.Server {
 // default implementation. The returned policy contains one integration using
 // the fake input and if useShipper is true, it'll use the shipper.
 // TODO: it needs to receive output configuration throug a WithEs/WithShipper
-// function
-func NewServerWithFakeComponent(api API) *httptest.Server {
-	panic("implement me!")
+// function //
+func NewServerWithFakeComponent(api API, agentID, policyID, ackToken string) *httptest.Server {
+	if api.StatusFn == nil {
+		api.StatusFn = NewStatusHandlerHealth()
+	}
+	if api.CheckinFn == nil {
+		api.CheckinFn = NewCheckinHandler(agentID, ackToken, false)
+	}
+	if api.EnrollFn == nil {
+		api.EnrollFn = NewEnrollHandler(agentID, policyID, APIKey{
+			ID:  api.APIKey,
+			Key: api.APIKeyID,
+		})
+	}
+	if api.AckFn == nil {
+		api.AckFn = NewAckHander(agentID)
+	}
+
+	mux := NewRouter(Handlers{api: api})
+	return httptest.NewServer(mux)
 }
 
 // TODO: Make a NewFullyFunctional fleet-server:
