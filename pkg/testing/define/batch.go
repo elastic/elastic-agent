@@ -100,7 +100,7 @@ func DetermineBatches(dir string, buildTags ...string) ([]Batch, error) {
 			output = b.Bytes()
 		}
 		return nil, fmt.Errorf(
-			"error running go test: (%w), got:\n%s\ntried to run: %v",
+			"error running go test: (%w), got:\n\n%s\ntried to run: %v",
 			err, string(output), cmdArgs)
 	}
 
