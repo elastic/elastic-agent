@@ -4,7 +4,7 @@
 
 ### Dependencies
 
-Go version >= Go 1.19
+Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository
 
 [GCloud CLI](https://cloud.google.com/sdk/gcloud)
 
