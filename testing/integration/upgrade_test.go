@@ -74,7 +74,7 @@ func (s *UpgradeElasticAgent) TestUpgradeFleetManagedElasticAgent() {
 	kibClient := s.requirementsInfo.KibanaClient
 	policyUUID := uuid.New().String()
 
-	createPolicyReq := kibana.CreatePolicyRequest{
+	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
 		Description: "Test policy " + policyUUID,
