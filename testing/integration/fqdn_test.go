@@ -86,7 +86,7 @@ func (s *FQDN) TestFQDN() {
 	kibClient := s.requirementsInfo.KibanaClient
 
 	s.T().Log("Set FQDN on host")
-	shortName := randStr(6)
+	shortName := strings.ToLower(randStr(6))
 	fqdn := shortName + ".baz.io"
 	err := setHostFQDN(ctx, s.externalIP, fqdn)
 	require.NoError(s.T(), err)
