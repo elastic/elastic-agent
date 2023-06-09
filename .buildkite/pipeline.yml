@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+env:
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+  DOCKER_REGISTRY: "docker.elastic.co"
+steps:
+  - label: "Integration tests"
+    key: "integration-tests"
+    command: ".buildkite/scripts/integration_tests.sh"
+    branches: "main"
+    artifact_paths:
+      - "build/TEST-**"
+    agents:
+      provider: "gcp"
