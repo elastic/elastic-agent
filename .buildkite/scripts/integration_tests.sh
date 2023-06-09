@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euxo pipefail
 
 # Install Go TODO: mode to makefile
 if ! command -v go &>/dev/null; then  
@@ -24,8 +24,10 @@ make mage
 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
 
 # Run integration tests
+set +e
 SNAPSHOT=true mage integration:single TestFleetManagedUpgrade
 TESTS_EXIT_STATUS=$?
+set -e
 
 # HTML report
 go install github.com/alexec/junit2html@latest
