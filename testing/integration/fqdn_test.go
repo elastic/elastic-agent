@@ -184,6 +184,7 @@ func (s *FQDN) verifyHostNameInIndices(indices, hostname string) {
 		search.WithIndex(indices),
 		search.WithSort("@timestamp:desc"),
 		search.WithFilterPath("hits.hits"),
+		search.WithSize(1),
 	)
 	require.NoError(s.T(), err)
 	require.False(s.T(), resp.IsError())
@@ -204,9 +205,9 @@ func (s *FQDN) verifyHostNameInIndices(indices, hostname string) {
 	err = decoder.Decode(&body)
 	require.NoError(s.T(), err)
 
-	for _, hit := range body.Hits.Hits {
-		assert.Equal(s.T(), hostname, hit.Source.Host.Name)
-	}
+	require.Len(s.T(), body.Hits.Hits, 1)
+	hit := body.Hits.Hits[0]
+	assert.Equal(s.T(), hostname, hit.Source.Host.Name)
 }
 
 func getHostFQDN(ctx context.Context) (string, error) {
