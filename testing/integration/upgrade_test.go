@@ -115,7 +115,7 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 	require.NoError(s.T(), err)
 
 	s.T().Log("Enrolling Elastic Agent...")
-	output, err := tools.EnrollElasticAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
+	output, err := tools.InstallElasticAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
 	if err != nil {
 		s.T().Log(string(output))
 	}
