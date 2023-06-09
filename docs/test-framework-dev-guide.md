@@ -6,7 +6,7 @@
 
 Go version >= Go 1.19
 
-GCloud CLI
+[GCloud CLI](https://cloud.google.com/sdk/gcloud)
 
 ### Configuration
 
