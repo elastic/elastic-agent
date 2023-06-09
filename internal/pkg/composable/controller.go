@@ -74,6 +74,8 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}
 		contextProviders[name] = &contextProviderState{
+			// Safe for Context to be nil here because it will be filled in
+			// by (*controller).Run before the provider is started.
 			provider: provider,
 		}
 	}
@@ -110,7 +112,7 @@ func (c *controller) Run(ctx context.Context) error {
 	c.logger.Debugf("Starting controller for composable inputs")
 	defer c.logger.Debugf("Stopped controller for composable inputs")
 
-	notify := make(chan bool, 1) // sized so we can store 1 notification or proceed
+	stateChangedChan := make(chan bool, 1) // sized so we can store 1 notification or proceed
 	localCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -122,7 +124,7 @@ func (c *controller) Run(ctx context.Context) error {
 	// run all the enabled context providers
 	for name, state := range c.contextProviders {
 		state.Context = localCtx
-		state.signal = notify
+		state.signal = stateChangedChan
 		go func(name string, state *contextProviderState) {
 			defer wg.Done()
 			err := state.provider.Run(state)
@@ -139,7 +141,7 @@ func (c *controller) Run(ctx context.Context) error {
 	// run all the enabled dynamic providers
 	for name, state := range c.dynamicProviders {
 		state.Context = localCtx
-		state.signal = notify
+		state.signal = stateChangedChan
 		go func(name string, state *dynamicProviderState) {
 			defer wg.Done()
 			err := state.provider.Run(state)
@@ -167,7 +169,7 @@ func (c *controller) Run(ctx context.Context) error {
 				select {
 				case <-emptyChan.Done():
 					return
-				case <-notify:
+				case <-stateChangedChan:
 				}
 			}
 		}()
@@ -184,10 +186,14 @@ func (c *controller) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				cleanupFn()
 				return ctx.Err()
-			case <-notify:
+			case <-stateChangedChan:
+				// Reset the timer safely, see https://pkg.go.dev/time#Timer.Reset
+				if !t.Stop() {
+					<-t.C
+				}
 				t.Reset(100 * time.Millisecond)
 				c.logger.Debugf("Variable state changed for composable inputs; debounce started")
-				drainChan(notify)
+				drainChan(stateChangedChan)
 				break DEBOUNCE
 			}
 		}
@@ -198,7 +204,7 @@ func (c *controller) Run(ctx context.Context) error {
 			cleanupFn()
 			return ctx.Err()
 		case <-t.C:
-			drainChan(notify)
+			drainChan(stateChangedChan)
 			// batching done, gather results
 		}
 
@@ -314,6 +320,10 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 	}
 	c.mapping = mapping
 
+	// Notify the controller Run loop that a state has changed. The notification
+	// channel has buffer size 1 so this ensures that an update will always
+	// happen after this change, while coalescing multiple simultaneous changes
+	// into a single controller update.
 	select {
 	case c.signal <- true:
 	default:

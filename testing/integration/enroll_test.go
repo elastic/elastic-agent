@@ -63,7 +63,7 @@ func (runner *EnrollRunner) TestEnroll() {
 			},
 		},
 	}
-	policy, err := tools.EnrollAgentWithPolicy(runner.T(), true, runner.agentFixture, kibClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(runner.T(), runner.agentFixture, kibClient, createPolicyReq)
 	require.NoError(runner.T(), err)
 	runner.T().Logf("got policy: %#v", policy)
 }

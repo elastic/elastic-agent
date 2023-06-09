@@ -10,9 +10,11 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
-func EnrollElasticAgent(fleetUrl string, enrollmentToken string, agentFixture *atesting.Fixture) ([]byte, error) {
+// InstallAgent force install the Elastic Agent through agentFixture.
+func InstallAgent(fleetUrl string, enrollmentToken string, agentFixture *atesting.Fixture) ([]byte, error) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
+		Force:          true,
 		EnrollOpts: atesting.EnrollOpts{
 			URL:             fleetUrl,
 			EnrollmentToken: enrollmentToken,
@@ -30,7 +32,8 @@ func EnrollWithoutInstall(fleetURL string, enrollmentToken string, agentFixture 
 	return agentFixture.Enroll(context.Background(), &enrollOpts)
 }
 
-func InstallStandaloneElasticAgent(agentFixture *atesting.Fixture) ([]byte, error) {
+// InstallStandaloneAgent force install the Elastic Agent through agentFixture.
+func InstallStandaloneAgent(agentFixture *atesting.Fixture) ([]byte, error) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,

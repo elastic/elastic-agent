@@ -40,35 +40,40 @@ func TestContextProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	hostProvider, _ := provider.(*contextProvider)
+	// returnHostMapping is a wrapper around getHostInfo that adds an
+	// idx field to the returned values, incremented each time it is
+	// invoked, starting from 0 on the first call.
 	hostProvider.fetcher = returnHostMapping(log)
 	require.Equal(t, checkInterval, hostProvider.CheckInterval)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	comm := ctesting.NewContextComm(ctx)
+	setChan := make(chan map[string]interface{})
+	comm.CallOnSet(func(value map[string]interface{}) {
+		// Forward Set's input to the test channel
+		setChan <- value
+	})
 
 	go func() {
 		_ = provider.Run(comm)
 	}()
 
 	// wait for it to be called once
-	setChan := make(chan struct{}, 1)
-	comm.CallOnSet(func() {
-		setChan <- struct{}{}
-	})
+	var current map[string]interface{}
 	select {
-	case <-setChan:
+	case current = <-setChan:
 	case <-time.After(testTimeout):
 		require.FailNow(t, "timeout waiting for provider to call Set")
 	}
 
 	starting, err = ctesting.CloneMap(starting)
 	require.NoError(t, err)
-	require.Equal(t, starting, comm.Current())
+	require.Equal(t, starting, current)
 
 	// wait for it to be called again
 	select {
-	case <-setChan:
+	case current = <-setChan:
 	case <-time.After(testTimeout):
 		require.FailNow(t, "timeout waiting for provider to call Set")
 	}
@@ -80,7 +85,7 @@ func TestContextProvider(t *testing.T) {
 	next["idx"] = 1
 	next, err = ctesting.CloneMap(next)
 	require.NoError(t, err)
-	assert.Equal(t, next, comm.Current())
+	assert.Equal(t, next, current)
 }
 
 func TestFQDNFeatureFlagToggle(t *testing.T) {

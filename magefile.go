@@ -1266,6 +1266,10 @@ func majorMinor() string {
 // cleans up the integration testing leftovers
 func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
+
+	// Clean out .ogc-cache always
+	defer os.RemoveAll(".ogc-cache")
+
 	_, err := os.Stat(".ogc-cache")
 	if err == nil {
 		// .ogc-cache exists; need to run `Clean` from the runner
@@ -1278,7 +1282,7 @@ func (Integration) Clean() error {
 			return fmt.Errorf("error running clean: %w", err)
 		}
 	}
-	_ = os.RemoveAll(".ogc-cache")
+
 	return nil
 }
 
@@ -1412,7 +1416,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	batches, err := define.DetermineBatches("testing/integration", "integration")
 	if err != nil {
-		return fmt.Errorf("failed to detemine batches: %w", err)
+		return fmt.Errorf("failed to determine batches: %w", err)
 	}
 	r, err := createTestRunner(matrix, singleTest, batches...)
 	if err != nil {
@@ -1464,7 +1468,13 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 			return nil, err
 		}
 		if agentStackVersion == "" {
+			// always use snapshot for stack version
 			agentStackVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
+		}
+		if hasSnapshotEnv() {
+			// in the case that SNAPSHOT=true is set in the environment the
+			// default version of the agent is used, but as a snapshot build
+			agentVersion = fmt.Sprintf("%s-SNAPSHOT", agentVersion)
 		}
 	}
 	if agentStackVersion == "" {
@@ -1829,4 +1839,13 @@ func writeFile(name string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("failed to write file %s: %w", name, err)
 	}
 	return nil
+}
+
+func hasSnapshotEnv() bool {
+	snapshot := os.Getenv(snapshotEnv)
+	if snapshot == "" {
+		return false
+	}
+	b, _ := strconv.ParseBool(snapshot)
+	return b
 }
