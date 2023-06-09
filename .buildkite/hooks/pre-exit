@@ -14,4 +14,6 @@ fi
 
 unset GOOGLE_APPLICATION_GCP_SECRET API_KEY_TOKEN
 
-docker logout $DOCKER_REGISTRY
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
+  docker logout $DOCKER_REGISTRY
+fi
