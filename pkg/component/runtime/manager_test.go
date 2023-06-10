@@ -895,10 +895,6 @@ func TestManager_FakeInput_NoDeadlock(t *testing.T) {
 				return
 			case <-updatedCh:
 				// update did occur
-				// Reset the timer safely, see https://pkg.go.dev/time#Timer.Reset
-				if !t.Stop() {
-					<-t.C
-				}
 				t.Reset(15 * time.Second)
 			case <-t.C:
 				// timeout hit waiting for another update to work
