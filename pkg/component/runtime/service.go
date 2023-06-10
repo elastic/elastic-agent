@@ -114,10 +114,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				// Initial state on start
 				lastCheckin = time.Time{}
 				missedCheckins = 0
-				// Stop timer safely, see https://pkg.go.dev/time#Timer.Stop
-				if !checkinTimer.Stop() {
-					<-checkinTimer.C
-				}
+				checkinTimer.Stop()
 				cisStop()
 
 				// Start connection info
@@ -141,10 +138,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			case actionStop, actionTeardown:
 				// Stop check-in timer
 				s.log.Debugf("stop check-in timer for %s service", s.name())
-				// Stop timer safely, see https://pkg.go.dev/time#Timer.Stop
-				if !checkinTimer.Stop() {
-					<-checkinTimer.C
-				}
+				checkinTimer.Stop()
 
 				// Stop connection info
 				s.log.Debugf("stop connection info for %s service", s.name())
