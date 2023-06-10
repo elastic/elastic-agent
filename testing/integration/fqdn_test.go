@@ -108,9 +108,7 @@ func (s *FQDN) TestFQDN() {
 	require.NoError(s.T(), err)
 
 	s.T().Log("Verify that agent name is short hostname")
-	agent, err := tools.GetAgentByHostnameFromList(kibClient, shortName)
-	require.NoError(s.T(), err)
-	require.NotNil(s.T(), agent)
+	agent := s.verifyAgentName(shortName)
 
 	s.T().Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname")
 	s.verifyHostNameInIndices("logs-*", shortName)
@@ -140,13 +138,8 @@ func (s *FQDN) TestFQDN() {
 		1*time.Second,
 	)
 
-	s.T().Log("Sleeping for 20 seconds...")
-	time.Sleep(20 * time.Second)
-
 	s.T().Log("Verify that agent name is FQDN")
-	agent, err = tools.GetAgentByHostnameFromList(kibClient, fqdn)
-	require.NoError(s.T(), err)
-	require.NotNil(s.T(), agent)
+	s.verifyAgentName(fqdn)
 
 	s.T().Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
 	s.verifyHostNameInIndices("logs-*", fqdn)
@@ -176,17 +169,28 @@ func (s *FQDN) TestFQDN() {
 		1*time.Second,
 	)
 
-	s.T().Log("Sleeping for 20 seconds...")
-	time.Sleep(20 * time.Second)
-
 	s.T().Log("Verify that agent name is short hostname again")
-	agent, err = tools.GetAgentByHostnameFromList(kibClient, shortName)
-	require.NoError(s.T(), err)
-	require.NotNil(s.T(), agent)
+	s.verifyAgentName(shortName)
 
 	s.T().Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname again")
 	s.verifyHostNameInIndices("logs-*", shortName)
 	s.verifyHostNameInIndices("metrics-*", shortName)
+}
+
+func (s *FQDN) verifyAgentName(hostname string) *kibana.AgentExisting {
+	var agent *kibana.AgentExisting
+	var err error
+
+	s.Require().Eventually(
+		func() bool {
+			agent, err = tools.GetAgentByHostnameFromList(s.requirementsInfo.KibanaClient, hostname)
+			return err == nil && agent != nil
+		},
+		1*time.Minute,
+		5*time.Second,
+	)
+
+	return agent
 }
 
 func (s *FQDN) verifyHostNameInIndices(indices, hostname string) {
