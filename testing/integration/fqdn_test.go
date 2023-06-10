@@ -195,34 +195,41 @@ func (s *FQDN) verifyAgentName(hostname string) *kibana.AgentExisting {
 
 func (s *FQDN) verifyHostNameInIndices(indices, hostname string) {
 	search := s.requirementsInfo.ESClient.Search
-	resp, err := search(
-		search.WithIndex(indices),
-		search.WithSort("@timestamp:desc"),
-		search.WithFilterPath("hits.hits"),
-		search.WithSize(1),
+
+	s.Require().Eventually(
+		func() bool {
+			resp, err := search(
+				search.WithIndex(indices),
+				search.WithSort("@timestamp:desc"),
+				search.WithFilterPath("hits.hits"),
+				search.WithSize(1),
+			)
+			require.NoError(s.T(), err)
+			require.False(s.T(), resp.IsError())
+			defer resp.Body.Close()
+
+			var body struct {
+				Hits struct {
+					Hits []struct {
+						Source struct {
+							Host struct {
+								Name string `json:"name"`
+							} `json:"host"`
+						} `json:"_source"`
+					} `json:"hits"`
+				} `json:"hits"`
+			}
+			decoder := json.NewDecoder(resp.Body)
+			err = decoder.Decode(&body)
+			require.NoError(s.T(), err)
+
+			require.Len(s.T(), body.Hits.Hits, 1)
+			hit := body.Hits.Hits[0]
+			return hostname == hit.Source.Host.Name
+		},
+		1*time.Minute,
+		5*time.Second,
 	)
-	require.NoError(s.T(), err)
-	require.False(s.T(), resp.IsError())
-	defer resp.Body.Close()
-
-	var body struct {
-		Hits struct {
-			Hits []struct {
-				Source struct {
-					Host struct {
-						Name string `json:"name"`
-					} `json:"host"`
-				} `json:"_source"`
-			} `json:"hits"`
-		} `json:"hits"`
-	}
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&body)
-	require.NoError(s.T(), err)
-
-	require.Len(s.T(), body.Hits.Hits, 1)
-	hit := body.Hits.Hits[0]
-	assert.Equal(s.T(), hostname, hit.Source.Host.Name)
 }
 
 func (s *FQDN) saveOriginalHostname(ctx context.Context) {
