@@ -10,20 +10,19 @@ Agent Mode | Description
 [Elastic Agent managed](elastic-agent-managed) | Elastic Agent managed by Fleet setup
 [Elastic Agent standalone](elastic-agent-standalone) | Standalone Elastic Agent setup
 
-> Note: Kube State Metrics Library is not installed as part of the above manifests and needs to be installed additionally
+> Note: The kube-state-metrics (KSM) simple service is not installed as part of the above manifests and needs to be installed from [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics).
 
 ## Kustomize Templates
 
-Additional to the above manifests, the list below includes the official [kustomize](https://github.com/kubernetes-sigs/kustomize) templates to run them in kubernetes:
+In addition to the above manifests, the list below includes the official [kustomize](https://github.com/kubernetes-sigs/kustomize) templates to run them in kubernetes:
 
 Agent Scenario | Description
 ---- | ----
-[Elastic Agent managed - Default ](./default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup. Includes the installation of Kube State Metrics (KSM) in default configuration.
+[Elastic Agent managed - Default ](./default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup. Includes the installation of kube-state-metrics (KSM) in default configuration.
 [Elastic Agent standalone Default ](./default/elastic-agent-standalone/) | Default Standalone Elastic Agent setup
 [Elastic Agent managed - With KSM in autosharding configuration ](./ksm-autosharding/elastic-agent-managed/) | Elastic Agent managed by Fleet setup with [KSM in autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 [Elastic Agent standalone - With KSM in autosharding configuration](./ksm-autosharding/elastic-agent-standalone/) | Standalone Elastic Agent setup with [KSM in autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 
-*(KSM = Kube State Metrics)
 
 ### How to use the kustomize templates
 
@@ -44,6 +43,6 @@ The several challenges phased during scaling of Kubernetes cluster are [explaine
 
 The suggested method of installing Elastic Agent in large Kubernetes clusters is to install Elastic Agent as a Side Container with KSM in order to collect the KSM metrics. As Kubernetes cluster becomes larger, we increase the number of KSM shards and we have a dedicated Elastic Agent to collect from specific shard endpoint. Those are installed as part of [Statefulset](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-statefulset-configmap.yaml)
 
-Additional to the Elastic Agents for KSM, the rest of metrics are collected from Elastic Agents deployed as [daemonsets](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-daemonset-configmap.yaml)
+In addition to the Elastic Agents for KSM, the rest of the metrics are collected from Elastic Agents deployed as [daemonsets](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-daemonset-configmap.yaml)
 
 More information for the configuration of Elastic Agent can be found [here](https://github.com/elastic/elastic-agent/blob/main/docs/elastic-agent-ksm-sharding.md)
