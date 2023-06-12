@@ -809,6 +809,12 @@ func (c *Coordinator) runner(ctx context.Context) error {
 				}
 			}
 		}
+
+		// At the end of each iteration, if we made any changes to the state,
+		// collect them and send them to stateBroadcaster.
+		if c.stateNeedsRefresh {
+			c.refreshState()
+		}
 	}
 }
 
