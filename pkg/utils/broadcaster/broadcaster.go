@@ -494,19 +494,19 @@ func (b *Broadcaster[T]) updateListeners() {
 		if subscriber.index <= b.index {
 			// The subscriber hasn't read the most recent value, unblock its channel.
 			subscriber.listenerCase.Chan = reflect.ValueOf(subscriber.listenerChan)
-		}
-		if subscriber.index < b.index-subscriber.bufferLen {
+		} else if subscriber.index < b.index-subscriber.bufferLen {
+			// If the subscriber is further behind than its buffer size, then
+			// we need
 			// If bufferLen is 0, then subscriber.index must be at least b.index,
 			// since it only receives the most recent value; therefore if
 			// bufferLen is n, subscriber.index must be at least b.index-n.
 			// (Note that subscriber.bufferLen is at most len(b.buffer)-1, so
 			// the oldest and newest values in the circular buffer don't overlap.)
 			subscriber.index = b.index - subscriber.bufferLen
-			subscriber.listenerCase.Send = reflect.ValueOf(
-				b.buffer[subscriber.index%len(b.buffer)])
 		}
-		// If subscriber.index didn't need to be advanced, then its listener
-		// case already contains the correct Send value.
+		// Load the subscriber's new target value into its send channel.
+		subscriber.listenerCase.Send =
+			reflect.ValueOf(b.buffer[subscriber.index%len(b.buffer)])
 	}
 	// Update getChan, used for standalone reads from non-subscribers.
 	b.selectCases[indexGetCase].Send = reflect.ValueOf(b.currentValue())

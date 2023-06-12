@@ -86,8 +86,6 @@ func waitForState(
 		case state := <-stateChan:
 			if stateCallback(state) {
 				return
-			} else {
-				fmt.Printf("wrong state: %v\n", state)
 			}
 		case <-timeoutChan:
 			assert.Fail(t, "timed out waiting for expected state")
@@ -113,31 +111,30 @@ func TestCoordinator_State_Starting(t *testing.T) {
 	}()
 
 	waitForState(t, stateChan, func(state State) bool {
-		return true
-		//return state.State == agentclient.Starting && state.Message == "Waiting for initial configuration and composable variables"
+		return state.State == agentclient.Starting &&
+			state.Message == "Waiting for initial configuration and composable variables"
 	}, 3*time.Second)
-	/*assert.Eventually(t, func() bool {
-		state := coord.State()
-		return state.State == agentclient.Starting && state.Message == "Waiting for initial configuration and composable variables"
-	}, 3*time.Second, 10*time.Millisecond)*/
 
 	// set vars state should stay same (until config)
 	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
 
-	assert.Eventually(t, func() bool {
-		state := coord.State()
-		return state.State == agentclient.Starting && state.Message == "Waiting for initial configuration and composable variables"
-	}, 3*time.Second, 10*time.Millisecond)
+	// State changes happen asynchronously in the Coordinator goroutine, so
+	// wait a little bit to make sure no changes are reported; if the Vars
+	// call does trigger a change, it should happen relatively quickly.
+	select {
+	case <-stateChan:
+		assert.Fail(t, "Vars call shouldn't cause a state change")
+	case <-time.After(50 * time.Millisecond):
+	}
 
 	// set configuration should change to healthy
 	cfg, err := config.NewConfigFrom(nil)
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	assert.Eventually(t, func() bool {
-		state := coord.State()
+	waitForState(t, stateChan, func(state State) bool {
 		return state.State == agentclient.Healthy && state.Message == "Running"
-	}, 3*time.Second, 10*time.Millisecond)
+	}, 3*time.Second)
 
 	cancel()
 	err = <-coordCh
