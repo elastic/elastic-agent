@@ -279,13 +279,23 @@ func (c *Coordinator) State() State {
 	return c.stateBroadcaster.Get()
 }
 
-// StateSubscribe subscribes to changes in the coordinator state.
-// Called by external goroutines (currently just from the StateWatch RPC).
+// StateSubscribe returns a channel that reports changes in Coordinator state.
 //
-// This provides the current state at the time of first subscription. Cancelling the context
-// results in the subscription being unsubscribed.
+// bufferLen specifies how many state changes should be queued in addition to
+// the most recent one. If bufferLen is 0, reads on the channel always return
+// the current state. Otherwise, multiple changes that occur between reads
+// will accumulate up to bufferLen. If the most recent state has already been
+// read, reads on the channel will block until the next state change.
 //
-// Note: Not reading from a subscription channel will cause the Coordinator to block.
+// The returned channel always returns at least one value, and will keep
+// returning changes until its context is cancelled or the Coordinator shuts
+// down. After Coordinator shutdown, the channel will continue returning
+// pending changes until the subscriber reads the final one, when the channel
+// will be closed. On context cancel, the channel is closed immediately.
+//
+// This is safe to call from external goroutines, and subscriber behavior can
+// never block Coordinator -- see the broadcaster package for detailed
+// performance guarantees.
 func (c *Coordinator) StateSubscribe(ctx context.Context, bufferLen int) chan State {
 	return c.stateBroadcaster.Subscribe(ctx, bufferLen)
 }
