@@ -46,4 +46,4 @@ The suggested method of installing Elastic Agent in large Kubernetes clusters is
 
 Additional to the Elastic Agents for KSM, the rest of metrics are collected from Elastic Agents deployed as [daemonsets](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-daemonset-configmap.yaml)
 
-More information for the configuration of Elastic Agent can be found [here](https://github.com/elastic/elastic-agent/blob/52b681c8c1a77192b8843e4ab140591871d77d24/docs/elastic-agent-ksm-sharding.md)
+More information for the configuration of Elastic Agent can be found [here](https://github.com/elastic/elastic-agent/blob/main/docs/elastic-agent-ksm-sharding.md)
