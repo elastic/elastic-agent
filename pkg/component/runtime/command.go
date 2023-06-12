@@ -42,6 +42,18 @@ const (
 	stateUnknownMessage = "Unknown"
 )
 
+func (m actionMode) String() string {
+	switch m {
+	case actionTeardown:
+		return "teardown"
+	case actionStop:
+		return "stop"
+	case actionStart:
+		return "start"
+	}
+	return ""
+}
+
 type MonitoringManager interface {
 	EnrichArgs(string, string, []string) []string
 	Prepare(string) error

@@ -86,91 +86,6 @@ func newServiceRuntime(comp component.Component, logger *logger.Logger) (*servic
 // Called by Manager inside a goroutine. Run does not return until the passed in context is done. Run is always
 // called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
-func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error) {
-	checkinTimer := time.NewTimer(s.checkinPeriod())
-	defer checkinTimer.Stop()
-
-	// Stop the check-ins timer initially
-	checkinTimer.Stop()
-
-	var (
-		cis            *connInfoServer
-		lastCheckin    time.Time
-		missedCheckins int
-	)
-
-	cisStop := func() {
-		if cis != nil {
-			_ = cis.stop()
-			cis = nil
-		}
-	}
-	defer cisStop()
-
-	for {
-		var err error
-		select {
-		case <-ctx.Done():
-			s.log.Debug("context is done. exiting.")
-			return ctx.Err()
-		case as := <-s.actionCh:
-			switch as.actionMode {
-			case actionStart:
-				// Initial state on start
-				lastCheckin = time.Time{}
-				missedCheckins = 0
-				checkinTimer.Stop()
-				cisStop()
-
-				// Start connection info
-				if cis == nil {
-					cis, err = newConnInfoServer(s.log, comm, s.comp.InputSpec.Spec.Service.CPort)
-					if err != nil {
-						err = fmt.Errorf("failed to start connection info service %s: %w", s.name(), err)
-						break
-					}
-				}
-
-				// Start service
-				err = s.start(ctx)
-				if err != nil {
-					cisStop()
-					break
-				}
-
-				// Start check-in timer
-				checkinTimer.Reset(s.checkinPeriod())
-			case actionStop, actionTeardown:
-				// Stop check-in timer
-				s.log.Debugf("stop check-in timer for %s service", s.name())
-				checkinTimer.Stop()
-
-				// Stop connection info
-				s.log.Debugf("stop connection info for %s service", s.name())
-				cisStop()
-
-				// Stop service
-				s.stop(ctx, comm, lastCheckin, as.actionMode == actionTeardown)
-			}
-			if err != nil {
-				s.forceCompState(client.UnitStateFailed, err.Error())
-			}
-		case newComp := <-s.compCh:
-			s.processNewComp(newComp, comm)
-		case checkin := <-comm.CheckinObserved():
-			s.processCheckin(checkin, comm, &lastCheckin)
-		case <-checkinTimer.C:
-			s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
-			checkinTimer.Reset(s.checkinPeriod())
-		}
-	}
-}
-
-// Run starts the runtime for the component.
-//
-// Called by Manager inside a goroutine. Run does not return until the passed in context is done. Run is always
-// called before any of the other methods in the interface and once the context is done none of those methods should
-// ever be called again.
 //
 // ==================================================================================================
 //
@@ -188,7 +103,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 //     e. upon receiving check-in if (tearingDown == true), send teardown action to itself
 //
 // ==================================================================================================
-func (s *serviceRuntime) xRun(ctx context.Context, comm Communicator) (err error) {
+func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error) {
 	// The teardownCheckingTimeout is set to the same amount as the checkin timeout for now
 	teardownCheckinTimeout := s.checkinPeriod()
 	teardownCheckinTimer := time.NewTimer(teardownCheckinTimeout)
@@ -256,6 +171,7 @@ func (s *serviceRuntime) xRun(ctx context.Context, comm Communicator) (err error
 			s.log.Debug("context is done. exiting.")
 			return ctx.Err()
 		case as := <-s.actionCh:
+			s.log.Debugf("got action %v for %s service", as.actionMode, s.name())
 			switch as.actionMode {
 			case actionStart:
 				// Initial state on start
@@ -297,7 +213,7 @@ func (s *serviceRuntime) xRun(ctx context.Context, comm Communicator) (err error
 		case newComp := <-s.compCh:
 			s.processNewComp(newComp, comm)
 		case checkin := <-comm.CheckinObserved():
-			s.log.Debugf("got checkin for %s service, tearingDown==%v", s.name(), tearingDown)
+			s.log.Debugf("got checkin for %s service, tearingDown: %v", s.name(), tearingDown)
 			s.processCheckin(checkin, comm, &lastCheckin)
 			// Got check-in upon teardown update
 			if tearingDown {
@@ -306,6 +222,7 @@ func (s *serviceRuntime) xRun(ctx context.Context, comm Communicator) (err error
 				processStop(actionTeardown)
 			}
 		case <-checkinTimer.C:
+			s.log.Debugf("checkin timer")
 			s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
 			checkinTimer.Reset(s.checkinPeriod())
 		case <-teardownCheckinTimer.C:
@@ -634,16 +551,12 @@ func (s *serviceRuntime) install(ctx context.Context) error {
 
 // uninstall executes the service uninstall command
 func (s *serviceRuntime) uninstall(ctx context.Context) error {
-	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl)
+	return uninstallService(ctx, s.log, s.comp, "", s.executeServiceCommandImpl)
 }
 
 // UninstallService uninstalls the service
 func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string) error {
-	if comp.InputSpec.Spec.Service.Operations.Uninstall != nil {
-		// Resolve uninstall token parameter
-		comp.InputSpec.Spec.Service.Operations.Uninstall = resolveUninstallTokenArg(comp.InputSpec.Spec.Service.Operations.Uninstall, uninstallToken)
-	}
-	return uninstallService(ctx, log, comp, executeServiceCommand)
+	return uninstallService(ctx, log, comp, uninstallToken, executeServiceCommand)
 }
 
 //nolint:gosec // was false flagged as hardcoded credentials by linter. it is not.
@@ -676,11 +589,14 @@ func resolveUninstallTokenArg(uninstallSpec *component.ServiceOperationsCommandS
 	return &spec
 }
 
-func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc) error {
+func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string, executeServiceCommandImpl executeServiceCommandFunc) error {
 	if comp.InputSpec.Spec.Service.Operations.Uninstall == nil {
 		log.Errorf("missing uninstall spec for %s service", comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
+
+	comp.InputSpec.Spec.Service.Operations.Uninstall = resolveUninstallTokenArg(comp.InputSpec.Spec.Service.Operations.Uninstall, uninstallToken)
+
 	log.Debugf("uninstall %s service", comp.InputSpec.BinaryName)
 	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, comp.InputSpec.Spec.Service.Operations.Uninstall)
 }
