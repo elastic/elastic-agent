@@ -38,7 +38,7 @@ func TestProxyURL(t *testing.T) {
 
 func (p *ProxyURL) SetupSuite() {
 	// agentVersion := "8.9.0-SNAPSHOT"
-	agentID := "proxy-url-agent-id"
+	// agentID := "proxy-url-agent-id"
 	policyID := "bedf2f42-a252-40bb-ab2b-8a7e1b874c7a"
 	enrollmentToken := "enrollmentToken"
 	ackToken := "ackToken"
@@ -48,12 +48,16 @@ func (p *ProxyURL) SetupSuite() {
 	}
 
 	fleet := fleetservertest.NewServerWithFakeComponent(
-		fleetservertest.API{
-			APIKey:          apiKey.Key,
-			APIKeyID:        apiKey.ID,
+		fleetservertest.API{},
+		policyID,
+		ackToken,
+		fleetservertest.Data{
+			APIKey:          apiKey,
 			EnrollmentToken: enrollmentToken,
-		},
-		agentID, policyID, ackToken)
+			Output: fmt.Sprintf(
+				`{"api_key":"%s","hosts":["%s"],"type":"elasticsearch"}`,
+				apiKey, "TODO: fix me!"),
+		})
 	defer fleet.Close()
 	p.fleet = fleet
 
@@ -72,6 +76,12 @@ func (p *ProxyURL) SetupSuite() {
 }
 
 func (p *ProxyURL) Test1() {
+	_ = define.Require(p.T(), define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+	})
+
 	out, err := p.fixture.Install(
 		context.Background(),
 		&integrationtest.InstallOpts{
@@ -79,7 +89,7 @@ func (p *ProxyURL) Test1() {
 			NonInteractive: true,
 			EnrollOpts: integrationtest.EnrollOpts{
 				URL:             p.fleet.URL,
-				EnrollmentToken: p.fleet.EnrollmentToken,
+				EnrollmentToken: p.fleet.Data.EnrollmentToken,
 			}})
 
 	fmt.Println("========================================== Agent output ==========================================")

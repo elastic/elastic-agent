@@ -20,14 +20,11 @@ import (
 // API.EnrollmentToken. API.EnrollmentToken is used for Enroll requests and
 // API.APIKey for all others.
 type API struct {
-	// APIKey is the API key to authenticate with Fleet Server.
-	APIKey string
-	// APIKeyID is the API ID key to authenticate with Fleet Server.
-	APIKeyID string
+	// TODO: better to get rid of this type. Merge it with Server and either have
+	// config functions to add the implementation on creation or setters.
 
-	// EnrollmentToken is the enrollment the agent should use to enroll with
-	// Fleet Server.
-	EnrollmentToken string
+	// AgentID is the ID of the last enrolled agent.
+	AgentID string
 
 	AckFn func(
 		ctx context.Context,
@@ -43,7 +40,6 @@ type API struct {
 
 	EnrollFn func(
 		ctx context.Context,
-		agentID string,
 		userAgent string,
 		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
 
@@ -72,72 +68,83 @@ type API struct {
 		uploadCompleteRequest UploadCompleteRequest) *HTTPError
 }
 
-type Server struct {
-	*httptest.Server
-
-	// APIKey is the API key to authenticate with Fleet Server.
-	APIKey string
-	// APIKeyID is the API ID key to authenticate with Fleet Server.
-	APIKeyID string
+type Data struct {
+	APIKey APIKey
 
 	// EnrollmentToken is the enrollment the agent should use to enroll with
 	// Fleet Server.
 	EnrollmentToken string
+
+	// Output is the JSON encoded value for the `output` node in the policy
+	Output string
+}
+
+type Server struct {
+	*httptest.Server
+	Data Data
 }
 
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
 // If a route is called and its handler (the *Fn field) is nil a.
 // http.StatusNotImplemented error will be returned.
 // If insecure is set, no authorization check will be performed.
-func NewServer(api API) *Server {
+func NewServer(api API, _ Data) *Server {
 	mux := NewRouter(Handlers{api: api})
 
 	return &Server{
-		Server:          httptest.NewServer(mux),
-		APIKey:          api.APIKey,
-		APIKeyID:        api.APIKeyID,
-		EnrollmentToken: api.EnrollmentToken,
+		Server: httptest.NewServer(mux),
 	}
 }
 
 // NewServerWithFakeComponent returns mock Fleet Server ready to use for Agent's
-// e2e tests.The server has the Status, Checkin, Enroll and Ack handlers
+// e2e tests. The server has the Status, Checkin, Enroll and Ack handlers
 // configured. If any of those handlers are defined on api, it'll overwrite the
 // default implementation. The returned policy contains one integration using
-// the fake input and if useShipper is true, it'll use the shipper.
+// the fake input.
+//
 // TODO: it needs to receive output configuration throug a WithEs/WithShipper
 // function //
-func NewServerWithFakeComponent(api API, agentID, policyID, ackToken string) *Server {
+func NewServerWithFakeComponent(api API, policyID, ackToken string, data Data) *Server {
+	// {
+	//    "api_key": "REDACTED:REDACTED",
+	//    "hosts": [
+	//      "https://REDACTED.some.elstc.co:443"
+	//    ],
+	//    "type": "elasticsearch"
+	//  }
+
 	if api.StatusFn == nil {
 		api.StatusFn = NewStatusHandlerHealth()
 	}
 	if api.CheckinFn == nil {
-		api.CheckinFn = NewCheckinHandler(agentID, ackToken, false)
+		api.CheckinFn = NewCheckinHandler(ackToken, false)
 	}
 	if api.EnrollFn == nil {
-		api.EnrollFn = NewEnrollHandler(agentID, policyID, APIKey{
-			ID:  api.APIKey,
-			Key: api.APIKeyID,
-		})
+		api.EnrollFn = NewEnrollHandler(policyID, data.APIKey)
 	}
 	if api.AckFn == nil {
-		api.AckFn = NewAckHander(agentID)
+		api.AckFn = NewAckHandler()
 	}
 
 	mux := NewRouter(Handlers{api: api})
 	return &Server{
-		Server:          httptest.NewServer(mux),
-		APIKey:          api.APIKey,
-		APIKeyID:        api.APIKeyID,
-		EnrollmentToken: api.EnrollmentToken,
+		Server: httptest.NewServer(mux),
+		Data:   data,
 	}
 }
 
-// TODO: Make a NewFullyFunctional fleet-server:
-// - status
-// - checkin - use fake input
-// - enroll
-// - ack
+// DataFromCtx returns the Data in the context or an empty Data if none is
+// found.
+// TODO: probably better to add it to the handlers' signature 
+func DataFromCtx(ctx context.Context) Data {
+	return ctx.Value(ctxAuthKey{}).(Data)
+}
+
+func (d Data) WithCtx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxAuthKey{}, d)
+}
+
+// ================================ API methods ================================
 
 // AgentAcks -
 func (a API) AgentAcks(
@@ -183,7 +190,6 @@ func (a API) AgentCheckin(
 // AgentEnroll -
 func (a API) AgentEnroll(
 	ctx context.Context,
-	id string,
 	userAgent string,
 	enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
 	if a.EnrollFn == nil {
@@ -192,10 +198,12 @@ func (a API) AgentEnroll(
 				Message: "agent checkin Handlers not implemented"}
 	}
 
-	resp, err := a.EnrollFn(ctx, id, userAgent, enrollRequest)
+	resp, err := a.EnrollFn(ctx, userAgent, enrollRequest)
 	if err != nil {
 		return nil, err
 	}
+
+	a.AgentID = resp.Item.AgentID
 
 	return resp, nil
 }

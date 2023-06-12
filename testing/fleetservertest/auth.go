@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -15,22 +16,29 @@ const (
 	HeaderAuthorization = "Authorization"
 )
 
-type ctxKey struct{}
+type ctxAuthKey struct{}
 
 // APIKey is used to represent an APIKey and APIKeyID pair.
 type APIKey struct {
-	ID  string
+	// ID is the ID of the API key to authenticate with Fleet Server
+	ID string
+	// Key is the API key to authenticate with Fleet Server.
 	Key string
 }
 
-// APIKeyFromCtx returns the APIKey in the context or an empty APIKey if none is
-// found.
-func APIKeyFromCtx(ctx context.Context) APIKey {
-	return ctx.Value(ctxKey{}).(APIKey)
+// String returns the APIKey as an "ID:Key" string.
+func (k APIKey) String() string {
+	return fmt.Sprintf("%s:%s", k.ID, k.Key)
 }
 
-func (a APIKey) WithCtx(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxKey{}, a)
+// AuthFromCtx returns the APIKey the agent sent with the request or empty if
+// none is found.
+func AuthFromCtx(ctx context.Context) APIKey {
+	return ctx.Value(ctxAuthKey{}).(APIKey)
+}
+
+func AuthWithCtx(ctx context.Context, a APIKey) context.Context {
+	return context.WithValue(ctx, ctxAuthKey{}, a)
 }
 
 // NewAPIKey generates an APIKey from the given base 64 encoded auth and returns
@@ -107,7 +115,7 @@ func AuthenticationMiddleware(key string, next http.Handler) http.Handler {
 			return
 		}
 
-		rr := r.WithContext(apiKey.WithCtx(r.Context()))
+		rr := r.WithContext(AuthWithCtx(r.Context(), apiKey))
 
 		next.ServeHTTP(w, rr)
 	})

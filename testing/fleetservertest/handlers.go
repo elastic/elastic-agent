@@ -11,12 +11,14 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
 	PathAgentAcks    = "/api/fleet/agents/{id}/acks"
 	PathAgentCheckin = "/api/fleet/agents/{id}/checkin"
-	PathAgentEnroll  = "/api/fleet/agents/{id}"
+	PathAgentEnroll  = "/api/fleet/agents/enroll"
 
 	PathArtifact = "/api/fleet/artifacts/{id}/{sha2}"
 	PathStatus   = "/api/status"
@@ -32,10 +34,6 @@ func NewPathAgentAcks(agentID string) string {
 
 func NewPathCheckin(agentID string) string {
 	return strings.Replace(PathAgentCheckin, "{id}", agentID, 1)
-}
-
-func NewPathAgentEnroll(agentID string) string {
-	return strings.Replace(PathAgentEnroll, "{id}", agentID, 1)
 }
 
 func NewPathArtifact(agentID, sha2 string) string {
@@ -62,19 +60,11 @@ func NewPathUploadComplete(agentID string) string {
 	return strings.Replace(PathUploadComplete, "{id}", agentID, 1)
 }
 
-func NewAckHander(agentID string) func(
+func NewAckHandler() func(
 	ctx context.Context,
 	agentID string,
 	ackRequest AckRequest) (*AckResponse, *HTTPError) {
-	return func(ctx context.Context, id string, ackRequest AckRequest) (*AckResponse, *HTTPError) {
-		// TODO(Anderson): move it to a middleware
-		if id != agentID {
-			return nil, &HTTPError{
-				StatusCode: http.StatusNotFound,
-				Message:    "agent ID not found",
-			}
-		}
-
+	return func(ctx context.Context, agentID string, ackRequest AckRequest) (*AckResponse, *HTTPError) {
 		resp := AckResponse{Action: "action"}
 		for range ackRequest.Events {
 			resp.Items = append(resp.Items, AckResponseItem{
@@ -86,13 +76,12 @@ func NewAckHander(agentID string) func(
 		return &resp, nil
 	}
 }
-func NewEnrollHandler(agentID, policyID string, apiKey APIKey) func(
+func NewEnrollHandler(policyID string, apiKey APIKey) func(
 	ctx context.Context,
-	id string,
 	userAgent string,
 	enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
 
-	return func(ctx context.Context, id string, userAgent string, enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
+	return func(ctx context.Context, userAgent string, enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
 		localMetadata, err := json.Marshal(enrollRequest.Metadata)
 		if err != nil {
 			return nil, &HTTPError{
@@ -104,12 +93,22 @@ func NewEnrollHandler(agentID, policyID string, apiKey APIKey) func(
 			}
 		}
 
+		agentID, err := uuid.NewUUID()
+		if err != nil {
+			return nil, &HTTPError{
+				StatusCode: http.StatusInternalServerError,
+				Status: fmt.Sprintf(
+					"could not create agentID: %v",
+					err),
+			}
+		}
+
 		return &EnrollResponse{
 			Action: "created",
 			Item: EnrollResponseItem{
-				Id:                   agentID,
+				AgentID:              agentID.String(),
 				Active:               true,
-				PolicyId:             policyID,
+				PolicyID:             policyID,
 				Type:                 "PERMANENT",
 				EnrolledAt:           time.Now().Format(time.RFC3339),
 				UserProvidedMetadata: nil,
@@ -126,9 +125,9 @@ func NewEnrollHandler(agentID, policyID string, apiKey APIKey) func(
 
 // NewCheckinHandler returns a checkin handler that always returns a policy with
 // System integrations and, if withEndpoint is true, Endpoint Security.
-func NewCheckinHandler(agentID, ackToken string, withEndpoint bool) func(
+func NewCheckinHandler(ackToken string, withEndpoint bool) func(
 	ctx context.Context,
-	id string,
+	agentID string,
 	userAgent string,
 	acceptEncoding string,
 	checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
@@ -140,11 +139,13 @@ func NewCheckinHandler(agentID, ackToken string, withEndpoint bool) func(
 
 	return func(
 		ctx context.Context,
-		id string,
+		agentID string,
 		userAgent string,
 		acceptEncoding string,
 		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
 
+		// TODO: add output
+		// data:= DataFromCtx(ctx)
 		resp := CheckinResponse{}
 		err := json.Unmarshal(
 			[]byte(fmt.Sprintf(policy, ackToken, agentID)),

@@ -205,13 +205,13 @@ type EnrollResponse struct {
 type EnrollResponseItem struct {
 
 	// The agent ID
-	Id string `json:"id"`
+	AgentID string `json:"id"`
 
 	// If the agent is active in fleet. Will be set to true upon enrollment.
 	Active bool `json:"active"`
 
 	// The policy ID that the agent is enrolled with. Decoded from the Handlers key used in the request.
-	PolicyId string `json:"policy_id"`
+	PolicyID string `json:"policy_id"`
 
 	// The enrollment request type.
 	Type string `json:"type"`

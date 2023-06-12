@@ -163,8 +163,6 @@ func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 
 // AgentEnroll -
 func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	idParam := params["id"]
 	userAgentParam := r.Header.Get("User-Agent")
 	enrollRequestParam := EnrollRequest{}
 	d := json.NewDecoder(r.Body)
@@ -178,7 +176,6 @@ func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.api.AgentEnroll(
 		r.Context(),
-		idParam,
 		userAgentParam,
 		enrollRequestParam)
 	if err != nil {
