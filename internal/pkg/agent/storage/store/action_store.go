@@ -29,11 +29,11 @@ type actionStore struct {
 
 // newActionStore creates a new action store.
 func newActionStore(log *logger.Logger, store storeLoad) (*actionStore, error) {
-	// If the store exists we will read it, if any errors is returned we assume we do not have anything
-	// persisted and we return an empty store.
+	// If the store exists we will read it, if an error is returned we log it
+	// and return an empty store.
 	reader, err := store.Load()
 	if err != nil {
-		//nolint:nilerr // ignore the error, this is expected
+		log.Errorf("failed to load action store, returning empty contents: %v", err.Error())
 		return &actionStore{log: log, store: store}, nil
 	}
 	defer reader.Close()

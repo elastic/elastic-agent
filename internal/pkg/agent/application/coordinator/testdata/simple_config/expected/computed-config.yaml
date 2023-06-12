@@ -1,6 +1,7 @@
 agent:
   download:
     sourceURI: https://artifacts.elastic.co/downloads/
+    retry_sleep_init_duration: 30s
   features:
     fqdn:
       enabled: true

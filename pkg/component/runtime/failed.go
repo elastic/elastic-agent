@@ -13,19 +13,19 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
-// FailedRuntime is used for a component that has an error from the component loader.
-type FailedRuntime struct {
+// failedRuntime is used for a component that has an error from the component loader.
+type failedRuntime struct {
 	ch      chan ComponentState
 	current component.Component
 	done    chan bool
 }
 
-// NewFailedRuntime creates a runtime for a component that has an error from the component loader.
-func NewFailedRuntime(comp component.Component) (ComponentRuntime, error) {
+// newFailedRuntime creates a runtime for a component that has an error from the component loader.
+func newFailedRuntime(comp component.Component) (*failedRuntime, error) {
 	if comp.Err == nil {
 		return nil, errors.New("must be a component that has a defined error")
 	}
-	return &FailedRuntime{
+	return &failedRuntime{
 		ch:      make(chan ComponentState),
 		current: comp,
 		done:    make(chan bool),
@@ -33,7 +33,7 @@ func NewFailedRuntime(comp component.Component) (ComponentRuntime, error) {
 }
 
 // Run runs the runtime for a component that got an error from the component loader.
-func (c *FailedRuntime) Run(ctx context.Context, _ Communicator) error {
+func (c *failedRuntime) Run(ctx context.Context, _ Communicator) error {
 	// state is hard coded to failed
 	c.ch <- createState(c.current, false)
 	select {
@@ -48,17 +48,17 @@ func (c *FailedRuntime) Run(ctx context.Context, _ Communicator) error {
 }
 
 // Watch returns the watch channel.
-func (c *FailedRuntime) Watch() <-chan ComponentState {
+func (c *failedRuntime) Watch() <-chan ComponentState {
 	return c.ch
 }
 
 // Start does nothing.
-func (c *FailedRuntime) Start() error {
+func (c *failedRuntime) Start() error {
 	return nil
 }
 
 // Update updates the component state.
-func (c *FailedRuntime) Update(comp component.Component) error {
+func (c *failedRuntime) Update(comp component.Component) error {
 	if comp.Err == nil {
 		return errors.New("cannot update to a component without a defined error")
 	}
@@ -67,7 +67,7 @@ func (c *FailedRuntime) Update(comp component.Component) error {
 }
 
 // Stop marks it stopped.
-func (c *FailedRuntime) Stop() error {
+func (c *failedRuntime) Stop() error {
 	go func() {
 		close(c.done)
 	}()
@@ -75,7 +75,7 @@ func (c *FailedRuntime) Stop() error {
 }
 
 // Teardown marks it stopped.
-func (c *FailedRuntime) Teardown(_ *component.Signed) error {
+func (c *failedRuntime) Teardown(_ *component.Signed) error {
 	return c.Stop()
 }
 

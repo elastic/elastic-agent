@@ -6,11 +6,8 @@ package host
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
-
-	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,6 +16,7 @@ import (
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 func TestContextProvider(t *testing.T) {
@@ -31,8 +29,10 @@ func TestContextProvider(t *testing.T) {
 	starting["idx"] = 0
 	require.NoError(t, err)
 
+	const checkInterval = 50 * time.Millisecond
+	const testTimeout = 500 * time.Millisecond
 	c, err := config.NewConfigFrom(map[string]interface{}{
-		"check_interval": 100 * time.Millisecond,
+		"check_interval": checkInterval,
 	})
 	require.NoError(t, err)
 	builder, _ := composable.Providers.GetContextProvider("host")
@@ -40,38 +40,43 @@ func TestContextProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	hostProvider, _ := provider.(*contextProvider)
+	// returnHostMapping is a wrapper around getHostInfo that adds an
+	// idx field to the returned values, incremented each time it is
+	// invoked, starting from 0 on the first call.
 	hostProvider.fetcher = returnHostMapping(log)
-	require.Equal(t, 100*time.Millisecond, hostProvider.CheckInterval)
+	require.Equal(t, checkInterval, hostProvider.CheckInterval)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	comm := ctesting.NewContextComm(ctx)
+	setChan := make(chan map[string]interface{})
+	comm.CallOnSet(func(value map[string]interface{}) {
+		// Forward Set's input to the test channel
+		setChan <- value
+	})
 
 	go func() {
-		err = provider.Run(comm)
+		_ = provider.Run(comm)
 	}()
 
 	// wait for it to be called once
-	var wg sync.WaitGroup
-	wg.Add(1)
-	comm.CallOnSet(func() {
-		wg.Done()
-	})
-	wg.Wait()
-	comm.CallOnSet(nil)
+	var current map[string]interface{}
+	select {
+	case current = <-setChan:
+	case <-time.After(testTimeout):
+		require.FailNow(t, "timeout waiting for provider to call Set")
+	}
 
-	require.NoError(t, err)
 	starting, err = ctesting.CloneMap(starting)
 	require.NoError(t, err)
-	require.Equal(t, starting, comm.Current())
+	require.Equal(t, starting, current)
 
 	// wait for it to be called again
-	wg.Add(1)
-	comm.CallOnSet(func() {
-		wg.Done()
-	})
-	wg.Wait()
-	comm.CallOnSet(nil)
+	select {
+	case current = <-setChan:
+	case <-time.After(testTimeout):
+		require.FailNow(t, "timeout waiting for provider to call Set")
+	}
 	cancel()
 
 	// next should have been set idx to 1
@@ -80,7 +85,7 @@ func TestContextProvider(t *testing.T) {
 	next["idx"] = 1
 	next, err = ctesting.CloneMap(next)
 	require.NoError(t, err)
-	assert.Equal(t, next, comm.Current())
+	assert.Equal(t, next, current)
 }
 
 func TestFQDNFeatureFlagToggle(t *testing.T) {
@@ -114,10 +119,12 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}()
 	comm := ctesting.NewContextComm(ctx)
 
-	// Track the number of times hostProvider.fetcher is called.
-	numCalled := 0
+	calledChan := make(chan struct{})
+	const expectedCalledCount = 2
+	// Send to calledChan when called, so we can detect the number
+	// of calls below.
 	hostProvider.fetcher = func() (map[string]interface{}, error) {
-		numCalled++
+		calledChan <- struct{}{}
 		return nil, nil
 	}
 
@@ -133,14 +140,20 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	// Wait long enough for the FQDN feature flag onChange
-	// callback to be called.
-	require.Eventually(t, func() bool {
-		// hostProvider.fetcher should be called twice:
-		// - once, right after the provider is run, and
-		// - once again, when the FQDN feature flag callback is triggered
-		return numCalled == 2
-	}, 10*time.Second, 100*time.Millisecond)
+	timeoutChan := time.After(100 * time.Millisecond)
+	calledCount := 0
+waitLoop:
+	// Wait until we get the expected number of calls or the timeout
+	// expires, whichever comes first.
+	for calledCount < expectedCalledCount {
+		select {
+		case <-calledChan:
+			calledCount++
+		case <-timeoutChan:
+			break waitLoop
+		}
+	}
+	require.Equal(t, expectedCalledCount, calledCount)
 }
 
 func returnHostMapping(log *logger.Logger) infoFetcher {

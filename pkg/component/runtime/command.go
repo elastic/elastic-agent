@@ -53,8 +53,8 @@ type procState struct {
 	state *os.ProcessState
 }
 
-// CommandRuntime provides the command runtime for running a component as a subprocess.
-type CommandRuntime struct {
+// commandRuntime provides the command runtime for running a component as a subprocess.
+type commandRuntime struct {
 	logStd *logWriter
 	logErr *logWriter
 
@@ -75,9 +75,9 @@ type CommandRuntime struct {
 	restartBucket  *rate.Limiter
 }
 
-// NewCommandRuntime creates a new command runtime for the provided component.
-func NewCommandRuntime(comp component.Component, log *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
-	c := &CommandRuntime{
+// newCommandRuntime creates a new command runtime for the provided component.
+func newCommandRuntime(comp component.Component, log *logger.Logger, monitor MonitoringManager) (*commandRuntime, error) {
+	c := &commandRuntime{
 		current:     comp,
 		monitor:     monitor,
 		ch:          make(chan ComponentState),
@@ -106,7 +106,7 @@ func NewCommandRuntime(comp component.Component, log *logger.Logger, monitor Mon
 // Called by Manager inside a goroutine. Run does not return until the passed in context is done. Run is always
 // called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
-func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
+func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 	cmdSpec := c.getCommandSpec()
 	checkinPeriod := cmdSpec.Timeouts.Checkin
 	restartPeriod := cmdSpec.Timeouts.Restart
@@ -223,14 +223,14 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 // Watch returns the channel that sends component state.
 //
 // Channel should send a new state anytime a state for a unit or the whole component changes.
-func (c *CommandRuntime) Watch() <-chan ComponentState {
+func (c *commandRuntime) Watch() <-chan ComponentState {
 	return c.ch
 }
 
 // Start starts the component.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Start() error {
+func (c *commandRuntime) Start() error {
 	// clear channel so it's the latest action
 	select {
 	case <-c.actionCh:
@@ -243,7 +243,7 @@ func (c *CommandRuntime) Start() error {
 // Update updates the currComp runtime with a new-revision for the component definition.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Update(comp component.Component) error {
+func (c *commandRuntime) Update(comp component.Component) error {
 	// clear channel so it's the latest component
 	select {
 	case <-c.compCh:
@@ -256,7 +256,7 @@ func (c *CommandRuntime) Update(comp component.Component) error {
 // Stop stops the component.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Stop() error {
+func (c *commandRuntime) Stop() error {
 	// clear channel so it's the latest action
 	select {
 	case <-c.actionCh:
@@ -269,7 +269,7 @@ func (c *CommandRuntime) Stop() error {
 // Teardown tears down the component.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Teardown(_ *component.Signed) error {
+func (c *commandRuntime) Teardown(_ *component.Signed) error {
 	// clear channel so it's the latest action
 	select {
 	case <-c.actionCh:
@@ -280,14 +280,14 @@ func (c *CommandRuntime) Teardown(_ *component.Signed) error {
 }
 
 // forceCompState force updates the state for the entire component, forcing that state on all units.
-func (c *CommandRuntime) forceCompState(state client.UnitState, msg string) {
+func (c *commandRuntime) forceCompState(state client.UnitState, msg string) {
 	if c.state.forceState(state, msg) {
 		c.sendObserved()
 	}
 }
 
 // compState updates just the component state not all the units.
-func (c *CommandRuntime) compState(state client.UnitState) {
+func (c *commandRuntime) compState(state client.UnitState) {
 	msg := stateUnknownMessage
 	if state == client.UnitStateHealthy {
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
@@ -303,11 +303,11 @@ func (c *CommandRuntime) compState(state client.UnitState) {
 	}
 }
 
-func (c *CommandRuntime) sendObserved() {
+func (c *commandRuntime) sendObserved() {
 	c.ch <- c.state.Copy()
 }
 
-func (c *CommandRuntime) start(comm Communicator) error {
+func (c *commandRuntime) start(comm Communicator) error {
 	if c.proc != nil {
 		// already running
 		return nil
@@ -361,7 +361,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	return nil
 }
 
-func (c *CommandRuntime) stop(ctx context.Context) error {
+func (c *commandRuntime) stop(ctx context.Context) error {
 	if c.proc == nil {
 		// already stopped, ensure that state of the component is also stopped
 		if c.state.State != client.UnitStateStopped {
@@ -391,7 +391,7 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 	return c.proc.Stop()
 }
 
-func (c *CommandRuntime) startWatcher(info *process.Info, comm Communicator) {
+func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	go func() {
 		err := comm.WriteConnInfo(info.Stdin)
 		if err != nil {
@@ -411,7 +411,7 @@ func (c *CommandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	}()
 }
 
-func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
+func (c *commandRuntime) handleProc(state *os.ProcessState) bool {
 	switch c.actionState {
 	case actionStart:
 		if c.restartBucket != nil && c.restartBucket.Allow() {
@@ -435,11 +435,11 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 	return false
 }
 
-func (c *CommandRuntime) workDirPath() string {
+func (c *commandRuntime) workDirPath() string {
 	return filepath.Join(paths.Run(), c.current.ID)
 }
 
-func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
+func (c *commandRuntime) workDir(uid int, gid int) (string, error) {
 	path := c.workDirPath()
 	err := os.MkdirAll(path, runDirMod)
 	if err != nil {
@@ -459,7 +459,7 @@ func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
 	return path, nil
 }
 
-func (c *CommandRuntime) getSpecType() string {
+func (c *commandRuntime) getSpecType() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.InputType
 	}
@@ -469,7 +469,7 @@ func (c *CommandRuntime) getSpecType() string {
 	return ""
 }
 
-func (c *CommandRuntime) getSpecBinaryName() string {
+func (c *commandRuntime) getSpecBinaryName() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.BinaryName
 	}
@@ -479,7 +479,7 @@ func (c *CommandRuntime) getSpecBinaryName() string {
 	return ""
 }
 
-func (c *CommandRuntime) getSpecBinaryPath() string {
+func (c *commandRuntime) getSpecBinaryPath() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.BinaryPath
 	}
@@ -489,7 +489,7 @@ func (c *CommandRuntime) getSpecBinaryPath() string {
 	return ""
 }
 
-func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
+func (c *commandRuntime) getCommandSpec() *component.CommandSpec {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.Spec.Command
 	}
@@ -499,7 +499,7 @@ func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
 	return nil
 }
 
-func (c *CommandRuntime) syncLogLevels() {
+func (c *commandRuntime) syncLogLevels() {
 	ll, unitLevels := getLogLevels(c.current)
 	c.logStd.SetLevels(ll, unitLevels)
 	ll, unitLevels = getLogLevels(c.current) // don't want to share mapping of units (so new map is generated)
