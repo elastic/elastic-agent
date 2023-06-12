@@ -40,7 +40,7 @@ spec:
       #        mountPath: /etc/elastic-agent/inputs.d
       containers:
         - name: elastic-agent-standalone
-          image: docker.elastic.co/beats/elastic-agent:8.3.0
+          image: docker.elastic.co/beats/elastic-agent:8.8.1
           args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           env:
             # The basic authentication username used to connect to Elasticsearch
@@ -147,5 +147,5 @@ spec:
         # Update 'kube-system' with the namespace of your agent installation
 #        - name: elastic-agent-state
 #          hostPath:
-            path: /var/lib/elastic-agent-standalone/kube-system/state
-            type: DirectoryOrCreate
+#            path: /var/lib/elastic-agent-standalone/kube-system/state
+#            type: DirectoryOrCreate

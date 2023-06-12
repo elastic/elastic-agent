@@ -1,4 +1,5 @@
-# For more information https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
+# Configmap for Daemoset Agents. It includes all the datastreams except Kube-State-metrics
+# For more information https://github.com/elastic/elastic-agent/blob/main/docs/elastic-agent-ksm-sharding.md
 apiVersion: v1
 kind: ConfigMap
 metadata:
