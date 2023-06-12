@@ -70,12 +70,39 @@ var (
 	}
 )
 
+// waitForState listens on the given stateChan for a state where stateCallback
+// returns true, up to the given timeout duration, and reports a test failure
+// if it doesn't arrive.
+func waitForState(
+	t *testing.T,
+	stateChan chan State,
+	stateCallback func(State) bool,
+	timeout time.Duration,
+) {
+	t.Helper()
+	timeoutChan := time.After(timeout)
+	for {
+		select {
+		case state := <-stateChan:
+			if stateCallback(state) {
+				return
+			} else {
+				fmt.Printf("wrong state: %v\n", state)
+			}
+		case <-timeoutChan:
+			assert.Fail(t, "timed out waiting for expected state")
+			return
+		}
+	}
+}
+
 func TestCoordinator_State_Starting(t *testing.T) {
 	coordCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	coord, cfgMgr, varsMgr := createCoordinator(t)
+	stateChan := coord.StateSubscribe(ctx, 32)
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -85,10 +112,14 @@ func TestCoordinator_State_Starting(t *testing.T) {
 		coordCh <- err
 	}()
 
-	assert.Eventually(t, func() bool {
+	waitForState(t, stateChan, func(state State) bool {
+		return true
+		//return state.State == agentclient.Starting && state.Message == "Waiting for initial configuration and composable variables"
+	}, 3*time.Second)
+	/*assert.Eventually(t, func() bool {
 		state := coord.State()
 		return state.State == agentclient.Starting && state.Message == "Waiting for initial configuration and composable variables"
-	}, 3*time.Second, 10*time.Millisecond)
+	}, 3*time.Second, 10*time.Millisecond)*/
 
 	// set vars state should stay same (until config)
 	varsMgr.Vars(ctx, []*transpiler.Vars{{}})

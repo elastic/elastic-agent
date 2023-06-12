@@ -282,10 +282,18 @@ func (b *Broadcaster[T]) Done() <-chan struct{} {
 // start the run loop, for tests that want to handle execution steps
 // manually/synchronously.
 func new[T any](initialValue T, maxBuffer int) *Broadcaster[T] {
-	return &Broadcaster[T]{
+	b := &Broadcaster[T]{
 		// 32 is probably an over-cautious buffer here, but preventing blocking
 		// in the input is the most important design goal.
 		InputChan: make(chan T, 32),
+
+		// Non-input channels are synchronous: subscribers have to wait for us
+		// to respond, only Broadcaster's owner gets to be completely non-blocking.
+		subscribeChan: make(chan subscribeRequest[T]),
+		getChan:       make(chan T),
+		shutdownChan:  make(chan struct{}),
+		doneChan:      make(chan struct{}),
+
 		// The array is maxBuffer+1 because we need to store the current value
 		// in addition to any "buffered" values. If maxBuffer is 0, then we
 		// store only the current value and the array is length 1. If
@@ -293,6 +301,28 @@ func new[T any](initialValue T, maxBuffer int) *Broadcaster[T] {
 		// the current one.
 		buffer: make([]T, maxBuffer+1),
 	}
+	// fixed order for the core select cases: input, subscribe, shutdown, get.
+	b.selectCases = []reflect.SelectCase{
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(b.InputChan),
+		},
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(b.subscribeChan),
+		},
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(b.shutdownChan),
+		},
+		{
+			Dir:  reflect.SelectSend,
+			Chan: reflect.ValueOf(b.getChan),
+			Send: reflect.ValueOf(initialValue),
+		},
+	}
+	b.buffer[b.index] = initialValue
+	return b
 }
 
 // runLoop is Broadcaster's main loop, which listens for updates from the
@@ -315,10 +345,10 @@ func (b *Broadcaster[T]) runLoopIterate() {
 	case indexInputCase:
 		if recvOK {
 			// We've received a new value, add it to the internal buffer and update
-			// subscriber state.
+			// listener select cases.
 			value := recvValue.Interface().(T)
 			b.handleNewInput(value)
-			b.updateSubscribers()
+			b.updateListeners()
 		} else {
 			// The input channel is closed, begin shutting down. Setting shuttingDown
 			// to true means subscribers will be removed as they finish reading
@@ -369,7 +399,7 @@ func (b *Broadcaster[T]) drainInput() {
 		default:
 			if receivedInput {
 				// If we received any values, refresh the subscriber state.
-				b.updateSubscribers()
+				b.updateListeners()
 			}
 			return
 		}
@@ -383,11 +413,10 @@ func (b *Broadcaster[T]) currentValue() T {
 }
 
 // handleNewInput adds an incoming value to the internal buffer. Callers should
-// also call updateSubscribers() when all changes are done. (handleNewInput
-// doesn't update subscribers itself so that we can avoid redundant passes
-// through the subscriber list when draining the input channel. In practice
-// this is rare, but if the input channel ever does gets backed up then
-// draining it is our highest priority.)
+// also call updateListeners() when all changes are done. (handleNewInput
+// doesn't do this so we can avoid redundant passes through the subscriber list
+// when draining the input channel. In practice this is rare, but if the input
+// channel ever does gets backed up then draining it is our highest priority.)
 func (b *Broadcaster[T]) handleNewInput(value T) {
 	b.index++
 	b.buffer[b.index%len(b.buffer)] = value
@@ -452,10 +481,10 @@ func (b *Broadcaster[T]) advanceSubscriber(subscriberIndex int) {
 	}
 }
 
-// updateSubscribers is called after new input comes in to advance subscriber
+// updateListeners is called after new input comes in to advance subscriber
 // position if necessary and reactivate their listener channels with the new
-// values.
-func (b *Broadcaster[T]) updateSubscribers() {
+// values, and to load the most recent value into getChan.
+func (b *Broadcaster[T]) updateListeners() {
 	for i := range b.subscribers {
 		subscriber := &b.subscribers[i]
 		if subscriber.index <= b.index {
@@ -475,6 +504,8 @@ func (b *Broadcaster[T]) updateSubscribers() {
 		// If subscriber.index didn't need to be advanced, then its listener
 		// case already contains the correct Send value.
 	}
+	// Update getChan, used for standalone reads from non-subscribers.
+	b.selectCases[indexGetCase].Send = reflect.ValueOf(b.currentValue())
 }
 
 // shutdown sets the shuttingDown flag and closes all subscribers, so the
