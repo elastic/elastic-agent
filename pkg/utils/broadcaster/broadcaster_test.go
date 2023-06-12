@@ -54,12 +54,12 @@ func TestSubscriberReceivesValueSequence(t *testing.T) {
 		case value := <-listenerChan:
 			require.Equal(t, expected, value, "listener should read the same value sequence that was written")
 		case <-timeoutChan:
-			require.Failf(t, "timeout waiting for expected values", "next expected value: %v", i)
+			require.Failf(t, "timeout waiting for expected values", "next expected value: %v", expected)
 		}
 	}
 }
 
-func TestBlockedSubscriberReceivesUpdates(t *testing.T) {
+func TestBlockedSubscriberReceivesValueSequence(t *testing.T) {
 	// Create a buffered subscriber, but send and receive values one at a time,
 	// to make sure the value sequence is correct while actively reading.
 
@@ -68,14 +68,18 @@ func TestBlockedSubscriberReceivesUpdates(t *testing.T) {
 
 	b := New(initialValue, valueCount)
 	listenerChan := b.Subscribe(context.Background(), valueCount)
-
 	timeoutChan := time.After(5 * time.Second)
+
+	// Start by reading the initial value, which should always be possible.
 	select {
 	case value := <-listenerChan:
 		require.Equal(t, initialValue, value, "initial value should match Broadcaster initialization")
 	case <-timeoutChan:
 		require.FailNow(t, "timeout waiting for initial read")
 	}
+	// For each additional value, confirm that the read channel is blocked
+	// initially then unblocks when we send the value, and that the sent and
+	// received values match.
 	for i := 1; i <= valueCount; i++ {
 		// confirm that a read blocks (at least briefly) since there are no additional
 		// values available.
@@ -92,6 +96,33 @@ func TestBlockedSubscriberReceivesUpdates(t *testing.T) {
 			require.Equal(t, expected, value, "listener value should match what was written")
 		case <-timeoutChan:
 			require.FailNow(t, "timeout waiting for initial read")
+		}
+	}
+}
+
+func TestSubscriberSkipsOldestValuesWhenBufferExceeded(t *testing.T) {
+	// Send 32 changes on a Broadcaster with a buffer of 32, then confirm that
+	// a subscriber with a buffer of 16 skips the first 16 values.
+
+	const initialValue = 4014
+
+	b := New(initialValue, 32)
+	listenerChan := b.Subscribe(context.Background(), 16)
+
+	for i := 1; i <= 32; i++ {
+		b.InputChan <- initialValue + i
+	}
+
+	timeoutChan := time.After(5 * time.Second)
+	for i := 0; i <= 16; i++ {
+		// add 16 to expected because that's how many values the listener
+		// should have skipped
+		expected := initialValue + 16 + i
+		select {
+		case value := <-listenerChan:
+			require.Equal(t, expected, value, "listener should read the same value sequence that was written")
+		case <-timeoutChan:
+			require.Failf(t, "timeout waiting for expected values", "next expected value: %v", expected)
 		}
 	}
 }
