@@ -233,10 +233,6 @@ func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, 
 			t.Reset(flushInterval)
 		case actions := <-fleetGateway.Actions():
 			actionDispatcher.Dispatch(ctx, actionAcker, actions...)
-			// Reset the timer safely, see https://pkg.go.dev/time#Timer.Reset
-			if !t.Stop() {
-				<-t.C
-			}
 			t.Reset(flushInterval)
 		}
 	}

@@ -187,10 +187,6 @@ func (c *controller) Run(ctx context.Context) error {
 				cleanupFn()
 				return ctx.Err()
 			case <-stateChangedChan:
-				// Reset the timer safely, see https://pkg.go.dev/time#Timer.Reset
-				if !t.Stop() {
-					<-t.C
-				}
 				t.Reset(100 * time.Millisecond)
 				c.logger.Debugf("Variable state changed for composable inputs; debounce started")
 				drainChan(stateChangedChan)
