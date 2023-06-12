@@ -2,8 +2,7 @@
 
 Kube-state-metrics (KSM) library provides [horizontal sharding](https://github.com/kubernetes/kube-state-metrics#horizontal-sharding) in order to support large kubernetes deployments. As Elastic-Agent collection from kube-state-metrics is proved to be resource intensive, we need to be able to support such horizontal scaling scenarios with our configuration. This doc aims to provide information on how to configure Elastic Agent with KSM horizontally sharded.
 
-*IMPORTANT*: Please review the relevant [Scaling Elastic Agent in Kubernetes document](https://github.com/elastic/ingest-docs/blob/325a46d475f4446199955c6acbf8f372535ed57b/docs/en/ingest-management/elastic-agent/scaling-on-kubernetes.asciidoc) before you continue. The documentation explains in more details why and how we concluded in the below configurations.
-
+*IMPORTANT*: Please review the relevant [Scaling Elastic Agent in Kubernetes document](https://www.elastic.co/guide/en/fleet/master/scaling-on-kubernetes.html) before you continue. The documentation explains in more details why and how we concluded in the below configurations.
 
 ## Kube State Metrics Configuration
 
@@ -26,18 +25,15 @@ This document suggests **the 4 alternative configuration methods** to deploy ela
 
 1. `Elastic Agent as side-container with KSM Sharded pods`. The Elastic Agent will be installed as `Statefulset` with `hostNetwork:false` and will be a side container of Kube-state-metrics. Meaning that KSM and Elastic Agent will share the same localhost network to communicate.
 2. With `hostNetwork:false` for non-leader Elastic Agent deployments that will collect from KSM Shards. In this configuration Elastic Agent will be installed as deployments and we will need one deployment for every KSM Shard collection endpoint. An additional Elastic Agent Leader wi
-3. With `podAntiAffinity` to isolate the Elastic Agent daemonset pods from rest of Elastic Agent deployments that will collect metrics from KSM Shard endpoints. The podAntiAffinity will ensure that no Elastic Deployment Pod will be in the same node with the Elastic Agent Daemonset pods. So Elastic Agent Daemonset pods will run only to those nodes where no Elastic Agent that collect KSM run.
-4. With `taint/tolerations` to isolate the Elastic Agent daemonset pods from rest of Elastic Agent deployments. Same as above, only that tolerations is the mean to exclude Daemonset pods from the nodes where the Elastic Agent KSM pods run.
+3. With `taint/tolerations` to isolate the Elastic Agent `Daemonset` pods from rest of Elastic Agent `Deployments`. Tolerations configuration is the mean to exclude Daemonset pods from the nodes where the Elastic Agent KSM pods run. So Elastic Agent Daemonset pods will run only to those nodes where no Elastic Agent that collect KSM run.
 
 Each configuration includes specific pros and cons and users may choose what best matches their needs.
 
-| Installation Method  | No of Policies  | Who can Use it  | Notes |   
+| Installation Method  | No of Policies  | Who can Use it  | Notes |
 |---|---|---|---|
 | Elastic Agent `Statefulset + KSM as Side Container`  | 2 (1 Policy for Leader Daemonset + 1 Policy for all KSM Elastic Agents) | Suggested for K8s clusters more than 2K pods. When latency problems occur (see relevant [Latency section](https://github.com/elastic/ingest-docs/blob/325a46d475f4446199955c6acbf8f372535ed57b/docs/en/ingest-management/elastic-agent/scaling-on-kubernetes.asciidoc))  | Easiest to configure. Suitable for automation scenarios  |
 | Elastic Agent Deployment with `hostNetwork:false` | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  |  Same as above, for k8s clusters more than 2k pods | More manual steps needed comparing to previous method. The KSM and Elastic Agents are in different pods  |
-| Elastic Agents with podAntiAffinity  | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  | Suitable for setups where users need more granularity and need to protect node resource consumption  | More complex method but gives more scheduling abilities to users  |
 | Elastic Agents with taint/tolerations  | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  | When users need to specify the nodes of Elastic Agent  | More complex method but gives more scheduling abilities to users |
-
 
 The Kubernetes observability is based on [kubernetes integration](https://docs.elastic.co/en/integrations/kubernetes), which is fetching metrics from several components:
 
@@ -117,85 +113,10 @@ Deploy following manifests:
 - [+] Simplicity
 - [-] You can not prevent execution of deployments in nodes where agents already running.
 
-### 3. PodAntiAffinity Installation
-
-For this installation, users need to configure the following agent policies:
-
-**Agent policies:**
-
-- Create a policy to be assigned to daemonset resources. 
-  - a) This policy will have enabled *only node-wide* metric datasets (like kubelet, proxy, scheduler or controller).
-  - b) **Disable KSM and Apiserver datasets**
-- Create a second policy for first KSM shard resources. For this policy you need to:
-  - a) Enable leader election from KSM (with url `kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster`) and also
-  ![Deployment policy in affinity config](./images/affinityksm0.png)
-  - b) Enable the APiServer dataset
-  ![Deployment policy in affinity config](./images/affinityksm0datasets.png)
-  - c) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller
-
-(- Repeat policy creation for rest KSM shards. **One deployment needs to be assigned per KSM shard**:  
-
-- a) Disable APIServer dataset
-- b) Enable any extra node-wide metric datasets (like kubelet, proxy, scheduler or controller)
-
-Reason is that now the deployment agent pods will run isolated in specific nodes. This method actually implies that first agent that will be installed from deployment is the leader of your cluster.
-
-**Manifest Installation:**
-
-1. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario
-2. Uncomment the following `affinity` block in both manifests [elastic-agent-managed-daemonset-ksm-0.yaml](./manifests/affinity/elastic-agent-managed-daemonset-ksm-0.yaml), [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/affinity/elastic-agent-managed-deployment-ksm-1.yaml)
-
-   ```bash
-    affinity:
-        podAntiAffinity:  
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:                            
-              - key: app
-                operator: In
-                values:                          
-                  - "elastic-agent"
-            topologyKey: "kubernetes.io/hostname"
-   ```
-
-The above configuration ensures that no more than one pod with `label="elastic-agent"` will be executed in each node.
-
-Then deploy manifests:
-
-```bash
- kubectl apply -f elastic-agent-managed-deployment-ksm-0.yaml
- kubectl apply -f elastic-agent-managed-deployment-ksm-1.yaml
- kubectl apply -f elastic-agent-managed-daemonset.yaml
-```
-
-> **Note:** : Order of deploying manifests is important. You need first to install deployments and then daemonset, otherwise deployments will not find a node available for scheduling.
-
-> **Note**: Above manifests exist under [manifests/affinty](./manifests/affinty) folder
-
-Verify installation:
-
-```bash
-❯ kgp -A | grep elastic
-kube-system   elastic-agent-64ctk                                              1/1     Running   0          4m44s
-kube-system   elastic-agent-8db69556b-6t4qv                                    1/1     Running   0          4m48s
-kube-system   elastic-agent-cj2zk                                              1/1     Running   0          4m44s
-kube-system   elastic-agent-rlnqk                                              1/1     Running   0          4m44s
-kube-system   elastic-agent-tt5lg                                              1/1     Running   0          4m44s
-kube-system   elastic-agent-txxfp                                              0/1     Pending   0          4m44s
-```
-
-> **Note:**: Elastic agent from deployment has a different naming, eg. `elastic-agent-8db69556b-6t4qv`
-
-**Pros/Cons**:
-
-- [+] You *can* prevent execution of deployments in nodes where agents already running.
-- [-] More complex than first method
-- [-] It displays scheduled daemonset pods in state `Pending` where antiaffinity is triggered.
-
-### 4. Tolerations Installation
+### 3. Tolerations Installation
 
 **Agent Policies:**
-For this installation, users need to configure the same agent policies as described in first scenario (aka hostnetwork configuration).
+For this installation, users need to configure the following agent policies:
 
 - Daemonset resources will include the leader ksm and apiserver.
   ![Deployment policy in tolerations config](./images/tolerationsksm0.png)
