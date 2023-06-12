@@ -124,43 +124,72 @@ type Broadcaster[T any] struct {
 	// - subscribeChan listener
 	// - shutdownChan listener
 	// - getChan writer
-	// - For each subcsriber, in the same order as the subscribers array,
+	// - For each subscriber, in the same order as the subscribers array,
 	//   two cases: the first reading the subscriber's context channel,
 	//   the second
 	selectCases []reflect.SelectCase
 
-	// index is incremented with every new value, and corresponds to the
-	// number of values that have been received so far. The next value
-	// to arrive will be placed in buffer[index % len(buffer)] (so buffer
-	// positions wrap around when the buffer limit is reached), and if
-	// index > 0 then the most recent received value is in
-	// buffer[(index-1) % len(buffer)].
-	index int64
+	// index is initialized to zero and incremented with every new value, and
+	// is used to track where subscribers are in Broadcaster's buffer relative
+	// to the most recent value. Broadcaster's most recent value is in
+	// buffer[index % len(buffer)] (i.e. "index" is the position of the current
+	// value once we account for wrapping around at the end of the array).
+	index int
+
+	// shuttingDown indicates that InputChan has been closed. When this is true,
+	// subscribers who finish reading all pending values have their listener
+	// channels closed and are removed from the subscriber list, and when all
+	// subscribers are removed the run loop returns.
+	shuttingDown bool
 }
+
+// constant indices representing the order of the cases in
+// Broadcaster.selectCases
+const (
+	indexInputCase           = 0
+	indexSubscribeCase       = 1
+	indexShutdownCase        = 2
+	indexGetCase             = 3
+	indexFirstSubscriberCase = 4
+)
 
 // subscribeRequest is sent to Broadcaster.subscribeChan to add a new
 // subscriber.
 type subscribeRequest[T any] struct {
-	ctx        context.Context
-	outputChan chan T
+	ctx          context.Context
+	listenerChan chan T
+	bufferLen    int
 }
 
 type subscriber[T any] struct {
 	// The channel to send new values to.
-	outputChan chan T
+	listenerChan chan T
+
+	// The index of the next value that this subscriber should receive.
+	// If subscriber.index == Broadcaster.index then the subscriber is waiting
+	// to receive the most recent vaue. If subscriber.index > Broadcaster.index
+	// then it has received all current values and will block until a new one
+	// arrives.
+	index int
+
+	// How many values this subscriber will buffer in between reads. If bufferLen
+	// is zero, this subscriber will always read the most recent value, otherwise
+	// it will read the most recent values in order up to a limit of bufferLen.
+	// bufferLen must be at most len(Broadcaster.buffer).
+	bufferLen int
 
 	// ctxCase is the case of the reflect.Select call that listens for the
 	// subscriber's context to end. This is a mutable pointer into Broadcaster's
 	// selectCases array.
 	ctxCase *reflect.SelectCase
 
-	// valueCase is the case of the reflect.Select call that waits to send new
+	// listenerCase is the case of the reflect.Select call that waits to send new
 	// values to the subscriber. When the subscriber has already read the most
-	// recent value, valueCase.chan is set to nil to prevent additional sends.
-	// When a new value arrives, all subscribers have valueCase.chan reset
+	// recent value, listenerCase.chan is set to nil to prevent additional sends.
+	// When a new value arrives, all subscribers have listenerCase.chan reset
 	// to their outputChan. This is a mutable pointer into Broadcaster's
 	// selectCases array.
-	valueCase *reflect.SelectCase
+	listenerCase *reflect.SelectCase
 }
 
 // New creates a Broadcaster and starts its run loop. The caller is responsible
@@ -168,54 +197,61 @@ type subscriber[T any] struct {
 // should be cleaned up. (Cleanup is explicit rather than via a context so
 // subscribers can optionally read the final values before shutdown.)
 func New[T any](initialValue T, maxBuffer int) *Broadcaster[T] {
-	b := &Broadcaster[T]{
-		// 32 is probably an over-cautious buffer here, but preventing blocking
-		// in the input is the most important design goal.
-		InputChan:   make(chan T, 32),
-		buffer:      make([]T, maxBuffer),
-		subscribers: []subscriber[T]{},
-	}
+	b := new(initialValue, maxBuffer)
 	go b.runLoop()
 	return b
 }
 
-func (b *Broadcaster[T]) runLoop() {
-	defer close(b.doneChan)
-	for {
-		b.runLoopIterate()
-	}
-}
-
-// The interior of the run loop is split into its own helper function so
-// we can deterministically test Broadcaster's behavior in the unit tests.
-func (b *Broadcaster[T]) runLoopIterate() {
-
-}
-
+// Subscribe adds a new subscriber to Broadcaster, returning a channel that
+// the subscriber can listen on for new values. While active, the channel
+// will return all changes to Broadcaster's tracked value, storing up to
+// bufferLen most recent values if the subscriber does not read them in time.
+// bufferLen values larger than the maxBuffer value passed to broadcaster.New
+// are capped. If bufferLen is zero, the listener channel always returns the
+// most recent value at the time of the read.
+// The channel will be closed when the given context expires, or when
+// Broadcaster itself shuts down. All returned channels are guaranteed to
+// produce at least one value on initial subscription, even if Broadcaster
+// has shut down.
 func (b *Broadcaster[T]) Subscribe(context context.Context, bufferLen int) chan T {
 	req := subscribeRequest[T]{
-		ctx:        context,
-		outputChan: make(chan T),
+		ctx:          context,
+		listenerChan: make(chan T),
+		bufferLen:    bufferLen,
 	}
 	select {
 	case b.subscribeChan <- req:
 		// If the request goes through then we were successful, we can return
 		// the output channel.
+		return req.listenerChan
+
 	case <-b.doneChan:
-		// The Broadcaster has been closed, return a closed channel to indicate
-		// there will be no more data.
-		close(req.outputChan)
+		// The Broadcaster has shut down. Return a closed channel with the final
+		// value buffered inside, so we don't break callers that rely on our
+		// guarantee that the first read always succeeds.
+		closedChan := make(chan T, 1)
+		closedChan <- b.currentValue()
+		close(closedChan)
+		return closedChan
 	}
-	return req.outputChan
 }
 
+// Get returns Broadcaster's current value. It always succeeds, even if
+// Broadcaster has been closed, and it always gives the most recent value
+// at the time of the call. (However, remember that it's possible for the
+// value to change again in between the time that Get reads it and the
+// time that Get returns to the caller. If you need to know about changes
+// to the current value, use Subscribe instead.)
 func (b *Broadcaster[T]) Get() T {
 	select {
 	case value := <-b.getChan:
 		return value
 	case <-b.doneChan:
+		// If doneChan is closed, then the run loop has shut down and the current
+		// value will never change again, so it is safe to read it directly from
+		// the caller's goroutine.
+		return b.currentValue()
 	}
-	return b.buffer[0]
 }
 
 // Close all subscriber channels, discarding any unsent values, and terminate
@@ -235,6 +271,220 @@ func (b *Broadcaster[T]) Close() {
 	}
 }
 
+// Done returns a channel callers can wait on to detect that Broadcaster has
+// shut down. When this channel is closed, Broadcaster's run loop has ended
+// and it will not send any more values.
 func (b *Broadcaster[T]) Done() <-chan struct{} {
 	return b.doneChan
+}
+
+// new is the internal implementation of New that does everything except
+// start the run loop, for tests that want to handle execution steps
+// manually/synchronously.
+func new[T any](initialValue T, maxBuffer int) *Broadcaster[T] {
+	return &Broadcaster[T]{
+		// 32 is probably an over-cautious buffer here, but preventing blocking
+		// in the input is the most important design goal.
+		InputChan: make(chan T, 32),
+		// The array is maxBuffer+1 because we need to store the current value
+		// in addition to any "buffered" values. If maxBuffer is 0, then we
+		// store only the current value and the array is length 1. If
+		// maxBuffer is 5, then we will store 5 previous values in addition to
+		// the current one.
+		buffer: make([]T, maxBuffer+1),
+	}
+}
+
+// runLoop is Broadcaster's main loop, which listens for updates from the
+// input and sends any buffered values to registered subscribers.
+// Its logic is implemented in runLoopIterate.
+func (b *Broadcaster[T]) runLoop() {
+	defer close(b.doneChan)
+	for {
+		b.runLoopIterate()
+	}
+}
+
+// runLoopIterate is the interior of the run loop, which is split into its own
+// helper function so we can deterministically test Broadcaster's behavior in
+// the unit tests.
+func (b *Broadcaster[T]) runLoopIterate() {
+	b.drainInput()
+	chosen, recvValue, recvOK := reflect.Select(b.selectCases)
+	switch chosen {
+	case indexInputCase:
+		if recvOK {
+			// We've received a new value, add it to the internal buffer and update
+			// subscriber state.
+			value := recvValue.Interface().(T)
+			b.handleNewInput(value)
+			b.updateSubscribers()
+		} else {
+			// The input channel is closed, begin shutting down. Setting shuttingDown
+			// to true means subscribers will be removed as they finish reading
+			// buffered values, and when all active subscribers are removed runLoop
+			// will return. We also clear the channel in input's select case, so we
+			// can keep iterating without hitting this case again.
+			b.shuttingDown = true
+			b.selectCases[indexInputCase].Chan = reflect.ValueOf(nil)
+		}
+
+	case indexSubscribeCase:
+		req := recvValue.Interface().(subscribeRequest[T])
+		b.handleNewSubscriber(req)
+
+	case indexShutdownCase:
+		b.shutdown()
+
+	case indexGetCase:
+		// Someone has read our current state, but we don't need to do anything.
+
+	default:
+		// The selected case is from one of our subscribers.
+		// Each subscriber covers two cases, figure out which one we got.
+		subscriberIndex := (chosen - indexFirstSubscriberCase) / 2
+		if (chosen-indexFirstSubscriberCase)%2 == 0 {
+			// The first case for each subscriber is the shutdown channel -- remove
+			// this subscriber from the list.
+			b.removeSubscriber(subscriberIndex)
+		} else {
+			// The second case for each subscriber is their listener channel -- they
+			// just received a value, advance their position in the buffer.
+			b.advanceSubscriber(subscriberIndex)
+		}
+	}
+}
+
+// drainInput reads as many values as possible from the input channel and
+// updates subscriber state if there were any new values.
+// This is called in the run loop before the main select, to make sure input
+// values get priority over any other signal.
+func (b *Broadcaster[T]) drainInput() {
+	receivedInput := false
+	for {
+		select {
+		case value := <-b.InputChan:
+			b.handleNewInput(value)
+			receivedInput = true
+		default:
+			if receivedInput {
+				// If we received any values, refresh the subscriber state.
+				b.updateSubscribers()
+			}
+			return
+		}
+	}
+}
+
+// currentValue is a simple internal helper to return the most recent value
+// in the buffer.
+func (b *Broadcaster[T]) currentValue() T {
+	return b.buffer[b.index%len(b.buffer)]
+}
+
+// handleNewInput adds an incoming value to the internal buffer. Callers should
+// also call updateSubscribers() when all changes are done. (handleNewInput
+// doesn't update subscribers itself so that we can avoid redundant passes
+// through the subscriber list when draining the input channel. In practice
+// this is rare, but if the input channel ever does gets backed up then
+// draining it is our highest priority.)
+func (b *Broadcaster[T]) handleNewInput(value T) {
+	b.index++
+	b.buffer[b.index%len(b.buffer)] = value
+}
+
+func (b *Broadcaster[T]) handleNewSubscriber(req subscribeRequest[T]) {
+	// Add two select cases for the new subscriber, one for its context channel
+	// and one for its listener channel.
+	b.selectCases = append(b.selectCases,
+		reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(req.ctx.Done()),
+		},
+		reflect.SelectCase{
+			Dir:  reflect.SelectSend,
+			Chan: reflect.ValueOf(req.listenerChan),
+			Send: reflect.ValueOf(b.currentValue()),
+		},
+	)
+
+	// Cap the requested buffer length at the maximum set when Broadcaster
+	// was created.
+	// Subtlety: in order for a bufferLen of 0 to correspond to the most
+	// recent value, the actual buffer inside Broadcaster must have length
+	// at least bufferLen+1, so bufferLen is capped at len(buffer)-1.
+	bufferLen := req.bufferLen
+	if bufferLen > len(b.buffer)-1 {
+		bufferLen = len(b.buffer) - 1
+	}
+	b.subscribers = append(b.subscribers, subscriber[T]{
+		listenerChan: req.listenerChan,
+		index:        b.index, // Start with the current value
+		bufferLen:    bufferLen,
+		ctxCase:      &b.selectCases[len(b.selectCases)-2],
+		listenerCase: &b.selectCases[len(b.selectCases)-1],
+	})
+}
+
+// Close the target subscriber's listener channel and remove it from the lists
+// of subscribers and select cases.
+func (b *Broadcaster[T]) removeSubscriber(subscriberIndex int) {
+	close(b.subscribers[subscriberIndex].listenerChan)
+	b.subscribers = append(b.subscribers[:subscriberIndex], b.subscribers[subscriberIndex+1:]...)
+	// Index in the select cases is the index of the first subscriber
+	// plus two cases for each subscriber.
+	caseIndex := indexFirstSubscriberCase + 2*subscriberIndex
+	b.selectCases = append(b.selectCases[:caseIndex], b.selectCases[caseIndex+2:]...)
+}
+
+// advanceSubscriber is called when a subscriber reads a value, to advance
+// it to the next index and either prepare its listener select case with the
+// next value or block it if there are no more values.
+func (b *Broadcaster[T]) advanceSubscriber(subscriberIndex int) {
+	s := &b.subscribers[subscriberIndex]
+	s.index++
+	if s.index > b.index {
+		// No more values to read, block the channel for now
+		s.listenerCase.Chan = reflect.ValueOf(nil)
+	} else {
+		// Load the send channel with the buffer value at s.index
+		s.listenerCase.Send = reflect.ValueOf(b.buffer[s.index%len(b.buffer)])
+	}
+}
+
+// updateSubscribers is called after new input comes in to advance subscriber
+// position if necessary and reactivate their listener channels with the new
+// values.
+func (b *Broadcaster[T]) updateSubscribers() {
+	for i := range b.subscribers {
+		subscriber := &b.subscribers[i]
+		if subscriber.index <= b.index {
+			// The subscriber hasn't read the most recent value, unblock its channel.
+			subscriber.listenerCase.Chan = reflect.ValueOf(subscriber.listenerChan)
+		}
+		if subscriber.index < b.index-subscriber.bufferLen {
+			// If bufferLen is 0, then subscriber.index must be at least b.index,
+			// since it only receives the most recent value; therefore if
+			// bufferLen is n, subscriber.index must be at least b.index-n.
+			// (Note that subscriber.bufferLen is at most len(b.buffer)-1, so
+			// the oldest and newest values in the circular buffer don't overlap.)
+			subscriber.index = b.index - subscriber.bufferLen
+			subscriber.listenerCase.Send = reflect.ValueOf(
+				b.buffer[subscriber.index%len(b.buffer)])
+		}
+		// If subscriber.index didn't need to be advanced, then its listener
+		// case already contains the correct Send value.
+	}
+}
+
+// shutdown sets the shuttingDown flag and closes all subscribers, so the
+// run loop will return after the current iteration.
+func (b *Broadcaster[T]) shutdown() {
+	b.shuttingDown = true
+
+	// Possibly overkill, but remove subscribers in reverse order so the array
+	// can be truncated as we go instead of copying the whole thing each step.
+	for i := len(b.subscribers) - 1; i >= 0; i-- {
+		b.removeSubscriber(i)
+	}
 }
