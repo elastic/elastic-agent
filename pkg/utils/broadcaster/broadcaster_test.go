@@ -59,6 +59,37 @@ func TestSubscriberReceivesValueSequence(t *testing.T) {
 	}
 }
 
+func TestUnbufferedSubscriberReceivesMostRecentValue(t *testing.T) {
+	// Send 32 values on a Broadcaster with a buffer length of 16, then confirm
+	// that an unbuffered subscriber (bufferLen 0) receives only the most recent
+	// change.
+
+	const valueCount = 32
+	const initialValue = 4014
+
+	b := New(initialValue, 16)
+	listenerChan := b.Subscribe(context.Background(), 0)
+
+	for i := 1; i <= valueCount; i++ {
+		b.InputChan <- initialValue + i
+	}
+
+	// Confirm we can read the most recent value
+	select {
+	case value := <-listenerChan:
+		require.Equal(t, initialValue+valueCount, value, "listener should receive the final value")
+	case <-time.After(50 * time.Millisecond):
+		require.Fail(t, "timed out waiting for listener channel")
+	}
+
+	// Confirm the channel blocks after the first read (at least briefly)
+	select {
+	case value := <-listenerChan:
+		require.Fail(t, fmt.Sprintf("received value %v when none was expected", value))
+	case <-time.After(10 * time.Millisecond):
+	}
+}
+
 func TestBlockedSubscriberReceivesValueSequence(t *testing.T) {
 	// Create a buffered subscriber, but send and receive values one at a time,
 	// to make sure the value sequence is correct while actively reading.
