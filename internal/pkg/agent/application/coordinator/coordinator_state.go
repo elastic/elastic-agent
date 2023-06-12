@@ -83,7 +83,7 @@ func (c *Coordinator) setOverrideState(overrideState *coordinatorOverrideState) 
 // Forward the current state to the broadcaster and clear the stateNeedsRefresh
 // flag. Must be called on the main Coordinator goroutine.
 func (c *Coordinator) refreshState() {
-	c.stateBroadcaster.Set(c.generateReportableState())
+	c.stateBroadcaster.InputChan <- c.generateReportableState()
 	c.stateNeedsRefresh = false
 }
 

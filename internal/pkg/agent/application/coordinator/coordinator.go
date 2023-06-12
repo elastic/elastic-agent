@@ -479,6 +479,11 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// log all changes in the state of the runtime and update the coordinator state
 	watchCtx, watchCanceller := context.WithCancel(ctx)
 	defer watchCanceller()
+	// Close the state broadcaster on finish, but leave it running in the
+	// background until all subscribers have read the final values or their
+	// context ends, so test listeners and such can collect Coordinator's
+	// shutdown state.
+	defer close(c.stateBroadcaster.InputChan)
 
 	go c.watchRuntimeComponents(watchCtx)
 
