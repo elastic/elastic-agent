@@ -76,18 +76,22 @@ var (
 	versionQualified bool
 	versionQualifier string
 
+	// Env var to set the agent package version
+	agentPackageVersion = EnvOr("AGENT_PACKAGE_VERSION", "")
+
 	FuncMap = map[string]interface{}{
-		"beat_doc_branch":   BeatDocBranch,
-		"beat_version":      BeatQualifiedVersion,
-		"commit":            CommitHash,
-		"commit_short":      CommitHashShort,
-		"date":              BuildDate,
-		"elastic_beats_dir": ElasticBeatsDir,
-		"go_version":        GoVersion,
-		"repo":              GetProjectRepoInfo,
-		"title":             func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
-		"tolower":           strings.ToLower,
-		"contains":          strings.Contains,
+		"beat_doc_branch":       BeatDocBranch,
+		"beat_version":          BeatQualifiedVersion,
+		"commit":                CommitHash,
+		"commit_short":          CommitHashShort,
+		"date":                  BuildDate,
+		"elastic_beats_dir":     ElasticBeatsDir,
+		"go_version":            GoVersion,
+		"repo":                  GetProjectRepoInfo,
+		"title":                 func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
+		"tolower":               strings.ToLower,
+		"contains":              strings.Contains,
+		"agent_package_version": AgentPackageVersion,
 	}
 )
 
@@ -223,6 +227,7 @@ repo.CanonicalRootImportPath = {{ repo.CanonicalRootImportPath }}
 repo.RootDir                 = {{ repo.RootDir }}
 repo.ImportPath              = {{ repo.ImportPath }}
 repo.SubDir                  = {{ repo.SubDir }}
+agent_package_version        = {{ agent_package_version}}
 `
 
 	return Expand(dumpTemplate)
@@ -260,6 +265,30 @@ func CommitHashShort() (string, error) {
 		shortHash = shortHash[:6]
 	}
 	return shortHash, err
+}
+
+func AgentPackageVersion() (string, error) {
+	if agentPackageVersion != "" {
+		return agentPackageVersion, nil
+	}
+
+	// build a package version based on major.minor.patch + Snapshot + git commit
+	beatsVersion, err := beatVersion()
+	if err != nil {
+		return "", fmt.Errorf("error retrieving beat version: %w", err)
+	}
+	b := new(strings.Builder)
+	b.WriteString(beatsVersion)
+	if Snapshot {
+		b.WriteString("-SNAPSHOT")
+	}
+	shortCommitHash, err := CommitHashShort()
+	if err != nil {
+		return "", fmt.Errorf("error retrieving short commit hash: %w", err)
+	}
+	b.WriteString("+git-")
+	b.WriteString(shortCommitHash)
+	return b.String(), nil
 }
 
 var (

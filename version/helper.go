@@ -4,7 +4,13 @@
 
 package version
 
-import "time"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
 
 // GetDefaultVersion returns the current libbeat version.
 // This method is in a separate file as the version.go file is auto generated
@@ -16,10 +22,40 @@ func GetDefaultVersion() string {
 }
 
 var (
-	buildTime = "unknown"
-	commit    = "unknown"
-	qualifier = ""
+	buildTime      = "unknown"
+	commit         = "unknown"
+	qualifier      = ""
+	packageVersion = "unknown"
 )
+
+const packageVersionFileName = ".package.version"
+
+// GetAgentPackageVersion retrieves the version saved in .package.version in the same
+// directory as the agent executable
+func GetAgentPackageVersion() string {
+	execPath, err := getCurrentExecutablePath()
+	if err != nil {
+		panic(err)
+	}
+	versionBytes, err := os.ReadFile(filepath.Join(filepath.Dir(execPath), packageVersionFileName))
+	if err != nil {
+		panic(err)
+	}
+	return strings.TrimSpace(string(versionBytes))
+}
+
+func getCurrentExecutablePath() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("retrieving current process executable: %w", err)
+	}
+	evalPath, err := filepath.EvalSymlinks(execPath)
+	if err != nil {
+		return "", fmt.Errorf("evaluating symlinks to current process executable: %w", err)
+	}
+
+	return evalPath, nil
+}
 
 // BuildTime exposes the compile-time build time information.
 // It will represent the zero time instant if parsing fails.
