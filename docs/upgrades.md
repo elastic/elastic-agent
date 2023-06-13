@@ -1,10 +1,11 @@
 ## Agent Upgrades
 
 ### Communications amongst components
-The following sequence diagram illustrates the process of Fleet-managed Agent
-upgrades, focussing on the communications that occur during this process amongst
-the various components involved.  This diagram is accurate as of version `8.9.0`
-of every component shown.
+The following sequence diagram illustrates the process of upgrading a
+Fleet-managed Agent. The diagram focusses on the communications that occur
+amongst the various components involved in the upgrade process.
+
+This diagram is accurate as of version `8.9.0` of every component shown.
 
 ```mermaid
 sequenceDiagram
