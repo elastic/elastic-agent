@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"log"
 	"net/url"
 	"os"
@@ -31,6 +30,8 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 // A backoff schedule for when and how often to retry failed HTTP
@@ -44,15 +45,16 @@ var backoffSchedule = []time.Duration{
 	10 * time.Second,
 }
 
-var invalidManifestURL = errors.New("invalid ManifestURL provided")
-var notAllowedManifestURL = errors.New("the provided ManifestURL is not allowed URL")
+var errorInvalidManifestURL = errors.New("invalid ManifestURL provided")
+var errorNotAllowedManifestURL = errors.New("the provided ManifestURL is not allowed URL")
+
 var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co"}
 
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
 func DownloadManifest(manifest string) (tools.Build, error) {
 	manifestUrl, urlError := url.Parse(manifest)
 	if urlError != nil {
-		return tools.Build{}, invalidManifestURL
+		return tools.Build{}, errorInvalidManifestURL
 	}
 	var valid = false
 	for _, manifestHost := range AllowedManifestHosts {
@@ -62,7 +64,7 @@ func DownloadManifest(manifest string) (tools.Build, error) {
 	}
 	if !valid {
 		log.Printf("Not allowed %s, valid ones are %+v", manifestUrl.Host, AllowedManifestHosts)
-		return tools.Build{}, notAllowedManifestURL
+		return tools.Build{}, errorNotAllowedManifestURL
 	}
 	sanitizedUrl := fmt.Sprintf("https://%s%s", manifestUrl.Host, manifestUrl.Path)
 	f := func() (tools.Build, error) { return downloadManifestData(sanitizedUrl) }
@@ -133,7 +135,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 							func(downloadUrl string, target string) {
 								parsedURL, errorUrl := url.Parse(downloadUrl)
 								if errorUrl != nil {
-									errGrp.Go(func() error { return invalidManifestURL })
+									errGrp.Go(func() error { return errorInvalidManifestURL })
 								}
 								var valid = false
 								for _, manifestHost := range AllowedManifestHosts {
@@ -143,7 +145,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 								}
 								if !valid {
 									log.Printf("Not allowed %s, valid ones are %+v", parsedURL.Host, AllowedManifestHosts)
-									errGrp.Go(func() error { return notAllowedManifestURL })
+									errGrp.Go(func() error { return errorNotAllowedManifestURL })
 								}
 								cleanUrl := fmt.Sprintf("https://%s%s", parsedURL.Host, parsedURL.Path)
 								download := func() (string, error) { return downloadFile(downloadsCtx, cleanUrl, target) }

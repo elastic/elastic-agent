@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"time"
 
 	"github.com/magefile/mage/mg"
+
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 func doWithRetries[T any](f func() (T, error)) (T, error) {
@@ -72,7 +73,8 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 
 func downloadManifestData(url string) (tools.Build, error) {
 	var response tools.Build
-	resp, err := http.Get(url)
+	// Setting nolint because we should have already verified that this is a proper valid url
+	resp, err := http.Get(url) //nolint
 	if err != nil {
 		return response, fmt.Errorf("failed to download manifest [%s]\n %w", url, err)
 	}
