@@ -15,8 +15,9 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/magefile/mage/mg"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 // DebianRunner is a handler for running tests on Linux
