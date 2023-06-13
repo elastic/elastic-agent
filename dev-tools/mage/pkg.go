@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 )
 
 // Package packages the Beat for distribution. It generates packages based on
@@ -27,8 +27,8 @@ func Package() error {
 	}
 
 	if len(Packages) == 0 {
-		return errors.New("no package specs are registered. Call " +
-			"UseCommunityBeatPackaging, UseElasticBeatPackaging or USeElasticBeatWithoutXPackPackaging first.")
+		return fmt.Errorf("no package specs are registered. Call " +
+			"UseCommunityBeatPackaging, UseElasticBeatPackaging or USeElasticBeatWithoutXPackPackaging first")
 	}
 
 	// platforms := updateWithDarwinUniversal(Platforms)
@@ -141,8 +141,11 @@ type packageBuilder struct {
 func (b packageBuilder) Build() error {
 	fmt.Printf(">> package: Building %v type=%v for platform=%v\n", b.Spec.Name, b.Type, b.Platform.Name)
 	log.Printf("Package spec: %+v", b.Spec)
-	return errors.Wrapf(b.Type.Build(b.Spec), "failed building %v type=%v for platform=%v",
-		b.Spec.Name, b.Type, b.Platform.Name)
+	if err := b.Type.Build(b.Spec); err != nil {
+		return fmt.Errorf("failed building %v type=%v for platform=%v : %w",
+			b.Spec.Name, b.Type, b.Platform.Name, err)
+	}
+	return nil
 }
 
 type testPackagesParams struct {
