@@ -73,8 +73,7 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 
 func downloadManifestData(url string) (tools.Build, error) {
 	var response tools.Build
-	// Setting nolint because we should have already verified that this is a proper valid url
-	resp, err := http.Get(url) //nolint
+	resp, err := http.Get(url) //nolint // we should have already verified that this is a proper valid url
 	if err != nil {
 		return response, fmt.Errorf("failed to download manifest [%s]\n %w", url, err)
 	}
