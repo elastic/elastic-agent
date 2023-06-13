@@ -410,12 +410,17 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
 func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 	state := make(map[string]runtime.ComponentState)
 
-	sub := c.runtimeMgr.SubscribeAll(ctx)
+	var subChan <-chan runtime.ComponentComponentState
+	if c.runtimeMgr != nil {
+		// A real Coordinator will always have a runtime manager, but a Coordinator
+		// in a unit test may only initialize the component it's testing.
+		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case s := <-sub.Ch():
+		case s := <-subChan:
 			oldState, ok := state[s.Component.ID]
 			if !ok {
 				componentLog := coordinatorComponentLog{
@@ -714,26 +719,36 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// We run nil checks before starting the various managers so that unit
+	// tests only have to initialize / mock the specific components they're
+	// testing. In a live agent, these fields are never nil.
+
 	runtimeErrCh := make(chan error)
-	go func() {
-		err := c.runtimeMgr.Run(ctx)
-		cancel()
-		runtimeErrCh <- err
-	}()
+	if c.runtimeMgr != nil {
+		go func() {
+			err := c.runtimeMgr.Run(ctx)
+			cancel()
+			runtimeErrCh <- err
+		}()
+	}
 
 	configErrCh := make(chan error)
-	go func() {
-		err := c.configMgr.Run(ctx)
-		cancel()
-		configErrCh <- err
-	}()
+	if c.configMgr != nil {
+		go func() {
+			err := c.configMgr.Run(ctx)
+			cancel()
+			configErrCh <- err
+		}()
+	}
 
 	varsErrCh := make(chan error)
-	go func() {
-		err := c.varsMgr.Run(ctx)
-		cancel()
-		varsErrCh <- err
-	}()
+	if c.varsMgr != nil {
+		go func() {
+			err := c.varsMgr.Run(ctx)
+			cancel()
+			varsErrCh <- err
+		}()
+	}
 
 	// Keep looping until the context ends or runLoopIteration returns false.
 	for ctx.Err() == nil {
@@ -749,10 +764,10 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case <-ctx.Done():
 		return
 
-	case runtimeErr := <-c.runtimeMgr.Errors():
+	case runtimeErr := <-c.runtimeManagerErrorChan():
 		c.setRuntimeManagerError(runtimeErr)
 
-	case configErr := <-c.configMgr.Errors():
+	case configErr := <-c.configManagerErrorChan():
 		if c.isManaged {
 			if configErr == nil {
 				c.setFleetState(agentclient.Healthy, "Connected")
@@ -764,10 +779,10 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			c.setConfigManagerError(configErr)
 		}
 
-	case actionsErr := <-c.configMgr.ActionErrors():
+	case actionsErr := <-c.actionsErrorChan():
 		c.setConfigManagerActionsError(actionsErr)
 
-	case varsErr := <-c.varsMgr.Errors():
+	case varsErr := <-c.varsManagerErrorChan():
 		c.setVarsManagerError(varsErr)
 
 	case overrideState := <-c.overrideStateChan:
@@ -779,7 +794,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		// Coordinator state.
 		c.applyComponentState(componentState)
 
-	case change := <-c.configMgr.Watch():
+	case change := <-c.configManagerUpdateChan():
 		if err := c.processConfig(ctx, change.Config()); err != nil {
 			c.setState(agentclient.Failed, err.Error())
 			c.logger.Errorf("%s", err)
@@ -792,7 +807,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			}
 		}
 
-	case vars := <-c.varsMgr.Watch():
+	case vars := <-c.varsManagerUpdateChan():
 		if ctx.Err() == nil {
 			if err := c.processVars(ctx, vars); err != nil {
 				c.setState(agentclient.Failed, err.Error())
@@ -1087,4 +1102,52 @@ func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args 
 	default:
 		l.With(args...).Info(msg)
 	}
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Helper functions to return various error reporting channels, falling
+// back to nil if their components don't exist. This never happens in a live
+// Coordinator, but it makes it easy to test the Coordinator run loop against
+// a target component without initializing / mocking everything:
+
+func (c *Coordinator) runtimeManagerErrorChan() <-chan error {
+	if c.runtimeMgr == nil {
+		return nil
+	}
+	return c.runtimeMgr.Errors()
+}
+
+func (c *Coordinator) configManagerErrorChan() <-chan error {
+	if c.configMgr == nil {
+		return nil
+	}
+	return c.configMgr.Errors()
+}
+
+func (c *Coordinator) actionsErrorChan() <-chan error {
+	if c.configMgr == nil {
+		return nil
+	}
+	return c.configMgr.ActionErrors()
+}
+
+func (c *Coordinator) varsManagerErrorChan() <-chan error {
+	if c.varsMgr == nil {
+		return nil
+	}
+	return c.varsMgr.Errors()
+}
+
+func (c *Coordinator) configManagerUpdateChan() <-chan ConfigChange {
+	if c.configMgr == nil {
+		return nil
+	}
+	return c.configMgr.Watch()
+}
+
+func (c *Coordinator) varsManagerUpdateChan() <-chan []*transpiler.Vars {
+	if c.varsMgr == nil {
+		return nil
+	}
+	return c.varsMgr.Watch()
 }
