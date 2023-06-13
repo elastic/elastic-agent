@@ -273,10 +273,10 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 		state := item.State
 
 		var shipperReference *fleetapi.CheckinShipperReference
-		if component.Shipper != nil {
+		if component.ShipperRef != nil {
 			shipperReference = &fleetapi.CheckinShipperReference{
-				ComponentID: component.Shipper.ComponentID,
-				UnitID:      component.Shipper.UnitID,
+				ComponentID: component.ShipperRef.ComponentID,
+				UnitID:      component.ShipperRef.UnitID,
 			}
 		}
 		checkinComponent := fleetapi.CheckinComponent{

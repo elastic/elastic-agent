@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -23,7 +24,6 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/otiai10/copy"
-	"github.com/pkg/errors"
 	"k8s.io/utils/strings/slices"
 
 	"github.com/elastic/e2e-testing/pkg/downloads"
@@ -117,22 +117,22 @@ func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
 	if err != nil {
-		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
+		return fmt.Errorf("failed running go mod tidy, please fix the issues reported: %w", err)
 	}
 	fmt.Println(">> fmt - git diff")
 	err = sh.RunV("git", "diff")
 	if err != nil {
-		return errors.Wrap(err, "failed running git diff, please fix the issues reported")
+		return fmt.Errorf("failed running git diff, please fix the issues reported: %w", err)
 	}
 	fmt.Println(">> fmt - git update-index")
 	err = sh.RunV("git", "update-index", "--refresh")
 	if err != nil {
-		return errors.Wrap(err, "failed running git update-index --refresh, please fix the issues reported")
+		return fmt.Errorf("failed running git update-index --refresh, please fix the issues reported: %w", err)
 	}
 	fmt.Println(">> fmt - git diff-index")
 	err = sh.RunV("git", "diff-index", "--exit-code", "HEAD", " --")
 	if err != nil {
-		return errors.Wrap(err, "failed running go mod tidy, please fix the issues reported")
+		return fmt.Errorf("failed running go mod tidy, please fix the issues reported: %w", err)
 	}
 	return nil
 }
@@ -461,6 +461,19 @@ func CrossBuild() error {
 // CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.
 func CrossBuildGoDaemon() error {
 	return devtools.CrossBuildGoDaemon()
+}
+
+// PackageAgentCore cross-builds and packages distribution artifacts containing
+// only elastic-agent binaries with no extra files or dependencies.
+func PackageAgentCore() {
+	start := time.Now()
+	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
+
+	mg.Deps(CrossBuild, CrossBuildGoDaemon)
+
+	devtools.UseElasticAgentCorePackaging()
+
+	mg.Deps(devtools.Package)
 }
 
 // Config generates both the short/reference/docker.
@@ -887,7 +900,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 			if os.IsNotExist(err) {
 				continue
 			} else if err != nil {
-				panic(errors.Wrap(err, "failed stating file"))
+				panic(fmt.Errorf("failed stating file: %w", err))
 			}
 
 			if stat.IsDir() {
@@ -955,7 +968,7 @@ func copyComponentSpecs(componentName, versionedDropPath string) (string, error)
 		sourceSpecFile := filepath.Join("specs", specFileName)
 		err := devtools.Copy(sourceSpecFile, targetPath)
 		if err != nil {
-			return "", errors.Wrapf(err, "failed copying spec file %q to %q", sourceSpecFile, targetPath)
+			return "", fmt.Errorf("failed copying spec file %q to %q: %w", sourceSpecFile, targetPath, err)
 		}
 	}
 
@@ -1015,7 +1028,7 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 			if os.IsNotExist(err) {
 				continue
 			} else if err != nil {
-				panic(errors.Wrap(err, "failed stating file"))
+				panic(fmt.Errorf("failed stating file: %w", err))
 			}
 
 			if stat.IsDir() {
@@ -1028,7 +1041,7 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
 			}
 			if err := os.Rename(f, targetPath); err != nil {
-				panic(errors.Wrap(err, "failed renaming file"))
+				panic(fmt.Errorf("failed renaming file: %w", err))
 			}
 		}
 	}
@@ -1165,10 +1178,10 @@ func Ironbank() error {
 		return nil
 	}
 	if err := prepareIronbankBuild(); err != nil {
-		return errors.Wrap(err, "failed to prepare the IronBank context")
+		return fmt.Errorf("failed to prepare the IronBank context: %w", err)
 	}
 	if err := saveIronbank(); err != nil {
-		return errors.Wrap(err, "failed to save artifacts for IronBank")
+		return fmt.Errorf("failed to save artifacts for IronBank: %w", err)
 	}
 	return nil
 }
@@ -1206,7 +1219,11 @@ func saveIronbank() error {
 		return fmt.Errorf("cannot compress the tar.gz file: %+v", err)
 	}
 
-	return errors.Wrap(devtools.CreateSHA512File(tarGzFile), "failed to create .sha512 file")
+	if err := devtools.CreateSHA512File(tarGzFile); err != nil {
+		return fmt.Errorf("failed to create .sha512 file: %w", err)
+	}
+
+	return nil
 }
 
 func getIronbankContextName() string {
@@ -1237,7 +1254,7 @@ func prepareIronbankBuild() error {
 
 			err := devtools.ExpandFile(path, target, data)
 			if err != nil {
-				return errors.Wrapf(err, "expanding template '%s' to '%s'", path, target)
+				return fmt.Errorf("expanding template '%s' to '%s': %w", path, target, err)
 			}
 		}
 		return nil
@@ -1416,7 +1433,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	batches, err := define.DetermineBatches("testing/integration", "integration")
 	if err != nil {
-		return fmt.Errorf("failed to detemine batches: %w", err)
+		return fmt.Errorf("failed to determine batches: %w", err)
 	}
 	r, err := createTestRunner(matrix, singleTest, batches...)
 	if err != nil {

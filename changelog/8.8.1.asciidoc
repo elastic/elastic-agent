@@ -1,0 +1,33 @@
+// begin 8.8.1 relnotes
+
+[[release-notes-8.8.1]]
+==  8.8.1
+
+Review important information about the  8.8.1 release.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.8.1]]
+=== Bug fixes
+
+
+
+
+* Fix potential deadlock issue in communication between updated components and RuntimeManager. {-pull}https://github.com/elastic/elastic-agent/pull/2729[#https://github.com/elastic/elastic-agent/pull/2729] {-issue}https://github.com/elastic/elastic-agent/issues/2691[#https://github.com/elastic/elastic-agent/issues/2691]
+agent::
+
+* Add a retry download step to the upgrade process. {agent-pull}https://github.com/elastic/elastic-agent/pull/2776[#https://github.com/elastic/elastic-agent/pull/2776] 
+
+// end 8.8.1 relnotes

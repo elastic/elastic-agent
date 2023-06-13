@@ -115,7 +115,7 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 	require.NoError(s.T(), err)
 
 	s.T().Log("Enrolling Elastic Agent...")
-	output, err := tools.EnrollElasticAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
+	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
 	if err != nil {
 		s.T().Log(string(output))
 	}
@@ -210,7 +210,7 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	output, err := tools.InstallStandaloneElasticAgent(s.agentFixture)
+	output, err := tools.InstallStandaloneAgent(s.agentFixture)
 	s.T().Logf("Agent installation output: %q", string(output))
 	require.NoError(s.T(), err)
 
@@ -398,7 +398,7 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) TestUpgradeStandaloneElasticAg
 	ctx := context.Background()
 
 	s.T().Log("Install the built Agent")
-	output, err := tools.InstallStandaloneElasticAgent(s.agentFixture)
+	output, err := tools.InstallStandaloneAgent(s.agentFixture)
 	s.T().Log(string(output))
 	s.Require().NoError(err)
 
@@ -498,18 +498,13 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) getVersion(ctx context.Context
 		args := []string{"version", "--yaml"}
 		var output []byte
 		output, err = s.agentFixture.Exec(ctx, args)
-
 		if err != nil {
 			s.T().Log(string(output))
 			return false
 		}
 
 		err = yaml.Unmarshal(output, &currentVersion)
-		if err != nil {
-			return false
-		}
-
-		return true
+		return err == nil
 	}, 1*time.Minute, 1*time.Second)
 
 	return &currentVersion, err
