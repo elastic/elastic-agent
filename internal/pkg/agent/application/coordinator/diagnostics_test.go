@@ -226,6 +226,7 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			helper.runtimeManager.EXPECT().Update(mock.AnythingOfType("[]component.Component")).Return(nil)
 
 			sut := helper.coordinator
+			stateChan := sut.StateSubscribe(ctx, 32)
 			coordinatorWg := new(sync.WaitGroup)
 			defer func() {
 				cancelFunc()
@@ -267,9 +268,10 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			}).Times(1)
 			mustWriteToChannelBeforeTimeout[coordinator.ConfigChange](t, initialConfChange, helper.configChangeChannel, 100*time.Millisecond)
 
-			assert.Eventually(t, func() bool {
-				return sut.State().State == cproto.State_HEALTHY
-			}, 1*time.Second, 50*time.Millisecond)
+			waitForState(t, stateChan, func(state coordinator.State) bool {
+				t.Logf("State update: %s", state.State)
+				return state.State == cproto.State_HEALTHY
+			}, time.Second)
 			assert.Eventually(t, func() bool {
 				return configCalled.Load() && ackCalled.Load()
 			}, 1*time.Second, 50*time.Millisecond)
@@ -318,6 +320,30 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// waitForState listens on the given stateChan for a state where stateCallback
+// returns true, up to the given timeout duration, and reports a test failure
+// if it doesn't arrive.
+func waitForState(
+	t *testing.T,
+	stateChan chan coordinator.State,
+	stateCallback func(coordinator.State) bool,
+	timeout time.Duration,
+) {
+	t.Helper()
+	timeoutChan := time.After(timeout)
+	for {
+		select {
+		case state := <-stateChan:
+			if stateCallback(state) {
+				return
+			}
+		case <-timeoutChan:
+			assert.Fail(t, "timed out waiting for expected state")
+			return
+		}
 	}
 }
 
