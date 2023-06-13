@@ -164,7 +164,6 @@ type Coordinator struct {
 	cfg   *configuration.Configuration
 	specs component.RuntimeSpecs
 
-	logLevel logp.Level
 	// loglevelCh forwards log level changes from the public API (SetLogLevel)
 	// to the run loop in Coordinator's main goroutine.
 	logLevelCh chan logp.Level
@@ -911,7 +910,6 @@ func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) (err e
 		span.End()
 	}()
 
-	c.logLevel = ll
 	c.setLogLevel(ll)
 
 	if c.ast != nil && c.vars != nil {
@@ -973,7 +971,7 @@ func (c *Coordinator) recomputeConfigAndComponents() (map[string]interface{}, []
 	comps, err := c.specs.ToComponents(
 		cfg,
 		configInjector,
-		c.State().LogLevel,
+		c.state.LogLevel,
 		c.agentInfo,
 	)
 	if err != nil {
