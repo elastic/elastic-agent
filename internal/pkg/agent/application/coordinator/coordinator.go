@@ -869,7 +869,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 
 	if err := c.monitorMgr.Reload(cfg); err != nil {
-		return fmt.Errorf("failed to reload upgrade manager configuration: %w", err)
+		return fmt.Errorf("failed to reload monitor manager configuration: %w", err)
 	}
 
 	c.config = cfg
