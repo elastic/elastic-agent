@@ -1,0 +1,57 @@
+## Agent Upgrades
+
+### Communications amongst components
+The following sequence diagram illustrates the process of Fleet-managed Agent
+upgrades, focussing on the communications that occur during this process amongst
+the various components involved.  This diagram is accurate as of version `8.9.0`
+of every component shown.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as Fleet UI
+    participant ES
+    participant FS as Fleet Server
+    participant A as Agent
+    participant UW as Upgrade Watcher
+    participant UM as Upgrader Marker
+
+    U->>UI: Initiate upgrade
+    UI->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_started_at`
+    UI->>UI: Show Agent status as "updating"
+    UI->>ES: Create new doc in `.fleet-actions` for `UPGRADE` action
+    A->>FS: Check-in request
+    FS->>ES: Read pending actions from .fleet-actions
+    FS->>A: Check-in response
+    A->>A: Queue upgrade action
+    alt If upgrade start fails
+       A->>FS: Ack failed upgrade
+       FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = "failed"
+       UI->>UI: Show Agent status as "???"
+       Note right of UI: Need to check
+    else
+       opt If previous upgrades found
+          A->>FS: Ack previous upgrades
+          A->>A: Remove previous upgrades from queue
+       end
+       A->>A: Download new Agent artifact
+       A->>A: Extract new Agent artifact
+       A->>A: Replace current Agent artifact with new one
+       A->>UM: Create
+       A->>UW: Start
+       A->>A: Rexec to start new Agent artifact
+       A->>FS: Ack successful upgrade
+       UW->>UM: Remove
+       FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at = <now>
+       UI->>UI: Show Agent status as "healthy"
+   end
+   opt Rollback
+       UW->>A: Start
+       A->>FS: Ack failed upgrade
+       FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at = <now>
+       Note right of ES: Need to check
+       UI->>UI: Show Agent status as "???"
+       Note right of UI: Need to check
+       UW->>UM: Remove
+   end
+```
