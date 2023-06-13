@@ -229,27 +229,6 @@ func HaveKubectl() error {
 	return nil
 }
 
-// IsDarwinUniversal indicates whether ot not the darwin/universal should be
-// assembled. If both platforms darwin/adm64 and darwin/arm64 are listed, then
-// IsDarwinUniversal returns true.
-// Note: Platforms might be edited at different moments, therefore it's necessary
-// to perform this check on the fly.
-func IsDarwinUniversal() bool {
-	var darwinAMD64, darwinARM64 bool
-
-	//nolint:goconst // Consistency: there are constants for platforms.
-	for _, p := range Platforms {
-		if p.Name == "darwin/arm64" {
-			darwinARM64 = true
-		}
-		if p.Name == "darwin/amd64" {
-			darwinAMD64 = true
-		}
-	}
-
-	return darwinAMD64 && darwinARM64
-}
-
 // FindReplace reads a file, performs a find/replace operation, then writes the
 // output to the same file path.
 func FindReplace(file string, re *regexp.Regexp, repl string) error {
