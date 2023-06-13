@@ -15,14 +15,11 @@ outputs:
     # username: "elastic"
     # password: "changeme"
 
-<<<<<<< HEAD
-=======
 
 
 # Here you can configure your list of inputs. You can either configure all the inputs as a list of arrays
 # or create an "inputs.d" directory containing your input configurations.
 # See https://www.elastic.co/guide/en/fleet/current/elastic-agent-configuration.html for how to structure the "inputs.d" directory.
->>>>>>> 6a6720ee20 (Add filestream stream IDs to k8s manifests. (#2788))
 inputs:
   - type: system/metrics
     # Each input must have a unique ID.
@@ -46,8 +43,6 @@ inputs:
         - filesystem
         data_stream.dataset: system.filesystem
 
-<<<<<<< HEAD
-=======
 #   # Collecting log files
 #   - type: filestream
 #     # Input ID allowing Elastic Agent to track the state of this input. Must be unique.
@@ -62,7 +57,6 @@ inputs:
 #           - /var/log/*.log
 
 
->>>>>>> 6a6720ee20 (Add filestream stream IDs to k8s manifests. (#2788))
 # agent.monitoring:
 #   # enabled turns on monitoring of running processes
 #   enabled: true
