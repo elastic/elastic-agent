@@ -37,6 +37,12 @@ const (
 	// defaultBinaryName specifies the output file for zip and tar.gz.
 	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
 
+	// defaultRootDir is the default name of the root directory contained inside of zip and
+	// tar.gz packages.
+	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
+	// directory to not include "-oss".
+	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+
 	componentConfigMode os.FileMode = 0600
 
 	rpm     = "rpm"
@@ -529,9 +535,7 @@ func (s PackageSpec) rootDir() string {
 		return filepath.Base(s.OutputFile)
 	}
 
-	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
-	// directory to not include "-oss".
-	return s.MustExpand("{{.BeatName}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}")
+	return s.MustExpand(defaultRootDir)
 }
 
 // PackageZip packages a zip file.
