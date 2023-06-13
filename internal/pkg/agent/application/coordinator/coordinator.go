@@ -710,111 +710,110 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 // runner performs the actual work of running all the managers.
 // Called on the main Coordinator goroutine, from Coordinator.Run.
 //
-// if one of the managers fails the others are also stopped and then the whole runner returns
+// if one of the managers terminates the others are also stopped and then the whole runner returns
 func (c *Coordinator) runner(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	runtimeWatcher := c.runtimeMgr
-	runtimeRun := make(chan bool)
 	runtimeErrCh := make(chan error)
-	go func(manager Runner) {
-		err := manager.Run(ctx)
-		close(runtimeRun)
+	go func() {
+		err := c.runtimeMgr.Run(ctx)
+		cancel()
 		runtimeErrCh <- err
-	}(runtimeWatcher)
+	}()
 
-	configWatcher := c.configMgr
-	configRun := make(chan bool)
 	configErrCh := make(chan error)
-	go func(manager Runner) {
-		err := manager.Run(ctx)
-		close(configRun)
+	go func() {
+		err := c.configMgr.Run(ctx)
+		cancel()
 		configErrCh <- err
-	}(configWatcher)
+	}()
 
-	varsWatcher := c.varsMgr
-	varsRun := make(chan bool)
 	varsErrCh := make(chan error)
-	go func(manager Runner) {
-		err := manager.Run(ctx)
-		close(varsRun)
+	go func() {
+		err := c.varsMgr.Run(ctx)
+		cancel()
 		varsErrCh <- err
-	}(varsWatcher)
+	}()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return c.handleCoordinatorDone(ctx, varsErrCh, runtimeErrCh, configErrCh)
-		case <-runtimeRun:
-			if ctx.Err() == nil {
-				cancel()
-			}
-		case <-configRun:
-			if ctx.Err() == nil {
-				cancel()
-			}
-		case <-varsRun:
-			if ctx.Err() == nil {
-				cancel()
-			}
-		case runtimeErr := <-c.runtimeMgr.Errors():
-			c.setRuntimeManagerError(runtimeErr)
-		case configErr := <-c.configMgr.Errors():
-			if c.isManaged {
-				if configErr == nil {
-					c.setFleetState(agentclient.Healthy, "Connected")
-				} else {
-					c.setFleetState(agentclient.Failed, configErr.Error())
-				}
+	// Keep looping until the context ends or runLoopIteration returns false.
+	for ctx.Err() == nil {
+		c.runLoopIteration(ctx)
+	}
+	return c.handleCoordinatorDone(ctx, varsErrCh, runtimeErrCh, configErrCh)
+}
+
+// runLoopIteration runs one iteration of the Coorinator's internal run
+// loop in a standalone helper function to enable testing.
+func (c *Coordinator) runLoopIteration(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+		return
+
+	case runtimeErr := <-c.runtimeMgr.Errors():
+		c.setRuntimeManagerError(runtimeErr)
+
+	case configErr := <-c.configMgr.Errors():
+		if c.isManaged {
+			if configErr == nil {
+				c.setFleetState(agentclient.Healthy, "Connected")
 			} else {
-				// not managed gets sets as an overall error for the agent
-				c.setConfigManagerError(configErr)
+				c.setFleetState(agentclient.Failed, configErr.Error())
 			}
-		case actionsErr := <-c.configMgr.ActionErrors():
-			c.setConfigManagerActionsError(actionsErr)
-		case varsErr := <-c.varsMgr.Errors():
-			c.setVarsManagerError(varsErr)
-		case overrideState := <-c.overrideStateChan:
-			c.setOverrideState(overrideState)
-		case componentState := <-c.componentStateChan:
-			c.applyComponentState(componentState)
-		case change := <-configWatcher.Watch():
-			if ctx.Err() == nil {
-				if err := c.processConfig(ctx, change.Config()); err != nil {
-					c.setState(agentclient.Failed, err.Error())
-					c.logger.Errorf("%s", err)
-					change.Fail(err)
-				} else {
-					if err := change.Ack(); err != nil {
-						err = fmt.Errorf("failed to ack configuration change: %w", err)
-						c.setState(agentclient.Failed, err.Error())
-						c.logger.Errorf("%s", err)
-					}
-				}
-			}
+		} else {
+			// not managed gets sets as an overall error for the agent
+			c.setConfigManagerError(configErr)
+		}
 
-		case vars := <-varsWatcher.Watch():
-			if ctx.Err() == nil {
-				if err := c.processVars(ctx, vars); err != nil {
-					c.setState(agentclient.Failed, err.Error())
-					c.logger.Errorf("%s", err)
-				}
-			}
-		case ll := <-c.logLevelCh:
-			if ctx.Err() == nil {
-				if err := c.processLogLevel(ctx, ll); err != nil {
-					c.setState(agentclient.Failed, err.Error())
-					c.logger.Errorf("%s", err)
-				}
+	case actionsErr := <-c.configMgr.ActionErrors():
+		c.setConfigManagerActionsError(actionsErr)
+
+	case varsErr := <-c.varsMgr.Errors():
+		c.setVarsManagerError(varsErr)
+
+	case overrideState := <-c.overrideStateChan:
+		c.setOverrideState(overrideState)
+
+	case componentState := <-c.componentStateChan:
+		// New component change reported by the runtime manager via
+		// Coordinator.watchRuntimeComponents(), merge it with the
+		// Coordinator state.
+		c.applyComponentState(componentState)
+
+	case change := <-c.configMgr.Watch():
+		if err := c.processConfig(ctx, change.Config()); err != nil {
+			c.setState(agentclient.Failed, err.Error())
+			c.logger.Errorf("%s", err)
+			change.Fail(err)
+		} else {
+			if err := change.Ack(); err != nil {
+				err = fmt.Errorf("failed to ack configuration change: %w", err)
+				c.setState(agentclient.Failed, err.Error())
+				c.logger.Errorf("%s", err)
 			}
 		}
 
-		// At the end of each iteration, if we made any changes to the state,
-		// collect them and send them to stateBroadcaster.
-		if c.stateNeedsRefresh {
-			c.refreshState()
+	case vars := <-c.varsMgr.Watch():
+		if ctx.Err() == nil {
+			if err := c.processVars(ctx, vars); err != nil {
+				c.setState(agentclient.Failed, err.Error())
+				c.logger.Errorf("%s", err)
+			}
 		}
+
+	case ll := <-c.logLevelCh:
+		if ctx.Err() == nil {
+			if err := c.processLogLevel(ctx, ll); err != nil {
+				c.setState(agentclient.Failed, err.Error())
+				c.logger.Errorf("%s", err)
+			}
+		}
+	}
+
+	// At the end of each iteration, if we made any changes to the state,
+	// collect them and send them to stateBroadcaster.
+	if c.stateNeedsRefresh {
+		c.refreshState()
 	}
 }
 

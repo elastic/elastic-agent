@@ -88,7 +88,7 @@ func (c *Coordinator) refreshState() {
 }
 
 // applyComponentState merges a changed component state into the overall
-// Coordinator state.
+// Coordinator state and sets stateNeedsRefresh.
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState) {
 	found := false
