@@ -9,7 +9,7 @@ This diagram is accurate as of version `8.9.0` of every component shown.
 
 ```mermaid
 sequenceDiagram
-    participant U as User
+    actor U as User
     participant UI as Fleet UI
     participant ES
     participant FS as Fleet Server
