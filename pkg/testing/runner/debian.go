@@ -16,10 +16,13 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/magefile/mage/mg"
 )
 
+// DebianRunner is a handler for running tests on Linux
 type DebianRunner struct{}
 
+// Prepare the test
 func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
 	// prepare build-essential and unzip
 	//
@@ -123,6 +126,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, logger Logger, a
 	return nil
 }
 
+// Run the test
 func (DebianRunner) Run(ctx context.Context, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
 	var tests []string
 	for _, pkg := range batch.Tests {
@@ -172,7 +176,11 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, logger Logger, agent
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(sudoTests, ","))
 		vars = extendVars(vars, env)
 		logger.Logf("Starting sudo tests")
-		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage integration:testOnRemote`, vars)
+		logArg := ""
+		if mg.Verbose() {
+			logArg = "-v"
+		}
+		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
 		execTest := strings.NewReader(script)
 
 		session, err := c.NewSession()

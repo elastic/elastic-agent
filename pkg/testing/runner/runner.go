@@ -643,12 +643,15 @@ func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
 // ogcDown brings down all the instances.
 func (r *Runner) ogcDown(ctx context.Context) error {
 	fmt.Printf(">>> Bring down instances through ogc\n")
-	proc, err := r.ogcRun(ctx, []string{"down", LayoutIntegrationTag}, false)
+	var output bytes.Buffer
+	proc, err := r.ogcRun(ctx, []string{"down", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run ogc down: %w", err)
 	}
 	ps := <-proc.Wait()
 	if ps.ExitCode() != 0 {
+		// print the output so its clear what went wrong
+		fmt.Printf("%s\n", output.Bytes())
 		return fmt.Errorf("failed to run ogc down: docker run exited with code: %d", ps.ExitCode())
 	}
 	return nil
