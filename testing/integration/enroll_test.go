@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/stretchr/testify/require"
@@ -23,8 +25,9 @@ func TestEnrollAndLog(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 		Local: false,
-		Sudo:  false,
+		Sudo:  true,
 	})
+	fmt.Printf("Got namespace: %s\n", info.Namespace)
 	t.Logf("got namespace: %s", info.Namespace)
 	suite.Run(t, &EnrollRunner{requirementsInfo: info})
 }
@@ -36,6 +39,7 @@ type EnrollRunner struct {
 }
 
 func (runner *EnrollRunner) SetupSuite() {
+	runner.T().Logf("In SetupSuite")
 	agentFixture, err := define.NewFixture(runner.T())
 	runner.agentFixture = agentFixture
 	require.NoError(runner.T(), err)
@@ -46,6 +50,7 @@ func (runner *EnrollRunner) SetupTest() {
 }
 
 func (runner *EnrollRunner) TestEnroll() {
+	runner.T().Logf("In TestEnroll")
 	kibClient := runner.requirementsInfo.KibanaClient
 	// Enroll agent in Fleet with a test policy
 	createPolicyReq := kibana.AgentPolicy{
@@ -66,4 +71,9 @@ func (runner *EnrollRunner) TestEnroll() {
 	policy, err := tools.InstallAgentWithPolicy(runner.T(), runner.agentFixture, kibClient, createPolicyReq)
 	require.NoError(runner.T(), err)
 	runner.T().Logf("got policy: %#v", policy)
+
+	req := &esapi.CatHealthRequest{Human: true}
+	resp, err := req.Do(context.Background(), runner.requirementsInfo.ESClient.Transport)
+	require.NoError(runner.T(), err)
+	fmt.Printf("Got response from ES: %#v\n", resp)
 }
