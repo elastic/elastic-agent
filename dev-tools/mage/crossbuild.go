@@ -133,7 +133,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 		for _, platform := range params.Platforms {
 			if platform.GOOS() == "aix" {
 				if len(params.Platforms) != 1 {
-					return fmt.Errorf("AIX cannot be crossbuilt with other platforms. Set PLATFORMS='aix/ppc64'")
+					return fmt.Errorf("platform AIX cannot be crossbuilt with other platforms. Set PLATFORMS='aix/ppc64'")
 				}
 				// This is basically a short-out so we can attempt to build on AIX in a relatively generic way
 				log.Printf("Target is building for AIX, skipping normal crossbuild process")
@@ -145,7 +145,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 			}
 		}
 		// If we're here, something isn't set.
-		return fmt.Errorf("Cannot crossbuild on AIX. Either run `mage build` or set PLATFORMS='aix/ppc64'")
+		return fmt.Errorf("cannot crossbuild on AIX. Either run `mage build` or set PLATFORMS='aix/ppc64'")
 	}
 
 	// Docker is required for this target.

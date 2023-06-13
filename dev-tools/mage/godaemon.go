@@ -28,8 +28,8 @@ func BuildGoDaemon() error {
 	}
 
 	if os.Getenv("GOLANG_CROSSBUILD") != "1" {
-		return errors.New("Use the crossBuildGoDaemon target. buildGoDaemon can " +
-			"only be executed within the golang-crossbuild docker environment.")
+		return errors.New("use the crossBuildGoDaemon target. buildGoDaemon can " +
+			"only be executed within the golang-crossbuild docker environment")
 	}
 
 	// Test if binaries are up-to-date.
