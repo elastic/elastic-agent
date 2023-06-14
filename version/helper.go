@@ -22,26 +22,26 @@ func GetDefaultVersion() string {
 }
 
 var (
-	buildTime      = "unknown"
-	commit         = "unknown"
-	qualifier      = ""
-	packageVersion = "unknown"
+	buildTime = "unknown"
+	commit    = "unknown"
+	qualifier = ""
 )
 
 const packageVersionFileName = ".package.version"
 
 // GetAgentPackageVersion retrieves the version saved in .package.version in the same
 // directory as the agent executable
-func GetAgentPackageVersion() string {
+func GetAgentPackageVersion() (string, error) {
 	execPath, err := getCurrentExecutablePath()
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("detecting current executable path: %w", err)
 	}
-	versionBytes, err := os.ReadFile(filepath.Join(filepath.Dir(execPath), packageVersionFileName))
+	packageVersionFilePath := filepath.Join(filepath.Dir(execPath), packageVersionFileName)
+	versionBytes, err := os.ReadFile(packageVersionFilePath)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("reading package version from file %q: %w", packageVersionFilePath, err)
 	}
-	return strings.TrimSpace(string(versionBytes))
+	return strings.TrimSpace(string(versionBytes)), nil
 }
 
 func getCurrentExecutablePath() (string, error) {

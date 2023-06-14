@@ -268,27 +268,28 @@ func CommitHashShort() (string, error) {
 }
 
 func AgentPackageVersion() (string, error) {
-	if agentPackageVersion != "" {
-		return agentPackageVersion, nil
-	}
 
-	// build a package version based on major.minor.patch + Snapshot + git commit
-	beatsVersion, err := beatVersion()
-	if err != nil {
-		return "", fmt.Errorf("error retrieving beat version: %w", err)
-	}
-	b := new(strings.Builder)
-	b.WriteString(beatsVersion)
-	if Snapshot {
-		b.WriteString("-SNAPSHOT")
-	}
-	shortCommitHash, err := CommitHashShort()
-	if err != nil {
-		return "", fmt.Errorf("error retrieving short commit hash: %w", err)
-	}
-	b.WriteString("+git-")
-	b.WriteString(shortCommitHash)
-	return b.String(), nil
+	return agentPackageVersion, nil
+	// if agentPackageVersion != "" {
+	// 	return agentPackageVersion, nil
+	// }
+	// (Possible fallback, disabled at the moment)build a package version based on major.minor.patch + Snapshot + git commit
+	// beatsVersion, err := beatVersion()
+	// if err != nil {
+	// 	return "", fmt.Errorf("error retrieving beat version: %w", err)
+	// }
+	// b := new(strings.Builder)
+	// b.WriteString(beatsVersion)
+	// if Snapshot {
+	// 	b.WriteString("-SNAPSHOT")
+	// }
+	// shortCommitHash, err := CommitHashShort()
+	// if err != nil {
+	// 	return "", fmt.Errorf("error retrieving short commit hash: %w", err)
+	// }
+	// b.WriteString("+git-")
+	// b.WriteString(shortCommitHash)
+	// return b.String(), nil
 }
 
 var (

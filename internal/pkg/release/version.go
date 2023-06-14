@@ -53,8 +53,13 @@ func BuildTime() time.Time {
 
 // Version returns the version of the application.
 func Version() string {
-	// return version.GetDefaultVersion()
-	return version.GetAgentPackageVersion()
+	pkgVersion, err := version.GetAgentPackageVersion()
+	if err == nil && pkgVersion != "" {
+		return pkgVersion
+	}
+	// TODO how to signal an error ?
+	// Fallback to previous behavior
+	return version.GetDefaultVersion()
 }
 
 // Snapshot returns true if binary was built as snapshot.
