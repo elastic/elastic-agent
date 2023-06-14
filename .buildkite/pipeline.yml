@@ -3,7 +3,7 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
-  SLACK_NOTIFICATIONS_ENABLED: 'true' 
+  ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true' 
   SLACK_NOTIFICATIONS_CHANNEL: '#ingest-notifications' 
   SLACK_NOTIFICATIONS_ALL_BRANCHES: 'false' 
   SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
