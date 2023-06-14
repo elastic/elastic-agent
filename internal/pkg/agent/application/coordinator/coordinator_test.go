@@ -282,7 +282,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 		coordCh <- err
 	}()
 
-	subCh := make(chan error)
+	resultChan := make(chan error)
 	go func() {
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -291,7 +291,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 		for {
 			select {
 			case <-ctx.Done():
-				subCh <- ctx.Err()
+				resultChan <- ctx.Err()
 				return
 			case state := <-subChan:
 				t.Logf("%+v", state)
@@ -301,7 +301,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 						unit, ok := compState.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}]
 						if ok {
 							if unit.State == client.UnitStateHealthy && unit.Message == "Healthy From Fake Config" {
-								subCh <- nil
+								resultChan <- nil
 								return
 							}
 						}
@@ -336,7 +336,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = <-subCh
+	err = <-resultChan
 	require.NoError(t, err)
 	cancel()
 
@@ -404,7 +404,6 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 				}
 			}
 		}
-
 	}
 }
 

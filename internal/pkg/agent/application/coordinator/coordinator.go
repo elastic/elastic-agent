@@ -164,10 +164,6 @@ type Coordinator struct {
 	cfg   *configuration.Configuration
 	specs component.RuntimeSpecs
 
-	// loglevelCh forwards log level changes from the public API (SetLogLevel)
-	// to the run loop in Coordinator's main goroutine.
-	logLevelCh chan logp.Level
-
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
@@ -203,29 +199,16 @@ type Coordinator struct {
 	// SetOverrideState helper to the Coordinator goroutine.
 	overrideStateChan chan *coordinatorOverrideState
 
-	// componentStateChan is used by watchRuntimeComponents, an internal helper
-	// goroutine that handles processing and logging of component updates to
-	// avoid congesting the Coordinator. When an update is ready,
-	// watchRuntimeComponents sends it on this channel so the main Coordinator
-	// goroutine can apply it.
-	componentStateChan chan runtime.ComponentComponentState
+	// loglevelCh forwards log level changes from the public API (SetLogLevel)
+	// to the run loop in Coordinator's main goroutine.
+	logLevelCh chan logp.Level
 
-	// managerChans contains the reporting channels for all our managers. It is
-	// intialized in Coordinator.New. We collect them here instead of reading
-	// them directly on their owners so run loop tests can override them without
-	// mocking a full manager.
-	// Tests that want to be careful should make their changes before calling
-	// Coordinator.Run, or should test synchronously with runLoopIteration.
-	managerChans struct {
-		runtimeManagerError <-chan error
-
-		configManagerUpdate <-chan ConfigChange
-		configManagerError  <-chan error
-		actionsError        <-chan error
-
-		varsManagerUpdate <-chan []*transpiler.Vars
-		varsManagerError  <-chan error
-	}
+	// managerChans collects the channels used to receive updates from the
+	// various managers. Coordinator reads from all of them during the run loop.
+	// Tests can safely override these before calling Coordinator.Run, or in
+	// between calls to Coordinator.runLoopIteration when testing synchronously.
+	// Tests can send to these channels to simulate manager updates.
+	managerChans managerChans
 
 	// Top-level errors reported by managers / actions. These will be folded
 	// into the reported state before broadcasting -- State() will report
@@ -236,15 +219,30 @@ type Coordinator struct {
 	actionsErr    error
 	varsMgrErr    error
 
-	config *config.Config
-	ast    *transpiler.AST
-	vars   []*transpiler.Vars
+	ast  *transpiler.AST
+	vars []*transpiler.Vars
 
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 
 	// mx         sync.RWMutex
 	// protection protection.Config
+}
+
+// The channels Coordinator reads to receive updates from the various managers.
+type managerChans struct {
+	// runtimeManagerUpdate is not read-only because it is owned internally
+	// and written to by watchRuntimeComponents in a helper goroutine after
+	// receiving updates from the raw runtime manager channel.
+	runtimeManagerUpdate chan runtime.ComponentComponentState
+	runtimeManagerError  <-chan error
+
+	configManagerUpdate <-chan ConfigChange
+	configManagerError  <-chan error
+	actionsError        <-chan error
+
+	varsManagerUpdate <-chan []*transpiler.Vars
+	varsManagerError  <-chan error
 }
 
 // ErrFatalCoordinator is returned when a coordinator sub-component returns an error, as opposed to a simple context-cancelled.
@@ -283,14 +281,25 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		state:            state,
 		stateBroadcaster: broadcaster.New(state, 64),
 
-		logLevelCh:         make(chan logp.Level),
-		overrideStateChan:  make(chan *coordinatorOverrideState),
-		componentStateChan: make(chan runtime.ComponentComponentState),
+		logLevelCh:        make(chan logp.Level),
+		overrideStateChan: make(chan *coordinatorOverrideState),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
 	// unit testing.
 	if runtimeMgr != nil {
+		// The runtime manager's update channel is a special case: unlike the
+		// other channels, we create it directly instead of reading it from the
+		// manager. Once Coordinator.runner starts, it calls watchRuntimeComponents
+		// in a helper goroutine, which subscribes directly to the runtime manager.
+		// It then scans and logs any changes before forwarding the update
+		// unmodified to this channel to merge with Coordinator.state. This is just
+		// to keep the work of scanning and logging the component changes off the
+		// main Coordinator goroutine.
+		// Tests want to simulate a component state update can send directly to
+		// this channel, as long as they aren't specifically testing the logging
+		// behavior in watchRuntimeComponents.
+		c.managerChans.runtimeManagerUpdate = make(chan runtime.ComponentComponentState)
 		c.managerChans.runtimeManagerError = runtimeMgr.Errors()
 	}
 	if configMgr != nil {
@@ -444,9 +453,10 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 	state := make(map[string]runtime.ComponentState)
 
 	var subChan <-chan runtime.ComponentComponentState
+	// A real Coordinator will always have a runtime manager, but unit tests
+	// may not initialize all managers -- in that case we leave subChan nil,
+	// and just idle until Coordinator shuts down.
 	if c.runtimeMgr != nil {
-		// A real Coordinator will always have a runtime manager, but a Coordinator
-		// in a unit test may only initialize the component it's testing.
 		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
 	}
 	for {
@@ -509,7 +519,7 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 			// Forward the final changes back to Coordinator, unless our context
 			// has ended.
 			select {
-			case c.componentStateChan <- s:
+			case c.managerChans.runtimeManagerUpdate <- s:
 			case <-ctx.Done():
 				return
 			}
@@ -752,38 +762,46 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// We run nil checks before starting the various managers so that unit
-	// tests only have to initialize / mock the specific components they're
-	// testing. In a live agent, these fields are never nil.
+	// We run nil checks before starting the various managers so that unit tests
+	// only have to initialize / mock the specific components they're testing.
+	// If a manager is nil, we prebuffer its return channel with nil also so
+	// handleCoordinatorDone doesn't block waiting for its result on shutdown.
+	// In a live agent, the manager fields are never nil.
 
-	runtimeErrCh := make(chan error)
+	runtimeErrCh := make(chan error, 1)
 	if c.runtimeMgr != nil {
 		go func() {
 			err := c.runtimeMgr.Run(ctx)
 			cancel()
 			runtimeErrCh <- err
 		}()
+	} else {
+		runtimeErrCh <- nil
 	}
 
-	configErrCh := make(chan error)
+	configErrCh := make(chan error, 1)
 	if c.configMgr != nil {
 		go func() {
 			err := c.configMgr.Run(ctx)
 			cancel()
 			configErrCh <- err
 		}()
+	} else {
+		configErrCh <- nil
 	}
 
-	varsErrCh := make(chan error)
+	varsErrCh := make(chan error, 1)
 	if c.varsMgr != nil {
 		go func() {
 			err := c.varsMgr.Run(ctx)
 			cancel()
 			varsErrCh <- err
 		}()
+	} else {
+		varsErrCh <- nil
 	}
 
-	// Keep looping until the context ends or runLoopIteration returns false.
+	// Keep looping until the context ends.
 	for ctx.Err() == nil {
 		c.runLoopIteration(ctx)
 	}
@@ -821,7 +839,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 	case overrideState := <-c.overrideStateChan:
 		c.setOverrideState(overrideState)
 
-	case componentState := <-c.componentStateChan:
+	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via
 		// Coordinator.watchRuntimeComponents(), merge it with the
 		// Coordinator state.
@@ -919,7 +937,6 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		return fmt.Errorf("failed to reload monitor manager configuration: %w", err)
 	}
 
-	c.config = cfg
 	c.ast = rawAst
 
 	// Disabled for 8.8.0 release in order to limit the surface
