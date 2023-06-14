@@ -3,6 +3,10 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
+  ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true' 
+  SLACK_NOTIFICATIONS_CHANNEL: '#ingest-notifications' 
+  SLACK_NOTIFICATIONS_ALL_BRANCHES: 'false' 
+  SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
 steps:
   - label: "Integration tests"
     key: "integration-tests"
@@ -12,5 +16,4 @@ steps:
       - "build/TEST-**"
     agents:
       provider: "gcp"
-notify:
-  - slack: "#ingest-notifications"
+
