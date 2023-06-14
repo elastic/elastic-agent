@@ -12,3 +12,5 @@ steps:
       - "build/TEST-**"
     agents:
       provider: "gcp"
+notify:
+  - slack: "#ingest-notifications"
