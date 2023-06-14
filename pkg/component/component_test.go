@@ -1931,14 +1931,16 @@ func TestSpecDurationsAreValid(t *testing.T) {
 
 	// Recursively reflect on component.Spec struct to find time.Duration fields
 	// and gather their paths.
-	//var durationFieldPaths []string
-
 	for path, spec := range specFiles {
 		path, err = filepath.Abs(path)
 		require.NoError(t, err)
 
+		// Gather all duration fields' YAML paths so we an check if the
+		// value at each path is valid.
 		durationFieldPaths := gatherDurationFieldPaths(spec, "")
 
+		// Parse each spec file's YAML into a ucfg.Config object for
+		// easy access to field values via their paths.
 		data, err := os.ReadFile(path)
 		require.NoError(t, err)
 
@@ -1949,6 +1951,8 @@ func TestSpecDurationsAreValid(t *testing.T) {
 		cfg, err := ucfg.NewFrom(v, ucfg.PathSep("."))
 		require.NoError(t, err)
 
+		// Check that every duration field in the spec file has
+		// valid syntax.
 		const durationPattern = `\d+[a-zA-Z]+$`
 		for _, durationFieldPath := range durationFieldPaths {
 			exists, err := cfg.Has(durationFieldPath, -1, ucfg.PathSep("."))
@@ -1959,18 +1963,16 @@ func TestSpecDurationsAreValid(t *testing.T) {
 			value, err := cfg.String(durationFieldPath, -1, ucfg.PathSep("."))
 
 			// Ensure that value is an integer (duration value)
-			// followed by a string suffix (duration units)
+			// followed by a string suffix (duration units).
 			matched, err := regexp.MatchString(durationPattern, value)
 			require.NoError(t, err)
 			require.Truef(t, matched, "in spec file [%s], field [%s] has value [%s] which does not match expected pattern [%s]", path, durationFieldPath, value, durationPattern)
 
-			// Ensure that value can be parsed as a time.Duration
+			// Ensure that value can be parsed as a time.Duration.
 			_, err = time.ParseDuration(value)
 			require.NoError(t, err)
 		}
 	}
-
-	// Parse each spec file's YAML into config(?)
 }
 
 func TestInjectingInputPolicyID(t *testing.T) {
@@ -2108,6 +2110,7 @@ func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
 			return gatheredPaths
 		}
 
+		// Recurse on the dereferenced pointer value.
 		morePaths := gatherDurationFieldPaths(rv.Elem().Interface(), pathSoFar)
 		gatheredPaths = append(gatheredPaths, morePaths...)
 		return gatheredPaths
@@ -2115,7 +2118,7 @@ func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
 
 	switch rt.Kind() {
 	case reflect.Int64:
-		// If this is a time.Duration value, we track it.
+		// If this is a time.Duration value, we gather its path.
 		if rv.Type().PkgPath() == "time" && rv.Type().Name() == "Duration" {
 			gatheredPaths = append(gatheredPaths, pathSoFar)
 			return gatheredPaths
