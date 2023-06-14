@@ -8,9 +8,19 @@ package component
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"reflect"
+	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -1913,6 +1923,56 @@ func TestPreventionsAreValid(t *testing.T) {
 	}
 }
 
+func TestSpecDurationsAreValid(t *testing.T) {
+	// Test that durations specified in all spec files explicitly specify valid units.
+
+	specFiles, err := specFilesForDirectory(filepath.Join("..", "..", "specs"))
+	require.NoError(t, err)
+
+	// Recursively reflect on component.Spec struct to find time.Duration fields
+	// and gather their paths.
+	//var durationFieldPaths []string
+
+	for path, spec := range specFiles {
+		path, err = filepath.Abs(path)
+		require.NoError(t, err)
+
+		durationFieldPaths := gatherDurationFieldPaths(spec, "")
+
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+
+		var v map[string]interface{}
+		err = yaml.Unmarshal(data, &v)
+		require.NoError(t, err)
+
+		cfg, err := ucfg.NewFrom(v, ucfg.PathSep("."))
+		require.NoError(t, err)
+
+		const durationPattern = `\d+[a-zA-Z]+$`
+		for _, durationFieldPath := range durationFieldPaths {
+			exists, err := cfg.Has(durationFieldPath, -1, ucfg.PathSep("."))
+			if !exists {
+				continue
+			}
+
+			value, err := cfg.String(durationFieldPath, -1, ucfg.PathSep("."))
+
+			// Ensure that value is an integer (duration value)
+			// followed by a string suffix (duration units)
+			matched, err := regexp.MatchString(durationPattern, value)
+			require.NoError(t, err)
+			require.Truef(t, matched, "in spec file [%s], field [%s] has value [%s] which does not match expected pattern [%s]", path, durationFieldPath, value, durationPattern)
+
+			// Ensure that value can be parsed as a time.Duration
+			_, err = time.ParseDuration(value)
+			require.NoError(t, err)
+		}
+	}
+
+	// Parse each spec file's YAML into config(?)
+}
+
 func TestInjectingInputPolicyID(t *testing.T) {
 	const testRevision = 10
 	fleetPolicy := map[string]interface{}{
@@ -2035,4 +2095,56 @@ type testHeadersProvider struct {
 
 func (h *testHeadersProvider) Headers() map[string]string {
 	return h.headers
+}
+
+func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
+	var gatheredPaths []string
+
+	rt := reflect.TypeOf(s)
+	rv := reflect.ValueOf(s)
+
+	if rt.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return gatheredPaths
+		}
+
+		morePaths := gatherDurationFieldPaths(rv.Elem().Interface(), pathSoFar)
+		gatheredPaths = append(gatheredPaths, morePaths...)
+		return gatheredPaths
+	}
+
+	switch rt.Kind() {
+	case reflect.Int64:
+		// If this is a time.Duration value, we track it.
+		if rv.Type().PkgPath() == "time" && rv.Type().Name() == "Duration" {
+			gatheredPaths = append(gatheredPaths, pathSoFar)
+			return gatheredPaths
+		}
+
+	case reflect.Slice:
+		for i := 0; i < rv.Len(); i++ {
+			// Recurse on slice elements
+			morePaths := gatherDurationFieldPaths(rv.Index(i).Interface(), pathSoFar+"."+strconv.Itoa(i))
+			gatheredPaths = append(gatheredPaths, morePaths...)
+		}
+		return gatheredPaths
+
+	case reflect.Struct:
+		// Recurse on the struct's fields
+		if pathSoFar != "" {
+			pathSoFar += "."
+		}
+		for i := 0; i < rv.NumField(); i++ {
+			tags := rt.Field(i).Tag
+			yamlTag := tags.Get("yaml")
+			yamlFieldName, _, _ := strings.Cut(yamlTag, ",")
+			yamlFieldPath := pathSoFar + yamlFieldName
+
+			morePaths := gatherDurationFieldPaths(rv.Field(i).Interface(), yamlFieldPath)
+			gatheredPaths = append(gatheredPaths, morePaths...)
+		}
+		return gatheredPaths
+	}
+
+	return gatheredPaths
 }
