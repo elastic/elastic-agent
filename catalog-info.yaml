@@ -51,10 +51,11 @@ spec:
       cancel_intermediate_builds_branch_filter: '!main'
       skip_intermediate_builds: true
       skip_intermediate_builds_branch_filter: '!main'
-      elastic_slack_notifications_enabled: 'true'
-      slack_notifications_channel: '#ingest-notifications' 
-      slack_notifications_all_branches: 'false'
-      slack_notifications_on_success: 'false'
+      env:
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true'
+        SLACK_NOTIFICATIONS_CHANNEL: '#ingest-notifications'
+        SLACK_NOTIFICATIONS_ALL_BRANCHES: 'false' 
+        SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
