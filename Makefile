@@ -44,7 +44,7 @@ notice:
 ## check-ci: Run all the checks under the ci, this doesn't include the linter which is run via a github action.
 .PHONY: check-ci
 check-ci:
-	@mage check
+	@mage -v check
 	@$(MAKE) notice
 	@$(MAKE) -C deploy/kubernetes generate-k8s
 	@$(MAKE) check-no-changes
