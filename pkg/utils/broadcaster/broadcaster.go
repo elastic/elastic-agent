@@ -6,6 +6,7 @@ package broadcaster
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 )
 
@@ -148,7 +149,8 @@ type Broadcaster[T any] struct {
 }
 
 // constant indices representing the order of the cases in
-// Broadcaster.selectCases
+// Broadcaster.selectCases. For context/listener cases for each subscriber
+// call indexCtxCase() and indexSubscriberCase() with the subscriber index.
 const (
 	indexInputCase           = 0
 	indexSubscribeCase       = 1
@@ -181,19 +183,6 @@ type subscriber[T any] struct {
 	// it will read the most recent values in order up to a limit of bufferLen.
 	// bufferLen must be at most len(Broadcaster.buffer).
 	bufferLen int
-
-	// ctxCase is the case of the reflect.Select call that listens for the
-	// subscriber's context to end. This is a mutable pointer into Broadcaster's
-	// selectCases array.
-	ctxCase *reflect.SelectCase
-
-	// listenerCase is the case of the reflect.Select call that waits to send new
-	// values to the subscriber. When the subscriber has already read the most
-	// recent value, listenerCase.chan is set to nil to prevent additional sends.
-	// When a new value arrives, all subscribers have listenerCase.chan reset
-	// to their outputChan. This is a mutable pointer into Broadcaster's
-	// selectCases array.
-	listenerCase *reflect.SelectCase
 }
 
 // New creates a Broadcaster and starts its run loop. The caller is responsible
@@ -280,6 +269,12 @@ func (b *Broadcaster[T]) Close() {
 // and it will not send any more values.
 func (b *Broadcaster[T]) Done() <-chan struct{} {
 	return b.doneChan
+}
+
+// The index in the selectCases array of the reflect.SelectCase for the
+// given subscriber's listener channel.
+func indexListenerCase(subscriberIndex int) int {
+	return indexFirstSubscriberCase + 2*subscriberIndex + 1
 }
 
 // new is the internal implementation of New that does everything except
@@ -454,8 +449,6 @@ func (b *Broadcaster[T]) handleNewSubscriber(req subscribeRequest[T]) {
 		listenerChan: req.listenerChan,
 		index:        b.index, // Start with the current value
 		bufferLen:    bufferLen,
-		ctxCase:      &b.selectCases[len(b.selectCases)-2],
-		listenerCase: &b.selectCases[len(b.selectCases)-1],
 	})
 }
 
@@ -476,12 +469,15 @@ func (b *Broadcaster[T]) removeSubscriber(subscriberIndex int) {
 func (b *Broadcaster[T]) advanceSubscriber(subscriberIndex int) {
 	s := &b.subscribers[subscriberIndex]
 	s.index++
+	fmt.Printf("advanceSubscriber(%v) -> new index %d/%d\n", subscriberIndex, s.index, b.index)
+	fmt.Printf("next value: %v\n", b.buffer[s.index%len(b.buffer)])
+	selectCaseIndex := indexListenerCase(subscriberIndex)
 	if s.index > b.index {
 		// No more values to read, block the channel for now
-		s.listenerCase.Chan = reflect.ValueOf(nil)
+		b.selectCases[selectCaseIndex].Chan = reflect.ValueOf(nil)
 	} else {
 		// Load the send channel with the buffer value at s.index
-		s.listenerCase.Send = reflect.ValueOf(b.buffer[s.index%len(b.buffer)])
+		b.selectCases[selectCaseIndex].Send = reflect.ValueOf(b.buffer[s.index%len(b.buffer)])
 	}
 }
 
@@ -490,10 +486,12 @@ func (b *Broadcaster[T]) advanceSubscriber(subscriberIndex int) {
 // values, and to load the most recent value into getChan.
 func (b *Broadcaster[T]) updateListeners() {
 	for i := range b.subscribers {
+		selectCaseIndex := indexListenerCase(i)
 		subscriber := &b.subscribers[i]
 		if subscriber.index <= b.index {
 			// The subscriber hasn't read the most recent value, unblock its channel.
-			subscriber.listenerCase.Chan = reflect.ValueOf(subscriber.listenerChan)
+			b.selectCases[selectCaseIndex].Chan =
+				reflect.ValueOf(subscriber.listenerChan)
 		}
 		if subscriber.index < b.index-subscriber.bufferLen {
 			// If the subscriber is further behind than its buffer size, then
@@ -501,7 +499,7 @@ func (b *Broadcaster[T]) updateListeners() {
 			subscriber.index = b.index - subscriber.bufferLen
 		}
 		// Load the subscriber's new target value into its send channel.
-		subscriber.listenerCase.Send =
+		b.selectCases[selectCaseIndex].Send =
 			reflect.ValueOf(b.buffer[subscriber.index%len(b.buffer)])
 	}
 	// Update getChan, used for standalone reads from non-subscribers.

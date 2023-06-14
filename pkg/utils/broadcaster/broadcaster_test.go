@@ -7,6 +7,7 @@ package broadcaster
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -55,6 +56,44 @@ func TestSubscriberReceivesValueSequence(t *testing.T) {
 			require.Equal(t, expected, value, "listener should read the same value sequence that was written")
 		case <-timeoutChan:
 			require.Failf(t, "timeout waiting for expected values", "next expected value: %v", expected)
+		}
+	}
+}
+
+func TestMultipleSubscribersReceiveValueSequence(t *testing.T) {
+	// Create a Broadcaster and 3 subscribers with a buffer length of 32 and send
+	// 32 changes through it, then verify that each subscriber receives them all
+	// in order.
+
+	const subscriberCount = 3
+	const valueCount = 32
+	const initialValue = 4014
+
+	b := New(initialValue, valueCount)
+	defer b.Close()
+	subscribers := []chan int{}
+	for i := 0; i < subscriberCount; i++ {
+		subscribers = append(subscribers,
+			b.Subscribe(context.Background(), valueCount))
+	}
+
+	for i := 1; i <= valueCount; i++ {
+		b.InputChan <- initialValue + i
+	}
+
+	timeoutChan := time.After(5 * time.Second)
+	for sIndex, subscriber := range subscribers {
+		// We should be able to read all the changes plus the initial value.
+		for i := 0; i <= valueCount; i++ {
+			expected := initialValue + i
+			select {
+			case value := <-subscriber:
+				require.Equal(t, expected, value,
+					"listener %d at index %d should read the same value sequence that was written",
+					sIndex, i)
+			case <-timeoutChan:
+				require.Failf(t, "timeout waiting for expected values", "next expected value: %v", expected)
+			}
 		}
 	}
 }
@@ -156,4 +195,48 @@ func TestSubscriberSkipsOldestValuesWhenBufferExceeded(t *testing.T) {
 			require.Failf(t, "timeout waiting for expected values", "next expected value: %v", expected)
 		}
 	}
+}
+
+func TestCancelledContextClosesSubscriberChannel(t *testing.T) {
+	// Create a new buffered subscriber, immediately cancel the context, and
+	// confirm the channel is closed without receiving any values.
+	// We test synchronously one iteration at a time, because otherwise
+	// there's an unavoidable race if the context signal and the channel
+	// read both arrive at the same time.
+	b := new(0, 16)
+	ctx, cancel := context.WithCancel(context.Background())
+	var listenerChan chan int
+
+	// Iterate to detect the subscription (in a helper to run the iteration
+	// in the background, since we're making a blocking call to its API).
+	b.withOneIteration(func() {
+		listenerChan = b.Subscribe(ctx, 16)
+	})
+
+	// Cancel context then iterate again to detect the cancellation
+	cancel()
+	b.runLoopIterate()
+
+	// Verify the channel was closed with no values
+	select {
+	case _, ok := <-listenerChan:
+		assert.False(t, ok, "channel should have closed after context cancellation")
+	case <-time.After(time.Second):
+		assert.Fail(t, "timeout waiting for channel to close after context cancellation")
+	}
+}
+
+// withOneIteration runs a single iteration of Broadcaster's run loop in a
+// background goroutine while running the given callback in the foreground.
+// It then waits for the run loop iteration to finish, so additional
+// iterations can be safely started as soon as the call returns.
+func (b *Broadcaster[T]) withOneIteration(callback func()) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		b.runLoopIterate()
+		wg.Done()
+	}()
+	callback()
+	wg.Wait()
 }
