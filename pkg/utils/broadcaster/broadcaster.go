@@ -6,7 +6,6 @@ package broadcaster
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 )
 
@@ -469,8 +468,6 @@ func (b *Broadcaster[T]) removeSubscriber(subscriberIndex int) {
 func (b *Broadcaster[T]) advanceSubscriber(subscriberIndex int) {
 	s := &b.subscribers[subscriberIndex]
 	s.index++
-	fmt.Printf("advanceSubscriber(%v) -> new index %d/%d\n", subscriberIndex, s.index, b.index)
-	fmt.Printf("next value: %v\n", b.buffer[s.index%len(b.buffer)])
 	selectCaseIndex := indexListenerCase(subscriberIndex)
 	if s.index > b.index {
 		// No more values to read, block the channel for now
