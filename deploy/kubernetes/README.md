@@ -43,6 +43,6 @@ The several challenges phased during scaling of Kubernetes cluster are [explaine
 
 The suggested method of installing Elastic Agent in large Kubernetes clusters is to install Elastic Agent as a Side Container with KSM in order to collect the KSM metrics. As Kubernetes cluster becomes larger, we increase the number of KSM shards and we have a dedicated Elastic Agent to collect from specific shard endpoint. Those are installed as part of [Statefulset](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-statefulset-configmap.yaml)
 
-In addition to the Elastic Agents for KSM, the rest of the metrics are collected from Elastic Agents deployed as [daemonsets](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-daemonset-configmap.yaml)
+Apart from the KSM metrics, the rest of the metrics are collected from Elastic Agents deployed as [daemonsets](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-daemonset-configmap.yaml)
 
 More information for the configuration of Elastic Agent can be found [here](https://github.com/elastic/elastic-agent/blob/main/docs/elastic-agent-ksm-sharding.md)
