@@ -28,7 +28,7 @@ Agent Scenario | Description
 
 Navigate to the scenario you want to install: 
 
-E.g. we need to install the default Elastic Agent Scenario with kustomize.
+E.g. we want to install the default Elastic Agent Scenario with kustomize.
 
 ```bash
 cd elastic-agent-kustomize/default/elastic-agent-standalone
