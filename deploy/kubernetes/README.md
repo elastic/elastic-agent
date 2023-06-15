@@ -26,7 +26,7 @@ Agent Scenario | Description
 
 ### How to use the kustomize templates
 
-Navigate to scenario you need to install: 
+Navigate to the scenario you want to install: 
 
 E.g. we need to install the default Elastic Agent Scenario with kustomize.
 
