@@ -1961,7 +1961,7 @@ func TestSpecDurationsAreValid(t *testing.T) {
 			require.NoError(t, err)
 
 			// Ensure that value can be parsed as a time.Duration. This parsing will
-			// fail if there is no unit suffix explicity specified.
+			// fail if there is no unit suffix explicitly specified.
 			_, err = time.ParseDuration(value)
 			assert.NoErrorf(t, err, "in spec file [%s], field [%s] has invalid value [%s]: %s", specFilePath, durationFieldPath, value, err)
 		}
