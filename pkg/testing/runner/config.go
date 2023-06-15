@@ -98,10 +98,10 @@ type GCEConfig struct {
 // Validate returns an error if the information is invalid.
 func (gce *GCEConfig) Validate() error {
 	if gce.ServiceTokenPath == "" {
-		return errors.New("ServiceTokenPath must be set")
+		return errors.New("ServiceTokenPath must be set") //nolint:stylecheck // references a specific field
 	}
 	if gce.Datacenter == "" {
-		return errors.New("Datacenter must be set")
+		return errors.New("Datacenter must be set") //nolint:stylecheck // references a specific field
 	}
 	return gce.ensureParsed()
 }
