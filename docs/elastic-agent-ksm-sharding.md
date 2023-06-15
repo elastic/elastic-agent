@@ -61,7 +61,7 @@ For this installation, users need to configure the two following agent policies.
 **Agent policies:**
 
 - The main policy where the KSM are disabled. This policy will be used by the Daemonset Elastic Agent manifest.
-- One policy with only KSM enabled.
+- A policy where only KSM are enabled.
   - Leader Election will be disabled
   - KSM Url endpoint: `localhost:8080`
 
