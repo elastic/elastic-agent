@@ -25,7 +25,7 @@ This document suggests **the 4 alternative configuration methods** to deploy ela
 
 1. `Elastic Agent as side-container with KSM Sharded pods`. The Elastic Agent will be installed as `Statefulset` with `hostNetwork:false` and will be a side container of Kube-state-metrics. Meaning that KSM and Elastic Agent will share the same localhost network to communicate.
 2. With `hostNetwork:false` for non-leader Elastic Agent deployments that will collect from KSM Shards. In this configuration Elastic Agent will be installed as deployments and we will need one deployment for every KSM Shard collection endpoint. An additional Elastic Agent Leader wi
-3. With `taint/tolerations` to isolate the Elastic Agent `Daemonset` pods from rest of Elastic Agent `Deployments`. Tolerations configuration is the mean to exclude Daemonset pods from the nodes where the Elastic Agent KSM pods run. So Elastic Agent Daemonset pods will run only to those nodes where no Elastic Agent that collect KSM run.
+3. With `taint/tolerations` to isolate the Elastic Agent `Daemonset` pods from rest of Elastic Agent `Deployments`. Tolerations configuration is the mean to exclude Daemonset pods from nodes where the Elastic Agent KSM pods run. So the Elastic Agent Daemonset pods will run only on those nodes where no Elastic Agents that collect KSM run.
 
 Each configuration includes specific pros and cons and users may choose what best matches their needs.
 
