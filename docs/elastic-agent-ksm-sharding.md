@@ -50,7 +50,7 @@ The Elastic Agent manifest is deployed by default as daemonset. That said, each 
 
 Additionally by default, one agent is elected as [**leader**](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L32) and this will be responsible for also collecting the cluster wide metrics.
 
-So let us discuss each alternative configuration method above. We will provide relevant [manifests](./manifests) to assist installation. We will describe the managed agent installation scenario (for simplicity we would not mention standalone scenarios, but relevant [manifests](./manifests) will be provided for both scenarios)
+Next, we will describe the managed agent installation scenarios (for simplicity we would not mention standalone scenarios, but relevant [manifests](./manifests) will be provided for both scenarios). 
 
 ### 1. Elastic Agent with HostNetwork:false and side container of KSM
 
