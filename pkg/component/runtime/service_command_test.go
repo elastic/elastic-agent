@@ -7,6 +7,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,7 +20,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/stretchr/testify/require"
+
+	"go.uber.org/zap/zapcore"
+
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -180,4 +186,102 @@ func TestExecuteCommand(t *testing.T) {
 		})
 	}
 
+}
+
+func TestExecuteServiceCommand(t *testing.T) {
+	// No spec
+	t.Run("no_spec", func(t *testing.T) {
+		ctx := context.Background()
+		log, observer := logger.NewTesting(t.Name())
+
+		exePath, err := prepareTestProg(ctx, log, t.TempDir(), progConfig{})
+		require.NoError(t, err)
+
+		err = executeServiceCommand(ctx, log, exePath, nil)
+		require.NoError(t, err)
+
+		warnLogs := observer.FilterLevelExact(zapcore.WarnLevel)
+		require.Equal(t, 1, warnLogs.Len())
+		require.Equal(t, fmt.Sprintf("spec is nil, nothing to execute, binaryPath: %s", exePath), warnLogs.TakeAll()[0].Message)
+	})
+
+	// Execution succeeded
+	t.Run("successful_execution", func(t *testing.T) {
+		ctx := context.Background()
+		log, observer := logger.NewTesting(t.Name())
+
+		exePath, err := prepareTestProg(ctx, log, t.TempDir(), progConfig{})
+		require.NoError(t, err)
+
+		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{})
+		require.NoError(t, err)
+		require.Equal(t, 0, observer.Len())
+	})
+
+	// Execution failed - no retries configured
+	t.Run("failed_execution_no_retries", func(t *testing.T) {
+		ctx := context.Background()
+		log, observer := logger.NewTesting(t.Name())
+
+		exeConfig := progConfig{
+			ErrMessage: "foo bar",
+			ExitCode:   111,
+		}
+		exePath, err := prepareTestProg(ctx, log, t.TempDir(), exeConfig)
+		require.NoError(t, err)
+
+		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{})
+		require.EqualError(t, err, fmt.Sprintf("%s: exit status %d", exeConfig.ErrMessage, exeConfig.ExitCode))
+
+		errorLogs := observer.FilterLevelExact(zapcore.ErrorLevel)
+		require.Equal(t, 1, errorLogs.Len())
+		require.Equal(t, exeConfig.ErrMessage, errorLogs.TakeAll()[0].Message)
+	})
+
+	// Execution failed after exhausting all retries
+	t.Run("failed_execution_with_retries", func(t *testing.T) {
+		ctx := context.Background()
+		log, observer := logger.NewTesting(t.Name())
+
+		exeConfig := progConfig{
+			ErrMessage: "foo bar",
+			ExitCode:   222,
+		}
+		exePath, err := prepareTestProg(ctx, log, t.TempDir(), exeConfig)
+		require.NoError(t, err)
+
+		cmdSpec := component.ServiceOperationsCommandSpec{
+			RetryMaxCount:          2,
+			RetrySleepInitDuration: 10 * time.Millisecond,
+		}
+
+		err = executeServiceCommand(ctx, log, exePath, &cmdSpec)
+		expectedErr := fmt.Sprintf("%s: exit status %d", exeConfig.ErrMessage, exeConfig.ExitCode)
+		require.EqualError(t, err, expectedErr)
+
+		logs := observer.TakeAll()
+		for i := 0; i < int(cmdSpec.RetryMaxCount); i++ {
+			// Check that the command failure was logged at an ERROR level
+			logEntry := logs[2*i]
+			require.Equal(t, zapcore.ErrorLevel, logEntry.Level)
+			require.Equal(t, exeConfig.ErrMessage, logEntry.Message)
+
+			// Check that the retry message was logged at a WARNING level
+			logEntry = logs[2*i+1]
+			require.Equal(t, zapcore.WarnLevel, logEntry.Level)
+			require.Contains(t, logEntry.Message, fmt.Sprintf(
+				"service command execution failed with error [%s], retrying [%d of %d] after",
+				expectedErr, i+1, cmdSpec.RetryMaxCount,
+			))
+		}
+
+		// Check that the command failed again with the final retry and the failure
+		// was logged at an ERROR level
+		logEntry := logs[cmdSpec.RetryMaxCount]
+		require.Equal(t, zapcore.ErrorLevel, logEntry.Level)
+		require.Equal(t, exeConfig.ErrMessage, logEntry.Message)
+	})
+
+	// Execution succeeded after retrying once
+	// TODO
 }
