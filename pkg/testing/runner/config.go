@@ -27,6 +27,9 @@ type Config struct {
 
 	// SingleTest only has the runner run that specific test.
 	SingleTest string
+
+	// VerboseMode passed along a verbose mode flag to tests
+	VerboseMode bool
 }
 
 // Validate returns an error if the information is invalid.

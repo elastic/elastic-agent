@@ -15,8 +15,6 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/magefile/mage/mg"
-
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
@@ -128,7 +126,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, logger Logger, a
 }
 
 // Run the test
-func (DebianRunner) Run(ctx context.Context, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
+func (DebianRunner) Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {
@@ -148,7 +146,7 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, logger Logger, agent
 		vars = extendVars(vars, env)
 		logger.Logf("Starting tests")
 		logArg := ""
-		if mg.Verbose() {
+		if verbose {
 			logArg = "-v"
 		}
 		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
@@ -182,7 +180,7 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, logger Logger, agent
 		vars = extendVars(vars, env)
 		logger.Logf("Starting sudo tests")
 		logArg := ""
-		if mg.Verbose() {
+		if verbose {
 			logArg = "-v"
 		}
 		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
