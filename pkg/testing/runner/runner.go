@@ -439,7 +439,7 @@ func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir stri
 func (r *Runner) ogcPull(ctx context.Context) error {
 	args := []string{
 		"pull",
-		"docker.io/gorambo/ogc:latest",
+		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
 	}
 	fmt.Fprintf(os.Stdout, ">>> Pulling latest ogc image\n")
 	proc, err := process.Start("docker", process.WithContext(ctx), process.WithArgs(args))
@@ -710,7 +710,7 @@ func (r *Runner) ogcRun(ctx context.Context, args []string, interactive bool, pr
 		fmt.Sprintf("%s:%s", wd, wd),
 		"-w",
 		wd,
-		"docker.io/gorambo/ogc:latest",
+		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
 		"--",
 		"ogc",
 		"-v",
