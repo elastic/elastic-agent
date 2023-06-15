@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"text/tabwriter"
+	"sort"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -19,6 +19,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/jedib0t/go-pretty/v6/list"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
@@ -26,9 +28,10 @@ import (
 type outputter func(io.Writer, interface{}) error
 
 var statusOutputs = map[string]outputter{
-	"human": humanStateOutput,
-	"json":  jsonOutput,
-	"yaml":  yamlOutput,
+	"human":      humanOutput,
+	"human_full": humanFullOutput,
+	"json":       jsonOutput,
+	"yaml":       yamlOutput,
 }
 
 func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -44,7 +47,7 @@ func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String("output", "human", "Output the status information in either human, json, or yaml (default: human)")
+	cmd.Flags().String("output", "human", "Output the status information in either 'human', 'human_full', 'json', or 'yaml'.  'human' only shows non-healthy details, others show full details. (default: human)")
 
 	return cmd
 }
@@ -69,6 +72,10 @@ func statusCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error 
 		return fmt.Errorf("failed to communicate with Elastic Agent daemon: %w", err)
 	}
 
+	sort.SliceStable(state.Components, func(i, j int) bool { return state.Components[i].ID < state.Components[j].ID })
+	for _, c := range state.Components {
+		sort.SliceStable(c.Units, func(i, j int) bool { return c.Units[i].UnitID < c.Units[j].UnitID })
+	}
 	err = outputFunc(streams.Out, state)
 	if err != nil {
 		return err
@@ -82,43 +89,95 @@ func statusCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error 
 	return nil
 }
 
-func humanStateOutput(w io.Writer, obj interface{}) error {
+func formatStatus(state client.State, message string) string {
+	return fmt.Sprintf("status: (%s) %s", state, message)
+}
+
+func listComponentState(l list.Writer, components []client.ComponentState, all bool) {
+	for _, c := range components {
+		// see if any unit is not Healthy because component
+		// can be healthy with failed units
+		units_healthy := true
+		for _, u := range c.Units {
+			if u.State != client.Healthy {
+				units_healthy = false
+				break
+			}
+		}
+		if !all && units_healthy && (c.State == client.Healthy) {
+			continue
+		}
+		l.Indent()
+		l.AppendItem(c.ID)
+		l.Indent()
+		l.AppendItem(formatStatus(c.State, c.Message))
+		l.UnIndent()
+		for _, u := range c.Units {
+			if !all && (u.State == client.Healthy) {
+				continue
+			}
+			l.Indent()
+			l.AppendItem(u.UnitID)
+			l.Indent()
+			l.AppendItem(formatStatus(u.State, u.Message))
+			if all {
+				l.AppendItem(fmt.Sprintf("type: %s", u.UnitType))
+			}
+			l.UnIndent()
+			l.UnIndent()
+		}
+		l.UnIndent()
+		l.UnIndent()
+	}
+}
+
+func listAgentState(l list.Writer, state *client.AgentState, all bool) {
+	l.AppendItem("elastic-agent")
+	l.Indent()
+	l.AppendItem(formatStatus(state.State, state.Message))
+	if all {
+		l.AppendItem("info")
+		l.Indent()
+		l.AppendItem("id: " + state.Info.ID)
+		l.AppendItem("version: " + state.Info.Version)
+		l.AppendItem("commit: " + state.Info.Commit)
+		l.UnIndent()
+	}
+	l.UnIndent()
+	listComponentState(l, state.Components, all)
+}
+
+func listFleetState(l list.Writer, state *client.AgentState, all bool) {
+	l.AppendItem("fleet")
+	l.Indent()
+	l.AppendItem(formatStatus(state.FleetState, state.FleetMessage))
+	l.UnIndent()
+}
+
+func humanListOutput(w io.Writer, state *client.AgentState, all bool) error {
+	l := list.NewWriter()
+	l.SetStyle(list.StyleConnectedLight)
+	l.SetOutputMirror(w)
+	listFleetState(l, state, all)
+	listAgentState(l, state, all)
+	_ = l.Render()
+	return nil
+}
+
+func humanFullOutput(w io.Writer, obj interface{}) error {
 	status, ok := obj.(*client.AgentState)
 	if !ok {
 		return fmt.Errorf("unable to cast %T as *client.AgentStatus", obj)
 	}
-	return outputState(w, status)
+	return humanListOutput(w, status, true)
 }
 
-func outputState(w io.Writer, state *client.AgentState) error {
-	fmt.Fprintf(w, "State: %s\n", state.State)
-	if state.Message == "" {
-		fmt.Fprint(w, "Message: (no message)\n")
-	} else {
-		fmt.Fprintf(w, "Message: %s\n", state.Message)
+func humanOutput(w io.Writer, obj interface{}) error {
+	status, ok := obj.(*client.AgentState)
+	if !ok {
+		return fmt.Errorf("unable to cast %T as *client.AgentStatus", obj)
 	}
-	fmt.Fprintf(w, "Fleet State: %s\n", state.FleetState)
-	if state.FleetMessage == "" {
-		fmt.Fprint(w, "Fleet Message: (no message)\n")
-	} else {
-		fmt.Fprintf(w, "Fleet Message: %s\n", state.FleetMessage)
-	}
-	if len(state.Components) == 0 {
-		fmt.Fprint(w, "Components: (none)\n")
-	} else {
-		fmt.Fprint(w, "Components:\n")
-		tw := tabwriter.NewWriter(w, 4, 1, 2, ' ', 0)
-		for _, comp := range state.Components {
-			fmt.Fprintf(tw, "  * %s\t(%s)\n", comp.Name, comp.State)
-			if comp.Message == "" {
-				fmt.Fprint(tw, "\t(no message)\n")
-			} else {
-				fmt.Fprintf(tw, "\t%s\n", comp.Message)
-			}
-		}
-		tw.Flush()
-	}
-	return nil
+	return humanListOutput(w, status, false)
 }
 
 func jsonOutput(w io.Writer, out interface{}) error {
