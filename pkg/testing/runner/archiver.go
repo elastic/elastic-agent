@@ -54,7 +54,6 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 	defer zw.Close()
 
 	s := bufio.NewScanner(&stdout)
-	var fileCount int
 	s.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if i := strings.IndexRune(string(data), '\x00'); i >= 0 {
 			return i + 1, data[0:i], nil
@@ -97,14 +96,12 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 			if err != nil {
 				return fmt.Errorf("failed to copy zip entry %s: %w", line, err)
 			}
-			fileCount++
 			return nil
 		}(s.Text())
 		if err != nil {
 			return fmt.Errorf("error adding files: %w", err)
 		}
 	}
-	fmt.Printf(">> Added %d files to zip archive\n", fileCount)
 	return nil
 }
 
