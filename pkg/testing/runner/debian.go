@@ -147,7 +147,11 @@ func (DebianRunner) Run(ctx context.Context, c *ssh.Client, logger Logger, agent
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(tests, ","))
 		vars = extendVars(vars, env)
 		logger.Logf("Starting tests")
-		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage integration:testOnRemote`, vars)
+		logArg := ""
+		if mg.Verbose() {
+			logArg = "-v"
+		}
+		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
 		execTest := strings.NewReader(script)
 
 		session, err := c.NewSession()
