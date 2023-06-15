@@ -2107,8 +2107,8 @@ func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
 		}
 
 	case reflect.Slice:
+		// Recurse on slice elements
 		for i := 0; i < rv.Len(); i++ {
-			// Recurse on slice elements
 			morePaths := gatherDurationFieldPaths(rv.Index(i).Interface(), pathSoFar+"."+strconv.Itoa(i))
 			gatheredPaths = append(gatheredPaths, morePaths...)
 		}
