@@ -1930,8 +1930,8 @@ func TestSpecDurationsAreValid(t *testing.T) {
 
 	// Recursively reflect on component.Spec struct to find time.Duration fields
 	// and gather their paths.
-	for path, spec := range specFiles {
-		path, err = filepath.Abs(path)
+	for specFilePath, spec := range specFiles {
+		specFilePath, err = filepath.Abs(specFilePath)
 		require.NoError(t, err)
 
 		// Gather all duration fields' YAML paths so we an check if the
@@ -1940,7 +1940,7 @@ func TestSpecDurationsAreValid(t *testing.T) {
 
 		// Parse each spec file's YAML into a ucfg.Config object for
 		// easy access to field values via their paths.
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(specFilePath)
 		require.NoError(t, err)
 
 		var v map[string]interface{}
@@ -1963,7 +1963,7 @@ func TestSpecDurationsAreValid(t *testing.T) {
 			// Ensure that value can be parsed as a time.Duration. This parsing will
 			// fail if there is no unit suffix explicity specified.
 			_, err = time.ParseDuration(value)
-			assert.NoErrorf(t, err, "in spec file [%s], field [%s] has invalid value [%s]: %s", path, durationFieldPath, value, err)
+			assert.NoErrorf(t, err, "in spec file [%s], field [%s] has invalid value [%s]: %s", specFilePath, durationFieldPath, value, err)
 		}
 	}
 }
