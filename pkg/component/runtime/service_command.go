@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
+
 	"github.com/dolmen-go/contextio"
 
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -97,7 +99,35 @@ func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath s
 		log.Warnf("spec is nil, nothing to execute, binaryPath: %s", binaryPath)
 		return nil
 	}
-	return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+
+	if spec.RetryMaxCount == 0 {
+		// Execute command without any retries
+		return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+	}
+
+	// Execute command with retries and exponential backoff between attempts
+	expBackoff := backoff.NewExponentialBackOff()
+	expBackoff.InitialInterval = spec.RetrySleepInitDuration
+
+	retryExpBackoff := backoff.WithMaxRetries(expBackoff, spec.RetryMaxCount)
+	backoffCtx := backoff.WithContext(retryExpBackoff, ctx)
+
+	retryAttempt := 0
+	return backoff.RetryNotify(
+		func() error {
+			return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+		},
+		backoffCtx,
+		func(err error, retryAfter time.Duration) {
+			retryAttempt++
+			log.Warnf(
+				"service command execution failed with error [%s], retrying [%d of %d] after [%s]",
+				err.Error(),
+				retryAttempt, spec.RetryMaxCount,
+				retryAfter,
+			)
+		},
+	)
 }
 
 func envSpecToEnv(envSpecs []component.CommandEnvSpec) []string {
