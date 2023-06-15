@@ -59,7 +59,7 @@ func main() {
 const testModFile = `
 module prog
 
-go 1.18
+go 1.19
 `
 
 func renderTestProg(cfg progConfig) string {
