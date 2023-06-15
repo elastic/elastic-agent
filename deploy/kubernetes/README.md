@@ -35,7 +35,7 @@ cd elastic-agent-kustomize/default/elastic-agent-standalone
 kubectl apply -k .
 ```
 
-> Since Kubernetes version 1.14, Kubectl supports the use of kustomize
+> Since Kubernetes version 1.14, Kubectl supports the usage of kustomize
 
 ### Kube State Metrics (KSM) in autosharding configuration
 
