@@ -1,4 +1,4 @@
-// //go:build integration
+//go:build integration
 
 package integration
 
@@ -17,6 +17,39 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestESHandling(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Stack: &define.Stack{},
+		Local: true,
+	})
+
+	suite.Run(t, &TestES{info: info})
+}
+
+type TestES struct {
+	suite.Suite
+	info *define.Info
+}
+
+func (runner *TestES) TestESQuery() {
+	resp, err := tools.GetIndices(runner.info.ESClient)
+	require.NoError(runner.T(), err)
+	for _, run := range resp {
+		fmt.Printf("%#v\n", run)
+	}
+	// req := esapi.CatIndicesRequest{Format: "json"}
+	// resp, err := req.Do(context.Background(), runner.info.ESClient.Transport)
+	// require.NoError(runner.T(), err)
+	// require.Equal(runner.T(), 200, resp.StatusCode)
+	// buf, err := io.ReadAll(resp.Body)
+	// require.NoError(runner.T(), err)
+	// fmt.Printf("Got response from ES: %#v\n", string(buf))
+	// fmt.Printf("Got header: %#v\n", resp.Header)
+}
 
 func TestEnrollAndLog(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -72,7 +105,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	require.NoError(runner.T(), err)
 	runner.T().Logf("got policy: %#v", policy)
 
-	req := &esapi.CatHealthRequest{Human: true}
+	req := esapi.CatIndicesRequest{}
 	resp, err := req.Do(context.Background(), runner.requirementsInfo.ESClient.Transport)
 	require.NoError(runner.T(), err)
 	fmt.Printf("Got response from ES: %#v\n", resp)
