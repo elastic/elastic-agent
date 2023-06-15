@@ -2098,17 +2098,6 @@ func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
 	rt := reflect.TypeOf(s)
 	rv := reflect.ValueOf(s)
 
-	if rt.Kind() == reflect.Ptr {
-		if rv.IsNil() {
-			return gatheredPaths
-		}
-
-		// Recurse on the dereferenced pointer value.
-		morePaths := gatherDurationFieldPaths(rv.Elem().Interface(), pathSoFar)
-		gatheredPaths = append(gatheredPaths, morePaths...)
-		return gatheredPaths
-	}
-
 	switch rt.Kind() {
 	case reflect.Int64:
 		// If this is a time.Duration value, we gather its path.
@@ -2139,6 +2128,17 @@ func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
 			morePaths := gatherDurationFieldPaths(rv.Field(i).Interface(), yamlFieldPath)
 			gatheredPaths = append(gatheredPaths, morePaths...)
 		}
+		return gatheredPaths
+
+	case reflect.Ptr:
+		if rv.IsNil() {
+			// Nil pointer, nothing more to do
+			return gatheredPaths
+		}
+
+		// Recurse on the dereferenced pointer value.
+		morePaths := gatherDurationFieldPaths(rv.Elem().Interface(), pathSoFar)
+		gatheredPaths = append(gatheredPaths, morePaths...)
 		return gatheredPaths
 	}
 
