@@ -27,7 +27,7 @@ var (
 	qualifier = ""
 )
 
-const packageVersionFileName = ".package.version"
+const PackageVersionFileName = ".package.version"
 
 // GetAgentPackageVersion retrieves the version saved in .package.version in the same
 // directory as the agent executable
@@ -36,7 +36,7 @@ func GetAgentPackageVersion() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("detecting current executable path: %w", err)
 	}
-	packageVersionFilePath := filepath.Join(filepath.Dir(execPath), packageVersionFileName)
+	packageVersionFilePath := filepath.Join(filepath.Dir(execPath), PackageVersionFileName)
 	versionBytes, err := os.ReadFile(packageVersionFilePath)
 	if err != nil {
 		return "", fmt.Errorf("reading package version from file %q: %w", packageVersionFilePath, err)

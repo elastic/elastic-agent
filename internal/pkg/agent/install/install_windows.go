@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/version"
 )
 
 // postInstall performs post installation for Windows systems.
@@ -20,6 +21,12 @@ func postInstall(topPath string) error {
 	// delete the top-level elastic-agent.exe
 	binary := filepath.Join(topPath, paths.BinaryName)
 	err := os.Remove(binary)
+	if err != nil {
+		// do not handle does not exist, it should have existed
+		return err
+	}
+
+	err = os.Remove(filepath.Join(topPath, version.PackageVersionFileName))
 	if err != nil {
 		// do not handle does not exist, it should have existed
 		return err

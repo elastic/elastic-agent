@@ -764,6 +764,10 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          '.package.version':
+            content: >
+              {{ agent_package_version }}
+            mode: 0644
 
     - os: darwin
       types: [tgz]
