@@ -79,10 +79,10 @@ type ESSConfig struct {
 // Validate returns an error if the information is invalid.
 func (ess *ESSConfig) Validate() error {
 	if ess.APIKey == "" {
-		return errors.New("APIKey must be set")
+		return errors.New("APIKey must be set") //nolint:stylecheck // references a specific field
 	}
 	if ess.Region == "" {
-		return errors.New("Region must be set")
+		return errors.New("Region must be set") //nolint:stylecheck // references a specific field
 	}
 	return nil
 }
