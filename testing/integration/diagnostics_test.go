@@ -9,6 +9,9 @@ package integration
 import (
 	"archive/zip"
 	"context"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"io"
 	"io/fs"
 	"os"
@@ -16,10 +19,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -38,6 +37,7 @@ var diagnosticsFiles = []string{
 	"computed-config.yaml",
 	"goroutine.pprof.gz",
 	"heap.pprof.gz",
+	"local-config.yaml",
 	"mutex.pprof.gz",
 	"pre-config.yaml",
 	"state.yaml",
@@ -47,12 +47,12 @@ var diagnosticsFiles = []string{
 }
 
 var unitsDiagnosticsFiles []string = []string{
-	"allocs.txt",
-	"block.txt",
-	"goroutine.txt",
-	"heap.txt",
-	"mutex.txt",
-	"threadcreate.txt",
+	"allocs.pprof.gz",
+	"block.pprof.gz",
+	"goroutine.pprof.gz",
+	"heap.pprof.gz",
+	"mutex.pprof.gz",
+	"threadcreate.pprof.gz",
 }
 
 type componentAndUnitNames struct {
@@ -109,10 +109,21 @@ func (s *DiagnosticsIntegrationTestSuite) TestDiagnosticsFromHealthyAgent() {
 			"fake-default": {
 				State: atesting.NewClientState(client.Healthy),
 				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
-					{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+				},
+			},
+			"fake-shipper-default": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
 						State: atesting.NewClientState(client.Healthy),
 					},
 				},
@@ -147,10 +158,14 @@ func verifyDiagnosticArchive(t *testing.T, ctx context.Context, diagArchive stri
 
 	expectedExtractedFiles := map[string]struct{}{}
 	for _, filePattern := range expectedDiagArchiveFilePatterns {
-		absFilePattern := filepath.Join(extractionDir, filePattern)
+		absFilePattern := filepath.Join(extractionDir, filePattern.pattern)
 		files, err := filepath.Glob(absFilePattern)
 		assert.NoErrorf(t, err, "error globbing with pattern %q", absFilePattern)
-		assert.Greaterf(t, len(files), 0, "glob pattern %q matched no files", absFilePattern)
+		min := 0
+		if filePattern.optional {
+			min = -1
+		}
+		assert.Greaterf(t, len(files), min, "glob pattern %q matched no files", absFilePattern)
 		for _, f := range files {
 			expectedExtractedFiles[f] = struct{}{}
 		}
@@ -227,23 +242,39 @@ func (s *DiagnosticsIntegrationTestSuite) getRunningAgentVersion(ctx context.Con
 	return &avi, err
 }
 
-func compileExpectedDiagnosticFilePatterns(avi *client.Version, comps []componentAndUnitNames) []string {
-	files := make([]string, 0, len(diagnosticsFiles)+len(comps)*len(unitsDiagnosticsFiles))
+func compileExpectedDiagnosticFilePatterns(avi *client.Version, comps []componentAndUnitNames) []filePattern {
+	files := make([]filePattern, 0, len(diagnosticsFiles)+len(comps)*len(unitsDiagnosticsFiles))
 
-	files = append(files, diagnosticsFiles...)
+	for _, file := range diagnosticsFiles {
+		files = append(files, filePattern{
+			pattern:  file,
+			optional: false,
+		})
+	}
 
 	for _, comp := range comps {
 		for _, unitName := range comp.unitNames {
 			unitPath := path.Join("components", comp.name, unitName)
 			for _, fileName := range unitsDiagnosticsFiles {
-				files = append(files, path.Join(unitPath, fileName))
+				files = append(files,
+					filePattern{
+						pattern:  path.Join(unitPath, fileName),
+						optional: false,
+					})
 			}
 		}
 	}
 
-	files = append(files, path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-agent-*.ndjson"))
+	files = append(files, filePattern{
+		pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-agent-*.ndjson"),
+		optional: false,
+	})
 	// this pattern overlaps with the previous one but filepath.Glob() does not seem to match using '?' wildcard
-	files = append(files, path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-agent-watcher-*.ndjson"))
+	// optional: it doesn't have to be there (in some cases the watcher has not written any logs)
+	files = append(files, filePattern{
+		pattern:  path.Join("logs", "elastic-agent-"+avi.Commit[:6], "elastic-agent-watcher-*.ndjson"),
+		optional: true,
+	})
 
 	return files
 }
@@ -254,4 +285,9 @@ func extractKeysFromMap[K comparable, V any](src map[K]V) []K {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+type filePattern struct {
+	pattern  string
+	optional bool
 }
