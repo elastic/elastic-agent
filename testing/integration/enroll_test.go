@@ -105,8 +105,9 @@ func (runner *EnrollRunner) TestEnroll() {
 	require.NoError(runner.T(), err)
 	runner.T().Logf("got policy: %#v", policy)
 
-	req := esapi.CatIndicesRequest{}
-	resp, err := req.Do(context.Background(), runner.requirementsInfo.ESClient.Transport)
+	resp, err := tools.GetIndices(runner.info.ESClient)
 	require.NoError(runner.T(), err)
-	fmt.Printf("Got response from ES: %#v\n", resp)
+	for _, run := range resp {
+		fmt.Printf("%#v\n", run)
+	}
 }

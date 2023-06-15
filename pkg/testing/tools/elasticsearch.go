@@ -64,3 +64,20 @@ func GetIndicesWithContext(ctx context.Context, client elastictransport.Interfac
 	}
 	return respData, nil
 }
+
+// GetDocumentsInIndex returns a sample of documents for an index
+func GetDocumentsInIndex(client elastictransport.Interface, index string) (string, error) {
+	testCount := 10
+	req := esapi.SearchRequest{Index: []string{index}, Size: &testCount}
+
+	resp, err := req.Do(context.Background(), client)
+	if err != nil {
+		return "", fmt.Errorf("error fetching documents: %w", err)
+	}
+
+	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
+		return "", fmt.Errorf("non-200 return code: %v, response: '%s'", resp.StatusCode, resp.String())
+	}
+
+	return resp.String(), nil
+}
