@@ -128,7 +128,7 @@ For this installation, users need to configure the following agent policies:
 
 **Manifest Installation:**
 
-1. Revert any changes from previous scenarios. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario. 
+1. Revert any changes from previous scenarios. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario.
 2. Uncomment the following `toleration` in manifest [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/tolerations/elastic-agent-managed-deployment-ksm-1.yaml). Only the deployments need to include tolerations
 
    ```bash
@@ -170,12 +170,17 @@ elastic-agent-fn5tt                                              1/1     Running
 elastic-agent-g4m92                                              1/1     Running   0          4m33s
 elastic-agent-h4wbc                                              1/1     Running   0          4m33s
 
+```
+
+Retrieve the node name of the elastic-agent:
+
+```bash
 kubectl get pod -n kube-system elastic-agent-56cfc5759-7bmz7 -o jsonpath='{.spec.nodeName}'
 gke-kubernetes-scale-kubernetes-scale-0f73d58f-8cz4
+
 ```
 
 > **Note**: Above manifests exist under [manifests/tolerations](./manifests/tolerations) folder
-
 
 **Pros/Cons**:
 
