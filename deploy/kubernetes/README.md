@@ -25,8 +25,10 @@ Agent Scenario | Description
 
 How to choose the appropriate scenario:
 
-- `Default` Elastic agent scenario, deploy Elastic Agent as Daemonset. The default installation method, that will deploy one agent per Kubernetes node.
-- `KSM in autosharding configuration` scenario, installs Elastic Agents (that only collect Kube-state-Metrics metrics), along with the KSM as a Side Container. An additional Elastic Agent Leader will be installed as `Daemonset` and will be responsible for the rest of metrics collection. *This scenario is suitable in large Kubernetes deployments*. For more information see [section below](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/README.md#kube-state-metrics-ksm-in-autosharding-configuration)
+- `Default` Elastic agent scenario, deploys Elastic Agent as Daemonset. The default installation method, that will deploy one agent per Kubernetes node.
+- `KSM in autosharding configuration` scenario, installs Elastic Agents (that only collect Kube-state-Metrics metrics), along with the KSM as a Side Container. An additional Elastic Agent Leader will be installed as `Daemonset` and will be responsible for the rest of metrics collection. 
+*This scenario is suitable in large Kubernetes deployments*.
+For more information see [section below](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/README.md#kube-state-metrics-ksm-in-autosharding-configuration)
 
 ### How to use the kustomize templates
 
