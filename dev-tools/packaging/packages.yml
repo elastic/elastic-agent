@@ -61,6 +61,10 @@ shared:
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/.package.version:
+        content: >
+          {{ agent_package_version }}
+        mode: 0644
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/components:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
