@@ -21,11 +21,11 @@ The default dns entries for to access created ksm pods are (assuming namespace o
 
 ## Installation methods of elastic-agent
 
-This document suggests **the 4 alternative configuration methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration. In general, we split the agent installation. We use a `daemonset Leader Elastic Agent` that collects both node-wide metrics and Kubernetes API Server metrics and `deployment (or statefuleset) Elastic Agents` that collect metrics from the different KSM Shard endpoints.
+This document suggests **the 3 alternative configuration methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration. In general, we split the agent installation. We use a `daemonset Leader Elastic Agent` that collects both node-wide metrics and Kubernetes API Server metrics and `deployment (or statefuleset) Elastic Agents` that collect metrics from the different KSM Shard endpoints.
 
-1. `Elastic Agent as side-container with KSM Sharded pods`. The Elastic Agent will be installed as `Statefulset` with `hostNetwork:false` and will be a side container of Kube-state-metrics. Meaning that KSM and Elastic Agent will share the same localhost network to communicate.
-2. With `hostNetwork:false` for non-leader Elastic Agent deployments that will collect from KSM Shards. In this configuration Elastic Agent will be installed as deployments and we will need one deployment for every KSM Shard collection endpoint. An additional Elastic Agent Leader wi
-3. With `taint/tolerations` to isolate the Elastic Agent `Daemonset` pods from rest of Elastic Agent `Deployments`. Tolerations configuration is the mean to exclude Daemonset pods from nodes where the Elastic Agent KSM pods run. So the Elastic Agent Daemonset pods will run only on those nodes where no Elastic Agents that collect KSM run.
+1. `Elastic Agent as side-container with KSM Sharded pods`: The Elastic Agent will be installed as `Statefulset` with `hostNetwork:false` and will be a side container of Kube-state-metrics. Meaning that KSM and Elastic Agent will share the same localhost network to communicate.
+2. `Elastic Agent Deployment with *hostNetwork:false*`: The `hostNetwork:false` is set in non-leader Elastic Agent deployments that will collect from KSM Shards. In this configuration Elastic Agents will be installed as deployments, thus we will need one deployment for every KSM Shard collection endpoint. An additional Elastic Agent Leader will be installed as `Daemonset` and will be responsible for the node-wide metrics collection.
+3. `Elastic Agents with taint/tolerations`: With `taint/tolerations` to isolate the Elastic Agent `Daemonset` pods from rest of Elastic Agent `Deployments`. Tolerations configuration is the mean to exclude Daemonset pods from nodes where the Elastic Agent KSM pods run. So the Elastic Agent Daemonset pods will run only on those nodes where no Elastic Agents that collect KSM run.
 
 Each configuration includes specific pros and cons and users may choose what best matches their needs.
 
@@ -46,13 +46,13 @@ The Kubernetes observability is based on [kubernetes integration](https://docs.e
   - kube-state-metrics
   - apiserver
 
-The Elastic Agent manifest is deployed by default as daemonset. That said, each elastic agent by default is being deployed on every node of kubernetes cluster.
+The Elastic Agent manifest is deployed by default as daemonset. That said, each elastic agent by default is being deployed on every node of Kubernetes cluster.
 
-Additionally by default, one agent is elected as [**leader**](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L32) and this will be responsible for also collecting the cluster wide metrics.
+By default, one agent is elected as [**leader**](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L32) and this will be responsible for also collecting the cluster wide metrics.
 
-Next, we will describe the managed agent installation scenarios (for simplicity we would not mention standalone scenarios, but relevant [manifests](./manifests) will be provided for both scenarios). 
+Next, we will describe the managed agent installation scenarios (for simplicity we would not mention standalone scenarios, but relevant [manifests](./manifests) will be provided for both scenarios).
 
-### 1. Elastic Agent with HostNetwork:false and side container of KSM
+### 1. Elastic Agent `Statefulset + KSM as Side Container`
 
 For this installation, users need to configure the two following agent policies.
 
@@ -75,7 +75,7 @@ Follow steps of [KSM Autosharding with Side Container](./manifests/kustomize-aut
 - [+] Localhost communication between KSM and Elastic Agent
 - [-] Users need to patch the Statefuleset of KSM in order to create Elastic Agent as side container
 
-### 2. HostNetwork:false Installation for non-leader Elastic Agent deployments
+### 2. Elastic Agent Deployment with `hostNetwork:false`
 
 For this installation, users need to configure the two following agent policies.
 
@@ -113,7 +113,7 @@ Deploy following manifests:
 - [+] Simplicity
 - [-] You can not prevent execution of deployments in nodes where agents already running.
 
-### 3. Tolerations Installation
+### 3. Elastic Agents with taint/tolerations
 
 **Agent Policies:**
 For this installation, users need to configure the following agent policies:
