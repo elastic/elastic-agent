@@ -31,11 +31,11 @@ Each configuration includes specific pros and cons and users may choose what bes
 
 | Installation Method  | No of Policies  | Who can Use it  | Notes |
 |---|---|---|---|
-| Elastic Agent `Statefulset + KSM as Side Container`  | 2 (1 Policy for Leader Daemonset + 1 Policy for all KSM Elastic Agents) | Suggested for K8s clusters more than 2K pods. When latency problems occur (see relevant [Latency section](https://github.com/elastic/ingest-docs/blob/325a46d475f4446199955c6acbf8f372535ed57b/docs/en/ingest-management/elastic-agent/scaling-on-kubernetes.asciidoc))  | Easiest to configure. Suitable for automation scenarios  |
+| Elastic Agent `Statefulset + KSM as Side Container`  | 2 (1 Policy for Leader Daemonset + 1 Policy for all KSM Elastic Agents) | Suggested for K8s clusters more than 2K pods. When latency problems occur (see relevant [Latency section](https://www.elastic.co/guide/en/fleet/master/scaling-on-kubernetes.html#verify-ingestion-latency))  | Easiest to configure. Suitable for automation scenarios  |
 | Elastic Agent Deployment with `hostNetwork:false` | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  |  Same as above, for k8s clusters more than 2k pods | More manual steps needed comparing to previous method. The KSM and Elastic Agents are in different pods  |
 | Elastic Agents with taint/tolerations  | 1 Policy for Leader Daemonset + N Policies for each N KSM shards.)  | When users need to specify the nodes of Elastic Agent  | More complex method but gives more scheduling abilities to users |
 
-The Kubernetes observability is based on [kubernetes integration](https://docs.elastic.co/en/integrations/kubernetes), which is fetching metrics from several components:
+The Kubernetes observability is based on [Kubernetes integration](https://docs.elastic.co/en/integrations/kubernetes), which is fetching metrics from several components:
 
 - **Per node:**
   - kubelet
