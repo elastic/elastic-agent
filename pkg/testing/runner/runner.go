@@ -52,13 +52,25 @@ type OSRunnerResult struct {
 // OSRunner provides an interface to run the tests on the OS.
 type OSRunner interface {
 	// Prepare prepares the runner to actual run on the host.
-	Prepare(ctx context.Context, c *ssh.Client, instanceName string, arch string, goVersion string, repoArchive string, buildPath string) error
+	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error
 	// Run runs the actual tests and provides the result.
-	Run(ctx context.Context, c *ssh.Client, instanceName string, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
+	Run(ctx context.Context, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
+}
+
+// Logger is a simple logging interface used by each runner type.
+type Logger interface {
+	// Prefix returns the prefix used for logging.
+	Prefix() string
+	// Logf logs the message for this runner.
+	Logf(format string, args ...any)
 }
 
 // Result is the complete result from the runner.
 type Result struct {
+	// Tests is the number of tests ran.
+	Tests int
+	// Failures is the number of tests that failed.
+	Failures int
 	// Output is the raw test output.
 	Output []byte
 	// XMLOutput is the XML Junit output.
@@ -83,11 +95,17 @@ func NewRunner(cfg Config, batches ...define.Batch) (*Runner, error) {
 	}
 	var layoutBatches []LayoutBatch
 	for _, b := range batches {
-		lb, err := createBatch(b)
+		lbs, err := createBatches(b, cfg.Matrix)
 		if err != nil {
 			return nil, err
 		}
-		layoutBatches = append(layoutBatches, lb)
+		layoutBatches = append(layoutBatches, lbs...)
+	}
+	if cfg.SingleTest != "" {
+		layoutBatches, err = filterSingleTest(layoutBatches, cfg.SingleTest)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &Runner{
 		cfg:          cfg,
@@ -151,7 +169,7 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 		// print the output so its clear what went wrong
 		// without this it's unclear where OGC went wrong it
 		// doesn't do a great job of reporting a clean error
-		fmt.Printf("%s\n", upOutput)
+		fmt.Fprintf(os.Stdout, "%s\n", upOutput)
 		return Result{}, fmt.Errorf("ogc didn't create any machines")
 	}
 	results, err := r.runMachines(ctx, sshAuth, repoArchive, machines)
@@ -182,9 +200,18 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 				if !ok {
 					return fmt.Errorf("unable to find layout batch with ID: %s", m.Layout.Name)
 				}
-				result, err := r.runMachine(ctx, sshAuth, repoArchive, batch, m)
+				loggerPrefix := fmt.Sprintf(
+					"%s/%s/%s/%s[%s]",
+					batch.LayoutOS.OS.Type,
+					batch.LayoutOS.OS.Arch,
+					batch.LayoutOS.OS.Distro,
+					batch.LayoutOS.OS.Version,
+					batch.ID[len(batch.ID)-5:len(batch.ID)-1],
+				)
+				logger := &batchLogger{prefix: loggerPrefix}
+				result, err := r.runMachine(ctx, sshAuth, logger, repoArchive, batch, m)
 				if err != nil {
-					fmt.Printf(">>> Failed for instance %s @ %s: %s\n", m.InstanceName, m.PublicIP, err)
+					logger.Logf("Failed for instance %s: %s\n", m.PublicIP, err)
 					return err
 				}
 				resultsMx.Lock()
@@ -202,23 +229,23 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 }
 
 // runMachine runs the batch on the machine.
-func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
-	fmt.Printf(">>> Starting SSH connection to instance %s @ %s\n", machine.InstanceName, machine.PublicIP)
+func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
+	logger.Logf("Starting SSH connection to %s", machine.PublicIP)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	client, err := sshConnect(connectCtx, machine.PublicIP, machine.Layout.Username, sshAuth)
 	if err != nil {
-		fmt.Printf(">>> Failed to connect to instance %s @ %s: %s\n", machine.InstanceName, machine.PublicIP, err)
+		logger.Logf("Failed to connect to instance %s: %s", machine.PublicIP, err)
 		return OSRunnerResult{}, fmt.Errorf("failed to connect to instance %s: %w", machine.InstanceName, err)
 	}
 	defer client.Close()
-	fmt.Printf(">>> Connected over SSH to instance %s\n", machine.InstanceName)
+	logger.Logf("Connected over SSH")
 
 	// prepare the host to run the tests
-	fmt.Printf(">>> Preparing instance %s\n", machine.InstanceName)
-	err = batch.LayoutOS.Runner.Prepare(ctx, client, machine.InstanceName, batch.LayoutOS.OS.Arch, r.cfg.GOVersion, repoArchive, r.getBuildPath(batch))
+	logger.Logf("Preparing instance")
+	err = batch.LayoutOS.Runner.Prepare(ctx, client, logger, batch.LayoutOS.OS.Arch, r.cfg.GOVersion, repoArchive, r.getBuildPath(batch))
 	if err != nil {
-		fmt.Printf(">>> Failed to prepare instance %s: %s\n", machine.InstanceName, err)
+		logger.Logf("Failed to prepare instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to prepare instance %s: %w", machine.InstanceName, err)
 	}
 
@@ -229,12 +256,12 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArc
 		if err != nil {
 			return OSRunnerResult{}, err
 		}
-		fmt.Printf(">>> Instance %s waiting for stack to be ready\n", machine.InstanceName)
+		logger.Logf("Waiting for stack to be ready")
 		resp := <-ch
 		if resp == nil {
-			fmt.Printf(">>> Instance %s cannot continue because stack never became ready\n", machine.InstanceName)
+			logger.Logf("Cannot continue because stack never became ready")
 		} else {
-			fmt.Printf(">>> Instance %s will continue stack is ready\n", machine.InstanceName)
+			logger.Logf("Will continue stack is ready")
 			env = map[string]string{
 				"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
 				"ELASTICSEARCH_USERNAME": resp.Username,
@@ -248,9 +275,9 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, repoArc
 
 	// run the actual tests on the host
 	prefix := fmt.Sprintf("%s-%s-%s-%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, strings.Replace(batch.LayoutOS.OS.Version, ".", "", -1))
-	result, err := batch.LayoutOS.Runner.Run(ctx, client, machine.InstanceName, r.cfg.AgentVersion, prefix, batch.Batch, env)
+	result, err := batch.LayoutOS.Runner.Run(ctx, client, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
 	if err != nil {
-		fmt.Printf(">>> Failed to execute tests on instance %s: %s\n", machine.InstanceName, err)
+		logger.Logf("Failed to execute tests on instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", machine.InstanceName, err)
 	}
 	return result, nil
@@ -353,7 +380,7 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 	var signer ssh.Signer
 	if errors.Is(priErr, os.ErrNotExist) || errors.Is(pubErr, os.ErrNotExist) {
 		// either is missing (re-create)
-		fmt.Printf(">>> Create SSH keys to use for SSH\n")
+		fmt.Fprintf(os.Stdout, ">>> Create SSH keys to use for SSH\n")
 		_ = os.Remove(privateKey)
 		_ = os.Remove(publicKey)
 		pri, err := newSSHPrivateKey()
@@ -400,7 +427,7 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir string) (string, error) {
 	zipPath := filepath.Join(dir, "agent-repo.zip")
 	_ = os.Remove(zipPath) // start fresh
-	fmt.Printf(">>> Creating zip archive of repo to send to remote hosts\n")
+	fmt.Fprintf(os.Stdout, ">>> Creating zip archive of repo to send to remote hosts\n")
 	err := createRepoZipArchive(ctx, repoDir, zipPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create zip archive of repo: %w", err)
@@ -412,9 +439,9 @@ func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir stri
 func (r *Runner) ogcPull(ctx context.Context) error {
 	args := []string{
 		"pull",
-		"docker.io/gorambo/ogc:latest",
+		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
 	}
-	fmt.Printf(">>> Pulling latest ogc image\n")
+	fmt.Fprintf(os.Stdout, ">>> Pulling latest ogc image\n")
 	proc, err := process.Start("docker", process.WithContext(ctx), process.WithArgs(args))
 	if err != nil {
 		return fmt.Errorf("failed to run docker pull: %w", err)
@@ -455,14 +482,14 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 	defer r.batchToCloudMx.Unlock()
 	for _, version := range versions {
 		name := fmt.Sprintf("at-%s-%s", strings.Replace(emailParts[0], ".", "-", -1), strings.Replace(version, ".", "", -1))
-		fmt.Printf(">>> Creating ESS cloud %s (%s)\n", version, name)
+		fmt.Fprintf(os.Stdout, ">>> Creating ESS cloud %s (%s)\n", version, name)
 		resp, err := essClient.CreateDeployment(ctx, ess.CreateDeploymentRequest{
 			Name:    name,
 			Region:  r.cfg.ESS.Region,
 			Version: version,
 		})
 		if err != nil {
-			fmt.Printf(">>> Failed to create ESS cloud %s: %s\n", version, err)
+			fmt.Fprintf(os.Stdout, ">>> Failed to create ESS cloud %s: %s\n", version, err)
 			return fmt.Errorf("failed to create ESS cloud for version %s: %w", version, err)
 		}
 		essResp := &essCloudResponse{
@@ -480,7 +507,7 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 			defer cancel()
 			ready, err := essClient.DeploymentIsReady(ctx, resp.resp.ID, 30*time.Second)
 			if err != nil {
-				fmt.Printf(">>> Failed to check for cloud %s to be ready: %s\n", version, err)
+				fmt.Fprintf(os.Stdout, ">>> Failed to check for cloud %s to be ready: %s\n", version, err)
 			}
 			resp.subMx.RLock()
 			subs := make([]chan *ess.CreateDeploymentResponse, len(resp.subCh))
@@ -526,7 +553,7 @@ func (r *Runner) cleanupCloud() {
 			return essClient.ShutdownDeployment(ctx, cloud.resp.ID)
 		}()
 		if err != nil {
-			fmt.Printf(">>> Failed to cleanup cloud %s: %s\n", cloud.resp.ID, err)
+			fmt.Fprintf(os.Stdout, ">>> Failed to cleanup cloud %s: %s\n", cloud.resp.ID, err)
 		}
 	}
 
@@ -576,7 +603,7 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal layouts YAML: %w", err)
 	}
-	fmt.Printf(">>> Import layouts into ogc\n")
+	fmt.Fprintf(os.Stdout, ">>> Import layouts into ogc\n")
 	proc, err := r.ogcRun(ctx, []string{"layout", "import"}, true)
 	if err != nil {
 		return fmt.Errorf("failed to run ogc import: %w", err)
@@ -598,7 +625,7 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 
 // ogcUp brings up all the instances.
 func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
-	fmt.Printf(">>> Bring up instances through ogc\n")
+	fmt.Fprintf(os.Stdout, ">>> Bring up instances through ogc\n")
 	var output bytes.Buffer
 	proc, err := r.ogcRun(ctx, []string{"up", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
@@ -607,7 +634,7 @@ func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
 	ps := <-proc.Wait()
 	if ps.ExitCode() != 0 {
 		// print the output so its clear what went wrong
-		fmt.Printf("%s\n", output.Bytes())
+		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
 		return nil, fmt.Errorf("failed to run ogc up: docker run exited with code: %d", ps.ExitCode())
 	}
 	return output.Bytes(), nil
@@ -615,13 +642,16 @@ func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
 
 // ogcDown brings down all the instances.
 func (r *Runner) ogcDown(ctx context.Context) error {
-	fmt.Printf(">>> Bring down instances through ogc\n")
-	proc, err := r.ogcRun(ctx, []string{"down", LayoutIntegrationTag}, false)
+	fmt.Fprintf(os.Stdout, ">>> Bring down instances through ogc\n")
+	var output bytes.Buffer
+	proc, err := r.ogcRun(ctx, []string{"down", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run ogc down: %w", err)
 	}
 	ps := <-proc.Wait()
 	if ps.ExitCode() != 0 {
+		// print the output so its clear what went wrong
+		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
 		return fmt.Errorf("failed to run ogc down: docker run exited with code: %d", ps.ExitCode())
 	}
 	return nil
@@ -680,7 +710,7 @@ func (r *Runner) ogcRun(ctx context.Context, args []string, interactive bool, pr
 		fmt.Sprintf("%s:%s", wd, wd),
 		"-w",
 		wd,
-		"docker.io/gorambo/ogc:latest",
+		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
 		"--",
 		"ogc",
 		"-v",
@@ -733,6 +763,10 @@ func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error)
 	}
 
 	var complete Result
+	for _, suite := range suites.Suites {
+		complete.Tests += suite.Tests
+		complete.Failures += suite.Failures
+	}
 	complete.Output = rawOutput.Bytes()
 	complete.JSONOutput = jsonOutput.Bytes()
 	complete.XMLOutput = junitBytes.Bytes()
@@ -807,29 +841,96 @@ func findLayoutBatchByID(id string, batches []LayoutBatch) (LayoutBatch, bool) {
 	return LayoutBatch{}, false
 }
 
-func createBatch(batch define.Batch) (LayoutBatch, error) {
-	skip := false
-	specific, err := getSupported(batch.OS)
+func createBatches(batch define.Batch, matrix bool) ([]LayoutBatch, error) {
+	var batches []LayoutBatch
+	specifics, err := getSupported(batch.OS)
 	if errors.Is(err, ErrOSNotSupported) {
-		skip = true
-		specific.OS.Type = batch.OS.Type
-		specific.OS.Arch = batch.OS.Arch
-		specific.OS.Distro = batch.OS.Distro
-		if specific.OS.Distro == "" {
-			specific.OS.Distro = "unknown"
+		var s LayoutOS
+		s.OS.Type = batch.OS.Type
+		s.OS.Arch = batch.OS.Arch
+		s.OS.Distro = batch.OS.Distro
+		if s.OS.Distro == "" {
+			s.OS.Distro = "unknown"
 		}
-		if specific.OS.Version == "" {
-			specific.OS.Version = "unknown"
+		if s.OS.Version == "" {
+			s.OS.Version = "unknown"
 		}
+		batches = append(batches, LayoutBatch{
+			ID:       xid.New().String(),
+			LayoutOS: s,
+			Batch:    batch,
+			Skip:     true,
+		})
+		return batches, nil
 	} else if err != nil {
-		return LayoutBatch{}, err
+		return nil, err
 	}
-	return LayoutBatch{
-		ID:       xid.New().String(),
-		LayoutOS: specific,
-		Batch:    batch,
-		Skip:     skip,
-	}, nil
+	if matrix {
+		for _, s := range specifics {
+			batches = append(batches, LayoutBatch{
+				ID:       xid.New().String(),
+				LayoutOS: s,
+				Batch:    batch,
+				Skip:     false,
+			})
+		}
+	} else {
+		batches = append(batches, LayoutBatch{
+			ID:       xid.New().String(),
+			LayoutOS: specifics[0],
+			Batch:    batch,
+			Skip:     false,
+		})
+	}
+	return batches, nil
+}
+
+func filterSingleTest(batches []LayoutBatch, singleTest string) ([]LayoutBatch, error) {
+	var filtered []LayoutBatch
+	for _, batch := range batches {
+		batch, ok := filterSingleTestBatch(batch, singleTest)
+		if ok {
+			filtered = append(filtered, batch)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil, fmt.Errorf("test not found: %s", singleTest)
+	}
+	return filtered, nil
+}
+
+func filterSingleTestBatch(batch LayoutBatch, testName string) (LayoutBatch, bool) {
+	for _, pt := range batch.Batch.Tests {
+		for _, t := range pt.Tests {
+			if t == testName {
+				// filter batch to only run one test
+				batch.Batch.Tests = []define.BatchPackageTests{
+					{
+						Name:  pt.Name,
+						Tests: []string{testName},
+					},
+				}
+				batch.Batch.SudoTests = nil
+				return batch, true
+			}
+		}
+	}
+	for _, pt := range batch.Batch.SudoTests {
+		for _, t := range pt.Tests {
+			if t == testName {
+				// filter batch to only run one test
+				batch.Batch.SudoTests = []define.BatchPackageTests{
+					{
+						Name:  pt.Name,
+						Tests: []string{testName},
+					},
+				}
+				batch.Batch.Tests = nil
+				return batch, true
+			}
+		}
+	}
+	return batch, false
 }
 
 type essCloudResponse struct {
@@ -838,4 +939,16 @@ type essCloudResponse struct {
 	done  bool
 	subCh []chan *ess.CreateDeploymentResponse
 	subMx sync.RWMutex
+}
+
+type batchLogger struct {
+	prefix string
+}
+
+func (b *batchLogger) Prefix() string {
+	return b.prefix
+}
+
+func (b *batchLogger) Logf(format string, args ...any) {
+	fmt.Fprintf(os.Stdout, ">>> (%s) %s\n", b.prefix, fmt.Sprintf(format, args...))
 }

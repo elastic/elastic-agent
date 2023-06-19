@@ -8,22 +8,23 @@ require (
 	github.com/billgraziano/dpapi v0.4.0
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliercoder/go-rpm v0.0.0-20190131055624-7a9c54e3d83e
+	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/coreos/go-systemd/v22 v22.3.3-0.20220203105225-a9a7ef127534
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
 	github.com/elastic/elastic-agent-autodiscover v0.6.1
-	github.com/elastic/elastic-agent-client/v7 v7.1.0
-	github.com/elastic/elastic-agent-libs v0.3.8-0.20230512004837-d6a37d929cd6
-	github.com/elastic/elastic-agent-system-metrics v0.6.0
-	github.com/elastic/go-elasticsearch/v8 v8.0.0-20210317102009-a9d74cec0186
-	github.com/elastic/go-licenser v0.4.0
-	github.com/elastic/go-sysinfo v1.10.0
+	github.com/elastic/elastic-agent-client/v7 v7.1.2
+	github.com/elastic/elastic-agent-libs v0.3.9-0.20230608184016-1f368a55a6ac
+	github.com/elastic/elastic-agent-system-metrics v0.6.1
+	github.com/elastic/go-elasticsearch/v8 v8.8.1
+	github.com/elastic/go-licenser v0.4.1
+	github.com/elastic/go-sysinfo v1.11.0
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/flock v0.8.1
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/google/go-cmp v0.5.9
-	github.com/google/pprof v0.0.0-20230406165453-00490a63f317
+	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -31,7 +32,7 @@ require (
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901
 	github.com/josephspurrier/goversioninfo v0.0.0-20190209210621-63e6d1acd3dd
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
-	github.com/magefile/mage v1.14.0
+	github.com/magefile/mage v1.15.0
 	github.com/mitchellh/gox v1.0.1
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/mitchellh/mapstructure v1.5.0
@@ -49,12 +50,12 @@ require (
 	go.elastic.co/apm/module/apmgorilla v1.15.0
 	go.elastic.co/ecszap v1.0.1
 	go.elastic.co/go-licence-detector v0.5.0
-	go.uber.org/zap v1.21.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.5.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.6.0
-	golang.org/x/text v0.8.0
+	golang.org/x/sys v0.7.0
+	golang.org/x/text v0.9.0
 	golang.org/x/time v0.3.0
 	golang.org/x/tools v0.7.0
 	google.golang.org/grpc v1.46.0
@@ -73,14 +74,14 @@ require (
 	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/cavaliercoder/badio v0.0.0-20160213150051-ce5280129e9e // indirect
-	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v20.10.24+incompatible // indirect
+	github.com/docker/docker v23.0.3+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/elastic/go-structform v0.0.9 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.3.0 // indirect
+	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
@@ -130,13 +131,13 @@ require (
 	go.elastic.co/apm/module/apmhttp/v2 v2.0.0 // indirect
 	go.elastic.co/apm/v2 v2.0.0 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/mod v0.9.0 // indirect
-	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
-	golang.org/x/term v0.6.0 // indirect
+	golang.org/x/term v0.7.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220426171045-31bebdecfb46 // indirect
 	google.golang.org/grpc/examples v0.0.0-20220304170021-431ea809a767 // indirect

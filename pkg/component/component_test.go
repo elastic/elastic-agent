@@ -8,9 +8,18 @@ package component
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -344,9 +353,13 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID:        "fleet-server-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       ErrOutputNotSupported,
+					ID:  "fleet-server-default",
+					Err: ErrOutputNotSupported,
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "fleet-server",
+						BinaryName: "fleet-server",
+						BinaryPath: filepath.Join("..", "..", "specs", "fleet-server"),
+					},
 					Units: []Unit{
 						{
 							ID:       "fleet-server-default",
@@ -1025,7 +1038,8 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "filestream-default",
 					},
@@ -1044,9 +1058,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": true,
-								},
 							}),
 						},
 						{
@@ -1077,8 +1088,10 @@ func TestToComponents(t *testing.T) {
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
 					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"shipper": map[string]interface{}{},
+						"type": "elasticsearch",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"other": map[string]interface{}{
 						"type": "elasticsearch",
@@ -1087,12 +1100,16 @@ func TestToComponents(t *testing.T) {
 						},
 					},
 					"stashit": map[string]interface{}{
-						"type":    "logstash",
-						"shipper": map[string]interface{}{},
+						"type": "logstash",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"redis": map[string]interface{}{
-						"type":    "redis",
-						"shipper": map[string]interface{}{},
+						"type": "redis",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 				},
 				"inputs": []interface{}{
@@ -1186,7 +1203,8 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "filestream-default",
 					},
@@ -1205,9 +1223,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": false,
-								},
 							}),
 						},
 						{
@@ -1265,7 +1280,8 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "log-default",
 					},
@@ -1333,8 +1349,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "elasticsearch",
-								"shipper": map[string]interface{}{},
+								"type": "elasticsearch",
 							}),
 						},
 					},
@@ -1353,9 +1368,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": false,
-								},
 							}),
 						},
 						{
@@ -1395,7 +1407,8 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-stashit",
 						UnitID:      "log-stashit",
 					},
@@ -1431,8 +1444,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "logstash",
-								"shipper": map[string]interface{}{},
+								"type": "logstash",
 							}),
 						},
 					},
@@ -1463,7 +1475,8 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-redis",
 						UnitID:      "log-redis",
 					},
@@ -1499,8 +1512,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "redis",
-								"shipper": map[string]interface{}{},
+								"type": "redis",
 							}),
 						},
 					},
@@ -1518,8 +1530,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "elasticsearch",
-								"shipper": map[string]interface{}{},
+								"type": "elasticsearch",
 							}),
 						},
 						{
@@ -1825,7 +1836,10 @@ func TestToComponents(t *testing.T) {
 					if expected.Err != nil {
 						assert.Equal(t, expected.Err, actual.Err)
 						assert.EqualValues(t, expected.Units, actual.Units)
-					} else if expected.InputSpec != nil {
+					} else {
+						assert.NoError(t, actual.Err, "Expected no error for component "+actual.ID)
+					}
+					if expected.InputSpec != nil {
 						assert.Nil(t, actual.ShipperSpec)
 						assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
 						assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
@@ -1834,10 +1848,10 @@ func TestToComponents(t *testing.T) {
 							assert.EqualValues(t, eu.Config, actual.Units[i].Config)
 						}
 						assert.EqualValues(t, expected.Units, actual.Units)
-						if expected.Shipper != nil {
-							assert.Equal(t, *expected.Shipper, *actual.Shipper)
+						if expected.ShipperRef != nil {
+							assert.Equal(t, *expected.ShipperRef, *actual.ShipperRef)
 						} else {
-							assert.Nil(t, actual.Shipper)
+							assert.Nil(t, actual.ShipperRef)
 						}
 					} else if expected.ShipperSpec != nil {
 						assert.Nil(t, actual.InputSpec)
@@ -1845,7 +1859,7 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
 						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
 
-						assert.Nil(t, actual.Shipper)
+						assert.Nil(t, actual.ShipperRef)
 						assert.Len(t, actual.Units, len(expected.Units))
 						for i := range expected.Units {
 							assertEqualUnitExpectedConfigs(t, &expected.Units[i], &actual.Units[i])
@@ -1904,6 +1918,52 @@ func TestPreventionsAreValid(t *testing.T) {
 				assert.NoErrorf(t, err, "shipper '%v' in spec file '%v' has error in prevention [%v]",
 					shipper.Name, path, prevention.Condition)
 			}
+		}
+	}
+}
+
+func TestSpecDurationsAreValid(t *testing.T) {
+	// Test that durations specified in all spec files explicitly specify valid units.
+
+	specFiles, err := specFilesForDirectory(filepath.Join("..", "..", "specs"))
+	require.NoError(t, err)
+
+	// Recursively reflect on component.Spec struct to find time.Duration fields
+	// and gather their paths.
+	for specFilePath, spec := range specFiles {
+		specFilePath, err = filepath.Abs(specFilePath)
+		require.NoError(t, err)
+
+		// Gather all duration fields' YAML paths so we an check if the
+		// value at each path is valid.
+		durationFieldPaths := gatherDurationFieldPaths(spec, "")
+
+		// Parse each spec file's YAML into a ucfg.Config object for
+		// easy access to field values via their paths.
+		data, err := os.ReadFile(specFilePath)
+		require.NoError(t, err)
+
+		var v map[string]interface{}
+		err = yaml.Unmarshal(data, &v)
+		require.NoError(t, err)
+
+		cfg, err := ucfg.NewFrom(v, ucfg.PathSep("."))
+		require.NoError(t, err)
+
+		for _, durationFieldPath := range durationFieldPaths {
+			exists, err := cfg.Has(durationFieldPath, -1, ucfg.PathSep("."))
+			if !exists {
+				continue
+			}
+			require.NoError(t, err)
+
+			value, err := cfg.String(durationFieldPath, -1, ucfg.PathSep("."))
+			require.NoError(t, err)
+
+			// Ensure that value can be parsed as a time.Duration. This parsing will
+			// fail if there is no unit suffix explicitly specified.
+			_, err = time.ParseDuration(value)
+			assert.NoErrorf(t, err, "in spec file [%s], field [%s] has invalid value [%s]: %s", specFilePath, durationFieldPath, value, err)
 		}
 	}
 }
@@ -2030,4 +2090,57 @@ type testHeadersProvider struct {
 
 func (h *testHeadersProvider) Headers() map[string]string {
 	return h.headers
+}
+
+func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
+	var gatheredPaths []string
+
+	rt := reflect.TypeOf(s)
+	rv := reflect.ValueOf(s)
+
+	switch rt.Kind() {
+	case reflect.Int64:
+		// If this is a time.Duration value, we gather its path.
+		if rv.Type().PkgPath() == "time" && rv.Type().Name() == "Duration" {
+			gatheredPaths = append(gatheredPaths, pathSoFar)
+			return gatheredPaths
+		}
+
+	case reflect.Slice:
+		// Recurse on slice elements
+		for i := 0; i < rv.Len(); i++ {
+			morePaths := gatherDurationFieldPaths(rv.Index(i).Interface(), pathSoFar+"."+strconv.Itoa(i))
+			gatheredPaths = append(gatheredPaths, morePaths...)
+		}
+		return gatheredPaths
+
+	case reflect.Struct:
+		// Recurse on the struct's fields
+		if pathSoFar != "" {
+			pathSoFar += "."
+		}
+		for i := 0; i < rv.NumField(); i++ {
+			tags := rt.Field(i).Tag
+			yamlTag := tags.Get("yaml")
+			yamlFieldName, _, _ := strings.Cut(yamlTag, ",")
+			yamlFieldPath := pathSoFar + yamlFieldName
+
+			morePaths := gatherDurationFieldPaths(rv.Field(i).Interface(), yamlFieldPath)
+			gatheredPaths = append(gatheredPaths, morePaths...)
+		}
+		return gatheredPaths
+
+	case reflect.Ptr:
+		if rv.IsNil() {
+			// Nil pointer, nothing more to do
+			return gatheredPaths
+		}
+
+		// Recurse on the dereferenced pointer value.
+		morePaths := gatherDurationFieldPaths(rv.Elem().Interface(), pathSoFar)
+		gatheredPaths = append(gatheredPaths, morePaths...)
+		return gatheredPaths
+	}
+
+	return gatheredPaths
 }

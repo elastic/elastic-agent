@@ -88,7 +88,7 @@ func WithAllowErrors() FixtureOpt {
 	}
 }
 
-// WithConnectTimeout adjusts the timeout for connecting to the spawned Elastic Agent control protocol.
+// WithConnectTimeout changes the timeout for connecting to the spawned Elastic Agent control protocol.
 // By default, the timeout is 5 seconds.
 func WithConnectTimeout(timeout time.Duration) FixtureOpt {
 	return func(f *Fixture) {
@@ -374,7 +374,7 @@ func (f *Fixture) getFetcherCache() *fetcherCache {
 
 func (f *Fixture) prepareComponents(workDir string, components ...UsableComponent) error {
 	if len(components) == 0 {
-		f.t.Logf("Components where not modified from the fetched artifact")
+		f.t.Logf("Components were not modified from the fetched artifact")
 		return nil
 	}
 
