@@ -735,12 +735,6 @@ spec:
                   fieldPath: metadata.name
             - name: STATE_PATH
               value: "/etc/elastic-agent"
-            # Special environment indicator for Universal Profiling.
-            # If you are using the Universal Profiling integration, please uncomment these lines before applying.
-            #- name: KUBERNETES_NODE_NAME
-            #  valueFrom:
-            #    fieldRef:
-            #      fieldPath: spec.nodeName
           securityContext:
             runAsUser: 0
             # The following capabilities are needed for 'Defend for containers' integration (cloud-defend)
