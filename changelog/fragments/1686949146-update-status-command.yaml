@@ -18,7 +18,7 @@ summary: status command, change human output to be a summary, added human_full o
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: >-
   status command has been changed, the default human output now uses a list format
-  and summaries output.  Full human output can be obtained with the new `human_full`
+  and summaries output. Full human output can be obtained with the new `human_full`
 
 # Affected component; a word indicating the component this changeset affects.
 component: agent
