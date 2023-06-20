@@ -134,8 +134,8 @@ func TestHumanOutput(t *testing.T) {
 	}{
 		{output: "human", state_name: "degraded", state: stateDegraded},
 		{output: "human", state_name: "healthy", state: stateHealthy},
-		{output: "human_full", state_name: "healthy", state: stateHealthy},
-		{output: "human_full", state_name: "degraded", state: stateDegraded},
+		{output: "full", state_name: "healthy", state: stateHealthy},
+		{output: "full", state_name: "degraded", state: stateDegraded},
 	}
 	for _, test := range tests {
 		b.Reset()

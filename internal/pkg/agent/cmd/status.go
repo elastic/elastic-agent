@@ -28,10 +28,10 @@ import (
 type outputter func(io.Writer, interface{}) error
 
 var statusOutputs = map[string]outputter{
-	"human":      humanOutput,
-	"human_full": humanFullOutput,
-	"json":       jsonOutput,
-	"yaml":       yamlOutput,
+	"human": humanOutput,
+	"full":  humanFullOutput,
+	"json":  jsonOutput,
+	"yaml":  yamlOutput,
 }
 
 func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -47,7 +47,7 @@ func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String("output", "human", "Output the status information in either 'human', 'human_full', 'json', or 'yaml'.  'human' only shows non-healthy details, others show full details. (default: human)")
+	cmd.Flags().String("output", "human", "Output the status information in either 'human', 'full', 'json', or 'yaml'.  'human' only shows non-healthy details, others show full details. (default: human)")
 
 	return cmd
 }
