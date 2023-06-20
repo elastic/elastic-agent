@@ -14,7 +14,7 @@ cd kube-state-metrics/examples/autosharding
 kubectl apply -k .
 ```
 
-The default dns entries for to access created ksm pods are (assuming namespace of installation of KSM remains default: `kube-system`):
+The default endpoints to access the KSM pods are (assuming the namespace of KSM remains the default: `kube-system`):
 
 - **KSM Shard01:** kube-state-metrics-0.kube-state-metrics.kube-system.svc.cluster.local:8080
 - **KSM Shard02:** kube-state-metrics-1.kube-state-metrics.kube-system.svc.cluster.local:8080
