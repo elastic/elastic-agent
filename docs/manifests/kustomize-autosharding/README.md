@@ -52,7 +52,7 @@ patches:
     kind: StatefulSet
 ```
 
-1. Update number of ReplicaSets in `kube-state-metrics/examples/autosharding/kustomization.yaml` and re-apply:
+5. Update the number of ReplicaSets in `kube-state-metrics/examples/autosharding/kustomization.yaml` and apply:
 
 ```bash
 kubectl apply -k .
