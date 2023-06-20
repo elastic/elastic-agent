@@ -57,24 +57,22 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 	// channel for the last error message from the stderr output
 	errch := make(chan string, 1)
 	ctxStderr := contextio.NewReader(ctx, proc.Stderr)
-	if ctxStderr != nil {
-		go func() {
-			var errText string
-			scanner := bufio.NewScanner(ctxStderr)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if len(line) > 0 {
-					txt := strings.TrimSpace(line)
-					if len(txt) > 0 {
-						errText = txt
-						// Log error output line
-						log.Error(errText)
-					}
+	go func() {
+		var errText string
+		scanner := bufio.NewScanner(ctxStderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if len(line) > 0 {
+				txt := strings.TrimSpace(line)
+				if len(txt) > 0 {
+					errText = txt
+					// Log error output line
+					log.Error(errText)
 				}
 			}
-			errch <- errText
-		}()
-	}
+		}
+		errch <- errText
+	}()
 
 	procState := <-proc.Wait()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
