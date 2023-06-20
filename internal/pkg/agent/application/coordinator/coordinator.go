@@ -944,12 +944,20 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		return fmt.Errorf("could not update feature flags config: %w", err)
 	}
 
-	if err := c.upgradeMgr.Reload(cfg); err != nil {
-		return fmt.Errorf("failed to reload upgrade manager configuration: %w", err)
+	// Check the upgrade and monitoring managers before updating them. Real
+	// Coordinators always have them, but not all tests do, and in that case
+	// we should skip the Reload call rather than segfault.
+
+	if c.upgradeMgr != nil {
+		if err := c.upgradeMgr.Reload(cfg); err != nil {
+			return fmt.Errorf("failed to reload upgrade manager configuration: %w", err)
+		}
 	}
 
-	if err := c.monitorMgr.Reload(cfg); err != nil {
-		return fmt.Errorf("failed to reload monitor manager configuration: %w", err)
+	if c.monitorMgr != nil {
+		if err := c.monitorMgr.Reload(cfg); err != nil {
+			return fmt.Errorf("failed to reload monitor manager configuration: %w", err)
+		}
 	}
 
 	c.ast = rawAst
@@ -1044,7 +1052,7 @@ func (c *Coordinator) recomputeConfigAndComponents() (map[string]interface{}, []
 		return nil, nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
 	var configInjector component.GenerateMonitoringCfgFn
-	if c.monitorMgr.Enabled() {
+	if c.monitorMgr != nil && c.monitorMgr.Enabled() {
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 

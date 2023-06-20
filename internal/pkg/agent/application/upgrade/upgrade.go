@@ -70,6 +70,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo *info.
 
 // Reload reloads the artifact configuration for the upgrader.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
+	fmt.Printf("Upgrader.Reload()\n")
 	type reloadConfig struct {
 		// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
 		SourceURI string `json:"agent.download.sourceURI" config:"agent.download.sourceURI"`
@@ -86,9 +87,13 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	var newSourceURI string
 	if cfg.FleetSourceURI != "" {
 		// fleet configuration takes precedence
+		fmt.Printf("got fleet source URI %v\n", cfg.FleetSourceURI)
 		newSourceURI = cfg.FleetSourceURI
 	} else if cfg.SourceURI != "" {
+		fmt.Printf("got source URI %v\n", cfg.SourceURI)
 		newSourceURI = cfg.SourceURI
+	} else {
+		fmt.Printf("got no source URI\n")
 	}
 
 	if newSourceURI != "" {

@@ -587,13 +587,18 @@ func (f *fakeReExecManager) ReExec(callback reexec.ShutdownCallbackFn, _ ...stri
 }
 
 type fakeUpgradeManager struct {
+	upgradeable    bool
+	reloadCallback func(*config.Config) error
 }
 
 func (f *fakeUpgradeManager) Upgradeable() bool {
-	return false
+	return f.upgradeable
 }
 
-func (f *fakeUpgradeManager) Reload(_ *config.Config) error {
+func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
+	if f.reloadCallback != nil {
+		return f.reloadCallback(cfg)
+	}
 	return nil
 }
 
@@ -666,12 +671,15 @@ func (f *fakeConfigManager) Watch() <-chan ConfigChange {
 func (f *fakeConfigManager) Config(ctx context.Context, cfg *config.Config) {
 	select {
 	case <-ctx.Done():
-	case f.cfgCh <- &configChange{cfg}:
+	case f.cfgCh <- &configChange{cfg: cfg}:
 	}
 }
 
 type configChange struct {
-	cfg *config.Config
+	cfg    *config.Config
+	acked  bool  // Set if Ack() was called
+	failed bool  // Set if Fail() was called
+	err    error // Set to Fail's argument
 }
 
 func (l *configChange) Config() *config.Config {
@@ -679,12 +687,13 @@ func (l *configChange) Config() *config.Config {
 }
 
 func (l *configChange) Ack() error {
-	// do nothing
+	l.acked = true
 	return nil
 }
 
-func (l *configChange) Fail(_ error) {
-	// do nothing
+func (l *configChange) Fail(err error) {
+	l.failed = true
+	l.err = err
 }
 
 type fakeVarsManager struct {
