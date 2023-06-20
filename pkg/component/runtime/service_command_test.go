@@ -17,12 +17,13 @@ import (
 	"text/template"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/stretchr/testify/require"
-
-	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -30,9 +31,10 @@ import (
 )
 
 type progConfig struct {
-	ErrMessage string
-	ExitCode   int
-	SleepMS    int
+	ErrMessage   string
+	ExitCode     int
+	SleepMS      int
+	SucceedAfter int64 // ms since unix epoch
 }
 
 const testProgramTemplate = `
@@ -45,6 +47,12 @@ import (
 )
 
 func main() {
+	if {{.SucceedAfter}} > 0 {
+		if time.Now().After(time.UnixMilli({{.SucceedAfter}})) {
+			os.Exit(0)
+		}
+	}
+
 	if len("{{.ErrMessage}}") > 0 {
 		fmt.Fprintf(os.Stderr, "{{.ErrMessage}}")
 	}
@@ -117,15 +125,15 @@ func TestExecuteCommand(t *testing.T) {
 		},
 		{
 			name: "fail no error output",
-			cfg:  progConfig{"", 1, 0},
+			cfg:  progConfig{"", 1, 0, 0},
 		},
 		{
 			name: "fail with error output",
-			cfg:  progConfig{"something failed", 2, 0},
+			cfg:  progConfig{"something failed", 2, 0, 0},
 		},
 		{
 			name:    "fail with timeout",
-			cfg:     progConfig{"", 3, 5000}, // executable runs for 5 seconds
+			cfg:     progConfig{"", 3, 5000, 0}, // executable runs for 5 seconds
 			timeout: 100 * time.Millisecond,
 			wantErr: context.DeadlineExceeded,
 		},
@@ -221,11 +229,12 @@ func TestExecuteServiceCommand(t *testing.T) {
 	// Execution failed - no retry configuration in spec
 	t.Run("failed_execution_no_retry_config", func(t *testing.T) {
 		cmdCtx := context.Background()
+		log, observer := logger.NewTesting(t.Name())
+
 		exeConfig := progConfig{
 			ErrMessage: "foo bar",
 			ExitCode:   111,
 		}
-		log, observer := logger.NewTesting(t.Name())
 		exePath, err := prepareTestProg(cmdCtx, log, t.TempDir(), exeConfig)
 		require.NoError(t, err)
 
@@ -241,30 +250,20 @@ func TestExecuteServiceCommand(t *testing.T) {
 			cmdCtx, log, exePath, &component.ServiceOperationsCommandSpec{},
 			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
+		require.EqualError(t, err, retryCtx.Err().Error())
 
-		logs := observer.TakeAll()
-		for i, l := range logs {
-			if i%2 == 0 {
-				require.Equal(t, zapcore.ErrorLevel, l.Level)
-				require.Equal(t, exeConfig.ErrMessage, l.Message)
-			} else {
-				require.Equal(t, zapcore.WarnLevel, l.Level)
-				require.Contains(t, l.Message, fmt.Sprintf(
-					"service command execution failed with error [%s: exit status %d], retrying (will be retry [%d]) after",
-					exeConfig.ErrMessage, exeConfig.ExitCode, (i/2)+1,
-				))
-			}
-		}
+		checkRetryLogs(t, observer, exeConfig)
 	})
 
 	// Execution failed - with retry configuration in spec
 	t.Run("failed_execution_with_retry_config", func(t *testing.T) {
 		cmdCtx := context.Background()
+		log, observer := logger.NewTesting(t.Name())
+
 		exeConfig := progConfig{
 			ErrMessage: "foo bar",
 			ExitCode:   111,
 		}
-		log, observer := logger.NewTesting(t.Name())
 		exePath, err := prepareTestProg(cmdCtx, log, t.TempDir(), exeConfig)
 		require.NoError(t, err)
 
@@ -277,8 +276,8 @@ func TestExecuteServiceCommand(t *testing.T) {
 		retrySleepMaxDuration := 1 * time.Second
 
 		spec := &component.ServiceOperationsCommandSpec{
-			// Deliberately set to just shorter than the context timeout to
-			// ensure we observe:
+			// We deliberately set RetrySleepInitDuration to just shorter
+			// than the retryCtx timeout. With this we should observe:
 			// - the initial execution of the command (before any retries)
 			// - one message about the next (first) retry
 			// - one more execution of the command, as a result of the first retry
@@ -289,22 +288,63 @@ func TestExecuteServiceCommand(t *testing.T) {
 			cmdCtx, log, exePath, spec,
 			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
+		require.EqualError(t, err, retryCtx.Err().Error())
 
-		logs := observer.TakeAll()
-		for i, l := range logs {
-			if i%2 == 0 {
-				require.Equal(t, zapcore.ErrorLevel, l.Level)
-				require.Equal(t, exeConfig.ErrMessage, l.Message)
-			} else {
-				require.Equal(t, zapcore.WarnLevel, l.Level)
-				require.Contains(t, l.Message, fmt.Sprintf(
-					"service command execution failed with error [%s: exit status %d], retrying (will be retry [%d]) after",
-					exeConfig.ErrMessage, exeConfig.ExitCode, (i/2)+1,
-				))
-			}
-		}
+		checkRetryLogs(t, observer, exeConfig)
 	})
 
-	// Execution succeeded after retrying once
-	// TODO
+	// Execution succeeded after a few retries
+	t.Run("succeed_after_retry", func(t *testing.T) {
+		cmdCtx := context.Background()
+		log, observer := logger.NewTesting(t.Name())
+
+		now := time.Now()
+		exeConfig := progConfig{
+			ErrMessage:   "foo bar",
+			ExitCode:     111,
+			SucceedAfter: now.Add(1 * time.Second).UnixMilli(),
+		}
+		exePath, err := prepareTestProg(cmdCtx, log, t.TempDir(), exeConfig)
+		require.NoError(t, err)
+
+		// Since the service command is retried indefinitely, we need a way to
+		// stop the test within a reasonable amount of time. However, we should never
+		// hit this timeout as the command should succeed before the timeout is reached.
+		retryCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		defaultRetrySleepInitDuration := 50 * time.Millisecond
+		retrySleepMaxDuration := 1 * time.Second
+
+		spec := &component.ServiceOperationsCommandSpec{
+			RetrySleepInitDuration: 200 * time.Millisecond,
+		}
+		err = executeServiceCommandWithRetries(
+			cmdCtx, log, exePath, spec,
+			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+		)
+		require.NoError(t, err)
+
+		checkRetryLogs(t, observer, exeConfig)
+	})
+}
+
+func checkRetryLogs(t *testing.T, observer *observer.ObservedLogs, exeConfig progConfig) {
+	t.Helper()
+
+	logs := observer.TakeAll()
+	require.GreaterOrEqual(t, len(logs), 2)
+	for i, l := range logs {
+		t.Logf("[%s] %s", l.Level, l.Message)
+		if i%2 == 0 {
+			require.Equal(t, zapcore.ErrorLevel, l.Level)
+			require.Equal(t, exeConfig.ErrMessage, l.Message)
+		} else {
+			require.Equal(t, zapcore.WarnLevel, l.Level)
+			require.Contains(t, l.Message, fmt.Sprintf(
+				"service command execution failed with error [%s: exit status %d], retrying (will be retry [%d]) after",
+				exeConfig.ErrMessage, exeConfig.ExitCode, (i/2)+1,
+			))
+		}
+	}
 }
