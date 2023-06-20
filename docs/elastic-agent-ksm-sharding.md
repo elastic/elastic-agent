@@ -21,13 +21,13 @@ The default endpoints to access the KSM pods are (assuming the namespace of KSM 
 
 ## Installation methods of elastic-agent
 
-This document suggests **the 3 alternative configuration methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration. In general, we split the agent installation. We use a `daemonset Leader Elastic Agent` that collects both node-wide metrics and Kubernetes API Server metrics and `deployment (or statefuleset) Elastic Agents` that collect metrics from the different KSM Shard endpoints.
+This document suggests **the 3 alternative Installation methods** to deploy elastic-agent in big scale Kubernetes clusters with KSM in sharding configuration. In general, we split the agent installation. We use a `daemonset Leader Elastic Agent` that collects both node-wide metrics and Kubernetes API Server metrics and `deployment (or statefuleset) Elastic Agents` that collect metrics from the different KSM Shard endpoints.
 
 1. `Elastic Agent as side-container with KSM Sharded pods`: The Elastic Agent will be installed as `Statefulset` with `hostNetwork:false` and will be a side container of Kube-state-metrics. Meaning that KSM and Elastic Agent will share the same localhost network to communicate.
-2. `Elastic Agent Deployment with *hostNetwork:false*`: The `hostNetwork:false` is set in non-leader Elastic Agent deployments that will collect from KSM Shards. In this configuration Elastic Agents will be installed as deployments, thus we will need one deployment for every KSM Shard collection endpoint. An additional Elastic Agent Leader will be installed as `Daemonset` and will be responsible for the node-wide metrics collection.
-3. `Elastic Agents with taint/tolerations`: With `taint/tolerations` to isolate the Elastic Agent `Daemonset` pods from rest of Elastic Agent `Deployments`. Tolerations configuration is the mean to exclude Daemonset pods from nodes where the Elastic Agent KSM pods run. So the Elastic Agent Daemonset pods will run only on those nodes where no Elastic Agents that collect KSM run.
+2. `Elastic Agent Deployment with *hostNetwork:false*`: The `hostNetwork:false` is set in non-leader Elastic Agent deployments that will collect from KSM Shards. In this installation, Elastic Agents will be installed as deployments, thus we will need one deployment for every KSM Shard collection endpoint. An additional Elastic Agent Leader will be installed as `Daemonset` and will be responsible for the node-wide metrics collection.
+3. `Elastic Agents with taint/tolerations`: With `taint/tolerations` to isolate the Elastic Agent `Daemonset` pods from rest of Elastic Agent `Deployments`. Tolerations are the mean to exclude Daemonset pods from nodes where the Elastic Agent KSM pods run. So the Elastic Agent Daemonset pods will run only on those nodes where no Elastic Agents that collect KSM run.
 
-Each configuration includes specific pros and cons and users may choose what best matches their needs.
+Each installation includes specific pros and cons and users may choose what best matches their needs.
 
 | Installation Method  | No of Policies  | Who can Use it  | Notes |
 |---|---|---|---|
