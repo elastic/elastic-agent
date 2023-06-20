@@ -1,0 +1,10 @@
+┌─ fleet
+│  └─ status: (HEALTHY) Connected
+└─ elastic-agent
+   ├─ status: (DEGRADED) 1 or more components/units in a failed state
+   └─ httpjson-default
+      ├─ status: (HEALTHY) Healthy communicating with pid '2875'
+      ├─ httpjson-default-httpjson-generic-ca7fa460-0bab-11ee-8598-c3f64dd59b06
+      │  └─ status: (FAILED) [failed to reloading inputs: 1 error: Error creating runner from config: required 'object', but found 'string' in field 'processors.6']
+      └─ httpjson-default
+         └─ status: (FAILED) [failed to reloading inputs: 1 error: Error creating runner from config: required 'object', but found 'string' in field 'processors.6']
