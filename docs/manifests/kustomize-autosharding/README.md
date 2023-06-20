@@ -2,7 +2,7 @@
 
 Follow below instructions to install Elastic Agent as side-container with Kube State Metrics Pods.
 
-1. Download the Kube-state-metrics manifests
+1. Download the kube-state-metrics:
 
 ```bash
 git clone git@github.com:kubernetes/kube-state-metrics.git
