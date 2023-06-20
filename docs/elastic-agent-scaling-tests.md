@@ -45,7 +45,7 @@ The Kubernetes Observability journey comprises from the following distinct phase
 1. Install Elastic Agent on the k8s cluster as DaemonSet using the Kubernetes manifest (get the manifest from the Fleet page of your ESS cluster). Make sure agent enrollment is confirmed before proceeding with next steps.
 2. Add Kubernetes integration to a policy that in use by k8s agents.
 3. Deploy **10000** pods using [stress_test_k8s script](https://github.com/elastic/k8s-integration-infra#put-load-on-the-cluster).
-`./stress_test_k8s -kubeconfig=/home/andrei_bialenik/.kube/config -deployments=10 -namespaces=1000 -podlabels=4 -podannotations=4`
+`./stress_test_k8s -kubeconfig=/home/user/.kube/config -deployments=10 -namespaces=1000 -podlabels=4 -podannotations=4`
 1. Ensure all pods are created
 
 ```bash
