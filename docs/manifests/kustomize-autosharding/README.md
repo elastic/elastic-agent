@@ -62,7 +62,7 @@ The `elastic-agent-kustomize/agent-statefulset.yaml` is the same as daemonset ma
 - `kind: StatefulSet`
 - `hostNetwork: false`
 
-The Statefulset points to a Fleet policy where only KSM is enabled with URL endpoint of `localhost:8080` and leader election disabled.
+The Statefulset points to a Fleet policy where only KSM is enabled with URL endpoint of `localhost:8080` and the leader election is disabled.
 
 ![statefulset policy](../../images/ksm-sidecontainer.png)
 
