@@ -20,10 +20,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
-func TestInstall(t *testing.T) {
+func TestInstallWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
 		// We require sudo for this test to run
 		// `elastic-agent install`.
@@ -32,34 +31,16 @@ func TestInstall(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
-
-		// Since this test sets the location on the
-		// filesystem where Elastic Agent will be
-		// installed, it's probably safest not to run
-		// it along with other tests.
-		Isolate: true,
 	})
 
 	// Get path to Elastic Agent executable
 	fixture, err := define.NewFixture(t)
 	require.NoError(t, err)
 
-	suite.Run(t, newInstallTestSuite(fixture))
-}
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(context.Background())
+	require.NoError(t, err)
 
-func newInstallTestSuite(fixture *atesting.Fixture) *InstallTestSuite {
-	i := new(InstallTestSuite)
-	i.fixture = fixture
-
-	return i
-}
-
-type InstallTestSuite struct {
-	suite.Suite
-	fixture *atesting.Fixture
-}
-
-func (i *InstallTestSuite) TestInstallWithoutBasePath() {
 	// Check that default base path is clean
 	var defaultBasePath string
 	switch runtime.GOOS {
@@ -72,50 +53,68 @@ func (i *InstallTestSuite) TestInstallWithoutBasePath() {
 	}
 
 	topPath := filepath.Join(defaultBasePath, "Elastic", "Agent")
-	_, err := os.Stat(topPath)
-	i.Require().True(os.IsNotExist(err))
+	_, err = os.Stat(topPath)
+	require.True(t, os.IsNotExist(err))
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	_, err = i.fixture.Install(context.Background(), &atesting.InstallOpts{Force: true})
-	i.Require().NoError(err)
+	_, err = fixture.Install(context.Background(), &atesting.InstallOpts{Force: true})
+	require.NoError(t, err)
 
 	// Check that Agent was installed in default base path
-	i.checkInstallSuccess(topPath)
+	checkInstallSuccess(t, topPath)
 }
 
-func (i *InstallTestSuite) TestInstallWithBasePath() {
-	const basePathFlag = "--base-path"
+func TestInstallWithBasePath(t *testing.T) {
+	define.Require(t, define.Requirements{
+		// We require sudo for this test to run
+		// `elastic-agent install`.
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixture(t)
+	require.NoError(t, err)
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(context.Background())
+	require.NoError(t, err)
 
 	// The `--base-path` flag is defined for the `elastic-agent install` CLI sub-command BUT
 	// it is hidden (see https://github.com/elastic/elastic-agent/pull/2592).  So we validate
 	// here that the usage text for the `install` sub-command does NOT mention the `--base-path`
 	// flag in it.
-	output, err := i.fixture.Exec(context.Background(), []string{"help", "install"})
-	i.Require().NoError(err)
-	require.NotContains(i.T(), string(output), basePathFlag)
+	const basePathFlag = "--base-path"
+	output, err := fixture.Exec(context.Background(), []string{"help", "install"})
+	require.NoError(t, err)
+	require.NotContains(t, string(output), basePathFlag)
 
 	// Set up random temporary directory to serve as base path for Elastic Agent
 	// installation.
-	tmpDir := i.T().TempDir()
+	tmpDir := t.TempDir()
 	randomBasePath := filepath.Join(tmpDir, strings.ToLower(randStr(8)))
 
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
-	_, err = i.fixture.Install(context.Background(), &atesting.InstallOpts{
+	_, err = fixture.Install(context.Background(), &atesting.InstallOpts{
 		BasePath: randomBasePath,
 		Force:    true,
 	})
-	i.Require().NoError(err)
+	require.NoError(t, err)
 
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
-	i.checkInstallSuccess(topPath)
+	checkInstallSuccess(t, topPath)
 }
 
-func (i *InstallTestSuite) checkInstallSuccess(topPath string) {
+func checkInstallSuccess(t *testing.T, topPath string) {
+	t.Helper()
 	_, err := os.Stat(topPath)
-	i.Require().NoError(err)
+	require.NoError(t, err)
 
 	// Check that a few expected installed files are present
 	installedBinPath := filepath.Join(topPath, "elastic-agent")
@@ -123,11 +122,11 @@ func (i *InstallTestSuite) checkInstallSuccess(topPath string) {
 	installMarkerPath := filepath.Join(topPath, ".installed")
 
 	_, err = os.Stat(installedBinPath)
-	i.Require().NoError(err)
+	require.NoError(t, err)
 	_, err = os.Stat(installedDataPath)
-	i.Require().NoError(err)
+	require.NoError(t, err)
 	_, err = os.Stat(installMarkerPath)
-	i.Require().NoError(err)
+	require.NoError(t, err)
 }
 
 func randStr(length int) string {
