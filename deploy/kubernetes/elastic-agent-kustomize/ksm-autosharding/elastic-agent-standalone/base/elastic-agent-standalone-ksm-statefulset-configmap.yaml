@@ -26,224 +26,151 @@ data:
     providers.kubernetes:
       enabled: false
     inputs:
-      - id: kubernetes-cluster-metrics
-        condition: ${kubernetes_leaderelection.leader} == false
-        type: kubernetes/metrics
-        use_output: default
-        meta:
-          package:
-            name: kubernetes
-            version: 1.29.2
+      - type: kubernetes/metrics
         data_stream:
           namespace: default
         streams:
           - data_stream:
-              dataset: kubernetes.state_container
               type: metrics
+              dataset: kubernetes.state_container
             metricsets:
               - state_container
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_cronjob
               type: metrics
+              dataset: kubernetes.state_cronjob
             metricsets:
               - state_cronjob
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_daemonset
               type: metrics
+              dataset: kubernetes.state_daemonset
             metricsets:
               - state_daemonset
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_deployment
               type: metrics
+              dataset: kubernetes.state_deployment
             metricsets:
               - state_deployment
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_job
               type: metrics
+              dataset: kubernetes.state_job
             metricsets:
               - state_job
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_node
               type: metrics
+              dataset: kubernetes.state_node
             metricsets:
               - state_node
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_persistentvolume
               type: metrics
+              dataset: kubernetes.state_persistentvolume
             metricsets:
               - state_persistentvolume
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_persistentvolumeclaim
               type: metrics
+              dataset: kubernetes.state_persistentvolumeclaim
             metricsets:
               - state_persistentvolumeclaim
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_pod
               type: metrics
+              dataset: kubernetes.state_pod
             metricsets:
               - state_pod
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_replicaset
               type: metrics
+              dataset: kubernetes.state_replicaset
             metricsets:
               - state_replicaset
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_resourcequota
               type: metrics
+              dataset: kubernetes.state_resourcequota
             metricsets:
               - state_resourcequota
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_service
               type: metrics
+              dataset: kubernetes.state_service
             metricsets:
               - state_service
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_statefulset
               type: metrics
+              dataset: kubernetes.state_statefulset
             metricsets:
               - state_statefulset
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           - data_stream:
-              dataset: kubernetes.state_storageclass
               type: metrics
+              dataset: kubernetes.state_storageclass
             metricsets:
               - state_storageclass
             add_metadata: true
             hosts:
               - 'localhost:8080'
             period: 10s
-            # Openshift:
-            # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
-            # and/or tls termination, then configuration below should be considered:
-            # bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-            # ssl.certificate_authorities:
-            #   - /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        meta:
+          package:
+            name: kubernetes
+            version: 1.42.0
