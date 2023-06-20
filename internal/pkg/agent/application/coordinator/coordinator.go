@@ -265,21 +265,36 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		LogLevel:     logLevel,
 	}
 	c := &Coordinator{
-		logger:           logger,
-		cfg:              cfg,
-		agentInfo:        agentInfo,
-		isManaged:        isManaged,
-		specs:            specs,
-		reexecMgr:        reexecMgr,
-		upgradeMgr:       upgradeMgr,
-		monitorMgr:       monitorMgr,
-		runtimeMgr:       runtimeMgr,
-		configMgr:        configMgr,
-		varsMgr:          varsMgr,
-		caps:             caps,
-		modifiers:        modifiers,
-		state:            state,
-		stateBroadcaster: broadcaster.New(state, 64),
+		logger:     logger,
+		cfg:        cfg,
+		agentInfo:  agentInfo,
+		isManaged:  isManaged,
+		specs:      specs,
+		reexecMgr:  reexecMgr,
+		upgradeMgr: upgradeMgr,
+		monitorMgr: monitorMgr,
+		runtimeMgr: runtimeMgr,
+		configMgr:  configMgr,
+		varsMgr:    varsMgr,
+		caps:       caps,
+		modifiers:  modifiers,
+		state:      state,
+		// Note: the uses of a buffered input channel in our broadcaster (the
+		// third parameter to broadcaster.New) means that it is possible for
+		// immediately adjacent writes/reads not to match, e.g.:
+		//
+		//  stateBroadcaster.Set(newState)
+		//  reportedState := stateBroadcaster.Get()  // may not match newState
+		//
+		// We accept this intentionally to make sure Coordinator itself blocks
+		// as rarely as possible. Within Coordinator's goroutine, we can always
+		// get the latest synchronized value by reading the state struct directly,
+		// so this only affects external callers, and we accept that some of those
+		// might be behind by a scheduler interrupt or so.
+		//
+		// If this ever changes and we decide we need absolute causal
+		// synchronization in the subscriber API, just set the input buffer to 0.
+		stateBroadcaster: broadcaster.New(state, 64, 32),
 
 		logLevelCh:        make(chan logp.Level),
 		overrideStateChan: make(chan *coordinatorOverrideState),

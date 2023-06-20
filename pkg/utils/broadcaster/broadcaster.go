@@ -188,8 +188,30 @@ type subscriber[T any] struct {
 // for calling (*Broadcaster).Close to terminate the run loop when Broadcaster
 // should be cleaned up. (Cleanup is explicit rather than via a context so
 // subscribers can optionally read the final values before shutdown.)
-func New[T any](initialValue T, maxBuffer int) *Broadcaster[T] {
-	b := new(initialValue, maxBuffer)
+// The parameters specify the initial value, the size of the internal value
+// buffer, and the size of the input channel buffer.
+//
+// Race warning: if inputBuffer > 0 then the input's current value may be
+// slightly (~1 scheduler cycle) ahead of its subscribers. In particular this
+// sequence:
+//
+//	b.InputChan <- newValue
+//	b.Get()
+//
+// is not guaranteed to return newValue, since the read and write may arrive
+// at the Broadcaster run loop simultaneously. Often this is ok -- the owning
+// goroutine always has synchronous access to the data being broadcasted, and
+// most subscriber use cases care more about reliable reporting of the value
+// sequence than sub-ms delays -- but callers who really need strict causality
+// and are willing to block a little more to get it can set inputBuffer to 0,
+// which will guarantee that any Get / unbuffered subscriber read after writing
+// to InputChan will definitely receive the new value.
+func New[T any](
+	initialValue T,
+	maxSubscriberBuffer int,
+	inputBuffer int,
+) *Broadcaster[T] {
+	b := new(initialValue, maxSubscriberBuffer, inputBuffer)
 	go b.runLoop()
 	return b
 }
@@ -279,11 +301,13 @@ func indexListenerCase(subscriberIndex int) int {
 // new is the internal implementation of New that does everything except
 // start the run loop, for tests that want to handle execution steps
 // manually/synchronously.
-func new[T any](initialValue T, maxBuffer int) *Broadcaster[T] {
+func new[T any](
+	initialValue T,
+	maxSubscriberBuffer int,
+	inputBuffer int,
+) *Broadcaster[T] {
 	b := &Broadcaster[T]{
-		// 32 is probably an over-cautious buffer here, but preventing blocking
-		// in the input is the most important design goal.
-		InputChan: make(chan T, 32),
+		InputChan: make(chan T, inputBuffer),
 
 		// Non-input channels are synchronous: subscribers have to wait for us
 		// to respond, only Broadcaster's owner gets to be completely non-blocking.
@@ -297,7 +321,7 @@ func new[T any](initialValue T, maxBuffer int) *Broadcaster[T] {
 		// store only the current value and the array is length 1. If
 		// maxBuffer is 5, then we will store 5 previous values in addition to
 		// the current one.
-		buffer: make([]T, maxBuffer+1),
+		buffer: make([]T, maxSubscriberBuffer+1),
 	}
 	// fixed order for the core select cases: input, subscribe, shutdown, get.
 	b.selectCases = []reflect.SelectCase{

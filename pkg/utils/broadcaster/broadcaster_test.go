@@ -20,7 +20,7 @@ func TestSubscriberReceivesInitialValue(t *testing.T) {
 	// and make sure a new subscriber can immediately read it.
 
 	const testValue = 4014
-	b := New(testValue, 32)
+	b := New(testValue, 32, 0)
 	listenerChan := b.Subscribe(context.Background(), 0)
 
 	select {
@@ -40,7 +40,7 @@ func TestSubscriberReceivesValueSequence(t *testing.T) {
 	const valueCount = 32
 	const initialValue = 4014
 
-	b := New(initialValue, valueCount)
+	b := New(initialValue, valueCount, 0)
 	listenerChan := b.Subscribe(context.Background(), valueCount)
 
 	for i := 1; i <= valueCount; i++ {
@@ -69,7 +69,7 @@ func TestMultipleSubscribersReceiveValueSequence(t *testing.T) {
 	const valueCount = 32
 	const initialValue = 4014
 
-	b := New(initialValue, valueCount)
+	b := New(initialValue, valueCount, 0)
 	defer b.Close()
 	subscribers := []chan int{}
 	for i := 0; i < subscriberCount; i++ {
@@ -106,27 +106,45 @@ func TestUnbufferedSubscriberReceivesMostRecentValue(t *testing.T) {
 	const valueCount = 32
 	const initialValue = 4014
 
-	b := New(initialValue, 16)
-	listenerChan := b.Subscribe(context.Background(), 0)
+	// Calling new instead of New so we can handle the run loop ourselves --
+	// sending new values vs receiving from a subscriber is an inherent race
+	// when the input channel is buffered (see the comments for New), so to
+	// test
+	b := new(initialValue, 16, valueCount)
 
+	// Send a subscription request while running the Broadcaster loop so it
+	// goes through
+	var listenerChan chan int
+	b.withOneIteration(func() {
+		listenerChan = b.Subscribe(context.Background(), 0)
+	})
+
+	// Buffer all input values before starting the next iteration -- if
+	// Broadcaster is working right, it will process all of these at the start
+	// of the iteration before handling the subscriber read we're about to send.
 	for i := 1; i <= valueCount; i++ {
 		b.InputChan <- initialValue + i
 	}
 
 	// Confirm we can read the most recent value
-	select {
-	case value := <-listenerChan:
-		require.Equal(t, initialValue+valueCount, value, "listener should receive the final value")
-	case <-time.After(50 * time.Millisecond):
-		require.Fail(t, "timed out waiting for listener channel")
-	}
+	b.withOneIteration(func() {
+		select {
+		case value := <-listenerChan:
+			require.Equal(t, initialValue+valueCount, value, "listener should receive the final value")
+		case <-time.After(50 * time.Millisecond):
+			require.Fail(t, "timed out waiting for listener channel")
+		}
+	})
 
 	// Confirm the channel blocks after the first read (at least briefly)
-	select {
-	case value := <-listenerChan:
-		require.Fail(t, fmt.Sprintf("received value %v when none was expected", value))
-	case <-time.After(10 * time.Millisecond):
-	}
+	b.withOneIteration(func() {
+		select {
+		case value := <-listenerChan:
+			require.Fail(t, fmt.Sprintf("received value %v when none was expected", value))
+		case <-time.After(10 * time.Millisecond):
+			b.Close() // Close the Broadcaster, which unblocks the run loop iteration
+		}
+	})
 }
 
 func TestBlockedSubscriberReceivesValueSequence(t *testing.T) {
@@ -136,7 +154,7 @@ func TestBlockedSubscriberReceivesValueSequence(t *testing.T) {
 	const valueCount = 32
 	const initialValue = 4014
 
-	b := New(initialValue, valueCount)
+	b := New(initialValue, valueCount, 0)
 	listenerChan := b.Subscribe(context.Background(), valueCount)
 	timeoutChan := time.After(5 * time.Second)
 
@@ -176,7 +194,11 @@ func TestSubscriberSkipsOldestValuesWhenBufferExceeded(t *testing.T) {
 
 	const initialValue = 4014
 
-	b := New(initialValue, 32)
+	// Use a 0-length input buffer for this one, since reading immediately
+	// after writing to a buffered channel would be a race in the test, but
+	// when the input channel is unbuffered Broadcaster's spec claims
+	// an immediate read will reflect exactly the latest values (see New).
+	b := New(initialValue, 32, 0)
 	listenerChan := b.Subscribe(context.Background(), 16)
 
 	for i := 1; i <= 32; i++ {
@@ -203,7 +225,7 @@ func TestCancelledContextClosesSubscriberChannel(t *testing.T) {
 	// We test synchronously one iteration at a time, because otherwise
 	// there's an unavoidable race if the context signal and the channel
 	// read both arrive at the same time.
-	b := new(0, 16)
+	b := new(0, 16, 0)
 	ctx, cancel := context.WithCancel(context.Background())
 	var listenerChan chan int
 
@@ -230,6 +252,8 @@ func TestCancelledContextClosesSubscriberChannel(t *testing.T) {
 // background goroutine while running the given callback in the foreground.
 // It then waits for the run loop iteration to finish, so additional
 // iterations can be safely started as soon as the call returns.
+// (This is for making test calls that require a blocking write into
+// Broadcaster, e.g. Subscribe or Close.)
 func (b *Broadcaster[T]) withOneIteration(callback func()) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
