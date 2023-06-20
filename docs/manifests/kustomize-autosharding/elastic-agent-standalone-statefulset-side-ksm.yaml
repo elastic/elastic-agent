@@ -13,9 +13,11 @@ data:
         type: elasticsearch
         hosts:
           - >-
-            https://23abe3bb90f244c7b302bfae2adc2da8.us-west2.gcp.elastic-cloud.com:443
+            ${ES_HOST}
         username: '${ES_USERNAME}'
         password: '${ES_PASSWORD}'
+    providers.kubernetes:
+      enabled: false
     inputs:
       - id: >-
           kubernetes/metrics-kube-state-metrics-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071

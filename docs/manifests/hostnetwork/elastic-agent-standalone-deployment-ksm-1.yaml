@@ -13,7 +13,7 @@ data:
         type: elasticsearch
         hosts:
           - >-
-            https://915f16524155436880148886a0aea156.us-central1.gcp.cloud.es.io:443
+            ${ES_HOST}
         username: '${ES_USERNAME}'
         password: '${ES_PASSWORD}'
     inputs:
