@@ -95,35 +95,46 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 }
 
 func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
+	return executeServiceCommandWithRetries(
+		ctx, log, binaryPath, spec,
+		context.Background(), 20*time.Second, 15*time.Minute,
+	)
+}
+
+func executeServiceCommandWithRetries(
+	cmdCtx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec,
+	retryCtx context.Context, defaultRetrySleepInitDuration time.Duration, retrySleepMaxDuration time.Duration,
+) error {
 	if spec == nil {
 		log.Warnf("spec is nil, nothing to execute, binaryPath: %s", binaryPath)
 		return nil
 	}
 
-	if spec.RetryMaxCount == 0 {
-		// Execute command without any retries
-		return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+	// If no initial sleep duration is specified, use default value
+	retrySleepInitDuration := spec.RetrySleepInitDuration
+	if retrySleepInitDuration == 0 {
+		retrySleepInitDuration = defaultRetrySleepInitDuration
 	}
 
 	// Execute command with retries and exponential backoff between attempts
 	expBackoff := backoff.NewExponentialBackOff()
-	expBackoff.InitialInterval = spec.RetrySleepInitDuration
+	expBackoff.InitialInterval = retrySleepInitDuration
+	expBackoff.MaxInterval = retrySleepMaxDuration
 
-	retryExpBackoff := backoff.WithMaxRetries(expBackoff, spec.RetryMaxCount)
-	backoffCtx := backoff.WithContext(retryExpBackoff, ctx)
+	backoffCtx := backoff.WithContext(expBackoff, retryCtx)
 
 	retryAttempt := 0
 	return backoff.RetryNotify(
 		func() error {
-			return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+			return executeCommand(cmdCtx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
 		},
 		backoffCtx,
 		func(err error, retryAfter time.Duration) {
 			retryAttempt++
 			log.Warnf(
-				"service command execution failed with error [%s], retrying [%d of %d] after [%s]",
+				"service command execution failed with error [%s], retrying (will be retry [%d]) after [%s]",
 				err.Error(),
-				retryAttempt, spec.RetryMaxCount,
+				retryAttempt,
 				retryAfter,
 			)
 		},

@@ -218,68 +218,91 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.Equal(t, 0, observer.Len())
 	})
 
-	// Execution failed - no retries configured
-	t.Run("failed_execution_no_retries", func(t *testing.T) {
-		ctx := context.Background()
-		log, observer := logger.NewTesting(t.Name())
-
+	// Execution failed - no retry configuration in spec
+	t.Run("failed_execution_no_retry_config", func(t *testing.T) {
+		cmdCtx := context.Background()
 		exeConfig := progConfig{
 			ErrMessage: "foo bar",
 			ExitCode:   111,
 		}
-		exePath, err := prepareTestProg(ctx, log, t.TempDir(), exeConfig)
-		require.NoError(t, err)
-
-		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{})
-		require.EqualError(t, err, fmt.Sprintf("%s: exit status %d", exeConfig.ErrMessage, exeConfig.ExitCode))
-
-		errorLogs := observer.FilterLevelExact(zapcore.ErrorLevel)
-		require.Equal(t, 1, errorLogs.Len())
-		require.Equal(t, exeConfig.ErrMessage, errorLogs.TakeAll()[0].Message)
-	})
-
-	// Execution failed after exhausting all retries
-	t.Run("failed_execution_with_retries", func(t *testing.T) {
-		ctx := context.Background()
 		log, observer := logger.NewTesting(t.Name())
-
-		exeConfig := progConfig{
-			ErrMessage: "foo bar",
-			ExitCode:   222,
-		}
-		exePath, err := prepareTestProg(ctx, log, t.TempDir(), exeConfig)
+		exePath, err := prepareTestProg(cmdCtx, log, t.TempDir(), exeConfig)
 		require.NoError(t, err)
 
-		cmdSpec := component.ServiceOperationsCommandSpec{
-			RetryMaxCount:          2,
-			RetrySleepInitDuration: 10 * time.Millisecond,
-		}
+		// Since the service command is retried indefinitely, we need a way to
+		// stop the test within a reasonable amount of time
+		retryCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
 
-		err = executeServiceCommand(ctx, log, exePath, &cmdSpec)
-		expectedErr := fmt.Sprintf("%s: exit status %d", exeConfig.ErrMessage, exeConfig.ExitCode)
-		require.EqualError(t, err, expectedErr)
+		defaultRetrySleepInitDuration := 50 * time.Millisecond
+		retrySleepMaxDuration := 200 * time.Millisecond
+
+		err = executeServiceCommandWithRetries(
+			cmdCtx, log, exePath, &component.ServiceOperationsCommandSpec{},
+			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+		)
 
 		logs := observer.TakeAll()
-		for i := 0; i < int(cmdSpec.RetryMaxCount); i++ {
-			// Check that the command failure was logged at an ERROR level
-			logEntry := logs[2*i]
-			require.Equal(t, zapcore.ErrorLevel, logEntry.Level)
-			require.Equal(t, exeConfig.ErrMessage, logEntry.Message)
-
-			// Check that the retry message was logged at a WARNING level
-			logEntry = logs[2*i+1]
-			require.Equal(t, zapcore.WarnLevel, logEntry.Level)
-			require.Contains(t, logEntry.Message, fmt.Sprintf(
-				"service command execution failed with error [%s], retrying [%d of %d] after",
-				expectedErr, i+1, cmdSpec.RetryMaxCount,
-			))
+		for i, l := range logs {
+			if i%2 == 0 {
+				require.Equal(t, zapcore.ErrorLevel, l.Level)
+				require.Equal(t, exeConfig.ErrMessage, l.Message)
+			} else {
+				require.Equal(t, zapcore.WarnLevel, l.Level)
+				require.Contains(t, l.Message, fmt.Sprintf(
+					"service command execution failed with error [%s: exit status %d], retrying (will be retry [%d]) after",
+					exeConfig.ErrMessage, exeConfig.ExitCode, (i/2)+1,
+				))
+			}
 		}
+	})
 
-		// Check that the command failed again with the final retry and the failure
-		// was logged at an ERROR level
-		logEntry := logs[cmdSpec.RetryMaxCount]
-		require.Equal(t, zapcore.ErrorLevel, logEntry.Level)
-		require.Equal(t, exeConfig.ErrMessage, logEntry.Message)
+	// Execution failed - with retry configuration in spec
+	t.Run("failed_execution_with_retry_config", func(t *testing.T) {
+		cmdCtx := context.Background()
+		exeConfig := progConfig{
+			ErrMessage: "foo bar",
+			ExitCode:   111,
+		}
+		log, observer := logger.NewTesting(t.Name())
+		exePath, err := prepareTestProg(cmdCtx, log, t.TempDir(), exeConfig)
+		require.NoError(t, err)
+
+		// Since the service command is retried indefinitely, we need a way to
+		// stop the test within a reasonable amount of time
+		retryCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		defaultRetrySleepInitDuration := 50 * time.Millisecond
+		retrySleepMaxDuration := 1 * time.Second
+
+		spec := &component.ServiceOperationsCommandSpec{
+			// Deliberately set to just shorter than the context timeout to
+			// ensure we observe:
+			// - the initial execution of the command (before any retries)
+			// - one message about the next (first) retry
+			// - one more execution of the command, as a result of the first retry
+			// - one message about the next (second) retry
+			RetrySleepInitDuration: 700 * time.Millisecond,
+		}
+		err = executeServiceCommandWithRetries(
+			cmdCtx, log, exePath, spec,
+			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+		)
+
+		logs := observer.TakeAll()
+		for i, l := range logs {
+			if i%2 == 0 {
+				require.Equal(t, zapcore.ErrorLevel, l.Level)
+				require.Equal(t, exeConfig.ErrMessage, l.Message)
+			} else {
+				require.Equal(t, zapcore.WarnLevel, l.Level)
+				require.Contains(t, l.Message, fmt.Sprintf(
+					"service command execution failed with error [%s: exit status %d], retrying (will be retry [%d]) after",
+					exeConfig.ErrMessage, exeConfig.ExitCode, (i/2)+1,
+				))
+			}
+		}
 	})
 
 	// Execution succeeded after retrying once
