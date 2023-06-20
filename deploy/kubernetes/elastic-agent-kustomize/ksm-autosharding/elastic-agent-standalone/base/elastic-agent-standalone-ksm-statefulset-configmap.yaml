@@ -24,10 +24,7 @@ data:
         logs: true
         metrics: true
     providers.kubernetes:
-      node: ${NODE_NAME}
-      scope: node
-      #Uncomment to enable hints' support
-      #hints.enabled: true
+      enabled: false
     inputs:
       - id: kubernetes-cluster-metrics
         condition: ${kubernetes_leaderelection.leader} == false

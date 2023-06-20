@@ -36,7 +36,7 @@ data:
         meta:
           package:
             name: kubernetes
-            version: 1.29.2
+            version: 1.41.0
         data_stream:
           namespace: default
         streams:
@@ -121,6 +121,7 @@ data:
               dataset: system.system
             condition: '${host.platform} == ''windows'''
             ignore_older: 72h
+      # Input ID allowing Elastic Agent to track the state of this input. Must be unique.
       - id: container-log-${kubernetes.pod.name}-${kubernetes.container.id}
         type: filestream
         use_output: default
@@ -131,7 +132,10 @@ data:
         data_stream:
           namespace: default
         streams:
-          - data_stream:
+          # Stream ID for this data stream allowing Filebeat to track the state of the ingested files. Must be unique.
+          # Each filestream data stream creates a separate instance of the Filebeat filestream input.
+          - id: container-log-${kubernetes.pod.name}-${kubernetes.container.id}
+            data_stream:
               dataset: kubernetes.container_logs
               type: logs
             prospector.scanner.symlinks: true
@@ -151,7 +155,8 @@ data:
         type: filestream
         use_output: default
         streams:
-          - condition: ${kubernetes.hints.generic_logs.container_logs.enabled} == true
+          - id: hints-container-logs-${kubernetes.hints.container_id}
+            condition: ${kubernetes.hints.generic_logs.container_logs.enabled} == true
             data_stream:
               dataset: kubernetes.hints.container_logs
               type: logs
