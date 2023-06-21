@@ -5,50 +5,72 @@
 package monitoring
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	LongID     = "105_characters_long_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	ShallowDir = "/usr/share/elastic-agent/state/data/tmp"
+	DeepDir    = "/usr/share/elastic-agent/state/data/tmp/aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddd/eeeeeeeeee/ffffffffff"
+	SpaceDir   = "/one/dir with space/three/"
+)
+
 func TestEndpointPath(t *testing.T) {
-	sep := string(filepath.Separator)
 	testCases := []struct {
 		Name       string
 		OS         string
+		Dir        string
 		ID         string
 		ExpectedID string
 	}{
-		// using filepath join so windows runner is happy, filepath is used internally.
 		// simple
-		{"simple linux", "linux", "simple", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "simple.sock")},
-		{"simple darwin", "darwin", "simple", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "simple.sock")},
-		{"simple windows", "windows", "simple", "npipe:///simple"},
+		{"simple linux", "linux", ShallowDir, "simple", "unix:///usr/share/elastic-agent/state/data/tmp/p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
+		{"simple darwin", "darwin", ShallowDir, "simple", "unix:///usr/share/elastic-agent/state/data/tmp/p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
+		{"simple windows", "windows", ShallowDir, "simple", "npipe:///p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
 
 		// special chars
-		{"simple linux", "linux", "complex43@#$", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "complex43@#$.sock")},
-		{"simple darwin", "darwin", "complex43@#$", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "complex43@#$.sock")},
-		{"simple windows", "windows", "complex43@#$", "npipe:///complex43@#$"},
+		{"special chars linux", "linux", ShallowDir, "complex43@#$ ^*(){}[]", "unix:///usr/share/elastic-agent/state/data/tmp/PE6b2V32MXkTl1rxBNiAwqXTTNCm-D9q.sock"},
+		{"special chars darwin", "darwin", ShallowDir, "complex43@#$ ^*(){}[]", "unix:///usr/share/elastic-agent/state/data/tmp/PE6b2V32MXkTl1rxBNiAwqXTTNCm-D9q.sock"},
+		{"special chars windows", "windows", ShallowDir, "complex43@#$ ^*(){}[]", "npipe:///PE6b2V32MXkTl1rxBNiAwqXTTNCm-D9q.sock"},
 
 		// slash
-		{"simple linux", "linux", "slash/sample", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "slash-sample.sock")},
-		{"simple darwin", "darwin", "slash/sample", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "slash-sample.sock")},
-		{"simple windows", "windows", "slash/sample", "npipe:///slash-sample"},
+		{"slash linux", "linux", ShallowDir, "slash/sample", "unix:///usr/share/elastic-agent/state/data/tmp/3Np2ygRfGEIqmar6kYkBBDmGRBAp6YMG.sock"},
+		{"slash darwin", "darwin", ShallowDir, "slash/sample", "unix:///usr/share/elastic-agent/state/data/tmp/3Np2ygRfGEIqmar6kYkBBDmGRBAp6YMG.sock"},
+		{"slash windows", "windows", ShallowDir, "slash/sample", "npipe:///3Np2ygRfGEIqmar6kYkBBDmGRBAp6YMG.sock"},
 
 		// backslash
-		{"simple linux", "linux", "back\\slash", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "back\\slash.sock")},
-		{"simple darwin", "darwin", "back\\slash", "unix://" + sep + filepath.Join("tmp", "elastic-agent", "back\\slash.sock")},
-		{"simple windows", "windows", "back\\slash", "npipe:///back-slash"},
+		{"backslash linux", "linux", ShallowDir, "back\\slash", "unix:///usr/share/elastic-agent/state/data/tmp/FJjgtWatfdJl1fLe68gKu3uURsPpQ97L.sock"},
+		{"backslash darwin", "darwin", ShallowDir, "back\\slash", "unix:///usr/share/elastic-agent/state/data/tmp/FJjgtWatfdJl1fLe68gKu3uURsPpQ97L.sock"},
+		{"backslash windows", "windows", ShallowDir, "back\\slash", "npipe:///FJjgtWatfdJl1fLe68gKu3uURsPpQ97L.sock"},
+
+		// long id
+		{"long id linux", "linux", ShallowDir, LongID, "unix:///usr/share/elastic-agent/state/data/tmp/RwNi8dyCwpukvKr2iTmarB9eQuoNAgmg.sock"},
+		{"long id darwin", "darwin", ShallowDir, LongID, "unix:///usr/share/elastic-agent/state/data/tmp/RwNi8dyCwpukvKr2iTmarB9eQuoNAgmg.sock"},
+		{"long id windows", "windows", ShallowDir, LongID, "npipe:///RwNi8dyCwpukvKr2iTmarB9eQuoNAgmg.sock"},
+
+		// Deep Dir
+		{"deep dir linux", "linux", DeepDir, "simple", "unix:///tmp/elastic-agent/p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
+		{"deep dir darwin", "darwin", DeepDir, "simple", "unix:///tmp/elastic-agent/p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
+		{"deep dir  windows", "windows", DeepDir, "simple", "npipe:///p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
+
+		// Long Dir, Long ID
+		{"deep dir, long id, linux", "linux", DeepDir, LongID, "unix:///tmp/elastic-agent/RwNi8dyCwpukvKr2iTmarB9eQuoNAgmg.sock"},
+		{"deep dir, long id, darwin", "darwin", DeepDir, LongID, "unix:///tmp/elastic-agent/RwNi8dyCwpukvKr2iTmarB9eQuoNAgmg.sock"},
+		{"deep dir, long id, windows", "windows", DeepDir, LongID, "npipe:///RwNi8dyCwpukvKr2iTmarB9eQuoNAgmg.sock"},
+
+		// space in dir
+		{"space dir linux", "linux", SpaceDir, "simple", "unix:///one/dir%20with%20space/three/p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
+		{"space dir darwin", "darwin", SpaceDir, "simple", "unix:///one/dir%20with%20space/three/p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
+		{"space dir windows", "windows", SpaceDir, "simple", "npipe:///p6ObcvKXGOZT5zUDIQ-7WXBXt6HHfR_j.sock"},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			separator := "/"
-			if tc.OS == windowsOS {
-				separator = "\\"
-			}
-			endpointPath := endpointPathWithDir(tc.ID, tc.OS, "/tmp/elastic-agent", separator)
+			endpointPath := endpointPathWithDir(tc.ID, tc.OS, tc.Dir)
 			require.Equal(t, tc.ExpectedID, endpointPath)
+			require.Less(t, len(endpointPath), 104)
 		})
 	}
 }

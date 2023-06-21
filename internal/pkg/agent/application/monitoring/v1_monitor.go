@@ -6,6 +6,7 @@ package monitoring
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -229,7 +230,7 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 			}
 
 			// create
-			if err := os.MkdirAll(drop, 0775); err != nil {
+			if err := os.MkdirAll(drop, 0o775); err != nil {
 				return errors.New(err, fmt.Sprintf("failed to create directory %q", drop))
 			}
 
@@ -432,7 +433,8 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 					"add_formatted_index": map[string]interface{}{
 						"index": "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
 					},
-				}},
+				},
+			},
 		},
 	}
 
@@ -527,6 +529,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	}
 	return defaultMonitoringNamespace
 }
+
 func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
@@ -828,7 +831,6 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 					"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
 				})
 		}
-
 	}
 
 	inputs := []interface{}{
@@ -950,24 +952,40 @@ func loggingPath(id, operatingSystem string) string {
 }
 
 func endpointPath(id, operatingSystem string) (endpointPath string) {
-	return endpointPathWithDir(id, operatingSystem, paths.TempDir(), string(filepath.Separator))
+	return endpointPathWithDir(id, operatingSystem, paths.TempDir())
 }
 
-func endpointPathWithDir(id, operatingSystem, tempDir, separator string) (endpointPath string) {
-	id = strings.ReplaceAll(id, separator, "-")
+// endpointPathWithDir builds a path for a unix socket or Windows named pipe.
+// There are several restrictions on these paths.
+// 1. unix socket paths must be less than 104 characters
+// 2. Windows named pipes must be less than 256 characters.
+// 3. Windows named pipes are just a filename not a path.
+// The ids can often be over these limits.  So we follow this
+// algorithm to get unique paths that are less than 104
+// characters.
+// 1. take sha256 of id
+// 2. base64 encode the first 24 bytes of hash (full 32 can be too long)
+// 3. use URLencoding for base64, this is filename safe and is shorter than hex
+// 4. if this is still to long for unix, use the system temp directory
+func endpointPathWithDir(id, operatingSystem, tempDir string) (endpointPath string) {
+	hashID := sha256.Sum256([]byte(id))
+	filename := base64.URLEncoding.EncodeToString(hashID[:24]) + ".sock"
+	u := &url.URL{}
+	u.Path = "/"
 	if operatingSystem == windowsOS {
-		// on windows named pipe `/` separates pipe name from a computer/server name
-		id = strings.ReplaceAll(id, "/", "-")
-		return fmt.Sprintf(mbEndpointFileFormatWin, id)
+		u.Scheme = "npipe"
+		tempDir = "/"
+	} else {
+		u.Scheme = "unix"
 	}
-	// unix socket path must be less than 104 characters
-	path := fmt.Sprintf("unix://%s.sock", filepath.Join(tempDir, id))
-	if len(path) < 104 {
-		return path
+
+	candidateURL := u.JoinPath(tempDir, filename)
+	if len(candidateURL.String()) < 104 {
+		return candidateURL.String()
 	}
-	// place in global /tmp (or /var/tmp on Darwin) to ensure that its small enough to fit; current path is way to long
-	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
-	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
+
+	candidateURL = u.JoinPath("/tmp/elastic-agent", filename)
+	return candidateURL.String()
 }
 
 func prefixedEndpoint(endpoint string) string {
