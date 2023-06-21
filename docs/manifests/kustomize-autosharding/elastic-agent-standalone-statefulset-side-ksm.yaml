@@ -7,7 +7,6 @@ metadata:
     k8s-app: elastic-agent
 data:
   agent.yml: |-
-    id: 98456730-0464-11ee-9c4b-b7b04a89d33e
     outputs:
       default:
         type: elasticsearch
@@ -19,19 +18,13 @@ data:
     providers.kubernetes:
       enabled: false
     inputs:
-      - id: >-
-          kubernetes/metrics-kube-state-metrics-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-        revision: 1
-        name: kubernetes-41
+      - name: kubernetes-41
         type: kubernetes/metrics
         data_stream:
           namespace: default
         use_output: default
-        package_policy_id: 3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
         streams:
-          - id: >-
-              kubernetes/metrics-kubernetes.state_deployment-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_deployment
             metricsets:
@@ -41,9 +34,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_container-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_container
             metricsets:
@@ -53,9 +44,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_cronjob-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_cronjob
             metricsets:
@@ -65,9 +54,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_daemonset-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_daemonset
             metricsets:
@@ -77,9 +64,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_persistentvolume-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_persistentvolume
             metricsets:
@@ -89,9 +74,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_resourcequota-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_resourcequota
             metricsets:
@@ -101,9 +84,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_node-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_node
             metricsets:
@@ -113,9 +94,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_replicaset-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_replicaset
             metricsets:
@@ -125,9 +104,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_pod-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_pod
             metricsets:
@@ -137,9 +114,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_persistentvolumeclaim-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_persistentvolumeclaim
             metricsets:
@@ -149,9 +124,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_storageclass-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_storageclass
             metricsets:
@@ -161,9 +134,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_job-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_job
             metricsets:
@@ -173,9 +144,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_statefulset-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_statefulset
             metricsets:
@@ -185,9 +154,7 @@ data:
               - 'localhost:8080'
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-          - id: >-
-              kubernetes/metrics-kubernetes.state_service-3fb98bfb-4fd0-4842-be84-0dc7b8dbd071
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.state_service
             metricsets:
@@ -201,7 +168,6 @@ data:
           package:
             name: kubernetes
             version: 1.36.0
-    revision: 3
     agent:
       download:
         sourceURI: 'https://artifacts.elastic.co/downloads/'

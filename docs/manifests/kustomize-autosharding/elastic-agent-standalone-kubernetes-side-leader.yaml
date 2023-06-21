@@ -7,7 +7,6 @@ metadata:
     k8s-app: elastic-agent
 data:
   agent.yml: |-
-    id: d078a6c0-0465-11ee-9c4b-b7b04a89d33e
     outputs:
       default:
         type: elasticsearch
@@ -17,17 +16,13 @@ data:
         username: '${ES_USERNAME}'
         password: '${ES_PASSWORD}'
     inputs:
-      - id: logfile-system-54be5f94-cb99-414a-9385-c33da85cdcda
-        revision: 1
-        name: system-2
+      - name: system-2
         type: logfile
         data_stream:
           namespace: default
         use_output: default
-        package_policy_id: 54be5f94-cb99-414a-9385-c33da85cdcda
         streams:
-          - id: logfile-system.auth-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: logs
               dataset: system.auth
             ignore_older: 72h
@@ -43,8 +38,7 @@ data:
               - system-auth
             processors:
               - add_locale: null
-          - id: logfile-system.syslog-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: logs
               dataset: system.syslog
             paths:
@@ -63,31 +57,25 @@ data:
           package:
             name: system
             version: 1.27.0
-      - id: winlog-system-54be5f94-cb99-414a-9385-c33da85cdcda
-        revision: 1
-        name: system-2
+      - name: system-2
         type: winlog
         data_stream:
           namespace: default
         use_output: default
-        package_policy_id: 54be5f94-cb99-414a-9385-c33da85cdcda
         streams:
-          - id: winlog-system.application-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: logs
               dataset: system.application
             name: Application
             condition: '${host.platform} == ''windows'''
             ignore_older: 72h
-          - id: winlog-system.security-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: logs
               dataset: system.security
             name: Security
             condition: '${host.platform} == ''windows'''
             ignore_older: 72h
-          - id: winlog-system.system-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: logs
               dataset: system.system
             name: System
@@ -97,24 +85,19 @@ data:
           package:
             name: system
             version: 1.27.0
-      - id: system/metrics-system-54be5f94-cb99-414a-9385-c33da85cdcda
-        revision: 1
-        name: system-2
+      - name: system-2
         type: system/metrics
         data_stream:
           namespace: default
         use_output: default
-        package_policy_id: 54be5f94-cb99-414a-9385-c33da85cdcda
         streams:
-          - id: system/metrics-system.uptime-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.uptime
             metricsets:
               - uptime
             period: 10s
-          - id: system/metrics-system.cpu-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.cpu
             metricsets:
@@ -123,9 +106,7 @@ data:
               - percentages
               - normalized_percentages
             period: 10s
-          - id: >-
-              system/metrics-system.filesystem-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.filesystem
             metricsets:
@@ -134,16 +115,13 @@ data:
             processors:
               - drop_event.when.regexp:
                   system.filesystem.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
-          - id: >-
-              system/metrics-system.socket_summary-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.socket_summary
             metricsets:
               - socket_summary
             period: 10s
-          - id: system/metrics-system.process-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.process
             metricsets:
@@ -156,47 +134,40 @@ data:
             process.include_cpu_ticks: false
             processes:
               - .*
-          - id: system/metrics-system.load-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.load
             metricsets:
               - load
             condition: '${host.platform} != ''windows'''
             period: 10s
-          - id: system/metrics-system.network-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.network
             metricsets:
               - network
             period: 10s
             network.interfaces: null
-          - id: system/metrics-system.memory-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.memory
             metricsets:
               - memory
             period: 10s
-          - id: >-
-              system/metrics-system.process.summary-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.process.summary
             metricsets:
               - process_summary
             period: 10s
-          - id: system/metrics-system.diskio-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.diskio
             metricsets:
               - diskio
             diskio.include_devices: null
             period: 10s
-          - id: system/metrics-system.fsstat-54be5f94-cb99-414a-9385-c33da85cdcda
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: system.fsstat
             metricsets:
@@ -209,18 +180,13 @@ data:
           package:
             name: system
             version: 1.27.0
-      - id: kubernetes/metrics-kubelet-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-        revision: 1
-        name: kubernetes-42
+      - name: kubernetes-42
         type: kubernetes/metrics
         data_stream:
           namespace: default
         use_output: default
-        package_policy_id: 8fa012b3-fd0b-42fd-bf7c-d17899a2d879
         streams:
-          - id: >-
-              kubernetes/metrics-kubernetes.container-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.container
             metricsets:
@@ -231,9 +197,7 @@ data:
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
-          - id: >-
-              kubernetes/metrics-kubernetes.node-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.node
             metricsets:
@@ -244,9 +208,7 @@ data:
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
-          - id: >-
-              kubernetes/metrics-kubernetes.pod-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.pod
             metricsets:
@@ -257,9 +219,7 @@ data:
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
-          - id: >-
-              kubernetes/metrics-kubernetes.volume-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.volume
             metricsets:
@@ -270,9 +230,7 @@ data:
             period: 10s
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
-          - id: >-
-              kubernetes/metrics-kubernetes.system-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.system
             metricsets:
@@ -287,18 +245,13 @@ data:
           package:
             name: kubernetes
             version: 1.36.0
-      - id: kubernetes/metrics-kube-apiserver-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-        revision: 1
-        name: kubernetes-42
+      - name: kubernetes-42
         type: kubernetes/metrics
         data_stream:
           namespace: default
         use_output: default
-        package_policy_id: 8fa012b3-fd0b-42fd-bf7c-d17899a2d879
         streams:
-          - id: >-
-              kubernetes/metrics-kubernetes.apiserver-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.apiserver
             metricsets:
@@ -315,18 +268,13 @@ data:
           package:
             name: kubernetes
             version: 1.36.0
-      - id: kubernetes/metrics-kube-proxy-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-        revision: 1
-        name: kubernetes-42
+      - name: kubernetes-42
         type: kubernetes/metrics
         data_stream:
           namespace: default
         use_output: default
-        package_policy_id: 8fa012b3-fd0b-42fd-bf7c-d17899a2d879
         streams:
-          - id: >-
-              kubernetes/metrics-kubernetes.proxy-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.proxy
             metricsets:
@@ -338,18 +286,13 @@ data:
           package:
             name: kubernetes
             version: 1.36.0
-      - id: kubernetes/metrics-events-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-        revision: 1
-        name: kubernetes-42
+      - name: kubernetes-42
         type: kubernetes/metrics
         data_stream:
           namespace: default
         use_output: default
-        package_policy_id: 8fa012b3-fd0b-42fd-bf7c-d17899a2d879
         streams:
-          - id: >-
-              kubernetes/metrics-kubernetes.event-8fa012b3-fd0b-42fd-bf7c-d17899a2d879
-            data_stream:
+          - data_stream:
               type: metrics
               dataset: kubernetes.event
             metricsets:
@@ -362,7 +305,6 @@ data:
           package:
             name: kubernetes
             version: 1.36.0
-    revision: 2
     agent:
       download:
         sourceURI: 'https://artifacts.elastic.co/downloads/'
