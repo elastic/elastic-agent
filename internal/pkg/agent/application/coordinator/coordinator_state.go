@@ -105,7 +105,6 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 
 	// In the case that the component has stopped, it is now removed.
 	// Broadcast its stopped state immediately, so subscribers get notified of stopped before removal
-	// TODO: is this separation still needed?
 	if state.State.State == client.UnitStateStopped {
 		c.refreshState()
 		for i, other := range c.state.Components {
