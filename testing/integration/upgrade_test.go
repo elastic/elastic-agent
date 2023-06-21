@@ -277,7 +277,8 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 	s.Require().NotNil(buildDetails)
 	agentBuildDetails, ok := buildDetails.Build.Projects["elastic-agent"]
 	s.Require().Truef(ok, "elastic agent project not found in version %q build %q", latestSnapshotVersion.Original(), upgradeVersionString)
-
+	s.T().Logf("agent build details: %+v", agentBuildDetails)
+	s.T().Logf("expected agent commit hash: %q", agentBuildDetails.CommitHash)
 	expectedAgentHashAfterUpgrade := agentBuildDetails.CommitHash
 
 	buildFragments := strings.Split(upgradeVersionString, "-")
