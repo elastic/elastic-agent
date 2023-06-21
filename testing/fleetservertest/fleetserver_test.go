@@ -16,10 +16,10 @@ import (
 
 func ExampleNewServer_status() {
 	apiKey := "aAPIKey"
-	ts := NewServer(API{
+	ts := NewServer(Handlers{
 		APIKey:   apiKey,
 		StatusFn: NewHandlerStatusHealth(),
-	})
+	}, Data{})
 
 	r, err := http.NewRequest(http.MethodGet, ts.URL+PathStatus, nil)
 	if err != nil {
@@ -48,9 +48,9 @@ func ExampleNewServer_status() {
 func ExampleNewServer_checkin() {
 	agentID := "agentID"
 
-	ts := NewServer(API{
-		CheckinFn: NewHandlerCheckin(agentID, "", false),
-	})
+	ts := NewServer(Handlers{
+		CheckinFn: NewHandlerCheckin(agentID),
+	}, Data{})
 
 	cmd := fleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})

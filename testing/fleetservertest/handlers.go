@@ -125,7 +125,7 @@ func NewHandlerEnroll(policyID string, apiKey APIKey) func(
 
 // NewHandlerCheckin returns a checkin handler that always returns a policy with
 // System integrations and, if withEndpoint is true, Endpoint Security.
-func NewHandlerCheckin(ackToken string, withEndpoint bool) func(
+func NewHandlerCheckin(ackToken string) func(
 	ctx context.Context,
 	agentID string,
 	userAgent string,
@@ -133,9 +133,6 @@ func NewHandlerCheckin(ackToken string, withEndpoint bool) func(
 	checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
 
 	policy := checkinResponseJSONPolicySystemIntegration
-	if withEndpoint {
-		policy = checkinResponseJSONPolicySystemIntegrationAndEndpoint
-	}
 
 	return func(
 		ctx context.Context,

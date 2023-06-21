@@ -5,17 +5,77 @@
 package fleetservertest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
 )
 
-// Handlers binds http requests to an api service and writes the service results to the http response
+// Handlers holds the handlers for the fleet-api, see https://petstore.swagger.io/?url=https://raw.githubusercontent.com/elastic/fleet-server/main/model/openapi.yml
+// for rendered OpenAPI definition. If any of the handlers are nil, a
+// http.StatusNotImplemented is returned for the route.
+//
+// Authentication is made extracting he API key or enrollment token,
+// from the HeaderAuthorization header and compared against API.APIKey or
+// API.EnrollmentToken. API.EnrollmentToken is used for Enroll requests and
+// API.APIKey for all others.
+// TODO(Anderson): fix me!
 type Handlers struct {
-	api API
+	// api API
+
+	// TODO: better to get rid of this type. Merge it with Server and either have
+	// config functions to add the implementation on creation or setters.
+
+	// AgentID is the ID of the last enrolled agent.
+	AgentID string
+
+	APIKey          string
+	EnrollmentToken string
+
+	AckFn func(
+		ctx context.Context,
+		agentID string,
+		ackRequest AckRequest) (*AckResponse, *HTTPError)
+
+	CheckinFn func(
+		ctx context.Context,
+		id string,
+		userAgent string,
+		acceptEncoding string,
+		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError)
+
+	EnrollFn func(
+		ctx context.Context,
+		userAgent string,
+		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
+
+	ArtifactFn func(
+		ctx context.Context,
+		artifactID string,
+		sha2 string) *HTTPError
+
+	StatusFn func(
+		ctx context.Context) (*StatusResponse, *HTTPError)
+
+	UploadBeginFn func(
+		ctx context.Context,
+		requestBody UploadBeginRequest) (*UploadBeginResponse, *HTTPError)
+
+	UploadChunkFn func(
+		ctx context.Context,
+		uploadID string,
+		chunkNum int32,
+		xChunkSHA2 string,
+		body io.ReadCloser) *HTTPError
+
+	UploadCompleteFn func(
+		ctx context.Context,
+		uploadID string,
+		uploadCompleteRequest UploadCompleteRequest) *HTTPError
 }
 
 type Route struct {
@@ -47,56 +107,56 @@ func (h *Handlers) Routes() []Route {
 			Name:    "AgentAcks",
 			Method:  http.MethodPost,
 			Pattern: PathAgentAcks,
-			AuthKey: h.api.APIKey,
+			AuthKey: h.APIKey,
 			Handler: http.HandlerFunc(h.AgentAcks),
 		},
 		{
 			Name:    "AgentCheckin",
 			Method:  http.MethodPost,
 			Pattern: PathAgentCheckin,
-			AuthKey: h.api.APIKey,
+			AuthKey: h.APIKey,
 			Handler: http.HandlerFunc(h.AgentCheckin),
 		},
 		{
 			Name:    "AgentEnroll",
 			Method:  http.MethodPost,
 			Pattern: PathAgentEnroll,
-			AuthKey: h.api.EnrollmentToken,
+			AuthKey: h.EnrollmentToken,
 			Handler: http.HandlerFunc(h.AgentEnroll),
 		},
 		{
 			Name:    "Artifact",
 			Method:  http.MethodGet,
 			Pattern: PathArtifact,
-			AuthKey: h.api.APIKey,
+			AuthKey: h.APIKey,
 			Handler: http.HandlerFunc(h.Artifact),
 		},
 		{
 			Name:    "Status",
 			Method:  http.MethodGet,
 			Pattern: PathStatus,
-			AuthKey: h.api.APIKey,
+			AuthKey: h.APIKey,
 			Handler: http.HandlerFunc(h.Status),
 		},
 		{
 			Name:    "UploadBegin",
 			Method:  http.MethodPost,
 			Pattern: PathUploadBegin,
-			AuthKey: h.api.APIKey,
+			AuthKey: h.APIKey,
 			Handler: http.HandlerFunc(h.UploadBegin),
 		},
 		{
 			Name:    "UploadChunk",
 			Method:  http.MethodPut,
 			Pattern: PathUploadChunk,
-			AuthKey: h.api.APIKey,
+			AuthKey: h.APIKey,
 			Handler: http.HandlerFunc(h.UploadChunk),
 		},
 		{
 			Name:    "UploadComplete",
 			Method:  http.MethodPost,
 			Pattern: PathUploadComplete,
-			AuthKey: h.api.APIKey,
+			AuthKey: h.APIKey,
 			Handler: http.HandlerFunc(h.UploadComplete),
 		},
 	}
@@ -104,9 +164,15 @@ func (h *Handlers) Routes() []Route {
 
 // AgentAcks -
 func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
+	if h.AckFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "agent acs Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+	}
+
 	params := mux.Vars(r)
 	idParam := params["id"]
-
 	ackRequestParam := AckRequest{}
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&ackRequestParam); err != nil {
@@ -117,7 +183,7 @@ func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.api.AgentAcks(r.Context(), idParam, ackRequestParam)
+	result, err := h.AckFn(r.Context(), idParam, ackRequestParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -128,6 +194,13 @@ func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 
 // AgentCheckin -
 func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
+	if h.CheckinFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "checkin Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+	}
+
 	params := mux.Vars(r)
 	idParam := params["id"]
 	userAgentParam := r.Header.Get("User-Agent")
@@ -140,14 +213,10 @@ func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 			StatusCode: http.StatusBadRequest,
 			Message:    fmt.Sprintf("%v", err),
 		}, w)
-		respondAsJSON(http.StatusBadRequest, HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("%v", err),
-		}, w)
 		return
 	}
 
-	result, err := h.api.AgentCheckin(
+	result, err := h.CheckinFn(
 		r.Context(),
 		idParam,
 		userAgentParam,
@@ -163,6 +232,13 @@ func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 
 // AgentEnroll -
 func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
+	if h.EnrollFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "agent checkin Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+	}
+
 	userAgentParam := r.Header.Get("User-Agent")
 	enrollRequestParam := EnrollRequest{}
 	d := json.NewDecoder(r.Body)
@@ -174,7 +250,7 @@ func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.api.AgentEnroll(
+	result, err := h.EnrollFn(
 		r.Context(),
 		userAgentParam,
 		enrollRequestParam)
@@ -188,11 +264,18 @@ func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 
 // Artifact -
 func (h *Handlers) Artifact(w http.ResponseWriter, r *http.Request) {
+	if h.ArtifactFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "artifact Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+
+	}
 	params := mux.Vars(r)
 	idParam := params["id"]
 	sha2Param := params["sha2"]
 
-	err := h.api.Artifact(r.Context(), idParam, sha2Param)
+	err := h.ArtifactFn(r.Context(), idParam, sha2Param)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -203,7 +286,15 @@ func (h *Handlers) Artifact(w http.ResponseWriter, r *http.Request) {
 
 // Status -
 func (h *Handlers) Status(w http.ResponseWriter, r *http.Request) {
-	result, err := h.api.Status(r.Context())
+	if h.StatusFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "status Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+
+	}
+
+	result, err := h.StatusFn(r.Context())
 	if err != nil {
 		if result != nil {
 			respondAsJSON(err.StatusCode, result, w)
@@ -216,6 +307,13 @@ func (h *Handlers) Status(w http.ResponseWriter, r *http.Request) {
 
 // UploadBegin - Initiate a file upload process
 func (h *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
+	if h.UploadBeginFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "upload begin Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+	}
+
 	requestBodyParam := UploadBeginRequest{}
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&requestBodyParam); err != nil {
@@ -226,7 +324,7 @@ func (h *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.api.UploadBegin(r.Context(), requestBodyParam)
+	result, err := h.UploadBeginFn(r.Context(), requestBodyParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -237,6 +335,14 @@ func (h *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
 
 // UploadChunk - Upload a section of file data
 func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
+	if h.UploadChunkFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "upload chunk Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+
+	}
+
 	params := mux.Vars(r)
 	idParam := params["id"]
 
@@ -247,6 +353,7 @@ func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 			Message:    "chunkNum is empty",
 		}, w)
 	}
+
 	chunkNum, err := strconv.ParseInt(chunkNumParam, 10, 32)
 	if err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
@@ -259,14 +366,14 @@ func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 	// Currently fleet-server limits the size of each chunk to 4 MiB.
 	body := http.MaxBytesReader(w, r.Body, 4194304 /*4 MiB*/)
 
-	uerr := h.api.UploadChunk(
+	uerr := h.UploadChunkFn(
 		r.Context(),
 		idParam,
 		int32(chunkNum),
 		chunkSHA2,
 		body)
-	if err != nil {
-		respondAsJSON(uerr.StatusCode, err, w)
+	if uerr != nil {
+		respondAsJSON(uerr.StatusCode, uerr, w)
 		return
 	}
 	respondAsJSON(http.StatusOK, nil, w)
@@ -274,6 +381,12 @@ func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 
 // UploadComplete - Complete a file upload process
 func (h *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
+	if h.UploadCompleteFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "upload complete Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+	}
 	params := mux.Vars(r)
 	idParam := params["id"]
 	uploadCompleteRequestParam := UploadCompleteRequest{}
@@ -286,13 +399,13 @@ func (h *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.api.UploadComplete(r.Context(), idParam, uploadCompleteRequestParam)
+	err := h.UploadCompleteFn(r.Context(), idParam, uploadCompleteRequestParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
 	}
 
-	respondAsJSON(http.StatusOK, result, w)
+	respondAsJSON(http.StatusOK, `{"status": "ok"}`, w)
 }
 
 // respondAsJSON uses the json encoder to write an interface to the http response with an optional status code
