@@ -204,7 +204,7 @@ func TestCoordinatorComponentStatesAreSeparate(t *testing.T) {
 	runtimeChan <- comp2
 	coord.runLoopIteration(ctx)
 
-	state := coord.stateBroadcaster.Get()
+	state := coord.State()
 	assert.Equal(t, agentclient.Healthy, state.State, "Starting components should produce healthy Coordinator")
 	assert.Equal(t, "Running", state.Message, "Starting components shouldn't affect state message")
 
@@ -216,7 +216,7 @@ func TestCoordinatorComponentStatesAreSeparate(t *testing.T) {
 	runtimeChan <- comp1
 	coord.runLoopIteration(ctx)
 
-	state = coord.stateBroadcaster.Get()
+	state = coord.State()
 
 	assert.Equal(t, agentclient.Degraded, state.State, "Failed component state should cause degraded Coordinator state")
 	assert.Equal(t, "1 or more components/units in a failed state", state.Message, "state message should reflect failed component")
@@ -225,7 +225,7 @@ func TestCoordinatorComponentStatesAreSeparate(t *testing.T) {
 	comp2.State.State = client.UnitStateHealthy
 	runtimeChan <- comp2
 	coord.runLoopIteration(ctx)
-	state = coord.stateBroadcaster.Get()
+	state = coord.State()
 	assert.Equal(t, agentclient.Healthy, state.State, "Starting component state should cause healthy Coordinator state")
 	assert.Equal(t, "Running", state.Message, "Healthy coordinator should return to baseline state message")
 }
@@ -396,7 +396,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Failed policy change should cause Failed coordinator state")
-		assert.Equal(t, "some kind of error", state.Message, "Coordinator state should report failed policy change")
+		assert.Equal(t, configChange.err.Error(), state.Message, "Coordinator state should report failed policy change")
 	default:
 		assert.Fail(t, "Coordinator's state didn't change")
 	}
@@ -472,44 +472,6 @@ inputs:
     use_output: default
 `)
 
-	expectedComponents := []component.Component{
-		{
-			ID: "filestream-default",
-			// We expect a Component error and an empty input spec because this test
-			// doesn't load any spec files. The rest of the policy will still be
-			// constructed/reported.
-			Err:       &component.ErrorReason{Reason: "input not supported"},
-			InputSpec: &component.InputRuntimeSpec{},
-			Features:  defaultFeatures(t),
-			Units: []component.Unit{
-				{
-					ID:       "filestream-default-test-input",
-					Type:     client.UnitTypeInput,
-					LogLevel: client.UnitLogLevelInfo,
-					Config: &proto.UnitExpectedConfig{
-						Id:   "test-input",
-						Type: "filestream",
-						Source: mustNewStruct(t, map[string]interface{}{
-							"id":   "test-input",
-							"type": "filestream",
-						}),
-					},
-				},
-				{
-					ID:       "filestream-default",
-					Type:     client.UnitTypeOutput,
-					LogLevel: client.UnitLogLevelInfo,
-					Config: &proto.UnitExpectedConfig{
-						Type: "elasticsearch",
-						Source: mustNewStruct(t, map[string]interface{}{
-							"type": "elasticsearch",
-						}),
-					},
-				},
-			},
-		},
-	}
-
 	// Send the policy change and make sure it was acknowledged.
 	configChange := &configChange{cfg: cfg}
 	configChan <- configChange
@@ -517,9 +479,28 @@ inputs:
 	assert.True(t, configChange.acked, "Coordinator should ACK a successful policy change")
 
 	// Make sure the runtime manager received the expected component update.
+	// An assert.Equal on the full component model doesn't play nice with
+	// the embedded proto structs, so instead we verify the important fields
+	// manually.
 	assert.True(t, updated, "Runtime manager should be updated after a policy change")
-	assert.Equal(t, expectedComponents, components,
-		"Runtime manager update should match the expected policy components")
+	require.Equal(t, 1, len(components), "Test policy should generate one component")
+
+	comp := components[0]
+	assert.Equal(t, "filestream-default", comp.ID)
+	require.NotNil(t, comp.Err, "Input with no spec should produce a component error")
+	assert.Equal(t, "input not supported", comp.Err.Error(), "Input with no spec should report 'input not supported'")
+	require.Equal(t, 2, len(comp.Units))
+
+	// Verify the input unit
+	assert.Equal(t, "filestream-default-test-input", comp.Units[0].ID)
+	assert.Equal(t, client.UnitTypeInput, comp.Units[0].Type)
+	assert.Equal(t, "test-input", comp.Units[0].Config.Id)
+	assert.Equal(t, "filestream", comp.Units[0].Config.Type)
+
+	// Verify the output unit
+	assert.Equal(t, "filestream-default", comp.Units[1].ID)
+	assert.Equal(t, client.UnitTypeOutput, comp.Units[1].Type)
+	assert.Equal(t, "elasticsearch", comp.Units[1].Config.Type)
 }
 
 func TestCoordinatorReportsRuntimeManagerPolicyFailure(t *testing.T) {
