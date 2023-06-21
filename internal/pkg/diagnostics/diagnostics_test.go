@@ -9,9 +9,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/hex"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +24,7 @@ import (
 	"github.com/google/pprof/profile"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/version"
 )
 
 func TestZipLogs(t *testing.T) {
@@ -63,6 +66,8 @@ func TestZipLogs(t *testing.T) {
 }
 
 func TestGlobalHooks(t *testing.T) {
+	testPkgVer := "1.2.3-test"
+	setupPkgVersion(t, testPkgVer, 0o644)
 	hooks := GlobalHooks()
 	assert.NotEmpty(t, hooks, "multiple hooks should be returned")
 	deadline, _ := t.Deadline()
@@ -76,11 +81,61 @@ func TestGlobalHooks(t *testing.T) {
 		switch h.Name {
 		case "version":
 			ok, err = isVersion(output)
+			assert.Truef(t, ok, "hook %q returned incompatible data: %q", h.Name, hex.EncodeToString(output))
+			assert.NoErrorf(t, err, "hook %q validation error: %v", err)
+		case "package version":
+			assert.Equal(t, testPkgVer, string(output), "hook package version does not match")
 		default:
 			ok, err = isPprof(output)
+			assert.Truef(t, ok, "hook %q returned incompatible data: %q", h.Name, hex.EncodeToString(output))
+			assert.NoErrorf(t, err, "hook %q validation error: %v", err)
 		}
-		assert.Truef(t, ok, "hook: %s returned incompatible data, err: %s, data: %v ", h.Name, err, output)
 	}
+}
+
+func TestPackageVersionHook(t *testing.T) {
+	for _, h := range GlobalHooks() {
+		if h.Name == "package version" {
+			testPackageVersionHook(t, h)
+			return
+		}
+	}
+	t.Fatal("package version hook not returned by GlobalHooks()")
+}
+
+func testPackageVersionHook(t *testing.T, pkgVersHook Hook) {
+	deadline, _ := t.Deadline()
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+	t.Run("package version hook returns an error if no package version file is found", func(t *testing.T) {
+		output := pkgVersHook.Hook(ctx)
+		assert.True(t, strings.HasPrefix(string(output), "error: "))
+	})
+	t.Run("package version hook returns an error if package version file is not readable", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("windows does not support non-readable permissions on files")
+		}
+		testPkgVer := "1.2.3-test"
+		setupPkgVersion(t, testPkgVer, 0o222)
+		output := pkgVersHook.Hook(ctx)
+		assert.True(t, strings.HasPrefix(string(output), "error: "))
+		assert.True(t, strings.HasSuffix(string(output), "permission denied\""))
+	})
+	t.Run("package version hook returns all the bytes in file including spaces", func(t *testing.T) {
+		testPkgVer := "\r\n   1.2.3-test  \n\t"
+		setupPkgVersion(t, testPkgVer, 0o444)
+		output := pkgVersHook.Hook(ctx)
+		assert.Equal(t, testPkgVer, string(output))
+	})
+}
+
+func setupPkgVersion(t *testing.T, pkgVer string, fileMode os.FileMode) {
+	// setup a fake package version to test the package version hook
+	pkgVersPath, err := version.GetAgentPackageVersionFilePath()
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(pkgVersPath) })
+	err = os.WriteFile(pkgVersPath, []byte(pkgVer), fileMode)
+	require.NoError(t, err)
 }
 
 func isVersion(input []byte) (bool, error) {

@@ -32,16 +32,25 @@ const PackageVersionFileName = ".package.version"
 // GetAgentPackageVersion retrieves the version saved in .package.version in the same
 // directory as the agent executable
 func GetAgentPackageVersion() (string, error) {
-	execPath, err := getCurrentExecutablePath()
+	packageVersionFilePath, err := GetAgentPackageVersionFilePath()
 	if err != nil {
-		return "", fmt.Errorf("detecting current executable path: %w", err)
+		return "", fmt.Errorf("retrieving package version file path: %w", err)
 	}
-	packageVersionFilePath := filepath.Join(filepath.Dir(execPath), PackageVersionFileName)
 	versionBytes, err := os.ReadFile(packageVersionFilePath)
 	if err != nil {
 		return "", fmt.Errorf("reading package version from file %q: %w", packageVersionFilePath, err)
 	}
 	return strings.TrimSpace(string(versionBytes)), nil
+}
+
+// GetAgentPackageVersionFilePath returns the path where the package version file
+// should be located (side by side with the currently executing binary)
+func GetAgentPackageVersionFilePath() (string, error) {
+	execPath, err := getCurrentExecutablePath()
+	if err != nil {
+		return "", fmt.Errorf("detecting current executable path: %w", err)
+	}
+	return filepath.Join(filepath.Dir(execPath), PackageVersionFileName), nil
 }
 
 func getCurrentExecutablePath() (string, error) {
