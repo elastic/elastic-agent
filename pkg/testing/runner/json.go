@@ -38,6 +38,10 @@ func suffixJSONResults(content []byte, suffix string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		_, err = result.Write([]byte("\n"))
+		if err != nil {
+			return nil, err
+		}
 	}
 	return result.Bytes(), nil
 }
