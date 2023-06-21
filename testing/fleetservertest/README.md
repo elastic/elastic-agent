@@ -56,22 +56,25 @@ Nice  have: New Handler functions taking  a few options to tailor the handler fo
 each test. Some of it done.
 
 ### Run the agent against the mock fleet-server
-Allow to e2e test the Agent without using the real fleet-server which allows:
- - test error cases / unhappy paths / hard to reproduce states. Eg. fleet-server send an invalid policy
- - develop and test feature before they're fully implemented on fleet-server
+Allow to e2e test the Agent without using a real fleet-server which allows:
+ - test error cases / unhappy paths / hard to reproduce states. Eg. fleet-server sends an invalid policy
+ - develop and test features before they're fully implemented on fleet-server
 
-in order  run the agent against the mock fleet-server, it needs to:
- - have least the states, enroll, checkin and ack handlers implemented
+in order run the agent against the mock fleet-server, it needs to:
+ - have at least the states, enroll, checkin and ack handlers implemented
  - an API key and Enrollment token for authentication. Which need to be shared with the test
+   - the ES API key needs to be valid if, and only if a real component is used with the agent
  - integrations to add in the policy:
-   - a fake component
-   - system Integration
-   - endpoint-security
- - a valid output. The agent needs a working output lest it degrade or fail:
-   - ES
-   - Shipper
+   - fake component
+   - fake shipper
+   - Should it allow a real components/integration to be used?
+     - system Integration (?)
+     - endpoint-security (?)
 
 ### Open Questions
-How integrate well with the test framework?
- - how get the ES endpoint and credential. Right now it isn't exposed.
-
+- How integrate well with the test framework?
+  - how get the ES endpoint and credential. Right now it isn't exposed.
+- Should the mock fleet-server allow any other components besides the fake inout and shipper?
+  - using fake components avoids the need for a real ES/output
+- allow to enrol more than one agent?
+  - more than 1 agent -> more state do manage. Do we need this?
