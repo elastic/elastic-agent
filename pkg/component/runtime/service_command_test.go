@@ -302,7 +302,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		exeConfig := progConfig{
 			ErrMessage:   "foo bar",
 			ExitCode:     111,
-			SucceedAfter: now.Add(1 * time.Second).UnixMilli(),
+			SucceedAfter: now.Add(2 * time.Second).UnixMilli(),
 		}
 		exePath, err := prepareTestProg(cmdCtx, log, t.TempDir(), exeConfig)
 		require.NoError(t, err)
@@ -310,7 +310,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		// Since the service command is retried indefinitely, we need a way to
 		// stop the test within a reasonable amount of time. However, we should never
 		// hit this timeout as the command should succeed before the timeout is reached.
-		retryCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		retryCtx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 		defer cancel()
 
 		defaultRetrySleepInitDuration := 50 * time.Millisecond
