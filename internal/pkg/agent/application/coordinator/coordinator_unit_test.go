@@ -13,16 +13,15 @@ package coordinator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -402,28 +401,12 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	}
 }
 
-func mustNewStruct(t *testing.T, cfg map[string]interface{}) *structpb.Struct {
-	result, err := structpb.NewStruct(cfg)
-	require.NoError(t, err, "Struct creation must succeed")
-	return result
-}
-
-func defaultFeatures(t *testing.T) *proto.Features {
-	return &proto.Features{
-		Source: mustNewStruct(t, map[string]interface{}{
-			"agent": map[string]interface{}{
-				"features": map[string]interface{}{
-					"fqdn": map[string]interface{}{
-						"enabled": false,
-					},
-				},
-			},
-		}),
-		Fqdn: &proto.FQDNFeature{},
-	}
-}
-
 func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
+	// Send a test policy to the Coordinator as a Config Manager update,
+	// verify it generates the right component model and sends it to the
+	// runtime manager, then send an empty policy and verify it calls
+	// another runtime manager update with an empty component model.
+
 	// Set a one-second timeout -- nothing here should block, but if it
 	// does let's report a failure instead of timing out the test runner.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -452,7 +435,6 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
 			configManagerUpdate: configChan,
 			varsManagerUpdate:   varsChan,
 		},
-		upgradeMgr: upgrade.NewUpgrader(logger, &artifact.Config{}, &info.AgentInfo{}),
 		runtimeMgr: runtimeManager,
 	}
 
@@ -473,38 +455,99 @@ inputs:
 `)
 
 	// Send the policy change and make sure it was acknowledged.
-	configChange := &configChange{cfg: cfg}
-	configChan <- configChange
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
-	assert.True(t, configChange.acked, "Coordinator should ACK a successful policy change")
+	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
 
 	// Make sure the runtime manager received the expected component update.
 	// An assert.Equal on the full component model doesn't play nice with
 	// the embedded proto structs, so instead we verify the important fields
-	// manually.
+	// manually (sorry).
 	assert.True(t, updated, "Runtime manager should be updated after a policy change")
 	require.Equal(t, 1, len(components), "Test policy should generate one component")
 
-	comp := components[0]
-	assert.Equal(t, "filestream-default", comp.ID)
-	require.NotNil(t, comp.Err, "Input with no spec should produce a component error")
-	assert.Equal(t, "input not supported", comp.Err.Error(), "Input with no spec should report 'input not supported'")
-	require.Equal(t, 2, len(comp.Units))
+	component := components[0]
+	assert.Equal(t, "filestream-default", component.ID)
+	require.NotNil(t, component.Err, "Input with no spec should produce a component error")
+	assert.Equal(t, "input not supported", component.Err.Error(), "Input with no spec should report 'input not supported'")
+	require.Equal(t, 2, len(component.Units))
 
+	units := component.Units
 	// Verify the input unit
-	assert.Equal(t, "filestream-default-test-input", comp.Units[0].ID)
-	assert.Equal(t, client.UnitTypeInput, comp.Units[0].Type)
-	assert.Equal(t, "test-input", comp.Units[0].Config.Id)
-	assert.Equal(t, "filestream", comp.Units[0].Config.Type)
+	assert.Equal(t, "filestream-default-test-input", units[0].ID)
+	assert.Equal(t, client.UnitTypeInput, units[0].Type)
+	assert.Equal(t, "test-input", units[0].Config.Id)
+	assert.Equal(t, "filestream", units[0].Config.Type)
 
 	// Verify the output unit
-	assert.Equal(t, "filestream-default", comp.Units[1].ID)
-	assert.Equal(t, client.UnitTypeOutput, comp.Units[1].Type)
-	assert.Equal(t, "elasticsearch", comp.Units[1].Config.Type)
+	assert.Equal(t, "filestream-default", units[1].ID)
+	assert.Equal(t, client.UnitTypeOutput, units[1].Type)
+	assert.Equal(t, "elasticsearch", units[1].Config.Type)
+
+	// Send a new empty config update and make sure the runtime manager
+	// receives that as well.
+	updated = false
+	components = nil
+	cfgChange = &configChange{cfg: config.MustNewConfigFrom(nil)}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+	assert.True(t, cfgChange.acked, "empty policy should be acknowledged")
+	assert.True(t, updated, "empty policy should cause runtime manager update")
+	assert.Empty(t, components, "empty policy should produce empty component model")
 }
 
-func TestCoordinatorReportsRuntimeManagerPolicyFailure(t *testing.T) {
+func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
 
+	configChan := make(chan ConfigChange, 1)
+	varsChan := make(chan []*transpiler.Vars, 1)
+
+	// Create a mocked runtime manager that always reports an error
+	runtimeManager := &fakeRuntimeManager{
+		updateCallback: func(comp []component.Component) error {
+			return fmt.Errorf("update failed for testing reasons")
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			varsManagerUpdate:   varsChan,
+		},
+		runtimeMgr: runtimeManager,
+	}
+
+	// Send an empty vars update, since Coordinator won't try to apply a policy
+	// change unless it has received valid vars.
+	varsChan <- []*transpiler.Vars{{}}
+	coord.runLoopIteration(ctx)
+
+	// Send an empty policy which should forward an empty component model to
+	// the runtime manager (which we have set up to report an error).
+	cfg := config.MustNewConfigFrom(nil)
+	configChange := &configChange{cfg: cfg}
+	configChan <- configChange
+	coord.runLoopIteration(ctx)
+
+	// Make sure the failure was reported to the config manager
+	assert.True(t, configChange.failed, "Config change should report failure if the runtime manager returns an error")
+	require.Error(t, configChange.err, "Config change should get an error if runtime manager update fails")
+	assert.Equal(t, "update failed for testing reasons", configChange.err.Error())
+
+	// Make sure the error was reported in Coordinator state.
+	// (Note: this reported failure will not be stable, see
+	// https://github.com/elastic/elastic-agent/issues/2852)
+	state := coord.State()
+	assert.Equal(t, agentclient.Failed, state.State, "Failed policy update should cause failed Coordinator")
+	assert.Equal(t, "update failed for testing reasons", state.Message, "Failed policy update should be reported in Coordinator state message")
 }
 
 func TestCoordinatorReportsOverrideState(t *testing.T) {
@@ -513,10 +556,6 @@ func TestCoordinatorReportsOverrideState(t *testing.T) {
 
 func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 	// Test both initial vars and changing vars after policy is computed
-}
-
-func TestPolicyChangeRegeneratesComponentModel(t *testing.T) {
-
 }
 
 func TestCoordinatorInitiatesUpgrade(t *testing.T) {
