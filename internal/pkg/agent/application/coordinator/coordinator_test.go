@@ -141,48 +141,6 @@ func TestCoordinator_State_Starting(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCoordinator_State_VarsError(t *testing.T) {
-	coordCh := make(chan error)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	coord, cfgMgr, varsMgr := createCoordinator(t)
-	go func() {
-		err := coord.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			// allowed error
-			err = nil
-		}
-		coordCh <- err
-	}()
-
-	// no vars used by the config
-	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
-
-	// no configuration needed
-	cfg, err := config.NewConfigFrom(nil)
-	require.NoError(t, err)
-	cfgMgr.Config(ctx, cfg)
-
-	// set an error on vars manager
-	varsMgr.ReportError(ctx, errors.New("force error"))
-	assert.Eventually(t, func() bool {
-		state := coord.State()
-		return state.State == agentclient.Failed && state.Message == "force error"
-	}, 3*time.Second, 10*time.Millisecond)
-
-	// clear error
-	varsMgr.ReportError(ctx, nil)
-	assert.Eventually(t, func() bool {
-		state := coord.State()
-		return state.State == agentclient.Healthy && state.Message == "Running"
-	}, 3*time.Second, 10*time.Millisecond)
-
-	cancel()
-	err = <-coordCh
-	require.NoError(t, err)
-}
-
 func TestCoordinator_State_ConfigError_NotManaged(t *testing.T) {
 	coordCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -733,6 +691,47 @@ func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
 	case <-ctx.Done():
 	case f.varsCh <- vars:
 	}
+}
+
+// An implementation of the RuntimeManager interface for use in testing.
+type fakeRuntimeManager struct {
+	state          []runtime.ComponentComponentState
+	updateCallback func([]component.Component) error
+}
+
+func (r *fakeRuntimeManager) Run(ctx context.Context) error {
+	<-ctx.Done()
+	return nil
+}
+
+func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
+
+func (r *fakeRuntimeManager) Update(components []component.Component) error {
+	if r.updateCallback != nil {
+		return r.updateCallback(components)
+	}
+	return nil
+}
+
+// State returns the current components model state.
+func (r *fakeRuntimeManager) State() []runtime.ComponentComponentState {
+	return r.state
+}
+
+// PerformAction executes an action on a unit.
+func (r *fakeRuntimeManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+// SubscribeAll provides an interface to watch for changes in all components.
+func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.SubscriptionAll {
+	return nil
+}
+
+// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
+// it performs diagnostics for all current units.
+func (r *fakeRuntimeManager) PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+	return nil
 }
 
 func testBinary(t *testing.T, name string) string {

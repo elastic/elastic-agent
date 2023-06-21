@@ -4,6 +4,12 @@
 
 package coordinator
 
+// This is a companion to coordinator_test.go focusing on the new
+// deterministic / channel-based testing model. Over time more of the old
+// tests should migrate to this model, and when that progresses far enough
+// the two files should be merged, the separation is just to informally
+// keep track of migration progress.
+
 import (
 	"context"
 	"errors"
@@ -12,8 +18,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -383,10 +392,134 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 			"failed to reload upgrade manager configuration"),
 		"wrong error message, expected 'failed to reload upgrade manager configuration...' got %v",
 		configChange.err.Error())
+
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Failed, state.State, "Failed policy change should cause Failed coordinator state")
+		assert.Equal(t, "some kind of error", state.Message, "Coordinator state should report failed policy change")
+	default:
+		assert.Fail(t, "Coordinator's state didn't change")
+	}
 }
 
-func TestCoordinatorPolicyChangesUpdateRuntimeManager(t *testing.T) {
+func mustNewStruct(t *testing.T, cfg map[string]interface{}) *structpb.Struct {
+	result, err := structpb.NewStruct(cfg)
+	require.NoError(t, err, "Struct creation must succeed")
+	return result
+}
 
+func defaultFeatures(t *testing.T) *proto.Features {
+	return &proto.Features{
+		Source: mustNewStruct(t, map[string]interface{}{
+			"agent": map[string]interface{}{
+				"features": map[string]interface{}{
+					"fqdn": map[string]interface{}{
+						"enabled": false,
+					},
+				},
+			},
+		}),
+		Fqdn: &proto.FQDNFeature{},
+	}
+}
+
+func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	configChan := make(chan ConfigChange, 1)
+	varsChan := make(chan []*transpiler.Vars, 1)
+
+	// Create a mocked runtime manager that will report the update call
+	var updated bool                     // Set by runtime manager callback
+	var components []component.Component // Set by runtime manager callback
+	runtimeManager := &fakeRuntimeManager{
+		updateCallback: func(comp []component.Component) error {
+			updated = true
+			components = comp
+			return nil
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			varsManagerUpdate:   varsChan,
+		},
+		upgradeMgr: upgrade.NewUpgrader(logger, &artifact.Config{}, &info.AgentInfo{}),
+		runtimeMgr: runtimeManager,
+	}
+
+	// Send an empty vars update, since Coordinator won't try to apply a policy
+	// change unless it has received valid vars.
+	varsChan <- []*transpiler.Vars{{}}
+	coord.runLoopIteration(ctx)
+
+	// Create a policy with one input and one output
+	cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)
+
+	expectedComponents := []component.Component{
+		{
+			ID: "filestream-default",
+			// We expect a Component error and an empty input spec because this test
+			// doesn't load any spec files. The rest of the policy will still be
+			// constructed/reported.
+			Err:       &component.ErrorReason{Reason: "input not supported"},
+			InputSpec: &component.InputRuntimeSpec{},
+			Features:  defaultFeatures(t),
+			Units: []component.Unit{
+				{
+					ID:       "filestream-default-test-input",
+					Type:     client.UnitTypeInput,
+					LogLevel: client.UnitLogLevelInfo,
+					Config: &proto.UnitExpectedConfig{
+						Id:   "test-input",
+						Type: "filestream",
+						Source: mustNewStruct(t, map[string]interface{}{
+							"id":   "test-input",
+							"type": "filestream",
+						}),
+					},
+				},
+				{
+					ID:       "filestream-default",
+					Type:     client.UnitTypeOutput,
+					LogLevel: client.UnitLogLevelInfo,
+					Config: &proto.UnitExpectedConfig{
+						Type: "elasticsearch",
+						Source: mustNewStruct(t, map[string]interface{}{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+		},
+	}
+
+	// Send the policy change and make sure it was acknowledged.
+	configChange := &configChange{cfg: cfg}
+	configChan <- configChange
+	coord.runLoopIteration(ctx)
+	assert.True(t, configChange.acked, "Coordinator should ACK a successful policy change")
+
+	// Make sure the runtime manager received the expected component update.
+	assert.True(t, updated, "Runtime manager should be updated after a policy change")
+	assert.Equal(t, expectedComponents, components,
+		"Runtime manager update should match the expected policy components")
 }
 
 func TestCoordinatorReportsRuntimeManagerPolicyFailure(t *testing.T) {
