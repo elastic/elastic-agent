@@ -352,15 +352,15 @@ func new[T any](
 // Its logic is implemented in runLoopIterate.
 func (b *Broadcaster[T]) runLoop() {
 	defer close(b.doneChan)
-	for {
-		b.runLoopIterate()
+	for b.runLoopIterate() {
 	}
 }
 
 // runLoopIterate is the interior of the run loop, which is split into its own
 // helper function so we can deterministically test Broadcaster's behavior in
 // the unit tests.
-func (b *Broadcaster[T]) runLoopIterate() {
+// Returns true if the loop should keep running, false to shut down.
+func (b *Broadcaster[T]) runLoopIterate() bool {
 	b.drainInput()
 	chosen, recvValue, recvOK := reflect.Select(b.selectCases)
 	switch chosen {
@@ -405,6 +405,9 @@ func (b *Broadcaster[T]) runLoopIterate() {
 			b.advanceSubscriber(subscriberIndex)
 		}
 	}
+	// Keep iterating if shutdown hasn't been initiated and/or we still have
+	// active subscribers.
+	return !b.shuttingDown || len(b.subscribers) > 0
 }
 
 // drainInput reads as many values as possible from the input channel and
@@ -413,16 +416,23 @@ func (b *Broadcaster[T]) runLoopIterate() {
 // values get priority over any other signal.
 func (b *Broadcaster[T]) drainInput() {
 	receivedInput := false
+	defer func() {
+		// If we received any values, refresh the subscriber state.
+		if receivedInput {
+			b.updateListeners()
+		}
+	}()
 	for {
 		select {
-		case value := <-b.InputChan:
+		case value, ok := <-b.InputChan:
+			// If the channel is closed, return immediately so runLoopIterate
+			// can handle it. Otherwise, handle any input.
+			if !ok {
+				return
+			}
 			b.handleNewInput(value)
 			receivedInput = true
 		default:
-			if receivedInput {
-				// If we received any values, refresh the subscriber state.
-				b.updateListeners()
-			}
 			return
 		}
 	}
@@ -494,8 +504,13 @@ func (b *Broadcaster[T]) advanceSubscriber(subscriberIndex int) {
 	s.index++
 	selectCaseIndex := indexListenerCase(subscriberIndex)
 	if s.index > b.index {
-		// No more values to read, block the channel for now
-		b.selectCases[selectCaseIndex].Chan = reflect.ValueOf(nil)
+		// No more values to read. If we're shutting down, remove
+		// this subscriber, otherwise just block the channel for now.
+		if b.shuttingDown {
+			b.removeSubscriber(subscriberIndex)
+		} else {
+			b.selectCases[selectCaseIndex].Chan = reflect.ValueOf(nil)
+		}
 	} else {
 		// Load the send channel with the buffer value at s.index
 		b.selectCases[selectCaseIndex].Send = reflect.ValueOf(b.buffer[s.index%len(b.buffer)])

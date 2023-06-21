@@ -249,6 +249,114 @@ func TestCancelledContextClosesSubscriberChannel(t *testing.T) {
 	}
 }
 
+func TestGetReturnsLatestValue(t *testing.T) {
+	// Check that Get always returns the latest value, even after Broadcaster
+	// has shut down.
+	const changeCount = 1000
+
+	// Set an input buffer of 0 since we don't want any undelivered changes
+	// when we call Get.
+	curValue := 0
+	b := New(curValue, 32, 0)
+	for i := 0; i < changeCount; i++ {
+		require.Equal(t, curValue, b.Get(), "Get should return the most recently set value")
+		curValue++
+		b.InputChan <- curValue
+	}
+
+	// Close the broadcaster and wait for its run loop to terminate
+	b.Close()
+	<-b.Done()
+
+	require.Equal(t, curValue, b.Get(), "Closed Broadcaster should still return most recent value")
+}
+
+func TestSoftShutdownWaitsForSubscribers(t *testing.T) {
+	// Buffer some values, close the input channel to initiate shutdown,
+	// then make sure Broadcaster waits for its subscribers to catch up
+	// before it stops.
+	const initialValue = 4014
+	const valueCount = 32
+
+	b := New(initialValue, valueCount, 0)
+	bufferedSub := b.Subscribe(context.Background(), valueCount)
+	unbufferedSub := b.Subscribe(context.Background(), 0)
+
+	for i := 1; i <= valueCount; i++ {
+		b.InputChan <- initialValue + i
+	}
+	close(b.InputChan)
+
+	// Wait briefly and make sure there was no shutdown
+	select {
+	case <-b.Done():
+		require.Fail(t, "Broadcaster shouldn't shut down with 2 active subscribers")
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	// We shouldn't block for long, but if we do let's time out gracefully after 1s
+	timeoutChan := time.After(5 * time.Second)
+	for i := 0; i <= valueCount; i++ {
+		select {
+		case value := <-bufferedSub:
+			assert.Equal(t, initialValue+i, value, "Expected value %d to be %d, got %d", i, initialValue+i, value)
+		case <-timeoutChan:
+			require.FailNow(t, "Timed out", "Expected %d values from buffered subscriber, got %d", valueCount+1, i)
+		}
+	}
+
+	// Wait briefly and make sure there was still no shutdown
+	select {
+	case <-b.Done():
+		require.Fail(t, "Broadcaster shouldn't shut down with 1 active subscriber")
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	// Read the final value on the unbuffered subscriber and verify that
+	// Broadcaster finally shuts down
+	select {
+	case value := <-unbufferedSub:
+		assert.Equal(t, initialValue+valueCount, value, "Unbuffered subscriber should only get final value of %d", initialValue+valueCount)
+	case <-timeoutChan:
+		require.FailNow(t, "Unbuffered subscriber received no values")
+	}
+
+	select {
+	case <-b.Done():
+	case <-timeoutChan:
+		require.FailNow(t, "Subscribers completed but Broadcaster never shut down")
+	}
+}
+
+func TestSubscribeAfterShutdown(t *testing.T) {
+	// Create a Broadcaster, set one value, then close it and wait for shutdown.
+	const finalValue = 4014
+
+	b := New(0, 32, 0)
+	b.InputChan <- finalValue
+	b.Close()
+	<-b.Done()
+
+	// Add a new subscriber and check that it receives the final value followed
+	// by a closed channel
+	sub := b.Subscribe(context.Background(), 5)
+	select {
+	case value := <-sub:
+		assert.Equal(t, finalValue, value, "Post-shutdown subscriber should receive the final value")
+	case <-time.After(10 * time.Millisecond):
+		assert.Fail(t, "Subscribers should always receive at least one value")
+	}
+
+	select {
+	case value, ok := <-sub:
+		if ok {
+			assert.Fail(t, "Channel not closed", "Expected closed channel, got value %d", value)
+		}
+	case <-time.After(10 * time.Millisecond):
+		assert.Fail(t, "Subscriber channel should be closed after reading final value")
+	}
+}
+
 // withOneIteration runs a single iteration of Broadcaster's run loop in a
 // background goroutine while running the given callback in the foreground.
 // It then waits for the run loop iteration to finish, so additional
