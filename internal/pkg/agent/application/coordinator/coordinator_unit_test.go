@@ -650,7 +650,53 @@ inputs:
 }
 
 func TestCoordinatorReportsOverrideState(t *testing.T) {
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
+	// Channels have buffer length 1 so we don't have to run on multiple
+	// goroutines.
+	stateChan := make(chan State, 1)
+	overrideStateChan := make(chan *coordinatorOverrideState, 1)
+	coord := &Coordinator{
+		state: State{
+			State:   agentclient.Degraded,
+			Message: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{
+			InputChan: stateChan,
+		},
+		overrideStateChan: overrideStateChan,
+	}
+	// Send an error via the vars manager channel, and let Coordinator update
+	overrideStateChan <- &coordinatorOverrideState{
+		state:   agentclient.Upgrading,
+		message: "Upgrading",
+	}
+	coord.runLoopIteration(ctx)
+
+	// Make sure the new reported state reflects the override state
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Upgrading, state.State, "expected Upgrading State")
+		assert.Equal(t, "Upgrading", state.Message, "state message should match override state")
+	default:
+		assert.Fail(t, "Coordinator's state didn't change")
+	}
+
+	// Clear the override state and let Coordinator update
+	overrideStateChan <- nil
+	coord.runLoopIteration(ctx)
+
+	// Make sure the state has returned to its original value
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Degraded, state.State, "state should return to its original value")
+		assert.Equal(t, "Running", state.Message, "state message should return to its original value")
+	default:
+		assert.Fail(t, "Coordinator's state didn't change")
+	}
 }
 
 func TestCoordinatorInitiatesUpgrade(t *testing.T) {
