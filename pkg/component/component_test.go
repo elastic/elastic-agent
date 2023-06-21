@@ -8,9 +8,18 @@ package component
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -1913,6 +1922,52 @@ func TestPreventionsAreValid(t *testing.T) {
 	}
 }
 
+func TestSpecDurationsAreValid(t *testing.T) {
+	// Test that durations specified in all spec files explicitly specify valid units.
+
+	specFiles, err := specFilesForDirectory(filepath.Join("..", "..", "specs"))
+	require.NoError(t, err)
+
+	// Recursively reflect on component.Spec struct to find time.Duration fields
+	// and gather their paths.
+	for specFilePath, spec := range specFiles {
+		specFilePath, err = filepath.Abs(specFilePath)
+		require.NoError(t, err)
+
+		// Gather all duration fields' YAML paths so we an check if the
+		// value at each path is valid.
+		durationFieldPaths := gatherDurationFieldPaths(spec, "")
+
+		// Parse each spec file's YAML into a ucfg.Config object for
+		// easy access to field values via their paths.
+		data, err := os.ReadFile(specFilePath)
+		require.NoError(t, err)
+
+		var v map[string]interface{}
+		err = yaml.Unmarshal(data, &v)
+		require.NoError(t, err)
+
+		cfg, err := ucfg.NewFrom(v, ucfg.PathSep("."))
+		require.NoError(t, err)
+
+		for _, durationFieldPath := range durationFieldPaths {
+			exists, err := cfg.Has(durationFieldPath, -1, ucfg.PathSep("."))
+			if !exists {
+				continue
+			}
+			require.NoError(t, err)
+
+			value, err := cfg.String(durationFieldPath, -1, ucfg.PathSep("."))
+			require.NoError(t, err)
+
+			// Ensure that value can be parsed as a time.Duration. This parsing will
+			// fail if there is no unit suffix explicitly specified.
+			_, err = time.ParseDuration(value)
+			assert.NoErrorf(t, err, "in spec file [%s], field [%s] has invalid value [%s]: %s", specFilePath, durationFieldPath, value, err)
+		}
+	}
+}
+
 func TestInjectingInputPolicyID(t *testing.T) {
 	const testRevision = 10
 	fleetPolicy := map[string]interface{}{
@@ -2035,4 +2090,57 @@ type testHeadersProvider struct {
 
 func (h *testHeadersProvider) Headers() map[string]string {
 	return h.headers
+}
+
+func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
+	var gatheredPaths []string
+
+	rt := reflect.TypeOf(s)
+	rv := reflect.ValueOf(s)
+
+	switch rt.Kind() {
+	case reflect.Int64:
+		// If this is a time.Duration value, we gather its path.
+		if rv.Type().PkgPath() == "time" && rv.Type().Name() == "Duration" {
+			gatheredPaths = append(gatheredPaths, pathSoFar)
+			return gatheredPaths
+		}
+
+	case reflect.Slice:
+		// Recurse on slice elements
+		for i := 0; i < rv.Len(); i++ {
+			morePaths := gatherDurationFieldPaths(rv.Index(i).Interface(), pathSoFar+"."+strconv.Itoa(i))
+			gatheredPaths = append(gatheredPaths, morePaths...)
+		}
+		return gatheredPaths
+
+	case reflect.Struct:
+		// Recurse on the struct's fields
+		if pathSoFar != "" {
+			pathSoFar += "."
+		}
+		for i := 0; i < rv.NumField(); i++ {
+			tags := rt.Field(i).Tag
+			yamlTag := tags.Get("yaml")
+			yamlFieldName, _, _ := strings.Cut(yamlTag, ",")
+			yamlFieldPath := pathSoFar + yamlFieldName
+
+			morePaths := gatherDurationFieldPaths(rv.Field(i).Interface(), yamlFieldPath)
+			gatheredPaths = append(gatheredPaths, morePaths...)
+		}
+		return gatheredPaths
+
+	case reflect.Ptr:
+		if rv.IsNil() {
+			// Nil pointer, nothing more to do
+			return gatheredPaths
+		}
+
+		// Recurse on the dereferenced pointer value.
+		morePaths := gatherDurationFieldPaths(rv.Elem().Interface(), pathSoFar)
+		gatheredPaths = append(gatheredPaths, morePaths...)
+		return gatheredPaths
+	}
+
+	return gatheredPaths
 }

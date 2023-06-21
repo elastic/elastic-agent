@@ -12,3 +12,4 @@ steps:
       - "build/TEST-**"
     agents:
       provider: "gcp"
+

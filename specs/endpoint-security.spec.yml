@@ -26,7 +26,7 @@ inputs:
             - "verify"
             - "--log"
             - "stderr"
-          timeout: 30
+          timeout: 30s
         install:
           args:
             - "install"
@@ -35,13 +35,13 @@ inputs:
             - "--upgrade"
             - "--resources"
             - "endpoint-security-resources.zip"
-          timeout: 600
+          timeout: 600s
         uninstall:
           args:
             - "uninstall"
             - "--log"
             - "stderr"
-          timeout: 600
+          timeout: 600s
   - name: endpoint
     description: "Endpoint Security"
     platforms:
