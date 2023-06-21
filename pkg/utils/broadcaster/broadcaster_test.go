@@ -109,7 +109,8 @@ func TestUnbufferedSubscriberReceivesMostRecentValue(t *testing.T) {
 	// Calling new instead of New so we can handle the run loop ourselves --
 	// sending new values vs receiving from a subscriber is an inherent race
 	// when the input channel is buffered (see the comments for New), so to
-	// test
+	// test Broadcaster's logic we need control of the order the messages
+	// arrive in the run loop.
 	b := new(initialValue, 16, valueCount)
 
 	// Send a subscription request while running the Broadcaster loop so it
