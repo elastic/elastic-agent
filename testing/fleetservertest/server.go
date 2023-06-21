@@ -25,11 +25,6 @@ import (
 // API.APIKey for all others.
 // TODO(Anderson): fix me!
 type Handlers struct {
-	// api API
-
-	// TODO: better to get rid of this type. Merge it with Server and either have
-	// config functions to add the implementation on creation or setters.
-
 	// AgentID is the ID of the last enrolled agent.
 	AgentID string
 
