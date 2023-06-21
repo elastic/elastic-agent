@@ -60,7 +60,7 @@ func NewPathUploadComplete(agentID string) string {
 	return strings.Replace(PathUploadComplete, "{id}", agentID, 1)
 }
 
-func NewAckHandler() func(
+func NewHandlerAck() func(
 	ctx context.Context,
 	agentID string,
 	ackRequest AckRequest) (*AckResponse, *HTTPError) {
@@ -76,7 +76,7 @@ func NewAckHandler() func(
 		return &resp, nil
 	}
 }
-func NewEnrollHandler(policyID string, apiKey APIKey) func(
+func NewHandlerEnroll(policyID string, apiKey APIKey) func(
 	ctx context.Context,
 	userAgent string,
 	enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
@@ -123,9 +123,9 @@ func NewEnrollHandler(policyID string, apiKey APIKey) func(
 	}
 }
 
-// NewCheckinHandler returns a checkin handler that always returns a policy with
+// NewHandlerCheckin returns a checkin handler that always returns a policy with
 // System integrations and, if withEndpoint is true, Endpoint Security.
-func NewCheckinHandler(ackToken string, withEndpoint bool) func(
+func NewHandlerCheckin(ackToken string, withEndpoint bool) func(
 	ctx context.Context,
 	agentID string,
 	userAgent string,
@@ -161,7 +161,7 @@ func NewCheckinHandler(ackToken string, withEndpoint bool) func(
 	}
 }
 
-func NewStatusHandlerHealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
+func NewHandlerStatusHealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
 	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
 		return &StatusResponse{
 			Name:   "fleet-server",
@@ -171,7 +171,7 @@ func NewStatusHandlerHealth() func(ctx context.Context) (*StatusResponse, *HTTPE
 	}
 }
 
-func NewStatusHandlerUnhealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
+func NewHandlerStatusUnhealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
 	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
 		return &StatusResponse{
 			Name:   "fleet-server",

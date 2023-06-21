@@ -114,16 +114,16 @@ func NewServerWithFakeComponent(api API, policyID, ackToken string, data Data) *
 	//  }
 
 	if api.StatusFn == nil {
-		api.StatusFn = NewStatusHandlerHealth()
+		api.StatusFn = NewHandlerStatusHealth()
 	}
 	if api.CheckinFn == nil {
-		api.CheckinFn = NewCheckinHandler(ackToken, false)
+		api.CheckinFn = NewHandlerCheckin(ackToken, false)
 	}
 	if api.EnrollFn == nil {
-		api.EnrollFn = NewEnrollHandler(policyID, data.APIKey)
+		api.EnrollFn = NewHandlerEnroll(policyID, data.APIKey)
 	}
 	if api.AckFn == nil {
-		api.AckFn = NewAckHandler()
+		api.AckFn = NewHandlerAck()
 	}
 
 	mux := NewRouter(Handlers{api: api})
@@ -135,7 +135,7 @@ func NewServerWithFakeComponent(api API, policyID, ackToken string, data Data) *
 
 // DataFromCtx returns the Data in the context or an empty Data if none is
 // found.
-// TODO: probably better to add it to the handlers' signature 
+// TODO: probably better to add it to the handlers' signature
 func DataFromCtx(ctx context.Context) Data {
 	return ctx.Value(ctxAuthKey{}).(Data)
 }

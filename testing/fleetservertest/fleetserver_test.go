@@ -18,7 +18,7 @@ func ExampleNewServer_status() {
 	apiKey := "aAPIKey"
 	ts := NewServer(API{
 		APIKey:   apiKey,
-		StatusFn: NewStatusHandlerHealth(),
+		StatusFn: NewHandlerStatusHealth(),
 	})
 
 	r, err := http.NewRequest(http.MethodGet, ts.URL+PathStatus, nil)
@@ -49,7 +49,7 @@ func ExampleNewServer_checkin() {
 	agentID := "agentID"
 
 	ts := NewServer(API{
-		CheckinFn: NewCheckinHandler(agentID, "", false),
+		CheckinFn: NewHandlerCheckin(agentID, "", false),
 	})
 
 	cmd := fleetapi.NewCheckinCmd(
