@@ -300,11 +300,12 @@ func TestExecuteServiceCommand(t *testing.T) {
 		cmdCtx := context.Background()
 		log, observer := logger.NewTesting(t.Name())
 
+		const succeedCmdAfter = 2 * time.Second
 		now := time.Now()
 		exeConfig := progConfig{
 			ErrMessage:   "foo bar",
 			ExitCode:     111,
-			SucceedAfter: now.Add(2 * time.Second).UnixMilli(),
+			SucceedAfter: now.Add(succeedCmdAfter).UnixMilli(),
 		}
 		exePath, err := prepareTestProg(cmdCtx, log, t.TempDir(), exeConfig)
 		require.NoError(t, err)
@@ -328,7 +329,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Give the command time to succeed.
-		time.Sleep(2 * time.Second)
+		time.Sleep(succeedCmdAfter)
 
 		require.NoError(t, retryCtx.Err())
 		checkRetryLogs(t, observer, exeConfig)
