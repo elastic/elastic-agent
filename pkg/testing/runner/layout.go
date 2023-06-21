@@ -35,7 +35,11 @@ func (lb *LayoutBatch) toOGC() OGCLayout {
 		LayoutIntegrationTag,
 		lb.LayoutOS.OS.Type,
 		lb.LayoutOS.OS.Arch,
-		strings.ToLower(fmt.Sprintf("%s-%s", lb.LayoutOS.OS.Distro, strings.Replace(lb.LayoutOS.OS.Version, ".", "-", -1))),
+	}
+	if lb.LayoutOS.OS.Type == define.Linux {
+		tags = append(tags, strings.ToLower(fmt.Sprintf("%s-%s", lb.LayoutOS.OS.Distro, strings.Replace(lb.LayoutOS.OS.Version, ".", "-", -1))))
+	} else {
+		tags = append(tags, strings.ToLower(fmt.Sprintf("%s-%s", lb.LayoutOS.OS.Type, strings.Replace(lb.LayoutOS.OS.Version, ".", "-", -1))))
 	}
 	if lb.Batch.Isolate {
 		tags = append(tags, "isolate")

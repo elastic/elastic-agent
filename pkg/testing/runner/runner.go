@@ -600,7 +600,6 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 	}{
 		Layouts: layouts,
 	})
-	fmt.Printf("layout: %s\n", layoutData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal layouts YAML: %w", err)
 	}

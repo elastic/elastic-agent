@@ -67,7 +67,7 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, logger Logger, a
 	}
 
 	// prepare golang
-	logger.Logf("Install golang %s (%s)", goVersion, arch)
+	logger.Logf("Installing golang %s (%s)", goVersion, arch)
 	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.linux-%s.tar.gz", goVersion, arch)
 	filename := path.Base(downloadURL)
 	stdOut, errOut, err := sshRunCommand(ctx, c, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)
