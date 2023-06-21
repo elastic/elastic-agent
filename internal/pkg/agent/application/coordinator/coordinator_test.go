@@ -545,8 +545,9 @@ func (f *fakeReExecManager) ReExec(callback reexec.ShutdownCallbackFn, _ ...stri
 }
 
 type fakeUpgradeManager struct {
-	upgradeable    bool
-	reloadCallback func(*config.Config) error
+	upgradeable   bool
+	upgradeErr    error // An error to return when Upgrade is called
+	upgradeCalled bool  // Set when Upgrade is called
 }
 
 func (f *fakeUpgradeManager) Upgradeable() bool {
@@ -554,13 +555,14 @@ func (f *fakeUpgradeManager) Upgradeable() bool {
 }
 
 func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
-	if f.reloadCallback != nil {
-		return f.reloadCallback(cfg)
-	}
 	return nil
 }
 
 func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	f.upgradeCalled = true
+	if f.upgradeErr != nil {
+		return nil, f.upgradeErr
+	}
 	return func() error { return nil }, nil
 }
 

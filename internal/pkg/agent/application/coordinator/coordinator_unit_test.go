@@ -700,5 +700,47 @@ func TestCoordinatorReportsOverrideState(t *testing.T) {
 }
 
 func TestCoordinatorInitiatesUpgrade(t *testing.T) {
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
+	// overrideStateChan has buffer 2 so we can run on a single goroutine,
+	// since a successful upgrade sets the override state twice.
+	overrideStateChan := make(chan *coordinatorOverrideState, 2)
+
+	// Create a manager that will allow upgrade attempts but return a failure
+	// from Upgrade itself (success requires testing ReExec and we aren't
+	// quite ready to do that yet).
+	upgradeMgr := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  errors.New("failed upgrade"),
+	}
+
+	coord := &Coordinator{
+		stateBroadcaster:  broadcaster.New(State{}, 0, 0),
+		overrideStateChan: overrideStateChan,
+		upgradeMgr:        upgradeMgr,
+	}
+
+	// Call upgrade and make sure the upgrade manager receives an Upgrade call
+	err := coord.Upgrade(ctx, "1.2.3", "", nil, false)
+	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
+	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
+
+	// Make sure the expected override states were set
+	select {
+	case overrideState := <-overrideStateChan:
+		require.NotNil(t, overrideState, "Upgrade should cause nonempty override state")
+		assert.Equal(t, agentclient.Upgrading, overrideState.state, "Expected Upgrade to set override state to Upgrading")
+		assert.Equal(t, "Upgrading to version 1.2.3", overrideState.message, "Expected Upgrade to set upgrading override message")
+	default:
+		assert.Fail(t, "Upgrade should have set an override state")
+	}
+	select {
+	case overrideState := <-overrideStateChan:
+		assert.Nil(t, overrideState, "Failed upgrade should clear the override state")
+	default:
+		assert.Fail(t, "Failed upgrade should clear the override state")
+	}
 }
