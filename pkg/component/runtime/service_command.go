@@ -163,7 +163,7 @@ func executeServiceCommandWithRetries(
 	go func() {
 		retryAttempt := 0
 
-		// nolint: errcheck // No point checking the error inside the goroutine.
+		//nolint: errcheck // No point checking the error inside the goroutine.
 		backoff.RetryNotify(
 			func() error {
 				return executeCommand(cmdCtx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
