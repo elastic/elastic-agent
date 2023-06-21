@@ -31,9 +31,6 @@ const (
 	logFileFormatWin = "%s\\logs\\%s"
 
 	// args: pipeline name, application name
-	mbEndpointFileFormatWin = `npipe:///%s`
-
-	// args: pipeline name, application name
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
 	// agentMbEndpointHTTP is used with cloud and exposes metrics on http endpoint
 	agentMbEndpointHTTP = "http://%s:%d"
