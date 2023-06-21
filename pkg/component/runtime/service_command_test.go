@@ -250,8 +250,9 @@ func TestExecuteServiceCommand(t *testing.T) {
 			cmdCtx, log, exePath, &component.ServiceOperationsCommandSpec{},
 			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
-		require.EqualError(t, err, retryCtx.Err().Error())
+		require.NoError(t, err)
 
+		<-retryCtx.Done()
 		checkRetryLogs(t, observer, exeConfig)
 	})
 
@@ -288,8 +289,9 @@ func TestExecuteServiceCommand(t *testing.T) {
 			cmdCtx, log, exePath, spec,
 			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
-		require.EqualError(t, err, retryCtx.Err().Error())
+		require.NoError(t, err)
 
+		<-retryCtx.Done()
 		checkRetryLogs(t, observer, exeConfig)
 	})
 
@@ -325,6 +327,10 @@ func TestExecuteServiceCommand(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		// Give the command time to succeed.
+		time.Sleep(2 * time.Second)
+
+		require.NoError(t, retryCtx.Err())
 		checkRetryLogs(t, observer, exeConfig)
 	})
 }
@@ -335,7 +341,6 @@ func checkRetryLogs(t *testing.T, observer *observer.ObservedLogs, exeConfig pro
 	logs := observer.TakeAll()
 	require.GreaterOrEqual(t, len(logs), 2)
 	for i, l := range logs {
-		t.Logf("[%s] %s", l.Level, l.Message)
 		if i%2 == 0 {
 			require.Equal(t, zapcore.ErrorLevel, l.Level)
 			require.Equal(t, exeConfig.ErrMessage, l.Message)

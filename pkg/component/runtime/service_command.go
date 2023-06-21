@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -22,6 +23,34 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
+
+type cancelFns struct {
+	fns map[string]context.CancelFunc
+	mu  sync.RWMutex
+}
+
+func (c *cancelFns) Add(name string, canceFunc context.CancelFunc) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.fns == nil {
+		c.fns = map[string]context.CancelFunc{}
+	}
+
+	c.fns[name] = canceFunc
+}
+
+func (c *cancelFns) Cancel(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if cancelFunc, exists := c.fns[name]; exists {
+		cancelFunc()
+		delete(c.fns, name)
+	}
+}
+
+var retryCancelFns = cancelFns{}
 
 func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, args []string, env []string, timeout time.Duration) error {
 	log = log.With("context", "command output")
@@ -93,9 +122,16 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 }
 
 func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
+	// If there is a previous incarnation of the command executing (due to infinite
+	// retries), make sure to cancel it first before starting a new one here.
+	retryCancelFns.Cancel(binaryPath)
+
+	retryCtx, retryCancel := context.WithCancel(context.Background())
+	retryCancelFns.Add(binaryPath, retryCancel)
+
 	return executeServiceCommandWithRetries(
 		ctx, log, binaryPath, spec,
-		context.Background(), 20*time.Second, 15*time.Minute,
+		retryCtx, 20*time.Second, 15*time.Minute,
 	)
 }
 
@@ -121,22 +157,32 @@ func executeServiceCommandWithRetries(
 
 	backoffCtx := backoff.WithContext(expBackoff, retryCtx)
 
-	retryAttempt := 0
-	return backoff.RetryNotify(
-		func() error {
-			return executeCommand(cmdCtx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
-		},
-		backoffCtx,
-		func(err error, retryAfter time.Duration) {
-			retryAttempt++
-			log.Warnf(
-				"service command execution failed with error [%s], retrying (will be retry [%d]) after [%s]",
-				err.Error(),
-				retryAttempt,
-				retryAfter,
-			)
-		},
-	)
+	// Since we will be executing the command with infinite retries, we don't
+	// want to block.  So we execute the command with retries in its own
+	// goroutine.
+	go func() {
+		retryAttempt := 0
+		backoff.RetryNotify(
+			func() error {
+				return executeCommand(cmdCtx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+			},
+			backoffCtx,
+			func(err error, retryAfter time.Duration) {
+				retryAttempt++
+				log.Warnf(
+					"service command execution failed with error [%s], retrying (will be retry [%d]) after [%s]",
+					err.Error(),
+					retryAttempt,
+					retryAfter,
+				)
+			},
+		)
+
+		// Command executed successfully.
+		retryCancelFns.Cancel(binaryPath)
+	}()
+
+	return nil
 }
 
 func envSpecToEnv(envSpecs []component.CommandEnvSpec) []string {
