@@ -550,12 +550,107 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	assert.Equal(t, "update failed for testing reasons", state.Message, "Failed policy update should be reported in Coordinator state message")
 }
 
-func TestCoordinatorReportsOverrideState(t *testing.T) {
+func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
+	// Make sure:
+	// - An input unit that depends on an undefined variable is not created
+	// - A vars update defining the variable causes the input to be created
+	// - A second vars update changing the variable updates the input config
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
 
+	configChan := make(chan ConfigChange, 1)
+	varsChan := make(chan []*transpiler.Vars, 1)
+
+	// Create a mocked runtime manager that will report the update call
+	var updated bool                     // Set by runtime manager callback
+	var components []component.Component // Set by runtime manager callback
+	runtimeManager := &fakeRuntimeManager{
+		updateCallback: func(comp []component.Component) error {
+			updated = true
+			components = comp
+			return nil
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			varsManagerUpdate:   varsChan,
+		},
+		runtimeMgr: runtimeManager,
+	}
+
+	// Send an empty vars update, since Coordinator won't try to apply a policy
+	// change unless it has received valid vars.
+
+	vars, err := transpiler.NewVars("", map[string]interface{}{}, nil)
+	require.NoError(t, err, "Vars creation must succeed")
+
+	varsChan <- []*transpiler.Vars{vars}
+	coord.runLoopIteration(ctx)
+
+	// Create a policy with one input and one output
+	cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: ${TEST_VAR}
+    type: filestream
+    use_output: default
+`)
+
+	// Send the policy change and make sure it was acknowledged, but produced
+	// empty components.
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+	assert.True(t, updated, "Runtime manager should receive a component model update")
+	assert.Empty(t, components, "Input with missing variable shouldn't create a component")
+
+	// Send a vars update adding the undefined variable
+	updated = false
+	components = nil
+	vars, err = transpiler.NewVars("", map[string]interface{}{
+		"TEST_VAR": "input-id",
+	}, nil)
+	require.NoError(t, err, "Vars creation must succeed")
+	varsChan <- []*transpiler.Vars{vars}
+	coord.runLoopIteration(ctx)
+
+	// Check that there was a component model update and that it has a component
+	// with the right id.
+	assert.True(t, updated, "Runtime manager should receive a component model update")
+	assert.Equal(t, 1, len(components), "Input with valid variable should create a component")
+	assert.Equal(t, 2, len(components[0].Units), "Component config should have 2 units (one input and one output)")
+	assert.Equal(t, "input-id", components[0].Units[0].Config.Id)
+
+	// Send a new vars update changing the variable
+	updated = false
+	components = nil
+	vars, err = transpiler.NewVars("", map[string]interface{}{
+		"TEST_VAR": "changed-input-id",
+	}, nil)
+	require.NoError(t, err, "Vars creation must succeed")
+	varsChan <- []*transpiler.Vars{vars}
+	coord.runLoopIteration(ctx)
+
+	// Check that the new value appears in the component model
+	assert.True(t, updated, "Runtime manager should receive a component model update")
+	assert.Equal(t, 1, len(components), "Input with valid variable should create a component")
+	assert.Equal(t, 2, len(components[0].Units), "Component config should have 2 units (one input and one output)")
+	assert.Equal(t, "changed-input-id", components[0].Units[0].Config.Id)
 }
 
-func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
-	// Test both initial vars and changing vars after policy is computed
+func TestCoordinatorReportsOverrideState(t *testing.T) {
+
 }
 
 func TestCoordinatorInitiatesUpgrade(t *testing.T) {
