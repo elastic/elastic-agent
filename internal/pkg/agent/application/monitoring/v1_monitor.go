@@ -6,7 +6,6 @@ package monitoring
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -949,40 +949,7 @@ func loggingPath(id, operatingSystem string) string {
 }
 
 func endpointPath(id, operatingSystem string) (endpointPath string) {
-	return endpointPathWithDir(id, operatingSystem, paths.TempDir())
-}
-
-// endpointPathWithDir builds a path for a unix socket or Windows named pipe.
-// There are several restrictions on these paths.
-// 1. unix socket paths must be less than 104 characters
-// 2. Windows named pipes must be less than 256 characters.
-// 3. Windows named pipes are just a filename not a path.
-// The ids can often be over these limits.  So we follow this
-// algorithm to get unique paths that are less than 104
-// characters.
-// 1. take sha256 of id
-// 2. base64 encode the first 24 bytes of hash (full 32 can be too long)
-// 3. use URLencoding for base64, this is filename safe and is shorter than hex
-// 4. if this is still to long for unix, use the system temp directory
-func endpointPathWithDir(id, operatingSystem, tempDir string) (endpointPath string) {
-	hashID := sha256.Sum256([]byte(id))
-	filename := base64.URLEncoding.EncodeToString(hashID[:24]) + ".sock"
-	u := &url.URL{}
-	u.Path = "/"
-	if operatingSystem == windowsOS {
-		u.Scheme = "npipe"
-		tempDir = "/"
-	} else {
-		u.Scheme = "unix"
-	}
-
-	candidateURL := u.JoinPath(tempDir, filename)
-	if len(candidateURL.String()) < 104 {
-		return candidateURL.String()
-	}
-
-	candidateURL = u.JoinPath("/tmp/elastic-agent", filename)
-	return candidateURL.String()
+	return utils.SocketURLWithFallback(id, operatingSystem, paths.TempDir())
 }
 
 func prefixedEndpoint(endpoint string) string {

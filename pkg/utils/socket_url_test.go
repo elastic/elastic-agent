@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package monitoring
+package utils
 
 import (
 	"testing"
@@ -17,7 +17,7 @@ var (
 	SpaceDir   = "/one/dir with space/three/"
 )
 
-func TestEndpointPath(t *testing.T) {
+func TestSocketURLWithFallback(t *testing.T) {
 	testCases := []struct {
 		Name       string
 		OS         string
@@ -68,9 +68,9 @@ func TestEndpointPath(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			endpointPath := endpointPathWithDir(tc.ID, tc.OS, tc.Dir)
+			endpointPath := SocketURLWithFallback(tc.ID, tc.OS, tc.Dir)
 			require.Equal(t, tc.ExpectedID, endpointPath)
-			require.Less(t, len(endpointPath), 104)
+			require.Less(t, len(endpointPath), UnixSocketMaxLength)
 		})
 	}
 }
