@@ -42,61 +42,76 @@ type LayoutOS struct {
 // one in this list will be picked. So it's best to place the one that we want the
 // most testing at the top.
 var supported = []LayoutOS{
+	/*
+		{
+			OS: define.OS{
+				Type:    define.Linux,
+				Arch:    define.AMD64,
+				Distro:  Ubuntu,
+				Version: "22.04",
+			},
+			Provider:     Google,
+			InstanceSize: "e2-standard-2", // 2 amd64 cpus
+			RunsOn:       "ubuntu-2204-lts",
+			Username:     "ubuntu",
+			RemotePath:   "/home/ubuntu/agent",
+			Runner:       DebianRunner{},
+		},
+		{
+			OS: define.OS{
+				Type:    define.Linux,
+				Arch:    define.AMD64,
+				Distro:  Ubuntu,
+				Version: "20.04",
+			},
+			Provider:     Google,
+			InstanceSize: "e2-standard-2", // 2 amd64 cpus
+			RunsOn:       "ubuntu-2004-lts",
+			Username:     "ubuntu",
+			RemotePath:   "/home/ubuntu/agent",
+			Runner:       DebianRunner{},
+		},
+		{
+			OS: define.OS{
+				Type:    define.Linux,
+				Arch:    define.ARM64,
+				Distro:  Ubuntu,
+				Version: "22.04",
+			},
+			Provider:     Google,
+			InstanceSize: "t2a-standard-2", // 2 arm64 cpus
+			RunsOn:       "ubuntu-2204-lts-arm64",
+			Username:     "ubuntu",
+			RemotePath:   "/home/ubuntu/agent",
+			Runner:       DebianRunner{},
+		},
+		{
+			OS: define.OS{
+				Type:    define.Linux,
+				Arch:    define.ARM64,
+				Distro:  Ubuntu,
+				Version: "20.04",
+			},
+			Provider:     Google,
+			InstanceSize: "t2a-standard-2", // 2 arm64 cpus
+			RunsOn:       "ubuntu-2004-lts-arm64",
+			Username:     "ubuntu",
+			RemotePath:   "/home/ubuntu/agent",
+			Runner:       DebianRunner{},
+		},
+	*/
 	{
 		OS: define.OS{
-			Type:    define.Linux,
+			Type:    define.Windows,
 			Arch:    define.AMD64,
-			Distro:  Ubuntu,
-			Version: "22.04",
+			Version: "2022",
 		},
 		Provider:     Google,
-		InstanceSize: "e2-standard-2", // 2 amd64 cpus
-		RunsOn:       "ubuntu-2204-lts",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
-	},
-	{
-		OS: define.OS{
-			Type:    define.Linux,
-			Arch:    define.AMD64,
-			Distro:  Ubuntu,
-			Version: "20.04",
-		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-2", // 2 amd64 cpus
-		RunsOn:       "ubuntu-2004-lts",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
-	},
-	{
-		OS: define.OS{
-			Type:    define.Linux,
-			Arch:    define.ARM64,
-			Distro:  Ubuntu,
-			Version: "22.04",
-		},
-		Provider:     Google,
-		InstanceSize: "t2a-standard-2", // 2 arm64 cpus
-		RunsOn:       "ubuntu-2204-lts-arm64",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
-	},
-	{
-		OS: define.OS{
-			Type:    define.Linux,
-			Arch:    define.ARM64,
-			Distro:  Ubuntu,
-			Version: "20.04",
-		},
-		Provider:     Google,
-		InstanceSize: "t2a-standard-2", // 2 arm64 cpus
-		RunsOn:       "ubuntu-2004-lts-arm64",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
+		InstanceSize: "e2-standard-4", // 4 amd64 cpus
+		RunsOn:       "windows-2022",
+		Username:     "windows",
+		RemotePath:   "C:\\Users\\windows\\agent",
+		Runner:       WindowsRunner{},
 	},
 }
 

@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
-// DebianRunner is a handler for running tests on Linux
+// DebianRunner is a handler for running tests on Debian based Linux distros.
 type DebianRunner struct{}
 
 // Prepare the test
