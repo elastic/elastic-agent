@@ -213,7 +213,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("spec is nil, nothing to execute, binaryPath: %s", exePath), warnLogs.TakeAll()[0].Message)
 	})
 
-	// Execution succeeded
+	// Execution succeeds on first attempt
 	t.Run("successful_execution", func(t *testing.T) {
 		ctx := context.Background()
 		log, observer := logger.NewTesting(t.Name())
@@ -226,7 +226,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.Equal(t, 0, observer.Len())
 	})
 
-	// Execution failed - no retry configuration in spec
+	// Execution fails indefinitely and there is no retry configuration in spec
 	t.Run("failed_execution_no_retry_config", func(t *testing.T) {
 		cmdCtx := context.Background()
 		log, observer := logger.NewTesting(t.Name())
@@ -256,7 +256,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		checkRetryLogs(t, observer, exeConfig)
 	})
 
-	// Execution failed - with retry configuration in spec
+	// Execution fails indefinitely but there is retry configuration in spec
 	t.Run("failed_execution_with_retry_config", func(t *testing.T) {
 		cmdCtx := context.Background()
 		log, observer := logger.NewTesting(t.Name())
@@ -295,7 +295,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		checkRetryLogs(t, observer, exeConfig)
 	})
 
-	// Execution succeeded after a few retries
+	// Execution fails initially but then succeeds after a few retries
 	t.Run("succeed_after_retry", func(t *testing.T) {
 		cmdCtx := context.Background()
 		log, observer := logger.NewTesting(t.Name())
