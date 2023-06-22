@@ -8,14 +8,21 @@ package integration
 
 import (
 	"context"
+	"io/fs"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/version"
 )
 
 func TestPackageVersion(t *testing.T) {
@@ -37,6 +44,10 @@ func TestPackageVersion(t *testing.T) {
 	testVersionFunc := func() error {
 		// check the version returned by the running agent
 		t.Run("check package version while the agent is running", testAgentPackageVersion(f, ctx, false))
+
+		// Destructive tests ahead! If you need to do a normal test on a healthy install of agent, put it before the tests below run
+		t.Run("remove package versions file and test version again", testAfterRemovingPkgVersionFiles(t, f))
+
 		return nil
 	}
 
@@ -61,4 +72,92 @@ func TestPackageVersion(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+}
+
+func testAfterRemovingPkgVersionFiles(t *testing.T, f *atesting.Fixture) func(*testing.T) {
+	return func(t *testing.T) {
+		installFS := os.DirFS(f.WorkDir())
+		matches := []string{}
+		err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if d.Name() == version.PackageVersionFileName {
+				matches = append(matches, path)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+
+		for _, m := range matches {
+			t.Logf("removing package version file %q", m)
+			err = os.Remove(m)
+			require.NoErrorf(t, err, "error removing package version file %q", m)
+		}
+
+		// check the version returned by the running agent
+		actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
+
+		actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "binary")
+
+		assert.Truef(t, strings.HasSuffix(actualVersion, "unknown_package_version"), actualVersion, "binary version does not match package version")
+	}
+
+}
+
+func testUpgradeAfterRemovingPkgVersionFiles(t *testing.T, ctx context.Context, f *atesting.Fixture) func(*testing.T) {
+	return func(t *testing.T) {
+		installFS := os.DirFS(f.WorkDir())
+		matches := []string{}
+
+		err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if d.Name() == version.PackageVersionFileName {
+				matches = append(matches, path)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+
+		// the version files should have been removed from the other test, we just make sure
+		for _, m := range matches {
+			t.Logf("removing package version file %q", m)
+			err = os.Remove(m)
+			require.NoErrorf(t, err, "error removing package version file %q", m)
+		}
+
+		// check the version returned by the running agent
+		actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
+
+		actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "binary")
+
+		assert.Truef(t, strings.HasSuffix(actualVersion, "unknown_package_version"), actualVersion, "binary version does not match package version")
+
+		// upgrade to latest version whatever that will be
+		aac := tools.NewArtifactAPIClient()
+		versionList, err := aac.GetVersions(ctx)
+		require.NoError(t, err)
+		require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
+		latestVersion := versionList.Versions[len(versionList.Versions)-1]
+
+		_, err = f.Client().Upgrade(ctx, latestVersion, "", false)
+		require.NoError(t, err, "upgrade request failed")
+
+		assert.Eventually(t, func() bool {
+
+			// check the version returned by the running agent
+			actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
+
+			actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "daemon")
+			return actualVersion == latestVersion
+		},
+			5*time.Minute,
+			10*time.Second,
+		)
+	}
+
 }
