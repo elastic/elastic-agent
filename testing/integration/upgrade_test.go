@@ -9,8 +9,11 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -275,11 +278,20 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 	buildDetails, err := aac.GetBuildDetails(ctx, latestSnapshotVersion.VersionWithPrerelease(), upgradeVersionString)
 	s.Require().NoErrorf(err, "error accessing build details for version %q and buildID %q", latestSnapshotVersion.Original(), upgradeVersionString)
 	s.Require().NotNil(buildDetails)
-	agentBuildDetails, ok := buildDetails.Build.Projects["elastic-agent"]
+	agentProject, ok := buildDetails.Build.Projects["elastic-agent"]
 	s.Require().Truef(ok, "elastic agent project not found in version %q build %q", latestSnapshotVersion.Original(), upgradeVersionString)
-	s.T().Logf("agent build details: %+v", agentBuildDetails)
-	s.T().Logf("expected agent commit hash: %q", agentBuildDetails.CommitHash)
-	expectedAgentHashAfterUpgrade := agentBuildDetails.CommitHash
+	s.T().Logf("agent build details: %+v", agentProject)
+	s.T().Logf("expected agent commit hash: %q", agentProject.CommitHash)
+	expectedAgentHashAfterUpgrade := agentProject.CommitHash
+
+	// Workaround until issue with Artifact API build commit hash are resolved
+	actualAgentHashAfterUpgrade := extractCommitHashFromArtifact(s.T(), ctx, latestSnapshotVersion, agentProject)
+	s.Require().NotEmpty(actualAgentHashAfterUpgrade)
+
+	s.T().Logf("Artifact API hash: %q Actual package hash: %q", expectedAgentHashAfterUpgrade, actualAgentHashAfterUpgrade)
+
+	// override the expected hash with the one extracted from the actual artifact
+	expectedAgentHashAfterUpgrade = actualAgentHashAfterUpgrade
 
 	buildFragments := strings.Split(upgradeVersionString, "-")
 	s.Require().Lenf(buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
@@ -309,7 +321,7 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 		}
 		s.T().Logf("current agent state: %+v", state)
 		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
-	}, 10*time.Minute, 1*time.Second, "agent never upgraded to expected version")
+	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
 	updateMarkerFile := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", ".update-marker")
 
@@ -326,6 +338,37 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 	// version, err := c.Version(ctx)
 	// s.Require().NoError(err, "error checking version after upgrade")
 	// s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+}
+
+func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVersion *version.ParsedSemVer, agentProject tools.Project) string {
+	tmpDownloadDir := t.TempDir()
+
+	operatingSystem := runtime.GOOS
+	architecture := runtime.GOARCH
+	suffix, err := atesting.GetPackageSuffix(operatingSystem, architecture)
+	require.NoErrorf(t, err, "error determining suffix for OS %q and arch %q", operatingSystem, architecture)
+	prefix := fmt.Sprintf("elastic-agent-%s", artifactVersion.VersionWithPrerelease())
+	pkgName := fmt.Sprintf("%s-%s", prefix, suffix)
+	require.Containsf(t, agentProject.Packages, pkgName, "Artifact API response does not contain pkg %s", pkgName)
+	artifactFilePath := filepath.Join(tmpDownloadDir, pkgName)
+	err = atesting.DownloadPackage(ctx, t, http.DefaultClient, agentProject.Packages[pkgName].URL, artifactFilePath)
+	require.NoError(t, err, "error downloading package")
+	err = atesting.ExtractArtifact(t, artifactFilePath, tmpDownloadDir)
+	require.NoError(t, err, "error extracting artifact")
+	extractedDir := ""
+	entries, err := os.ReadDir(tmpDownloadDir)
+	require.NoError(t, err, "unable to read temp directory")
+	for _, e := range entries {
+		if e.IsDir() && strings.HasPrefix(e.Name(), "elastic-agent-") {
+			extractedDir = e.Name()
+			break
+		}
+	}
+	hashFilePath := filepath.Join(tmpDownloadDir, extractedDir, ".build_hash.txt")
+	t.Logf("Accessing hash file %q", hashFilePath)
+	hashBytes, err := os.ReadFile(hashFilePath)
+	require.NoError(t, err, "error reading build hash")
+	return strings.TrimSpace(string(hashBytes))
 }
 
 func TestStandaloneUpgradeRetryDownload(t *testing.T) {
