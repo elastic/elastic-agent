@@ -17,15 +17,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 
 	"github.com/google/uuid"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/elastic/elastic-agent-libs/kibana"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
