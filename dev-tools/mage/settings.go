@@ -38,6 +38,13 @@ const (
 	elasticAgentImportPath = "github.com/elastic/elastic-agent"
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
+
+	// Env vars
+	// agent package version
+	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
+
+	// Mapped functions
+	agentPackageVersionMappedFunc = "agent_package_version"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -77,25 +84,29 @@ var (
 	versionQualifier string
 
 	// Env var to set the agent package version
-	agentPackageVersion = EnvOr("AGENT_PACKAGE_VERSION", "")
+	agentPackageVersion string
 
 	FuncMap = map[string]interface{}{
-		"beat_doc_branch":       BeatDocBranch,
-		"beat_version":          BeatQualifiedVersion,
-		"commit":                CommitHash,
-		"commit_short":          CommitHashShort,
-		"date":                  BuildDate,
-		"elastic_beats_dir":     ElasticBeatsDir,
-		"go_version":            GoVersion,
-		"repo":                  GetProjectRepoInfo,
-		"title":                 func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
-		"tolower":               strings.ToLower,
-		"contains":              strings.Contains,
-		"agent_package_version": AgentPackageVersion,
+		"beat_doc_branch":             BeatDocBranch,
+		"beat_version":                BeatQualifiedVersion,
+		"commit":                      CommitHash,
+		"commit_short":                CommitHashShort,
+		"date":                        BuildDate,
+		"elastic_beats_dir":           ElasticBeatsDir,
+		"go_version":                  GoVersion,
+		"repo":                        GetProjectRepoInfo,
+		"title":                       func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
+		"tolower":                     strings.ToLower,
+		"contains":                    strings.Contains,
+		agentPackageVersionMappedFunc: AgentPackageVersion,
 	}
 )
 
 func init() {
+	initGlobals()
+}
+
+func initGlobals() {
 	if GOOS == "windows" {
 		BinaryExt = ".exe"
 	}
@@ -127,6 +138,8 @@ func init() {
 	}
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
+
+	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).
@@ -269,27 +282,11 @@ func CommitHashShort() (string, error) {
 
 func AgentPackageVersion() (string, error) {
 
-	return agentPackageVersion, nil
-	// if agentPackageVersion != "" {
-	// 	return agentPackageVersion, nil
-	// }
-	// (Possible fallback, disabled at the moment)build a package version based on major.minor.patch + Snapshot + git commit
-	// beatsVersion, err := beatVersion()
-	// if err != nil {
-	// 	return "", fmt.Errorf("error retrieving beat version: %w", err)
-	// }
-	// b := new(strings.Builder)
-	// b.WriteString(beatsVersion)
-	// if Snapshot {
-	// 	b.WriteString("-SNAPSHOT")
-	// }
-	// shortCommitHash, err := CommitHashShort()
-	// if err != nil {
-	// 	return "", fmt.Errorf("error retrieving short commit hash: %w", err)
-	// }
-	// b.WriteString("+git-")
-	// b.WriteString(shortCommitHash)
-	// return b.String(), nil
+	if agentPackageVersion != "" {
+		return agentPackageVersion, nil
+	}
+
+	return BeatQualifiedVersion()
 }
 
 var (
