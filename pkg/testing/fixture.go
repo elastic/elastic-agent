@@ -151,31 +151,44 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 		return err
 	}
 	filename := filepath.Base(src)
-	name, ext, err := splitFileType(filename)
+	name, _, err := splitFileType(filename)
 	if err != nil {
 		return err
 	}
 	workDir := f.t.TempDir()
 	finalDir := filepath.Join(workDir, name)
-	f.t.Logf("Extracting artifact %s to %s", filename, finalDir)
-	switch ext {
-	case ".tar.gz":
-		err := untar(src, workDir)
-		if err != nil {
-			return fmt.Errorf("failed to untar %s: %w", src, err)
-		}
-	case ".zip":
-		err := unzip(src, workDir)
-		if err != nil {
-			return fmt.Errorf("failed to unzip %s: %w", src, err)
-		}
+	err = ExtractArtifact(f.t, src, workDir)
+	if err != nil {
+		return fmt.Errorf("extracting artifact %q in %q: %w", src, workDir, err)
 	}
-	f.t.Logf("Completed extraction of artifact %s to %s", filename, finalDir)
 	err = f.prepareComponents(finalDir, components...)
 	if err != nil {
 		return err
 	}
 	f.workDir = finalDir
+	return nil
+}
+
+func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
+	filename := filepath.Base(artifactFile)
+	_, ext, err := splitFileType(filename)
+	if err != nil {
+		return err
+	}
+	l.Logf("Extracting artifact %s to %s", filename, outputDir)
+	switch ext {
+	case ".tar.gz":
+		err := untar(artifactFile, outputDir)
+		if err != nil {
+			return fmt.Errorf("failed to untar %s: %w", artifactFile, err)
+		}
+	case ".zip":
+		err := unzip(artifactFile, outputDir)
+		if err != nil {
+			return fmt.Errorf("failed to unzip %s: %w", artifactFile, err)
+		}
+	}
+	l.Logf("Completed extraction of artifact %s to %s", filename, outputDir)
 	return nil
 }
 
