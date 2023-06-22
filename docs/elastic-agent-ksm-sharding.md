@@ -79,7 +79,7 @@ Follow steps of [KSM Autosharding with Side Container](./manifests/kustomize-aut
 
 For this installation, users need to configure the two following agent policies.
 
-*Note*: The mount point of /var/lib/elastic-agent-managed/kube-system/state to [store elastic-agent state](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-managed-kubernetes.yaml#L104), creates conflicts between Leader Elastic Agent and KSM Agents. This is the reason that it should be removed in `HostNetwork:false` scenarios
+**Note**: The mount point of `/var/lib/elastic-agent-managed/kube-system/state` to [store elastic-agent state](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-managed-kubernetes.yaml#L104), creates conflicts between Leader Elastic Agent and KSM Agents. This is the reason that it should be removed in `HostNetwork:false` scenarios
 
 **Agent policies:**
 
@@ -106,7 +106,7 @@ Deploy following manifests:
 
 > **Note**: Above manifests exist under [manifests/hostnetwork](./manifests/hostnetwork) folder
 
-> **Note**: Make sure that `hostNetwork:false` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40).
+> **Note**: Make sure that `hostNetwork:false` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/hostnetwork/kubernetes_deployment_ksm-1.yaml#40).
 
 **Pros/Cons**:
 
@@ -128,7 +128,7 @@ For this installation, users need to configure the following agent policies:
 
 **Manifest Installation:**
 
-1. Revert any changes from previous scenarios. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario.
+1. Revert any changes from previous scenarios. Make sure that `hostNetwork:true` in [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/tolerations/kubernetes_deployment_ksm-1.yaml#40). This option is not needed anymore and can be reverted in this scenario.
 2. Uncomment the following `toleration` in manifest [elastic-agent-managed-deployment-ksm-1.yaml](./manifests/tolerations/elastic-agent-managed-deployment-ksm-1.yaml). Only the deployments need to include tolerations
 
    ```bash
