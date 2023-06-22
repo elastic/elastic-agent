@@ -1434,7 +1434,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	if err != nil {
 		return fmt.Errorf("error writing test out file: %w", err)
 	}
-	err = writeFile("build/TEST-go-integration.out.json", results.Output, 0644)
+	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0644)
 	if err != nil {
 		return fmt.Errorf("error writing test out json file: %w", err)
 	}
