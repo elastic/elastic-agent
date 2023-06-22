@@ -1416,7 +1416,10 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 			JUnitReportFile: fileName + ".xml",
 			Packages:        []string{packageName},
 			Tags:            []string{"integration"},
-			ExtraFlags:      []string{"-test.run", strings.Join(packageTests, "|")},
+			ExtraFlags: []string{
+				"-test.run", strings.Join(packageTests, "|"),
+				"-test.shuffle", "on",
+			},
 			Env: map[string]string{
 				"AGENT_VERSION":      version,
 				"TEST_DEFINE_PREFIX": testPrefix,
