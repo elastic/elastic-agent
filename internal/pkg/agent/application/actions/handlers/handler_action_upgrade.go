@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -21,14 +20,14 @@ import (
 // from repository specified by fleet.
 type Upgrade struct {
 	log        *logger.Logger
-	coord      *coordinator.Coordinator
+	coord      upgradeCoordinator
 	bkgActions []fleetapi.Action
 	bkgCancel  context.CancelFunc
 	bkgMutex   sync.Mutex
 }
 
 // NewUpgrade creates a new Upgrade handler.
-func NewUpgrade(log *logger.Logger, coord *coordinator.Coordinator) *Upgrade {
+func NewUpgrade(log *logger.Logger, coord upgradeCoordinator) *Upgrade {
 	return &Upgrade{
 		log:   log,
 		coord: coord,
@@ -51,8 +50,24 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	if !runAsync {
 		return nil
 	}
+	// Find inputs that want to receive UPGRADE action
+	// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself
+	state := h.coord.State()
+	comps, units := findMatchingUnitsByActionType(state, a.Type())
+	if len(comps) > 0 {
+		h.log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
+		err := dispatchActionInParallel(ctx, h.log, action, comps, units, h.coord.PerformAction)
+		h.log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Log and continue
+		h.log.Debugf("No components running for %v action type", a.Type())
+	}
+
 	go func() {
-		h.log.Infof("starting upgrade to version %s in background", action.Version)
+		h.log.Debugf("starting upgrade to version %s in background", action.Version)
 		if err := h.coord.Upgrade(asyncCtx, action.Version, action.SourceURI, action, false); err != nil {
 
 			h.log.Errorf("upgrade to version %s failed: %v", action.Version, err)
