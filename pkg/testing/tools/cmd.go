@@ -10,8 +10,8 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
-// InstallElasticAgent force install the Elastic Agent through agentFixture.
-func InstallElasticAgent(fleetUrl string, enrollmentToken string, agentFixture *atesting.Fixture) ([]byte, error) {
+// InstallAgent force install the Elastic Agent through agentFixture.
+func InstallAgent(fleetUrl string, enrollmentToken string, agentFixture *atesting.Fixture) ([]byte, error) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
@@ -23,8 +23,8 @@ func InstallElasticAgent(fleetUrl string, enrollmentToken string, agentFixture *
 	return agentFixture.Install(context.Background(), &installOpts)
 }
 
-// InstallStandaloneElasticAgent force install the Elastic Agent through agentFixture.
-func InstallStandaloneElasticAgent(agentFixture *atesting.Fixture) ([]byte, error) {
+// InstallStandaloneAgent force install the Elastic Agent through agentFixture.
+func InstallStandaloneAgent(agentFixture *atesting.Fixture) ([]byte, error) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,

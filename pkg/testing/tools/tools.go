@@ -74,7 +74,7 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 	}
 
 	// Enroll agent
-	output, err := InstallElasticAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
+	output, err := InstallAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 		return nil, fmt.Errorf("unable to enroll Elastic Agent: %w", err)
