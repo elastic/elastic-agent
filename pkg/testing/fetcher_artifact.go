@@ -97,7 +97,7 @@ func (r *artifactResult) Name() string {
 
 // Fetch performs the actual fetch into the provided directory.
 func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error {
-	err := downloadPackage(ctx, l, r.doer, r.src, filepath.Join(dir, r.path))
+	err := DownloadPackage(ctx, l, r.doer, r.src, filepath.Join(dir, r.path))
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
@@ -165,7 +165,7 @@ func findURI(ctx context.Context, doer httpDoer, version string) (string, error)
 	return "", fmt.Errorf("uri not detected")
 }
 
-func downloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
+func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
 	l.Logf("Downloading artifact from %s", downloadPath)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", downloadPath, nil)
