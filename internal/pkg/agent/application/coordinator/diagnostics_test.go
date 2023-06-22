@@ -88,8 +88,97 @@ type MockedComponentsUnits struct {
 	Units []MockedUnit `yaml:"units"`
 }
 
-func TestCoordinatorDiagnosticHooks(t *testing.T) {
+func diagnosticsTestVars(t *testing.T) []*transpiler.Vars {
+	//Provide vars
+	fetchContextProvider := mocks.NewFetchContextProvider(t)
+	fetchContextProviders := mapstr.M{
+		"kubernetes_secrets": fetchContextProvider,
+	}
+	vars, err := transpiler.NewVars(
+		"id",
+		map[string]interface{}{
+			"host": map[string]interface{}{"platform": "linux"},
+			"dynamic": map[string]interface{}{
+				"key1": "dynamic1",
+				"list": []string{
+					"array1",
+					"array2",
+				},
+				"dict": map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+				},
+			},
+		},
+		fetchContextProviders)
+	require.NoError(t, err)
+	return []*transpiler.Vars{vars}
+}
 
+func diagnosticsTestComponentState(t *testing.T, specs *component.RuntimeSpecs, componentsUnitsFilePath string) []runtime.ComponentComponentState {
+
+	componentsBytes, err := os.ReadFile(componentsUnitsFilePath)
+	require.NoError(t, err)
+	mockedComponents := make([]MockedComponentsUnits, 0, 5)
+	err = yaml.Unmarshal(componentsBytes, &mockedComponents)
+	require.NoError(t, err)
+
+	componentStates := make([]runtime.ComponentComponentState, 0, len(mockedComponents))
+
+	for _, comp := range mockedComponents {
+
+		// create all the units for the component
+		units := make([]component.Unit, 0, len(comp.Units))
+		unitsStates := map[runtime.ComponentUnitKey]runtime.ComponentUnitState{}
+		for _, mockedUnit := range comp.Units {
+			// FIXME: when trying to create the proto struct values from map, we panic trying to create the "source" attribute
+			require.NoErrorf(t, err, "Error parsing unit expected config for component %q unit %q", comp.ID, mockedUnit.ID)
+			units = append(units, component.Unit{
+				ID:       mockedUnit.ID,
+				Type:     mockedUnit.Type,
+				LogLevel: mockedUnit.LogLevel,
+				// Config:   mockedUnit.Config,
+			})
+			// FIXME this composite key is ok for Marshaling but then Unmarshaling into a generic map[any]any returns error,
+			// hence we cannot properly sanitize hook output - A custom unmarshaler would probably solve this
+			// unitStateKey := runtime.ComponentUnitKey{UnitType: mockedUnit.Type, UnitID: mockedUnit.ID}
+			// unitsStates[unitStateKey] = runtime.ComponentUnitState{
+			// 	State:   client.UnitStateHealthy,
+			// 	Message: "Healthy",
+			// }
+		}
+
+		//create the component itself
+		spec, err := specs.GetInput(comp.CType)
+		require.NoErrorf(t, err, "unknown spec for component with id %q and type %q", comp.ID, comp.CType)
+
+		componentState := runtime.ComponentComponentState{
+			Component: component.Component{
+				ID:        comp.ID,
+				InputSpec: &spec,
+				Units:     units,
+			},
+			State: runtime.ComponentState{
+				State: client.UnitStateHealthy,
+				VersionInfo: runtime.ComponentVersionInfo{
+					Name:    fmt.Sprintf("Mock %s", comp.CType),
+					Version: "1.2.3",
+				},
+				Units: unitsStates,
+				Features: &proto.Features{
+					Fqdn: &proto.FQDNFeature{Enabled: true},
+				},
+				FeaturesIdx: 1,
+			},
+		}
+
+		componentStates = append(componentStates, componentState)
+	}
+	return componentStates
+}
+
+func TestCoordinatorDiagnosticHooks(t *testing.T) {
+	configPath := filepath.Join(".", "testdata", "simple_config")
 	type testCase struct {
 		name                    string
 		runtimeSpecsPath        string
@@ -106,105 +195,11 @@ func TestCoordinatorDiagnosticHooks(t *testing.T) {
 			name:                    "Default Fleet Policy",
 			runtimeSpecsPath:        filepath.Join("..", "..", "..", "..", "..", "specs"),
 			platform:                linuxPlatformDetail,
-			configFilePath:          filepath.Join(".", "testdata", "simple_config", "elastic-agent.yml"),
-			componentsUnitsFilePath: filepath.Join(".", "testdata", "simple_config", "mocked_components_units.yaml"),
-			componentsState: func(t *testing.T, specs *component.RuntimeSpecs, componentsUnitsFilePath string) []runtime.ComponentComponentState {
-
-				componentsBytes, err := os.ReadFile(componentsUnitsFilePath)
-				require.NoError(t, err)
-				mockedComponents := make([]MockedComponentsUnits, 0, 5)
-				err = yaml.Unmarshal(componentsBytes, &mockedComponents)
-				require.NoError(t, err)
-
-				componentStates := make([]runtime.ComponentComponentState, 0, len(mockedComponents))
-
-				for _, comp := range mockedComponents {
-
-					// create all the units for the component
-					units := make([]component.Unit, 0, len(comp.Units))
-					unitsStates := map[runtime.ComponentUnitKey]runtime.ComponentUnitState{}
-					for _, mockedUnit := range comp.Units {
-						// FIXME: when trying to create the proto struct values from map, we panic trying to create the "source" attribute
-						require.NoErrorf(t, err, "Error parsing unit expected config for component %q unit %q", comp.ID, mockedUnit.ID)
-						units = append(units, component.Unit{
-							ID:       mockedUnit.ID,
-							Type:     mockedUnit.Type,
-							LogLevel: mockedUnit.LogLevel,
-							// Config:   mockedUnit.Config,
-						})
-						// FIXME this composite key is ok for Marshaling but then Unmarshaling into a generic map[any]any returns error,
-						// hence we cannot properly sanitize hook output - A custom unmarshaler would probably solve this
-						// unitStateKey := runtime.ComponentUnitKey{UnitType: mockedUnit.Type, UnitID: mockedUnit.ID}
-						// unitsStates[unitStateKey] = runtime.ComponentUnitState{
-						// 	State:   client.UnitStateHealthy,
-						// 	Message: "Healthy",
-						// }
-					}
-
-					//create the component itself
-					spec, err := specs.GetInput(comp.CType)
-					require.NoErrorf(t, err, "unknown spec for component with id %q and type %q", comp.ID, comp.CType)
-
-					componentState := runtime.ComponentComponentState{
-						Component: component.Component{
-							ID:        comp.ID,
-							InputSpec: &spec,
-							Units:     units,
-						},
-						State: runtime.ComponentState{
-							State: client.UnitStateHealthy,
-							VersionInfo: runtime.ComponentVersionInfo{
-								Name:    fmt.Sprintf("Mock %s", comp.CType),
-								Version: "1.2.3",
-							},
-							Units: unitsStates,
-							Features: &proto.Features{
-								Fqdn: &proto.FQDNFeature{Enabled: true},
-							},
-							FeaturesIdx: 1,
-						},
-					}
-
-					componentStates = append(componentStates, componentState)
-				}
-				return componentStates
-			},
-			varsProvider: func(t *testing.T) []*transpiler.Vars {
-				//Provide vars
-				processors := transpiler.Processors{
-					{
-						"add_fields": map[string]interface{}{
-							"dynamic": "added",
-						},
-					},
-				}
-				fetchContextProvider := mocks.NewFetchContextProvider(t)
-				fetchContextProviders := mapstr.M{
-					"kubernetes_secrets": fetchContextProvider,
-				}
-				vars, err := transpiler.NewVarsWithProcessors(
-					"id",
-					map[string]interface{}{
-						"host": map[string]interface{}{"platform": "linux"},
-						"dynamic": map[string]interface{}{
-							"key1": "dynamic1",
-							"list": []string{
-								"array1",
-								"array2",
-							},
-							"dict": map[string]string{
-								"key1": "value1",
-								"key2": "value2",
-							},
-						},
-					},
-					"dynamic",
-					processors,
-					fetchContextProviders)
-				require.NoError(t, err)
-				return []*transpiler.Vars{vars}
-			},
-			expectedDiagnosticsPath: filepath.Join(".", "testdata", "simple_config", "expected"),
+			configFilePath:          filepath.Join(configPath, "elastic-agent.yml"),
+			componentsUnitsFilePath: filepath.Join(configPath, "mocked_components_units.yaml"),
+			componentsState:         diagnosticsTestComponentState,
+			varsProvider:            diagnosticsTestVars,
+			expectedDiagnosticsPath: filepath.Join(configPath, "expected"),
 		},
 	}
 
