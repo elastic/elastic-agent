@@ -219,8 +219,18 @@ type Coordinator struct {
 	actionsErr    error
 	varsMgrErr    error
 
-	ast  *transpiler.AST
+	// The raw policy before spec lookup or variable substitution
+	ast *transpiler.AST
+
+	// The current variables
 	vars []*transpiler.Vars
+
+	// The policy after spec and variable substitution
+	derivedConfig map[string]interface{}
+
+	// The final component model generated from ast and vars (this is the same
+	// value that is sent to the runtime manager).
+	componentModel []component.Component
 
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
@@ -662,13 +672,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current computed configuration of the running Elastic Agent after variable substitution",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.ast == nil || c.vars == nil {
-					return []byte("error: failed no configuration or variables received by the coordinator")
-				}
-				cfg, _, err := c.recomputeConfigAndComponents()
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
+				cfg := c.derivedConfig
 				o, err := yaml.Marshal(cfg)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -685,10 +689,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				if c.ast == nil || c.vars == nil {
 					return []byte("error: failed no configuration or variables received by the coordinator")
 				}
-				_, comps, err := c.recomputeConfigAndComponents()
-				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
-				}
+				comps := c.componentModel
 				o, err := yaml.Marshal(struct {
 					Components []component.Component `yaml:"components"`
 				}{
@@ -1014,14 +1015,15 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 		span.End()
 	}()
 
-	_, comps, err := c.recomputeConfigAndComponents()
+	// regenerate the component model
+	err = c.recomputeConfigAndComponents()
 	if err != nil {
 		return err
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", comps).Debug("Updating running component model")
-	err = c.runtimeMgr.Update(comps)
+	c.logger.With("components", c.componentModel).Debug("Updating running component model")
+	err = c.runtimeMgr.Update(c.componentModel)
 	if err != nil {
 		return err
 	}
@@ -1033,23 +1035,23 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 // components from the current AST and vars and returns the result.
 // Called from both the main Coordinator goroutine and from external
 // goroutines via diagnostics hooks.
-func (c *Coordinator) recomputeConfigAndComponents() (map[string]interface{}, []component.Component, error) {
+func (c *Coordinator) recomputeConfigAndComponents() error {
 	ast := c.ast.Clone()
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
 		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
 		if err != nil {
-			return nil, nil, fmt.Errorf("rendering inputs failed: %w", err)
+			return fmt.Errorf("rendering inputs failed: %w", err)
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
-			return nil, nil, fmt.Errorf("inserting rendered inputs failed: %w", err)
+			return fmt.Errorf("inserting rendered inputs failed: %w", err)
 		}
 	}
 
 	cfg, err := ast.Map()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
 	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr != nil && c.monitorMgr.Enabled() {
@@ -1063,17 +1065,21 @@ func (c *Coordinator) recomputeConfigAndComponents() (map[string]interface{}, []
 		c.agentInfo,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to render components: %w", err)
+		return fmt.Errorf("failed to render components: %w", err)
 	}
 
 	for _, modifier := range c.modifiers {
 		comps, err = modifier(comps, cfg)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to modify components: %w", err)
+			return fmt.Errorf("failed to modify components: %w", err)
 		}
 	}
 
-	return cfg, comps, nil
+	// If we made it this far, update our internal derived values and
+	// return with no error
+	c.derivedConfig = cfg
+	c.componentModel = comps
+	return nil
 }
 
 // handleCoordinatorDone is called when the Coordinator's context is

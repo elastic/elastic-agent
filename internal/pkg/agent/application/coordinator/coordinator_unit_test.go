@@ -374,13 +374,11 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 
 	// Send an invalid config update and confirm that Coordinator reports
 	// the failure to the config change object.
-	cfg := config.MustNewConfigFrom(map[string]interface{}{
-		// Give an incorrectly typed value for the artifacts URI, which should
-		// cause the policy update to fail in the upgrade manager.
-		"agent.download.sourceURI": map[string]interface{}{
-			"the problem": "URIs shouldn't have subfields",
-		},
-	})
+	cfg := config.MustNewConfigFrom(`
+name: "this config is invalid"
+agent.download.sourceURI:
+  the.problem: "URIs shouldn't have subfields"
+`)
 	configChange := &configChange{cfg: cfg}
 	configChan <- configChange
 	coord.runLoopIteration(ctx)
