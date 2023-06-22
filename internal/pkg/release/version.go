@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	hashLen = 6
+	hashLen                     = 6
+	unknownPackageVersionSuffix = "+unknown_package_version"
 )
 
 // snapshot is a flag marking build as a snapshot.
@@ -57,9 +58,9 @@ func Version() string {
 	if err == nil && pkgVersion != "" {
 		return pkgVersion
 	}
-	// TODO how to signal an error ?
-	// Fallback to previous behavior
-	return version.GetDefaultVersion()
+
+	// Fallback to beats qualified version + unknown package version
+	return version.GetDefaultVersion() + unknownPackageVersionSuffix
 }
 
 // Snapshot returns true if binary was built as snapshot.
