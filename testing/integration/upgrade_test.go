@@ -9,8 +9,11 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -19,20 +22,17 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-
-	"github.com/google/uuid"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/google/uuid"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -161,7 +161,6 @@ func upgradeMarkerRemoved() bool {
 	return marker == nil
 }
 
-
 func TestStandaloneUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		// Stack:   &define.Stack{},
@@ -279,10 +278,20 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 	buildDetails, err := aac.GetBuildDetails(ctx, latestSnapshotVersion.VersionWithPrerelease(), upgradeVersionString)
 	s.Require().NoErrorf(err, "error accessing build details for version %q and buildID %q", latestSnapshotVersion.Original(), upgradeVersionString)
 	s.Require().NotNil(buildDetails)
-	agentBuildDetails, ok := buildDetails.Build.Projects["elastic-agent"]
+	agentProject, ok := buildDetails.Build.Projects["elastic-agent"]
 	s.Require().Truef(ok, "elastic agent project not found in version %q build %q", latestSnapshotVersion.Original(), upgradeVersionString)
+	s.T().Logf("agent build details: %+v", agentProject)
+	s.T().Logf("expected agent commit hash: %q", agentProject.CommitHash)
+	expectedAgentHashAfterUpgrade := agentProject.CommitHash
 
-	expectedAgentHashAfterUpgrade := agentBuildDetails.CommitHash
+	// Workaround until issue with Artifact API build commit hash are resolved
+	actualAgentHashAfterUpgrade := extractCommitHashFromArtifact(s.T(), ctx, latestSnapshotVersion, agentProject)
+	s.Require().NotEmpty(actualAgentHashAfterUpgrade)
+
+	s.T().Logf("Artifact API hash: %q Actual package hash: %q", expectedAgentHashAfterUpgrade, actualAgentHashAfterUpgrade)
+
+	// override the expected hash with the one extracted from the actual artifact
+	expectedAgentHashAfterUpgrade = actualAgentHashAfterUpgrade
 
 	buildFragments := strings.Split(upgradeVersionString, "-")
 	s.Require().Lenf(buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
@@ -312,7 +321,7 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 		}
 		s.T().Logf("current agent state: %+v", state)
 		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
-	}, 10*time.Minute, 1*time.Second, "agent never upgraded to expected version")
+	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
 	updateMarkerFile := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", ".update-marker")
 
@@ -329,262 +338,39 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 	// version, err := c.Version(ctx)
 	// s.Require().NoError(err, "error checking version after upgrade")
 	// s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+}
+
+func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVersion *version.ParsedSemVer, agentProject tools.Project) string {
+	tmpDownloadDir := t.TempDir()
+
+	operatingSystem := runtime.GOOS
+	architecture := runtime.GOARCH
+	suffix, err := atesting.GetPackageSuffix(operatingSystem, architecture)
+	require.NoErrorf(t, err, "error determining suffix for OS %q and arch %q", operatingSystem, architecture)
+	prefix := fmt.Sprintf("elastic-agent-%s", artifactVersion.VersionWithPrerelease())
+	pkgName := fmt.Sprintf("%s-%s", prefix, suffix)
+	require.Containsf(t, agentProject.Packages, pkgName, "Artifact API response does not contain pkg %s", pkgName)
+	artifactFilePath := filepath.Join(tmpDownloadDir, pkgName)
+	err = atesting.DownloadPackage(ctx, t, http.DefaultClient, agentProject.Packages[pkgName].URL, artifactFilePath)
+	require.NoError(t, err, "error downloading package")
+	err = atesting.ExtractArtifact(t, artifactFilePath, tmpDownloadDir)
+	require.NoError(t, err, "error extracting artifact")
+
+	matches, err := filepath.Glob(filepath.Join(tmpDownloadDir, "elastic-agent-*", ".build_hash.txt"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches)
+
+	hashFilePath := matches[0]
+	t.Logf("Accessing hash file %q", hashFilePath)
+	hashBytes, err := os.ReadFile(hashFilePath)
+	require.NoError(t, err, "error reading build hash")
+	return strings.TrimSpace(string(hashBytes))
 }
 
 func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Local:   false, // requires Agent installation
 		Isolate: true,
-		Sudo:    true, // requires Agent installation and modifying /etc/hosts
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		}, // modifying /etc/hosts
-	})
-
-	currentVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
-
-	previousVersion, err := currentVersion.GetPreviousMinor()
-	require.NoError(t, err)
-
-	// For testing the upgrade we actually perform a downgrade
-	upgradeFromVersion := currentVersion
-	upgradeToVersion := previousVersion
-
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
-	suite.Run(t, newStandaloneUpgradeRetryDownloadTestSuite(info, upgradeToVersion))
-}
-
-type StandaloneUpgradeRetryDownloadTestSuite struct {
-	suite.Suite
-
-	requirementsInfo *define.Info
-	toVersion        *version.ParsedSemVer
-	agentFixture     *atesting.Fixture
-
-	isEtcHostsModified bool
-}
-
-type versionInfo struct {
-	Version string `yaml:"version"`
-	Commit  string `yaml:"commit"`
-}
-
-type versionOutput struct {
-	Binary versionInfo `yaml:"binary"`
-	Daemon versionInfo `yaml:"daemon"`
-}
-
-func newStandaloneUpgradeRetryDownloadTestSuite(info *define.Info, toVersion *version.ParsedSemVer) *StandaloneUpgradeRetryDownloadTestSuite {
-	return &StandaloneUpgradeRetryDownloadTestSuite{
-		requirementsInfo: info,
-		toVersion:        toVersion,
-	}
-}
-
-// Before suite
-func (s *StandaloneUpgradeRetryDownloadTestSuite) SetupSuite() {
-	agentFixture, err := define.NewFixture(
-		s.T(),
-	)
-	s.Require().NoError(err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	err = agentFixture.Prepare(ctx)
-	s.Require().NoError(err, "error preparing agent fixture")
-	s.agentFixture = agentFixture
-}
-
-func (s *StandaloneUpgradeRetryDownloadTestSuite) TestUpgradeStandaloneElasticAgentRetryDownload() {
-	ctx := context.Background()
-
-	s.T().Log("Install the built Agent")
-	output, err := tools.InstallStandaloneAgent(s.agentFixture)
-	s.T().Log(string(output))
-	s.Require().NoError(err)
-
-	s.T().Log("Ensure the correct version is running")
-	currentVersion, err := s.getVersion(ctx)
-	s.Require().NoError(err)
-
-	s.T().Log("Modify /etc/hosts to simulate transient network error")
-	cmd := exec.Command("sed",
-		"-i.bak",
-		"s/localhost/localhost artifacts.elastic.co artifacts-api.elastic.co/g",
-		"/etc/hosts",
-	)
-	s.T().Log("/etc/hosts modify command: ", cmd.String())
-
-	output, err = cmd.CombinedOutput()
->>>>>>> 24acf95d88 (Isolate standalone upgrade retry test (#2919))
-	if err != nil {
-		return "", fmt.Errorf("error parsing version [%s]: %w", v, err)
->>>>>>> c0de9a058 (Isolate standalone upgrade retry test (#2919))
-	}
-
-	suite.Run(t, testSuite)
-}
-
-type StandaloneUpgradeTestSuite struct {
-	suite.Suite
-
-	requirementsInfo *define.Info
-	agentVersion     string
-	agentFixture     *atesting.Fixture
-}
-
-// Before suite
-func (s *StandaloneUpgradeTestSuite) SetupSuite() {
-
-	agentFixture, err := define.NewFixture(
-		s.T(),
-	)
-
-	require.NoError(s.T(), err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	err = agentFixture.Prepare(ctx)
-	s.Require().NoError(err, "error preparing agent fixture")
-	s.agentFixture = agentFixture
-}
-
-func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot() {
-
-	const minVersionString = "8.9.0-SNAPSHOT"
-	minVersion, _ := version.ParseVersion(minVersionString)
-	pv, err := version.ParseVersion(s.agentVersion)
-	if pv.Less(*minVersion) {
-		s.T().Skipf("Version %s is lower than min version %s", s.agentVersion, minVersionString)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	output, err := tools.InstallStandaloneAgent(s.agentFixture)
-	s.T().Logf("Agent installation output: %q", string(output))
-	require.NoError(s.T(), err)
-
-	c := s.agentFixture.Client()
-
-	require.Eventually(s.T(), func() bool {
-		err := c.Connect(ctx)
-		if err != nil {
-			s.T().Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
-		state, err := c.State(ctx)
-		if err != nil {
-			s.T().Logf("error getting the agent state: %v", err)
-			return false
-		}
-		s.T().Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
-
-	aac := tools.NewArtifactAPIClient()
-	vList, err := aac.GetVersions(ctx)
-	s.Require().NoError(err, "error retrieving versions from Artifact API")
-	s.Require().NotNil(vList)
-
-	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
-	for _, v := range vList.Versions {
-		pv, err := version.ParseVersion(v)
-		s.Require().NoErrorf(err, "invalid version retrieved from artifact API: %q", v)
-		sortedParsedVersions = append(sortedParsedVersions, pv)
-	}
-
-	s.Require().NotEmpty(sortedParsedVersions)
-
-	// normally the output of the versions returned by artifact API is already sorted in ascending order,
-	// if we want to sort in descending order we could use
-	sort.Sort(sort.Reverse(sortedParsedVersions))
-
-	var latestSnapshotVersion *version.ParsedSemVer
-	// fetch the latest SNAPSHOT build
-	for _, pv := range sortedParsedVersions {
-		if pv.IsSnapshot() {
-			latestSnapshotVersion = pv
-			break
-		}
-	}
-
-	s.Require().NotNil(latestSnapshotVersion)
-
-	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
-	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
-	s.Require().NoError(err)
-	// TODO if we don't have at least 2 builds, select the next older snapshot build
-	s.Require().Greater(len(builds.Builds), 1)
-
-	// take the penultimate build of the snapshot (the builds are ordered from most to least recent)
-	upgradeVersionString := builds.Builds[1]
-
-	s.T().Logf("Targeting build %q of version %q", upgradeVersionString, latestSnapshotVersion)
-
-	buildDetails, err := aac.GetBuildDetails(ctx, latestSnapshotVersion.VersionWithPrerelease(), upgradeVersionString)
-	s.Require().NoErrorf(err, "error accessing build details for version %q and buildID %q", latestSnapshotVersion.Original(), upgradeVersionString)
-	s.Require().NotNil(buildDetails)
-	agentBuildDetails, ok := buildDetails.Build.Projects["elastic-agent"]
-	s.Require().Truef(ok, "elastic agent project not found in version %q build %q", latestSnapshotVersion.Original(), upgradeVersionString)
-
-	expectedAgentHashAfterUpgrade := agentBuildDetails.CommitHash
-
-	buildFragments := strings.Split(upgradeVersionString, "-")
-	s.Require().Lenf(buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
-
-	upgradeInputVersion := version.NewParsedSemVer(
-		latestSnapshotVersion.Major(),
-		latestSnapshotVersion.Minor(),
-		latestSnapshotVersion.Patch(),
-		latestSnapshotVersion.Prerelease(),
-		buildFragments[1],
-	)
-
-	s.T().Logf("Upgrading to version %q", upgradeInputVersion)
-
-	err = c.Connect(ctx)
-	s.Require().NoError(err, "error connecting client to agent")
-	defer c.Disconnect()
-
-	_, err = c.Upgrade(ctx, upgradeInputVersion.String(), "", false)
-	s.Require().NoErrorf(err, "error triggering agent upgrade to version %q", upgradeInputVersion.String())
-
-	s.Require().Eventuallyf(func() bool {
-		state, err := c.State(ctx)
-		if err != nil {
-			s.T().Logf("error getting the agent state: %v", err)
-			return false
-		}
-		s.T().Logf("current agent state: %+v", state)
-		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
-	}, 10*time.Minute, 1*time.Second, "agent never upgraded to expected version")
-
-	updateMarkerFile := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", ".update-marker")
-
-	s.Require().FileExists(updateMarkerFile)
-
-	// The checks of the update marker makes the test time out since it runs for more than 10 minutes :(
-	// A dedicated issue to address this has been opened: https://github.com/elastic/elastic-agent/issues/2796
-
-	// s.Require().Eventuallyf(func() bool {
-	// 	_, err := os.Stat(updateMarkerFile)
-	// 	return errors.Is(err, fs.ErrNotExist)
-	// }, 10*time.Minute, 1*time.Second, "agent never removed update marker")
-
-	// version, err := c.Version(ctx)
-	// s.Require().NoError(err, "error checking version after upgrade")
-	// s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
-}
-
-func TestStandaloneUpgradeRetryDownload(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Local:   false, // requires Agent installation
-		Isolate: false,
 		Sudo:    true, // requires Agent installation and modifying /etc/hosts
 		OS: []define.OS{
 			{Type: define.Linux},
