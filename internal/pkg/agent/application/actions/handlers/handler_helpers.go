@@ -60,12 +60,12 @@ func dispatchActionInParallel(ctx context.Context, log *logp.Logger, action disp
 				if err != nil {
 					log.Warnf("%v failed to dispatch to %v, err: %v", actionType, comp.ID, err)
 					return err
-				} else {
-					strErr := readMapString(res, "error", "")
-					if strErr != "" {
-						log.Warnf("%v failed for %v, err: %v", actionType, comp.ID, strErr)
-						return errors.New(strErr)
-					}
+				}
+
+				strErr := readMapString(res, "error", "")
+				if strErr != "" {
+					log.Warnf("%v failed for %v, err: %v", actionType, comp.ID, strErr)
+					return errors.New(strErr)
 				}
 				return nil
 			}
