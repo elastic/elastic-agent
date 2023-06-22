@@ -1419,6 +1419,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 			ExtraFlags: []string{
 				"-test.run", strings.Join(packageTests, "|"),
 				"-test.shuffle", "on",
+				"-test.timeout", "0",
 			},
 			Env: map[string]string{
 				"AGENT_VERSION":      version,

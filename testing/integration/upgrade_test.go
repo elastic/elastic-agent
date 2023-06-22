@@ -330,7 +330,7 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Local:   false, // requires Agent installation
-		Isolate: true,
+		Isolate: false,
 		Sudo:    true, // requires Agent installation and modifying /etc/hosts
 		OS: []define.OS{
 			{Type: define.Linux},
