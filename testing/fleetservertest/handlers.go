@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -62,9 +60,14 @@ func NewPathUploadComplete(agentID string) string {
 
 func NewHandlerAck() func(
 	ctx context.Context,
+	h *Handlers,
 	agentID string,
 	ackRequest AckRequest) (*AckResponse, *HTTPError) {
-	return func(ctx context.Context, agentID string, ackRequest AckRequest) (*AckResponse, *HTTPError) {
+	return func(
+		ctx context.Context,
+		h *Handlers,
+		agentID string,
+		ackRequest AckRequest) (*AckResponse, *HTTPError) {
 		resp := AckResponse{Action: "action"}
 		for range ackRequest.Events {
 			resp.Items = append(resp.Items, AckResponseItem{
@@ -76,41 +79,48 @@ func NewHandlerAck() func(
 		return &resp, nil
 	}
 }
-func NewHandlerEnroll(policyID string, apiKey APIKey) func(
+
+// NewHandlerEnroll returns an enrol handler ready to be used. Its repose will
+// use the agentID, policyID and apiKey when building the EnrollResponse.
+func NewHandlerEnroll(agentID, policyID string, apiKey APIKey) func(
 	ctx context.Context,
+	h *Handlers,
 	userAgent string,
 	enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
+	return func(
+		ctx context.Context,
+		h *Handlers,
+		userAgent string,
+		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
 
-	return func(ctx context.Context, userAgent string, enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
-		localMetadata, err := json.Marshal(enrollRequest.Metadata)
+		h.AgentID = agentID
+
+		localMetadata, err := json.Marshal(enrollRequest.Metadata.Local)
 		if err != nil {
 			return nil, &HTTPError{
 				StatusCode: http.StatusInternalServerError,
-				Message:    http.StatusText(http.StatusInternalServerError),
-				Status: fmt.Sprintf(
+				Message: fmt.Sprintf(
 					"could not marshal enroll request metadata into JSON: %v",
 					err),
 			}
 		}
 
-		agentID, err := uuid.NewUUID()
+		localMetadata, err = updateLocalMetaAgentID(localMetadata, agentID)
 		if err != nil {
 			return nil, &HTTPError{
 				StatusCode: http.StatusInternalServerError,
-				Status: fmt.Sprintf(
-					"could not create agentID: %v",
-					err),
+				Message:    fmt.Sprintf("could not update local metadata: %v", err),
 			}
 		}
 
 		return &EnrollResponse{
 			Action: "created",
 			Item: EnrollResponseItem{
-				AgentID:              agentID.String(),
+				AgentID:              agentID,
 				Active:               true,
 				PolicyID:             policyID,
 				Type:                 "PERMANENT",
-				EnrolledAt:           time.Now().Format(time.RFC3339),
+				EnrolledAt:           timeNow().Format(time.RFC3339),
 				UserProvidedMetadata: nil,
 				LocalMetadata:        localMetadata,
 				Actions:              nil,
@@ -127,6 +137,7 @@ func NewHandlerEnroll(policyID string, apiKey APIKey) func(
 // System integrations and, if withEndpoint is true, Endpoint Security.
 func NewHandlerCheckin(ackToken string) func(
 	ctx context.Context,
+	h *Handlers,
 	agentID string,
 	userAgent string,
 	acceptEncoding string,
@@ -136,13 +147,13 @@ func NewHandlerCheckin(ackToken string) func(
 
 	return func(
 		ctx context.Context,
+		h *Handlers,
 		agentID string,
 		userAgent string,
 		acceptEncoding string,
 		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
+		h.AgentID = agentID
 
-		// TODO: add output
-		// data:= DataFromCtx(ctx)
 		resp := CheckinResponse{}
 		err := json.Unmarshal(
 			[]byte(fmt.Sprintf(policy, ackToken, agentID)),
@@ -158,8 +169,8 @@ func NewHandlerCheckin(ackToken string) func(
 	}
 }
 
-func NewHandlerStatusHealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
-	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
+func NewHandlerStatusHealth() func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
+	return func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
 		return &StatusResponse{
 			Name:   "fleet-server",
 			Status: "HEALTHY",

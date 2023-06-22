@@ -48,15 +48,12 @@ func (p *ProxyURL) SetupSuite() {
 	}
 
 	fleet := fleetservertest.NewServerWithFakeComponent(
-		fleetservertest.API{},
+		&fleetservertest.Handlers{},
 		policyID,
 		ackToken,
 		fleetservertest.Data{
 			APIKey:          apiKey,
 			EnrollmentToken: enrollmentToken,
-			Output: fmt.Sprintf(
-				`{"api_key":"%s","hosts":["%s"],"type":"elasticsearch"}`,
-				apiKey, "TODO: fix me!"),
 		})
 	defer fleet.Close()
 	p.fleet = fleet

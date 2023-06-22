@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/gorilla/mux"
 )
@@ -25,7 +26,10 @@ import (
 // API.APIKey for all others.
 // TODO(Anderson): fix me!
 type Handlers struct {
-	// AgentID is the ID of the last enrolled agent.
+	// AgentID is the ID of agent communicating with this fleet-server:
+	//  - on Enrol this ID is returned,
+	//  - on all other API calls using an agent ID, if the ID sent is different,
+	// fleet-server will return a 404.
 	AgentID string
 
 	APIKey          string
@@ -33,11 +37,13 @@ type Handlers struct {
 
 	AckFn func(
 		ctx context.Context,
+		h *Handlers,
 		agentID string,
 		ackRequest AckRequest) (*AckResponse, *HTTPError)
 
 	CheckinFn func(
 		ctx context.Context,
+		h *Handlers,
 		id string,
 		userAgent string,
 		acceptEncoding string,
@@ -45,23 +51,28 @@ type Handlers struct {
 
 	EnrollFn func(
 		ctx context.Context,
+		h *Handlers,
 		userAgent string,
 		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
 
 	ArtifactFn func(
 		ctx context.Context,
+		h *Handlers,
 		artifactID string,
 		sha2 string) *HTTPError
 
 	StatusFn func(
-		ctx context.Context) (*StatusResponse, *HTTPError)
+		ctx context.Context,
+		h *Handlers) (*StatusResponse, *HTTPError)
 
 	UploadBeginFn func(
 		ctx context.Context,
+		h *Handlers,
 		requestBody UploadBeginRequest) (*UploadBeginResponse, *HTTPError)
 
 	UploadChunkFn func(
 		ctx context.Context,
+		h *Handlers,
 		uploadID string,
 		chunkNum int32,
 		xChunkSHA2 string,
@@ -69,6 +80,7 @@ type Handlers struct {
 
 	UploadCompleteFn func(
 		ctx context.Context,
+		h *Handlers,
 		uploadID string,
 		uploadCompleteRequest UploadCompleteRequest) *HTTPError
 }
@@ -81,15 +93,30 @@ type Route struct {
 	Handler http.Handler
 }
 
-// NewRouter creates a new router for any number of api routers
-func NewRouter(hs Handlers) *mux.Router {
+// NewRouter creates a new *mux.Router for each route defined on handlers.
+// It'll add the AuthenticationMiddleware and will synchronise the calls for the
+// handlers. That way it's safe for any handler implementation to access the
+// Handlers properties.
+func NewRouter(handlers *Handlers) *mux.Router {
+	// mu is the mutex used to allow any handler safely access the properties
+	// of handlers. It's used by a middleware so the handler implementation
+	// does not need to worry about race conditions.
+	mu := &sync.Mutex{}
+
 	router := mux.NewRouter().StrictSlash(true)
-	for _, route := range hs.Routes() {
+	for _, route := range handlers.Routes() {
+		route := route // needed because it's been captured in the closure
 		router.
 			Methods(route.Method).
 			Path(route.Pattern).
 			Name(route.Name).
-			Handler(AuthenticationMiddleware(route.AuthKey, route.Handler))
+			Handler(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					mu.Lock()
+					defer mu.Unlock()
+					AuthenticationMiddleware(route.AuthKey, route.Handler).
+						ServeHTTP(w, r)
+				}))
 	}
 
 	return router
@@ -167,7 +194,8 @@ func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := mux.Vars(r)
-	idParam := params["id"]
+	agentID := params["id"]
+
 	ackRequestParam := AckRequest{}
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&ackRequestParam); err != nil {
@@ -178,7 +206,7 @@ func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.AckFn(r.Context(), idParam, ackRequestParam)
+	result, err := h.AckFn(r.Context(), h, agentID, ackRequestParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -197,7 +225,8 @@ func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := mux.Vars(r)
-	idParam := params["id"]
+	agentID := params["id"]
+
 	userAgentParam := r.Header.Get("User-Agent")
 	acceptEncodingParam := r.Header.Get("Accept-Encoding")
 	checkinRequestParam := CheckinRequest{}
@@ -213,7 +242,8 @@ func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.CheckinFn(
 		r.Context(),
-		idParam,
+		h,
+		agentID,
 		userAgentParam,
 		acceptEncodingParam,
 		checkinRequestParam)
@@ -247,6 +277,7 @@ func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.EnrollFn(
 		r.Context(),
+		h,
 		userAgentParam,
 		enrollRequestParam)
 	if err != nil {
@@ -267,10 +298,11 @@ func (h *Handlers) Artifact(w http.ResponseWriter, r *http.Request) {
 
 	}
 	params := mux.Vars(r)
-	idParam := params["id"]
+	agentID := params["id"]
+
 	sha2Param := params["sha2"]
 
-	err := h.ArtifactFn(r.Context(), idParam, sha2Param)
+	err := h.ArtifactFn(r.Context(), h, agentID, sha2Param)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -289,7 +321,7 @@ func (h *Handlers) Status(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	result, err := h.StatusFn(r.Context())
+	result, err := h.StatusFn(r.Context(), h)
 	if err != nil {
 		if result != nil {
 			respondAsJSON(err.StatusCode, result, w)
@@ -319,7 +351,7 @@ func (h *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.UploadBeginFn(r.Context(), requestBodyParam)
+	result, err := h.UploadBeginFn(r.Context(), h, requestBodyParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -339,7 +371,7 @@ func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := mux.Vars(r)
-	idParam := params["id"]
+	uploadID := params["id"]
 
 	chunkNumParam := params["chunkNum"]
 	if chunkNumParam == "" {
@@ -363,7 +395,8 @@ func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 
 	uerr := h.UploadChunkFn(
 		r.Context(),
-		idParam,
+		h,
+		uploadID,
 		int32(chunkNum),
 		chunkSHA2,
 		body)
@@ -383,7 +416,7 @@ func (h *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	params := mux.Vars(r)
-	idParam := params["id"]
+	uploadID := params["id"]
 	uploadCompleteRequestParam := UploadCompleteRequest{}
 	d := json.NewDecoder(r.Body)
 	if err := d.Decode(&uploadCompleteRequestParam); err != nil {
@@ -394,7 +427,7 @@ func (h *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.UploadCompleteFn(r.Context(), idParam, uploadCompleteRequestParam)
+	err := h.UploadCompleteFn(r.Context(), h, uploadID, uploadCompleteRequestParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
 		return
@@ -416,4 +449,34 @@ func respondAsJSON(status int, body interface{}, w http.ResponseWriter) {
 		//nolint:forbidigo // it's to be used in tests
 		fmt.Printf("could not write response body: %v\n", err)
 	}
+}
+
+func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
+	if data == nil {
+		return data, nil
+	}
+
+	var m map[string]interface{}
+	err := json.Unmarshal(data, &m)
+	if err != nil {
+		return nil, err
+	}
+
+	if v, ok := m["elastic"]; ok {
+		if sm, ok := v.(map[string]interface{}); ok {
+			if v, ok = sm["agent"]; ok {
+				if sm, ok = v.(map[string]interface{}); ok {
+					if _, ok = sm["id"]; ok {
+						sm["id"] = agentID
+						data, err = json.Marshal(m)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return data, nil
 }

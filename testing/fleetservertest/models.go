@@ -248,7 +248,7 @@ type EnrollMetadata struct {
 	UserProvided string `json:"user_provided"`
 
 	// An embedded JSON object that holds meta-data values. Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent. elastic-agent will populate the object with information from the binary and host/system environment. If not empty fleet-server will update the value of `local[\"elastic\"][\"agent\"][\"id\"]` to the agent ID (assuming the keys exist). The (possibly updated) value is sent by fleet-server when creating the record for a new agent.
-	Local string `json:"local"`
+	Local json.RawMessage `json:"local"`
 
 	// User provided tags for the agent. fleet-server will pass the tags to the agent record on enrollment.
 	Tags []string `json:"tags"`
@@ -359,6 +359,8 @@ type UploadCompleteRequestTransithash struct {
 // =============================================================================
 
 // HTTPError is the HTTP error to be returned to the client.
+// If no StatusCode is defined, http.StatusInternalServerError will be used by
+// String() and Error().
 type HTTPError struct {
 
 	// The HTTP status code of the error.

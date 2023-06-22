@@ -6,6 +6,7 @@ package fleetservertest
 
 import (
 	"net/http/httptest"
+	"time"
 )
 
 type Data struct {
@@ -23,11 +24,13 @@ type Server struct {
 	Data Data
 }
 
+var timeNow = time.Now
+
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
 // If a route is called and its handler (the *Fn field) is nil a.
 // http.StatusNotImplemented error will be returned.
 // If insecure is set, no authorization check will be performed.
-func NewServer(h Handlers, _ Data) *Server {
+func NewServer(h *Handlers, _ Data) *Server {
 	mux := NewRouter(h)
 
 	return &Server{
@@ -40,18 +43,7 @@ func NewServer(h Handlers, _ Data) *Server {
 // configured. If any of those handlers are defined on api, it'll overwrite the
 // default implementation. The returned policy contains one integration using
 // the fake input.
-//
-// TODO: it needs to receive output configuration throug a WithEs/WithShipper
-// function //
-func NewServerWithFakeComponent(h Handlers, policyID, ackToken string, data Data) *Server {
-	// {
-	//    "api_key": "REDACTED:REDACTED",
-	//    "hosts": [
-	//      "https://REDACTED.some.elstc.co:443"
-	//    ],
-	//    "type": "elasticsearch"
-	//  }
-
+func NewServerWithFakeComponent(h *Handlers, agentID, policyID, ackToken string, data Data) *Server {
 	if h.StatusFn == nil {
 		h.StatusFn = NewHandlerStatusHealth()
 	}
@@ -59,7 +51,7 @@ func NewServerWithFakeComponent(h Handlers, policyID, ackToken string, data Data
 		h.CheckinFn = NewHandlerCheckin(ackToken)
 	}
 	if h.EnrollFn == nil {
-		h.EnrollFn = NewHandlerEnroll(policyID, data.APIKey)
+		h.EnrollFn = NewHandlerEnroll(agentID, policyID, data.APIKey)
 	}
 	if h.AckFn == nil {
 		h.AckFn = NewHandlerAck()

@@ -6,17 +6,20 @@ package fleetservertest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 func ExampleNewServer_status() {
 	apiKey := "aAPIKey"
-	ts := NewServer(Handlers{
+	ts := NewServer(&Handlers{
 		APIKey:   apiKey,
 		StatusFn: NewHandlerStatusHealth(),
 	}, Data{})
@@ -48,7 +51,7 @@ func ExampleNewServer_status() {
 func ExampleNewServer_checkin() {
 	agentID := "agentID"
 
-	ts := NewServer(Handlers{
+	ts := NewServer(&Handlers{
 		CheckinFn: NewHandlerCheckin(agentID),
 	}, Data{})
 
@@ -63,6 +66,80 @@ func ExampleNewServer_checkin() {
 
 	// Output:
 	// [action_id: policy:24e4d030-ffa7-11ed-b040-9debaa5fecb8:2:1, type: POLICY_CHANGE]
+}
+
+func ExampleNewHandlerEnroll() {
+	nowStr := "2009-11-10T23:00:00+00:00"
+	now, err := time.Parse(time.RFC3339, nowStr)
+	if err != nil {
+		panic(fmt.Sprintf("could not parse %q as time: %v", nowStr, err))
+	}
+	timeNow = func() time.Time { return now }
+
+	agentID := "agentID"
+	policyID := "policyID"
+	enrollAPIKey := "enrollAPIKey"
+	apiKey := APIKey{
+		ID:  "apiKeyID",
+		Key: "apiKeyKey",
+	}
+
+	ts := NewServer(&Handlers{
+		EnrollFn: NewHandlerEnroll(agentID, policyID, apiKey),
+	}, Data{})
+
+	cmd := fleetapi.NewEnrollCmd(sender{url: ts.URL, path: NewPathCheckin(agentID)})
+	resp, err := cmd.Execute(context.Background(), &fleetapi.EnrollRequest{
+		EnrollAPIKey: enrollAPIKey,
+		Type:         "PERMANENT",
+		Metadata: fleetapi.Metadata{
+			Local: &info.ECSMeta{
+				Elastic: &info.ElasticECSMeta{Agent: &info.AgentECSMeta{
+					ID: "wrongAgentID",
+				}},
+			},
+		},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("could not execute enrol command: %v", err))
+	}
+
+	bs, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		panic(fmt.Sprintf("could not marshal enrol response: %v", err))
+	}
+	fmt.Println(string(bs))
+
+	// Output:
+	// {
+	//   "action": "created",
+	//   "item": {
+	//     "id": "agentID",
+	//     "active": true,
+	//     "policy_id": "policyID",
+	//     "type": "PERMANENT",
+	//     "enrolled_at": "2009-11-10T23:00:00Z",
+	//     "user_provided_metadata": null,
+	//     "local_metadata": {
+	//       "elastic": {
+	//         "agent": {
+	//           "build.original": "",
+	//           "id": "agentID",
+	//           "log_level": "",
+	//           "snapshot": false,
+	//           "upgradeable": false,
+	//           "version": ""
+	//         }
+	//       },
+	//       "host": null,
+	//       "os": null
+	//     },
+	//     "actions": null,
+	//     "access_api_key": "apiKeyKey",
+	//     "tags": null
+	//   }
+	// }
+	//
 }
 
 type agentInfo string
