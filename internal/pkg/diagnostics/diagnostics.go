@@ -273,6 +273,13 @@ func redactKey(k string) bool {
 }
 
 func zipLogs(zw *zip.Writer, ts time.Time) error {
+	currentDir := fmt.Sprintf("%s-%s", agentName, release.ShortCommit())
+	if !paths.IsVersionHome() {
+		// running in a container with custom top path set
+		// logs are directly under top path
+		return zipLogsWithPath(paths.Home(), currentDir, true, zw, ts)
+	}
+
 	dataDir, err := os.Open(paths.Data())
 	if err != nil {
 		return err
@@ -285,7 +292,6 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 	}
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)
-	currentDir := fmt.Sprintf("%s-%s", agentName, release.ShortCommit())
 	for _, dir := range subdirs {
 		if !strings.HasPrefix(dir, dirPrefix) {
 			continue
@@ -295,7 +301,6 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 		if err := zipLogsWithPath(path, dir, collectServices, zw, ts); err != nil {
 			return err
 		}
-
 	}
 
 	return nil
