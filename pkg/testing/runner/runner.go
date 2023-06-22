@@ -52,9 +52,9 @@ type OSRunnerResult struct {
 // OSRunner provides an interface to run the tests on the OS.
 type OSRunner interface {
 	// Prepare prepares the runner to actual run on the host.
-	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error
+	Prepare(ctx context.Context, c SSHClient, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error
 	// Run runs the actual tests and provides the result.
-	Run(ctx context.Context, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
+	Run(ctx context.Context, c SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
 }
 
 // Logger is a simple logging interface used by each runner type.
@@ -200,14 +200,25 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 				if !ok {
 					return fmt.Errorf("unable to find layout batch with ID: %s", m.Layout.Name)
 				}
-				loggerPrefix := fmt.Sprintf(
-					"%s/%s/%s/%s[%s]",
-					batch.LayoutOS.OS.Type,
-					batch.LayoutOS.OS.Arch,
-					batch.LayoutOS.OS.Distro,
-					batch.LayoutOS.OS.Version,
-					batch.ID[len(batch.ID)-5:len(batch.ID)-1],
-				)
+				var loggerPrefix string
+				if batch.LayoutOS.OS.Type == define.Linux {
+					loggerPrefix = fmt.Sprintf(
+						"%s/%s/%s/%s[%s]",
+						batch.LayoutOS.OS.Type,
+						batch.LayoutOS.OS.Arch,
+						batch.LayoutOS.OS.Distro,
+						batch.LayoutOS.OS.Version,
+						batch.ID[len(batch.ID)-5:len(batch.ID)-1],
+					)
+				} else {
+					loggerPrefix = fmt.Sprintf(
+						"%s/%s/%s[%s]",
+						batch.LayoutOS.OS.Type,
+						batch.LayoutOS.OS.Arch,
+						batch.LayoutOS.OS.Version,
+						batch.ID[len(batch.ID)-5:len(batch.ID)-1],
+					)
+				}
 				logger := &batchLogger{prefix: loggerPrefix}
 				result, err := r.runMachine(ctx, sshAuth, logger, repoArchive, batch, m)
 				if err != nil {
@@ -231,9 +242,8 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 // runMachine runs the batch on the machine.
 func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
 	logger.Logf("Starting SSH connection to %s", machine.PublicIP)
-	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer connectCancel()
-	client, err := sshConnect(connectCtx, machine.PublicIP, machine.Layout.Username, sshAuth)
+	client := NewSSHClient(machine.PublicIP, machine.Layout.Username, sshAuth)
+	err := client.ConnectWithTimeout(ctx, 10*time.Minute)
 	if err != nil {
 		logger.Logf("Failed to connect to instance %s: %s", machine.PublicIP, err)
 		return OSRunnerResult{}, fmt.Errorf("failed to connect to instance %s: %w", machine.InstanceName, err)
@@ -246,6 +256,8 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 	err = batch.LayoutOS.Runner.Prepare(ctx, client, logger, batch.LayoutOS.OS.Arch, r.cfg.GOVersion, repoArchive, r.getBuildPath(batch))
 	if err != nil {
 		logger.Logf("Failed to prepare instance: %s", err)
+		logger.Logf("Waiting 30 minutes because of error")
+		<-time.After(30 * time.Minute)
 		return OSRunnerResult{}, fmt.Errorf("failed to prepare instance %s: %w", machine.InstanceName, err)
 	}
 
@@ -274,7 +286,12 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 	}
 
 	// run the actual tests on the host
-	prefix := fmt.Sprintf("%s-%s-%s-%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, strings.Replace(batch.LayoutOS.OS.Version, ".", "", -1))
+	var prefix string
+	if batch.LayoutOS.OS.Type == define.Linux {
+		prefix = fmt.Sprintf("%s-%s-%s-%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, strings.Replace(batch.LayoutOS.OS.Version, ".", "", -1))
+	} else {
+		prefix = fmt.Sprintf("%s-%s-%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, strings.Replace(batch.LayoutOS.OS.Version, ".", "", -1))
+	}
 	result, err := batch.LayoutOS.Runner.Run(ctx, client, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
 	if err != nil {
 		logger.Logf("Failed to execute tests on instance: %s", err)
@@ -742,7 +759,12 @@ func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error)
 		if !ok {
 			return Result{}, fmt.Errorf("batch ID not found %s", id)
 		}
-		batchName := fmt.Sprintf("%s/%s/%s/%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, batch.LayoutOS.OS.Version)
+		var batchName string
+		if batch.LayoutOS.OS.Type == define.Linux {
+			batchName = fmt.Sprintf("%s/%s/%s/%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, batch.LayoutOS.OS.Version)
+		} else {
+			batchName = fmt.Sprintf("%s/%s/%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Version)
+		}
 		for _, pkg := range res.Packages {
 			err := mergePackageResult(pkg, id, batchName, false, &rawOutput, &jsonOutput, &suites)
 			if err != nil {
