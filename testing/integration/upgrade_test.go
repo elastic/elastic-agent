@@ -355,16 +355,12 @@ func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVe
 	require.NoError(t, err, "error downloading package")
 	err = atesting.ExtractArtifact(t, artifactFilePath, tmpDownloadDir)
 	require.NoError(t, err, "error extracting artifact")
-	extractedDir := ""
-	entries, err := os.ReadDir(tmpDownloadDir)
-	require.NoError(t, err, "unable to read temp directory")
-	for _, e := range entries {
-		if e.IsDir() && strings.HasPrefix(e.Name(), "elastic-agent-") {
-			extractedDir = e.Name()
-			break
-		}
-	}
-	hashFilePath := filepath.Join(tmpDownloadDir, extractedDir, ".build_hash.txt")
+
+	matches, err := filepath.Glob(filepath.Join(tmpDownloadDir, "elastic-agent-*", ".build_hash.txt"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches)
+
+	hashFilePath := matches[0]
 	t.Logf("Accessing hash file %q", hashFilePath)
 	hashBytes, err := os.ReadFile(hashFilePath)
 	require.NoError(t, err, "error reading build hash")
