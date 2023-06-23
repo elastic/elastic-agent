@@ -120,7 +120,7 @@ type CheckinRequest struct {
 }
 type CheckinResponse struct {
 
-	// The acknowlegment token used to indicate action delivery.
+	// The acknowledgment token used to indicate action delivery.
 	AckToken string `json:"ack_token,omitempty"`
 
 	// The action result. Set to \"checkin\".

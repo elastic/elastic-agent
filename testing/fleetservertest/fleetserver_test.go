@@ -207,17 +207,17 @@ func ExampleNewServer_checkin_fakeComponent() {
 	}
 
 	var count int
-	nextAction := func() (string, *HTTPError) {
+	nextAction := func() (CheckinAction, *HTTPError) {
 		defer func() { count++ }()
 
 		switch count {
 		case 0:
-			return actions, nil
+			return CheckinAction{Actions: []string{actions}}, nil
 		case 1:
-			return "", &HTTPError{StatusCode: http.StatusTeapot}
+			return CheckinAction{}, &HTTPError{StatusCode: http.StatusTeapot}
 		}
 
-		return "[]", nil
+		return CheckinAction{}, nil
 	}
 
 	ts := NewServer(&Handlers{
@@ -252,6 +252,77 @@ func ExampleNewServer_checkin_fakeComponent() {
 	// [action_id: ActionID, type: POLICY_CHANGE]
 	// Error: status code: 418, fleet-server returned an error: I'm a teapot
 	// []
+}
+
+func ExampleNewServer_checkin_withDelay() {
+	agentID := "agentID"
+	policyID := "policyID"
+	tmpl := TmplData{
+		AckToken:   "AckToken",
+		AgentID:    "AgentID",
+		ActionID:   "ActionID",
+		PolicyID:   policyID,
+		FleetHosts: `"host1", "host2"`,
+		SourceURI:  "http://source.uri",
+		CreatedAt:  "2023-05-31T11:37:50.607Z",
+		Output: struct {
+			APIKey string
+			Hosts  string
+			Type   string
+		}{APIKey: "APIKey", Hosts: `"host1", "host2"`, Type: "Type"},
+	}
+
+	action, err := NewActionPolicyChangeWithFakeComponent(tmpl)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get new actions: %v", err))
+	}
+
+	delay := 250 * time.Millisecond
+	var sent bool
+	nextAction := func() (CheckinAction, *HTTPError) {
+		if !sent {
+			sent = true
+			return CheckinAction{Actions: []string{action}, Delay: delay}, nil
+		}
+
+		return CheckinAction{}, nil
+	}
+
+	ts := NewServer(&Handlers{
+		AgentID:   agentID, // as there is no enrol, the agentID needs to be manually set
+		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
+	}, Data{})
+
+	// 1st - call actions have a delay.
+	cmd := fleetapi.NewCheckinCmd(
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+
+	start := time.Now()
+	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	if err != nil {
+		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
+	}
+	elapsed := time.Since(start)
+	fmt.Printf("took more than %s: %t. response: %s\n",
+		delay,
+		elapsed > delay,
+		resp.Actions)
+
+	// 2nd - subsequent call to nextAction() will return immediately.
+	start = time.Now()
+	resp, _, err = cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	if err != nil {
+		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
+	}
+	elapsed = time.Since(start)
+	fmt.Printf("took more than %s: %t. response: %s\n",
+		delay,
+		elapsed > time.Second,
+		resp.Actions)
+
+	// Output:
+	// took more than 250ms: true. response: [action_id: ActionID, type: POLICY_CHANGE]
+	// took more than 250ms: false. response: []
 }
 
 func ExampleNewServer_ackWithAcker() {
@@ -360,17 +431,17 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	//  2nd - an error http.StatusTeapot
 	//  all other calls - no action
 	var actionsIdx int
-	nextAction := func() (string, *HTTPError) {
+	nextAction := func() (CheckinAction, *HTTPError) {
 		defer func() { actionsIdx++ }()
 
 		switch actionsIdx {
 		case 0:
-			return actions, nil
+			return CheckinAction{Actions: []string{actions}}, nil
 		case 1:
-			return "", &HTTPError{StatusCode: http.StatusTeapot}
+			return CheckinAction{}, &HTTPError{StatusCode: http.StatusTeapot}
 		}
 
-		return "[]", nil
+		return CheckinAction{}, nil
 	}
 
 	// =========================================================================

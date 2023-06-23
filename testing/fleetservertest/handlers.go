@@ -201,13 +201,20 @@ func NewHandlerCheckin(ackToken string) func(
 	}
 }
 
+// CheckinAction is the actions to be sent on next checkin and the delay, how
+// long the handler will wait before sending the response.
+type CheckinAction struct {
+	Actions []string
+	Delay   time.Duration
+}
+
 // NewHandlerCheckinFakeComponent takes a generator function that returns the
 // actions to be sent on the next checkin. The actions format is a JSON list.
 // E.g.:
 //   - ["action1", "action2"]
 //   - ["action1"]
 //   - []
-func NewHandlerCheckinFakeComponent(nextActions func() (string, *HTTPError)) func(
+func NewHandlerCheckinFakeComponent(next func() (CheckinAction, *HTTPError)) func(
 	ctx context.Context,
 	h *Handlers,
 	agentID string,
@@ -229,10 +236,12 @@ func NewHandlerCheckinFakeComponent(nextActions func() (string, *HTTPError)) fun
 			}
 		}
 
-		actions, hErr := nextActions()
+		data, hErr := next()
 		if hErr != nil {
 			return nil, hErr
 		}
+
+		actions := fmt.Sprintf("[%s]", strings.Join(data.Actions, ","))
 
 		respStr := NewCheckinResponse(actions)
 		resp := CheckinResponse{}
@@ -245,6 +254,9 @@ func NewHandlerCheckinFakeComponent(nextActions func() (string, *HTTPError)) fun
 				Message:    fmt.Sprintf("failed to unmarshal policy: %v", err),
 			}
 		}
+
+		// simulate long pool
+		time.Sleep(data.Delay)
 
 		return &resp, nil
 	}
