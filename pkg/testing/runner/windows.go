@@ -183,7 +183,7 @@ func sshRunPowershell(ctx context.Context, c SSHClient, cmd string) ([]byte, []b
 func toPowershellScript(agentVersion string, prefix string, verbose bool, tests []string, env map[string]string) string {
 	var sb strings.Builder
 	for k, v := range env {
-		sb.WriteString("$env")
+		sb.WriteString("$env:")
 		sb.WriteString(k)
 		sb.WriteString("=\"")
 		sb.WriteString(v)
