@@ -30,7 +30,7 @@ elastic-agent::
 
 elastic-agent::
 
-* Log Start And Stop Operations From Service Runtime At Info Level. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2879[#https://github.com/elastic/elastic-agent/pull/2879] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2864[#https://github.com/elastic/elastic-agent/issues/2864]
+* Log start and stop operations from service runtime at `INFO` rather than `DEBUG` level. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2879[#https://github.com/elastic/elastic-agent/pull/2879] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2864[#https://github.com/elastic/elastic-agent/issues/2864]
 
 
 
