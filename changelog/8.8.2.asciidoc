@@ -12,7 +12,7 @@ Review important information about the  8.8.2 release.
 
 elastic-agent::
 
-* Increase Go Version To 1.19.10. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2846[#https://github.com/elastic/elastic-agent/pull/2846] 
+* Updated Go version to 1.19.10. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2846[#https://github.com/elastic/elastic-agent/pull/2846] 
 
 
 
