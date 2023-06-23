@@ -68,12 +68,37 @@ func NewHandlerAck() func(
 		h *Handlers,
 		agentID string,
 		ackRequest AckRequest) (*AckResponse, *HTTPError) {
-		resp := AckResponse{Action: "action"}
+		resp := AckResponse{Action: "acks"}
 		for range ackRequest.Events {
 			resp.Items = append(resp.Items, AckResponseItem{
 				Status:  http.StatusOK,
 				Message: http.StatusText(http.StatusOK),
 			})
+		}
+
+		return &resp, nil
+	}
+}
+
+// NewHandlerAckWithAcker takes an acker, a function that for each actionID must
+// return the expected AckResponseItem for that action and if this ack errored
+// or not.
+func NewHandlerAckWithAcker(acker func(actionID string) (AckResponseItem, bool)) func(
+	ctx context.Context,
+	h *Handlers,
+	agentID string,
+	ackRequest AckRequest) (*AckResponse, *HTTPError) {
+	return func(
+		ctx context.Context,
+		h *Handlers,
+		agentID string,
+		ackRequest AckRequest) (*AckResponse, *HTTPError) {
+		resp := AckResponse{Action: "acks"}
+
+		for _, e := range ackRequest.Events {
+			r, isErr := acker(e.ActionId)
+			resp.Errors = resp.Errors || isErr
+			resp.Items = append(resp.Items, r)
 		}
 
 		return &resp, nil
@@ -169,13 +194,13 @@ func NewHandlerCheckin(ackToken string) func(
 	}
 }
 
-// NewHandlerCheckinFakeComponent takes a generator function that should return
-// the actions to be sent on the next checkin. The actions format is a JSON list
+// NewHandlerCheckinFakeComponent takes a generator function that returns the
+// actions to be sent on the next checkin. The actions format is a JSON list.
 // E.g.:
 //   - ["action1", "action2"]
 //   - ["action1"]
 //   - []
-func NewHandlerCheckinFakeComponent(nextAction func() string) func(
+func NewHandlerCheckinFakeComponent(nextActions func() (string, *HTTPError)) func(
 	ctx context.Context,
 	h *Handlers,
 	agentID string,
@@ -191,7 +216,12 @@ func NewHandlerCheckinFakeComponent(nextAction func() string) func(
 		acceptEncoding string,
 		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
 
-		respStr := NewCheckinResponse(nextAction())
+		actions, hErr := nextActions()
+		if hErr != nil {
+			return nil, hErr
+		}
+
+		respStr := NewCheckinResponse(actions)
 		resp := CheckinResponse{}
 		err := json.Unmarshal(
 			[]byte(respStr),

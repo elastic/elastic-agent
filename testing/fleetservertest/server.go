@@ -441,10 +441,6 @@ func respondAsJSON(status int, body interface{}, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(status)
 
-	if body == nil {
-		return
-	}
-
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		//nolint:forbidigo // it's to be used in tests
 		fmt.Printf("could not write response body: %v\n", err)
