@@ -93,6 +93,13 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 }
 
 func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
+	// TODO: due to infinite retries, we may still be trying to (re)execute
+	// a service command when a new call to executeServiceCommand is made. So,
+	// before we call executeServiceCommandWithRetries (again), we need to:
+	// - cancel the previous retryCtx (if one exists),
+	// - cancel the previous cmdCtx (if one exists),
+	// - ensure that the previous command actually stopped running
+
 	return executeServiceCommandWithRetries(
 		ctx, log, binaryPath, spec,
 		context.Background(), 20*time.Second, 15*time.Minute,
