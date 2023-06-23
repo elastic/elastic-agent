@@ -54,7 +54,7 @@ type OSRunner interface {
 	// Prepare prepares the runner to actual run on the host.
 	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error
 	// Run runs the actual tests and provides the result.
-	Run(ctx context.Context, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
+	Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
 }
 
 // Logger is a simple logging interface used by each runner type.
@@ -275,7 +275,7 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 
 	// run the actual tests on the host
 	prefix := fmt.Sprintf("%s-%s-%s-%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, strings.Replace(batch.LayoutOS.OS.Version, ".", "", -1))
-	result, err := batch.LayoutOS.Runner.Run(ctx, client, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
+	result, err := batch.LayoutOS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
 	if err != nil {
 		logger.Logf("Failed to execute tests on instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", machine.InstanceName, err)

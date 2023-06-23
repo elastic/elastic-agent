@@ -1521,8 +1521,9 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 			ServiceTokenPath: serviceTokenPath,
 			Datacenter:       datacenter,
 		},
-		Matrix:     matrix,
-		SingleTest: singleTest,
+		Matrix:      matrix,
+		SingleTest:  singleTest,
+		VerboseMode: mg.Verbose(),
 	}, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
