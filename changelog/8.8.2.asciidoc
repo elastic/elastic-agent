@@ -42,7 +42,7 @@ elastic-agent::
 
 elastic-agent::
 
-* Explicitly Specify Timeout Units As Seconds In Endpoint Spec File. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2870[#https://github.com/elastic/elastic-agent/pull/2870] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2863[#https://github.com/elastic/elastic-agent/issues/2863]
+* Explicitly specify timeout units as seconds in the Endpoint spec file. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2870[#https://github.com/elastic/elastic-agent/pull/2870] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2863[#https://github.com/elastic/elastic-agent/issues/2863]
 * Fix Logs Collection In Diagnostics When Elastic Agent Is Running On K8s. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2905[#https://github.com/elastic/elastic-agent/pull/2905] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2899[#https://github.com/elastic/elastic-agent/issues/2899]
 
 // end 8.8.2 relnotes
