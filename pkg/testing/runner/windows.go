@@ -102,7 +102,7 @@ func (WindowsRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, ar
 }
 
 // Run the test
-func (WindowsRunner) Run(ctx context.Context, c SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
+func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {

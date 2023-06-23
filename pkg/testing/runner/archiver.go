@@ -25,14 +25,25 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 		return fmt.Errorf("failed to get absolute path to %s: %w", dir, err)
 	}
 	var stdout bytes.Buffer
-	p, err := process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "-z"}), process.WithCmdOptions(attachOut(&stdout), workDir(dir)))
+	processHandler, err := process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "-z"}), process.WithCmdOptions(attachOut(&stdout), workDir(dir)))
 	if err != nil {
 		return fmt.Errorf("failed to run git ls-files: %w", err)
 	}
-	i := <-p.Wait()
-	if i.ExitCode() != 0 {
-		return fmt.Errorf("failed to run git ls-files: exited code %d", i.ExitCode())
+	processDone := <-processHandler.Wait()
+	if processDone.ExitCode() != 0 {
+		return fmt.Errorf("failed to run git ls-files: exited code %d", processDone.ExitCode())
 	}
+
+	// Add files that are not yet tracked in git. Prevents a footcannon where someone writes code to a new file, then tests it before they add to git
+	processHandler, err = process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "--exclude-standard", "-o", "-z"}), process.WithCmdOptions(attachOut(&stdout), workDir(dir)))
+	if err != nil {
+		return fmt.Errorf("failed to run git ls-files -o: %w", err)
+	}
+	processDone = <-processHandler.Wait()
+	if processDone.ExitCode() != 0 {
+		return fmt.Errorf("failed to run git ls-files -o: exited code %d", processDone.ExitCode())
+	}
+
 	archive, err := os.Create(dest)
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %w", dest, err)
@@ -88,7 +99,7 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 			return nil
 		}(s.Text())
 		if err != nil {
-			return err
+			return fmt.Errorf("error adding files: %w", err)
 		}
 	}
 	return nil
