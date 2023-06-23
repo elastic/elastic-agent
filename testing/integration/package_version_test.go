@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -94,10 +93,9 @@ func testAfterRemovingPkgVersionFiles(f *atesting.Fixture) func(*testing.T) {
 		matches := findPkgVersionFiles(t, f.WorkDir())
 
 		for _, m := range matches {
-			vFile := filepath.Join(f.WorkDir(), m)
-			t.Logf("removing package version file %q", vFile)
-			err := os.Remove(vFile)
-			require.NoErrorf(t, err, "error removing package version file %q", vFile)
+			t.Logf("removing package version file %q", m)
+			err := os.Remove(m)
+			require.NoErrorf(t, err, "error removing package version file %q", m)
 		}
 
 		// check the version returned by the running agent

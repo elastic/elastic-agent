@@ -10,6 +10,7 @@ import (
 	"context"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -87,7 +88,7 @@ func findPkgVersionFiles(t *testing.T, rootDir string) []string {
 		}
 
 		if d.Name() == version.PackageVersionFileName {
-			matches = append(matches, path)
+			matches = append(matches, filepath.Join(rootDir, path))
 		}
 		return nil
 	})
