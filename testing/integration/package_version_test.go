@@ -10,9 +10,9 @@ import (
 	"context"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,6 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -90,10 +89,13 @@ func testAfterRemovingPkgVersionFiles(t *testing.T, f *atesting.Fixture) func(*t
 		})
 		require.NoError(t, err)
 
+		t.Logf("package version files found: %v", matches)
+
 		for _, m := range matches {
-			t.Logf("removing package version file %q", m)
-			err = os.Remove(m)
-			require.NoErrorf(t, err, "error removing package version file %q", m)
+			vFile := filepath.Join(f.WorkDir(), m)
+			t.Logf("removing package version file %q", vFile)
+			err = os.Remove(vFile)
+			require.NoErrorf(t, err, "error removing package version file %q", vFile)
 		}
 
 		// check the version returned by the running agent
@@ -102,62 +104,6 @@ func testAfterRemovingPkgVersionFiles(t *testing.T, f *atesting.Fixture) func(*t
 		actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "binary")
 
 		assert.Truef(t, strings.HasSuffix(actualVersion, "unknown_package_version"), actualVersion, "binary version does not match package version")
-	}
-
-}
-
-func testUpgradeAfterRemovingPkgVersionFiles(t *testing.T, ctx context.Context, f *atesting.Fixture) func(*testing.T) {
-	return func(t *testing.T) {
-		installFS := os.DirFS(f.WorkDir())
-		matches := []string{}
-
-		err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if d.Name() == version.PackageVersionFileName {
-				matches = append(matches, path)
-			}
-			return nil
-		})
-		require.NoError(t, err)
-
-		// the version files should have been removed from the other test, we just make sure
-		for _, m := range matches {
-			t.Logf("removing package version file %q", m)
-			err = os.Remove(m)
-			require.NoErrorf(t, err, "error removing package version file %q", m)
-		}
-
-		// check the version returned by the running agent
-		actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
-
-		actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "binary")
-
-		assert.Truef(t, strings.HasSuffix(actualVersion, "unknown_package_version"), actualVersion, "binary version does not match package version")
-
-		// upgrade to latest version whatever that will be
-		aac := tools.NewArtifactAPIClient()
-		versionList, err := aac.GetVersions(ctx)
-		require.NoError(t, err)
-		require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
-		latestVersion := versionList.Versions[len(versionList.Versions)-1]
-
-		_, err = f.Client().Upgrade(ctx, latestVersion, "", false)
-		require.NoError(t, err, "upgrade request failed")
-
-		assert.Eventually(t, func() bool {
-
-			// check the version returned by the running agent
-			actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
-
-			actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "daemon")
-			return actualVersion == latestVersion
-		},
-			5*time.Minute,
-			10*time.Second,
-		)
 	}
 
 }
