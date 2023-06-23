@@ -68,7 +68,7 @@ func ExampleNewServer_checkin() {
 	// [action_id: policy:24e4d030-ffa7-11ed-b040-9debaa5fecb8:2:1, type: POLICY_CHANGE]
 }
 
-func ExampleNewHandlerEnroll() {
+func ExampleNewServer_enrol() {
 	nowStr := "2009-11-10T23:00:00+00:00"
 	now, err := time.Parse(time.RFC3339, nowStr)
 	if err != nil {
@@ -140,6 +140,76 @@ func ExampleNewHandlerEnroll() {
 	//   }
 	// }
 	//
+}
+
+func ExampleNewServer_checkin_fakeComponent() {
+	agentID := "agentID"
+	policyID := "policyID"
+	tmpl := TmplData{
+		AckToken:   "AckToken",
+		AgentID:    "AgentID",
+		ActionID:   "ActionID",
+		PolicyID:   policyID,
+		FleetHosts: `"host1", "host2"`,
+		SourceURI:  "http://source.uri",
+		CreatedAt:  "2023-05-31T11:37:50.607Z",
+		Output: struct {
+			APIKey string
+			Hosts  string
+			Type   string
+		}{APIKey: "APIKey", Hosts: `"host1", "host2"`, Type: "Type"},
+	}
+
+	actions, err := NewActionPolicyChangeWithFakeComponent(tmpl)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get new actions: %v", err))
+	}
+
+	var count int
+	nextAction := func() (string, *HTTPError) {
+		defer func() { count++ }()
+
+		switch count {
+		case 0:
+			return actions, nil
+		case 1:
+			return "", &HTTPError{StatusCode: http.StatusTeapot}
+		}
+
+		return "[]", nil
+	}
+
+	ts := NewServer(&Handlers{
+		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
+	}, Data{})
+
+	// 1st call, nextAction() will return a POLICY_CHANGE.
+	cmd := fleetapi.NewCheckinCmd(
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	if err != nil {
+		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
+	}
+	fmt.Println(resp.Actions)
+
+	// 2nd subsequent call to nextAction() will return an error.
+	resp, _, err = cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	if err == nil {
+		panic("expected an error, got none")
+	}
+	fmt.Println("Error:", err)
+
+	// any subsequent call to nextAction() will return no action.
+	resp, _, err = cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	if err != nil {
+		panic(fmt.Sprintf("failed executing 3rd checkin: %v", err))
+	}
+	fmt.Println(resp.Actions)
+
+	// Output:
+	// [action_id: ActionID, type: POLICY_CHANGE]
+	// Error: status code: 418, fleet-server returned an error: I'm a teapot
+	// []
 }
 
 type agentInfo string

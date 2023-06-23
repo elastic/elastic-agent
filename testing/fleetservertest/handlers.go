@@ -169,6 +169,44 @@ func NewHandlerCheckin(ackToken string) func(
 	}
 }
 
+// NewHandlerCheckinFakeComponent takes a generator function that should return
+// the actions to be sent on the next checkin. The actions format is a JSON list
+// E.g.:
+//   - ["action1", "action2"]
+//   - ["action1"]
+//   - []
+func NewHandlerCheckinFakeComponent(nextAction func() string) func(
+	ctx context.Context,
+	h *Handlers,
+	agentID string,
+	userAgent string,
+	acceptEncoding string,
+	checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
+
+	return func(
+		ctx context.Context,
+		h *Handlers,
+		agentID string,
+		userAgent string,
+		acceptEncoding string,
+		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
+
+		respStr := NewCheckinResponse(nextAction())
+		resp := CheckinResponse{}
+		err := json.Unmarshal(
+			[]byte(respStr),
+			&resp)
+		if err != nil {
+			return nil, &HTTPError{
+				StatusCode: http.StatusInternalServerError,
+				Message:    fmt.Sprintf("failed to unmarshal policy: %v", err),
+			}
+		}
+
+		return &resp, nil
+	}
+}
+
 func NewHandlerStatusHealth() func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
 	return func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
 		return &StatusResponse{
