@@ -686,9 +686,6 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current expected components model of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.ast == nil || c.vars == nil {
-					return []byte("error: failed no configuration or variables received by the coordinator")
-				}
 				comps := c.componentModel
 				o, err := yaml.Marshal(struct {
 					Components []component.Component `yaml:"components"`

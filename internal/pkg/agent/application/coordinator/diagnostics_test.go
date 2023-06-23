@@ -6,16 +6,21 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
 func TestCoordinatorExpectedDiagnosticHooks(t *testing.T) {
@@ -137,16 +142,149 @@ something:
 	require.True(t, ok, "diagnostic hooks should have an entry for computed-config")
 
 	result := hook.Hook(context.Background())
-	assert.YAMLEq(t, expected, string(result), "vars diagnostic returned unexpected value")
+	assert.YAMLEq(t, expected, string(result), "computed-config diagnostic returned unexpected value")
 }
 
 func TestDiagnosticComponentsExpected(t *testing.T) {
 	// Create a Coordinator with a test component model and make sure it's
 	// reported by the components-expected diagnostic
+	components := []component.Component{
+		{
+			ID: "filestream-component",
+			InputSpec: &component.InputRuntimeSpec{
+				InputType:  "filestream",
+				BinaryName: "filestream-binary",
+				BinaryPath: "filestream-path",
+				Spec: component.InputSpec{
+					Name:        "filestream-spec",
+					Description: "filestream description",
+				},
+			},
+			Units: []component.Unit{
+				{ID: "filestream-input", Type: client.UnitTypeInput, LogLevel: 2},
+				{ID: "filestream-output", Type: client.UnitTypeOutput, LogLevel: 2},
+			},
+		},
+		{
+			ID: "shipper-component",
+			ShipperSpec: &component.ShipperRuntimeSpec{
+				ShipperType: "shipper",
+				BinaryName:  "shipper-binary",
+				BinaryPath:  "shipper-path",
+				Spec: component.ShipperSpec{
+					Name:        "shipper-spec",
+					Description: "shipper description",
+				},
+			},
+			Units: []component.Unit{
+				{ID: "shipper-input", Type: client.UnitTypeInput, LogLevel: 3},
+				{ID: "shipper-output", Type: client.UnitTypeOutput, LogLevel: 3},
+			},
+		},
+	}
 
+	expected := `
+components:
+  - id: filestream-component
+    input_spec:
+      binary_name: filestream-binary
+      binary_path: filestream-path
+      input_type: filestream
+      spec:
+        name: filestream-spec
+        description: "filestream description"
+        platforms: []
+    units:
+      - id: filestream-input
+        log_level: 2
+        type: 0
+      - id: filestream-output
+        log_level: 2
+        type: 1
+  - id: shipper-component
+    shipper_spec:
+      binary_name: shipper-binary
+      binary_path: shipper-path
+      shipper_type: shipper
+      spec:
+        name: shipper-spec
+        description: "shipper description"
+        outputs: []
+        platforms: []
+    units:
+      - id: shipper-input
+        log_level: 3
+        type: 0
+      - id: shipper-output
+        log_level: 3
+        type: 1
+`
+
+	coord := &Coordinator{componentModel: components}
+
+	hook, ok := diagnosticHooksMap(coord)["components-expected"]
+	require.True(t, ok, "diagnostic hooks should have an entry for components-expected")
+
+	result := hook.Hook(context.Background())
+	assert.YAMLEq(t, expected, string(result), "components-expected diagnostic returned unexpected value")
 }
 
 func TestDiagnosticComponentsActual(t *testing.T) {
+	// Create a Coordinator with observed component data in the state broadcaster
+	// and make sure the components-actual diagnostic reports it
+	state := State{
+		Components: []runtime.ComponentComponentState{
+			{
+				Component: component.Component{
+					ID:  "component-1",
+					Err: errors.New("component error"),
+					Units: []component.Unit{
+						{
+							ID:       "test-unit",
+							Type:     client.UnitTypeInput,
+							LogLevel: 1,
+							Err:      errors.New("unit error"),
+						},
+					},
+				},
+				State: runtime.ComponentState{
+					State:   client.UnitStateFailed,
+					Message: "error running component",
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{
+							UnitType: client.UnitTypeInput,
+							UnitID:   "test-unit",
+						}: {State: client.UnitStateFailed},
+					},
+				},
+			},
+		},
+	}
+
+	// The error values here shouldn't really be empty, this is a known bug, see
+	// https://github.com/elastic/elastic-agent/issues/2940
+	expected := `
+components:
+  - id: component-1
+    error: {}
+    units:
+      - id: test-unit
+        error: {}
+        log_level: 1
+        type: 0
+`
+
+	coord := &Coordinator{
+		// This test needs a broadcaster since the components-actual diagnostic
+		// fetches the state via State().
+		stateBroadcaster: broadcaster.New(state, 0, 0),
+	}
+
+	hook, ok := diagnosticHooksMap(coord)["components-actual"]
+	require.True(t, ok, "diagnostic hooks should have an entry for components-actual")
+
+	result := hook.Hook(context.Background())
+	assert.YAMLEq(t, expected, string(result), "components-actual diagnostic returned unexpected value")
 
 }
 

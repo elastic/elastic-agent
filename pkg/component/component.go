@@ -101,7 +101,8 @@ type Component struct {
 	// Features configuration the component should use.
 	Features *proto.Features `yaml:"features,omitempty"`
 
-	// ShipperRef references the component/unit that this component used as its output. (not set when ShipperSpec)
+	// ShipperRef references the component/unit that this component used as its output.
+	// (only applies to inputs, not set when ShipperSpec is)
 	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
 }
 
