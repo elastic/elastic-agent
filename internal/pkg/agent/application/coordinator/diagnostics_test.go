@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -285,11 +286,62 @@ components:
 
 	result := hook.Hook(context.Background())
 	assert.YAMLEq(t, expected, string(result), "components-actual diagnostic returned unexpected value")
-
 }
 
 func TestDiagnosticState(t *testing.T) {
+	// Create a coordinator with a test state and verify that the state
+	// diagnostic reports it
 
+	state := State{
+		State:        agentclient.Starting,
+		Message:      "starting up",
+		FleetState:   agentclient.Configuring,
+		FleetMessage: "configuring",
+		LogLevel:     1,
+		Components: []runtime.ComponentComponentState{
+			{
+				Component: component.Component{ID: "comp-1"},
+				State: runtime.ComponentState{
+					State:   client.UnitStateDegraded,
+					Message: "degraded message",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:    "version name",
+						Version: "version value",
+					},
+				},
+			},
+		},
+	}
+
+	expected := `
+state: 0
+message: "starting up"
+fleet_state: 1
+fleet_message: "configuring"
+log_level: "warning"
+components:
+  - id: "comp-1"
+    state:
+      state: 3
+      message: "degraded message"
+      features_idx: 0
+      units: {}
+      version_info:
+        name: "version name"
+        version: "version value"
+`
+
+	coord := &Coordinator{
+		// This test needs a broadcaster since the components-actual diagnostic
+		// fetches the state via State().
+		stateBroadcaster: broadcaster.New(state, 0, 0),
+	}
+
+	hook, ok := diagnosticHooksMap(coord)["state"]
+	require.True(t, ok, "diagnostic hooks should have an entry for state")
+
+	result := hook.Hook(context.Background())
+	assert.YAMLEq(t, expected, string(result), "state diagnostic returned unexpected value")
 }
 
 // Fetch the diagnostic hooks and add them to a lookup table for
