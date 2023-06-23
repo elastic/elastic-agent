@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -23,34 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
-
-type cancelFns struct {
-	fns map[string]context.CancelFunc
-	mu  sync.RWMutex
-}
-
-func (c *cancelFns) Add(name string, canceFunc context.CancelFunc) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.fns == nil {
-		c.fns = map[string]context.CancelFunc{}
-	}
-
-	c.fns[name] = canceFunc
-}
-
-func (c *cancelFns) Cancel(name string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if cancelFunc, exists := c.fns[name]; exists {
-		cancelFunc()
-		delete(c.fns, name)
-	}
-}
-
-var retryCancelFns = cancelFns{}
 
 func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, args []string, env []string, timeout time.Duration) error {
 	log = log.With("context", "command output")
@@ -122,16 +93,9 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 }
 
 func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
-	// If there is a previous incarnation of the command executing (due to infinite
-	// retries), make sure to cancel it first before starting a new one here.
-	retryCancelFns.Cancel(binaryPath)
-
-	retryCtx, retryCancel := context.WithCancel(context.Background())
-	retryCancelFns.Add(binaryPath, retryCancel)
-
 	return executeServiceCommandWithRetries(
 		ctx, log, binaryPath, spec,
-		retryCtx, 20*time.Second, 15*time.Minute,
+		context.Background(), 20*time.Second, 15*time.Minute,
 	)
 }
 
@@ -179,9 +143,6 @@ func executeServiceCommandWithRetries(
 				)
 			},
 		)
-
-		// Command executed successfully.
-		retryCancelFns.Cancel(binaryPath)
 	}()
 
 	return nil
