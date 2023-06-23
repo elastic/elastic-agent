@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,9 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/version"
 )
 
 func TestPackageVersion(t *testing.T) {
@@ -37,20 +34,23 @@ func TestPackageVersion(t *testing.T) {
 	err = f.Prepare(ctx, fakeComponent, fakeShipper)
 	require.NoError(t, err)
 
-	t.Run("check package version without the agent running", testAgentPackageVersion(f, ctx, true))
+	t.Run("check package version without the agent running", testAgentPackageVersion(ctx, f, true))
 
 	// run the agent and check the daemon version as well
 	testVersionFunc := func() error {
 		// check the version returned by the running agent
-		t.Run("check package version while the agent is running", testAgentPackageVersion(f, ctx, false))
+		t.Run("check package version while the agent is running", testAgentPackageVersion(ctx, f, false))
+
+		// change the version in the version file and verify that the agent returns the new value
+		t.Run("check package version after updating file", testVersionAfterUpdatingFile(ctx, f))
 
 		// Destructive tests ahead! If you need to do a normal test on a healthy install of agent, put it before the tests below run
-		t.Run("remove package versions file and test version again", testAfterRemovingPkgVersionFiles(t, f))
+		t.Run("remove package versions file and test version again", testAfterRemovingPkgVersionFiles(f))
 
 		return nil
 	}
 
-	err = f.Run(ctx, integrationtest.State{
+	err = f.Run(ctx, atesting.State{
 		AgentState: atesting.NewClientState(client.Healthy),
 		// we don't really need a config and a state but the testing fwk wants it anyway
 		Configure: simpleConfig2,
@@ -73,28 +73,30 @@ func TestPackageVersion(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func testAfterRemovingPkgVersionFiles(t *testing.T, f *atesting.Fixture) func(*testing.T) {
+func testVersionAfterUpdatingFile(ctx context.Context, f *atesting.Fixture) func(*testing.T) {
+
 	return func(t *testing.T) {
-		installFS := os.DirFS(f.WorkDir())
-		matches := []string{}
-		err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
+		pkgVersionFiles := findPkgVersionFiles(t, f.WorkDir())
 
-			if d.Name() == version.PackageVersionFileName {
-				matches = append(matches, path)
-			}
-			return nil
-		})
-		require.NoError(t, err)
+		testVersion := "1.2.3-test-abcdef"
 
-		t.Logf("package version files found: %v", matches)
+		for _, pkgVerFile := range pkgVersionFiles {
+			err := os.WriteFile(pkgVerFile, []byte(testVersion), 0o644)
+			require.NoError(t, err)
+		}
+
+		testAgentPackageVersion(ctx, f, false)
+	}
+}
+
+func testAfterRemovingPkgVersionFiles(f *atesting.Fixture) func(*testing.T) {
+	return func(t *testing.T) {
+		matches := findPkgVersionFiles(t, f.WorkDir())
 
 		for _, m := range matches {
 			vFile := filepath.Join(f.WorkDir(), m)
 			t.Logf("removing package version file %q", vFile)
-			err = os.Remove(vFile)
+			err := os.Remove(vFile)
 			require.NoErrorf(t, err, "error removing package version file %q", vFile)
 		}
 

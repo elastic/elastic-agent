@@ -10,7 +10,6 @@ import (
 	"context"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -24,10 +23,10 @@ import (
 )
 
 // testAgentPackageVersion returns a func that can be used with t.Run() to execute the version check as a subtest
-func testAgentPackageVersion(f *integrationtest.Fixture, ctx context.Context, binaryOnly bool) func(*testing.T) {
+func testAgentPackageVersion(ctx context.Context, f *integrationtest.Fixture, binaryOnly bool) func(*testing.T) {
 	return func(t *testing.T) {
 		// find package version files
-		pkgVersionFiles := findPkgVersionFiles(f.WorkDir())
+		pkgVersionFiles := findPkgVersionFiles(t, f.WorkDir())
 		if len(pkgVersionFiles) == 0 {
 			t.Skip("No package version files detected, skipping")
 		}
@@ -77,19 +76,23 @@ func unmarshalVersionOutput(t *testing.T, cmdOutput []byte, binaryOrDaemonKey st
 }
 
 // findPkgVersionFiles scans recursively a root directory and returns all the package version files encountered
-func findPkgVersionFiles(rootDir string) []string {
+func findPkgVersionFiles(t *testing.T, rootDir string) []string {
+	t.Helper()
 	//find the package version file
+	installFS := os.DirFS(rootDir)
 	matches := []string{}
-	filepath.WalkDir(rootDir, func(path string, d fs.DirEntry, err error) error {
-		if d.IsDir() {
-			return nil
+	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
 
 		if d.Name() == version.PackageVersionFileName {
 			matches = append(matches, path)
 		}
-
-		return err
+		return nil
 	})
+	require.NoError(t, err)
+
+	t.Logf("package version files found: %v", matches)
 	return matches
 }
