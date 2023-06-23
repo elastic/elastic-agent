@@ -9,9 +9,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -23,7 +26,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
-func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, args []string, env []string, timeout time.Duration) error {
+var serviceCmdRetrier = cmdRetrier{}
+
+func executeCommand(
+	ctx context.Context, log *logger.Logger,
+	binaryPath string, args []string, env []string,
+	timeout time.Duration, cmdDone chan<- struct{},
+) error {
 	log = log.With("context", "command output")
 	// Create context with timeout if the timeout is greater than 0
 	if timeout > 0 {
@@ -89,17 +98,11 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 		}
 	}
 
+	cmdDone <- struct{}{}
 	return err
 }
 
 func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
-	// TODO: due to infinite retries, we may still be trying to (re)execute
-	// a service command when a new call to executeServiceCommand is made. So,
-	// before we call executeServiceCommandWithRetries (again), we need to:
-	// - cancel the previous retryCtx (if one exists),
-	// - cancel the previous cmdCtx (if one exists),
-	// - ensure that the previous command actually stopped running
-
 	return executeServiceCommandWithRetries(
 		ctx, log, binaryPath, spec,
 		context.Background(), 20*time.Second, 15*time.Minute,
@@ -121,6 +124,43 @@ func executeServiceCommandWithRetries(
 		retrySleepInitDuration = defaultRetrySleepInitDuration
 	}
 
+	serviceCmdRetrier.Start(
+		cmdCtx, log,
+		binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout,
+		retryCtx, retrySleepInitDuration, retrySleepMaxDuration,
+	)
+	return nil
+}
+
+type cmdRetryInfo struct {
+	retryCancelFn context.CancelFunc
+	cmdCancelFn   context.CancelFunc
+	cmdDone       <-chan struct{}
+}
+
+type cmdRetrier struct {
+	mu   sync.RWMutex
+	cmds map[uint64]cmdRetryInfo
+}
+
+func (cr *cmdRetrier) Start(
+	cmdCtx context.Context, log *logger.Logger,
+	binaryPath string, args []string, env []string, timeout time.Duration,
+	retryCtx context.Context, retrySleepInitDuration time.Duration, retrySleepMaxDuration time.Duration,
+) {
+	cmdKey := cr.cmdKey(binaryPath, args, env)
+
+	// Due to infinite retries, we may still be trying to (re)execute
+	// a command from a previous call to Start(). We should first stop
+	// these retries as well as the command process.
+	cr.Stop(cmdKey)
+
+	// Track the command so we can cancel it and it's retries later.
+	cmdCtx, cmdCancelFn := context.WithCancel(cmdCtx)
+	retryCtx, retryCancelFn := context.WithCancel(retryCtx)
+	cmdDone := make(chan struct{}, 1)
+	cr.track(cmdKey, cmdCancelFn, retryCancelFn, cmdDone)
+
 	// Execute command with retries and exponential backoff between attempts
 	expBackoff := backoff.NewExponentialBackOff()
 	expBackoff.InitialInterval = retrySleepInitDuration
@@ -134,10 +174,14 @@ func executeServiceCommandWithRetries(
 	go func() {
 		retryAttempt := 0
 
+		// Here we indefinitely retry the executeCommand call, as long as it
+		// returns a non-nil error. We will block here until executeCommand
+		// returns a nil error, indicating that the command being executed has
+		// successfully completed execution.
 		//nolint: errcheck // No point checking the error inside the goroutine.
 		backoff.RetryNotify(
 			func() error {
-				return executeCommand(cmdCtx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+				return executeCommand(cmdCtx, log, binaryPath, args, env, timeout, cmdDone)
 			},
 			backoffCtx,
 			func(err error, retryAfter time.Duration) {
@@ -148,11 +192,103 @@ func executeServiceCommandWithRetries(
 					retryAttempt,
 					retryAfter,
 				)
+				<-cmdDone
 			},
 		)
-	}()
 
-	return nil
+		cr.untrack(cmdKey)
+	}()
+}
+
+func (cr *cmdRetrier) Stop(cmdKey uint64) {
+	cr.mu.RLock()
+	defer cr.mu.RUnlock()
+	info, exists := cr.cmds[cmdKey]
+	if !exists {
+		// Nothing to do
+		return
+	}
+
+	// Cancel the previous retries
+	info.retryCancelFn()
+
+	// Cancel the previous command
+	info.cmdCancelFn()
+
+	// Ensure that the previous command actually stopped running
+	<-info.cmdDone
+
+	// Stop tracking
+	cr.untrack(cmdKey)
+}
+
+func (cr *cmdRetrier) track(cmdKey uint64, cmdCancelFn context.CancelFunc, retryCanceFn context.CancelFunc, cmdDone <-chan struct{}) {
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
+
+	// Initialize map if needed
+	if cr.cmds == nil {
+		cr.cmds = map[uint64]cmdRetryInfo{}
+	}
+
+	cr.cmds[cmdKey] = cmdRetryInfo{
+		retryCancelFn: retryCanceFn,
+		cmdCancelFn:   cmdCancelFn,
+		cmdDone:       cmdDone,
+	}
+}
+
+func (cr *cmdRetrier) untrack(cmdKey uint64) {
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
+
+	delete(cr.cmds, cmdKey)
+}
+
+// cmdKey returns a unique, deterministic integer for the combination of the given
+// binaryPath, args, and env. This integer can be used to determine if the same command
+// is being executed again or not.
+func (cr *cmdRetrier) cmdKey(binaryPath string, args []string, env []string) uint64 {
+	var sb strings.Builder
+
+	sb.WriteString(binaryPath)
+	sb.WriteString("|")
+
+	var posArgs, flagArgs []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "-") {
+			flagArgs = append(flagArgs, arg+" "+args[i+1])
+			i++
+		} else {
+			posArgs = append(posArgs, arg)
+		}
+	}
+
+	sort.Strings(posArgs)
+	sort.Strings(flagArgs)
+
+	for _, arg := range posArgs {
+		sb.WriteString(arg)
+		sb.WriteString("|")
+	}
+
+	for _, arg := range flagArgs {
+		sb.WriteString(arg)
+		sb.WriteString("|")
+	}
+
+	sort.Strings(env)
+
+	for _, kv := range env {
+		sb.WriteString(kv)
+		sb.WriteString("|")
+	}
+
+	digest := fnv.New64()
+	digest.Write([]byte(sb.String()))
+
+	return digest.Sum64()
 }
 
 func envSpecToEnv(envSpecs []component.CommandEnvSpec) []string {
