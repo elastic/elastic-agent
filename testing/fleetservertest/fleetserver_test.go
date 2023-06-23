@@ -221,6 +221,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	}
 
 	ts := NewServer(&Handlers{
+		AgentID:   agentID, // as there is no enrol, the agentID needs to be manually set
 		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
 	}, Data{})
 
@@ -277,7 +278,8 @@ func ExampleNewServer_ackWithAcker() {
 	}
 
 	handlers := &Handlers{
-		AckFn: NewHandlerAckWithAcker(acker),
+		AgentID: agentID, // as there is no enrol, the agentID needs to be manually set
+		AckFn:   NewHandlerAckWithAcker(acker),
 	}
 	ts := NewServer(handlers, Data{})
 
@@ -313,6 +315,9 @@ func ExampleNewServer_ackWithAcker() {
 	// &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}, fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
 }
 
+// ExampleNewServer_checkin_and_ackWithAcker demonstrates how to assemble a
+// fleet-server with checkin and ack handlers which cooperate, the ack handler
+// only acks actions sent on checking responses.
 func ExampleNewServer_checkin_and_ackWithAcker() {
 	agentID := "agentID"
 	actionID := "ActionID"
@@ -354,11 +359,11 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	//  1st - a POLICY_CHANGE action with the fake input
 	//  2nd - an error http.StatusTeapot
 	//  all other calls - no action
-	var count int
+	var actionsIdx int
 	nextAction := func() (string, *HTTPError) {
-		defer func() { count++ }()
+		defer func() { actionsIdx++ }()
 
-		switch count {
+		switch actionsIdx {
 		case 0:
 			return actions, nil
 		case 1:
@@ -377,7 +382,8 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	//  - success for the POLICY_CHANGE action defined above
 	//  - not found for any other
 	acker := func(id string) (AckResponseItem, bool) {
-		if id == actionID {
+		// only ack the action if it was already sent in the checkin response.
+		if id == actionID && actionsIdx > 0 {
 			return AckResponseItem{
 				Status:  http.StatusOK,
 				Message: http.StatusText(http.StatusOK),
@@ -394,6 +400,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// 3rd - define the implementation for the fleet-server handlers we'll use
 	// and create the mock fleet-server
 	handlers := &Handlers{
+		AgentID:   agentID, // as there is no enrol, the agentID needs to be manually set
 		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
 		AckFn:     NewHandlerAckWithAcker(acker),
 		StatusFn:  NewHandlerStatusHealth(),
@@ -411,6 +418,24 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// 5th - Simulate the checkin -> ack flow by calling the checkin and ack
 	// commands in order
 
+	ackEventPolicyChange := fleetapi.AckEvent{
+		EventType: "ACTION_RESULT",
+		SubType:   "ACKNOWLEDGED",
+		Timestamp: "2022-12-01T01:02:03.00004-07:00",
+		ActionID:  actionID,
+		AgentID:   agentID,
+		Message: fmt.Sprintf("Action '%s' of type 'ACTION_TYPE' acknowledged.",
+			actionID),
+	}
+
+	// 1st ack: acking an action that haven't been sent
+	respAck, err := cmdAck.Execute(context.Background(),
+		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{ackEventPolicyChange}})
+	if err != nil {
+		panic(fmt.Sprintf("failed executing checkin: %v", err))
+	}
+	fmt.Printf("[1st ack] %#v\n", respAck)
+
 	// 1st checkin: it will return a POLICY_CHANGE.
 	// TODO: make the acker only ack if the checkin was called
 	respCheckin, _, err := cmdCheckin.Execute(context.Background(), &fleetapi.CheckinRequest{})
@@ -419,22 +444,13 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	}
 	fmt.Println("[1st checkin]", respCheckin.Actions)
 
-	// 1st ack: acking the POLICY_CHANGE
-	respAck, err := cmdAck.Execute(context.Background(),
-		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{
-			{
-				EventType: "ACTION_RESULT",
-				SubType:   "ACKNOWLEDGED",
-				Timestamp: "2022-12-01T01:02:03.00004-07:00",
-				ActionID:  actionID,
-				AgentID:   agentID,
-				Message: fmt.Sprintf("Action '%s' of type 'ACTION_TYPE' acknowledged.",
-					actionID),
-			}}})
+	// 2dn ack: acking the POLICY_CHANGE
+	respAck, err = cmdAck.Execute(context.Background(),
+		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{ackEventPolicyChange}})
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
-	fmt.Printf("[1st ack] %#v\n", respAck)
+	fmt.Printf("[2nd ack] %#v\n", respAck)
 
 	// 2nd checkin: it will fail.
 	respCheckin, _, err = cmdCheckin.Execute(context.Background(), &fleetapi.CheckinRequest{})
@@ -443,7 +459,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	}
 	fmt.Println("[2nd checkin] Error:", err)
 
-	// 2nd ack: acking an action not received during checkin
+	// 3rd ack: acking an action not received during checkin
 	respAck, err = cmdAck.Execute(context.Background(),
 		&fleetapi.AckRequest{Events: []fleetapi.AckEvent{
 			{
@@ -458,13 +474,14 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	if err != nil {
 		panic(fmt.Sprintf("failed executing checkin: %v", err))
 	}
-	fmt.Printf("[2nd ack] %#v\n", respAck)
+	fmt.Printf("[3rd ack] %#v\n", respAck)
 
 	// Output:
+	// [1st ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action ActionID not found"}}}
 	// [1st checkin] [action_id: ActionID, type: POLICY_CHANGE]
-	// [1st ack] &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
+	// [2nd ack] &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
 	// [2nd checkin] Error: status code: 418, fleet-server returned an error: I'm a teapot
-	// [2nd ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
+	// [3rd ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}
 }
 
 type agentInfo string

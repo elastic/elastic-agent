@@ -93,6 +93,13 @@ func NewHandlerAckWithAcker(acker func(actionID string) (AckResponseItem, bool))
 		h *Handlers,
 		agentID string,
 		ackRequest AckRequest) (*AckResponse, *HTTPError) {
+		if agentID != h.AgentID {
+			return nil, &HTTPError{
+				StatusCode: http.StatusNotFound,
+				Message:    fmt.Sprintf("agent %q not found", agentID),
+			}
+		}
+
 		resp := AckResponse{Action: "acks"}
 
 		for _, e := range ackRequest.Events {
@@ -215,6 +222,12 @@ func NewHandlerCheckinFakeComponent(nextActions func() (string, *HTTPError)) fun
 		userAgent string,
 		acceptEncoding string,
 		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
+		if agentID != h.AgentID {
+			return nil, &HTTPError{
+				StatusCode: http.StatusNotFound,
+				Message:    fmt.Sprintf("agent %q not found", agentID),
+			}
+		}
 
 		actions, hErr := nextActions()
 		if hErr != nil {
