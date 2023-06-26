@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package tools
 
 import (
@@ -39,11 +43,14 @@ type VersionBuilds struct {
 }
 
 type Package struct {
-	URL        string `json:"url"`
-	ShaURL     string `json:"sha_url"`
-	AscURL     string `json:"asc_url"`
-	Type       string `json:"type"`
-	Attributes struct {
+	URL          string   `json:"url"`
+	ShaURL       string   `json:"sha_url"`
+	AscURL       string   `json:"asc_url"`
+	Type         string   `json:"type"`
+	Architecture string   `json:"architecture"`
+	Os           []string `json:"os"`
+	Classifier   string   `json:"classifier"`
+	Attributes   struct {
 		ArtifactNoKpi string `json:"artifactNoKpi"`
 		Internal      string `json:"internal"`
 		ArtifactID    string `json:"artifact_id"`

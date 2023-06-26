@@ -184,7 +184,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.agentInfo,
 		m.client,
 		actionAcker,
-		m.coord,
+		m.coord.State,
 		m.stateStore,
 	)
 	if err != nil {

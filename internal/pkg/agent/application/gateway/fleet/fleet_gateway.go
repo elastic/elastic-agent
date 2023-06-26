@@ -11,7 +11,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -75,7 +75,7 @@ type fleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	stateFetcher       state.StateFetcher
+	stateFetcher       func() coordinator.State
 	stateStore         stateStore
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
@@ -87,7 +87,7 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
-	stateFetcher state.StateFetcher,
+	stateFetcher func() coordinator.State,
 	stateStore stateStore,
 ) (gateway.FleetGateway, error) {
 
@@ -111,7 +111,7 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
-	stateFetcher state.StateFetcher,
+	stateFetcher func() coordinator.State,
 	stateStore stateStore,
 ) (gateway.FleetGateway, error) {
 	return &fleetGateway{
@@ -273,10 +273,10 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 		state := item.State
 
 		var shipperReference *fleetapi.CheckinShipperReference
-		if component.Shipper != nil {
+		if component.ShipperRef != nil {
 			shipperReference = &fleetapi.CheckinShipperReference{
-				ComponentID: component.Shipper.ComponentID,
-				UnitID:      component.Shipper.UnitID,
+				ComponentID: component.ShipperRef.ComponentID,
+				UnitID:      component.ShipperRef.UnitID,
 			}
 		}
 		checkinComponent := fleetapi.CheckinComponent{
@@ -320,7 +320,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher.State()
+	state := f.stateFetcher()
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components)

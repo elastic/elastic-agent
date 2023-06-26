@@ -28,6 +28,12 @@ var (
 	ErrOutputNotSupported = newError("output not supported")
 	// ErrOutputNotSupportedOnPlatform is returned when the input is supported but not on this platform
 	ErrOutputNotSupportedOnPlatform = newError("output not supported on this platform")
+	// ErrInputShipperNotSupported is returned when an input that does not support any shippers targets a shipper output
+	ErrInputShipperNotSupported = newError("this input does not support shipper outputs")
+	// ErrOutputShipperNotSupported is returned when shipper output is enabled on an output type that no shipper supports
+	ErrOutputShipperNotSupported = newError("no shipper supports this output type")
+	// ErrShipperOutputNotSupported is returned when an input supports at least one shipper, but none of them support the target output type.
+	ErrShipperOutputNotSupported = newError("the input does not support a shipper for this output type")
 )
 
 // InputRuntimeSpec returns the specification for running this input on the current platform.
@@ -204,6 +210,7 @@ func specFilesForDirectory(dir string) (map[string]Spec, error) {
 }
 
 // NewRuntimeSpecs creates a RuntimeSpecs from already loaded input and shipper runtime specifications.
+// Only used for testing.
 func NewRuntimeSpecs(platform PlatformDetail, inputSpecs []InputRuntimeSpec, shipperSpecs []ShipperRuntimeSpec) (RuntimeSpecs, error) {
 	var inputTypes []string
 	inputSpecsMap := make(map[string]InputRuntimeSpec)
@@ -272,48 +279,40 @@ func (r *RuntimeSpecs) Inputs() []string {
 	return inputs
 }
 
-// GetInput returns the input runtime specification for this input on this platform.
+// GetInput returns the input runtime specification for the given input type on this platform.
 func (r *RuntimeSpecs) GetInput(inputType string) (InputRuntimeSpec, error) {
-	runtime, ok := r.inputSpecs[inputType]
-	if ok {
-		return runtime, nil
+	if !containsStr(r.inputTypes, inputType) {
+		return InputRuntimeSpec{}, ErrInputNotSupported
 	}
-	if containsStr(r.inputTypes, inputType) {
+	runtimeSpec, ok := r.inputSpecs[inputType]
+	if !ok {
 		// supported but not on this platform
 		return InputRuntimeSpec{}, ErrInputNotSupportedOnPlatform
 	}
-	// not supported at all
-	return InputRuntimeSpec{}, ErrInputNotSupported
-}
-
-// GetShipper returns the shipper runtime specification for this shipper on this platform.
-func (r *RuntimeSpecs) GetShipper(shipperType string) (ShipperRuntimeSpec, bool) {
-	runtime, ok := r.shipperSpecs[shipperType]
-	return runtime, ok
-}
-
-// GetShippers returns the shippers that support the outputType.
-func (r *RuntimeSpecs) GetShippers(outputType string) ([]ShipperRuntimeSpec, error) {
-	shipperNames, ok := r.shipperOutputs[outputType]
-	if !ok {
-		// no shippers support that outputType
-		return nil, nil
+	err := validateRuntimeChecks(&runtimeSpec.Spec.Runtime, r.platform)
+	if err != nil {
+		return InputRuntimeSpec{}, err
 	}
-	platformErr := false
+	return runtimeSpec, nil
+}
+
+// ShippersForOutputType returns the shippers that support the outputType.
+// If the list is empty, then the returned error will be either
+// ErrOutputNotSupportedOnPlatform (output is supported but not on this
+// platform) or ErrOutputNotSupported (output isn't supported on any platform).
+func (r *RuntimeSpecs) ShippersForOutputType(outputType string) ([]ShipperRuntimeSpec, error) {
+	shipperNames := r.shipperOutputs[outputType]
 	shippers := make([]ShipperRuntimeSpec, 0, len(shipperNames))
 	for _, name := range shipperNames {
 		shipper, ok := r.shipperSpecs[name]
-		if !ok {
-			// not supported on this platform
-			platformErr = true
-			continue
+		if ok {
+			shippers = append(shippers, shipper)
 		}
-		shippers = append(shippers, shipper)
 	}
 	if len(shippers) > 0 {
 		return shippers, nil
 	}
-	if platformErr {
+	if len(shipperNames) > 0 {
 		// supported by at least one shipper, but not on this platform
 		return nil, ErrOutputNotSupportedOnPlatform
 	}

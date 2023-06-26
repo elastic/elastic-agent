@@ -2406,7 +2406,7 @@ func TestManager_FakeShipper(t *testing.T) {
 					}),
 				},
 			},
-			Shipper: &component.ShipperReference{
+			ShipperRef: &component.ShipperReference{
 				ComponentID: "fake-shipper-default",
 				UnitID:      "fake-default",
 			},

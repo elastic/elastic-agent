@@ -27,24 +27,27 @@ type Config struct {
 
 	// SingleTest only has the runner run that specific test.
 	SingleTest string
+
+	// VerboseMode passed along a verbose mode flag to tests
+	VerboseMode bool
 }
 
 // Validate returns an error if the information is invalid.
 func (c *Config) Validate() error {
 	if c.AgentVersion == "" {
-		return errors.New("AgentVersion must be set")
+		return errors.New("field AgentVersion must be set")
 	}
 	if c.AgentStackVersion == "" {
-		return errors.New("AgentStackVersion must be set")
+		return errors.New("field AgentStackVersion must be set")
 	}
 	if c.BuildDir == "" {
-		return errors.New("BuildDir must be set")
+		return errors.New("field BuildDir must be set")
 	}
 	if c.GOVersion == "" {
-		return errors.New("GOVersion must be set")
+		return errors.New("field GOVersion must be set")
 	}
 	if c.RepoDir == "" {
-		return errors.New("RepoDir must be set")
+		return errors.New("field RepoDir must be set")
 	}
 	if c.ESS == nil {
 		// in the future we could adjust to work on different providers
@@ -53,7 +56,7 @@ func (c *Config) Validate() error {
 	}
 	err := c.ESS.Validate()
 	if err != nil {
-		return fmt.Errorf("ESS error: %w", err)
+		return fmt.Errorf("error validating ESS: %w", err)
 	}
 	if c.GCE == nil {
 		// in the future we could adjust to work on different providers
@@ -62,7 +65,7 @@ func (c *Config) Validate() error {
 	}
 	err = c.GCE.Validate()
 	if err != nil {
-		return fmt.Errorf("GCE error: %w", err)
+		return fmt.Errorf("error validating GCE: %w", err)
 	}
 	return err
 }
@@ -76,10 +79,10 @@ type ESSConfig struct {
 // Validate returns an error if the information is invalid.
 func (ess *ESSConfig) Validate() error {
 	if ess.APIKey == "" {
-		return errors.New("APIKey must be set")
+		return errors.New("field APIKey must be set")
 	}
 	if ess.Region == "" {
-		return errors.New("Region must be set")
+		return errors.New("field Region must be set")
 	}
 	return nil
 }
@@ -95,10 +98,10 @@ type GCEConfig struct {
 // Validate returns an error if the information is invalid.
 func (gce *GCEConfig) Validate() error {
 	if gce.ServiceTokenPath == "" {
-		return errors.New("ServiceTokenPath must be set")
+		return errors.New("field ServiceTokenPath must be set")
 	}
 	if gce.Datacenter == "" {
-		return errors.New("Datacenter must be set")
+		return errors.New("field Datacenter must be set")
 	}
 	return gce.ensureParsed()
 }
