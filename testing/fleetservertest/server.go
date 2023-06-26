@@ -201,7 +201,7 @@ func (h *Handlers) AgentAcks(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&ackRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("%v", err),
+			Message:    fmt.Sprintf("could not decode ack params: %v", err),
 		}, w)
 		return
 	}
@@ -235,7 +235,7 @@ func (h *Handlers) AgentCheckin(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&checkinRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("%v", err),
+			Message:    fmt.Sprintf("cannot decode checking request: %v", err),
 		}, w)
 		return
 	}
@@ -270,7 +270,7 @@ func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&enrollRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("%v", err),
+			Message:    fmt.Sprintf("could not decode enrol request: %v", err),
 		}, w)
 		return
 	}
@@ -346,7 +346,7 @@ func (h *Handlers) UploadBegin(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&requestBodyParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("%v", err),
+			Message:    fmt.Sprintf("could not decode upliad begin request: %v", err),
 		}, w)
 		return
 	}
@@ -385,7 +385,8 @@ func (h *Handlers) UploadChunk(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("%v", err),
+			Message: fmt.Sprintf("could not parse chunkNumParam=%s: %v",
+				chunkNumParam, err),
 		}, w)
 	}
 
@@ -422,7 +423,7 @@ func (h *Handlers) UploadComplete(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&uploadCompleteRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("%v", err),
+			Message:    fmt.Sprintf("could not decode upload complete request%v", err),
 		}, w)
 		return
 	}

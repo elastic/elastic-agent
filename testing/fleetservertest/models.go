@@ -110,10 +110,10 @@ type CheckinRequest struct {
 	AckToken string `json:"ack_token,omitempty"`
 
 	// An embedded JSON object that holds meta-data values. Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent. elastic-agent will populate the object with information from the binary and host/system environment. fleet-server will update the agent record if a checkin response contains different data from the record.
-	LocalMetadata string `json:"local_metadata,omitempty"`
+	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
 
 	// An embedded JSON object that holds component information that the agent is running. Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent. fleet-server will update the components in an agent record if they differ from this object.
-	Components string `json:"components,omitempty"`
+	Components json.RawMessage `json:"components,omitempty"`
 
 	// An optional timeout value that informs fleet-server of when a client will time out on it's checkin request. If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout). The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration). If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
 	PollTimeout string `json:"poll_timeout,omitempty"`
@@ -245,7 +245,7 @@ type EnrollResponseItem struct {
 type EnrollMetadata struct {
 
 	// An embedded JSON object that holds user-provided meta-data values. Defined in fleet-server as a `json.RawMessage`. fleet-server does not use these values on enrollment of an agent. Defined in the elastic-agent as a `map[string]interface{}` with no way to specify any values.
-	UserProvided string `json:"user_provided"`
+	UserProvided json.RawMessage `json:"user_provided"`
 
 	// An embedded JSON object that holds meta-data values. Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent. elastic-agent will populate the object with information from the binary and host/system environment. If not empty fleet-server will update the value of `local[\"elastic\"][\"agent\"][\"id\"]` to the agent ID (assuming the keys exist). The (possibly updated) value is sent by fleet-server when creating the record for a new agent.
 	Local json.RawMessage `json:"local"`

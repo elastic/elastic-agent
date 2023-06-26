@@ -54,7 +54,8 @@ func NewAPIKey(auth string) (APIKey, error) {
 
 	key := strings.Split(string(d), ":")
 	if len(key) != 2 {
-		return APIKey{}, errors.New("malformed authorization token")
+		return APIKey{}, fmt.Errorf("malformed authorization token: %q",
+			key)
 	}
 
 	// interpret id:key
@@ -100,7 +101,8 @@ func Authenticate(r *http.Request, key string) (APIKey, *HTTPError) {
 	if apiKey.Key != key {
 		return apiKey, &HTTPError{
 			StatusCode: http.StatusUnauthorized,
-			Message:    "alid Handlers key: api key ID=" + apiKey.ID,
+			Message: fmt.Sprintf("invalid Handlers key: api key=%q, want %q",
+				apiKey.Key, key),
 		}
 	}
 
