@@ -244,7 +244,6 @@ func NewHandlerCheckinFakeComponent(next func() (CheckinAction, *HTTPError)) fun
 
 		actions := fmt.Sprintf("[%s]", strings.Join(data.Actions, ","))
 
-		respStr := NewCheckinResponse(actions)
 		respStr := NewCheckinResponse(data.AckToken, actions)
 		resp := CheckinResponse{}
 		err := json.Unmarshal(
