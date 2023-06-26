@@ -18,8 +18,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
+// DebianRunner is a handler for running tests on Linux
 type DebianRunner struct{}
 
+// Prepare the test
 func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
 	// prepare build-essential and unzip
 	//
@@ -123,12 +125,8 @@ func (DebianRunner) Prepare(ctx context.Context, c *ssh.Client, logger Logger, a
 	return nil
 }
 
-<<<<<<< HEAD
-func (DebianRunner) Run(ctx context.Context, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
-=======
 // Run the test
 func (DebianRunner) Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
->>>>>>> 00a21761b8 (Integration tests: Pass along verbse statements in debian handler, tweak archiver (#2882))
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {
@@ -181,15 +179,11 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, c *ssh.Client, logger
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(sudoTests, ","))
 		vars = extendVars(vars, env)
 		logger.Logf("Starting sudo tests")
-<<<<<<< HEAD
-		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage integration:testOnRemote`, vars)
-=======
 		logArg := ""
-		if verbose {
+		if mg.Verbose() {
 			logArg = "-v"
 		}
 		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
->>>>>>> 00a21761b8 (Integration tests: Pass along verbse statements in debian handler, tweak archiver (#2882))
 		execTest := strings.NewReader(script)
 
 		session, err := c.NewSession()

@@ -169,7 +169,7 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 		// print the output so its clear what went wrong
 		// without this it's unclear where OGC went wrong it
 		// doesn't do a great job of reporting a clean error
-		fmt.Printf("%s\n", upOutput)
+		fmt.Fprintf(os.Stdout, "%s\n", upOutput)
 		return Result{}, fmt.Errorf("ogc didn't create any machines")
 	}
 	results, err := r.runMachines(ctx, sshAuth, repoArchive, machines)
@@ -380,7 +380,7 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 	var signer ssh.Signer
 	if errors.Is(priErr, os.ErrNotExist) || errors.Is(pubErr, os.ErrNotExist) {
 		// either is missing (re-create)
-		fmt.Printf(">>> Create SSH keys to use for SSH\n")
+		fmt.Fprintf(os.Stdout, ">>> Create SSH keys to use for SSH\n")
 		_ = os.Remove(privateKey)
 		_ = os.Remove(publicKey)
 		pri, err := newSSHPrivateKey()
@@ -427,7 +427,7 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir string) (string, error) {
 	zipPath := filepath.Join(dir, "agent-repo.zip")
 	_ = os.Remove(zipPath) // start fresh
-	fmt.Printf(">>> Creating zip archive of repo to send to remote hosts\n")
+	fmt.Fprintf(os.Stdout, ">>> Creating zip archive of repo to send to remote hosts\n")
 	err := createRepoZipArchive(ctx, repoDir, zipPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create zip archive of repo: %w", err)
@@ -441,7 +441,7 @@ func (r *Runner) ogcPull(ctx context.Context) error {
 		"pull",
 		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
 	}
-	fmt.Printf(">>> Pulling latest ogc image\n")
+	fmt.Fprintf(os.Stdout, ">>> Pulling latest ogc image\n")
 	proc, err := process.Start("docker", process.WithContext(ctx), process.WithArgs(args))
 	if err != nil {
 		return fmt.Errorf("failed to run docker pull: %w", err)
@@ -482,14 +482,14 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 	defer r.batchToCloudMx.Unlock()
 	for _, version := range versions {
 		name := fmt.Sprintf("at-%s-%s", strings.Replace(emailParts[0], ".", "-", -1), strings.Replace(version, ".", "", -1))
-		fmt.Printf(">>> Creating ESS cloud %s (%s)\n", version, name)
+		fmt.Fprintf(os.Stdout, ">>> Creating ESS cloud %s (%s)\n", version, name)
 		resp, err := essClient.CreateDeployment(ctx, ess.CreateDeploymentRequest{
 			Name:    name,
 			Region:  r.cfg.ESS.Region,
 			Version: version,
 		})
 		if err != nil {
-			fmt.Printf(">>> Failed to create ESS cloud %s: %s\n", version, err)
+			fmt.Fprintf(os.Stdout, ">>> Failed to create ESS cloud %s: %s\n", version, err)
 			return fmt.Errorf("failed to create ESS cloud for version %s: %w", version, err)
 		}
 		essResp := &essCloudResponse{
@@ -507,7 +507,7 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 			defer cancel()
 			ready, err := essClient.DeploymentIsReady(ctx, resp.resp.ID, 30*time.Second)
 			if err != nil {
-				fmt.Printf(">>> Failed to check for cloud %s to be ready: %s\n", version, err)
+				fmt.Fprintf(os.Stdout, ">>> Failed to check for cloud %s to be ready: %s\n", version, err)
 			}
 			resp.subMx.RLock()
 			subs := make([]chan *ess.CreateDeploymentResponse, len(resp.subCh))
@@ -553,7 +553,7 @@ func (r *Runner) cleanupCloud() {
 			return essClient.ShutdownDeployment(ctx, cloud.resp.ID)
 		}()
 		if err != nil {
-			fmt.Printf(">>> Failed to cleanup cloud %s: %s\n", cloud.resp.ID, err)
+			fmt.Fprintf(os.Stdout, ">>> Failed to cleanup cloud %s: %s\n", cloud.resp.ID, err)
 		}
 	}
 
@@ -603,7 +603,7 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal layouts YAML: %w", err)
 	}
-	fmt.Printf(">>> Import layouts into ogc\n")
+	fmt.Fprintf(os.Stdout, ">>> Import layouts into ogc\n")
 	proc, err := r.ogcRun(ctx, []string{"layout", "import"}, true)
 	if err != nil {
 		return fmt.Errorf("failed to run ogc import: %w", err)
@@ -625,7 +625,7 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 
 // ogcUp brings up all the instances.
 func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
-	fmt.Printf(">>> Bring up instances through ogc\n")
+	fmt.Fprintf(os.Stdout, ">>> Bring up instances through ogc\n")
 	var output bytes.Buffer
 	proc, err := r.ogcRun(ctx, []string{"up", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
@@ -634,7 +634,7 @@ func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
 	ps := <-proc.Wait()
 	if ps.ExitCode() != 0 {
 		// print the output so its clear what went wrong
-		fmt.Printf("%s\n", output.Bytes())
+		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
 		return nil, fmt.Errorf("failed to run ogc up: docker run exited with code: %d", ps.ExitCode())
 	}
 	return output.Bytes(), nil
@@ -642,13 +642,16 @@ func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
 
 // ogcDown brings down all the instances.
 func (r *Runner) ogcDown(ctx context.Context) error {
-	fmt.Printf(">>> Bring down instances through ogc\n")
-	proc, err := r.ogcRun(ctx, []string{"down", LayoutIntegrationTag}, false)
+	fmt.Fprintf(os.Stdout, ">>> Bring down instances through ogc\n")
+	var output bytes.Buffer
+	proc, err := r.ogcRun(ctx, []string{"down", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run ogc down: %w", err)
 	}
 	ps := <-proc.Wait()
 	if ps.ExitCode() != 0 {
+		// print the output so its clear what went wrong
+		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
 		return fmt.Errorf("failed to run ogc down: docker run exited with code: %d", ps.ExitCode())
 	}
 	return nil
@@ -947,5 +950,5 @@ func (b *batchLogger) Prefix() string {
 }
 
 func (b *batchLogger) Logf(format string, args ...any) {
-	fmt.Printf(">>> (%s) %s\n", b.prefix, fmt.Sprintf(format, args...))
+	fmt.Fprintf(os.Stdout, ">>> (%s) %s\n", b.prefix, fmt.Sprintf(format, args...))
 }
