@@ -180,7 +180,7 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, c *ssh.Client, logger
 		vars = extendVars(vars, env)
 		logger.Logf("Starting sudo tests")
 		logArg := ""
-		if mg.Verbose() {
+		if verbose {
 			logArg = "-v"
 		}
 		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
