@@ -353,10 +353,12 @@ func TestExecuteServiceCommand(t *testing.T) {
 func checkRetryLogs(t *testing.T, obs *observer.ObservedLogs, exeConfig progConfig) {
 	t.Helper()
 
+	// We expect there to be at least 2 log entries as this would indicate that
+	// at least one round of retries was attempted.
 	logs := obs.TakeAll()
 	require.GreaterOrEqual(t, len(logs), 2)
+
 	for i, l := range logs {
-		t.Logf("[%s] %s", l.Level, l.Message)
 		if i%2 == 0 {
 			require.Equal(t, zapcore.ErrorLevel, l.Level)
 			require.Equal(t, exeConfig.ErrMessage, l.Message)
