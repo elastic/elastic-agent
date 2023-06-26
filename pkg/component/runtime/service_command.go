@@ -28,11 +28,7 @@ import (
 
 var serviceCmdRetrier = cmdRetrier{}
 
-func executeCommand(
-	ctx context.Context, log *logger.Logger,
-	binaryPath string, args []string, env []string,
-	timeout time.Duration, cmdDone chan<- struct{},
-) error {
+func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, args []string, env []string, timeout time.Duration) error {
 	log = log.With("context", "command output")
 	// Create context with timeout if the timeout is greater than 0
 	if timeout > 0 {
@@ -98,7 +94,6 @@ func executeCommand(
 		}
 	}
 
-	cmdDone <- struct{}{}
 	return err
 }
 
@@ -153,7 +148,7 @@ func (cr *cmdRetrier) Start(
 	// Due to infinite retries, we may still be trying to (re)execute
 	// a command from a previous call to Start(). We should first stop
 	// these retries as well as the command process.
-	cr.Stop(cmdKey)
+	cr.Stop(cmdKey, log)
 
 	// Track the command so we can cancel it and it's retries later.
 	cmdCtx, cmdCancelFn := context.WithCancel(cmdCtx)
@@ -181,7 +176,9 @@ func (cr *cmdRetrier) Start(
 		//nolint: errcheck // No point checking the error inside the goroutine.
 		backoff.RetryNotify(
 			func() error {
-				return executeCommand(cmdCtx, log, binaryPath, args, env, timeout, cmdDone)
+				err := executeCommand(cmdCtx, log, binaryPath, args, env, timeout)
+				cmdDone <- struct{}{}
+				return err
 			},
 			backoffCtx,
 			func(err error, retryAfter time.Duration) {
@@ -200,12 +197,12 @@ func (cr *cmdRetrier) Start(
 	}()
 }
 
-func (cr *cmdRetrier) Stop(cmdKey uint64) {
+func (cr *cmdRetrier) Stop(cmdKey uint64, log *logger.Logger) {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
 	info, exists := cr.cmds[cmdKey]
 	if !exists {
-		// Nothing to do
+		log.Debugf("no retries for command key [%d] are pending; nothing to do", cmdKey)
 		return
 	}
 
@@ -219,7 +216,8 @@ func (cr *cmdRetrier) Stop(cmdKey uint64) {
 	<-info.cmdDone
 
 	// Stop tracking
-	cr.untrack(cmdKey)
+	delete(cr.cmds, cmdKey)
+	log.Debugf("retries and command process for command key [%d] stopped", cmdKey)
 }
 
 func (cr *cmdRetrier) track(cmdKey uint64, cmdCancelFn context.CancelFunc, retryCanceFn context.CancelFunc, cmdDone <-chan struct{}) {

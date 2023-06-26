@@ -104,9 +104,7 @@ func prepareTestProg(ctx context.Context, log *logger.Logger, dir string, cfg pr
 		return "", err
 	}
 
-	cmdDone := make(chan struct{}, 1)
-	err = executeCommand(ctx, log, "go", []string{"build", "-o", dir, progPath}, nil, 0, cmdDone)
-	<-cmdDone
+	err = executeCommand(ctx, log, "go", []string{"build", "-o", dir, progPath}, nil, 0)
 	if err != nil {
 		return "", err
 	}
@@ -155,9 +153,7 @@ func TestExecuteCommand(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cmdDone := make(chan struct{}, 1)
-			err = executeCommand(ctx, log, exePath, nil, nil, tc.timeout, cmdDone)
-			<-cmdDone
+			err = executeCommand(ctx, log, exePath, nil, nil, tc.timeout)
 
 			if tc.wantErr != nil {
 				diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
@@ -228,6 +224,13 @@ func TestExecuteServiceCommand(t *testing.T) {
 
 		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{})
 		require.NoError(t, err)
+
+		// Remove debug-level logs as those are only being emitted from
+		// retrier internals.
+		obs = obs.Filter(func(entry observer.LoggedEntry) bool {
+			return entry.Level != zapcore.DebugLevel
+		})
+
 		require.Equal(t, 0, obs.Len())
 	})
 
@@ -348,10 +351,80 @@ func TestExecuteServiceCommand(t *testing.T) {
 		})
 		checkRetryLogs(t, obs, exeConfig)
 	})
+
+	// Ensure two calls to executeServiceCommandWithRetries cancels
+	// the previous command execution.
+	t.Run("previous_execution_cancels", func(t *testing.T) {
+		log, obs := logger.NewTesting(t.Name())
+
+		exeConfig := progConfig{
+			ErrMessage: "foo bar",
+			ExitCode:   111,
+		}
+		exePath, err := prepareTestProg(context.Background(), log, t.TempDir(), exeConfig)
+		require.NoError(t, err)
+
+		defaultRetrySleepInitDuration := 50 * time.Millisecond
+		retrySleepMaxDuration := 200 * time.Millisecond
+
+		// First call
+		cmd1Ctx := context.Background()
+		retry1Ctx := context.Background()
+
+		err = executeServiceCommandWithRetries(
+			cmd1Ctx, log, exePath, &component.ServiceOperationsCommandSpec{},
+			retry1Ctx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+		)
+		require.NoError(t, err)
+
+		debugLogs := obs.FilterLevelExact(zapcore.DebugLevel).TakeAll()
+		require.Len(t, debugLogs, 1)
+		require.Equal(t,
+			fmt.Sprintf(
+				"no retries for command key [%d] are pending; nothing to do",
+				serviceCmdRetrier.cmdKey(exePath, nil, nil),
+			),
+			debugLogs[0].Message,
+		)
+
+		// Second call
+		cmd2Ctx := context.Background()
+		// Since the service command is retried indefinitely, we need a way to
+		// stop the test within a reasonable amount of time. However, we should never
+		// hit this timeout as the command should succeed before the timeout is reached.
+		retry2Ctx, cancel2 := context.WithTimeout(context.Background(), 4*time.Second)
+		defer cancel2()
+
+		err = executeServiceCommandWithRetries(
+			cmd2Ctx, log, exePath, &component.ServiceOperationsCommandSpec{},
+			retry2Ctx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+		)
+		require.NoError(t, err)
+
+		debugLogs = obs.FilterLevelExact(zapcore.DebugLevel).TakeAll()
+		require.Len(t, debugLogs, 2)
+		require.Equal(t,
+			fmt.Sprintf(
+				"retries and command process for command key [%d] stopped",
+				serviceCmdRetrier.cmdKey(exePath, nil, nil),
+			),
+			debugLogs[1].Message,
+		)
+
+		<-retry2Ctx.Done()
+
+		checkRetryLogs(t, obs, exeConfig)
+	})
 }
 
 func checkRetryLogs(t *testing.T, obs *observer.ObservedLogs, exeConfig progConfig) {
 	t.Helper()
+
+	// Remove debug-level logs as those are only being emitted from
+	// retrier internals.
+	obs = obs.Filter(func(entry observer.LoggedEntry) bool {
+		return entry.Level != zapcore.DebugLevel
+	})
 
 	// We expect there to be at least 2 log entries as this would indicate that
 	// at least one round of retries was attempted.
