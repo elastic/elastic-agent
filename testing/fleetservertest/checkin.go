@@ -32,8 +32,8 @@ type TmplData struct {
 //	 - ["a1", "a2"]
 //	 - ["a"]
 //	 - []
-func NewCheckinResponse(actions string) string {
-	return fmt.Sprintf(checkinResponseJSONFakeComponentTmpl, actions)
+func NewCheckinResponse(ackToken, actions string) string {
+	return fmt.Sprintf(checkinResponseJSONFakeComponentTmpl, ackToken, actions)
 }
 
 func NewActionPolicyChangeWithFakeComponent(data TmplData) (string, error) {
@@ -52,7 +52,7 @@ func NewActionPolicyChangeWithFakeComponent(data TmplData) (string, error) {
 const (
 	checkinResponseJSONFakeComponentTmpl = `
 {
-  "ack_token": "{{.AckToken}}",
+  "ack_token": "%s",
   "action": "checkin",
   "actions": %s
 }`

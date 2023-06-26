@@ -204,8 +204,9 @@ func NewHandlerCheckin(ackToken string) func(
 // CheckinAction is the actions to be sent on next checkin and the delay, how
 // long the handler will wait before sending the response.
 type CheckinAction struct {
-	Actions []string
-	Delay   time.Duration
+	AckToken string
+	Actions  []string
+	Delay    time.Duration
 }
 
 // NewHandlerCheckinFakeComponent takes a generator function that returns the
@@ -244,6 +245,7 @@ func NewHandlerCheckinFakeComponent(next func() (CheckinAction, *HTTPError)) fun
 		actions := fmt.Sprintf("[%s]", strings.Join(data.Actions, ","))
 
 		respStr := NewCheckinResponse(actions)
+		respStr := NewCheckinResponse(data.AckToken, actions)
 		resp := CheckinResponse{}
 		err := json.Unmarshal(
 			[]byte(respStr),

@@ -115,6 +115,8 @@ func NewRouter(handlers *Handlers) *mux.Router {
 					mu.Lock()
 					defer mu.Unlock()
 					AuthenticationMiddleware(route.AuthKey, route.Handler).
+					// AuthenticationMiddleware(route.AuthKey, route.Handler).
+					route.Handler.
 						ServeHTTP(w, r)
 				}))
 	}
