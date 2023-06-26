@@ -11,11 +11,112 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
+	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
+
+func TestRunFleetServer(_ *testing.T) {
+	agentID := "agentID"
+	actionID := "ActionID"
+	policyID := "policyID"
+	ackToken := "AckToken"
+	apiKey := APIKey{
+		ID:  "cG6T94gBfS1zT1GB9whs",
+		Key: "RWEBnHqLToGK7r3IYT-VaQ",
+	}
+
+	var actionsIdx int
+	fleetHosts := "host1"
+	// create a POLICY_CHANGE action with a valid policy and the fake-inout
+	tmpl := TmplData{
+		AckToken:   ackToken,
+		AgentID:    agentID,
+		ActionID:   actionID,
+		PolicyID:   policyID,
+		FleetHosts: `"host1", "host2"`,
+		SourceURI:  "http://source.uri",
+		CreatedAt:  "2023-05-31T11:37:50.607Z",
+		Output: struct {
+			APIKey string
+			Hosts  string
+			Type   string
+		}{
+			APIKey: apiKey.String(),
+			Hosts:  `"https://5d01afcb71a448afb038650d11c0417f.us-central1.gcp.qa.cld.elstc.co:443"`,
+			Type:   "elasticsearch"},
+	}
+
+	nextAction := func() (CheckinAction, *HTTPError) {
+		// defer func() { actionsIdx++ }()
+		tmpl.FleetHosts = fleetHosts
+
+		actions, err := NewActionPolicyChangeWithFakeComponent(tmpl)
+		if err != nil {
+			panic(fmt.Sprintf("failed to get new actions: %v", err))
+		}
+
+		switch actionsIdx {
+		case 0:
+			fmt.Println("checkin response action:")
+			fmt.Println(actions)
+			return CheckinAction{
+					AckToken: tmpl.AckToken, Actions: []string{actions}},
+				nil
+		}
+
+		return CheckinAction{}, nil
+	}
+
+	// =========================================================================
+	// 2nd - defining the acks. it depends on the actions returned during checkin.
+
+	// define the 'acker'. It takes the actionID and returns the appropriated
+	// AckResponseItem.
+	// This acker returns:
+	//  - success for the POLICY_CHANGE action defined above
+	//  - not found for any other
+	acker := func(id string) (AckResponseItem, bool) {
+		// only ack the action if it was already sent in the checkin response.
+		// if id == actionID && actionsIdx > 0 {
+		return AckResponseItem{
+			Status:  http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+		}, false
+		// }
+
+		// return AckResponseItem{
+		// 	Status:  http.StatusNotFound,
+		// 	Message: fmt.Sprintf("action %s not found", id),
+		// }, true
+	}
+
+	// =========================================================================
+	// 3rd - define the implementation for the fleet-server handlers we'll use
+	// and create the mock fleet-server
+	handlers := &Handlers{
+		APIKey: apiKey.Key,
+		//  --enrollment-token=Ym02VDk0Z0JmUzF6VDFHQlhRaXc6VUhOTlBxLUJUMWF3M1NSNkw3U3oyUQ== -nfi
+		EnrollmentToken: "UHNNPq-BT1aw3SR6L7Sz2Q",
+		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
+		CheckinFn:       NewHandlerCheckinFakeComponent(nextAction),
+		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
+		AckFn:           NewHandlerAckWithAcker(acker),
+		StatusFn:        NewHandlerStatusHealth(),
+	}
+	ts := NewServer(handlers, Data{})
+	fleetHosts = fmt.Sprintf(`"%s"`, ts.URL)
+
+	fmt.Println("running on:", fleetHosts)
+	fmt.Println("press CTRL + C to stop")
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	wg.Wait()
+
+}
 
 func ExampleNewServer_status() {
 	apiKey := "aAPIKey"
