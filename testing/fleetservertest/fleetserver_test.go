@@ -19,7 +19,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
-func TestRunFleetServer(_ *testing.T) {
+func TestRunFleetServer(t *testing.T) {
+	t.Skip("use this test if yu want a mock fleet-server running to enroll a real agent")
 	agentID := "agentID"
 	actionID := "ActionID"
 	policyID := "policyID"
@@ -71,32 +72,13 @@ func TestRunFleetServer(_ *testing.T) {
 		return CheckinAction{}, nil
 	}
 
-	// =========================================================================
-	// 2nd - defining the acks. it depends on the actions returned during checkin.
-
-	// define the 'acker'. It takes the actionID and returns the appropriated
-	// AckResponseItem.
-	// This acker returns:
-	//  - success for the POLICY_CHANGE action defined above
-	//  - not found for any other
 	acker := func(id string) (AckResponseItem, bool) {
-		// only ack the action if it was already sent in the checkin response.
-		// if id == actionID && actionsIdx > 0 {
 		return AckResponseItem{
 			Status:  http.StatusOK,
 			Message: http.StatusText(http.StatusOK),
 		}, false
-		// }
-
-		// return AckResponseItem{
-		// 	Status:  http.StatusNotFound,
-		// 	Message: fmt.Sprintf("action %s not found", id),
-		// }, true
 	}
 
-	// =========================================================================
-	// 3rd - define the implementation for the fleet-server handlers we'll use
-	// and create the mock fleet-server
 	handlers := &Handlers{
 		APIKey: apiKey.Key,
 		//  --enrollment-token=Ym02VDk0Z0JmUzF6VDFHQlhRaXc6VUhOTlBxLUJUMWF3M1NSNkw3U3oyUQ== -nfi
@@ -115,7 +97,6 @@ func TestRunFleetServer(_ *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	wg.Wait()
-
 }
 
 func ExampleNewServer_status() {
