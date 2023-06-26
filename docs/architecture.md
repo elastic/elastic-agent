@@ -20,14 +20,14 @@ The next stage of the policy's journey is to apply conditions. Applying conditio
 ### Compute Model
 The final stage of the policy’s journey is to compute the components and units model that represents the expected state of the running Elastic Agent environment. Using the input specifications that each component defines in the Elastic Agent component directory, the Elastic Agent computes a model. That model can be different based on the platform that the Elastic Agent is running on because of specification settings defined in a component’s specification.
 
-<center><img src="img/compute_model.png" alt="Compute Model Diagram"></center>
+<center><img src="./images/compute_model.png" alt="Compute Model Diagram"></center>
 
 ## Coordinator
 The Elastic Agent Coordinator does as the name describes and it coordinates the process of taking policy and variables, computing the model, and passing that model off to the Runtime Manager. All actions that occur during the lifecycle of the Elastic Agent pass through the Coordinator. This allows the Coordinator to ensure that the action is performed by the correct piece of code in the Elastic Agent and the overall status of the Elastic Agent is managed from a central place (aka. Coordinator).
 
 The architecture of the Coordinator is designed in a modular way. This modularity allows future changes to replace implementation without having to rewrite the entire operation of the Elastic Agent. A very simple example is a new Config Manager could be implemented and everything else stays the same.
 
-<center><img src="img/coordinator.png" alt="Coordinator Diagram"></center>
+<center><img src="./images/coordinator.png" alt="Coordinator Diagram"></center>
 
 ## Config Manager
 Currently the Elastic Agent has 3 Config Managers. The Config Manager role is to gather the configuration (based on its implementation) and pass that information to the Coordinator.

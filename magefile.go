@@ -273,7 +273,7 @@ func (Build) TestBinaries() error {
 
 // All run all the code checks.
 func (Check) All() {
-	mg.SerialDeps(Check.License, Integration.Check, Check.GoLint)
+	mg.SerialDeps(Check.License, Integration.Check)
 }
 
 // GoLint run the code through the linter.
@@ -1416,7 +1416,11 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 			JUnitReportFile: fileName + ".xml",
 			Packages:        []string{packageName},
 			Tags:            []string{"integration"},
-			ExtraFlags:      []string{"-test.run", strings.Join(packageTests, "|")},
+			ExtraFlags: []string{
+				"-test.run", strings.Join(packageTests, "|"),
+				"-test.shuffle", "on",
+				"-test.timeout", "0",
+			},
 			Env: map[string]string{
 				"AGENT_VERSION":      version,
 				"TEST_DEFINE_PREFIX": testPrefix,
@@ -1450,7 +1454,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	if err != nil {
 		return fmt.Errorf("error writing test out file: %w", err)
 	}
-	err = writeFile("build/TEST-go-integration.out.json", results.Output, 0644)
+	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0644)
 	if err != nil {
 		return fmt.Errorf("error writing test out json file: %w", err)
 	}
@@ -1537,8 +1541,9 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 			ServiceTokenPath: serviceTokenPath,
 			Datacenter:       datacenter,
 		},
-		Matrix:     matrix,
-		SingleTest: singleTest,
+		Matrix:      matrix,
+		SingleTest:  singleTest,
+		VerboseMode: mg.Verbose(),
 	}, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)

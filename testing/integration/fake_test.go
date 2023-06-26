@@ -79,7 +79,7 @@ var simpleConfig1 = `
 outputs:
   default:
     type: fake-action-output
-    fake-shipper: {}
+    shipper.enabled: true
 inputs:
   - id: fake
     type: fake
@@ -91,7 +91,7 @@ var simpleConfig2 = `
 outputs:
   default:
     type: fake-action-output
-    fake-shipper: {}
+    shipper.enabled: true
 inputs:
   - id: fake
     type: fake

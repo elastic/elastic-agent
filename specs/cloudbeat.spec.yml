@@ -50,6 +50,11 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     command: *command
+  - name: cloudbeat/cis_gcp
+    description: "CIS GCP monitoring"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
   - name: cloudbeat/vuln_mgmt_aws
     description: "AWS Vulnerabilities management"
     platforms: *platforms

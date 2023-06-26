@@ -12,8 +12,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
-
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
 	v1server "github.com/elastic/elastic-agent/pkg/control/v1/server"
@@ -138,12 +136,16 @@ func (s *Server) State(_ context.Context, _ *cproto.Empty) (*cproto.StateRespons
 // StateWatch streams the current state of the Elastic Agent to the client.
 func (s *Server) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
 	ctx := srv.Context()
-	sub := s.coord.StateSubscribe(ctx)
+	// TODO: Should we expose the subscription buffer size in the RPC? This
+	// would e.g. let subscribers who only care about the latest state set a
+	// buffer size of 0 so they will always receive the most recent value
+	// instead of the full sequence.
+	subChan := s.coord.StateSubscribe(ctx, 32)
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case state := <-sub.Ch():
+		case state := <-subChan:
 			resp, err := stateToProto(&state, s.agentInfo)
 			if err != nil {
 				return err
@@ -266,7 +268,7 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 	return &cproto.Empty{}, nil
 }
 
-func stateToProto(state *state.State, agentInfo *info.AgentInfo) (*cproto.StateResponse, error) {
+func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.StateResponse, error) {
 	var err error
 	components := make([]*cproto.ComponentState, 0, len(state.Components))
 	for _, comp := range state.Components {

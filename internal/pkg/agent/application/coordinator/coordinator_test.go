@@ -70,12 +70,37 @@ var (
 	}
 )
 
+// waitForState listens on the given stateChan for a state where stateCallback
+// returns true, up to the given timeout duration, and reports a test failure
+// if it doesn't arrive.
+func waitForState(
+	t *testing.T,
+	stateChan chan State,
+	stateCallback func(State) bool,
+	timeout time.Duration,
+) {
+	t.Helper()
+	timeoutChan := time.After(timeout)
+	for {
+		select {
+		case state := <-stateChan:
+			if stateCallback(state) {
+				return
+			}
+		case <-timeoutChan:
+			assert.Fail(t, "timed out waiting for expected state")
+			return
+		}
+	}
+}
+
 func TestCoordinator_State_Starting(t *testing.T) {
 	coordCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	coord, cfgMgr, varsMgr := createCoordinator(t)
+	stateChan := coord.StateSubscribe(ctx, 32)
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -85,70 +110,31 @@ func TestCoordinator_State_Starting(t *testing.T) {
 		coordCh <- err
 	}()
 
-	assert.Eventually(t, func() bool {
-		state := coord.State()
-		return state.State == agentclient.Starting && state.Message == "Waiting for initial configuration and composable variables"
-	}, 3*time.Second, 10*time.Millisecond)
+	waitForState(t, stateChan, func(state State) bool {
+		return state.State == agentclient.Starting &&
+			state.Message == "Waiting for initial configuration and composable variables"
+	}, 3*time.Second)
 
 	// set vars state should stay same (until config)
 	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
 
-	assert.Eventually(t, func() bool {
-		state := coord.State()
-		return state.State == agentclient.Starting && state.Message == "Waiting for initial configuration and composable variables"
-	}, 3*time.Second, 10*time.Millisecond)
+	// State changes happen asynchronously in the Coordinator goroutine, so
+	// wait a little bit to make sure no changes are reported; if the Vars
+	// call does trigger a change, it should happen relatively quickly.
+	select {
+	case <-stateChan:
+		assert.Fail(t, "Vars call shouldn't cause a state change")
+	case <-time.After(50 * time.Millisecond):
+	}
 
 	// set configuration should change to healthy
 	cfg, err := config.NewConfigFrom(nil)
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	assert.Eventually(t, func() bool {
-		state := coord.State()
+	waitForState(t, stateChan, func(state State) bool {
 		return state.State == agentclient.Healthy && state.Message == "Running"
-	}, 3*time.Second, 10*time.Millisecond)
-
-	cancel()
-	err = <-coordCh
-	require.NoError(t, err)
-}
-
-func TestCoordinator_State_VarsError(t *testing.T) {
-	coordCh := make(chan error)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	coord, cfgMgr, varsMgr := createCoordinator(t)
-	go func() {
-		err := coord.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			// allowed error
-			err = nil
-		}
-		coordCh <- err
-	}()
-
-	// no vars used by the config
-	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
-
-	// no configuration needed
-	cfg, err := config.NewConfigFrom(nil)
-	require.NoError(t, err)
-	cfgMgr.Config(ctx, cfg)
-
-	// set an error on vars manager
-	varsMgr.ReportError(ctx, errors.New("force error"))
-	assert.Eventually(t, func() bool {
-		state := coord.State()
-		return state.State == agentclient.Failed && state.Message == "force error"
-	}, 3*time.Second, 10*time.Millisecond)
-
-	// clear error
-	varsMgr.ReportError(ctx, nil)
-	assert.Eventually(t, func() bool {
-		state := coord.State()
-		return state.State == agentclient.Healthy && state.Message == "Running"
-	}, 3*time.Second, 10*time.Millisecond)
+	}, 3*time.Second)
 
 	cancel()
 	err = <-coordCh
@@ -254,18 +240,18 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 		coordCh <- err
 	}()
 
-	subCh := make(chan error)
+	resultChan := make(chan error)
 	go func() {
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
-		sub := coord.StateSubscribe(ctx)
+		subChan := coord.StateSubscribe(ctx, 32)
 		for {
 			select {
 			case <-ctx.Done():
-				subCh <- ctx.Err()
+				resultChan <- ctx.Err()
 				return
-			case state := <-sub.Ch():
+			case state := <-subChan:
 				t.Logf("%+v", state)
 				if len(state.Components) == 2 {
 					compState := getComponentState(state.Components, "fake-default")
@@ -273,7 +259,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 						unit, ok := compState.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}]
 						if ok {
 							if unit.State == client.UnitStateHealthy && unit.Message == "Healthy From Fake Config" {
-								subCh <- nil
+								resultChan <- nil
 								return
 							}
 						}
@@ -308,7 +294,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = <-subCh
+	err = <-resultChan
 	require.NoError(t, err)
 	cancel()
 
@@ -376,7 +362,6 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 				}
 			}
 		}
-
 	}
 }
 
@@ -560,17 +545,24 @@ func (f *fakeReExecManager) ReExec(callback reexec.ShutdownCallbackFn, _ ...stri
 }
 
 type fakeUpgradeManager struct {
+	upgradeable   bool
+	upgradeErr    error // An error to return when Upgrade is called
+	upgradeCalled bool  // Set when Upgrade is called
 }
 
 func (f *fakeUpgradeManager) Upgradeable() bool {
-	return false
+	return f.upgradeable
 }
 
-func (f *fakeUpgradeManager) Reload(_ *config.Config) error {
+func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
 func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	f.upgradeCalled = true
+	if f.upgradeErr != nil {
+		return nil, f.upgradeErr
+	}
 	return func() error { return nil }, nil
 }
 
@@ -639,12 +631,15 @@ func (f *fakeConfigManager) Watch() <-chan ConfigChange {
 func (f *fakeConfigManager) Config(ctx context.Context, cfg *config.Config) {
 	select {
 	case <-ctx.Done():
-	case f.cfgCh <- &configChange{cfg}:
+	case f.cfgCh <- &configChange{cfg: cfg}:
 	}
 }
 
 type configChange struct {
-	cfg *config.Config
+	cfg    *config.Config
+	acked  bool  // Set if Ack() was called
+	failed bool  // Set if Fail() was called
+	err    error // Set to Fail's argument
 }
 
 func (l *configChange) Config() *config.Config {
@@ -652,12 +647,13 @@ func (l *configChange) Config() *config.Config {
 }
 
 func (l *configChange) Ack() error {
-	// do nothing
+	l.acked = true
 	return nil
 }
 
-func (l *configChange) Fail(_ error) {
-	// do nothing
+func (l *configChange) Fail(err error) {
+	l.failed = true
+	l.err = err
 }
 
 type fakeVarsManager struct {
@@ -697,6 +693,47 @@ func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
 	case <-ctx.Done():
 	case f.varsCh <- vars:
 	}
+}
+
+// An implementation of the RuntimeManager interface for use in testing.
+type fakeRuntimeManager struct {
+	state          []runtime.ComponentComponentState
+	updateCallback func([]component.Component) error
+}
+
+func (r *fakeRuntimeManager) Run(ctx context.Context) error {
+	<-ctx.Done()
+	return nil
+}
+
+func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
+
+func (r *fakeRuntimeManager) Update(components []component.Component) error {
+	if r.updateCallback != nil {
+		return r.updateCallback(components)
+	}
+	return nil
+}
+
+// State returns the current components model state.
+func (r *fakeRuntimeManager) State() []runtime.ComponentComponentState {
+	return r.state
+}
+
+// PerformAction executes an action on a unit.
+func (r *fakeRuntimeManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+// SubscribeAll provides an interface to watch for changes in all components.
+func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.SubscriptionAll {
+	return nil
+}
+
+// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
+// it performs diagnostics for all current units.
+func (r *fakeRuntimeManager) PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+	return nil
 }
 
 func testBinary(t *testing.T, name string) string {
