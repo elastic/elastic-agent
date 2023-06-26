@@ -4,29 +4,29 @@
 
 package component
 
-// errorReason is an error that can be marshalled/unmarshalled to and from YAML.
-type errorReason struct {
-	reason string
+// ErrorReason is an error that can be marshalled/unmarshalled to and from YAML.
+type ErrorReason struct {
+	Reason string
 }
 
 func newError(reason string) error {
-	return &errorReason{reason: reason}
+	return &ErrorReason{Reason: reason}
 }
 
-func (e *errorReason) Error() string {
-	return e.reason
+func (e *ErrorReason) Error() string {
+	return e.Reason
 }
 
-func (e *errorReason) MarshalYAML() (interface{}, error) {
-	return e.reason, nil
+func (e *ErrorReason) MarshalYAML() (interface{}, error) {
+	return e.Reason, nil
 }
 
-func (e *errorReason) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (e *ErrorReason) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var s string
 	err := unmarshal(&s)
 	if err != nil {
 		return err
 	}
-	e.reason = s
+	e.Reason = s
 	return nil
 }
