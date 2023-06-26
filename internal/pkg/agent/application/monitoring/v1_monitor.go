@@ -172,7 +172,7 @@ func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
 	}
 
 	appendix := make([]string, 0, 20)
-	endpoint := endpointPath(unit, b.operatingSystem)
+	endpoint := utils.SocketURLWithFallback(unit, paths.TempDir())
 	if endpoint != "" {
 		appendix = append(appendix,
 			"-E", "http.enabled=true",
@@ -211,7 +211,7 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	}
 
 	if b.config.C.MonitorMetrics {
-		metricsDrop := monitoringDrop(endpointPath(unit, b.operatingSystem))
+		metricsDrop := monitoringDrop(utils.SocketURLWithFallback(unit, paths.TempDir()))
 		drops = append(drops, metricsDrop)
 	}
 
@@ -247,7 +247,7 @@ func (b *BeatsMonitor) Cleanup(unit string) error {
 		return nil
 	}
 
-	endpoint := monitoringFile(unit, b.operatingSystem)
+	endpoint := monitoringFile(unit)
 	if endpoint == "" {
 		return nil
 	}
@@ -606,7 +606,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			continue
 		}
 
-		endpoints := []interface{}{prefixedEndpoint(endpointPath(unit, b.operatingSystem))}
+		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(unit, paths.TempDir()))}
 		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {
@@ -792,7 +792,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	// iterate over the full component list, adding a monitoring output for every shipper binary.
 	for _, comp := range componentList {
 		if comp.ShipperSpec != nil { // a shipper unit
-			endpoints := []interface{}{prefixedEndpoint(endpointPath(comp.ID, b.operatingSystem))}
+			endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(comp.ID, paths.TempDir()))}
 			name := "shipper" // in other beats this is the binary name, but we can hard-code it here.
 			if comp.ShipperSpec.Spec.Name != "" {
 				name = comp.ShipperSpec.Spec.Name
@@ -948,10 +948,6 @@ func loggingPath(id, operatingSystem string) string {
 	return fmt.Sprintf(logFileFormat, paths.Home(), id)
 }
 
-func endpointPath(id, operatingSystem string) (endpointPath string) {
-	return utils.SocketURLWithFallback(id, operatingSystem, paths.TempDir())
-}
-
 func prefixedEndpoint(endpoint string) string {
 	if endpoint == "" || strings.HasPrefix(endpoint, httpPlusPrefix) || strings.HasPrefix(endpoint, httpPrefix) {
 		return endpoint
@@ -960,8 +956,8 @@ func prefixedEndpoint(endpoint string) string {
 	return httpPlusPrefix + endpoint
 }
 
-func monitoringFile(id, operatingSystem string) string {
-	endpoint := endpointPath(id, operatingSystem)
+func monitoringFile(id string) string {
+	endpoint := utils.SocketURLWithFallback(id, paths.TempDir())
 	if endpoint == "" {
 		return ""
 	}
