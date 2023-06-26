@@ -28,8 +28,7 @@ sequenceDiagram
     alt If upgrade start fails
        A->>FS: Ack failed upgrade
        FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = "failed"
-       UI->>UI: Show Agent status as "???"
-       Note right of UI: Need to check
+       UI->>UI: Agent status remains as "updating" (bug)
     else
        opt If previous upgrades found
           A->>FS: Ack previous upgrades
@@ -43,16 +42,15 @@ sequenceDiagram
        A->>A: Rexec to start new Agent artifact
        A->>FS: Ack successful upgrade
        UW->>UM: Remove
-       FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at = <now>
+       FS->>ES: Write successful ack in `.fleet-actions-results`
+       FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at` = <now><br />`upgrade_started_at` = null
        UI->>UI: Show Agent status as "healthy"
    end
    opt Rollback
        UW->>A: Start
        A->>FS: Ack failed upgrade
        FS->>ES: Update Agent doc in `.fleet-agents`<br />set `upgrade_status` = null<br />`upgraded_at = <now>
-       Note right of ES: Need to check
-       UI->>UI: Show Agent status as "???"
-       Note right of UI: Need to check
+       UI->>UI: Show Agent status as "healthy"
        UW->>UM: Remove
    end
 ```
