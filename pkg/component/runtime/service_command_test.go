@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/zap/zaptest/observer"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +16,8 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
