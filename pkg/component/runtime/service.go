@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 type actionModeSigned struct {
@@ -108,6 +109,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	teardownCheckinTimeout := s.checkinPeriod()
 	teardownCheckinTimer := time.NewTimer(teardownCheckinTimeout)
 	defer teardownCheckinTimer.Stop()
+
 	// Stop teardown checkin timeout timer initially
 	teardownCheckinTimer.Stop()
 
@@ -132,7 +134,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	}
 	defer cisStop()
 
-	processStop := func(am actionMode) {
+	onStop := func(am actionMode) {
 		// Stop check-in timer
 		s.log.Debugf("stop check-in timer for %s service", s.name())
 		checkinTimer.Stop()
@@ -146,7 +148,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	}
 
 	processTeardown := func(am actionMode, signed *component.Signed) error {
-		s.log.Infof("start teardown for %s service", s.name())
+		s.log.Debugf("start teardown for %s service", s.name())
 		// Inject new signed
 		newComp, err := injectSigned(s.comp, signed)
 		if err != nil {
@@ -162,6 +164,23 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		s.log.Debugf("process new comp config for %s service", s.name())
 		s.processNewComp(newComp, comm)
 		return nil
+	}
+
+	onTeardown := func(as actionModeSigned) {
+		tamperProtection := features.TamperProtection()
+		s.log.Debugf("got teardown for %s service, tearingDown==%v, tamperProtectoin=%v", s.name(), tearingDown, tamperProtection)
+
+		// If tamper protection is disabled do the old behavior
+		if !tamperProtection {
+			onStop(as.actionMode)
+			return
+		}
+
+		if !tearingDown {
+			tearingDown = true
+			err = processTeardown(as.actionMode, as.signed)
+		}
+
 	}
 
 	for {
@@ -199,13 +218,9 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				// Start check-in timer
 				checkinTimer.Reset(s.checkinPeriod())
 			case actionStop:
-				processStop(as.actionMode)
+				onStop(as.actionMode)
 			case actionTeardown:
-				s.log.Debugf("got teardown for %s service, tearingDown==%v", s.name(), tearingDown)
-				if !tearingDown {
-					tearingDown = true
-					err = processTeardown(as.actionMode, as.signed)
-				}
+				onTeardown(as)
 			}
 			if err != nil {
 				s.forceCompState(client.UnitStateFailed, err.Error())
@@ -213,24 +228,25 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		case newComp := <-s.compCh:
 			s.processNewComp(newComp, comm)
 		case checkin := <-comm.CheckinObserved():
-			s.log.Debugf("got checkin for %s service, tearingDown: %v", s.name(), tearingDown)
+			s.log.Debugf("got check-in for %s service, tearingDown=%v", s.name(), tearingDown)
 			s.processCheckin(checkin, comm, &lastCheckin)
 			// Got check-in upon teardown update
+			// tearingDown can be set to true only if tamper protection feature is enabled
 			if tearingDown {
 				tearingDown = false
 				teardownCheckinTimer.Stop()
-				processStop(actionTeardown)
+				onStop(actionTeardown)
 			}
 		case <-checkinTimer.C:
-			s.log.Debugf("checkin timer")
 			s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
 			checkinTimer.Reset(s.checkinPeriod())
 		case <-teardownCheckinTimer.C:
-			s.log.Debugf("got teardown timeout for %s service", s.name())
-			// teardown timed out
+			s.log.Debugf("got tearing down timeout for %s service", s.name())
+			// Teardown timed out
+			// tearingDown can be set to true only if tamper protection feature is enabled
 			if tearingDown {
 				tearingDown = false
-				processStop(actionTeardown)
+				onStop(actionTeardown)
 			}
 		}
 	}
@@ -595,6 +611,11 @@ func uninstallService(ctx context.Context, log *logger.Logger, comp component.Co
 		return ErrOperationSpecUndefined
 	}
 
+	// If tamper protection feature flag is disabled, force uninstallToken value to empty,
+	// this will remove the --uninstall-token command arg
+	if !features.TamperProtection() {
+		uninstallToken = ""
+	}
 	comp.InputSpec.Spec.Service.Operations.Uninstall = resolveUninstallTokenArg(comp.InputSpec.Spec.Service.Operations.Uninstall, uninstallToken)
 
 	log.Debugf("uninstall %s service", comp.InputSpec.BinaryName)

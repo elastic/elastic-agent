@@ -106,11 +106,18 @@ func TestActionUnenrollHandler(t *testing.T) {
 
 	handler := NewUnenroll(log, coord, ch, nil, nil)
 
+	getTamperProtectionFunc := func(enabled bool) func() bool {
+		return func() bool {
+			return enabled
+		}
+	}
+
 	tests := []struct {
 		name                 string
 		st                   state.State
 		wantErr              error // Handler error
 		wantPerformedActions int
+		tamperProtectionFn   func() bool
 	}{
 		{
 			name: "no running components",
@@ -126,7 +133,7 @@ func TestActionUnenrollHandler(t *testing.T) {
 			}(),
 		},
 		{
-			name: "endpoint with UNENROLL",
+			name: "endpoint with UNENROLL, tamper protection feature flag disabled",
 			st: func() state.State {
 				return state.State{
 					Components: []runtime.ComponentComponentState{
@@ -135,10 +142,23 @@ func TestActionUnenrollHandler(t *testing.T) {
 					},
 				}
 			}(),
+			wantPerformedActions: 0,
+		},
+		{
+			name: "endpoint with UNENROLL, tamper protection feature flag enabled",
+			st: func() state.State {
+				return state.State{
+					Components: []runtime.ComponentComponentState{
+						makeComponentState("endpoint", []string{"UNENROLL"}),
+						makeComponentState("osquery", nil),
+					},
+				}
+			}(),
+			tamperProtectionFn:   getTamperProtectionFunc(true),
 			wantPerformedActions: 1,
 		},
 		{
-			name: "more than one UNENROLL dispatch",
+			name: "more than one UNENROLL dispatch, tamper protection feature flag disabled",
 			st: func() state.State {
 				return state.State{
 					Components: []runtime.ComponentComponentState{
@@ -148,6 +168,20 @@ func TestActionUnenrollHandler(t *testing.T) {
 					},
 				}
 			}(),
+			wantPerformedActions: 0,
+		},
+		{
+			name: "more than one UNENROLL dispatch, tamper protection feature flag enabled",
+			st: func() state.State {
+				return state.State{
+					Components: []runtime.ComponentComponentState{
+						makeComponentState("endpoint", []string{"UNENROLL"}),
+						makeComponentState("foobar", []string{"UNENROLL", "FOOBAR"}),
+						makeComponentState("osquery", nil),
+					},
+				}
+			}(),
+			tamperProtectionFn:   getTamperProtectionFunc(true),
 			wantPerformedActions: 2,
 		},
 	}
@@ -159,7 +193,14 @@ func TestActionUnenrollHandler(t *testing.T) {
 
 			coord.st = tc.st
 
+			if tc.tamperProtectionFn == nil {
+				handler.tamperProtectionFn = getTamperProtectionFunc(false)
+			} else {
+				handler.tamperProtectionFn = tc.tamperProtectionFn
+			}
+
 			err := handler.Handle(ctx, action, acker)
+
 			require.ErrorIs(t, err, tc.wantErr)
 			if tc.wantErr == nil {
 				require.Len(t, acker.Acked, 1)

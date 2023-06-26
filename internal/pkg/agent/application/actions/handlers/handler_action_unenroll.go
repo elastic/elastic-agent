@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -36,6 +37,8 @@ type Unenroll struct {
 	ch         chan coordinator.ConfigChange
 	closers    []context.CancelFunc
 	stateStore stateStore
+
+	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
 }
 
 // NewUnenroll creates a new Unenroll handler.
@@ -47,11 +50,12 @@ func NewUnenroll(
 	stateStore stateStore,
 ) *Unenroll {
 	return &Unenroll{
-		log:        log,
-		coord:      coord,
-		ch:         ch,
-		closers:    closers,
-		stateStore: stateStore,
+		log:                log,
+		coord:              coord,
+		ch:                 ch,
+		closers:            closers,
+		stateStore:         stateStore,
+		tamperProtectionFn: features.TamperProtection,
 	}
 }
 
@@ -63,18 +67,20 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		return fmt.Errorf("invalid type, expected ActionUnenroll and received %T", a)
 	}
 
-	// Find inputs that want to receive UNENROLL action
-	// Endpoint needs to receive a signed UNENROLL action in order to be able to uncontain itself
-	state := h.coord.State()
-	comps, units := findMatchingUnitsByActionType(state, a.Type())
-	if len(comps) > 0 {
-		err := dispatchActionInParallel(ctx, h.log, action, comps, units, h.coord.PerformAction)
-		if err != nil {
-			return err
+	if h.tamperProtectionFn() {
+		// Find inputs that want to receive UNENROLL action
+		// Endpoint needs to receive a signed UNENROLL action in order to be able to uncontain itself
+		state := h.coord.State()
+		comps, units := findMatchingUnitsByActionType(state, a.Type())
+		if len(comps) > 0 {
+			err := dispatchActionInParallel(ctx, h.log, action, comps, units, h.coord.PerformAction)
+			if err != nil {
+				return err
+			}
+		} else {
+			// Log and continue
+			h.log.Debugf("No components running for %v action type", a.Type())
 		}
-	} else {
-		// Log and continue
-		h.log.Debugf("No components running for %v action type", a.Type())
 	}
 
 	if action.IsDetected {

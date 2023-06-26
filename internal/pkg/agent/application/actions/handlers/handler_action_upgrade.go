@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // Upgrade is a handler for UPGRADE action.
@@ -50,20 +51,23 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	if !runAsync {
 		return nil
 	}
-	// Find inputs that want to receive UPGRADE action
-	// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself
-	state := h.coord.State()
-	comps, units := findMatchingUnitsByActionType(state, a.Type())
-	if len(comps) > 0 {
-		h.log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
-		err := dispatchActionInParallel(ctx, h.log, action, comps, units, h.coord.PerformAction)
-		h.log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
-		if err != nil {
-			return err
+
+	if features.TamperProtection() {
+		// Find inputs that want to receive UPGRADE action
+		// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself
+		state := h.coord.State()
+		comps, units := findMatchingUnitsByActionType(state, a.Type())
+		if len(comps) > 0 {
+			h.log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
+			err := dispatchActionInParallel(ctx, h.log, action, comps, units, h.coord.PerformAction)
+			h.log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
+			if err != nil {
+				return err
+			}
+		} else {
+			// Log and continue
+			h.log.Debugf("No components running for %v action type", a.Type())
 		}
-	} else {
-		// Log and continue
-		h.log.Debugf("No components running for %v action type", a.Type())
 	}
 
 	go func() {

@@ -15,8 +15,16 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+// The default value of tamper protection flag if the flag is missing
+// The following was agreed upon for upcoming releases
+// 8.10  - default is disabled
+// 8.11+ - default is enabled
+const defaultTamperProtection = false
+
 var (
-	current = Flags{}
+	current = Flags{
+		tamperProtection: defaultTamperProtection,
+	}
 )
 
 type BoolValueOnChangeCallback func(new, old bool)
@@ -27,6 +35,8 @@ type Flags struct {
 
 	fqdn          bool
 	fqdnCallbacks map[string]BoolValueOnChangeCallback
+
+	tamperProtection bool
 }
 
 type cfg struct {
@@ -35,6 +45,9 @@ type cfg struct {
 			FQDN struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"fqdn" yaml:"fqdn" config:"fqdn"`
+			TamperProtection *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"tamper_protection,omitempty" yaml:"tamper_protection,omitempty" config:"tamper_protection,omitempty"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -44,6 +57,13 @@ func (f *Flags) FQDN() bool {
 	defer f.mu.RUnlock()
 
 	return f.fqdn
+}
+
+func (f *Flags) TamperProtection() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.tamperProtection
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -91,6 +111,14 @@ func (f *Flags) setFQDN(newValue bool) {
 	for _, cb := range f.fqdnCallbacks {
 		cb(newValue, oldValue)
 	}
+}
+
+// setTamperProtection sets the value of the TamperProtection flag in Flags.
+func (f *Flags) setTamperProtection(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.tamperProtection = newValue
 }
 
 // setSource sets the source from he given cfg.
@@ -150,6 +178,12 @@ func Parse(policy any) (*Flags, error) {
 
 	flags := new(Flags)
 	flags.setFQDN(parsedFlags.Agent.Features.FQDN.Enabled)
+
+	// Tamper protection flag is optional, fallback on default value if missing
+	if parsedFlags.Agent.Features.TamperProtection != nil {
+		flags.setTamperProtection(parsedFlags.Agent.Features.TamperProtection.Enabled)
+	}
+
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -171,10 +205,16 @@ func Apply(c *config.Config) error {
 	}
 
 	current.setFQDN(parsed.FQDN())
+	current.setTamperProtection(parsed.TamperProtection())
 	return err
 }
 
 // FQDN reports if FQDN should be used instead of hostname for host.name.
 func FQDN() bool {
 	return current.FQDN()
+}
+
+// TamperProtection reports if tamper protection feature is enabled
+func TamperProtection() bool {
+	return current.TamperProtection()
 }

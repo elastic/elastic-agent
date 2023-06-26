@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
@@ -36,6 +37,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 		return err
 	}
 	status, _ := svc.Status()
+
 	if status == service.StatusRunning {
 		err := svc.Stop()
 		if err != nil {
@@ -199,6 +201,11 @@ func uninstallComponents(ctx context.Context, cfgFile, uninstallToken string) er
 	// nothing to remove
 	if len(comps) == 0 {
 		return nil
+	}
+
+	// Need to read the features from config on uninstall, in order to set the tamper protection feature flag correctly
+	if err := features.Apply(cfg); err != nil {
+		return fmt.Errorf("could not parse and apply feature flags config: %w", err)
 	}
 
 	// remove each service component
