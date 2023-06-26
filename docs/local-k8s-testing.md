@@ -27,7 +27,6 @@ In order to run agent on a local k8s cluster we need to set some environment var
 ES_HOST=https://<elasticsearch host>:443
 ES_USERNAME=elastic
 ES_PASSWORD=changeme
-
 ```
 
 #### Managed mode
