@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.uber.org/zap/zaptest/observer"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,11 +18,9 @@ import (
 	"text/template"
 	"time"
 
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/stretchr/testify/require"
 
@@ -47,17 +46,12 @@ import (
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "testprog started")
-
-	//if {{.SucceedAfter}} > 0 {
-	//	fmt.Fprintln(os.Stderr, "testprog succeedafter configured")
-	//	fmt.Fprintf(os.Stderr, "testprog succeedafter unixmilli: %s\n", time.UnixMilli({{.SucceedAfter}}))
-	//	fmt.Fprintf(os.Stderr, "testprog succeedafter now: %s\n", time.Now())
-	//	if time.Now().After(time.UnixMilli({{.SucceedAfter}})) {
-	//		fmt.Fprintln(os.Stderr, "testprog succeeded")
-	//		os.Exit(0)
-	//	}
-	//}
+	if {{.SucceedAfter}} > 0 {
+		if time.Now().After(time.UnixMilli({{.SucceedAfter}})) {
+			fmt.Fprintln(os.Stderr, "testprog succeeded")
+			os.Exit(0)
+		}
+	}
 
 	if len("{{.ErrMessage}}") > 0 {
 		fmt.Fprintf(os.Stderr, "{{.ErrMessage}}")
@@ -210,7 +204,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 	// No spec
 	t.Run("no_spec", func(t *testing.T) {
 		ctx := context.Background()
-		log, observer := logger.NewTesting(t.Name())
+		log, obs := logger.NewTesting(t.Name())
 
 		exePath, err := prepareTestProg(ctx, log, t.TempDir(), progConfig{})
 		require.NoError(t, err)
@@ -218,7 +212,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		err = executeServiceCommand(ctx, log, exePath, nil)
 		require.NoError(t, err)
 
-		warnLogs := observer.FilterLevelExact(zapcore.WarnLevel)
+		warnLogs := obs.FilterLevelExact(zapcore.WarnLevel)
 		require.Equal(t, 1, warnLogs.Len())
 		require.Equal(t, fmt.Sprintf("spec is nil, nothing to execute, binaryPath: %s", exePath), warnLogs.TakeAll()[0].Message)
 	})
@@ -226,20 +220,20 @@ func TestExecuteServiceCommand(t *testing.T) {
 	// Execution succeeds on first attempt
 	t.Run("successful_execution", func(t *testing.T) {
 		ctx := context.Background()
-		log, observer := logger.NewTesting(t.Name())
+		log, obs := logger.NewTesting(t.Name())
 
 		exePath, err := prepareTestProg(ctx, log, t.TempDir(), progConfig{})
 		require.NoError(t, err)
 
 		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{})
 		require.NoError(t, err)
-		require.Equal(t, 0, observer.Len())
+		require.Equal(t, 0, obs.Len())
 	})
 
 	// Execution fails indefinitely and there is no retry configuration in spec
 	t.Run("failed_execution_no_retry_config", func(t *testing.T) {
 		cmdCtx := context.Background()
-		log, observer := logger.NewTesting(t.Name())
+		log, obs := logger.NewTesting(t.Name())
 
 		exeConfig := progConfig{
 			ErrMessage: "foo bar",
@@ -250,7 +244,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 
 		// Since the service command is retried indefinitely, we need a way to
 		// stop the test within a reasonable amount of time
-		retryCtx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+		retryCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
 		defaultRetrySleepInitDuration := 50 * time.Millisecond
@@ -263,13 +257,13 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		<-retryCtx.Done()
-		checkRetryLogs(t, observer, exeConfig)
+		checkRetryLogs(t, obs, exeConfig)
 	})
 
 	// Execution fails indefinitely but there is retry configuration in spec
 	t.Run("failed_execution_with_retry_config", func(t *testing.T) {
 		cmdCtx := context.Background()
-		log, observer := logger.NewTesting(t.Name())
+		log, obs := logger.NewTesting(t.Name())
 
 		exeConfig := progConfig{
 			ErrMessage: "foo bar",
@@ -302,15 +296,15 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		<-retryCtx.Done()
-		checkRetryLogs(t, observer, exeConfig)
+		checkRetryLogs(t, obs, exeConfig)
 	})
 
 	// Execution fails initially but then succeeds after a few retries
 	t.Run("succeed_after_retry", func(t *testing.T) {
 		cmdCtx := context.Background()
-		log, observer := logger.NewTesting(t.Name())
+		log, obs := logger.NewTesting(t.Name())
 
-		const succeedCmdAfter = 4 * time.Second
+		const succeedCmdAfter = 1 * time.Second
 		now := time.Now()
 		exeConfig := progConfig{
 			ErrMessage:   "foo bar",
@@ -323,7 +317,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		// Since the service command is retried indefinitely, we need a way to
 		// stop the test within a reasonable amount of time. However, we should never
 		// hit this timeout as the command should succeed before the timeout is reached.
-		retryCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		retryCtx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 		defer cancel()
 
 		defaultRetrySleepInitDuration := 50 * time.Millisecond
@@ -339,21 +333,26 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Give the command time to succeed.
-		time.Sleep(6 * time.Second)
-		logs := observer.TakeAll()
-		for _, l := range logs {
-			t.Logf("[%s] %s", l.Level, l.Message)
+		successMsgFilterFn := func(l observer.LoggedEntry) bool {
+			return strings.Contains(l.Message, "testprog succeeded")
 		}
+		require.Eventually(t, func() bool {
+			return obs.Filter(successMsgFilterFn).Len() == 1
+		}, 4*time.Second, 1*time.Second)
 
-		//require.NoError(t, retryCtx.Err())
-		//checkRetryLogs(t, observer, exeConfig)
+		require.NoError(t, retryCtx.Err())
+
+		obs = obs.Filter(func(l observer.LoggedEntry) bool {
+			return !successMsgFilterFn(l)
+		})
+		checkRetryLogs(t, obs, exeConfig)
 	})
 }
 
-func checkRetryLogs(t *testing.T, observer *observer.ObservedLogs, exeConfig progConfig) {
+func checkRetryLogs(t *testing.T, obs *observer.ObservedLogs, exeConfig progConfig) {
 	t.Helper()
 
-	logs := observer.TakeAll()
+	logs := obs.TakeAll()
 	require.GreaterOrEqual(t, len(logs), 2)
 	for i, l := range logs {
 		t.Logf("[%s] %s", l.Level, l.Message)
