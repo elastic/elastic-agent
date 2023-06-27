@@ -66,15 +66,11 @@ func allowUpgrade(
 		result, err := cap.condition.Eval(varStore, true)
 		if err != nil {
 			log.Errorf("failed evaluating eql formula %q, skipping: %v", cap.conditionStr, err)
-			return true
+			continue
 		}
-		if result && cap.rule == ruleTypeDeny {
-			// This rule blocks the attempted upgrade
-			return false
-		}
-		if !result && cap.rule == ruleTypeAllow {
-			// An "allow" rule failed its check, this also blocks the upgrade.
-			return false
+		if result {
+			// The check passed, either accept or deny as configured.
+			return cap.rule == ruleTypeAllow
 		}
 	}
 	// If nothing blocked the upgrade, allow it.

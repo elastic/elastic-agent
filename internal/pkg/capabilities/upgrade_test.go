@@ -53,47 +53,37 @@ func TestUpgrade(t *testing.T) {
 
 	t.Run("valid action - version mismmatch", func(t *testing.T) {
 		log := logger.NewWithoutConfig("testing")
+		// allow version 7.12.0, reject anything else
 		caps := []*upgradeCapability{
-			mustNewUpgradeCapability(
-				"${version} == '7.12.0'",
-				ruleTypeAllow,
-			),
+			mustNewUpgradeCapability("${version} == '7.12.0'", ruleTypeAllow),
+			mustNewUpgradeCapability("", ruleTypeDeny),
 		}
+		assert.True(t, allowUpgrade(log, "7.12.0", "", caps))
+		assert.False(t, allowUpgrade(log, "7.12.1", "", caps))
 		assert.False(t, allowUpgrade(log, "8.0.0", "", caps))
 	})
 
-	t.Run("valid action - version bug allowed minor mismatch", func(t *testing.T) {
+	t.Run("version bug allowed minor mismatch", func(t *testing.T) {
 		log := logger.NewWithoutConfig("testing")
 		caps := []*upgradeCapability{
-			mustNewUpgradeCapability(
-				"match(${version}, '8.0.*')",
-				ruleTypeAllow,
-			),
+			mustNewUpgradeCapability("match(${version}, '8.0.*')", ruleTypeAllow),
+			mustNewUpgradeCapability("", ruleTypeDeny),
 		}
 		assert.True(t, allowUpgrade(log, "8.0.0", "", caps))
+		assert.True(t, allowUpgrade(log, "8.0.1", "", caps))
 		assert.False(t, allowUpgrade(log, "8.1.0", "", caps))
 	})
 
-	t.Run("valid action - version minor allowed major mismatch", func(t *testing.T) {
+	t.Run("version minor allowed major mismatch", func(t *testing.T) {
 		log := logger.NewWithoutConfig("testing")
 		caps := []*upgradeCapability{
-			mustNewUpgradeCapability(
-				"match(${version}, '8.*.*')",
-				ruleTypeAllow,
-			),
+			mustNewUpgradeCapability("match(${version}, '8.*.*')", ruleTypeAllow),
+			mustNewUpgradeCapability("", ruleTypeDeny),
 		}
-		assert.False(t, allowUpgrade(log, "7.157.0", "", caps))
-	})
-
-	t.Run("valid action - version minor allowed minor upgrade", func(t *testing.T) {
-		log := logger.NewWithoutConfig("testing")
-		caps := []*upgradeCapability{
-			mustNewUpgradeCapability(
-				"match(${version}, '8.*.*')",
-				ruleTypeAllow,
-			),
-		}
+		assert.True(t, allowUpgrade(log, "8.157.0", "", caps))
+		assert.True(t, allowUpgrade(log, "8.0.123", "", caps))
 		assert.True(t, allowUpgrade(log, "8.2.0", "", caps))
+		assert.False(t, allowUpgrade(log, "7.157.0", "", caps))
 	})
 
 	t.Run("require trusted url", func(t *testing.T) {
@@ -103,6 +93,7 @@ func TestUpgrade(t *testing.T) {
 				"startsWith(${sourceURI}, 'https')",
 				ruleTypeAllow,
 			),
+			mustNewUpgradeCapability("", ruleTypeDeny),
 		}
 		assert.True(t, allowUpgrade(log, "9.0.0", "https://artifacts.elastic.co", caps))
 		assert.False(t, allowUpgrade(log, "9.0.0", "http://artifacts.elastic.co", caps))
