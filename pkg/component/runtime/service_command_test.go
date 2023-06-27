@@ -289,11 +289,10 @@ func TestExecuteServiceCommand(t *testing.T) {
 		defaultRetrySleepInitDuration := 50 * time.Millisecond
 		retrySleepMaxDuration := 200 * time.Millisecond
 
-		err = executeServiceCommandWithRetries(
+		executeServiceCommandWithRetries(
 			cmdCtx, log, exePath, &component.ServiceOperationsCommandSpec{},
 			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
-		require.NoError(t, err)
 
 		<-retryCtx.Done()
 		checkRetryLogs(t, obs, exeConfig)
@@ -328,11 +327,10 @@ func TestExecuteServiceCommand(t *testing.T) {
 			// - one message about the next (second) retry
 			RetrySleepInitDuration: 700 * time.Millisecond,
 		}
-		err = executeServiceCommandWithRetries(
+		executeServiceCommandWithRetries(
 			cmdCtx, log, exePath, spec,
 			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
-		require.NoError(t, err)
 
 		<-retryCtx.Done()
 		checkRetryLogs(t, obs, exeConfig)
@@ -365,11 +363,10 @@ func TestExecuteServiceCommand(t *testing.T) {
 		spec := &component.ServiceOperationsCommandSpec{
 			RetrySleepInitDuration: 200 * time.Millisecond,
 		}
-		err = executeServiceCommandWithRetries(
+		executeServiceCommandWithRetries(
 			cmdCtx, log, exePath, spec,
 			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
-		require.NoError(t, err)
 
 		// Give the command time to succeed.
 		successMsgFilterFn := func(l observer.LoggedEntry) bool {
@@ -406,11 +403,10 @@ func TestExecuteServiceCommand(t *testing.T) {
 		cmd1Ctx := context.Background()
 		retry1Ctx := context.Background()
 
-		err = executeServiceCommandWithRetries(
+		executeServiceCommandWithRetries(
 			cmd1Ctx, log, exePath, &component.ServiceOperationsCommandSpec{},
 			retry1Ctx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
-		require.NoError(t, err)
 
 		debugLogs := obs.FilterLevelExact(zapcore.DebugLevel).TakeAll()
 		require.Len(t, debugLogs, 1)
@@ -430,11 +426,10 @@ func TestExecuteServiceCommand(t *testing.T) {
 		retry2Ctx, cancel2 := context.WithTimeout(context.Background(), 4*time.Second)
 		defer cancel2()
 
-		err = executeServiceCommandWithRetries(
+		executeServiceCommandWithRetries(
 			cmd2Ctx, log, exePath, &component.ServiceOperationsCommandSpec{},
 			retry2Ctx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
 		)
-		require.NoError(t, err)
 
 		debugLogs = obs.FilterLevelExact(zapcore.DebugLevel).TakeAll()
 		require.Len(t, debugLogs, 2)

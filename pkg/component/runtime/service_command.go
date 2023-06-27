@@ -107,16 +107,17 @@ func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath s
 		return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
 	}
 
-	return executeServiceCommandWithRetries(
+	executeServiceCommandWithRetries(
 		ctx, log, binaryPath, spec,
 		context.Background(), 20*time.Second, 15*time.Minute,
 	)
+	return nil
 }
 
 func executeServiceCommandWithRetries(
 	cmdCtx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec,
 	retryCtx context.Context, defaultRetrySleepInitDuration time.Duration, retrySleepMaxDuration time.Duration,
-) error {
+) {
 	// If no initial sleep duration is specified, use default value
 	retrySleepInitDuration := spec.RetrySleepInitDuration
 	if retrySleepInitDuration == 0 {
@@ -128,7 +129,6 @@ func executeServiceCommandWithRetries(
 		binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout,
 		retryCtx, retrySleepInitDuration, retrySleepMaxDuration,
 	)
-	return nil
 }
 
 type cmdRetryInfo struct {
