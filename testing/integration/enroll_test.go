@@ -1,9 +1,8 @@
-//go:build integration
+// //go:build integration
 
 package integration
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -12,7 +11,6 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/stretchr/testify/require"
@@ -36,19 +34,19 @@ type TestES struct {
 }
 
 func (runner *TestES) TestESQuery() {
-	resp, err := tools.GetIndices(runner.info.ESClient)
+	resp, err := tools.GetAllindicies(runner.info.ESClient)
 	require.NoError(runner.T(), err)
 	for _, run := range resp {
 		fmt.Printf("%#v\n", run)
 	}
-	// req := esapi.CatIndicesRequest{Format: "json"}
-	// resp, err := req.Do(context.Background(), runner.info.ESClient.Transport)
-	// require.NoError(runner.T(), err)
-	// require.Equal(runner.T(), 200, resp.StatusCode)
-	// buf, err := io.ReadAll(resp.Body)
-	// require.NoError(runner.T(), err)
-	// fmt.Printf("Got response from ES: %#v\n", string(buf))
-	// fmt.Printf("Got header: %#v\n", resp.Header)
+
+	docs, err := tools.GetLogsForDatastream(runner.info.ESClient, "elastic_agent.metricbeat")
+	require.NoError(runner.T(), err)
+	runner.T().Logf("Got %d documents", len(docs.Hits.Hits))
+	for _, doc := range docs.Hits.Hits {
+		fmt.Printf("%#v\n", doc)
+	}
+	runner.T().Logf("Raw: %#v", docs)
 }
 
 func TestEnrollAndLog(t *testing.T) {
@@ -101,13 +99,26 @@ func (runner *EnrollRunner) TestEnroll() {
 			},
 		},
 	}
-	policy, err := tools.InstallAgentWithPolicy(runner.T(), runner.agentFixture, kibClient, createPolicyReq)
+	// Stage 1: Install
+	policy, err := tools.InstallAgentWithPolicy(runner.T(), runner.agentFixture, kibClient, runner.requirementsInfo.ESClient, createPolicyReq)
 	require.NoError(runner.T(), err)
-	runner.T().Logf("got policy: %#v", policy)
+	runner.T().Logf("created policy: %s", policy.ID)
 
-	resp, err := tools.GetIndices(runner.info.ESClient)
+	runner.T().Logf("sleeping for one minute...")
+	time.Sleep(time.Second * 60)
+
+	// Stage 2:
+	resp, err := tools.GetAllindicies(runner.requirementsInfo.ESClient)
 	require.NoError(runner.T(), err)
 	for _, run := range resp {
-		fmt.Printf("%#v\n", run)
+		fmt.Printf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
 	}
+
+	docs, err := tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.metricbeat")
+	require.NoError(runner.T(), err)
+	runner.T().Logf("Got %d documents", len(docs.Hits.Hits))
+	for _, doc := range docs.Hits.Hits {
+		fmt.Printf("%#v\n", doc)
+	}
+	runner.T().Logf("Raw: %#v", docs)
 }

@@ -5,12 +5,14 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +54,7 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
-func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
+func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibClient *kibana.Client, esClient *elasticsearch.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
 	policy, err := kibClient.CreatePolicy(createPolicyReq)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create policy: %w", err)
@@ -82,13 +84,36 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 	t.Logf(">>> Ran Enroll. Output: %s", output)
 
 	// Wait for Agent to be healthy
-	require.Eventually(
-		t,
-		WaitForAgentStatus(t, kibClient, "online"),
-		2*time.Minute,
-		10*time.Second,
-		"Elastic Agent status is not online",
-	)
+	timeout, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	defer cancel()
+	ticker := time.Tick(time.Second * 10)
+	for {
+		select {
+		case <-timeout.Done():
+			t.Logf(">>> Elastic agent failed")
+			logs, err := GetDocumentsInIndex(esClient, "*agent*")
+			if err != nil {
+				return nil, fmt.Errorf("error fetching debug documents while agent install failed: Elastic Agent status is not online")
+			}
+			t.Logf("Got agent logs:")
+			for _, log := range logs.Hits.Hits {
+				t.Logf("%#v", log.Source)
+			}
+			return nil, fmt.Errorf("Elastic Agent status is not online")
+		case <-ticker:
+			cb := WaitForAgentStatus(t, kibClient, "online")
+			if cb() {
+				return policy, nil
+			}
+		}
+	}
+	// require.Eventually(
+	// 	t,
+	// 	WaitForAgentStatus(t, kibClient, "online"),
+	// 	2*time.Minute,
+	// 	10*time.Second,
+	// 	"Elastic Agent status is not online",
+	// )
 
 	return policy, nil
 }

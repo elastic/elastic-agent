@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -41,14 +42,40 @@ func (s *CatIntData) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// GetIndices returns a list of indicies on the target ES instance
-func GetIndices(client elastictransport.Interface) ([]Index, error) {
-	return GetIndicesWithContext(context.Background(), client)
+type Documents struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Hits     Hits `json:"hits"`
+}
+
+type Hits struct {
+	Hits  []ESDoc       `json:"hits"`
+	Total TotalDocCount `json:"total"`
+}
+
+type TotalDocCount struct {
+	Value    int    `json:"value"`
+	Relation string `json:"relation"`
+}
+
+type ESDoc struct {
+	Index  string                 `json:"_index"`
+	Score  float64                `json:"_score"`
+	Source map[string]interface{} `json:"_source"`
+}
+
+// GetAllindicies returns a list of indicies on the target ES instance
+func GetAllindicies(client elastictransport.Interface) ([]Index, error) {
+	return GetIndicesWithContext(context.Background(), client, []string{})
 }
 
 // GetIndicesWithContext returns a list of indicies on the target ES instance with the provided context
-func GetIndicesWithContext(ctx context.Context, client elastictransport.Interface) ([]Index, error) {
+func GetIndicesWithContext(ctx context.Context, client elastictransport.Interface, indicies []string) ([]Index, error) {
 	req := esapi.CatIndicesRequest{Format: "json", Bytes: "b"}
+	if len(indicies) > 0 {
+		req.Index = indicies
+		req.ExpandWildcards = "all"
+	}
 	resp, err := req.Do(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("error performing cat query: %w", err)
@@ -63,21 +90,79 @@ func GetIndicesWithContext(ctx context.Context, client elastictransport.Interfac
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 	return respData, nil
+
+}
+
+// GetLogsForDatastream returns any logs associated with the datastream
+func GetLogsForDatastream(client elastictransport.Interface, index string) (Documents, error) {
+	indexQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"data_stream.dataset": index,
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(indexQuery)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithIndex("*.ds-logs*"),
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithPretty(),
+	)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	if res.StatusCode >= 300 || res.StatusCode < 200 {
+		return Documents{}, fmt.Errorf("non-200 return code: %v, response: '%s'", res.StatusCode, res.String())
+	}
+
+	resultBuf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error reading response body: %w", err)
+	}
+	respData := Documents{}
+
+	err = json.Unmarshal(resultBuf, &respData)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+
+	return respData, err
 }
 
 // GetDocumentsInIndex returns a sample of documents for an index
-func GetDocumentsInIndex(client elastictransport.Interface, index string) (string, error) {
+func GetDocumentsInIndex(client elastictransport.Interface, index string) (Documents, error) {
 	testCount := 10
-	req := esapi.SearchRequest{Index: []string{index}, Size: &testCount}
+	req := esapi.SearchRequest{Index: []string{index}, Size: &testCount, ExpandWildcards: "all"}
 
 	resp, err := req.Do(context.Background(), client)
 	if err != nil {
-		return "", fmt.Errorf("error fetching documents: %w", err)
+		return Documents{}, fmt.Errorf("error fetching documents: %w", err)
 	}
 
 	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
-		return "", fmt.Errorf("non-200 return code: %v, response: '%s'", resp.StatusCode, resp.String())
+		return Documents{}, fmt.Errorf("non-200 return code: %v, response: '%s'", resp.StatusCode, resp.String())
 	}
 
-	return resp.String(), nil
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error reading response body: %w", err)
+	}
+	respData := Documents{}
+
+	err = json.Unmarshal(buf, &respData)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+
+	return respData, nil
 }
