@@ -191,7 +191,7 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 	// check caps so we don't try uninstalling things that were already
 	// prevented from installing
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
-	if err == nil {
+	if err != nil {
 		return err
 	}
 
@@ -264,23 +264,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			return nil, errors.New("inserting rendered inputs failed", err)
 		}
 	}
-	/*
-		// apply caps
-		caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
-		if err != nil {
-			return nil, err
-		}
 
-		astIface, err := caps.Apply(ast)
-		if err != nil {
-			return nil, err
-		}
-
-		newAst, ok := astIface.(*transpiler.AST)
-		if ok {
-			ast = newAst
-		}
-	*/
 	finalConfig, err := ast.Map()
 	if err != nil {
 		return nil, err

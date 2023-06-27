@@ -922,19 +922,6 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		return fmt.Errorf("could not create the AST from the configuration: %w", err)
 	}
 
-	/*if c.caps != nil {
-		var ok bool
-		updatedAst, err := c.caps.Apply(rawAst)
-		if err != nil {
-			return fmt.Errorf("failed to apply capabilities: %w", err)
-		}
-
-		rawAst, ok = updatedAst.(*transpiler.AST)
-		if !ok {
-			return fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
-		}
-	}*/
-
 	if err := features.Apply(cfg); err != nil {
 		return fmt.Errorf("could not update feature flags config: %w", err)
 	}
