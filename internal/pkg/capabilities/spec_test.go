@@ -20,9 +20,9 @@ func TestUnmarshal(t *testing.T) {
 		assert.Nil(t, err, "no error is expected")
 
 		// The yaml has one capability of each type
-		assert.Equal(t, 1, len(rr.Capabilities.inputCaps))
-		assert.Equal(t, 1, len(rr.Capabilities.outputCaps))
-		assert.Equal(t, 1, len(rr.Capabilities.upgradeCaps))
+		assert.Equal(t, 1, len(rr.Capabilities.inputChecks))
+		assert.Equal(t, 1, len(rr.Capabilities.outputChecks))
+		assert.Equal(t, 1, len(rr.Capabilities.upgradeChecks))
 	})
 
 	t.Run("invalid yaml", func(t *testing.T) {

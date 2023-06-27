@@ -13,9 +13,9 @@ import (
 // capabilitiesList deserializes a YAML list of capabilities into organized
 // arrays based on their type, for easy use by capabilitiesManager.
 type capabilitiesList struct {
-	inputCaps   []*inputCapability
-	outputCaps  []*outputCapability
-	upgradeCaps []*upgradeCapability
+	inputChecks   []*stringMatcher
+	outputChecks  []*stringMatcher
+	upgradeChecks []*upgradeCapability
 }
 
 // a type for capability values that must equal "allow" or "deny", enforced
@@ -47,19 +47,25 @@ func (r *capabilitiesList) UnmarshalYAML(unmarshal func(interface{}) error) erro
 			return err
 		}
 		if _, found := mm["input"]; found {
-			cap := &inputCapability{}
-			if err := yaml.Unmarshal(partialYaml, &cap); err != nil {
+			spec := struct {
+				Type  allowOrDeny `yaml:"rule"`
+				Input string      `yaml:"input"`
+			}{}
+			if err := yaml.Unmarshal(partialYaml, &spec); err != nil {
 				return err
 			}
-			r.inputCaps = append(r.inputCaps, cap)
-
+			r.inputChecks = append(r.inputChecks,
+				&stringMatcher{pattern: spec.Input, rule: spec.Type})
 		} else if _, found = mm["output"]; found {
-			cap := &outputCapability{}
-			if err := yaml.Unmarshal(partialYaml, &cap); err != nil {
+			spec := struct {
+				Type   allowOrDeny `yaml:"rule"`
+				Output string      `yaml:"output"`
+			}{}
+			if err := yaml.Unmarshal(partialYaml, &spec); err != nil {
 				return err
 			}
-			r.outputCaps = append(r.outputCaps, cap)
-
+			r.outputChecks = append(r.outputChecks,
+				&stringMatcher{pattern: spec.Output, rule: spec.Type})
 		} else if _, found = mm["upgrade"]; found {
 			// Serialize upgrade constraints to a temporary struct so we can
 			// safely assemble the associated EQL expression
@@ -74,7 +80,7 @@ func (r *capabilitiesList) UnmarshalYAML(unmarshal func(interface{}) error) erro
 			if err != nil {
 				return err
 			}
-			r.upgradeCaps = append(r.upgradeCaps, cap)
+			r.upgradeChecks = append(r.upgradeChecks, cap)
 		} else {
 			return fmt.Errorf("unexpected capability type for definition number '%d'", i)
 		}

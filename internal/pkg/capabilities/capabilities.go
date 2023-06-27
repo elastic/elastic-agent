@@ -22,18 +22,18 @@ type Capabilities interface {
 }
 
 type capabilitiesManager struct {
-	log         *logger.Logger
-	inputCaps   []*inputCapability
-	outputCaps  []*outputCapability
-	upgradeCaps []*upgradeCapability
+	log          *logger.Logger
+	inputChecks  []*stringMatcher
+	outputChecks []*stringMatcher
+	upgradeCaps  []*upgradeCapability
 }
 
 func (cm *capabilitiesManager) AllowInput(inputType string) bool {
-	return allowInput(inputType, cm.inputCaps)
+	return matchString(inputType, cm.inputChecks)
 }
 
 func (cm *capabilitiesManager) AllowOutput(outputType string) bool {
-	return allowOutput(outputType, cm.outputCaps)
+	return matchString(outputType, cm.outputChecks)
 }
 
 func (cm *capabilitiesManager) AllowUpgrade(version string, uri string) bool {
@@ -68,8 +68,8 @@ func Load(capsReader io.Reader, log *logger.Logger) (Capabilities, error) {
 	caps := spec.Capabilities
 
 	return &capabilitiesManager{
-		inputCaps:   caps.inputCaps,
-		outputCaps:  caps.outputCaps,
-		upgradeCaps: caps.upgradeCaps,
+		inputChecks:  caps.inputChecks,
+		outputChecks: caps.outputChecks,
+		upgradeCaps:  caps.upgradeChecks,
 	}, nil
 }
