@@ -28,7 +28,8 @@ func TestEndpointSecurity(t *testing.T) {
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
 		Isolate: false,
-		Sudo:    true, // requires Agent installation
+		Sudo:    true,                                                  // requires Agent installation
+		OS:      []define.OS{{Type: define.Linux, Arch: define.AMD64}}, // only run on Linux AMD64 during development.
 	})
 
 	// Get version of this Agent build and ensure that it has a `-SNAPSHOT` suffix. We
