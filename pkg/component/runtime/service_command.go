@@ -97,7 +97,16 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 	return err
 }
 
-func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error {
+func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec, shouldRetry bool) error {
+	if spec == nil {
+		log.Warnf("spec is nil, nothing to execute, binaryPath: %s", binaryPath)
+		return nil
+	}
+
+	if !shouldRetry {
+		return executeCommand(ctx, log, binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout)
+	}
+
 	return executeServiceCommandWithRetries(
 		ctx, log, binaryPath, spec,
 		context.Background(), 20*time.Second, 15*time.Minute,
@@ -108,11 +117,6 @@ func executeServiceCommandWithRetries(
 	cmdCtx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec,
 	retryCtx context.Context, defaultRetrySleepInitDuration time.Duration, retrySleepMaxDuration time.Duration,
 ) error {
-	if spec == nil {
-		log.Warnf("spec is nil, nothing to execute, binaryPath: %s", binaryPath)
-		return nil
-	}
-
 	// If no initial sleep duration is specified, use default value
 	retrySleepInitDuration := spec.RetrySleepInitDuration
 	if retrySleepInitDuration == 0 {

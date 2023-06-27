@@ -206,7 +206,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		exePath, err := prepareTestProg(ctx, log, t.TempDir(), progConfig{})
 		require.NoError(t, err)
 
-		err = executeServiceCommand(ctx, log, exePath, nil)
+		err = executeServiceCommand(ctx, log, exePath, nil, false)
 		require.NoError(t, err)
 
 		warnLogs := obs.FilterLevelExact(zapcore.WarnLevel)
@@ -214,15 +214,50 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.Equal(t, fmt.Sprintf("spec is nil, nothing to execute, binaryPath: %s", exePath), warnLogs.TakeAll()[0].Message)
 	})
 
-	// Execution succeeds on first attempt
-	t.Run("successful_execution", func(t *testing.T) {
+	// Execution fails (without retries)
+	t.Run("no_retries_failed_execution", func(t *testing.T) {
+		ctx := context.Background()
+		log, obs := logger.NewTesting(t.Name())
+
+		exeConfig := progConfig{
+			ErrMessage: "foo bar",
+			ExitCode:   111,
+		}
+		exePath, err := prepareTestProg(ctx, log, t.TempDir(), exeConfig)
+		require.NoError(t, err)
+
+		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{}, false)
+		require.EqualError(t, err, fmt.Sprintf("%s: exit status %d", exeConfig.ErrMessage, exeConfig.ExitCode))
+
+		require.Equal(t, 1, obs.Len())
+		logs := obs.TakeAll()
+		require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
+		require.Equal(t, exeConfig.ErrMessage, logs[0].Message)
+	})
+
+	// Execution succeeds (without retries)
+	t.Run("no_retries_successful_execution", func(t *testing.T) {
 		ctx := context.Background()
 		log, obs := logger.NewTesting(t.Name())
 
 		exePath, err := prepareTestProg(ctx, log, t.TempDir(), progConfig{})
 		require.NoError(t, err)
 
-		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{})
+		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{}, false)
+		require.NoError(t, err)
+
+		require.Equal(t, 0, obs.Len())
+	})
+
+	// Execution succeeds on first attempt (with retries)
+	t.Run("with_retries_successful_execution", func(t *testing.T) {
+		ctx := context.Background()
+		log, obs := logger.NewTesting(t.Name())
+
+		exePath, err := prepareTestProg(ctx, log, t.TempDir(), progConfig{})
+		require.NoError(t, err)
+
+		err = executeServiceCommand(ctx, log, exePath, &component.ServiceOperationsCommandSpec{}, true)
 		require.NoError(t, err)
 
 		// Remove debug-level logs as those are only being emitted from
