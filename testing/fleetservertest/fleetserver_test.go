@@ -19,25 +19,39 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
+// TestRunFleetServer shows how to configure and run a fleet-server capable of
+// enrolling and send action to a single agent.
+// For a detailed explanation of each piece and how to put them work together,
+// look at ExampleNewServer_checkin_and_ackWithAcker.
+// Currently, the authentication is disabled so the API key and enrollment token
+// values should not matter.
 func TestRunFleetServer(t *testing.T) {
-	t.Skip("use this test if yu want a mock fleet-server running to enroll a real agent")
+	t.Skip("use this test if you want a mock fleet-server running to enroll a real agent")
 	agentID := "agentID"
 	actionID := "ActionID"
 	policyID := "policyID"
 	ackToken := "AckToken"
 	apiKey := APIKey{
-		ID:  "cG6T94gBfS1zT1GB9whs",
-		Key: "RWEBnHqLToGK7r3IYT-VaQ",
+		ID:  "myKeyID",
+		Key: "MyKeyKey",
 	}
 
-	var actionsIdx int
+	// FleetHosts needs to be changed after the server is running, so we can
+	// get the port the server is listening on. Therefore, the action generator
+	// captures the 'fleetHosts' variable so it can read the real fleet-server
+	// address from it.
 	fleetHosts := "host1"
-	// create a POLICY_CHANGE action with a valid policy and the fake-inout
+	var actionsIdx int
+
 	tmpl := TmplData{
-		AckToken:   ackToken,
-		AgentID:    agentID,
-		ActionID:   actionID,
-		PolicyID:   policyID,
+		AckToken: ackToken,
+		AgentID:  agentID,
+		ActionID: actionID,
+		PolicyID: policyID,
+		// FleetHosts needs to be changed after the server is running, so we can
+		// get the port the server is listening on. Therefore, the action generator
+		// captures the 'fleetHosts' variable, so it can read the real fleet-server
+		// address from it.
 		FleetHosts: `"host1", "host2"`,
 		SourceURI:  "http://source.uri",
 		CreatedAt:  "2023-05-31T11:37:50.607Z",
@@ -47,7 +61,7 @@ func TestRunFleetServer(t *testing.T) {
 			Type   string
 		}{
 			APIKey: apiKey.String(),
-			Hosts:  `"https://5d01afcb71a448afb038650d11c0417f.us-central1.gcp.qa.cld.elstc.co:443"`,
+			Hosts:  `"https://my.clould.elstc.co:443"`,
 			Type:   "elasticsearch"},
 	}
 
@@ -81,8 +95,8 @@ func TestRunFleetServer(t *testing.T) {
 
 	handlers := &Handlers{
 		APIKey: apiKey.Key,
-		//  --enrollment-token=Ym02VDk0Z0JmUzF6VDFHQlhRaXc6VUhOTlBxLUJUMWF3M1NSNkw3U3oyUQ== -nfi
-		EnrollmentToken: "UHNNPq-BT1aw3SR6L7Sz2Q",
+		//  --enrollment-token bXlLZXlJRDpNeUtleUtleQo=
+		EnrollmentToken: "",
 		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
 		CheckinFn:       NewHandlerCheckinFakeComponent(nextAction),
 		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
