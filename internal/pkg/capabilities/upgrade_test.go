@@ -96,7 +96,7 @@ func TestUpgrade(t *testing.T) {
 		assert.True(t, allowUpgrade(log, "8.2.0", "", caps))
 	})
 
-	t.Run("valid action - require trusted url", func(t *testing.T) {
+	t.Run("require trusted url", func(t *testing.T) {
 		log := logger.NewWithoutConfig("testing")
 		caps := []*upgradeCapability{
 			mustNewUpgradeCapability(
@@ -106,6 +106,22 @@ func TestUpgrade(t *testing.T) {
 		}
 		assert.True(t, allowUpgrade(log, "9.0.0", "https://artifacts.elastic.co", caps))
 		assert.False(t, allowUpgrade(log, "9.0.0", "http://artifacts.elastic.co", caps))
+	})
+
+	t.Run("empty pattern allow", func(t *testing.T) {
+		log := logger.NewWithoutConfig("testing")
+		caps := []*upgradeCapability{
+			mustNewUpgradeCapability("", ruleTypeAllow),
+		}
+		assert.True(t, allowUpgrade(log, "9.0.0", "", caps))
+	})
+
+	t.Run("empty pattern deny", func(t *testing.T) {
+		log := logger.NewWithoutConfig("testing")
+		caps := []*upgradeCapability{
+			mustNewUpgradeCapability("", ruleTypeDeny),
+		}
+		assert.False(t, allowUpgrade(log, "9.0.0", "", caps))
 	})
 }
 

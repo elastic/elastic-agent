@@ -25,7 +25,13 @@ type upgradeCapability struct {
 }
 
 func newUpgradeCapability(condition string, rule allowOrDeny) (*upgradeCapability, error) {
-	eqlExpr, err := eql.New(condition)
+	sanitizedCond := condition
+	if condition == "" {
+		// empty string counts as always succeeding, but empty string is not
+		// a valid EQL expression, so create it from the constant expression "true"
+		sanitizedCond = "true"
+	}
+	eqlExpr, err := eql.New(sanitizedCond)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't load upgrade condition %q: %w", condition, err)
 	}
