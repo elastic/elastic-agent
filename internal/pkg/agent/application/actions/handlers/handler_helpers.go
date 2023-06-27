@@ -35,7 +35,12 @@ type dispatchableAction interface {
 	Type() string
 }
 
-func dispatchActionInParallel(ctx context.Context, log *logp.Logger, action dispatchableAction, comps []component.Component, units []component.Unit, performAction performActionFunc) error {
+type unitWithComponent struct {
+	unit      component.Unit
+	component component.Component
+}
+
+func dispatchActionInParallel(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error {
 	if action == nil {
 		return nil
 	}
@@ -50,48 +55,48 @@ func dispatchActionInParallel(ctx context.Context, log *logp.Logger, action disp
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	// Iterate through found components and forward the UNENROLL action
-	for i := 0; i < len(comps); i++ {
-		g.Go(func(idx int) func() error {
-			comp := comps[i]
-			unit := units[i]
-			return func() error {
-				log.Debugf("Dispatch %v action to %v", actionType, unit.Config.Type)
-				res, err := performAction(ctx, comp, unit, unit.Config.Type, params)
-				if err != nil {
-					log.Warnf("%v failed to dispatch to %v, err: %v", actionType, comp.ID, err)
-					return err
-				}
+	dispatch := func(uc unitWithComponent) error {
+		log.Debugf("Dispatch %v action to %v", actionType, uc.unit.Config.Type)
+		res, err := performAction(ctx, uc.component, uc.unit, uc.unit.Config.Type, params)
+		if err != nil {
+			log.Warnf("%v failed to dispatch to %v, err: %v", actionType, uc.component.ID, err)
+			return err
+		}
 
-				strErr := readMapString(res, "error", "")
-				if strErr != "" {
-					log.Warnf("%v failed for %v, err: %v", actionType, comp.ID, strErr)
-					return errors.New(strErr)
-				}
-				return nil
-			}
-		}(i))
+		strErr := readMapString(res, "error", "")
+		if strErr != "" {
+			log.Warnf("%v failed for %v, err: %v", actionType, uc.component.ID, strErr)
+			return errors.New(strErr)
+		}
+		return nil
+	}
+
+	// Iterate through the components and dispatch the action is the action type is listed in the proxied_actions
+	for _, uc := range ucs {
+		// Send the action to the target unit via g.Go to collect any resulting errors
+		target := uc
+		g.Go(func() error {
+			return dispatch(target)
+		})
 	}
 
 	return g.Wait()
 }
 
-func findMatchingUnitsByActionType(state coordinator.State, typ string) ([]component.Component, []component.Unit) {
-	comps := make([]component.Component, 0)
-	units := make([]component.Unit, 0)
+func findMatchingUnitsByActionType(state coordinator.State, typ string) []unitWithComponent {
+	ucs := make([]unitWithComponent, 0)
 	for _, comp := range state.Components {
 		if comp.Component.InputSpec != nil && contains(comp.Component.InputSpec.Spec.ProxiedActions, typ) {
 			name := comp.Component.InputSpec.Spec.Name
 
 			for _, unit := range comp.Component.Units {
 				if unit.Type == client.UnitTypeInput && unit.Config != nil && unit.Config.Type == name {
-					comps = append(comps, comp.Component)
-					units = append(units, unit)
+					ucs = append(ucs, unitWithComponent{unit, comp.Component})
 				}
 			}
 		}
 	}
-	return comps, units
+	return ucs
 }
 
 func contains[T comparable](arr []T, val T) bool {

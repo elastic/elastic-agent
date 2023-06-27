@@ -56,10 +56,10 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		// Find inputs that want to receive UPGRADE action
 		// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself
 		state := h.coord.State()
-		comps, units := findMatchingUnitsByActionType(state, a.Type())
-		if len(comps) > 0 {
+		ucs := findMatchingUnitsByActionType(state, a.Type())
+		if len(ucs) > 0 {
 			h.log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
-			err := dispatchActionInParallel(ctx, h.log, action, comps, units, h.coord.PerformAction)
+			err := dispatchActionInParallel(ctx, h.log, action, ucs, h.coord.PerformAction)
 			h.log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
 			if err != nil {
 				return err

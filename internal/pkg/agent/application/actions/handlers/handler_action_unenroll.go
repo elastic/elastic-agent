@@ -71,9 +71,9 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		// Find inputs that want to receive UNENROLL action
 		// Endpoint needs to receive a signed UNENROLL action in order to be able to uncontain itself
 		state := h.coord.State()
-		comps, units := findMatchingUnitsByActionType(state, a.Type())
-		if len(comps) > 0 {
-			err := dispatchActionInParallel(ctx, h.log, action, comps, units, h.coord.PerformAction)
+		ucs := findMatchingUnitsByActionType(state, a.Type())
+		if len(ucs) > 0 {
+			err := dispatchActionInParallel(ctx, h.log, action, ucs, h.coord.PerformAction)
 			if err != nil {
 				return err
 			}
