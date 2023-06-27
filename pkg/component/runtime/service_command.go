@@ -198,8 +198,8 @@ func (cr *cmdRetrier) Start(
 }
 
 func (cr *cmdRetrier) Stop(cmdKey uint64, log *logger.Logger) {
-	cr.mu.RLock()
-	defer cr.mu.RUnlock()
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
 	info, exists := cr.cmds[cmdKey]
 	if !exists {
 		log.Debugf("no retries for command key [%d] are pending; nothing to do", cmdKey)
