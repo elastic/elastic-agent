@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
-	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
@@ -167,9 +166,18 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
-		components, binaryMapping, err := specs.PolicyToComponents(cfg, lvl, agentInfo)
+		components, err := specs.PolicyToComponents(cfg, lvl, agentInfo)
 		if err != nil {
 			return fmt.Errorf("failed to get binary mappings: %w", err)
+		}
+
+		// The monitoring config depends on a map from component id to
+		// binary name.
+		binaryMapping := make(map[string]string)
+		for _, component := range components {
+			if spec := component.InputSpec; spec != nil {
+				binaryMapping[component.ID] = spec.BinaryName
+			}
 		}
 		monitorCfg, err := monitorFn(cfg, components, binaryMapping)
 		if err != nil {
@@ -204,25 +212,11 @@ func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams)
 }
 
 func printConfig(cfg *config.Config, l *logger.Logger, streams *cli.IOStreams) error {
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
-	if err != nil {
-		return err
-	}
-
 	mapStr, err := cfg.ToMapStr()
 	if err != nil {
 		return err
 	}
-	newCfg, err := caps.Apply(mapStr)
-	if err != nil {
-		return errors.New(err, "failed to apply capabilities")
-	}
-	newMap, ok := newCfg.(map[string]interface{})
-	if !ok {
-		return errors.New("config returned from capabilities has invalid type")
-	}
-
-	return printMapStringConfig(newMap, streams)
+	return printMapStringConfig(mapStr, streams)
 }
 
 type inspectComponentsOpts struct {
@@ -346,10 +340,6 @@ func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCf
 }
 
 func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration) (map[string]interface{}, logp.Level, error) {
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
-	if err != nil {
-		return nil, logp.InfoLevel, fmt.Errorf("failed to determine capabilities: %w", err)
-	}
 
 	cfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
 	if err != nil {
@@ -366,16 +356,6 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	ast, err := transpiler.NewAST(m)
 	if err != nil {
 		return nil, lvl, fmt.Errorf("could not create the AST from the configuration: %w", err)
-	}
-
-	var ok bool
-	updatedAst, err := caps.Apply(ast)
-	if err != nil {
-		return nil, lvl, fmt.Errorf("failed to apply capabilities: %w", err)
-	}
-	ast, ok = updatedAst.(*transpiler.AST)
-	if !ok {
-		return nil, lvl, fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
 	}
 
 	// Wait for the variables based on the timeout.

@@ -6,6 +6,7 @@ package capabilities
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 
 	"gopkg.in/yaml.v2"
@@ -21,72 +22,79 @@ type Capability interface {
 	Apply(interface{}) (interface{}, error)
 }
 
+type Capabilities interface {
+	AllowUpgrade(version string, sourceURI string) bool
+	AllowInput(name string) bool
+	AllowOutput(name string) bool
+}
+
 var (
 	// ErrBlocked is returned when capability is blocking.
 	ErrBlocked = errors.New("capability blocked")
 )
 
 type capabilitiesManager struct {
-	caps []Capability
+	allowInputType  func(string) bool
+	allowOutputType func(string) bool
+	allowUpgrade    func(version string, uri string) bool
+	//caps []Capability
+}
+
+func (cm *capabilitiesManager) AllowInput(inputType string) bool {
+	if cm.allowInputType != nil {
+		return cm.allowInputType(inputType)
+	}
+	return true
+}
+
+func (cm *capabilitiesManager) AllowOutput(outputType string) bool {
+	if cm.allowOutputType != nil {
+		return cm.allowOutputType(outputType)
+	}
+	return true
+}
+
+func (cm *capabilitiesManager) AllowUpgrade(version string, uri string) bool {
+	if cm.allowUpgrade != nil {
+		return cm.allowUpgrade(version, uri)
+	}
+	return true
 }
 
 type capabilityFactory func(*logger.Logger, *ruleDefinitions) (Capability, error)
 
 // Load loads capabilities files and prepares manager.
-func Load(capsFile string, log *logger.Logger) (Capability, error) {
-	handlers := []capabilityFactory{
-		newInputsCapability,
-		newOutputsCapability,
-		newUpgradesCapability,
-	}
-
-	cm := &capabilitiesManager{
-		caps: make([]Capability, 0),
-	}
+func Load(capsFile string, log *logger.Logger) (Capabilities, error) {
+	cm := &capabilitiesManager{}
 
 	// load capabilities from file
 	fd, err := os.Open(capsFile)
-	if err != nil && !os.IsNotExist(err) {
-		return cm, err
-	}
-
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		log.Infof("Capabilities file not found in %s", capsFile)
 		return cm, nil
 	}
+	if err != nil {
+		return cm, err
+	}
 	defer fd.Close()
 
-	definitions := &ruleDefinitions{Capabilities: make([]ruler, 0)}
+	definitions := &ruleDefinitions{}
 	dec := yaml.NewDecoder(fd)
 	if err := dec.Decode(&definitions); err != nil {
 		return cm, err
 	}
 
-	// make list of handlers out of capabilities definition
-	for _, h := range handlers {
-		cap, err := h(log, definitions)
-		if err != nil {
-			return nil, err
-		}
+	inputCaps := newInputsCapability(definitions.Capabilities.inputCaps)
+	cm.allowInputType = inputCaps.allowInput
 
-		if cap == nil {
-			continue
-		}
+	outputCaps := newOutputsCapability(definitions.Capabilities.outputCaps)
+	cm.allowOutputType = outputCaps.allowOutput
 
-		cm.caps = append(cm.caps, cap)
+	upgradeCaps := newUpgradesCapability(definitions.Capabilities.upgradeCaps)
+	if err != nil {
+		return nil, err
 	}
+	cm.allowUpgrade = upgradeCaps.allowUpgrade
 
 	return cm, nil
-}
-
-func (mgr *capabilitiesManager) Apply(in interface{}) (interface{}, error) {
-	var err error
-	for _, cap := range mgr.caps {
-		in, err = cap.Apply(in)
-		if err != nil {
-			return in, err
-		}
-	}
-
-	return in, nil
 }

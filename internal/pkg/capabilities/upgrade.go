@@ -6,7 +6,6 @@ package capabilities
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
@@ -17,51 +16,41 @@ import (
 // Available variables:
 // - version
 // - source_uri
-func newUpgradesCapability(log *logger.Logger, rd *ruleDefinitions) (Capability, error) {
-	if rd == nil {
-		return &multiUpgradeCapability{caps: []*upgradeCapability{}}, nil
-	}
-
-	caps := make([]*upgradeCapability, 0, len(rd.Capabilities))
-
-	for _, r := range rd.Capabilities {
-		c, err := newUpgradeCapability(log, r)
-		if err != nil {
-			return nil, err
-		}
-
-		if c != nil {
-			caps = append(caps, c)
-		}
-	}
-
-	return &multiUpgradeCapability{log: log, caps: caps}, nil
+func newUpgradesCapability(caps []*upgradeCapability) *multiUpgradeCapability {
+	return &multiUpgradeCapability{caps: caps}
 }
 
-func newUpgradeCapability(log *logger.Logger, r ruler) (*upgradeCapability, error) {
-	cap, ok := r.(*upgradeCapability)
-	if !ok {
-		return nil, nil
-	}
-
-	cap.Type = strings.ToLower(cap.Type)
-	if cap.Type != allowKey && cap.Type != denyKey {
-		return nil, fmt.Errorf("'%s' is not a valid type 'allow' and 'deny' are supported", cap.Type)
-	}
-
-	// if eql definition is not supported make a global rule
-	if len(cap.UpgradeEqlDefinition) == 0 {
-		cap.UpgradeEqlDefinition = "true"
-	}
-
-	eqlExp, err := eql.New(cap.UpgradeEqlDefinition)
+func (c *multiUpgradeCapability) allowUpgrade(version string, sourceURI string) bool {
+	// create VarStore out of map
+	varStore, err := transpiler.NewAST(map[string]interface{}{
+		"version":   version,
+		"sourceURI": sourceURI,
+	})
 	if err != nil {
-		return nil, err
+		// This should never happen, since the variables we just created should
+		// deterministically succeed. But if there is a mysterious encoding bug,
+		// don't block upgrades.
+		c.log.Errorf("failed creating a varStore for upgrade capability: %v", err)
+		return true
 	}
 
-	cap.upgradeEql = eqlExp
-	cap.log = log
-	return cap, nil
+	for _, cap := range c.caps {
+		// if eql is not parsed or defined, skip
+		if cap.upgradeEql == nil {
+			continue
+		}
+		result, err := cap.upgradeEql.Eval(varStore, true)
+		if err != nil {
+			c.log.Errorf("failed evaluating eql formula for capability '%s', skipping: %v", cap.name(), err)
+			return true
+		}
+		if result {
+			// Passed the check, now see if we're allowing or denying
+			return cap.Type == allowKey
+		}
+	}
+	// If nothing else took effect, default to allow.
+	return true
 }
 
 type upgradeCapability struct {
@@ -72,10 +61,6 @@ type upgradeCapability struct {
 	UpgradeEqlDefinition string `json:"upgrade" yaml:"upgrade"`
 
 	upgradeEql *eql.Expression
-}
-
-func (c *upgradeCapability) Rule() string {
-	return c.Type
 }
 
 func (c *upgradeCapability) name() string {
@@ -93,66 +78,7 @@ func (c *upgradeCapability) name() string {
 	return c.Name
 }
 
-// Apply supports upgrade action or fleetapi upgrade action object.
-func (c *upgradeCapability) Apply(upgradeMap map[string]interface{}) (map[string]interface{}, error) {
-	// if eql is not parsed or defined skip
-	if c.upgradeEql == nil {
-		return upgradeMap, nil
-	}
-
-	// create VarStore out of map
-	varStore, err := transpiler.NewAST(upgradeMap)
-	if err != nil {
-		c.log.Errorf("failed creating a varStore for capability '%s': %v", c.name(), err)
-		return upgradeMap, nil
-	}
-
-	isSupported, err := c.upgradeEql.Eval(varStore, true)
-	if err != nil {
-		c.log.Errorf("failed evaluating eql formula for capability '%s': %v", c.name(), err)
-		return upgradeMap, nil
-	}
-
-	// if deny switch the logic
-	if c.Type == denyKey {
-		isSupported = !isSupported
-		msg := fmt.Sprintf("upgrade is blocked out due to capability restriction '%s'", c.name())
-		c.log.Errorf(msg)
-	}
-
-	if !isSupported {
-		return upgradeMap, ErrBlocked
-	}
-
-	return upgradeMap, nil
-}
-
 type multiUpgradeCapability struct {
 	log  *logger.Logger
 	caps []*upgradeCapability
-}
-
-func (c *multiUpgradeCapability) Apply(in interface{}) (interface{}, error) {
-	upgradeMap := upgradeObject(in)
-	if upgradeMap == nil {
-		// not an upgrade we don't alter origin
-		return in, nil
-	}
-
-	for _, cap := range c.caps {
-		// upgrade does not modify incoming action
-		_, err := cap.Apply(upgradeMap)
-		if err != nil {
-			return in, err
-		}
-	}
-
-	return in, nil
-}
-
-func upgradeObject(a interface{}) map[string]interface{} {
-	if m, ok := a.(map[string]interface{}); ok {
-		return m
-	}
-	return nil
 }

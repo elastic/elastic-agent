@@ -116,6 +116,26 @@ func (c *Component) Type() string {
 	return ""
 }
 
+// Returns the component's input type, or the empty string if no input spec
+// is present.
+func (c *Component) InputType() string {
+	if inputSpec := c.InputSpec; inputSpec != nil {
+		return inputSpec.InputType
+	}
+	return ""
+}
+
+// Returns the type of the component's output unit, or the empty string
+// if no output unit is present.
+func (c *Component) OutputType() string {
+	for _, unit := range c.Units {
+		if unit.Type == client.UnitTypeOutput {
+			return unit.Config.Type
+		}
+	}
+	return ""
+}
+
 // ToComponents returns the components that should be running based on the policy and
 // the current runtime specification.
 func (r *RuntimeSpecs) ToComponents(
@@ -124,12 +144,20 @@ func (r *RuntimeSpecs) ToComponents(
 	ll logp.Level,
 	headers HeadersProvider,
 ) ([]Component, error) {
-	components, binaryMapping, err := r.PolicyToComponents(policy, ll, headers)
+	components, err := r.PolicyToComponents(policy, ll, headers)
 	if err != nil {
 		return nil, err
 	}
 
 	if monitoringInjector != nil {
+		// The monitoring config depends on a map from component id to
+		// binary name
+		binaryMapping := make(map[string]string)
+		for _, component := range components {
+			if spec := component.InputSpec; spec != nil {
+				binaryMapping[component.ID] = spec.BinaryName
+			}
+		}
 		monitoringCfg, err := monitoringInjector(policy, components, binaryMapping)
 		if err != nil {
 			return nil, fmt.Errorf("failed to inject monitoring: %w", err)
@@ -137,7 +165,7 @@ func (r *RuntimeSpecs) ToComponents(
 
 		if monitoringCfg != nil {
 			// monitoring is enabled
-			monitoringComps, _, err := r.PolicyToComponents(monitoringCfg, ll, headers)
+			monitoringComps, err := r.PolicyToComponents(monitoringCfg, ll, headers)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
 			}
@@ -338,25 +366,24 @@ func (r *RuntimeSpecs) componentForShipper(
 	return Component{}, false
 }
 
-// PolicyToComponents takes the policy and generated a component model along with providing
-// a mapping between component and the running binary.
+// PolicyToComponents takes the policy and generates a component model.
 func (r *RuntimeSpecs) PolicyToComponents(
 	policy map[string]interface{},
 	ll logp.Level,
 	headers HeadersProvider,
-) ([]Component, map[string]string, error) {
+) ([]Component, error) {
 	// get feature flags from policy
 	featureFlags, err := features.Parse(policy)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
+		return nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
 	}
 
 	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if outputsMap == nil {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	// order output keys; ensures result is always the same order
@@ -375,14 +402,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 		}
 	}
 
-	componentIdsInputMap := make(map[string]string)
-	for _, component := range components {
-		if spec := component.InputSpec; spec != nil {
-			componentIdsInputMap[component.ID] = spec.BinaryName
-		}
-	}
-
-	return components, componentIdsInputMap, nil
+	return components, nil
 }
 
 func componentToShipperConfig(shipperType string, comp Component) (*proto.UnitExpectedConfig, error) {

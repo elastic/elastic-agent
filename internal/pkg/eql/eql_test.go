@@ -351,6 +351,8 @@ func TestEql(t *testing.T) {
 		{expression: "${***} != ${~~~}", err: true},
 		{expression: "false asdf!@#$", err: true},
 		{expression: "length('something' 345) > 1000", err: true},
+
+		{expression: "startsWith(${null}, '8.9')", allowMissingVars: true, result: false},
 	}
 
 	store := &testVarStore{

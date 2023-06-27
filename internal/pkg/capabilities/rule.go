@@ -5,7 +5,6 @@
 package capabilities
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"gopkg.in/yaml.v2"
@@ -21,14 +20,17 @@ type ruler interface {
 	Rule() string
 }
 
-type capabilitiesList []ruler
+type capabilitiesList struct {
+	inputCaps   []*inputCapability
+	outputCaps  []*outputCapability
+	upgradeCaps []*upgradeCapability
+}
 
 type ruleDefinitions struct {
-	Version      string           `yaml:"version" json:"version"`
 	Capabilities capabilitiesList `yaml:"capabilities" json:"capabilities"`
 }
 
-func (r *capabilitiesList) UnmarshalJSON(p []byte) error {
+/*func (r *capabilitiesList) UnmarshalJSON(p []byte) error {
 	var tmpArray []json.RawMessage
 
 	err := json.Unmarshal(p, &tmpArray)
@@ -68,17 +70,17 @@ func (r *capabilitiesList) UnmarshalJSON(p []byte) error {
 	}
 
 	return nil
-}
+}*/
 
 func (r *capabilitiesList) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var tmpArray []map[string]interface{}
+	var capabilityConfigs []map[string]interface{}
 
-	err := unmarshal(&tmpArray)
+	err := unmarshal(&capabilityConfigs)
 	if err != nil {
 		return err
 	}
 
-	for i, mm := range tmpArray {
+	for i, mm := range capabilityConfigs {
 		partialYaml, err := yaml.Marshal(mm)
 		if err != nil {
 			return err
@@ -88,21 +90,21 @@ func (r *capabilitiesList) UnmarshalYAML(unmarshal func(interface{}) error) erro
 			if err := yaml.Unmarshal(partialYaml, &cap); err != nil {
 				return err
 			}
-			(*r) = append((*r), cap)
+			r.inputCaps = append(r.inputCaps, cap)
 
 		} else if _, found = mm["output"]; found {
 			cap := &outputCapability{}
 			if err := yaml.Unmarshal(partialYaml, &cap); err != nil {
 				return err
 			}
-			(*r) = append((*r), cap)
+			r.outputCaps = append(r.outputCaps, cap)
 
 		} else if _, found = mm["upgrade"]; found {
 			cap := &upgradeCapability{}
 			if err := yaml.Unmarshal(partialYaml, &cap); err != nil {
 				return err
 			}
-			(*r) = append((*r), cap)
+			r.upgradeCaps = append(r.upgradeCaps, cap)
 		} else {
 			return fmt.Errorf("unexpected capability type for definition number '%d'", i)
 		}

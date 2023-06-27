@@ -125,6 +125,7 @@ func fixInputsType(mm map[string]interface{}) {
 	}
 }
 
+/*
 func TestCapabilityManager(t *testing.T) {
 	t.Run("filter", func(t *testing.T) {
 		m := getConfig()
@@ -289,34 +290,35 @@ func TestCapabilityManager(t *testing.T) {
 		_, found = newMap["key"]
 		assert.False(t, found, "filter filters additional keys")
 	})
-}
+}*/
 
+/*
 type keepAsIsCap struct{}
 
-func (keepAsIsCap) Apply(in interface{}) (interface{}, error) {
-	return in, nil
-}
-
-type blockCap struct{}
-
-func (blockCap) Apply(in interface{}) (interface{}, error) {
-	return in, ErrBlocked
-}
-
-type filterKeywordCap struct {
-	keyWord string
-}
-
-func (f filterKeywordCap) Apply(in interface{}) (interface{}, error) {
-	mm, ok := in.(map[string]string)
-	if !ok {
+	func (keepAsIsCap) Apply(in interface{}) (interface{}, error) {
 		return in, nil
 	}
 
-	delete(mm, f.keyWord)
-	return mm, nil
-}
+type blockCap struct{}
 
+	func (blockCap) Apply(in interface{}) (interface{}, error) {
+		return in, ErrBlocked
+	}
+
+	type filterKeywordCap struct {
+		keyWord string
+	}
+
+	func (f filterKeywordCap) Apply(in interface{}) (interface{}, error) {
+		mm, ok := in.(map[string]string)
+		if !ok {
+			return in, nil
+		}
+
+		delete(mm, f.keyWord)
+		return mm, nil
+	}
+*/
 func getConfig() map[string]string {
 	return map[string]string{
 		"filter": "f_val",

@@ -172,7 +172,7 @@ type Coordinator struct {
 	configMgr  ConfigManager
 	varsMgr    VarsManager
 
-	caps      capabilities.Capability
+	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
 
 	// The current state of the Coordinator. This value and its subfields are
@@ -259,7 +259,7 @@ type managerChans struct {
 var ErrFatalCoordinator = errors.New("fatal error in coordinator")
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -402,10 +402,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// early check capabilities to ensure this upgrade actions is allowed
 	if c.caps != nil {
-		if _, err := c.caps.Apply(map[string]interface{}{
-			"version":   version,
-			"sourceURI": sourceURI,
-		}); errors.Is(err, capabilities.ErrBlocked) {
+		if !c.caps.AllowUpgrade(version, sourceURI) {
 			return ErrNotUpgradable
 		}
 	}
@@ -925,7 +922,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		return fmt.Errorf("could not create the AST from the configuration: %w", err)
 	}
 
-	if c.caps != nil {
+	/*if c.caps != nil {
 		var ok bool
 		updatedAst, err := c.caps.Apply(rawAst)
 		if err != nil {
@@ -936,7 +933,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		if !ok {
 			return fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
 		}
-	}
+	}*/
 
 	if err := features.Apply(cfg); err != nil {
 		return fmt.Errorf("could not update feature flags config: %w", err)
@@ -1065,6 +1062,9 @@ func (c *Coordinator) recomputeConfigAndComponents() error {
 		return fmt.Errorf("failed to render components: %w", err)
 	}
 
+	// Filter any disallowed inputs/outputs from the components
+	comps = c.filterByCapabilities(comps)
+
 	for _, modifier := range c.modifiers {
 		comps, err = modifier(comps, cfg)
 		if err != nil {
@@ -1077,6 +1077,29 @@ func (c *Coordinator) recomputeConfigAndComponents() error {
 	c.derivedConfig = cfg
 	c.componentModel = comps
 	return nil
+}
+
+// Filter any inputs and outputs int he generated component model
+// based on whether they're excluded by the capabilities config
+func (c *Coordinator) filterByCapabilities(comps []component.Component) []component.Component {
+	if c.caps == nil {
+		// No active filters, return unchanged
+		return comps
+	}
+	result := []component.Component{}
+	for _, component := range comps {
+		// Check that the input type is allowed
+		if !c.caps.AllowInput(component.InputType()) {
+			c.logger.Info("Component %q with input type %q filtered by capabilities.yml", component.InputType())
+			continue
+		}
+		if !c.caps.AllowOutput(component.OutputType()) {
+			c.logger.Info("Component %q with output type %q filtered by capabilities.yml", component.ID, component.OutputType())
+			continue
+		}
+		result = append(result, component)
+	}
+	return result
 }
 
 // handleCoordinatorDone is called when the Coordinator's context is
