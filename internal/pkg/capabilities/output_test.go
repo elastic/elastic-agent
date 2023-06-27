@@ -14,7 +14,7 @@ import (
 func TestMultiOutput(t *testing.T) {
 	t.Run("no match", func(t *testing.T) {
 		caps := []*outputCapability{
-			&outputCapability{
+			{
 				Type:   "allow",
 				Output: "something_else",
 			},
@@ -26,7 +26,7 @@ func TestMultiOutput(t *testing.T) {
 
 	t.Run("filters logstash", func(t *testing.T) {
 		caps := []*outputCapability{
-			&outputCapability{
+			{
 				Type:   "deny",
 				Output: "logstash",
 			},
@@ -39,11 +39,11 @@ func TestMultiOutput(t *testing.T) {
 
 	t.Run("allows logstash only", func(t *testing.T) {
 		caps := []*outputCapability{
-			&outputCapability{
+			{
 				Type:   "allow",
 				Output: "logstash",
 			},
-			&outputCapability{
+			{
 				Type:   "deny",
 				Output: "*",
 			},
@@ -56,7 +56,7 @@ func TestMultiOutput(t *testing.T) {
 
 	t.Run("allows everything", func(t *testing.T) {
 		caps := []*outputCapability{
-			&outputCapability{
+			{
 				Type:   "allow",
 				Output: "*",
 			},
@@ -68,7 +68,7 @@ func TestMultiOutput(t *testing.T) {
 
 	t.Run("deny everything", func(t *testing.T) {
 		caps := []*outputCapability{
-			&outputCapability{
+			{
 				Type:   "deny",
 				Output: "*",
 			},
@@ -124,13 +124,11 @@ func TestOutput(t *testing.T) {
 }
 
 func runMultiOutputTest(t *testing.T, caps []*outputCapability, expectAllowed []string, expectBlocked []string) {
-	cap := &multiOutputsCapability{caps: caps}
-
 	for _, outputType := range expectAllowed {
-		assert.True(t, cap.allowOutput(outputType), "expected output type %v to be allowed", outputType)
+		assert.True(t, allowOutput(outputType, caps), "expected output type %v to be allowed", outputType)
 	}
 	for _, outputType := range expectBlocked {
-		assert.False(t, cap.allowOutput(outputType), "expected output type %v to be blocked", outputType)
+		assert.False(t, allowOutput(outputType, caps), "expected output type %v to be blocked", outputType)
 	}
 }
 

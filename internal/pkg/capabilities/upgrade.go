@@ -12,15 +12,37 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// NewUpgradeCapability creates capability filter for upgrade.
-// Available variables:
-// - version
-// - source_uri
-func newUpgradesCapability(caps []*upgradeCapability) *multiUpgradeCapability {
-	return &multiUpgradeCapability{caps: caps}
+type upgradeCapability struct {
+	// The condition that this constraint checks
+	condition *eql.Expression
+
+	// Whether a successful condition check lets an upgrade proceed or blocks it
+	rule allowOrDeny
+
+	// The original string used to create the EQL condition, preserved to allow
+	// useful error reporting
+	conditionStr string
 }
 
-func (c *multiUpgradeCapability) allowUpgrade(version string, sourceURI string) bool {
+func newUpgradeCapability(condition string, rule allowOrDeny) (*upgradeCapability, error) {
+	eqlExpr, err := eql.New(condition)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't load upgrade condition %q: %w", condition, err)
+	}
+	return &upgradeCapability{
+		condition:    eqlExpr,
+		rule:         rule,
+		conditionStr: condition,
+	}, nil
+}
+
+// allowUpgrade checks the EQL conditions in the given upgrade capabilities
+// giving them variable access to "version" and "sourceURI"
+func allowUpgrade(
+	log *logger.Logger,
+	version string, sourceURI string,
+	upgradeCaps []*upgradeCapability,
+) bool {
 	// create VarStore out of map
 	varStore, err := transpiler.NewAST(map[string]interface{}{
 		"version":   version,
@@ -30,55 +52,25 @@ func (c *multiUpgradeCapability) allowUpgrade(version string, sourceURI string) 
 		// This should never happen, since the variables we just created should
 		// deterministically succeed. But if there is a mysterious encoding bug,
 		// don't block upgrades.
-		c.log.Errorf("failed creating a varStore for upgrade capability: %v", err)
+		log.Errorf("failed creating a varStore for upgrade capability: %v", err)
 		return true
 	}
 
-	for _, cap := range c.caps {
-		// if eql is not parsed or defined, skip
-		if cap.upgradeEql == nil {
-			continue
-		}
-		result, err := cap.upgradeEql.Eval(varStore, true)
+	for _, cap := range upgradeCaps {
+		result, err := cap.condition.Eval(varStore, true)
 		if err != nil {
-			c.log.Errorf("failed evaluating eql formula for capability '%s', skipping: %v", cap.name(), err)
+			log.Errorf("failed evaluating eql formula %q, skipping: %v", cap.conditionStr, err)
 			return true
 		}
-		if result {
-			// Passed the check, now see if we're allowing or denying
-			return cap.Type == allowKey
+		if result && cap.rule == ruleTypeDeny {
+			// This rule blocks the attempted upgrade
+			return false
+		}
+		if !result && cap.rule == ruleTypeAllow {
+			// An "allow" rule failed its check, this also blocks the upgrade.
+			return false
 		}
 	}
-	// If nothing else took effect, default to allow.
+	// If nothing blocked the upgrade, allow it.
 	return true
-}
-
-type upgradeCapability struct {
-	log  *logger.Logger
-	Name string `json:"name,omitempty" yaml:"name,omitempty"`
-	Type string `json:"rule" yaml:"rule"`
-	// UpgradeEql is eql expression defining upgrade
-	UpgradeEqlDefinition string `json:"upgrade" yaml:"upgrade"`
-
-	upgradeEql *eql.Expression
-}
-
-func (c *upgradeCapability) name() string {
-	if c.Name != "" {
-		return c.Name
-	}
-
-	t := "A"
-	if c.Type == denyKey {
-		t = "D"
-	}
-
-	// e.g UA(*) or UD(7.*.*)
-	c.Name = fmt.Sprintf("U%s(%s)", t, c.UpgradeEqlDefinition)
-	return c.Name
-}
-
-type multiUpgradeCapability struct {
-	log  *logger.Logger
-	caps []*upgradeCapability
 }

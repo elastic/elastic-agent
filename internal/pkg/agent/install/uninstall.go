@@ -190,7 +190,7 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 
 	// check caps so we don't try uninstalling things that were already
 	// prevented from installing
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
 	if err == nil {
 		return err
 	}

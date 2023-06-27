@@ -14,7 +14,7 @@ import (
 func TestMultiInput(t *testing.T) {
 	t.Run("no match", func(t *testing.T) {
 		caps := []*inputCapability{
-			&inputCapability{
+			{
 				Type:  "allow",
 				Input: "something_else",
 			},
@@ -26,7 +26,7 @@ func TestMultiInput(t *testing.T) {
 
 	t.Run("filters metrics", func(t *testing.T) {
 		caps := []*inputCapability{
-			&inputCapability{
+			{
 				Type:  "deny",
 				Input: "system/metrics",
 			},
@@ -39,11 +39,11 @@ func TestMultiInput(t *testing.T) {
 
 	t.Run("allows metrics only", func(t *testing.T) {
 		caps := []*inputCapability{
-			&inputCapability{
+			{
 				Type:  "allow",
 				Input: "system/metrics",
 			},
-			&inputCapability{
+			{
 				Type:  "deny",
 				Input: "*",
 			},
@@ -56,7 +56,7 @@ func TestMultiInput(t *testing.T) {
 
 	t.Run("allows everything", func(t *testing.T) {
 		caps := []*inputCapability{
-			&inputCapability{
+			{
 				Type:  "allow",
 				Input: "*",
 			},
@@ -67,7 +67,7 @@ func TestMultiInput(t *testing.T) {
 
 	t.Run("deny everything", func(t *testing.T) {
 		caps := []*inputCapability{
-			&inputCapability{
+			{
 				Type:  "deny",
 				Input: "*",
 			},
@@ -79,11 +79,11 @@ func TestMultiInput(t *testing.T) {
 
 	t.Run("deny everything with noise", func(t *testing.T) {
 		caps := []*inputCapability{
-			&inputCapability{
+			{
 				Type:  "deny",
 				Input: "*",
 			},
-			&inputCapability{
+			{
 				Type:  "allow",
 				Input: "something_else",
 			},
@@ -143,12 +143,10 @@ func runInputTest(t *testing.T, cap *inputCapability, expectAllowed []string, ex
 }
 
 func runMultiInputTest(t *testing.T, caps []*inputCapability, expectAllowed []string, expectBlocked []string) {
-	cap := &multiInputsCapability{caps: caps}
-
 	for _, inputType := range expectAllowed {
-		assert.True(t, cap.allowInput(inputType), "input type %v should be allowed", inputType)
+		assert.True(t, allowInput(inputType, caps), "input type %v should be allowed", inputType)
 	}
 	for _, inputType := range expectBlocked {
-		assert.False(t, cap.allowInput(inputType), "input type %v should be blocked", inputType)
+		assert.False(t, allowInput(inputType, caps), "input type %v should be blocked", inputType)
 	}
 }

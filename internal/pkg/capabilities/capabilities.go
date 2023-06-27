@@ -6,6 +6,7 @@ package capabilities
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 
@@ -14,87 +15,61 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// Capability provides a way of applying predefined filter to object.
-// It's up to capability to determine if capability is applicable on object.
-type Capability interface {
-	// Apply applies capabilities on input and returns true if input should be completely blocked
-	// otherwise, false and updated input is returned
-	Apply(interface{}) (interface{}, error)
-}
-
 type Capabilities interface {
 	AllowUpgrade(version string, sourceURI string) bool
 	AllowInput(name string) bool
 	AllowOutput(name string) bool
 }
 
-var (
-	// ErrBlocked is returned when capability is blocking.
-	ErrBlocked = errors.New("capability blocked")
-)
-
 type capabilitiesManager struct {
-	allowInputType  func(string) bool
-	allowOutputType func(string) bool
-	allowUpgrade    func(version string, uri string) bool
-	//caps []Capability
+	log         *logger.Logger
+	inputCaps   []*inputCapability
+	outputCaps  []*outputCapability
+	upgradeCaps []*upgradeCapability
 }
 
 func (cm *capabilitiesManager) AllowInput(inputType string) bool {
-	if cm.allowInputType != nil {
-		return cm.allowInputType(inputType)
-	}
-	return true
+	return allowInput(inputType, cm.inputCaps)
 }
 
 func (cm *capabilitiesManager) AllowOutput(outputType string) bool {
-	if cm.allowOutputType != nil {
-		return cm.allowOutputType(outputType)
-	}
-	return true
+	return allowOutput(outputType, cm.outputCaps)
 }
 
 func (cm *capabilitiesManager) AllowUpgrade(version string, uri string) bool {
-	if cm.allowUpgrade != nil {
-		return cm.allowUpgrade(version, uri)
-	}
-	return true
+	return allowUpgrade(cm.log, version, uri, cm.upgradeCaps)
 }
 
-type capabilityFactory func(*logger.Logger, *ruleDefinitions) (Capability, error)
-
-// Load loads capabilities files and prepares manager.
-func Load(capsFile string, log *logger.Logger) (Capabilities, error) {
-	cm := &capabilitiesManager{}
-
+func LoadFile(capsFile string, log *logger.Logger) (Capabilities, error) {
 	// load capabilities from file
 	fd, err := os.Open(capsFile)
 	if errors.Is(err, fs.ErrNotExist) {
+		// No file, return an empty capabilities manager
 		log.Infof("Capabilities file not found in %s", capsFile)
-		return cm, nil
+		return &capabilitiesManager{}, nil
 	}
-	if err != nil {
-		return cm, err
-	}
-	defer fd.Close()
-
-	definitions := &ruleDefinitions{}
-	dec := yaml.NewDecoder(fd)
-	if err := dec.Decode(&definitions); err != nil {
-		return cm, err
-	}
-
-	inputCaps := newInputsCapability(definitions.Capabilities.inputCaps)
-	cm.allowInputType = inputCaps.allowInput
-
-	outputCaps := newOutputsCapability(definitions.Capabilities.outputCaps)
-	cm.allowOutputType = outputCaps.allowOutput
-
-	upgradeCaps := newUpgradesCapability(definitions.Capabilities.upgradeCaps)
 	if err != nil {
 		return nil, err
 	}
-	cm.allowUpgrade = upgradeCaps.allowUpgrade
 
-	return cm, nil
+	// We successfully opened the file, pass it through to Load
+	defer fd.Close()
+	return Load(fd, log)
+}
+
+// Load loads capabilities data and prepares manager.
+func Load(capsReader io.Reader, log *logger.Logger) (Capabilities, error) {
+
+	spec := &capabilitiesSpec{}
+	dec := yaml.NewDecoder(capsReader)
+	if err := dec.Decode(&spec); err != nil {
+		return &capabilitiesManager{}, err
+	}
+	caps := spec.Capabilities
+
+	return &capabilitiesManager{
+		inputCaps:   caps.inputCaps,
+		outputCaps:  caps.outputCaps,
+		upgradeCaps: caps.upgradeCaps,
+	}, nil
 }

@@ -10,67 +10,28 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const (
-	allowKey     = "allow"
-	denyKey      = "deny"
-	conditionKey = "__condition__"
-)
-
-type ruler interface {
-	Rule() string
-}
-
+// capabilitiesList deserializes a YAML list of capabilities into organized
+// arrays based on their type, for easy use by capabilitiesManager.
 type capabilitiesList struct {
 	inputCaps   []*inputCapability
 	outputCaps  []*outputCapability
 	upgradeCaps []*upgradeCapability
 }
 
-type ruleDefinitions struct {
-	Capabilities capabilitiesList `yaml:"capabilities" json:"capabilities"`
+// a type for capability values that must equal "allow" or "deny", enforced
+// during deserialization via its Validate function.
+type allowOrDeny string
+
+const (
+	ruleTypeAllow allowOrDeny = "allow"
+	ruleTypeDeny  allowOrDeny = "deny"
+)
+
+// The in-memory struct representing capabilities.yml. Used for deserializing
+// when loading capabilitiessManager.
+type capabilitiesSpec struct {
+	Capabilities capabilitiesList `yaml:"capabilities"`
 }
-
-/*func (r *capabilitiesList) UnmarshalJSON(p []byte) error {
-	var tmpArray []json.RawMessage
-
-	err := json.Unmarshal(p, &tmpArray)
-	if err != nil {
-		return err
-	}
-
-	for i, t := range tmpArray {
-		mm := make(map[string]interface{})
-		if err := json.Unmarshal(t, &mm); err != nil {
-			return err
-		}
-
-		if _, found := mm["input"]; found {
-			cap := &inputCapability{}
-			if err := json.Unmarshal(t, &cap); err != nil {
-				return err
-			}
-			(*r) = append((*r), cap)
-
-		} else if _, found = mm["output"]; found {
-			cap := &outputCapability{}
-			if err := json.Unmarshal(t, &cap); err != nil {
-				return err
-			}
-			(*r) = append((*r), cap)
-
-		} else if _, found = mm["upgrade"]; found {
-			cap := &upgradeCapability{}
-			if err := json.Unmarshal(t, &cap); err != nil {
-				return err
-			}
-			(*r) = append((*r), cap)
-		} else {
-			return fmt.Errorf("unexpected capability type for definition number '%d'", i)
-		}
-	}
-
-	return nil
-}*/
 
 func (r *capabilitiesList) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var capabilityConfigs []map[string]interface{}
@@ -100,8 +61,17 @@ func (r *capabilitiesList) UnmarshalYAML(unmarshal func(interface{}) error) erro
 			r.outputCaps = append(r.outputCaps, cap)
 
 		} else if _, found = mm["upgrade"]; found {
-			cap := &upgradeCapability{}
-			if err := yaml.Unmarshal(partialYaml, &cap); err != nil {
+			// Serialize upgrade constraints to a temporary struct so we can
+			// safely assemble the associated EQL expression
+			spec := struct {
+				Type      allowOrDeny `yaml:"rule"`
+				Condition string      `yaml:"upgrade"`
+			}{}
+			if err := yaml.Unmarshal(partialYaml, &spec); err != nil {
+				return err
+			}
+			cap, err := newUpgradeCapability(spec.Condition, spec.Type)
+			if err != nil {
 				return err
 			}
 			r.upgradeCaps = append(r.upgradeCaps, cap)
@@ -110,5 +80,12 @@ func (r *capabilitiesList) UnmarshalYAML(unmarshal func(interface{}) error) erro
 		}
 	}
 
+	return nil
+}
+
+func (ad allowOrDeny) Validate() error {
+	if ad != ruleTypeAllow && ad != ruleTypeDeny {
+		return fmt.Errorf("capability rule was %q, expected 'allow' or 'deny'", ad)
+	}
 	return nil
 }

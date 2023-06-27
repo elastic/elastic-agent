@@ -4,37 +4,18 @@
 
 package capabilities
 
-import (
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-)
-
-const (
-	outputKey = "outputs"
-	typeKey   = "type"
-)
-
-func newOutputsCapability(caps []*outputCapability) *multiOutputsCapability {
-	return &multiOutputsCapability{caps: caps}
+type outputCapability struct {
+	Type   allowOrDeny `yaml:"rule"`
+	Output string      `yaml:"output"`
 }
 
-func (mic *multiOutputsCapability) allowOutput(outputType string) bool {
-	for _, cap := range mic.caps {
+func allowOutput(outputType string, outputCaps []*outputCapability) bool {
+	for _, cap := range outputCaps {
 		if matchesExpr(cap.Output, outputType) {
 			// The check passed, allow or reject as appropriate
-			return cap.Type == "allow"
+			return cap.Type == ruleTypeAllow
 		}
 	}
 	// If nothing blocked it, default to allow.
 	return true
-}
-
-type outputCapability struct {
-	log    *logger.Logger
-	Name   string `json:"name,omitempty" yaml:"name,omitempty"`
-	Type   string `json:"rule" yaml:"rule"`
-	Output string `json:"output" yaml:"output"`
-}
-
-type multiOutputsCapability struct {
-	caps []*outputCapability
 }
