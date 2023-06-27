@@ -6,7 +6,6 @@ package capabilities
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,15 +14,15 @@ import (
 
 func TestUnmarshal(t *testing.T) {
 	t.Run("valid json", func(t *testing.T) {
-		rr := &ruleDefinitions{Capabilities: make([]ruler, 0)}
+		rr := &ruleDefinitions{}
 
 		err := json.Unmarshal(jsonDefinitionValid, &rr)
-
 		assert.Nil(t, err, "no error is expected")
-		assert.Equal(t, 3, len(rr.Capabilities))
-		assert.Equal(t, "*capabilities.upgradeCapability", reflect.TypeOf(rr.Capabilities[0]).String())
-		assert.Equal(t, "*capabilities.inputCapability", reflect.TypeOf(rr.Capabilities[1]).String())
-		assert.Equal(t, "*capabilities.outputCapability", reflect.TypeOf(rr.Capabilities[2]).String())
+
+		// The given json has one capability of each type
+		assert.Equal(t, 1, len(rr.Capabilities.inputCaps))
+		assert.Equal(t, 1, len(rr.Capabilities.outputCaps))
+		assert.Equal(t, 1, len(rr.Capabilities.upgradeCaps))
 	})
 
 	t.Run("invalid json", func(t *testing.T) {
@@ -35,15 +34,15 @@ func TestUnmarshal(t *testing.T) {
 	})
 
 	t.Run("valid yaml", func(t *testing.T) {
-		rr := &ruleDefinitions{Capabilities: make([]ruler, 0)}
+		rr := &ruleDefinitions{}
 
 		err := yaml.Unmarshal(yamlDefinitionValid, &rr)
-
 		assert.Nil(t, err, "no error is expected")
-		assert.Equal(t, 3, len(rr.Capabilities))
-		assert.Equal(t, "*capabilities.upgradeCapability", reflect.TypeOf(rr.Capabilities[0]).String())
-		assert.Equal(t, "*capabilities.inputCapability", reflect.TypeOf(rr.Capabilities[1]).String())
-		assert.Equal(t, "*capabilities.outputCapability", reflect.TypeOf(rr.Capabilities[2]).String())
+
+		// The yaml has one capability of each type
+		assert.Equal(t, 1, len(rr.Capabilities.inputCaps))
+		assert.Equal(t, 1, len(rr.Capabilities.outputCaps))
+		assert.Equal(t, 1, len(rr.Capabilities.upgradeCaps))
 	})
 
 	t.Run("invalid yaml", func(t *testing.T) {
