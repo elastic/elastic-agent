@@ -116,18 +116,18 @@ func executeServiceCommand(ctx context.Context, log *logger.Logger, binaryPath s
 
 func executeServiceCommandWithRetries(
 	cmdCtx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec,
-	retryCtx context.Context, defaultRetrySleepInitDuration time.Duration, retrySleepMaxDuration time.Duration,
+	retryCtx context.Context, defaultRetryInitInterval time.Duration, retryMaxInterval time.Duration,
 ) {
-	// If no initial sleep duration is specified, use default value
-	retrySleepInitDuration := spec.RetrySleepInitDuration
-	if retrySleepInitDuration == 0 {
-		retrySleepInitDuration = defaultRetrySleepInitDuration
+	// If no initial retry interval is specified, use default value
+	retryInitInterval := spec.Retry.InitInterval
+	if retryInitInterval == 0 {
+		retryInitInterval = defaultRetryInitInterval
 	}
 
 	serviceCmdRetrier.Start(
 		cmdCtx, log,
 		binaryPath, spec.Args, envSpecToEnv(spec.Env), spec.Timeout,
-		retryCtx, retrySleepInitDuration, retrySleepMaxDuration,
+		retryCtx, retryInitInterval, retryMaxInterval,
 	)
 }
 

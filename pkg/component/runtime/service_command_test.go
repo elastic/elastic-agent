@@ -286,12 +286,12 @@ func TestExecuteServiceCommand(t *testing.T) {
 		retryCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		defaultRetrySleepInitDuration := 50 * time.Millisecond
-		retrySleepMaxDuration := 200 * time.Millisecond
+		defaultRetryInitInterval := 50 * time.Millisecond
+		retryMaxInterval := 200 * time.Millisecond
 
 		executeServiceCommandWithRetries(
 			cmdCtx, log, exePath, &component.ServiceOperationsCommandSpec{},
-			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+			retryCtx, defaultRetryInitInterval, retryMaxInterval,
 		)
 
 		<-retryCtx.Done()
@@ -315,8 +315,8 @@ func TestExecuteServiceCommand(t *testing.T) {
 		retryCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 
-		defaultRetrySleepInitDuration := 50 * time.Millisecond
-		retrySleepMaxDuration := 1 * time.Second
+		defaultRetryInitInterval := 50 * time.Millisecond
+		retryMaxInterval := 1 * time.Second
 
 		spec := &component.ServiceOperationsCommandSpec{
 			// We deliberately set RetrySleepInitDuration to just shorter
@@ -325,11 +325,13 @@ func TestExecuteServiceCommand(t *testing.T) {
 			// - one message about the next (first) retry
 			// - one more execution of the command, as a result of the first retry
 			// - one message about the next (second) retry
-			RetrySleepInitDuration: 700 * time.Millisecond,
+			Retry: component.RetryConfig{
+				InitInterval: 700 * time.Millisecond,
+			},
 		}
 		executeServiceCommandWithRetries(
 			cmdCtx, log, exePath, spec,
-			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+			retryCtx, defaultRetryInitInterval, retryMaxInterval,
 		)
 
 		<-retryCtx.Done()
@@ -357,15 +359,17 @@ func TestExecuteServiceCommand(t *testing.T) {
 		retryCtx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 		defer cancel()
 
-		defaultRetrySleepInitDuration := 50 * time.Millisecond
-		retrySleepMaxDuration := 1 * time.Second
+		defaultRetryInitInterval := 50 * time.Millisecond
+		retryMaxInterval := 1 * time.Second
 
 		spec := &component.ServiceOperationsCommandSpec{
-			RetrySleepInitDuration: 200 * time.Millisecond,
+			Retry: component.RetryConfig{
+				InitInterval: 200 * time.Millisecond,
+			},
 		}
 		executeServiceCommandWithRetries(
 			cmdCtx, log, exePath, spec,
-			retryCtx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+			retryCtx, defaultRetryInitInterval, retryMaxInterval,
 		)
 
 		// Give the command time to succeed.
@@ -396,8 +400,8 @@ func TestExecuteServiceCommand(t *testing.T) {
 		exePath, err := prepareTestProg(context.Background(), log, t.TempDir(), exeConfig)
 		require.NoError(t, err)
 
-		defaultRetrySleepInitDuration := 50 * time.Millisecond
-		retrySleepMaxDuration := 200 * time.Millisecond
+		defaultRetryInitInterval := 50 * time.Millisecond
+		retryMaxInterval := 200 * time.Millisecond
 
 		// First call
 		cmd1Ctx := context.Background()
@@ -405,7 +409,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 
 		executeServiceCommandWithRetries(
 			cmd1Ctx, log, exePath, &component.ServiceOperationsCommandSpec{},
-			retry1Ctx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+			retry1Ctx, defaultRetryInitInterval, retryMaxInterval,
 		)
 
 		debugLogs := obs.FilterLevelExact(zapcore.DebugLevel).TakeAll()
@@ -428,7 +432,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 
 		executeServiceCommandWithRetries(
 			cmd2Ctx, log, exePath, &component.ServiceOperationsCommandSpec{},
-			retry2Ctx, defaultRetrySleepInitDuration, retrySleepMaxDuration,
+			retry2Ctx, defaultRetryInitInterval, retryMaxInterval,
 		)
 
 		debugLogs = obs.FilterLevelExact(zapcore.DebugLevel).TakeAll()
