@@ -11,7 +11,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -40,11 +39,11 @@ func makeComponentState(name string, proxiedActions []string) runtime.ComponentC
 }
 
 type MockActionCoordinator struct {
-	st               state.State
+	st               coordinator.State
 	performedActions int
 }
 
-func (c *MockActionCoordinator) State() state.State {
+func (c *MockActionCoordinator) State() coordinator.State {
 	return c.st
 }
 
@@ -114,7 +113,7 @@ func TestActionUnenrollHandler(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		st                   state.State
+		st                   coordinator.State
 		wantErr              error // Handler error
 		wantPerformedActions int
 		tamperProtectionFn   func() bool
@@ -124,8 +123,8 @@ func TestActionUnenrollHandler(t *testing.T) {
 		},
 		{
 			name: "endpoint no dispatch",
-			st: func() state.State {
-				return state.State{
+			st: func() coordinator.State {
+				return coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						makeComponentState("endpoint", nil),
 					},
@@ -134,8 +133,8 @@ func TestActionUnenrollHandler(t *testing.T) {
 		},
 		{
 			name: "endpoint with UNENROLL, tamper protection feature flag disabled",
-			st: func() state.State {
-				return state.State{
+			st: func() coordinator.State {
+				return coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						makeComponentState("endpoint", []string{"UNENROLL"}),
 						makeComponentState("osquery", nil),
@@ -146,8 +145,8 @@ func TestActionUnenrollHandler(t *testing.T) {
 		},
 		{
 			name: "endpoint with UNENROLL, tamper protection feature flag enabled",
-			st: func() state.State {
-				return state.State{
+			st: func() coordinator.State {
+				return coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						makeComponentState("endpoint", []string{"UNENROLL"}),
 						makeComponentState("osquery", nil),
@@ -159,8 +158,8 @@ func TestActionUnenrollHandler(t *testing.T) {
 		},
 		{
 			name: "more than one UNENROLL dispatch, tamper protection feature flag disabled",
-			st: func() state.State {
-				return state.State{
+			st: func() coordinator.State {
+				return coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						makeComponentState("endpoint", []string{"UNENROLL"}),
 						makeComponentState("foobar", []string{"UNENROLL", "FOOBAR"}),
@@ -172,8 +171,8 @@ func TestActionUnenrollHandler(t *testing.T) {
 		},
 		{
 			name: "more than one UNENROLL dispatch, tamper protection feature flag enabled",
-			st: func() state.State {
-				return state.State{
+			st: func() coordinator.State {
+				return coordinator.State{
 					Components: []runtime.ComponentComponentState{
 						makeComponentState("endpoint", []string{"UNENROLL"}),
 						makeComponentState("foobar", []string{"UNENROLL", "FOOBAR"}),

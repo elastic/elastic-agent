@@ -12,14 +12,14 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 type actionCoordinator interface {
-	State() state.State
+	State() coordinator.State
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 }
 
@@ -76,7 +76,7 @@ func dispatchActionInParallel(ctx context.Context, log *logp.Logger, action disp
 	return g.Wait()
 }
 
-func findMatchingUnitsByActionType(state state.State, typ string) ([]component.Component, []component.Unit) {
+func findMatchingUnitsByActionType(state coordinator.State, typ string) ([]component.Component, []component.Unit) {
 	comps := make([]component.Component, 0)
 	units := make([]component.Unit, 0)
 	for _, comp := range state.Components {
