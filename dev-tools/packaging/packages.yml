@@ -960,6 +960,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        version: '{{ beat_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -970,6 +971,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        version: '{{ beat_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -980,6 +982,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        version: '{{ beat_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -990,6 +993,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        version: '{{ beat_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
