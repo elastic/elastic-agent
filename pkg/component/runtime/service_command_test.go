@@ -416,7 +416,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.Len(t, debugLogs, 1)
 		require.Equal(t,
 			fmt.Sprintf(
-				"no retries for command key [%d] are pending; nothing to do",
+				"no retries for command key [%s] are pending; nothing to do",
 				serviceCmdRetrier.cmdKey(exePath, nil, nil),
 			),
 			debugLogs[0].Message,
@@ -439,7 +439,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		require.Len(t, debugLogs, 2)
 		require.Equal(t,
 			fmt.Sprintf(
-				"retries and command process for command key [%d] stopped",
+				"retries and command process for command key [%s] stopped",
 				serviceCmdRetrier.cmdKey(exePath, nil, nil),
 			),
 			debugLogs[1].Message,

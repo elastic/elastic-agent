@@ -7,9 +7,10 @@ package runtime
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -139,7 +140,7 @@ type cmdRetryInfo struct {
 
 type cmdRetrier struct {
 	mu   sync.RWMutex
-	cmds map[uint64]cmdRetryInfo
+	cmds map[string]cmdRetryInfo
 }
 
 func (cr *cmdRetrier) Start(
@@ -201,12 +202,12 @@ func (cr *cmdRetrier) Start(
 	}()
 }
 
-func (cr *cmdRetrier) Stop(cmdKey uint64, log *logger.Logger) {
+func (cr *cmdRetrier) Stop(cmdKey string, log *logger.Logger) {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 	info, exists := cr.cmds[cmdKey]
 	if !exists {
-		log.Debugf("no retries for command key [%d] are pending; nothing to do", cmdKey)
+		log.Debugf("no retries for command key [%s] are pending; nothing to do", cmdKey)
 		return
 	}
 
@@ -221,16 +222,16 @@ func (cr *cmdRetrier) Stop(cmdKey uint64, log *logger.Logger) {
 
 	// Stop tracking
 	delete(cr.cmds, cmdKey)
-	log.Debugf("retries and command process for command key [%d] stopped", cmdKey)
+	log.Debugf("retries and command process for command key [%s] stopped", cmdKey)
 }
 
-func (cr *cmdRetrier) track(cmdKey uint64, cmdCancelFn context.CancelFunc, retryCanceFn context.CancelFunc, cmdDone <-chan struct{}) {
+func (cr *cmdRetrier) track(cmdKey string, cmdCancelFn context.CancelFunc, retryCanceFn context.CancelFunc, cmdDone <-chan struct{}) {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 
 	// Initialize map if needed
 	if cr.cmds == nil {
-		cr.cmds = map[uint64]cmdRetryInfo{}
+		cr.cmds = map[string]cmdRetryInfo{}
 	}
 
 	cr.cmds[cmdKey] = cmdRetryInfo{
@@ -240,7 +241,7 @@ func (cr *cmdRetrier) track(cmdKey uint64, cmdCancelFn context.CancelFunc, retry
 	}
 }
 
-func (cr *cmdRetrier) untrack(cmdKey uint64) {
+func (cr *cmdRetrier) untrack(cmdKey string) {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
 
@@ -250,7 +251,7 @@ func (cr *cmdRetrier) untrack(cmdKey uint64) {
 // cmdKey returns a unique, deterministic integer for the combination of the given
 // binaryPath, args, and env. This integer can be used to determine if the same command
 // is being executed again or not.
-func (cr *cmdRetrier) cmdKey(binaryPath string, args []string, env []string) uint64 {
+func (cr *cmdRetrier) cmdKey(binaryPath string, args []string, env []string) string {
 	var sb strings.Builder
 
 	sb.WriteString(binaryPath)
@@ -287,10 +288,10 @@ func (cr *cmdRetrier) cmdKey(binaryPath string, args []string, env []string) uin
 		sb.WriteString("|")
 	}
 
-	digest := fnv.New64()
+	digest := sha256.New()
 	digest.Write([]byte(sb.String()))
 
-	return digest.Sum64()
+	return hex.EncodeToString(digest.Sum(nil))
 }
 
 func envSpecToEnv(envSpecs []component.CommandEnvSpec) []string {
