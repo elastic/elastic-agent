@@ -59,10 +59,12 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 	}
 
 	// Create enrollment API key
-	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
+	createEnrollmentAPIKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
 	}
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+
+	t.Logf("Creating enrollment API key...")
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentAPIKeyReq)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create enrollment API key: %w", err)
 	}
@@ -74,11 +76,13 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 	}
 
 	// Enroll agent
+	t.Logf("Unpacking and installing Elastic Agent")
 	output, err := InstallAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 		return nil, fmt.Errorf("unable to enroll Elastic Agent: %w", err)
 	}
+	t.Logf("Got response from Elastic Agent: %s", string(output))
 
 	// Wait for Agent to be healthy
 	require.Eventually(

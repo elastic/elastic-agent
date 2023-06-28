@@ -309,7 +309,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
 	err := f.ensurePrepared(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error preparing Elastic Agent for tests: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -319,7 +319,7 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	cmd := exec.CommandContext(ctx, f.binaryPath(), args...)
 	for _, o := range opts {
 		if err := o(cmd); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error applying options to exect command: %w", err)
 		}
 	}
 

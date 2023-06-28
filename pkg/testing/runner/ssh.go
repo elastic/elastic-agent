@@ -81,7 +81,7 @@ func sshConnect(ctx context.Context, ip string, username string, sshAuth ssh.Aut
 }
 
 // sshRunCommand runs a command on the SSH client connection
-func sshRunCommand(ctx context.Context, c *ssh.Client, cmd string, args []string, stdin io.Reader) ([]byte, []byte, error) {
+func sshRunCommand(ctx context.Context, sshClient *ssh.Client, cmd string, args []string, stdin io.Reader) ([]byte, []byte, error) {
 	if ctx.Err() != nil {
 		return nil, nil, ctx.Err()
 	}
@@ -89,7 +89,7 @@ func sshRunCommand(ctx context.Context, c *ssh.Client, cmd string, args []string
 	cmdArgs := []string{cmd}
 	cmdArgs = append(cmdArgs, args...)
 	cmdStr := strings.Join(cmdArgs, " ")
-	session, err := c.NewSession()
+	session, err := sshClient.NewSession()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,14 +107,14 @@ func sshRunCommand(ctx context.Context, c *ssh.Client, cmd string, args []string
 }
 
 // sshRunCommandWithRetry runs the command on loop waiting the interval between calls
-func sshRunCommandWithRetry(ctx context.Context, c *ssh.Client, cmd string, args []string, interval time.Duration) ([]byte, []byte, error) {
+func sshRunCommandWithRetry(ctx context.Context, sshClient *ssh.Client, cmd string, args []string, interval time.Duration) ([]byte, []byte, error) {
 	var lastErr error
 	var lastStdout []byte
 	var lastStderr []byte
 	for {
 		// the length of time for running the command is not blocked on the interval
 		// don't create a new context with the interval as its timeout
-		stdout, stderr, err := sshRunCommand(ctx, c, cmd, args, nil)
+		stdout, stderr, err := sshRunCommand(ctx, sshClient, cmd, args, nil)
 		if err == nil {
 			return stdout, stderr, nil
 		}
