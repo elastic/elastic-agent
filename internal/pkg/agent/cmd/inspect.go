@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
+	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
@@ -226,6 +227,11 @@ type inspectComponentsOpts struct {
 	variablesWait time.Duration
 }
 
+// returns true if the given Capabilities config blocks the given component.
+func blockedByCaps(c component.Component, caps capabilities.Capabilities) bool {
+	return !caps.AllowInput(c.InputType()) || !caps.AllowOutput(c.OutputType())
+}
+
 func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponentsOpts, streams *cli.IOStreams) error {
 	l, err := newErrorLogger()
 	if err != nil {
@@ -264,38 +270,6 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return fmt.Errorf("failed to render components: %w", err)
 	}
 
-	// ID provided.
-	if opts.id != "" {
-		splitID := strings.SplitN(opts.id, "/", 2)
-		compID := splitID[0]
-		unitID := ""
-		if len(splitID) > 1 {
-			unitID = splitID[1]
-		}
-		comp, ok := findComponent(comps, compID)
-		if ok {
-			if unitID != "" {
-				unit, ok := findUnit(comp, unitID)
-				if ok {
-					return printUnit(unit, streams)
-				}
-				return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
-			}
-			if !opts.showSpec {
-				comp.InputSpec = nil
-				comp.ShipperSpec = nil
-			}
-			if !opts.showConfig {
-				for key, unit := range comp.Units {
-					unit.Config = nil
-					comp.Units[key] = unit
-				}
-			}
-			return printComponent(comp, streams)
-		}
-		return fmt.Errorf("unable to find component with ID: %s", compID)
-	}
-
 	// Hide configuration unless toggled on.
 	if !opts.showConfig {
 		for i, comp := range comps {
@@ -316,7 +290,44 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		}
 	}
 
-	return printComponents(comps, streams)
+	// ID provided.
+	if opts.id != "" {
+		splitID := strings.SplitN(opts.id, "/", 2)
+		compID := splitID[0]
+		unitID := ""
+		if len(splitID) > 1 {
+			unitID = splitID[1]
+		}
+		comp, ok := findComponent(comps, compID)
+		if ok {
+			if unitID != "" {
+				unit, ok := findUnit(comp, unitID)
+				if ok {
+					return printUnit(unit, streams)
+				}
+				return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
+			}
+			return printComponent(comp, streams)
+		}
+		return fmt.Errorf("unable to find component with ID: %s", compID)
+	}
+
+	// Separate any components that are blocked by capabilities config
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
+	if err != nil {
+		return err
+	}
+	allowed := []component.Component{}
+	blocked := []component.Component{}
+	for _, c := range comps {
+		if blockedByCaps(c, caps) {
+			blocked = append(blocked, c)
+		} else {
+			allowed = append(allowed, c)
+		}
+	}
+
+	return printComponents(allowed, blocked, streams)
 }
 
 func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
@@ -397,9 +408,14 @@ func getLogLevel(rawCfg *config.Config, cfgPath string) (logp.Level, error) {
 	return logger.DefaultLogLevel, nil
 }
 
-func printComponents(components []component.Component, streams *cli.IOStreams) error {
+func printComponents(
+	components []component.Component,
+	blocked []component.Component,
+	streams *cli.IOStreams,
+) error {
 	topLevel := struct {
 		Components []component.Component `yaml:"components"`
+		Blocked    []component.Component `yaml:"blocked_by_capabilities"`
 	}{
 		Components: components,
 	}
