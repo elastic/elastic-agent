@@ -197,12 +197,8 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 
 	// remove each service component
 	for _, comp := range comps {
-		if comp.InputSpec != nil && !caps.AllowInput(comp.InputSpec.InputType) {
-			// This input type is not active
-			continue
-		}
-		if !caps.AllowOutput(comp.OutputType()) {
-			// This output type is not active
+		if !caps.AllowInput(comp.InputType) || !caps.AllowOutput(comp.OutputType) {
+			// This component is not active
 			continue
 		}
 		if err := uninstallComponent(ctx, log, comp); err != nil {

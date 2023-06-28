@@ -229,7 +229,7 @@ type inspectComponentsOpts struct {
 
 // returns true if the given Capabilities config blocks the given component.
 func blockedByCaps(c component.Component, caps capabilities.Capabilities) bool {
-	return !caps.AllowInput(c.InputType()) || !caps.AllowOutput(c.OutputType())
+	return !caps.AllowInput(c.InputType) || !caps.AllowOutput(c.OutputType)
 }
 
 func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponentsOpts, streams *cli.IOStreams) error {

@@ -95,6 +95,15 @@ type Component struct {
 	// ShipperSpec on how the shipper should run. (not set when InputSpec set)
 	ShipperSpec *ShipperRuntimeSpec `yaml:"shipper_spec,omitempty"`
 
+	// The type of the input units. Empty for shippers.
+	InputType string `yaml:"input_type"`
+
+	// The logical output type, i.e. the type of output that was requested.
+	// If this component's output is targeting a shipper writing to
+	// elasticsearch, then OutputType is "elasticsearch".
+	// (To check the type of the shipper itself, use ShipperRef instead.)
+	OutputType string `yaml:"output_type"`
+
 	// Units that should be running inside this component.
 	Units []Unit `yaml:"units"`
 
@@ -102,7 +111,7 @@ type Component struct {
 	Features *proto.Features `yaml:"features,omitempty"`
 
 	// ShipperRef references the component/unit that this component used as its output.
-	// (only applies to inputs, not set when ShipperSpec is)
+	// (only applies to inputs targeting a shipper, not set when ShipperSpec is)
 	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
 }
 
@@ -112,26 +121,6 @@ func (c *Component) Type() string {
 		return c.InputSpec.InputType
 	} else if c.ShipperSpec != nil {
 		return c.ShipperSpec.ShipperType
-	}
-	return ""
-}
-
-// Returns the component's input type, or the empty string if no input spec
-// is present.
-func (c *Component) InputType() string {
-	if inputSpec := c.InputSpec; inputSpec != nil {
-		return inputSpec.InputType
-	}
-	return ""
-}
-
-// Returns the type of the component's output unit, or the empty string
-// if no output unit is present.
-func (c *Component) OutputType() string {
-	for _, unit := range c.Units {
-		if unit.Type == client.UnitTypeOutput {
-			return unit.Config.Type
-		}
 	}
 	return ""
 }
@@ -281,6 +270,8 @@ func (r *RuntimeSpecs) componentForInputType(
 		ID:         componentID,
 		Err:        componentErr,
 		InputSpec:  &inputSpec,
+		InputType:  inputType,
+		OutputType: output.outputType,
 		Units:      units,
 		Features:   featureFlags.AsProto(),
 		ShipperRef: shipperRef,
