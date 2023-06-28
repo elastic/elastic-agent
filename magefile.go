@@ -20,6 +20,9 @@ import (
 	"strings"
 	"time"
 
+	// "github.com/docker/docker/api/types"
+	// "github.com/docker/docker/api/types/container"
+	// "github.com/docker/docker/client"
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -1328,6 +1331,14 @@ func (Integration) Local(ctx context.Context) error {
 	return devtools.GoTest(ctx, params)
 }
 
+func (Integration) LocalSingle(ctx context.Context, testName string) error {
+	params := devtools.DefaultGoTestIntegrationArgs()
+	params.Tags = append(params.Tags, "local")
+	params.TestName = testName
+	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
+	return devtools.GoTest(ctx, params)
+}
+
 // authenticates users who run it to various IaaS CSPs and ESS
 func (Integration) Auth(ctx context.Context) error {
 	if err := authGCP(ctx); err != nil {
@@ -1363,6 +1374,34 @@ func (Integration) Matrix(ctx context.Context) error {
 func (Integration) Single(ctx context.Context, testName string) error {
 	mg.CtxDeps(ctx, Integration.Clean)
 	return integRunner(ctx, false, testName)
+}
+
+func (Integration) SingleContainer(ctx context.Context, testName string) error {
+	return RunDockerContainer("go", "test", "-v", "-tags=integration", "github.com/elastic/elastic-agent/testing/integration", "-run", testName)
+}
+
+func RunDockerContainer(cmdArgs ...string) error {
+	curDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+	args := []string{"run", "--rm", "-e", "TEST_DEFINE_PREFIX=asd", "-v", fmt.Sprintf("%s:/elastic-agent", curDir), "eac"}
+	args = append(args, cmdArgs...)
+
+	cmd := exec.Command("docker", args...)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Printf("Running Docker container...\n")
+	fmt.Println(cmd.String())
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to run Docker container: %w", err)
+	}
+
+	return nil
 }
 
 // don't call locally (called on remote host to prepare it for testing)

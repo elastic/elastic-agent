@@ -1,9 +1,31 @@
+# version: '3'
+# services:
+#   testunit:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile.test
+#       args:
+#         GO_VERSION: ${GO_VERSION}
+#     command: ["mage", "update", "check:all", "test:all"]
+
 version: '3'
+
 services:
-  testunit:
+  testsuite:
     build:
       context: .
-      dockerfile: Dockerfile.test
-      args:
-        GO_VERSION: ${GO_VERSION}
-    command: ["mage", "update", "check:all", "test:all"]
+      dockerfile: Dockerfile
+    environment:
+      - TEST_DEFINE_PREFIX=asd
+    command:
+      [
+        "go",
+        "test",
+        "-v",
+        "-tags=integration",
+        "github.com/elastic/elastic-agent/testing/integration",
+        "-run",
+        "TestInstallWithBasePath"
+      ]
+    volumes:
+      - .:/elastic-agent

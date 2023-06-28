@@ -1,16 +1,10 @@
 ARG GO_VERSION=1.19.10
-FROM circleci/golang:${GO_VERSION}
+FROM golang:${GO_VERSION}
 
 
-ARG TEST_RESULTS=/tmp/test-results
-
-RUN mkdir -p ${TEST_RESULTS} && mkdir -p ./code
-RUN go get github.com/magefile/mage
-
+RUN GO111MODULE=off go get github.com/magefile/mage
 ENV GO111MODULE=on
-WORKDIR ./code
-#COPY --chown=circleci:circleci . .
-COPY . .
-VOLUME "/tmp" "dev-tools/mage/build/distributions"
+COPY . /elastic-agent
+WORKDIR /elastic-agent
+RUN go mod tidy
 USER root
-
