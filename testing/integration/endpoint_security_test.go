@@ -11,6 +11,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -22,6 +23,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
@@ -64,6 +67,40 @@ type PackagePolicy struct {
 	PolicyID    string                      `json:"policy_id"`
 	Name        string                      `json:"name"`
 	Description string                      `json:"description"`
+}
+
+type PolicyResponse struct {
+	Item AgentPolicy `json:"item"`
+}
+
+type AgentPolicy struct {
+	ID     string `json:"id,omitempty"`
+	Inputs []AgentPolicyInput
+	// Name of the policy. Required to create a policy.
+	Name string `json:"name"`
+	// Namespace of the policy. Required to create a policy.
+	Namespace          string                           `json:"namespace"`
+	Description        string                           `json:"description,omitempty"`
+	MonitoringEnabled  []kibana.MonitoringEnabledOption `json:"monitoring_enabled,omitempty"`
+	DataOutputID       string                           `json:"data_output_id,omitempty"`
+	MonitoringOutputID string                           `json:"monitoring_output_id,omitempty"`
+	FleetServerHostID  string                           `json:"fleet_server_host_id,omitempty"`
+	DownloadSourceID   string                           `json:"download_source_id,omitempty"`
+	UnenrollTimeout    int                              `json:"unenroll_timeout,omitempty"`
+	InactivityTImeout  int                              `json:"inactivity_timeout,omitempty"`
+	AgentFeatures      []map[string]interface{}         `json:"agent_features,omitempty"`
+	UpdatedOn          time.Time                        `json:"updated_on"`
+	UpdatedBy          string                           `json:"updated_by"`
+	Revision           int                              `json:"revision"`
+	IsProtected        bool                             `json:"is_protected"`
+	PackagePolicies    []map[string]interface{}         `json:"package_policies"`
+}
+
+type AgentPolicyInput struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Type            string `json:"type"`
+	PackagePolicyID string `json:"package_policy_id"`
 }
 
 // https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#fleet_server_health_check_400_response
@@ -132,10 +169,10 @@ func TestEndpointSecurity(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("POSTing endpoint package policy request")
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
+	pkgCtx, pkgCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer pkgCancel()
 
-	resp, err := info.KibanaClient.Connection.SendWithContext(ctx,
+	pkgResp, err := info.KibanaClient.Connection.SendWithContext(pkgCtx,
 		http.MethodPost,
 		"/api/fleet/package_policies",
 		nil,
@@ -143,50 +180,82 @@ func TestEndpointSecurity(t *testing.T) {
 		bytes.NewReader(jsonPackagePolicyReq),
 	)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer pkgResp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	pkgRespBytes, err := io.ReadAll(pkgResp.Body)
 	require.NoError(t, err)
 
-	if !assert.Equal(t, http.StatusOK, resp.StatusCode) {
+	if !assert.Equal(t, http.StatusOK, pkgResp.StatusCode) {
 		fleetErrorResp := FleetErrorResponse{}
-		err = json.Unmarshal(bodyBytes, &fleetErrorResp)
+		err = json.Unmarshal(pkgRespBytes, &fleetErrorResp)
 		require.NoError(t, err)
 		t.Logf("Fleet Error Response:\n%+v", fleetErrorResp)
 		t.FailNow()
 	}
 
-	t.Log(string(bodyBytes))
 	packagePolicyResp := PackagePolicyResponse{}
-	err = json.Unmarshal(bodyBytes, &packagePolicyResp)
+	err = json.Unmarshal(pkgRespBytes, &packagePolicyResp)
 	require.NoError(t, err)
 	t.Logf("Package Policy Response:\n%+v", packagePolicyResp)
 
 	t.Log("GETing updated agent policy")
-	policyResp, err := info.KibanaClient.GetPolicy(policy.ID)
-	t.Logf("Agent Policy with Endpoint:\n%+v", policyResp)
+	policyCtx, policyCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer policyCancel()
 
-	// TODO: Get new agent policy and parse out endpoint component IDs
-	// TODO: Make sure endpoint is healthy.
-	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	// defer cancel()
+	policyResp, err := info.KibanaClient.Connection.SendWithContext(policyCtx,
+		http.MethodGet,
+		fmt.Sprintf("/api/fleet/agent_policies/%s", policy.ID),
+		nil,
+		nil,
+		bytes.NewReader(jsonPackagePolicyReq),
+	)
+	require.NoError(t, err)
+	defer policyResp.Body.Close()
 
-	// err = fixture.Run(ctx, atesting.State{
-	// 	Configure:  simpleConfig1,
-	// 	AgentState: atesting.NewClientState(client.Healthy),
-	// 	Components: map[string]atesting.ComponentState{
-	// 		"endpoint-default": {
-	// 			State: atesting.NewClientState(client.Healthy),
-	// 			Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-	// 				atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "endpoint-default"}: {
-	// 					State: atesting.NewClientState(client.Healthy),
-	// 				},
-	// 				atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "endpoint-default-TBD"}: {
-	// 					State: atesting.NewClientState(client.Configuring),
-	// 				},
-	// 			},
-	// 		},
-	// 	},
-	// })
-	// require.NoError(t, err)
+	policyRespBytes, err := io.ReadAll(policyResp.Body)
+	require.NoError(t, err)
+
+	if !assert.Equal(t, http.StatusOK, policyResp.StatusCode) {
+		fleetErrorResp := FleetErrorResponse{}
+		err = json.Unmarshal(policyRespBytes, &fleetErrorResp)
+		require.NoError(t, err)
+		t.Logf("Fleet Error Response:\n%+v", fleetErrorResp)
+		t.FailNow()
+	}
+
+	agentPolicyResp := PolicyResponse{}
+	err = json.Unmarshal(policyRespBytes, &agentPolicyResp)
+	require.NoError(t, err)
+	t.Logf("Agent Policy with Endpoint:\n%+v", agentPolicyResp)
+
+	endpointInputID := ""
+	for input := range agentPolicyResp.Item.Inputs {
+		if input.Type == "endpoint" {
+			endpointInputID = input.ID
+			break
+		}
+	}
+	require.NotEmptyf(t, endpointInputID, "Endpoint ID not found in: %+v", agentPolicyResp.Item.Inputs)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = fixture.Run(ctx, atesting.State{
+		Configure:  simpleConfig1,
+		AgentState: atesting.NewClientState(client.Healthy),
+		Components: map[string]atesting.ComponentState{
+			"endpoint-default": {
+				State: atesting.NewClientState(client.Healthy),
+				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "endpoint-default"}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: fmt.Sprintf("endpoint-default-%s", endpointInputID)}: {
+						State: atesting.NewClientState(client.Healthy),
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
 }
