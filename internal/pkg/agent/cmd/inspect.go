@@ -138,7 +138,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return err
 		}
-		return printConfig(fullCfg, l, streams)
+		return printConfig(fullCfg, streams)
 	}
 
 	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
@@ -212,7 +212,7 @@ func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams)
 	return err
 }
 
-func printConfig(cfg *config.Config, l *logger.Logger, streams *cli.IOStreams) error {
+func printConfig(cfg *config.Config, streams *cli.IOStreams) error {
 	mapStr, err := cfg.ToMapStr()
 	if err != nil {
 		return err
