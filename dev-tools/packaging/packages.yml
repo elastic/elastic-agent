@@ -11,7 +11,7 @@ shared:
     os: '{{.GOOS}}'
     arch: '{{.PackageArch}}'
     vendor: '{{.BeatVendor}}'
-    version: '{{ beat_version }}'
+    version: '{{ agent_package_version }}'
     license: '{{.BeatLicense}}'
     url: '{{.BeatURL}}'
     description: '{{.BeatDescription}}'
