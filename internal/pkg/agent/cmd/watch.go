@@ -7,6 +7,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"os"
 	"os/signal"
 	"runtime"
@@ -23,15 +24,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
-	// period during which we monitor for failures resulting in a rollback
-	gracePeriodDuration = 10 * time.Minute
-
 	watcherName     = "elastic-agent-watcher"
 	watcherLockFile = "watcher.lock"
 )
@@ -42,14 +39,29 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			log, err := configuredLogger()
+			pathConfigFile := paths.ConfigFile()
+			rawConfig, err := config.LoadFile(pathConfigFile)
+			if err != nil {
+				fmt.Fprintf(streams.Err, "could not read configuration file %s", pathConfigFile)
+				os.Exit(1)
+			}
+
+			cfg, err := configuration.NewFromConfig(rawConfig)
+			if err != nil {
+				fmt.Fprintf(streams.Err, "could not parse configuration file %s", pathConfigFile)
+				os.Exit(2)
+			}
+
+			log, err := configuredLogger(cfg)
 			if err != nil {
 				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
+				os.Exit(3)
 			}
-			if err := watchCmd(log); err != nil {
+
+			if err := watchCmd(log, cfg); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+				os.Exit(4)
 			}
 		},
 	}
@@ -57,7 +69,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 	return cmd
 }
 
-func watchCmd(log *logp.Logger) error {
+func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	marker, err := upgrade.LoadMarker()
 	if err != nil {
 		log.Error("failed to load marker", err)
@@ -83,7 +95,7 @@ func watchCmd(log *logp.Logger) error {
 		_ = locker.Unlock()
 	}()
 
-	isWithinGrace, tilGrace := gracePeriod(marker)
+	isWithinGrace, tilGrace := gracePeriod(marker, cfg.Settings.Upgrade.Watcher.GracePeriod)
 	if !isWithinGrace {
 		log.Debugf("not within grace [updatedOn %v] %v", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String())
 		// if it is started outside of upgrade loop
@@ -182,7 +194,7 @@ WATCHLOOP:
 
 // gracePeriod returns true if it is within grace period and time until grace period ends.
 // otherwise it returns false and 0
-func gracePeriod(marker *upgrade.UpdateMarker) (bool, time.Duration) {
+func gracePeriod(marker *upgrade.UpdateMarker, gracePeriodDuration time.Duration) (bool, time.Duration) {
 	sinceUpdate := time.Since(marker.UpdatedOn)
 
 	if 0 < sinceUpdate && sinceUpdate < gracePeriodDuration {
@@ -192,24 +204,7 @@ func gracePeriod(marker *upgrade.UpdateMarker) (bool, time.Duration) {
 	return false, gracePeriodDuration
 }
 
-func configuredLogger() (*logger.Logger, error) {
-	pathConfigFile := paths.ConfigFile()
-	rawConfig, err := config.LoadFile(pathConfigFile)
-	if err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("could not read configuration file %s", pathConfigFile),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
-	}
-
-	cfg, err := configuration.NewFromConfig(rawConfig)
-	if err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("could not parse configuration file %s", pathConfigFile),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
-	}
-
+func configuredLogger(cfg *configuration.Configuration) (*logger.Logger, error) {
 	cfg.Settings.LoggingConfig.Beat = watcherName
 	cfg.Settings.LoggingConfig.Level = logp.DebugLevel
 	internal, err := logger.MakeInternalFileOutput(cfg.Settings.LoggingConfig)

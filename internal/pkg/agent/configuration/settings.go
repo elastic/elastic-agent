@@ -20,7 +20,8 @@ type SettingsConfig struct {
 	GRPC             *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
 	MonitoringConfig *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
 	LoggingConfig    *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
-
+	Upgrade          *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"
+`
 	// standalone config
 	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
 	Path                string        `config:"path" yaml:"path" json:"path"`
@@ -35,6 +36,7 @@ func DefaultSettingsConfig() *SettingsConfig {
 		LoggingConfig:       logger.DefaultLoggingConfig(),
 		MonitoringConfig:    monitoringCfg.DefaultConfig(),
 		GRPC:                DefaultGRPCConfig(),
+		Upgrade:             DefaultUpgradeConfig(),
 		Reload:              DefaultReloadConfig(),
 		V1MonitoringEnabled: true,
 	}
