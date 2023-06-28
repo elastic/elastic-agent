@@ -204,10 +204,10 @@ func TestEndpointSecurity(t *testing.T) {
 
 	policyResp, err := info.KibanaClient.Connection.SendWithContext(policyCtx,
 		http.MethodGet,
-		fmt.Sprintf("/api/fleet/agent_policies/%s", policy.ID),
+		fmt.Sprintf("/api/fleet/agent_policies/%s/full", policy.ID),
 		nil,
 		nil,
-		bytes.NewReader(jsonPackagePolicyReq),
+		nil,
 	)
 	require.NoError(t, err)
 	defer policyResp.Body.Close()
@@ -229,7 +229,7 @@ func TestEndpointSecurity(t *testing.T) {
 	t.Logf("Agent Policy with Endpoint:\n%+v", agentPolicyResp)
 
 	endpointInputID := ""
-	for input := range agentPolicyResp.Item.Inputs {
+	for _, input := range agentPolicyResp.Item.Inputs {
 		if input.Type == "endpoint" {
 			endpointInputID = input.ID
 			break
