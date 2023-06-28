@@ -1066,7 +1066,7 @@ func (c *Coordinator) recomputeConfigAndComponents() error {
 	return nil
 }
 
-// Filter any inputs and outputs int he generated component model
+// Filter any inputs and outputs in the generated component model
 // based on whether they're excluded by the capabilities config
 func (c *Coordinator) filterByCapabilities(comps []component.Component) []component.Component {
 	if c.caps == nil {
