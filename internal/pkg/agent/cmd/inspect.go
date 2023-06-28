@@ -418,6 +418,7 @@ func printComponents(
 		Blocked    []component.Component `yaml:"blocked_by_capabilities"`
 	}{
 		Components: components,
+		Blocked:    blocked,
 	}
 	data, err := yaml.Marshal(topLevel)
 	if err != nil {
