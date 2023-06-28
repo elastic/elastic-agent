@@ -7,21 +7,71 @@
 package integration
 
 import (
-	"strings"
+	"bytes"
+	"context"
+	_ "embed"
+	"encoding/json"
+	"io"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
+
+//go:embed endpoint_security_package_policy.json
+var endpointPackagePolicyJSON []byte
+
+// https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#createPackagePolicy
+// request https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#package_policy_request
+type PackagePolicyRequest struct {
+	ID        string                      `json:"id,omitempty"`
+	Name      string                      `json:"name"`
+	Namespace string                      `json:"namespace"`
+	PolicyID  string                      `json:"policy_id"`
+	Package   PackagePolicyRequestPackage `json:"package"`
+	Vars      map[string]interface{}      `json:"vars"`
+	Inputs    []map[string]interface{}    `json:"inputs"`
+	Force     bool                        `json:"force"`
+}
+
+type PackagePolicyRequestPackage struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+// https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#create_package_policy_200_response
+type PackagePolicyResponse struct {
+	Item PackagePolicy `json:"item"`
+}
+
+// https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#package_policy
+type PackagePolicy struct {
+	ID          string                      `json:"id,omitempty"`
+	Revision    int                         `json:"revision"`
+	Enabled     bool                        `json:"enabled"`
+	Inputs      []map[string]interface{}    `json:"inputs"`
+	Package     PackagePolicyRequestPackage `json:"package"`
+	Namespace   string                      `json:"namespace"`
+	OutputID    string                      `json:"output_id"`
+	PolicyID    string                      `json:"policy_id"`
+	Name        string                      `json:"name"`
+	Description string                      `json:"description"`
+}
+
+// https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#fleet_server_health_check_400_response
+type FleetErrorResponse struct {
+	StatusCode int    `json:"statusCode"`
+	Error      string `json:"error"`
+	Message    string `json:"message"`
+}
 
 func TestEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -32,53 +82,12 @@ func TestEndpointSecurity(t *testing.T) {
 		OS:      []define.OS{{Type: define.Linux, Arch: define.AMD64}}, // only run on Linux AMD64 during development.
 	})
 
-	// Get version of this Agent build and ensure that it has a `-SNAPSHOT` suffix. We
-	// do this by first removing the `-SNAPSHOT` suffix if it exists, and then appending
-	// it. We use the `-SNAPSHOT`-suffixed version because it is guaranteed to exist, even
-	// for unreleased versions.
-	currentVersion := define.Version()
-	currentVersion = strings.TrimRight(currentVersion, "-SNAPSHOT") + "-SNAPSHOT"
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixture(t)
+	require.NoError(t, err)
 
-	upgradeFromVersion := "8.8.1"
-	upgradeToVersion := currentVersion
-
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
-	suite.Run(t, newEndpointSecurityTestSuite(info, upgradeFromVersion, upgradeToVersion))
-}
-
-type EndpointSecurityTestSuite struct {
-	suite.Suite
-
-	requirementsInfo *define.Info
-	agentFromVersion string
-	agentToVersion   string
-	agentFixture     *atesting.Fixture
-}
-
-func newEndpointSecurityTestSuite(info *define.Info, fromVersion, toVersion string) *EndpointSecurityTestSuite {
-	return &EndpointSecurityTestSuite{
-		requirementsInfo: info,
-		agentFromVersion: fromVersion,
-		agentToVersion:   toVersion,
-	}
-}
-
-// Before suite
-func (s *EndpointSecurityTestSuite) SetupSuite() {
-	agentFixture, err := atesting.NewFixture(
-		s.T(),
-		s.agentFromVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-	)
-	require.NoError(s.T(), err)
-	s.agentFixture = agentFixture
-}
-
-func (s *EndpointSecurityTestSuite) TestUpgradeFleetManagedElasticAgent() {
-	kibClient := s.requirementsInfo.KibanaClient
+	t.Log("Creating Agent policy...")
 	policyUUID := uuid.New().String()
-
-	s.T().Log("Creating Agent policy...")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -88,51 +97,96 @@ func (s *EndpointSecurityTestSuite) TestUpgradeFleetManagedElasticAgent() {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policy, err := kibClient.CreatePolicy(createPolicyReq)
-	require.NoError(s.T(), err)
+	policy, err := info.KibanaClient.CreatePolicy(createPolicyReq)
+	require.NoError(t, err)
 
-	s.T().Log("Creating Agent enrollment API key...")
+	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
 	}
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
-	require.NoError(s.T(), err)
+	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+	require.NoError(t, err)
 
-	s.T().Log("Getting default Fleet Server URL...")
-	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
-	require.NoError(s.T(), err)
+	t.Log("Getting default Fleet Server URL...")
+	fleetServerURL, err := tools.GetDefaultFleetServerURL(info.KibanaClient)
+	require.NoError(t, err)
 
-	s.T().Log("Enrolling Elastic Agent...")
-	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
+	t.Log("Enrolling Elastic Agent...")
+	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, fixture)
 	if err != nil {
-		s.T().Log(string(output))
+		t.Log(string(output))
 	}
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
-	s.T().Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	t.Log(`Waiting for enrolled Agent status to be "online"...`)
+	require.Eventually(t, tools.WaitForAgentStatus(t, info.KibanaClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
-	s.T().Logf("Upgrade Elastic Agent to version %s...", s.agentToVersion)
-	err = tools.UpgradeAgent(kibClient, s.agentToVersion)
-	require.NoError(s.T(), err)
+	t.Log("Creating endpoint package policy request")
+	packagePolicyReq := PackagePolicyRequest{}
+	err = json.Unmarshal(endpointPackagePolicyJSON, &packagePolicyReq)
+	require.NoError(t, err)
 
-	s.T().Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 3*time.Minute, 15*time.Second, "Agent status is not online")
+	// TODO: Set the Package.Version to the last minor release.
+	packagePolicyReq.PolicyID = policy.ID
+	jsonPackagePolicyReq, err := json.Marshal(packagePolicyReq)
+	require.NoError(t, err)
 
-	s.T().Log("Waiting for upgrade marker to be removed...")
-	require.Eventually(s.T(), upgradeMarkerRemoved, 10*time.Minute, 20*time.Second)
+	t.Log("POSTing endpoint package policy request")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 
-	s.T().Log("Getting Agent version...")
-	newVersion, err := tools.GetAgentVersion(kibClient)
-	require.NoError(s.T(), err)
+	resp, err := info.KibanaClient.Connection.SendWithContext(ctx,
+		http.MethodPost,
+		"/api/fleet/package_policies",
+		nil,
+		nil,
+		bytes.NewReader(jsonPackagePolicyReq),
+	)
+	require.NoError(t, err)
+	defer resp.Body.Close()
 
-	// We remove the `-SNAPSHOT` suffix because, post-upgrade, the version reported
-	// by the Agent will not contain this suffix, even if a `-SNAPSHOT`-suffixed
-	// version was used as the target version for the upgrade.
-	require.Equal(s.T(), strings.TrimRight(s.agentToVersion, `-SNAPSHOT`), newVersion)
-}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
 
-func (s *EndpointSecurityTestSuite) TearDownTest() {
-	s.T().Log("Un-enrolling Elastic Agent...")
-	assert.NoError(s.T(), tools.UnEnrollAgent(s.requirementsInfo.KibanaClient))
+	if !assert.Equal(t, http.StatusOK, resp.StatusCode) {
+		fleetErrorResp := FleetErrorResponse{}
+		err = json.Unmarshal(bodyBytes, &fleetErrorResp)
+		require.NoError(t, err)
+		t.Logf("Fleet Error Response:\n%+v", fleetErrorResp)
+		t.FailNow()
+	}
+
+	t.Log(string(bodyBytes))
+	packagePolicyResp := PackagePolicyResponse{}
+	err = json.Unmarshal(bodyBytes, &packagePolicyResp)
+	require.NoError(t, err)
+	t.Logf("Package Policy Response:\n%+v", packagePolicyResp)
+
+	t.Log("GETing updated agent policy")
+	policyResp, err := info.KibanaClient.GetPolicy(policy.ID)
+	t.Logf("Agent Policy with Endpoint:\n%+v", policyResp)
+
+	// TODO: Get new agent policy and parse out endpoint component IDs
+	// TODO: Make sure endpoint is healthy.
+	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// defer cancel()
+
+	// err = fixture.Run(ctx, atesting.State{
+	// 	Configure:  simpleConfig1,
+	// 	AgentState: atesting.NewClientState(client.Healthy),
+	// 	Components: map[string]atesting.ComponentState{
+	// 		"endpoint-default": {
+	// 			State: atesting.NewClientState(client.Healthy),
+	// 			Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
+	// 				atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "endpoint-default"}: {
+	// 					State: atesting.NewClientState(client.Healthy),
+	// 				},
+	// 				atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "endpoint-default-TBD"}: {
+	// 					State: atesting.NewClientState(client.Configuring),
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// })
+	// require.NoError(t, err)
 }

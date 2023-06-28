@@ -6,7 +6,8 @@
       "name": "endpoint",
       "version": "8.9.0"
     },
-    "policy_id": "f5bfb7c0-14e6-11ee-8fa9-5d0edc8ea230",
+    "policy_id": "b86264e0-15a4-11ee-8520-6f79f493bfbf",
+    "vars": {},
     "inputs": [
       {
         "type": "endpoint",
