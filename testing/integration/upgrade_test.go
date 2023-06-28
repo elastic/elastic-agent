@@ -8,7 +8,9 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -198,6 +200,11 @@ func (s *StandaloneUpgradeTestSuite) SetupSuite() {
 	defer cancel()
 	err = agentFixture.Prepare(ctx)
 	s.Require().NoError(err, "error preparing agent fixture")
+
+	agentTestCfg := `agent.upgrade.watcher.grace_period: 30s`
+	err = agentFixture.Configure(ctx, []byte(agentTestCfg))
+	s.Require().NoError(err, "error configuring agent fixture")
+
 	s.agentFixture = agentFixture
 }
 
@@ -327,17 +334,14 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 
 	s.Require().FileExists(updateMarkerFile)
 
-	// The checks of the update marker makes the test time out since it runs for more than 10 minutes :(
-	// A dedicated issue to address this has been opened: https://github.com/elastic/elastic-agent/issues/2796
+	s.Require().Eventuallyf(func() bool {
+		_, err := os.Stat(updateMarkerFile)
+		return errors.Is(err, fs.ErrNotExist)
+	}, 10*time.Minute, 1*time.Second, "agent never removed update marker")
 
-	// s.Require().Eventuallyf(func() bool {
-	// 	_, err := os.Stat(updateMarkerFile)
-	// 	return errors.Is(err, fs.ErrNotExist)
-	// }, 10*time.Minute, 1*time.Second, "agent never removed update marker")
-
-	// version, err := c.Version(ctx)
-	// s.Require().NoError(err, "error checking version after upgrade")
-	// s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+	version, err := c.Version(ctx)
+	s.Require().NoError(err, "error checking version after upgrade")
+	s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
 }
 
 func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVersion *version.ParsedSemVer, agentProject tools.Project) string {
