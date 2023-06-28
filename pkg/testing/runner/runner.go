@@ -259,7 +259,7 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 		logger.Logf("Waiting for stack to be ready")
 		resp := <-ch
 		if resp == nil {
-			return OSRunnerResult{}, fmt.Errorf("Cannot continue because stack never became ready")
+			return OSRunnerResult{}, fmt.Errorf("cannot continue because stack never became ready")
 		}
 		logger.Logf("Will continue, stack is ready")
 		env = map[string]string{
