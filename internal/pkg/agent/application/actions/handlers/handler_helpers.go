@@ -6,6 +6,7 @@ package handlers
 
 import (
 	"context"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -40,49 +42,6 @@ type unitWithComponent struct {
 	component component.Component
 }
 
-func dispatchActionInParallel(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error {
-	if action == nil {
-		return nil
-	}
-
-	// Deserialize the action into map[string]interface{} for dispatching over to the apps
-	params, err := action.MarshalMap()
-	if err != nil {
-		return err
-	}
-
-	actionType := action.Type()
-
-	g, ctx := errgroup.WithContext(ctx)
-
-	dispatch := func(uc unitWithComponent) error {
-		log.Debugf("Dispatch %v action to %v", actionType, uc.unit.Config.Type)
-		res, err := performAction(ctx, uc.component, uc.unit, uc.unit.Config.Type, params)
-		if err != nil {
-			log.Warnf("%v failed to dispatch to %v, err: %v", actionType, uc.component.ID, err)
-			return err
-		}
-
-		strErr := readMapString(res, "error", "")
-		if strErr != "" {
-			log.Warnf("%v failed for %v, err: %v", actionType, uc.component.ID, strErr)
-			return errors.New(strErr)
-		}
-		return nil
-	}
-
-	// Iterate through the components and dispatch the action is the action type is listed in the proxied_actions
-	for _, uc := range ucs {
-		// Send the action to the target unit via g.Go to collect any resulting errors
-		target := uc
-		g.Go(func() error {
-			return dispatch(target)
-		})
-	}
-
-	return g.Wait()
-}
-
 func findMatchingUnitsByActionType(state coordinator.State, typ string) []unitWithComponent {
 	ucs := make([]unitWithComponent, 0)
 	for _, comp := range state.Components {
@@ -106,4 +65,103 @@ func contains[T comparable](arr []T, val T) bool {
 		}
 	}
 	return false
+}
+
+type backoffActionDispatcher struct {
+	log           *logp.Logger
+	performAction performActionFunc
+
+	timeout    time.Duration
+	minBackoff time.Duration
+	maxBackoff time.Duration
+}
+
+const (
+	defaultActionDispatcherTimeout    = 40 * time.Second
+	defaultActionDispatcherBackoffMin = 500 * time.Millisecond
+	defaultActionDispatcherBackoffMax = 10 * time.Second
+)
+
+func newBackoffActionDispatcher(log *logp.Logger, performAction performActionFunc) backoffActionDispatcher {
+	return backoffActionDispatcher{
+		log:           log,
+		performAction: performAction,
+		timeout:       defaultActionDispatcherTimeout,
+		minBackoff:    defaultActionDispatcherBackoffMin,
+		maxBackoff:    defaultActionDispatcherBackoffMax,
+	}
+}
+
+func (d backoffActionDispatcher) Dispatch(ctx context.Context, action dispatchableAction, ucs []unitWithComponent) error {
+	if action == nil {
+		return nil
+	}
+
+	ctx, cn := context.WithTimeout(ctx, d.timeout)
+	defer cn()
+
+	// Deserialize the action into map[string]interface{} for dispatching over to the apps
+	params, err := action.MarshalMap()
+	if err != nil {
+		return err
+	}
+
+	actionType := action.Type()
+
+	backExp := backoff.NewExpBackoff(ctx.Done(), d.minBackoff, d.maxBackoff)
+
+	start := time.Now()
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	dispatch := func(uc unitWithComponent) error {
+		if uc.unit.Config == nil {
+			return nil
+		}
+		d.log.Debugf("Dispatch %v action to %v", actionType, uc.unit.Config.Type)
+		res, err := d.performAction(ctx, uc.component, uc.unit, uc.unit.Config.Type, params)
+		if err != nil {
+			d.log.Debugf("%v failed to dispatch to %v, err: %v", actionType, uc.component.ID, err)
+			return err
+		}
+
+		strErr := readMapString(res, "error", "")
+		if strErr != "" {
+			d.log.Debugf("%v failed for %v, err: %v", actionType, uc.component.ID, strErr)
+			return errors.New(strErr)
+		}
+		return nil
+	}
+
+	dispatchWithBackoff := func(uc unitWithComponent) error {
+		attempt := 1
+		for {
+			err := dispatch(uc)
+			if err != nil {
+				if backExp.Wait() {
+					d.log.Debugf("%v action dispatch to %v with backoff attempt: %v, after %v since start\n", actionType, uc.component.ID, attempt, time.Since(start))
+					attempt++
+					continue
+				}
+				return err
+			}
+			return nil
+		}
+	}
+
+	// Iterate through the components and dispatch the action is the action type is listed in the proxied_actions
+	for _, uc := range ucs {
+		// Send the action to the target unit via g.Go to collect any resulting errors
+		target := uc
+		g.Go(func() error {
+			return dispatchWithBackoff(target)
+		})
+	}
+
+	return g.Wait()
+}
+
+// dispatchActionInParallel dispatches actions to the units/components in parallel, with exponential backoff and timeout
+func dispatchActionInParallel(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error {
+	return newBackoffActionDispatcher(log, performAction).Dispatch(ctx, action, ucs)
 }
