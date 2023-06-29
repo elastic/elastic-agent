@@ -116,7 +116,7 @@ func (d proxiedActionsNotifier) notify(ctx context.Context, action dispatchableA
 		res, err := d.performAction(ctx, uc.component, uc.unit, uc.unit.Config.Type, params)
 		if err != nil {
 			d.log.Debugf("%v failed to dispatch to %v, err: %v", actionType, uc.component.ID, err)
-			// ErrNoUnit means that the unit is not longer avaiable
+			// ErrNoUnit means that the unit is not longer available
 			// This can happen if the policy change updated state while the action proxying was retried
 			// Stop retrying proxying action to that unit return nil
 			if errors.Is(err, runtime.ErrNoUnit) {
