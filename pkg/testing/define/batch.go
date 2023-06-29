@@ -102,7 +102,6 @@ func DetermineBatches(dir string, buildTags ...string) ([]Batch, error) {
 		return nil, fmt.Errorf(
 			"error running go test: (%w), got:\n\n%s\ntried to run: %v",
 			err, string(output), cmdArgs)
-
 	}
 
 	// parses each test and determine the batches that each test belongs in

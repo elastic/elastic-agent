@@ -107,18 +107,6 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	return out, nil
 }
 
-// Enroll the beat without installing
-func (f *Fixture) Enroll(ctx context.Context, enrollOpts *EnrollOpts, opts ...process.CmdOption) ([]byte, error) {
-	installArgs := []string{"enroll"}
-	installArgs = append(installArgs, enrollOpts.toCmdArgs()...)
-	out, err := f.Exec(ctx, installArgs, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("error enrolling beat: %w Output: %s", err, out)
-	}
-
-	return out, nil
-}
-
 type UninstallOpts struct {
 	Force bool // --force
 }

@@ -23,15 +23,6 @@ func InstallAgent(fleetUrl string, enrollmentToken string, agentFixture *atestin
 	return agentFixture.Install(context.Background(), &installOpts)
 }
 
-// EnrollWithoutInstall is the same as EnrollElasticAgent, but doesn't install the agent
-func EnrollWithoutInstall(fleetURL string, enrollmentToken string, agentFixture *atesting.Fixture) ([]byte, error) {
-	enrollOpts := atesting.EnrollOpts{
-		URL:             fleetURL,
-		EnrollmentToken: enrollmentToken,
-	}
-	return agentFixture.Enroll(context.Background(), &enrollOpts)
-}
-
 // InstallStandaloneAgent force install the Elastic Agent through agentFixture.
 func InstallStandaloneAgent(agentFixture *atesting.Fixture) ([]byte, error) {
 	installOpts := atesting.InstallOpts{
