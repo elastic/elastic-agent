@@ -67,7 +67,7 @@ func contains[T comparable](arr []T, val T) bool {
 	return false
 }
 
-type backoffActionDispatcher struct {
+type proxiedActionsNotifier struct {
 	log           *logp.Logger
 	performAction performActionFunc
 
@@ -82,8 +82,8 @@ const (
 	defaultActionDispatcherBackoffMax = 10 * time.Second
 )
 
-func newBackoffActionDispatcher(log *logp.Logger, performAction performActionFunc) backoffActionDispatcher {
-	return backoffActionDispatcher{
+func newProxiedActionsNotifier(log *logp.Logger, performAction performActionFunc) proxiedActionsNotifier {
+	return proxiedActionsNotifier{
 		log:           log,
 		performAction: performAction,
 		timeout:       defaultActionDispatcherTimeout,
@@ -92,7 +92,7 @@ func newBackoffActionDispatcher(log *logp.Logger, performAction performActionFun
 	}
 }
 
-func (d backoffActionDispatcher) Dispatch(ctx context.Context, action dispatchableAction, ucs []unitWithComponent) error {
+func (d proxiedActionsNotifier) notify(ctx context.Context, action dispatchableAction, ucs []unitWithComponent) error {
 	if action == nil {
 		return nil
 	}
@@ -160,7 +160,7 @@ func (d backoffActionDispatcher) Dispatch(ctx context.Context, action dispatchab
 	return g.Wait()
 }
 
-// dispatchActionInParallel dispatches actions to the units/components in parallel, with exponential backoff and timeout
-func dispatchActionInParallel(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error {
-	return newBackoffActionDispatcher(log, performAction).Dispatch(ctx, action, ucs)
+// notifyUnitsOfProxiedAction dispatches actions to the units/components in parallel, with exponential backoff and timeout
+func notifyUnitsOfProxiedAction(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error {
+	return newProxiedActionsNotifier(log, performAction).notify(ctx, action, ucs)
 }

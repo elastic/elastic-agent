@@ -33,7 +33,7 @@ func (a testAction) MarshalMap() (map[string]interface{}, error) {
 	return a.data, nil
 }
 
-func TestDispatchActionInParallel(t *testing.T) {
+func TestNotifyUnitsOfProxiedAction(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	log := logp.NewLogger("testing")
@@ -81,7 +81,7 @@ func TestDispatchActionInParallel(t *testing.T) {
 				tc.performAction = happyPerformAction
 			}
 
-			err := dispatchActionInParallel(ctx, log, tc.Action, tc.UCs, tc.performAction)
+			err := notifyUnitsOfProxiedAction(ctx, log, tc.Action, tc.UCs, tc.performAction)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -108,7 +108,7 @@ type ActionPerformer interface {
 	PerformAction(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
 }
 
-func TestBackoffActionDispatcher(t *testing.T) {
+func TestProxiedActionsNotifier(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	log := logp.NewLogger("testing")
@@ -195,14 +195,14 @@ func TestBackoffActionDispatcher(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			d := newBackoffActionDispatcher(log, tc.ActionPerformer.PerformAction)
+			d := newProxiedActionsNotifier(log, tc.ActionPerformer.PerformAction)
 			if tc.RetryTimeout != 0 {
 				d.timeout = tc.RetryTimeout
 			}
 			if tc.RetryMinBackoff != 0 {
 				d.minBackoff = tc.RetryMinBackoff
 			}
-			err := d.Dispatch(ctx, tc.Action, tc.UCs)
+			err := d.notify(ctx, tc.Action, tc.UCs)
 			diff := cmp.Diff(tc.WantErr, err, cmpopts.EquateErrors())
 			if diff != "" {
 				t.Fatal(diff)

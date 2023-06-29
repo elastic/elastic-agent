@@ -59,7 +59,7 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		ucs := findMatchingUnitsByActionType(state, a.Type())
 		if len(ucs) > 0 {
 			h.log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
-			err := dispatchActionInParallel(ctx, h.log, action, ucs, h.coord.PerformAction)
+			err := notifyUnitsOfProxiedAction(ctx, h.log, action, ucs, h.coord.PerformAction)
 			h.log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
 			if err != nil {
 				return err

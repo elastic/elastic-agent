@@ -73,7 +73,7 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		state := h.coord.State()
 		ucs := findMatchingUnitsByActionType(state, a.Type())
 		if len(ucs) > 0 {
-			err := dispatchActionInParallel(ctx, h.log, action, ucs, h.coord.PerformAction)
+			err := notifyUnitsOfProxiedAction(ctx, h.log, action, ucs, h.coord.PerformAction)
 			if err != nil {
 				return err
 			}
