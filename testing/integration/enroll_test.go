@@ -84,7 +84,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	resp, err := tools.GetAllindicies(runner.requirementsInfo.ESClient)
 	require.NoError(runner.T(), err)
 	for _, run := range resp {
-		fmt.Printf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
+		runner.T().Logf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
 	}
 
 	// Stage 3: Make sure metricbeat logs are populated

@@ -92,6 +92,9 @@ func GetIndicesWithContext(ctx context.Context, client elastictransport.Interfac
 		return nil, fmt.Errorf("non-200 return code: %v, response: '%s'", resp.StatusCode, resp.String())
 	}
 	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %w", err)
+	}
 	respData := []Index{}
 	err = json.Unmarshal(buf, &respData)
 	if err != nil {
