@@ -60,6 +60,25 @@ capabilities:
 	assert.True(t, caps.AllowOutput("elasticsearch"))
 }
 
+func TestDenyMetrics(t *testing.T) {
+	yml := `
+capabilities:
+- rule: deny
+  input: "*/metrics"
+`
+
+	caps, err := Load(strings.NewReader(yml), logger.NewWithoutConfig("testing"))
+	require.NoError(t, err, "Loading capabilities should succeed")
+
+	assert.False(t, caps.AllowInput("system/metrics"))
+	assert.False(t, caps.AllowInput("linux/metrics"))
+	assert.False(t, caps.AllowInput("statsd/metrics"))
+	assert.False(t, caps.AllowInput("gcp/metrics"))
+	assert.True(t, caps.AllowInput("filestream"))
+	assert.True(t, caps.AllowInput("cloudbeat/cis_aws"))
+	assert.True(t, caps.AllowInput("synthetics/http"))
+}
+
 func TestNoCaps(t *testing.T) {
 	// Make sure capabilities loaded from a nonexistent file don't interfere
 	// with anything
