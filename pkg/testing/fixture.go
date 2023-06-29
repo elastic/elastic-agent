@@ -183,6 +183,12 @@ func (f *Fixture) Configure(ctx context.Context, yamlConfig []byte) error {
 	return os.WriteFile(cfgFilePath, yamlConfig, 0600)
 }
 
+// WorkDir returns the installed fixture's work dir AKA base dir AKA top dir. This
+// must be called after `Install` is called.
+func (f *Fixture) WorkDir() string {
+	return f.workDir
+}
+
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	filename := filepath.Base(artifactFile)
 	_, ext, err := splitFileType(filename)

@@ -330,18 +330,23 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
-	updateMarkerFile := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", ".update-marker")
-
-	s.Require().FileExists(updateMarkerFile)
-
-	s.Require().Eventuallyf(func() bool {
-		_, err := os.Stat(updateMarkerFile)
-		return errors.Is(err, fs.ErrNotExist)
-	}, 10*time.Minute, 1*time.Second, "agent never removed update marker")
+	checkUpgradeWatcherRan(s.T(), s.agentFixture)
 
 	version, err := c.Version(ctx)
 	s.Require().NoError(err, "error checking version after upgrade")
 	s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+}
+
+func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture) {
+	t.Helper()
+
+	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
+	require.FileExists(t, updateMarkerFile)
+
+	require.Eventuallyf(t, func() bool {
+		_, err := os.Stat(updateMarkerFile)
+		return errors.Is(err, fs.ErrNotExist)
+	}, 10*time.Minute, 1*time.Second, "agent never removed update marker")
 }
 
 func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVersion *version.ParsedSemVer, agentProject tools.Project) string {
