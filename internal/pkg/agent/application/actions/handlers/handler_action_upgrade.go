@@ -25,13 +25,16 @@ type Upgrade struct {
 	bkgActions []fleetapi.Action
 	bkgCancel  context.CancelFunc
 	bkgMutex   sync.Mutex
+
+	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
 }
 
 // NewUpgrade creates a new Upgrade handler.
 func NewUpgrade(log *logger.Logger, coord upgradeCoordinator) *Upgrade {
 	return &Upgrade{
-		log:   log,
-		coord: coord,
+		log:                log,
+		coord:              coord,
+		tamperProtectionFn: features.TamperProtection,
 	}
 }
 
@@ -52,7 +55,7 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return nil
 	}
 
-	if features.TamperProtection() {
+	if h.tamperProtectionFn() {
 		// Find inputs that want to receive UPGRADE action
 		// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself
 		state := h.coord.State()
