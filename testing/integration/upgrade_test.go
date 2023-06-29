@@ -32,7 +32,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -136,8 +135,7 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 	s.T().Log(`Waiting for enrolled Agent status to be "online"...`)
 	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 3*time.Minute, 15*time.Second, "Agent status is not online")
 
-	s.T().Log("Waiting for upgrade marker to be removed...")
-	require.Eventually(s.T(), upgradeMarkerRemoved, 10*time.Minute, 20*time.Second)
+	checkUpgradeWatcherRan(s.T(), s.agentFixture)
 
 	s.T().Log("Getting Agent version...")
 	newVersion, err := tools.GetAgentVersion(kibClient)
@@ -152,15 +150,6 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 func (s *FleetManagedUpgradeTestSuite) TearDownTest() {
 	s.T().Log("Un-enrolling Elastic Agent...")
 	assert.NoError(s.T(), tools.UnEnrollAgent(s.requirementsInfo.KibanaClient))
-}
-
-func upgradeMarkerRemoved() bool {
-	marker, err := upgrade.LoadMarker()
-	if err != nil {
-		return false
-	}
-
-	return marker == nil
 }
 
 func TestStandaloneUpgrade(t *testing.T) {
@@ -339,6 +328,7 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 
 func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture) {
 	t.Helper()
+	t.Log("Waiting for upgrade watcher to have ran...")
 
 	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
 	require.FileExists(t, updateMarkerFile)
@@ -536,6 +526,8 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) TestUpgradeStandaloneElasticAg
 	// Wait for upgrade command to finish executing
 	s.T().Log("Waiting for upgrade to finish")
 	wg.Wait()
+
+	checkUpgradeWatcherRan(s.T(), s.agentFixture)
 
 	s.T().Log("Check Agent version to ensure upgrade is successful")
 	currentVersion, err = s.getVersion(ctx)
