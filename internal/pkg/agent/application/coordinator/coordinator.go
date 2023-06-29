@@ -1075,8 +1075,8 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	}
 	result := []component.Component{}
 	for _, component := range comps {
-		// Check that the input type is allowed
-		if !c.caps.AllowInput(component.InputType) {
+		// If this is an input component (not a shipper), make sure its type is allowed
+		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
 			c.logger.Info("Component %q with input type %q filtered by capabilities.yml", component.InputType)
 			continue
 		}
