@@ -197,46 +197,9 @@ func TestEndpointSecurity(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("Package Policy Response:\n%+v", packagePolicyResp)
 
-	// t.Log("GETing updated agent policy")
-	// policyCtx, policyCancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	// defer policyCancel()
-
-	// policyResp, err := info.KibanaClient.Connection.SendWithContext(policyCtx,
-	// 	http.MethodGet,
-	// 	fmt.Sprintf("/api/fleet/agent_policies/%s/full", policy.ID),
-	// 	nil,
-	// 	nil,
-	// 	nil,
-	// )
-	// require.NoError(t, err)
-	// defer policyResp.Body.Close()
-
-	// policyRespBytes, err := io.ReadAll(policyResp.Body)
-	// require.NoError(t, err)
-
-	// if !assert.Equal(t, http.StatusOK, policyResp.StatusCode) {
-	// 	fleetErrorResp := FleetErrorResponse{}
-	// 	err = json.Unmarshal(policyRespBytes, &fleetErrorResp)
-	// 	require.NoError(t, err)
-	// 	t.Logf("Fleet Error Response:\n%+v", fleetErrorResp)
-	// 	t.FailNow()
-	// }
-
-	// agentPolicyResp := PolicyResponse{}
-	// err = json.Unmarshal(policyRespBytes, &agentPolicyResp)
-	// require.NoError(t, err)
-	// t.Logf("Agent Policy with Endpoint:\n%+v", agentPolicyResp)
-
-	// endpointInputID := ""
-	// for _, input := range agentPolicyResp.Item.Inputs {
-	// 	if input.Type == "endpoint" {
-	// 		endpointInputID = input.ID
-	// 		break
-	// 	}
-	// }
-	// require.NotEmptyf(t, endpointInputID, "Endpoint ID not found in: %+v", agentPolicyResp.Item.Inputs)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Log("Polling for endpoint to become Healthy")
+	statePollingTimeout := 2 * time.Minute
+	ctx, cancel := context.WithTimeout(context.Background(), statePollingTimeout)
 	defer cancel()
 
 	agentClient := fixture.Client()
@@ -282,5 +245,5 @@ func TestEndpointSecurity(t *testing.T) {
 
 		return true
 	}
-	require.Eventually(t, healthyEndpointFunc, time.Minute, time.Second)
+	require.Eventually(t, healthyEndpointFunc, statePollingTimeout, time.Second)
 }
