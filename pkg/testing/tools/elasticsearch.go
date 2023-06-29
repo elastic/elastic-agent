@@ -146,17 +146,15 @@ func CheckForErrorsInLogs(client elastictransport.Interface, excludeStrings []st
 // CheckForErrorsInLogsWithContext checks to see if any error-level lines exist
 // excludeStrings can be used to remove any particular error strings from logs
 func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictransport.Interface, excludeStrings []string) (Documents, error) {
-	queryRaw := map[string]interface{}{}
-
-	if len(excludeStrings) == 0 {
-		queryRaw = map[string]interface{}{
-			"query": map[string]interface{}{
-				"match": map[string]interface{}{
-					"log.level": "error",
-				},
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"log.level": "error",
 			},
-		}
-	} else {
+		},
+	}
+
+	if len(excludeStrings) > 0 {
 		excludeStatements := []map[string]interface{}{}
 		for _, ex := range excludeStrings {
 			excludeStatements = append(excludeStatements, map[string]interface{}{

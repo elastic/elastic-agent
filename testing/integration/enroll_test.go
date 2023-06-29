@@ -30,7 +30,6 @@ func TestEnrollAndLog(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-	fmt.Printf("Got namespace: %s\n", info.Namespace)
 	t.Logf("got namespace: %s", info.Namespace)
 	suite.Run(t, &EnrollRunner{requirementsInfo: info})
 }
