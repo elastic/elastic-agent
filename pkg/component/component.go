@@ -349,6 +349,7 @@ func (r *RuntimeSpecs) componentForShipper(
 		})
 		return Component{
 			ID:          shipperCompID,
+			OutputType:  output.outputType,
 			ShipperSpec: &shipperSpec,
 			Units:       shipperUnits,
 			Features:    featureFlags.AsProto(),
