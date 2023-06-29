@@ -24,6 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
@@ -122,88 +123,15 @@ func TestEndpointSecurity(t *testing.T) {
 	fixture, err := define.NewFixture(t)
 	require.NoError(t, err)
 
-	t.Log("Creating Agent policy...")
-	policyUUID := uuid.New().String()
-	createPolicyReq := kibana.AgentPolicy{
-		Name:        "test-policy-" + policyUUID,
-		Namespace:   "default",
-		Description: "Test policy " + policyUUID,
-		MonitoringEnabled: []kibana.MonitoringEnabledOption{
-			kibana.MonitoringEnabledLogs,
-			kibana.MonitoringEnabledMetrics,
-		},
-	}
-	policy, err := info.KibanaClient.CreatePolicy(createPolicyReq)
-	require.NoError(t, err)
+	policyID := enrollAgentInFleet(t, info, fixture)
+	installElasticDefendPackage(t, info, policyID)
 
-	t.Log("Creating Agent enrollment API key...")
-	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
-		PolicyID: policy.ID,
-	}
-	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
-	require.NoError(t, err)
-
-	t.Log("Getting default Fleet Server URL...")
-	fleetServerURL, err := tools.GetDefaultFleetServerURL(info.KibanaClient)
-	require.NoError(t, err)
-
-	t.Log("Enrolling Elastic Agent...")
-	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, fixture)
-	if err != nil {
-		t.Log(string(output))
-	}
-	require.NoError(t, err)
-
-	t.Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(t, tools.WaitForAgentStatus(t, info.KibanaClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
-
-	t.Log("Creating endpoint package policy request")
-	packagePolicyReq := PackagePolicyRequest{}
-	err = json.Unmarshal(endpointPackagePolicyJSON, &packagePolicyReq)
-	require.NoError(t, err)
-
-	// TODO: Set the Package.Version to the last minor release.
-	packagePolicyReq.PolicyID = policy.ID
-	jsonPackagePolicyReq, err := json.Marshal(packagePolicyReq)
-	require.NoError(t, err)
-
-	t.Log("POSTing endpoint package policy request")
-	pkgCtx, pkgCancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer pkgCancel()
-
-	pkgResp, err := info.KibanaClient.Connection.SendWithContext(pkgCtx,
-		http.MethodPost,
-		"/api/fleet/package_policies",
-		nil,
-		nil,
-		bytes.NewReader(jsonPackagePolicyReq),
-	)
-	require.NoError(t, err)
-	defer pkgResp.Body.Close()
-
-	pkgRespBytes, err := io.ReadAll(pkgResp.Body)
-	require.NoError(t, err)
-
-	if !assert.Equal(t, http.StatusOK, pkgResp.StatusCode) {
-		fleetErrorResp := FleetErrorResponse{}
-		err = json.Unmarshal(pkgRespBytes, &fleetErrorResp)
-		require.NoError(t, err)
-		t.Logf("Fleet Error Response:\n%+v", fleetErrorResp)
-		t.FailNow()
-	}
-
-	packagePolicyResp := PackagePolicyResponse{}
-	err = json.Unmarshal(pkgRespBytes, &packagePolicyResp)
-	require.NoError(t, err)
-	t.Logf("Package Policy Response:\n%+v", packagePolicyResp)
-
-	t.Log("Polling for endpoint to become Healthy")
+	t.Log("Polling for endpoint-security to become Healthy")
 	statePollingTimeout := 2 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), statePollingTimeout)
 	defer cancel()
 
 	agentClient := fixture.Client()
-
 	err = agentClient.Connect(ctx)
 	require.NoError(t, err)
 
@@ -246,4 +174,94 @@ func TestEndpointSecurity(t *testing.T) {
 		return true
 	}
 	require.Eventually(t, healthyEndpointFunc, statePollingTimeout, time.Second)
+}
+
+// Installs the agent, enrolls it in Fleet, and returns the created policy ID.
+func enrollAgentInFleet(t *testing.T, info *define.Info, fixture *atesting.Fixture) string {
+	t.Log("Creating Agent policy...")
+	policyUUID := uuid.New().String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	policy, err := info.KibanaClient.CreatePolicy(createPolicyReq)
+	require.NoError(t, err)
+
+	t.Log("Creating Agent enrollment API key...")
+	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policy.ID,
+	}
+	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
+	require.NoError(t, err)
+
+	t.Log("Getting default Fleet Server URL...")
+	fleetServerURL, err := tools.GetDefaultFleetServerURL(info.KibanaClient)
+	require.NoError(t, err)
+
+	t.Log("Enrolling Elastic Agent...")
+	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, fixture)
+	if err != nil {
+		t.Log(string(output))
+	}
+	require.NoError(t, err)
+
+	t.Log(`Waiting for enrolled Agent status to be "online"...`)
+	require.Eventually(t,
+		tools.WaitForAgentStatus(t, info.KibanaClient, "online"),
+		2*time.Minute,
+		10*time.Second,
+		"Agent status is not online",
+	)
+
+	return policy.ID
+}
+
+// Installs the Elastic Defend package to cause the agent to install the endpoint-security service.
+func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) {
+	t.Helper()
+
+	t.Log("Creating endpoint package policy request")
+	packagePolicyReq := PackagePolicyRequest{}
+	err := json.Unmarshal(endpointPackagePolicyJSON, &packagePolicyReq)
+	require.NoError(t, err)
+
+	// TODO: Set the Package.Version to the last minor release.
+	packagePolicyReq.PolicyID = policyID
+	jsonPackagePolicyReq, err := json.Marshal(packagePolicyReq)
+	require.NoError(t, err)
+
+	t.Log("POST /api/fleet/package_policies")
+	pkgCtx, pkgCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer pkgCancel()
+
+	pkgResp, err := info.KibanaClient.Connection.SendWithContext(pkgCtx,
+		http.MethodPost,
+		"/api/fleet/package_policies",
+		nil,
+		nil,
+		bytes.NewReader(jsonPackagePolicyReq),
+	)
+	require.NoError(t, err)
+	defer pkgResp.Body.Close()
+
+	pkgRespBytes, err := io.ReadAll(pkgResp.Body)
+	require.NoError(t, err)
+
+	if !assert.Equal(t, http.StatusOK, pkgResp.StatusCode) {
+		fleetErrorResp := FleetErrorResponse{}
+		err = json.Unmarshal(pkgRespBytes, &fleetErrorResp)
+		require.NoError(t, err)
+		t.Logf("Fleet Error Response:\n%+v", fleetErrorResp)
+		t.FailNow()
+	}
+
+	packagePolicyResp := PackagePolicyResponse{}
+	err = json.Unmarshal(pkgRespBytes, &packagePolicyResp)
+	require.NoError(t, err)
+	t.Logf("Endpoint package Policy Response:\n%+v", packagePolicyResp)
 }
