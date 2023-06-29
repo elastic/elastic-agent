@@ -7,12 +7,13 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/spf13/cobra"
 
