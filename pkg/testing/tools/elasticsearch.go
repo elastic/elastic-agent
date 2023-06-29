@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package tools
 
 import (
@@ -42,22 +46,26 @@ func (s *CatIntData) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// Documents represents the complete response from an ES query
 type Documents struct {
 	Took     int  `json:"took"`
 	TimedOut bool `json:"timed_out"`
 	Hits     Hits `json:"hits"`
 }
 
+// Hits returns the matching documents from an ES query
 type Hits struct {
 	Hits  []ESDoc       `json:"hits"`
 	Total TotalDocCount `json:"total"`
 }
 
+// TotalDocCount contains metadata for the ES response
 type TotalDocCount struct {
 	Value    int    `json:"value"`
 	Relation string `json:"relation"`
 }
 
+// ESDoc contains the documents returned by an ES query
 type ESDoc struct {
 	Index  string                 `json:"_index"`
 	Score  float64                `json:"_score"`
@@ -90,11 +98,118 @@ func GetIndicesWithContext(ctx context.Context, client elastictransport.Interfac
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 	return respData, nil
+}
 
+// FindMatchingLogLines returns any logs with message fields that match the given line
+func FindMatchingLogLines(client elastictransport.Interface, line string) (Documents, error) {
+	return FindMatchingLogLinesWithContext(context.Background(), client, line)
+}
+
+// FindMatchingLogLinesWithContext returns any logs with message fields that match the given line
+func FindMatchingLogLinesWithContext(ctx context.Context, client elastictransport.Interface, line string) (Documents, error) {
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match_phrase": map[string]interface{}{
+				"message": line,
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(queryRaw)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithIndex("*.ds-logs*"),
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithPretty(),
+		es.Search.WithContext(ctx),
+	)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	return handleDocsResponse(res)
+}
+
+// CheckForErrorsInLogs checks to see if any error-level lines exist
+// excludeStrings can be used to remove any particular error strings from logs
+func CheckForErrorsInLogs(client elastictransport.Interface, excludeStrings []string) (Documents, error) {
+	return CheckForErrorsInLogsWithContext(context.Background(), client, excludeStrings)
+}
+
+// CheckForErrorsInLogsWithContext checks to see if any error-level lines exist
+// excludeStrings can be used to remove any particular error strings from logs
+func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictransport.Interface, excludeStrings []string) (Documents, error) {
+	queryRaw := map[string]interface{}{}
+
+	if len(excludeStrings) == 0 {
+		queryRaw = map[string]interface{}{
+			"query": map[string]interface{}{
+				"match": map[string]interface{}{
+					"log.level": "error",
+				},
+			},
+		}
+	} else {
+		excludeStatements := []map[string]interface{}{}
+		for _, ex := range excludeStrings {
+			excludeStatements = append(excludeStatements, map[string]interface{}{
+				"match_phrase": map[string]interface{}{
+					"message": ex,
+				},
+			})
+		}
+		queryRaw = map[string]interface{}{
+			"query": map[string]interface{}{
+				"bool": map[string]interface{}{
+					"must": []map[string]interface{}{
+						{
+							"match": map[string]interface{}{
+								"log.level": "error",
+							},
+						},
+					},
+					"must_not": excludeStatements,
+				},
+			},
+		}
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(queryRaw)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithIndex("*.ds-logs*"),
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithPretty(),
+		es.Search.WithContext(ctx),
+	)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	return handleDocsResponse(res)
 }
 
 // GetLogsForDatastream returns any logs associated with the datastream
 func GetLogsForDatastream(client elastictransport.Interface, index string) (Documents, error) {
+	return GetLogsForDatastreamWithContext(context.Background(), client, index)
+}
+
+// GetLogsForDatastreamWithContext returns any logs associated with the datastream
+func GetLogsForDatastreamWithContext(ctx context.Context, client elastictransport.Interface, index string) (Documents, error) {
 	indexQuery := map[string]interface{}{
 		"query": map[string]interface{}{
 			"match": map[string]interface{}{
@@ -116,11 +231,16 @@ func GetLogsForDatastream(client elastictransport.Interface, index string) (Docu
 		es.Search.WithBody(&buf),
 		es.Search.WithTrackTotalHits(true),
 		es.Search.WithPretty(),
+		es.Search.WithContext(ctx),
 	)
 	if err != nil {
 		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
 	}
 
+	return handleDocsResponse(res)
+}
+
+func handleDocsResponse(res *esapi.Response) (Documents, error) {
 	if res.StatusCode >= 300 || res.StatusCode < 200 {
 		return Documents{}, fmt.Errorf("non-200 return code: %v, response: '%s'", res.StatusCode, res.String())
 	}
@@ -137,32 +257,4 @@ func GetLogsForDatastream(client elastictransport.Interface, index string) (Docu
 	}
 
 	return respData, err
-}
-
-// GetDocumentsInIndex returns a sample of documents for an index
-func GetDocumentsInIndex(client elastictransport.Interface, index string) (Documents, error) {
-	testCount := 10
-	req := esapi.SearchRequest{Index: []string{index}, Size: &testCount, ExpandWildcards: "all"}
-
-	resp, err := req.Do(context.Background(), client)
-	if err != nil {
-		return Documents{}, fmt.Errorf("error fetching documents: %w", err)
-	}
-
-	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
-		return Documents{}, fmt.Errorf("non-200 return code: %v, response: '%s'", resp.StatusCode, resp.String())
-	}
-
-	buf, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return Documents{}, fmt.Errorf("error reading response body: %w", err)
-	}
-	respData := Documents{}
-
-	err = json.Unmarshal(buf, &respData)
-	if err != nil {
-		return Documents{}, fmt.Errorf("error unmarshaling response: %w", err)
-	}
-
-	return respData, nil
 }
