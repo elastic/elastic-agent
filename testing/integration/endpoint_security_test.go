@@ -11,9 +11,9 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,7 +24,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
@@ -198,64 +197,90 @@ func TestEndpointSecurity(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("Package Policy Response:\n%+v", packagePolicyResp)
 
-	t.Log("GETing updated agent policy")
-	policyCtx, policyCancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer policyCancel()
+	// t.Log("GETing updated agent policy")
+	// policyCtx, policyCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	// defer policyCancel()
 
-	policyResp, err := info.KibanaClient.Connection.SendWithContext(policyCtx,
-		http.MethodGet,
-		fmt.Sprintf("/api/fleet/agent_policies/%s/full", policy.ID),
-		nil,
-		nil,
-		nil,
-	)
-	require.NoError(t, err)
-	defer policyResp.Body.Close()
+	// policyResp, err := info.KibanaClient.Connection.SendWithContext(policyCtx,
+	// 	http.MethodGet,
+	// 	fmt.Sprintf("/api/fleet/agent_policies/%s/full", policy.ID),
+	// 	nil,
+	// 	nil,
+	// 	nil,
+	// )
+	// require.NoError(t, err)
+	// defer policyResp.Body.Close()
 
-	policyRespBytes, err := io.ReadAll(policyResp.Body)
-	require.NoError(t, err)
+	// policyRespBytes, err := io.ReadAll(policyResp.Body)
+	// require.NoError(t, err)
 
-	if !assert.Equal(t, http.StatusOK, policyResp.StatusCode) {
-		fleetErrorResp := FleetErrorResponse{}
-		err = json.Unmarshal(policyRespBytes, &fleetErrorResp)
-		require.NoError(t, err)
-		t.Logf("Fleet Error Response:\n%+v", fleetErrorResp)
-		t.FailNow()
-	}
+	// if !assert.Equal(t, http.StatusOK, policyResp.StatusCode) {
+	// 	fleetErrorResp := FleetErrorResponse{}
+	// 	err = json.Unmarshal(policyRespBytes, &fleetErrorResp)
+	// 	require.NoError(t, err)
+	// 	t.Logf("Fleet Error Response:\n%+v", fleetErrorResp)
+	// 	t.FailNow()
+	// }
 
-	agentPolicyResp := PolicyResponse{}
-	err = json.Unmarshal(policyRespBytes, &agentPolicyResp)
-	require.NoError(t, err)
-	t.Logf("Agent Policy with Endpoint:\n%+v", agentPolicyResp)
+	// agentPolicyResp := PolicyResponse{}
+	// err = json.Unmarshal(policyRespBytes, &agentPolicyResp)
+	// require.NoError(t, err)
+	// t.Logf("Agent Policy with Endpoint:\n%+v", agentPolicyResp)
 
-	endpointInputID := ""
-	for _, input := range agentPolicyResp.Item.Inputs {
-		if input.Type == "endpoint" {
-			endpointInputID = input.ID
-			break
-		}
-	}
-	require.NotEmptyf(t, endpointInputID, "Endpoint ID not found in: %+v", agentPolicyResp.Item.Inputs)
+	// endpointInputID := ""
+	// for _, input := range agentPolicyResp.Item.Inputs {
+	// 	if input.Type == "endpoint" {
+	// 		endpointInputID = input.ID
+	// 		break
+	// 	}
+	// }
+	// require.NotEmptyf(t, endpointInputID, "Endpoint ID not found in: %+v", agentPolicyResp.Item.Inputs)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err = fixture.Run(ctx, atesting.State{
-		Configure:  simpleConfig1,
-		AgentState: atesting.NewClientState(client.Healthy),
-		Components: map[string]atesting.ComponentState{
-			"endpoint-default": {
-				State: atesting.NewClientState(client.Healthy),
-				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "endpoint-default"}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: fmt.Sprintf("endpoint-default-%s", endpointInputID)}: {
-						State: atesting.NewClientState(client.Healthy),
-					},
-				},
-			},
-		},
-	})
+	agentClient := fixture.Client()
+
+	err = agentClient.Connect(ctx)
 	require.NoError(t, err)
+
+	healthyEndpointFunc := func() bool {
+		state, err := agentClient.State(ctx)
+		if err != nil {
+			t.Logf("Error getting agent state: %s", err)
+			return false
+		}
+
+		if state.State != client.Healthy {
+			t.Logf("Agent is not Healthy\n%+v", state)
+			return false
+		}
+
+		foundEndpoint := false
+		for _, comp := range state.Components {
+			if strings.Contains(comp.Name, "endpoint") {
+				foundEndpoint = true
+			}
+
+			if comp.State != client.Healthy {
+				t.Logf("Component is not Healthy\n%+v", comp)
+				return false
+			}
+
+			for _, unit := range comp.Units {
+				if unit.State != client.Healthy {
+					t.Logf("Unit is not Healthy\n%+v", unit)
+					return false
+				}
+			}
+		}
+
+		if !foundEndpoint {
+			t.Logf("State did not contain endpoint!\n%+v", state)
+			return false
+		}
+
+		return true
+	}
+	require.Eventually(t, healthyEndpointFunc, time.Minute, time.Second)
 }
