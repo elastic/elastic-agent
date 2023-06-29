@@ -310,9 +310,11 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID:        "unknown-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       ErrInputNotSupported,
+					InputType:  "unknown",
+					OutputType: "elasticsearch",
+					ID:         "unknown-default",
+					InputSpec:  &InputRuntimeSpec{},
+					Err:        ErrInputNotSupported,
 					Units: []Unit{
 						{
 							ID:       "unknown-default",
@@ -353,8 +355,10 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID:  "fleet-server-default",
-					Err: ErrOutputNotSupported,
+					InputType:  "fleet-server",
+					OutputType: "logstash",
+					ID:         "fleet-server-default",
+					Err:        ErrOutputNotSupported,
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "fleet-server",
 						BinaryName: "fleet-server",
@@ -412,9 +416,11 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID:        "endpoint-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       NewErrInputRuntimeCheckFail("No support for RHEL7 on arm64"),
+					InputType:  "endpoint",
+					OutputType: "elasticsearch",
+					ID:         "endpoint-default",
+					InputSpec:  &InputRuntimeSpec{},
+					Err:        NewErrInputRuntimeCheckFail("No support for RHEL7 on arm64"),
 					Units: []Unit{
 						{
 							ID:       "endpoint-default",
@@ -469,7 +475,9 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID: "filestream-default",
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					ID:         "filestream-default",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -566,6 +574,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -619,6 +629,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -673,6 +685,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -775,6 +789,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -810,6 +826,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -845,6 +863,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -880,6 +900,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -906,6 +928,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "log",
+					OutputType: "logstash",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -932,6 +956,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "log",
+					OutputType: "redis",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -958,6 +984,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "apm",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "apm",
 						BinaryName: "apm-server",
@@ -1013,7 +1041,9 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID: "filestream-default",
+					ID:         "filestream-default",
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1045,7 +1075,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "shipper-default",
+					ID:         "shipper-default",
+					OutputType: "elasticsearch",
 					ShipperSpec: &ShipperRuntimeSpec{
 						ShipperType: "shipper",
 						BinaryName:  "shipper",
@@ -1169,7 +1200,9 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID: "filestream-default",
+					ID:         "filestream-default",
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1210,7 +1243,9 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "filestream-other",
+					ID:         "filestream-other",
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1246,7 +1281,9 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "log-default",
+					ID:         "log-default",
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1287,7 +1324,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "shipper-default",
+					ID:         "shipper-default",
+					OutputType: "elasticsearch",
 					ShipperSpec: &ShipperRuntimeSpec{
 						ShipperType: "shipper",
 						BinaryName:  "shipper",
@@ -1355,7 +1393,9 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "log-other",
+					ID:         "log-other",
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1382,7 +1422,9 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "log-stashit",
+					ID:         "log-stashit",
+					InputType:  "log",
+					OutputType: "logstash",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1414,7 +1456,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "shipper-stashit",
+					ID:         "shipper-stashit",
+					OutputType: "logstash",
 					ShipperSpec: &ShipperRuntimeSpec{
 						ShipperType: "shipper",
 						BinaryName:  "shipper",
@@ -1450,7 +1493,9 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "log-redis",
+					ID:         "log-redis",
+					InputType:  "log",
+					OutputType: "redis",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1482,7 +1527,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "shipper-redis",
+					ID:         "shipper-redis",
+					OutputType: "redis",
 					ShipperSpec: &ShipperRuntimeSpec{
 						ShipperType: "shipper",
 						BinaryName:  "shipper",
@@ -1518,7 +1564,9 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "apm-default",
+					ID:         "apm-default",
+					InputType:  "apm",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "apm",
 						BinaryName: "apm-server",
@@ -1571,6 +1619,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1627,6 +1677,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1682,6 +1734,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1736,6 +1790,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "kafka",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1786,6 +1842,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "logstash",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1839,6 +1897,8 @@ func TestToComponents(t *testing.T) {
 					} else {
 						assert.NoError(t, actual.Err, "Expected no error for component "+actual.ID)
 					}
+					assert.Equal(t, expected.InputType, actual.InputType, "%q: component %q has wrong input type", scenario.Name, actual.ID)
+					assert.Equal(t, expected.OutputType, actual.OutputType, "%q: component %q has wrong output type", scenario.Name, actual.ID)
 					if expected.InputSpec != nil {
 						assert.Nil(t, actual.ShipperSpec)
 						assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
