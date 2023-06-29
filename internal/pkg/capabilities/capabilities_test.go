@@ -79,6 +79,29 @@ capabilities:
 	assert.True(t, caps.AllowInput("synthetics/http"))
 }
 
+func TestUpgradeVersion(t *testing.T) {
+	// Allow upgrades to 8.9.2 or any 8.8.x, deny all others
+	yml := `
+capabilities:
+- upgrade: "match(${version}, '8.8.*')"
+  rule: allow
+- upgrade: "${version} == '8.9.2'"
+  rule: allow
+- upgrade:
+  rule: deny
+`
+
+	caps, err := Load(strings.NewReader(yml), logger.NewWithoutConfig("testing"))
+	require.NoError(t, err, "Loading capabilities should succeed")
+	assert.True(t, caps.AllowUpgrade("8.8.0", ""))
+	assert.True(t, caps.AllowUpgrade("8.8.1", ""))
+	assert.True(t, caps.AllowUpgrade("8.9.2", ""))
+	assert.False(t, caps.AllowUpgrade("8.9.1", ""))
+	assert.False(t, caps.AllowUpgrade("8.7.0", ""))
+	assert.False(t, caps.AllowUpgrade("8.10.0", ""))
+
+}
+
 func TestNoCaps(t *testing.T) {
 	// Make sure capabilities loaded from a nonexistent file don't interfere
 	// with anything
