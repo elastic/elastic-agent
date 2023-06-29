@@ -188,8 +188,19 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 		return nil
 	}
 
+	// check caps so we don't try uninstalling things that were already
+	// prevented from installing
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
+	if err != nil {
+		return err
+	}
+
 	// remove each service component
 	for _, comp := range comps {
+		if !caps.AllowInput(comp.InputType) || !caps.AllowOutput(comp.OutputType) {
+			// This component is not active
+			continue
+		}
 		if err := uninstallComponent(ctx, log, comp); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
@@ -248,22 +259,6 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		if err != nil {
 			return nil, errors.New("inserting rendered inputs failed", err)
 		}
-	}
-
-	// apply caps
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
-	if err != nil {
-		return nil, err
-	}
-
-	astIface, err := caps.Apply(ast)
-	if err != nil {
-		return nil, err
-	}
-
-	newAst, ok := astIface.(*transpiler.AST)
-	if ok {
-		ast = newAst
 	}
 
 	finalConfig, err := ast.Map()
