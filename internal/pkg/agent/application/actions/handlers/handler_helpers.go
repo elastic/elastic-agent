@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 )
 
 type actionCoordinator interface {
@@ -46,9 +47,9 @@ func findMatchingUnitsByActionType(state coordinator.State, typ string) []unitWi
 	ucs := make([]unitWithComponent, 0)
 	for _, comp := range state.Components {
 		if comp.Component.InputSpec != nil && contains(comp.Component.InputSpec.Spec.ProxiedActions, typ) {
-			name := comp.Component.InputSpec.Spec.Name
-
+			name := comp.Component.InputType
 			for _, unit := range comp.Component.Units {
+				// All input units should match the component input type, but let's be cautious
 				if unit.Type == client.UnitTypeInput && unit.Config != nil && unit.Config.Type == name {
 					ucs = append(ucs, unitWithComponent{unit, comp.Component})
 				}
@@ -115,6 +116,13 @@ func (d proxiedActionsNotifier) notify(ctx context.Context, action dispatchableA
 		res, err := d.performAction(ctx, uc.component, uc.unit, uc.unit.Config.Type, params)
 		if err != nil {
 			d.log.Debugf("%v failed to dispatch to %v, err: %v", actionType, uc.component.ID, err)
+			// ErrNoUnit means that the unit is not longer avaiable
+			// This can happen if the policy change updated state while the action proxying was retried
+			// Stop retrying proxying action to that unit return nil
+			if errors.Is(err, runtime.ErrNoUnit) {
+				d.log.Debugf("%v unit is not longer managed by runtime, possibly due to policy change", uc.component.ID)
+				return nil
+			}
 			return err
 		}
 
