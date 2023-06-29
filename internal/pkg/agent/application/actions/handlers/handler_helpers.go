@@ -97,9 +97,6 @@ func (d backoffActionDispatcher) Dispatch(ctx context.Context, action dispatchab
 		return nil
 	}
 
-	ctx, cn := context.WithTimeout(ctx, d.timeout)
-	defer cn()
-
 	// Deserialize the action into map[string]interface{} for dispatching over to the apps
 	params, err := action.MarshalMap()
 	if err != nil {
@@ -107,10 +104,6 @@ func (d backoffActionDispatcher) Dispatch(ctx context.Context, action dispatchab
 	}
 
 	actionType := action.Type()
-
-	backExp := backoff.NewExpBackoff(ctx.Done(), d.minBackoff, d.maxBackoff)
-
-	start := time.Now()
 
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -134,12 +127,18 @@ func (d backoffActionDispatcher) Dispatch(ctx context.Context, action dispatchab
 	}
 
 	dispatchWithBackoff := func(uc unitWithComponent) error {
+		ctx, cn := context.WithTimeout(ctx, d.timeout)
+		defer cn()
+
 		attempt := 1
+		backExp := backoff.NewExpBackoff(ctx.Done(), d.minBackoff, d.maxBackoff)
+		start := time.Now()
+
 		for {
 			err := dispatch(uc)
 			if err != nil {
 				if backExp.Wait() {
-					d.log.Debugf("%v action dispatch to %v with backoff attempt: %v, after %v since start\n", actionType, uc.component.ID, attempt, time.Since(start))
+					d.log.Debugf("%v action dispatch to %v with backoff attempt: %v, after %v since start", actionType, uc.component.ID, attempt, time.Since(start))
 					attempt++
 					continue
 				}
