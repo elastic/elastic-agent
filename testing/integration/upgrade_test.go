@@ -381,7 +381,12 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
+	// We go back TWO minors because sometimes we are in a situation where
+	// the current version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
 	previousVersion, err := currentVersion.GetPreviousMinor()
+	require.NoError(t, err)
+	previousVersion, err = previousVersion.GetPreviousMinor()
 	require.NoError(t, err)
 
 	// For testing the upgrade we actually perform a downgrade
