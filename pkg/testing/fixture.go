@@ -131,9 +131,10 @@ func (f *Fixture) Client() client.Client {
 
 // Prepare prepares the Elastic Agent for usage.
 //
-// This must be called before `Run` or `Install` can be called. `components` defines the components that you want to
-// be prepared for the Elastic Agent. See the definition on defining usable components on the `UsableComponent`
-// structure.
+// This must be called before `Configure`, `Run`, or `Install` can be called.
+// `components` defines the components that you want to be prepared for the
+// Elastic Agent. See the definition on defining usable components on the
+// `UsableComponent` structure.
 //
 // Note: If no `components` are defined then the Elastic Agent will keep all the components that are shipped with the
 // fetched build of the Elastic Agent.
@@ -167,6 +168,25 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.workDir = finalDir
 	return nil
+}
+
+// Configure replaces the default Agent configuration file with the provided
+// configuration. This must be called after `Prepare` is called but before `Run`
+// or `Install` can be called.
+func (f *Fixture) Configure(ctx context.Context, yamlConfig []byte) error {
+	err := f.ensurePrepared(ctx)
+	if err != nil {
+		return err
+	}
+
+	cfgFilePath := filepath.Join(f.workDir, "elastic-agent.yml")
+	return os.WriteFile(cfgFilePath, yamlConfig, 0600)
+}
+
+// WorkDir returns the installed fixture's work dir AKA base dir AKA top dir. This
+// must be called after `Install` is called.
+func (f *Fixture) WorkDir() string {
+	return f.workDir
 }
 
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
