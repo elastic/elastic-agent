@@ -72,7 +72,7 @@ agent:
   v1_monitoring_enabled: true
   upgrade:
     watcher:
-      grace_period: 10m
+      grace_period: 10m0s
       crash_check:
         interval: 10s
       error_check:
