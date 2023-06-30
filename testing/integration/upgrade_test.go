@@ -40,6 +40,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
+const fastWatcherCfg = `
+agent.upgrade.watcher:
+  grace_period: 1m
+  error_check.interval: 15s
+  crash_check.interval: 15s
+`
+
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
@@ -94,8 +101,7 @@ func (s *FleetManagedUpgradeTestSuite) SetupSuite() {
 	err = agentFixture.Prepare(ctx)
 	s.Require().NoError(err, "error preparing agent fixture")
 
-	agentTestCfg := `agent.upgrade.watcher.grace_period: 30s`
-	err = agentFixture.Configure(ctx, []byte(agentTestCfg))
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	s.Require().NoError(err, "error configuring agent fixture")
 
 	s.agentFixture = agentFixture
@@ -201,8 +207,7 @@ func (s *StandaloneUpgradeTestSuite) SetupSuite() {
 	err = agentFixture.Prepare(ctx)
 	s.Require().NoError(err, "error preparing agent fixture")
 
-	agentTestCfg := `agent.upgrade.watcher.grace_period: 30s`
-	err = agentFixture.Configure(ctx, []byte(agentTestCfg))
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	s.Require().NoError(err, "error configuring agent fixture")
 
 	s.agentFixture = agentFixture
@@ -337,17 +342,22 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 	s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
 }
 
+// checkUpgradeWatcherRan asserts that the Upgrade Watcher finished running. We use the
+// presence of the update marker file as evidence that the Upgrade Watcher is still running
+// and the absence of that file as evidence that the Upgrade Watcher is no longer running.
 func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture) {
 	t.Helper()
-	t.Log("Waiting for upgrade watcher to have ran...")
+	t.Log("Waiting for upgrade watcher to finish ran...")
 
 	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
 	require.FileExists(t, updateMarkerFile)
 
+	now := time.Now()
 	require.Eventuallyf(t, func() bool {
 		_, err := os.Stat(updateMarkerFile)
 		return errors.Is(err, fs.ErrNotExist)
-	}, 10*time.Minute, 1*time.Second, "agent never removed update marker")
+	}, 2*time.Minute, 15*time.Second, "agent never removed update marker")
+	t.Logf("Upgrade Watcher completed in %s", time.Now().Sub(now))
 }
 
 func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVersion *version.ParsedSemVer, agentProject tools.Project) string {
@@ -447,8 +457,7 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) SetupSuite() {
 	err = agentFixture.Prepare(ctx)
 	s.Require().NoError(err, "error preparing agent fixture")
 
-	agentTestCfg := `agent.upgrade.watcher.grace_period: 30s`
-	err = agentFixture.Configure(ctx, []byte(agentTestCfg))
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	s.Require().NoError(err, "error configuring agent fixture")
 
 	s.agentFixture = agentFixture
