@@ -40,19 +40,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			pathConfigFile := paths.ConfigFile()
-			rawConfig, err := config.LoadFile(pathConfigFile)
-			if err != nil {
-				fmt.Fprintf(streams.Err, "could not read configuration file %s", pathConfigFile)
-				os.Exit(1)
-			}
-
-			cfg, err := configuration.NewFromConfig(rawConfig)
-			if err != nil {
-				fmt.Fprintf(streams.Err, "could not parse configuration file %s", pathConfigFile)
-				os.Exit(2)
-			}
-
+			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg)
 			if err != nil {
 				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
@@ -224,4 +212,23 @@ func configuredLogger(cfg *configuration.Configuration) (*logger.Logger, error) 
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
 	return logp.NewLogger(""), nil
+}
+
+func getConfig(streams *cli.IOStreams) *configuration.Configuration {
+	defaultCfg := configuration.DefaultConfiguration()
+
+	pathConfigFile := paths.ConfigFile()
+	rawConfig, err := config.LoadFile(pathConfigFile)
+	if err != nil {
+		fmt.Fprintf(streams.Err, "could not read configuration file %s", pathConfigFile)
+		return defaultCfg
+	}
+
+	cfg, err := configuration.NewFromConfig(rawConfig)
+	if err != nil {
+		fmt.Fprintf(streams.Err, "could not parse configuration file %s", pathConfigFile)
+		return defaultCfg
+	}
+
+	return cfg
 }
