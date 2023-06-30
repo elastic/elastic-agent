@@ -343,7 +343,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		cmdCtx := context.Background()
 		log, obs := logger.NewTesting(t.Name())
 
-		const succeedCmdAfter = 2 * time.Second
+		const succeedCmdAfter = 3 * time.Second
 		now := time.Now()
 		exeConfig := progConfig{
 			ErrMessage:   "foo bar",
