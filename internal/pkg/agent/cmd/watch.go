@@ -110,8 +110,10 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		return nil
 	}
 
+	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
+	crashCheckInterval := cfg.Settings.Upgrade.Watcher.CrashCheck.Interval
 	ctx := context.Background()
-	if err := watch(ctx, tilGrace, log); err != nil {
+	if err := watch(ctx, tilGrace, errorCheckInterval, crashCheckInterval, log); err != nil {
 		log.Error("Error detected proceeding to rollback: %v", err)
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
@@ -135,7 +137,7 @@ func isWindows() bool {
 	return runtime.GOOS == "windows"
 }
 
-func watch(ctx context.Context, tilGrace time.Duration, log *logger.Logger) error {
+func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval, crashCheckInterval time.Duration, log *logger.Logger) error {
 	errChan := make(chan error)
 	crashChan := make(chan error)
 
@@ -148,12 +150,12 @@ func watch(ctx context.Context, tilGrace time.Duration, log *logger.Logger) erro
 		close(crashChan)
 	}()
 
-	errorChecker, err := upgrade.NewErrorChecker(errChan, log)
+	errorChecker, err := upgrade.NewErrorChecker(errChan, log, errorCheckInterval)
 	if err != nil {
 		return err
 	}
 
-	crashChecker, err := upgrade.NewCrashChecker(ctx, crashChan, log)
+	crashChecker, err := upgrade.NewCrashChecker(ctx, crashChan, log, crashCheckInterval)
 	if err != nil {
 		return err
 	}

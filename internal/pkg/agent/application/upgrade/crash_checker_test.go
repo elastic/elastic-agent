@@ -133,7 +133,7 @@ func testableChecker(t *testing.T, pider *testPider) (*CrashChecker, chan error)
 	ch, err := NewCrashChecker(context.Background(), errChan, l)
 	require.NoError(t, err)
 
-	ch.checkPeriod = testCheckPeriod
+	ch.checkInterval = testCheckPeriod
 	ch.sc.Close()
 	ch.sc = pider
 
