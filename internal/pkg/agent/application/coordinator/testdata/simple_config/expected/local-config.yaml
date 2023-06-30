@@ -73,5 +73,7 @@ agent:
   upgrade:
     watcher:
       grace_period: 10m
-      crash_check.interval: 10s
-      error_check.interval: 30s
+      crash_check:
+        interval: 10s
+      error_check:
+        interval: 30s
