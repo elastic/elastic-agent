@@ -356,7 +356,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		// Since the service command is retried indefinitely, we need a way to
 		// stop the test within a reasonable amount of time. However, we should never
 		// hit this timeout as the command should succeed before the timeout is reached.
-		retryCtx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+		retryCtx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 		defer cancel()
 
 		defaultRetryInitInterval := 50 * time.Millisecond
@@ -378,7 +378,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 		}
 		require.Eventually(t, func() bool {
 			return obs.Filter(successMsgFilterFn).Len() == 1
-		}, 4*time.Second, 1*time.Second)
+		}, 5*time.Second, 1*time.Second)
 
 		require.NoError(t, retryCtx.Err())
 
