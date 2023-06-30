@@ -312,7 +312,7 @@ func TestExecuteServiceCommand(t *testing.T) {
 
 		// Since the service command is retried indefinitely, we need a way to
 		// stop the test within a reasonable amount of time
-		retryCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		retryCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
 		defaultRetryInitInterval := 50 * time.Millisecond
