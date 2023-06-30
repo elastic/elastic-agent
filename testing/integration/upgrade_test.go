@@ -86,7 +86,18 @@ func (s *FleetManagedUpgradeTestSuite) SetupSuite() {
 		s.agentFromVersion,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
-	require.NoError(s.T(), err)
+	s.Require().NoError(err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err = agentFixture.Prepare(ctx)
+	s.Require().NoError(err, "error preparing agent fixture")
+
+	agentTestCfg := `agent.upgrade.watcher.grace_period: 30s`
+	err = agentFixture.Configure(ctx, []byte(agentTestCfg))
+	s.Require().NoError(err, "error configuring agent fixture")
+
 	s.agentFixture = agentFixture
 }
 
@@ -435,6 +446,11 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) SetupSuite() {
 
 	err = agentFixture.Prepare(ctx)
 	s.Require().NoError(err, "error preparing agent fixture")
+
+	agentTestCfg := `agent.upgrade.watcher.grace_period: 30s`
+	err = agentFixture.Configure(ctx, []byte(agentTestCfg))
+	s.Require().NoError(err, "error configuring agent fixture")
+
 	s.agentFixture = agentFixture
 }
 
