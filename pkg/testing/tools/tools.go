@@ -82,7 +82,7 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 		t.Log(string(output))
 		return nil, fmt.Errorf("unable to enroll Elastic Agent: %w", err)
 	}
-	t.Logf("Got response from Elastic Agent: %s", string(output))
+	t.Logf(">>> Ran Enroll. Output: %s", output)
 
 	// Wait for Agent to be healthy
 	require.Eventually(

@@ -151,7 +151,9 @@ func TestDiagnosticComponentsExpected(t *testing.T) {
 	// reported by the components-expected diagnostic
 	components := []component.Component{
 		{
-			ID: "filestream-component",
+			ID:         "filestream-component",
+			InputType:  "filestream",
+			OutputType: "elasticsearch",
 			InputSpec: &component.InputRuntimeSpec{
 				InputType:  "filestream",
 				BinaryName: "filestream-binary",
@@ -167,7 +169,8 @@ func TestDiagnosticComponentsExpected(t *testing.T) {
 			},
 		},
 		{
-			ID: "shipper-component",
+			ID:         "shipper-component",
+			OutputType: "elasticsearch",
 			ShipperSpec: &component.ShipperRuntimeSpec{
 				ShipperType: "shipper",
 				BinaryName:  "shipper-binary",
@@ -187,6 +190,8 @@ func TestDiagnosticComponentsExpected(t *testing.T) {
 	expected := `
 components:
   - id: filestream-component
+    input_type: filestream
+    output_type: elasticsearch
     input_spec:
       binary_name: filestream-binary
       binary_path: filestream-path
@@ -203,6 +208,8 @@ components:
         log_level: 2
         type: 1
   - id: shipper-component
+    input_type: ""
+    output_type: elasticsearch
     shipper_spec:
       binary_name: shipper-binary
       binary_path: shipper-path
@@ -237,8 +244,10 @@ func TestDiagnosticComponentsActual(t *testing.T) {
 		Components: []runtime.ComponentComponentState{
 			{
 				Component: component.Component{
-					ID:  "component-1",
-					Err: errors.New("component error"),
+					ID:         "component-1",
+					Err:        errors.New("component error"),
+					InputType:  "test-input",
+					OutputType: "test-output",
 					Units: []component.Unit{
 						{
 							ID:       "test-unit",
@@ -268,6 +277,8 @@ func TestDiagnosticComponentsActual(t *testing.T) {
 components:
   - id: component-1
     error: {}
+    input_type: "test-input"
+    output_type: "test-output"
     units:
       - id: test-unit
         error: {}
