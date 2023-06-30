@@ -76,6 +76,12 @@ func (runner *EnrollRunner) TestEnroll() {
 	require.NoError(runner.T(), err)
 	runner.T().Logf("created policy: %s", policy.ID)
 
+	runner.T().Cleanup(func() {
+		//After: unenroll
+		err = tools.UnEnrollAgent(runner.requirementsInfo.KibanaClient)
+		require.NoError(runner.T(), err)
+	})
+
 	runner.T().Logf("sleeping for one minute...")
 	time.Sleep(time.Second * 60)
 
@@ -122,7 +128,4 @@ func (runner *EnrollRunner) TestEnroll() {
 	require.NoError(runner.T(), err)
 	require.NotZero(runner.T(), len(docs.Hits.Hits))
 
-	// Stage 6: Unenroll
-	err = tools.UnEnrollAgent(runner.requirementsInfo.KibanaClient)
-	require.NoError(runner.T(), err)
 }
