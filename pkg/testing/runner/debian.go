@@ -176,7 +176,6 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient *ssh.Client
 func runTests(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient *ssh.Client, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
 	execTest := strings.NewReader(script)
 
-	logger.Logf("creating new SSH session for %s...", name)
 	session, err := sshClient.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start session: %w", err)
