@@ -152,7 +152,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	}
 
 	if err != nil {
-		return out, fmt.Errorf("error stating agent pathN: %w", err)
+		return out, fmt.Errorf("error stating agent path: %w", err)
 	}
 
 	if err != nil && topPathStats != nil {

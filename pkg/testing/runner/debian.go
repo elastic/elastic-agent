@@ -148,7 +148,6 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient *ssh.Client
 	if len(tests) > 0 {
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(tests, ","))
 		vars = extendVars(vars, env)
-		logger.Logf("Starting tests")
 
 		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
 		results, err := runTests(ctx, logger, "non-sudo", prefix, script, sshClient, batch.Tests)
@@ -175,8 +174,6 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient *ssh.Client
 }
 
 func runTests(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient *ssh.Client, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
-	logger.Logf("starting %s tests", name)
-
 	execTest := strings.NewReader(script)
 
 	logger.Logf("creating new SSH session for %s...", name)
