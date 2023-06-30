@@ -70,3 +70,8 @@ agent:
     period: 10s
   path: ""
   v1_monitoring_enabled: true
+  upgrade:
+    watcher:
+      grace_period: 10m
+      crash_check.interval: 10s
+      error_check.interval: 30s
