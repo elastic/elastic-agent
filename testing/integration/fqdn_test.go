@@ -103,8 +103,14 @@ func (s *FQDN) TestFQDN() {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
+		AgentFeatures: []map[string]interface{}{
+			{
+				"name":    "fqdn",
+				"enabled": false,
+			},
+		},
 	}
-	policy, err := tools.InstallAgentWithPolicy(s.T(), s.agentFixture, kibClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(s.T(), s.agentFixture, kibClient, s.requirementsInfo.ESClient, createPolicyReq)
 	require.NoError(s.T(), err)
 
 	s.T().Log("Verify that agent name is short hostname")
