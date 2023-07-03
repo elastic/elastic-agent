@@ -96,7 +96,8 @@ func NewHandlerAckWithAcker(acker func(actionID string) (AckResponseItem, bool))
 		if agentID != h.AgentID {
 			return nil, &HTTPError{
 				StatusCode: http.StatusNotFound,
-				Message:    fmt.Sprintf("agent %q not found", agentID),
+				Message: fmt.Sprintf("agent %q not found, expecting %q",
+					agentID, h.AgentID),
 			}
 		}
 

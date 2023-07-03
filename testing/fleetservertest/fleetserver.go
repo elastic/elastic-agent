@@ -38,7 +38,10 @@ func NewServer(h *Handlers, opts ...Option) *Server {
 	if os.logFn != nil {
 		h.logFn = os.logFn
 	}
-	h.AgentID = os.agentID
+	if os.agentID != "" {
+		h.AgentID = os.agentID
+	}
+
 	mux := NewRouter(h)
 
 	address := ":0"

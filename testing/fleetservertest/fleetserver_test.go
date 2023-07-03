@@ -155,11 +155,10 @@ func ExampleNewServer_checkin() {
 
 	// NewHandlerCheckinFakeComponent
 	ts := NewServer(&Handlers{
-		AgentID: agentID,
 		CheckinFn: NewHandlerCheckinFakeComponent(func() (CheckinAction, *HTTPError) {
 			return CheckinAction{Actions: []string{actions}}, nil
-		}),
-	})
+		})},
+		WithAgentID(agentID))
 
 	cmd := fleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
