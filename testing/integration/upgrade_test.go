@@ -349,7 +349,7 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 // and the absence of that file as evidence that the Upgrade Watcher is no longer running.
 func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture) {
 	t.Helper()
-	t.Log("Waiting for upgrade watcher to finish ran...")
+	t.Log("Waiting for upgrade watcher to finish running...")
 
 	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
 	require.FileExists(t, updateMarkerFile)
