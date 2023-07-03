@@ -74,19 +74,9 @@ func NewAPIKey(auth string) (APIKey, error) {
 // - the extracted APIKey and a nil error if all succeeds.
 func Authenticate(r *http.Request, key string) (APIKey, *HTTPError) {
 
-	value := r.Header.Get(HeaderAuthorization)
-	if value == "" {
-		return APIKey{}, &HTTPError{
-			StatusCode: http.StatusUnauthorized,
-			Message:    "no authorization header",
-		}
-	}
-
-	if !strings.HasPrefix(value, APIKeyPrefix) {
-		return APIKey{}, &HTTPError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "malformed authorization header",
-		}
+	value, herr := getAuthorization(r)
+	if herr != nil {
+		return APIKey{}, herr
 	}
 	rawKey := value[len(APIKeyPrefix):]
 
@@ -107,6 +97,25 @@ func Authenticate(r *http.Request, key string) (APIKey, *HTTPError) {
 	}
 
 	return apiKey, nil
+}
+
+func getAuthorization(r *http.Request) (string, *HTTPError) {
+	value := r.Header.Get(HeaderAuthorization)
+	if value == "" {
+		return "", &HTTPError{
+			StatusCode: http.StatusUnauthorized,
+			Message:    "no authorization header",
+		}
+	}
+
+	if !strings.HasPrefix(value, APIKeyPrefix) {
+		return "", &HTTPError{
+			StatusCode: http.StatusBadRequest,
+			Message:    "malformed authorization header",
+		}
+	}
+
+	return value, nil
 }
 
 func AuthenticationMiddleware(key string, next http.Handler) http.Handler {

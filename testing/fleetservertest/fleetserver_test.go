@@ -20,11 +20,11 @@ import (
 )
 
 // TestRunFleetServer shows how to configure and run a fleet-server capable of
-// enrolling and send action to a single agent.
+// enrolling and send actions to a single agent.
 // For a detailed explanation of each piece and how to put them work together,
 // look at ExampleNewServer_checkin_and_ackWithAcker.
-// Currently, the authentication is disabled so the API key and enrollment token
-// values should not matter.
+// There is no authentication and the enrollment token is ignored, thus it can
+// be any value.
 func TestRunFleetServer(t *testing.T) {
 	t.Skip("use this test if you want a mock fleet-server running to enroll a real agent")
 	agentID := "agentID"
@@ -33,17 +33,19 @@ func TestRunFleetServer(t *testing.T) {
 	ackToken := "AckToken"
 	apiKey := APIKey{
 		ID:  "myKeyID",
-		Key: "MyKeyKey",
+		Key: "myvaKeyKey",
 	}
 
 	// FleetHosts needs to be changed after the server is running, so we can
 	// get the port the server is listening on. Therefore, the action generator
-	// captures the 'fleetHosts' variable so it can read the real fleet-server
+	// captures the 'fleetHosts' variable, so it can read the real fleet-server
 	// address from it.
+	// If you want to predefine an address for the server to listen on, pass
+	// WithAddress(addr) to NewServer.
 	fleetHosts := "host1"
 	var actionsIdx int
 
-	tmpl := TmplData{
+	tmpl := TmplPolicy{
 		AckToken: ackToken,
 		AgentID:  agentID,
 		ActionID: actionID,
@@ -66,7 +68,7 @@ func TestRunFleetServer(t *testing.T) {
 	}
 
 	nextAction := func() (CheckinAction, *HTTPError) {
-		// defer func() { actionsIdx++ }()
+		defer func() { actionsIdx++ }()
 		tmpl.FleetHosts = fleetHosts
 
 		actions, err := NewActionPolicyChangeWithFakeComponent(tmpl)
@@ -76,8 +78,6 @@ func TestRunFleetServer(t *testing.T) {
 
 		switch actionsIdx {
 		case 0:
-			fmt.Println("checkin response action:")
-			fmt.Println(actions)
 			return CheckinAction{
 					AckToken: tmpl.AckToken, Actions: []string{actions}},
 				nil
@@ -93,17 +93,9 @@ func TestRunFleetServer(t *testing.T) {
 		}, false
 	}
 
-	handlers := &Handlers{
-		APIKey: apiKey.Key,
-		//  --enrollment-token bXlLZXlJRDpNeUtleUtleQo=
-		EnrollmentToken: "",
-		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
-		CheckinFn:       NewHandlerCheckinFakeComponent(nextAction),
-		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
-		AckFn:           NewHandlerAckWithAcker(acker),
-		StatusFn:        NewHandlerStatusHealth(),
-	}
-	ts := NewServer(handlers, Data{})
+	ts := NewServerWithFakeComponent(apiKey, agentID, policyID, nextAction, acker,
+		WithRequestLog(t.Logf))
+	defer ts.Close()
 	fleetHosts = fmt.Sprintf(`"%s"`, ts.URL)
 
 	fmt.Println("running on:", fleetHosts)
@@ -118,7 +110,7 @@ func ExampleNewServer_status() {
 	ts := NewServer(&Handlers{
 		APIKey:   apiKey,
 		StatusFn: NewHandlerStatusHealth(),
-	}, Data{})
+	})
 
 	r, err := http.NewRequest(http.MethodGet, ts.URL+PathStatus, nil)
 	if err != nil {
@@ -146,22 +138,32 @@ func ExampleNewServer_status() {
 
 func ExampleNewServer_checkin() {
 	agentID := "agentID"
+	tmpl := TmplPolicy{ActionID: "anActionID"}
 
+	actions, err := NewActionPolicyChangeWithFakeComponent(tmpl)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get new actions: %v", err))
+	}
+
+	// NewHandlerCheckinFakeComponent
 	ts := NewServer(&Handlers{
-		CheckinFn: NewHandlerCheckin(agentID),
-	}, Data{})
+		AgentID: agentID,
+		CheckinFn: NewHandlerCheckinFakeComponent(func() (CheckinAction, *HTTPError) {
+			return CheckinAction{Actions: []string{actions}}, nil
+		}),
+	})
 
 	cmd := fleetapi.NewCheckinCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
-	resp, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+
+	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
 	if err != nil {
-		panic(fmt.Sprintf("failed executing checkin: %v", err))
+		panic(fmt.Sprintf("ExampleNewServer_checkin failed executing checkin: %v", err))
 	}
 
-	fmt.Println(resp.Actions)
-
+	fmt.Println(got.Actions)
 	// Output:
-	// [action_id: policy:24e4d030-ffa7-11ed-b040-9debaa5fecb8:2:1, type: POLICY_CHANGE]
+	// [action_id: anActionID, type: POLICY_CHANGE]
 }
 
 func ExampleNewServer_ack() {
@@ -171,7 +173,7 @@ func ExampleNewServer_ack() {
 	handlers := &Handlers{
 		AckFn: NewHandlerAck(),
 	}
-	ts := NewServer(handlers, Data{})
+	ts := NewServer(handlers)
 
 	cmdAck := fleetapi.NewAckCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
@@ -223,7 +225,7 @@ func ExampleNewServer_enrol() {
 
 	ts := NewServer(&Handlers{
 		EnrollFn: NewHandlerEnroll(agentID, policyID, apiKey),
-	}, Data{})
+	})
 
 	cmd := fleetapi.NewEnrollCmd(sender{url: ts.URL, path: NewPathCheckin(agentID)})
 	resp, err := cmd.Execute(context.Background(), &fleetapi.EnrollRequest{
@@ -282,7 +284,7 @@ func ExampleNewServer_enrol() {
 func ExampleNewServer_checkin_fakeComponent() {
 	agentID := "agentID"
 	policyID := "policyID"
-	tmpl := TmplData{
+	tmpl := TmplPolicy{
 		AckToken:   "AckToken",
 		AgentID:    "AgentID",
 		ActionID:   "ActionID",
@@ -319,7 +321,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	ts := NewServer(&Handlers{
 		AgentID:   agentID, // as there is no enrol, the agentID needs to be manually set
 		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
-	}, Data{})
+	})
 
 	// 1st call, nextAction() will return a POLICY_CHANGE.
 	cmd := fleetapi.NewCheckinCmd(
@@ -353,7 +355,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 func ExampleNewServer_checkin_withDelay() {
 	agentID := "agentID"
 	policyID := "policyID"
-	tmpl := TmplData{
+	tmpl := TmplPolicy{
 		AckToken:   "AckToken",
 		AgentID:    "AgentID",
 		ActionID:   "ActionID",
@@ -387,7 +389,7 @@ func ExampleNewServer_checkin_withDelay() {
 	ts := NewServer(&Handlers{
 		AgentID:   agentID, // as there is no enrol, the agentID needs to be manually set
 		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
-	}, Data{})
+	})
 
 	// 1st - call actions have a delay.
 	cmd := fleetapi.NewCheckinCmd(
@@ -448,7 +450,7 @@ func ExampleNewServer_ackWithAcker() {
 		AgentID: agentID, // as there is no enrol, the agentID needs to be manually set
 		AckFn:   NewHandlerAckWithAcker(acker),
 	}
-	ts := NewServer(handlers, Data{})
+	ts := NewServer(handlers)
 
 	cmdAck := fleetapi.NewAckCmd(
 		agentInfo(agentID), sender{url: ts.URL, path: NewPathAgentAcks(agentID)})
@@ -499,7 +501,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// 1st - defining the check in =============================================
 
 	// create a POLICY_CHANGE action with a valid policy and the fake-inout
-	tmpl := TmplData{
+	tmpl := TmplPolicy{
 		AckToken:   ackToken,
 		AgentID:    agentID,
 		ActionID:   actionID,
@@ -572,7 +574,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 		AckFn:     NewHandlerAckWithAcker(acker),
 		StatusFn:  NewHandlerStatusHealth(),
 	}
-	ts := NewServer(handlers, Data{})
+	ts := NewServer(handlers)
 
 	// =========================================================================
 	// 4th - instantiate the fleetapi commands

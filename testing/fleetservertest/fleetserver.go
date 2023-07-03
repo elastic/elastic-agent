@@ -5,61 +5,96 @@
 package fleetservertest
 
 import (
+	"fmt"
+	"net"
+	"net/http"
 	"net/http/httptest"
 	"time"
 )
 
-type Data struct {
-	AgentID string
-
-	APIKey APIKey
-
-	// EnrollmentToken is the enrollment the agent should use to enroll with
-	// Fleet Server.
-	EnrollmentToken string
-}
-
 type Server struct {
 	*httptest.Server
-	Data Data
 }
 
 var timeNow = time.Now
 
+type Option func(o *options)
+
+type options struct {
+	address string
+	logFn   func(format string, a ...any)
+}
+
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
-// If a route is called and its handler (the *Fn field) is nil a.
+// If a route is called and its handler (the *Fn field) is nil a
 // http.StatusNotImplemented error will be returned.
-// If insecure is set, no authorization check will be performed.
-func NewServer(h *Handlers, _ Data) *Server {
+func NewServer(h *Handlers, opts ...Option) *Server {
+	os := options{}
+	for _, o := range opts {
+		o(&os)
+	}
+
+	if os.logFn != nil {
+		h.logFn = os.logFn
+	}
 	mux := NewRouter(h)
 
-	return &Server{
-		Server: httptest.NewServer(mux),
+	address := ":0"
+	if os.address != "" {
+		address = os.address
+	}
+
+	l, err := net.Listen("tcp", address)
+	if err != nil {
+		panic(fmt.Sprintf("NewServer failed to create a net.Listener: %v", err))
+	}
+
+	s := Server{
+		Server: &httptest.Server{
+			Listener: l,
+			Config:   &http.Server{Handler: mux}},
+	}
+	s.Start()
+
+	return &s
+}
+
+// WithRequestLog sets the server to log every incoming request using logFn.
+func WithRequestLog(logFn func(format string, a ...any)) Option {
+	return func(o *options) {
+		o.logFn = logFn
+	}
+}
+
+// WithAddress will set the address the server will listen on. The format is as
+// defined by net.Listen for an tcp connection.
+func WithAddress(addr string) Option {
+	return func(o *options) {
+		o.address = addr
 	}
 }
 
 // NewServerWithFakeComponent returns mock Fleet Server ready to use for Agent's
 // e2e tests. The server has the Status, Checkin, Enroll and Ack handlers
-// configured. If any of those handlers are defined on api, it'll overwrite the
-// default implementation. The returned policy contains one integration using
-// the fake input.
-func NewServerWithFakeComponent(h *Handlers, agentID, policyID, ackToken string, data Data) *Server {
-	if h.StatusFn == nil {
-		h.StatusFn = NewHandlerStatusHealth()
+// configured. You need to implement:
+//   - nextAction, called on every checkin to get the actions to return
+//   - acker, responsible for ack-ing the actions.
+func NewServerWithFakeComponent(
+	apiKey APIKey,
+	agentID string,
+	policyID string,
+	nextAction func() (CheckinAction, *HTTPError),
+	acker func(id string) (AckResponseItem, bool),
+	opts ...Option) *Server {
+	handlers := &Handlers{
+		APIKey:          apiKey.Key,
+		EnrollmentToken: "",
+		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
+		CheckinFn:       NewHandlerCheckinFakeComponent(nextAction),
+		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
+		AckFn:           NewHandlerAckWithAcker(acker),
+		StatusFn:        NewHandlerStatusHealth(),
 	}
-	if h.CheckinFn == nil {
-		h.CheckinFn = NewHandlerCheckin(ackToken)
-	}
-	if h.EnrollFn == nil {
-		h.EnrollFn = NewHandlerEnroll(agentID, policyID, data.APIKey)
-	}
-	if h.AckFn == nil {
-		h.AckFn = NewHandlerAck()
-	}
-
-	mux := NewRouter(h)
-	return &Server{
-		Server: httptest.NewServer(mux),
-		Data:   data,
-	}
+	ts := NewServer(handlers, opts...)
+	return ts
 }

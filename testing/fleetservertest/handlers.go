@@ -112,17 +112,21 @@ func NewHandlerAckWithAcker(acker func(actionID string) (AckResponseItem, bool))
 	}
 }
 
-// NewHandlerEnroll returns an enrol handler ready to be used. Its repose will
-// use the agentID, policyID and apiKey when building the EnrollResponse.
+// NewHandlerEnroll returns an enrol handler ready to be used. It ignores the
+// enrolment token. Its repose will use the provided agentID, policyID and apiKey
+// when building the EnrollResponse. It'll also set the agentID on Handlers, which
+// is accessible by the other handlers.
 func NewHandlerEnroll(agentID, policyID string, apiKey APIKey) func(
 	ctx context.Context,
 	h *Handlers,
 	userAgent string,
+	enrolmentToken string,
 	enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
 	return func(
 		ctx context.Context,
 		h *Handlers,
 		userAgent string,
+		enrolmentToken string,
 		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError) {
 
 		h.AgentID = agentID
@@ -162,42 +166,6 @@ func NewHandlerEnroll(agentID, policyID string, apiKey APIKey) func(
 				Tags:                 enrollRequest.Metadata.Tags,
 			},
 		}, nil
-	}
-}
-
-// NewHandlerCheckin returns a checkin handler that always returns a policy with
-// System integrations and, if withEndpoint is true, Endpoint Security.
-func NewHandlerCheckin(ackToken string) func(
-	ctx context.Context,
-	h *Handlers,
-	agentID string,
-	userAgent string,
-	acceptEncoding string,
-	checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
-
-	policy := checkinResponseJSONPolicySystemIntegration
-
-	return func(
-		ctx context.Context,
-		h *Handlers,
-		agentID string,
-		userAgent string,
-		acceptEncoding string,
-		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError) {
-		h.AgentID = agentID
-
-		resp := CheckinResponse{}
-		err := json.Unmarshal(
-			[]byte(fmt.Sprintf(policy, ackToken, agentID)),
-			&resp)
-		if err != nil {
-			return nil, &HTTPError{
-				StatusCode: http.StatusInternalServerError,
-				Message:    fmt.Sprintf("failed to unmarshal policy PolicySystemIntegration: %v", err),
-			}
-		}
-
-		return &resp, nil
 	}
 }
 
@@ -242,9 +210,7 @@ func NewHandlerCheckinFakeComponent(next func() (CheckinAction, *HTTPError)) fun
 			return nil, hErr
 		}
 
-		actions := fmt.Sprintf("[%s]", strings.Join(data.Actions, ","))
-
-		respStr := NewCheckinResponse(data.AckToken, actions)
+		respStr := NewCheckinResponse(data.AckToken, data.Actions...)
 		resp := CheckinResponse{}
 		err := json.Unmarshal(
 			[]byte(respStr),

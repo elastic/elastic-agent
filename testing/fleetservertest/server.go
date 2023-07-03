@@ -35,6 +35,10 @@ type Handlers struct {
 	APIKey          string
 	EnrollmentToken string
 
+	// logFn if set will be used to log every request.
+	logFn func(format string, a ...any)
+
+	// =============================== Handlers ===============================
 	AckFn func(
 		ctx context.Context,
 		h *Handlers,
@@ -53,6 +57,7 @@ type Handlers struct {
 		ctx context.Context,
 		h *Handlers,
 		userAgent string,
+		enrolmentToken string,
 		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
 
 	ArtifactFn func(
@@ -114,9 +119,15 @@ func NewRouter(handlers *Handlers) *mux.Router {
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					mu.Lock()
 					defer mu.Unlock()
-					// AuthenticationMiddleware(route.AuthKey, route.Handler).
+
+					ww := &statusResponseWriter{w: w}
+
 					route.Handler.
-						ServeHTTP(w, r)
+						ServeHTTP(ww, r)
+					if handlers.logFn != nil {
+						handlers.logFn("%d - %s %s %s %s\n",
+							ww.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr)
+					}
 				}))
 	}
 
@@ -276,10 +287,14 @@ func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// we can ignore the error and let the handler implementation deal with it.
+	enrollmentToken, _ := getAuthorization(r)
+
 	result, err := h.EnrollFn(
 		r.Context(),
 		h,
 		userAgentParam,
+		enrollmentToken,
 		enrollRequestParam)
 	if err != nil {
 		respondAsJSON(err.StatusCode, err, w)
@@ -477,4 +492,28 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// statusResponseWriter wraps a http.ResponseWriter to expose the status code
+// through statusResponseWriter.statusCode
+type statusResponseWriter struct {
+	w          http.ResponseWriter
+	statusCode int
+}
+
+func (s *statusResponseWriter) Header() http.Header {
+	return s.w.Header()
+}
+
+func (s *statusResponseWriter) Write(bs []byte) (int, error) {
+	return s.w.Write(bs)
+}
+
+func (s *statusResponseWriter) WriteHeader(statusCode int) {
+	s.statusCode = statusCode
+	s.w.WriteHeader(statusCode)
+}
+
+func (s *statusResponseWriter) StatusCode() int {
+	return s.statusCode
 }
