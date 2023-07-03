@@ -118,6 +118,9 @@ func getAuthorization(r *http.Request) (string, *HTTPError) {
 	return value, nil
 }
 
+// TODO: it does not work for enroll. Even though enroll and the other APIs
+// authenticate using the same header, the way they handle the authentication
+// is different. So it'd need to check the path and apply the right authentication.
 func AuthenticationMiddleware(key string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		apiKey, err := Authenticate(r, key)
@@ -132,7 +135,7 @@ func AuthenticationMiddleware(key string, next http.Handler) http.Handler {
 	})
 }
 
-// NewAuthorizationHeader returns a authorization header key-value pair built
+// NewAuthorizationHeader returns an authorization header key-value pair built
 // from key to be used to authenticate requests to Fleet Server.
 //
 //	req.Header.Set(NewAuthorizationHeader("my-api-key"))

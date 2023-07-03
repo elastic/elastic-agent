@@ -107,9 +107,7 @@ func (p *ProxyURL) SetupSuite() {
 		}, false
 	}
 
-	fleet := fleetservertest.NewServerWithFakeComponent(
-		apiKey, agentID, policyID, nextAction, acker,
-		fleetservertest.WithRequestLog(log.Printf))
+	fleet := fleetservertest.NewServerWithFakeComponent(apiKey, "anEnrolmentToken", agentID, policyID, nextAction, acker, fleetservertest.WithRequestLog(log.Printf))
 	p.fleet = fleet
 
 	f, err := define.NewFixture(p.T(),

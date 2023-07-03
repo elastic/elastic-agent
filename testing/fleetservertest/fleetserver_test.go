@@ -31,6 +31,7 @@ func TestRunFleetServer(t *testing.T) {
 	actionID := "ActionID"
 	policyID := "policyID"
 	ackToken := "AckToken"
+	enrolmentToken := "enrolmentToken"
 	apiKey := APIKey{
 		ID:  "myKeyID",
 		Key: "myvaKeyKey",
@@ -93,13 +94,20 @@ func TestRunFleetServer(t *testing.T) {
 		}, false
 	}
 
-	ts := NewServerWithFakeComponent(apiKey, agentID, policyID, nextAction, acker,
+	ts := NewServerWithFakeComponent(
+		apiKey,
+		enrolmentToken,
+		agentID,
+		policyID,
+		nextAction,
+		acker,
 		WithRequestLog(t.Logf))
 	defer ts.Close()
+
 	fleetHosts = fmt.Sprintf(`"%s"`, ts.URL)
 
-	fmt.Println("running on:", fleetHosts)
-	fmt.Println("press CTRL + C to stop")
+	fmt.Println("listening on:", fleetHosts)               //nolint:forbidigo // it's a test
+	fmt.Println("press CTRL + C or kill the test to stop") //nolint:forbidigo // it's a test
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	wg.Wait()
@@ -112,7 +120,7 @@ func ExampleNewServer_status() {
 		StatusFn: NewHandlerStatusHealth(),
 	})
 
-	r, err := http.NewRequest(http.MethodGet, ts.URL+PathStatus, nil)
+	r, err := http.NewRequest(http.MethodGet, ts.URL+PathStatus, nil) //nolint:noctx // it's a test
 	if err != nil {
 		panic(fmt.Sprintf("could not create new request to fleet-test-server: %v", err))
 	}
@@ -569,12 +577,11 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// 3rd - define the implementation for the fleet-server handlers we'll use
 	// and create the mock fleet-server
 	handlers := &Handlers{
-		AgentID:   agentID, // as there is no enrol, the agentID needs to be manually set
 		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
 		AckFn:     NewHandlerAckWithAcker(acker),
 		StatusFn:  NewHandlerStatusHealth(),
 	}
-	ts := NewServer(handlers)
+	ts := NewServer(handlers, WithAgentID(agentID)) // as there is no enrol, the agentID needs to be manually set
 
 	// =========================================================================
 	// 4th - instantiate the fleetapi commands
@@ -671,7 +678,7 @@ func (s sender) Send(
 	headers http.Header,
 	body io.Reader) (*http.Response, error) {
 
-	r, err := http.NewRequest(method, s.url+path, body)
+	r, err := http.NewRequest(method, s.url+path, body) //nolint:noctx // it's a test
 	if err != nil {
 		panic(fmt.Sprintf("could not create new request to fleet-test-server: %v", err))
 	}

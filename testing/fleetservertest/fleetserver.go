@@ -23,6 +23,7 @@ type Option func(o *options)
 type options struct {
 	address string
 	logFn   func(format string, a ...any)
+	agentID string
 }
 
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
@@ -37,6 +38,7 @@ func NewServer(h *Handlers, opts ...Option) *Server {
 	if os.logFn != nil {
 		h.logFn = os.logFn
 	}
+	h.AgentID = os.agentID
 	mux := NewRouter(h)
 
 	address := ":0"
@@ -44,7 +46,7 @@ func NewServer(h *Handlers, opts ...Option) *Server {
 		address = os.address
 	}
 
-	l, err := net.Listen("tcp", address)
+	l, err := net.Listen("tcp", address) //nolint:gosec // it's a test
 	if err != nil {
 		panic(fmt.Sprintf("NewServer failed to create a net.Listener: %v", err))
 	}
@@ -52,14 +54,14 @@ func NewServer(h *Handlers, opts ...Option) *Server {
 	s := Server{
 		Server: &httptest.Server{
 			Listener: l,
-			Config:   &http.Server{Handler: mux}},
+			Config:   &http.Server{Handler: mux}}, //nolint:gosec // it's a test
 	}
 	s.Start()
 
 	return &s
 }
 
-// WithRequestLog sets the server to log every incoming request using logFn.
+// WithRequestLog sets the server to log every request using logFn.
 func WithRequestLog(logFn func(format string, a ...any)) Option {
 	return func(o *options) {
 		o.logFn = logFn
@@ -67,10 +69,18 @@ func WithRequestLog(logFn func(format string, a ...any)) Option {
 }
 
 // WithAddress will set the address the server will listen on. The format is as
-// defined by net.Listen for an tcp connection.
+// defined by net.Listen for a tcp connection.
 func WithAddress(addr string) Option {
 	return func(o *options) {
 		o.address = addr
+	}
+}
+
+// WithAgentID sets the agentID considered enrolled with the server. If enroll
+// isn't called or the agentID 'manually' set, the server will reject the requests.
+func WithAgentID(id string) Option {
+	return func(o *options) {
+		o.agentID = id
 	}
 }
 
@@ -79,22 +89,27 @@ func WithAddress(addr string) Option {
 // configured. You need to implement:
 //   - nextAction, called on every checkin to get the actions to return
 //   - acker, responsible for ack-ing the actions.
+//
+// See TestRunFleetServer and ExampleNewServer_checkin_and_ackWithAcker for more
+// details on how to use it and define `nextAction` and `acker`.
 func NewServerWithFakeComponent(
 	apiKey APIKey,
+	enrolmentToken string,
 	agentID string,
 	policyID string,
 	nextAction func() (CheckinAction, *HTTPError),
 	acker func(id string) (AckResponseItem, bool),
 	opts ...Option) *Server {
+
 	handlers := &Handlers{
 		APIKey:          apiKey.Key,
-		EnrollmentToken: "",
+		EnrollmentToken: enrolmentToken,
 		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
 		CheckinFn:       NewHandlerCheckinFakeComponent(nextAction),
 		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
 		AckFn:           NewHandlerAckWithAcker(acker),
 		StatusFn:        NewHandlerStatusHealth(),
 	}
-	ts := NewServer(handlers, opts...)
-	return ts
+
+	return NewServer(handlers, opts...)
 }
