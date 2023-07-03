@@ -31,7 +31,7 @@ func TestRunFleetServer(t *testing.T) {
 	actionID := "ActionID"
 	policyID := "policyID"
 	ackToken := "AckToken"
-	enrolmentToken := "enrolmentToken"
+	enrolmentToken := "enrolmentToken" //nolint:gosec // it's a test
 	apiKey := APIKey{
 		ID:  "myKeyID",
 		Key: "myvaKeyKey",

@@ -27,7 +27,7 @@ import (
 // TODO(Anderson): fix me!
 type Handlers struct {
 	// AgentID is the ID of agent communicating with this fleet-server:
-	//  - on Enrol this ID is returned,
+	//  - on Enrol this ID is set and returned to the enrolling agent,
 	//  - on all other API calls using an agent ID, if the ID sent is different,
 	// fleet-server will return a 404.
 	AgentID string
@@ -99,9 +99,8 @@ type Route struct {
 }
 
 // NewRouter creates a new *mux.Router for each route defined on handlers.
-// It'll add the AuthenticationMiddleware and will synchronise the calls for the
-// handlers. That way it's safe for any handler implementation to access the
-// Handlers properties.
+// It'll synchronise the calls to the handlers. That way it's safe for any handler
+// implementation to access the Handlers properties.
 func NewRouter(handlers *Handlers) *mux.Router {
 	// mu is the mutex used to allow any handler safely access the properties
 	// of handlers. It's used by a middleware so the handler implementation
