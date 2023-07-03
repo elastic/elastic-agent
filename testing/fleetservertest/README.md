@@ -9,6 +9,9 @@ be enrolled or AgentID must be set on Handlers. Use `WithAgentID` to set it when
 creating the server. Also, the requests are executed sequentially, making safe for
 the handlers implementations to access and eventually change the Handlers properties.
 
+Right now there is no authentication, which means any enrollment token will work
+by default. There is some work done for authentication on [auth.go](auth.go).
+
 ## tl;dr
 
 - See [`fleetservertest_test.go`](fleetserver_test.go) for examples.
