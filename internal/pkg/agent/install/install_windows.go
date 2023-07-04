@@ -26,6 +26,9 @@ func postInstall(topPath string) error {
 		return err
 	}
 
+	// since we removed the top-level elastic-agent.exe we can get
+	// rid of the package version file (it was there only in case
+	// the top .exe was called with a `version` subcommand )
 	err = os.Remove(filepath.Join(topPath, version.PackageVersionFileName))
 	if err != nil {
 		// do not handle does not exist, it should have existed
