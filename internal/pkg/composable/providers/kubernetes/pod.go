@@ -447,7 +447,7 @@ func generateContainerData(
 							)
 						} else if config.Hints.DefaultContainerLogs {
 							// in case of no package detected in the hints fallback to the generic log collection
-							_, _ = hintsMapping.Put("generic_logs.container_logs.enabled", true)
+							_, _ = hintsMapping.Put("container_logs.enabled", true)
 							_, _ = hintsMapping.Put("container_id", c.ID)
 							_ = comm.AddOrUpdate(
 								eventID,
