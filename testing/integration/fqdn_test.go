@@ -55,7 +55,7 @@ type FQDN struct {
 
 // Before suite
 func (s *FQDN) SetupSuite() {
-	agentFixture, err := define.NewFixture(s.T())
+	agentFixture, err := define.NewFixture(s.T(), define.Version())
 	require.NoError(s.T(), err)
 	s.agentFixture = agentFixture
 
