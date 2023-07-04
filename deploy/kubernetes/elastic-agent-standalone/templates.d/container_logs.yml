@@ -4,7 +4,7 @@ inputs:
     type: filestream
     use_output: default
     streams:
-      - condition: ${kubernetes.hints.generic_logs.container_logs.enabled} == true
+      - condition: ${kubernetes.hints.container_logs.enabled} == true
         data_stream:
           dataset: kubernetes.container_logs
           type: logs
@@ -13,7 +13,7 @@ inputs:
         parsers:
           - container:
               format: auto
-              stream: ${kubernetes.hints.generic_logs.container_logs.stream|'all'}
+              stream: ${kubernetes.hints.container_logs.stream|'all'}
         paths:
           - /var/log/containers/*${kubernetes.hints.container_id}.log
         prospector:
