@@ -347,11 +347,6 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	return cmd.CombinedOutput()
 }
 
-// WorkDir returns the current working directory of the fixture (where the agent files are located)
-func (f *Fixture) WorkDir() string {
-	return f.workDir
-}
-
 func (f *Fixture) ensurePrepared(ctx context.Context) error {
 	if f.workDir == "" {
 		return f.Prepare(ctx)
