@@ -676,28 +676,6 @@ func performGET(cfg setupConfig, client *kibana.Client, path string, response in
 	return lastErr
 }
 
-func performPOST(cfg setupConfig, client *kibana.Client, path string, writer io.Writer, msg string) error {
-	var lastErr error
-	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Connection.Request("POST", path, nil, nil, nil)
-		if err != nil || code >= 400 {
-			if err != nil {
-				err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
-					client.Connection.URL, path, err, truncateString(result))
-			} else {
-				err = fmt.Errorf("http POST request to %s%s fails. StatusCode: %d Response: %s",
-					client.Connection.URL, path, code, truncateString(result))
-			}
-			lastErr = err
-			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
-			<-time.After(cfg.Kibana.RetrySleepDuration)
-			continue
-		}
-		return nil
-	}
-	return lastErr
-}
-
 func truncateString(b []byte) string {
 	const maxLength = 250
 	runes := bytes.Runes(b)
