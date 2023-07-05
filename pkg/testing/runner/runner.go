@@ -230,7 +230,7 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 
 // runMachine runs the batch on the machine.
 func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
-	logger.Logf("Starting SSH connection to %s", machine.PublicIP)
+	logger.Logf("Starting SSH; connect with `ssh -i ./ogc-cache/id_rsa %s@%s`", machine.PublicIP, machine.Layout.Username)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	client, err := sshConnect(connectCtx, machine.PublicIP, machine.Layout.Username, sshAuth)
@@ -259,18 +259,19 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 		logger.Logf("Waiting for stack to be ready")
 		resp := <-ch
 		if resp == nil {
-			logger.Logf("Cannot continue because stack never became ready")
-		} else {
-			logger.Logf("Will continue stack is ready")
-			env = map[string]string{
-				"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
-				"ELASTICSEARCH_USERNAME": resp.Username,
-				"ELASTICSEARCH_PASSWORD": resp.Password,
-				"KIBANA_HOST":            resp.KibanaEndpoint,
-				"KIBANA_USERNAME":        resp.Username,
-				"KIBANA_PASSWORD":        resp.Password,
-			}
+			return OSRunnerResult{}, fmt.Errorf("cannot continue because stack never became ready")
 		}
+		logger.Logf("Will continue, stack is ready")
+		env = map[string]string{
+			"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
+			"ELASTICSEARCH_USERNAME": resp.Username,
+			"ELASTICSEARCH_PASSWORD": resp.Password,
+			"KIBANA_HOST":            resp.KibanaEndpoint,
+			"KIBANA_USERNAME":        resp.Username,
+			"KIBANA_PASSWORD":        resp.Password,
+		}
+		logger.Logf("Created Stack with Kibana host %s, %s/%s", resp.KibanaEndpoint, resp.Username, resp.Password)
+
 	}
 
 	// run the actual tests on the host
