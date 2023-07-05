@@ -8,8 +8,6 @@ inputs:
         data_stream:
           dataset: kubernetes.container_logs
           type: logs
-        exclude_files: [ ]
-        exclude_lines: [ ]
         parsers:
           - container:
               format: auto
@@ -19,5 +17,4 @@ inputs:
         prospector:
           scanner:
             symlinks: true
-        tags: [ ]
     data_stream.namespace: default
