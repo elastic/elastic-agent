@@ -359,26 +359,6 @@ data:
               #     match: after
             paths:
               - /var/log/containers/*${kubernetes.container.id}.log
-      - name: hints-filestream-container-logs
-        id: hints-filestream-container-logs-${kubernetes.hints.container_id}
-        type: filestream
-        use_output: default
-        streams:
-          - id: hints-filestream-container-logs-${kubernetes.hints.container_id}
-            condition: ${kubernetes.hints.container_logs.enabled} == true
-            data_stream:
-              dataset: kubernetes.hints.container_logs
-              type: logs
-            parsers:
-              - container:
-                  format: auto
-                  stream: ${kubernetes.hints.container_logs.stream|'all'}
-            paths:
-              - /var/log/containers/*${kubernetes.hints.container_id}.log
-            prospector:
-              scanner:
-                symlinks: true
-        data_stream.namespace: default
       - id: audit-log
         type: filestream
         use_output: default
