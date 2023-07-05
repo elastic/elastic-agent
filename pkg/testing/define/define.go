@@ -63,8 +63,9 @@ func Version() string {
 	return ver
 }
 
-// NewFixture returns a new Elastic Agent testing fixture.
-func NewFixture(t *testing.T, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+// NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
+// the agent logging to the test logger.
+func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	buildsDir := os.Getenv("AGENT_BUILD_DIR")
 	if buildsDir == "" {
 		projectDir, err := findProjectRoot()
@@ -73,9 +74,10 @@ func NewFixture(t *testing.T, opts ...atesting.FixtureOpt) (*atesting.Fixture, e
 		}
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
+
 	f := atesting.LocalFetcher(buildsDir)
 	opts = append(opts, atesting.WithFetcher(f), atesting.WithLogOutput())
-	return atesting.NewFixture(t, Version(), opts...)
+	return atesting.NewFixture(t, version, opts...)
 }
 
 // findProjectRoot finds the root directory of the project, by finding the go.mod file.
