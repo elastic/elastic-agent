@@ -59,8 +59,6 @@ type OSRunner interface {
 
 // Logger is a simple logging interface used by each runner type.
 type Logger interface {
-	// Prefix returns the prefix used for logging.
-	Prefix() string
 	// Logf logs the message for this runner.
 	Logf(format string, args ...any)
 }
@@ -109,6 +107,7 @@ func NewRunner(cfg Config, batches ...define.Batch) (*Runner, error) {
 		}
 	}
 	logger := &runnerLogger{
+		writer:    os.Stdout,
 		timestamp: cfg.Timestamp,
 	}
 	return &Runner{
@@ -117,6 +116,11 @@ func NewRunner(cfg Config, batches ...define.Batch) (*Runner, error) {
 		batches:      layoutBatches,
 		batchToCloud: make(map[string]*essCloudResponse),
 	}, nil
+}
+
+// Logger returns the logger used by the runner.
+func (r *Runner) Logger() Logger {
+	return r.logger
 }
 
 // Run runs all the tests.
@@ -786,7 +790,8 @@ func mergePackageResult(pkg OSRunnerPackageResult, id string, batchName string, 
 		sudoStr = "true"
 	}
 	if pkg.Output != nil {
-		pkgWriter := newPrefixOutput(rawOutput, fmt.Sprintf("%s(%s)%s: ", pkg.Name, batchName, suffix))
+		rawLogger := &runnerLogger{writer: rawOutput, timestamp: false}
+		pkgWriter := newPrefixOutput(rawLogger, fmt.Sprintf("%s(%s)%s: ", pkg.Name, batchName, suffix))
 		_, err := pkgWriter.Write(pkg.Output)
 		if err != nil {
 			return fmt.Errorf("failed to write raw output from %s %s: %w", id, pkg.Name, err)
@@ -947,28 +952,21 @@ type essCloudResponse struct {
 }
 
 type runnerLogger struct {
+	writer    io.Writer
 	timestamp bool
-}
-
-func (l *runnerLogger) Prefix() string {
-	return ""
 }
 
 func (l *runnerLogger) Logf(format string, args ...any) {
 	if l.timestamp {
-		_, _ = fmt.Fprintf(os.Stdout, "[%s] >>> %s\n", time.Now().Format(time.StampMilli), fmt.Sprintf(format, args...))
+		_, _ = fmt.Fprintf(l.writer, "[%s] >>> %s\n", time.Now().Format(time.StampMilli), fmt.Sprintf(format, args...))
 	} else {
-		_, _ = fmt.Fprintf(os.Stdout, ">>> %s\n", fmt.Sprintf(format, args...))
+		_, _ = fmt.Fprintf(l.writer, ">>> %s\n", fmt.Sprintf(format, args...))
 	}
 }
 
 type batchLogger struct {
 	wrapped Logger
 	prefix  string
-}
-
-func (b *batchLogger) Prefix() string {
-	return b.prefix
 }
 
 func (b *batchLogger) Logf(format string, args ...any) {

@@ -7,7 +7,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -157,8 +156,8 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, c *ssh.Client, logger
 			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
 		}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (stdout): ", logger.Prefix()))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (stderr): ", logger.Prefix()))
+		session.Stdout = newPrefixOutput(logger, fmt.Sprintf("Test output (stdout): "))
+		session.Stderr = newPrefixOutput(logger, fmt.Sprintf("Test output (stderr): "))
 		session.Stdin = execTest
 		// allowed to fail because tests might fail
 		_ = session.Run("bash")
@@ -191,8 +190,8 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, c *ssh.Client, logger
 			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
 		}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (sudo) (stdout): ", logger.Prefix()))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (sudo) (stderr): ", logger.Prefix()))
+		session.Stdout = newPrefixOutput(logger, fmt.Sprintf("Test output (sudo) (stdout): "))
+		session.Stderr = newPrefixOutput(logger, fmt.Sprintf("Test output (sudo) (stderr): "))
 		session.Stdin = execTest
 		// allowed to fail because tests might fail
 		_ = session.Run("bash")
