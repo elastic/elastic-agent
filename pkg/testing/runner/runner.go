@@ -82,6 +82,7 @@ type Result struct {
 // Runner runs the tests on remote instances.
 type Runner struct {
 	cfg            Config
+	logger         Logger
 	batches        []LayoutBatch
 	batchToCloud   map[string]*essCloudResponse
 	batchToCloudMx sync.RWMutex
@@ -107,8 +108,12 @@ func NewRunner(cfg Config, batches ...define.Batch) (*Runner, error) {
 			return nil, err
 		}
 	}
+	logger := &runnerLogger{
+		timestamp: cfg.Timestamp,
+	}
 	return &Runner{
 		cfg:          cfg,
+		logger:       logger,
 		batches:      layoutBatches,
 		batchToCloud: make(map[string]*essCloudResponse),
 	}, nil
@@ -208,7 +213,7 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 					batch.LayoutOS.OS.Version,
 					batch.ID[len(batch.ID)-5:len(batch.ID)-1],
 				)
-				logger := &batchLogger{prefix: loggerPrefix}
+				logger := &batchLogger{wrapped: r.logger, prefix: loggerPrefix}
 				result, err := r.runMachine(ctx, sshAuth, logger, repoArchive, batch, m)
 				if err != nil {
 					logger.Logf("Failed for instance %s: %s\n", m.PublicIP, err)
@@ -380,7 +385,7 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 	var signer ssh.Signer
 	if errors.Is(priErr, os.ErrNotExist) || errors.Is(pubErr, os.ErrNotExist) {
 		// either is missing (re-create)
-		fmt.Fprintf(os.Stdout, ">>> Create SSH keys to use for SSH\n")
+		r.logger.Logf("Create SSH keys to use for SSH")
 		_ = os.Remove(privateKey)
 		_ = os.Remove(publicKey)
 		pri, err := newSSHPrivateKey()
@@ -427,7 +432,7 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir string) (string, error) {
 	zipPath := filepath.Join(dir, "agent-repo.zip")
 	_ = os.Remove(zipPath) // start fresh
-	fmt.Fprintf(os.Stdout, ">>> Creating zip archive of repo to send to remote hosts\n")
+	r.logger.Logf("Creating zip archive of repo to send to remote hosts")
 	err := createRepoZipArchive(ctx, repoDir, zipPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create zip archive of repo: %w", err)
@@ -441,7 +446,7 @@ func (r *Runner) ogcPull(ctx context.Context) error {
 		"pull",
 		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
 	}
-	fmt.Fprintf(os.Stdout, ">>> Pulling latest ogc image\n")
+	r.logger.Logf("Pulling latest ogc image")
 	proc, err := process.Start("docker", process.WithContext(ctx), process.WithArgs(args))
 	if err != nil {
 		return fmt.Errorf("failed to run docker pull: %w", err)
@@ -482,14 +487,14 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 	defer r.batchToCloudMx.Unlock()
 	for _, version := range versions {
 		name := fmt.Sprintf("at-%s-%s", strings.Replace(emailParts[0], ".", "-", -1), strings.Replace(version, ".", "", -1))
-		fmt.Fprintf(os.Stdout, ">>> Creating ESS cloud %s (%s)\n", version, name)
+		r.logger.Logf("Creating ESS cloud %s (%s)", version, name)
 		resp, err := essClient.CreateDeployment(ctx, ess.CreateDeploymentRequest{
 			Name:    name,
 			Region:  r.cfg.ESS.Region,
 			Version: version,
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stdout, ">>> Failed to create ESS cloud %s: %s\n", version, err)
+			r.logger.Logf("Failed to create ESS cloud %s: %s", version, err)
 			return fmt.Errorf("failed to create ESS cloud for version %s: %w", version, err)
 		}
 		essResp := &essCloudResponse{
@@ -507,7 +512,7 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 			defer cancel()
 			ready, err := essClient.DeploymentIsReady(ctx, resp.resp.ID, 30*time.Second)
 			if err != nil {
-				fmt.Fprintf(os.Stdout, ">>> Failed to check for cloud %s to be ready: %s\n", version, err)
+				r.logger.Logf("Failed to check for cloud %s to be ready: %s", version, err)
 			}
 			resp.subMx.RLock()
 			subs := make([]chan *ess.CreateDeploymentResponse, len(resp.subCh))
@@ -553,7 +558,7 @@ func (r *Runner) cleanupCloud() {
 			return essClient.ShutdownDeployment(ctx, cloud.resp.ID)
 		}()
 		if err != nil {
-			fmt.Fprintf(os.Stdout, ">>> Failed to cleanup cloud %s: %s\n", cloud.resp.ID, err)
+			r.logger.Logf("Failed to cleanup cloud %s: %s", cloud.resp.ID, err)
 		}
 	}
 
@@ -603,7 +608,7 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal layouts YAML: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, ">>> Import layouts into ogc\n")
+	r.logger.Logf("Import layouts into ogc")
 	proc, err := r.ogcRun(ctx, []string{"layout", "import"}, true)
 	if err != nil {
 		return fmt.Errorf("failed to run ogc import: %w", err)
@@ -625,7 +630,7 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 
 // ogcUp brings up all the instances.
 func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
-	fmt.Fprintf(os.Stdout, ">>> Bring up instances through ogc\n")
+	r.logger.Logf("Bring up instances through ogc")
 	var output bytes.Buffer
 	proc, err := r.ogcRun(ctx, []string{"up", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
@@ -642,7 +647,7 @@ func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
 
 // ogcDown brings down all the instances.
 func (r *Runner) ogcDown(ctx context.Context) error {
-	fmt.Fprintf(os.Stdout, ">>> Bring down instances through ogc\n")
+	r.logger.Logf("Bring down instances through ogc")
 	var output bytes.Buffer
 	proc, err := r.ogcRun(ctx, []string{"down", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
@@ -941,8 +946,25 @@ type essCloudResponse struct {
 	subMx sync.RWMutex
 }
 
+type runnerLogger struct {
+	timestamp bool
+}
+
+func (l *runnerLogger) Prefix() string {
+	return ""
+}
+
+func (l *runnerLogger) Logf(format string, args ...any) {
+	if l.timestamp {
+		_, _ = fmt.Fprintf(os.Stdout, "[%s] >>> %s\n", time.Now().Format(time.StampMilli), fmt.Sprintf(format, args...))
+	} else {
+		_, _ = fmt.Fprintf(os.Stdout, ">>> %s\n", fmt.Sprintf(format, args...))
+	}
+}
+
 type batchLogger struct {
-	prefix string
+	wrapped Logger
+	prefix  string
 }
 
 func (b *batchLogger) Prefix() string {
@@ -950,5 +972,5 @@ func (b *batchLogger) Prefix() string {
 }
 
 func (b *batchLogger) Logf(format string, args ...any) {
-	fmt.Fprintf(os.Stdout, ">>> (%s) %s\n", b.prefix, fmt.Sprintf(format, args...))
+	b.wrapped.Logf("(%s) %s", b.prefix, fmt.Sprintf(format, args...))
 }

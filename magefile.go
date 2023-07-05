@@ -1529,6 +1529,7 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
+	timestamp := timestampEnabled()
 	r, err := runner.NewRunner(runner.Config{
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
@@ -1546,6 +1547,7 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 		Matrix:      matrix,
 		SingleTest:  singleTest,
 		VerboseMode: mg.Verbose(),
+		Timestamp:   timestamp,
 	}, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
@@ -1563,6 +1565,15 @@ func shouldBuildAgent() bool {
 		return false
 	}
 	return ret
+}
+
+func timestampEnabled() bool {
+	timestamp := os.Getenv("TEST_INTEG_TIMESTAMP")
+	if timestamp == "" {
+		return false
+	}
+	b, _ := strconv.ParseBool(timestamp)
+	return b
 }
 
 // Pre-requisite: user must have the gcloud CLI installed
