@@ -41,6 +41,7 @@ func queryDaemon() (*release.VersionInfo, error) {
 		Commit:    version.Commit,
 		BuildTime: version.BuildTime,
 		Snapshot:  version.Snapshot,
+		FIPS:      version.FIPS,
 	}, nil
 }
 
@@ -111,5 +112,5 @@ func isMismatch(a *release.VersionInfo, b *release.VersionInfo) bool {
 	if a.Commit != "unknown" && b.Commit != "unknown" {
 		return a.Commit != b.Commit
 	}
-	return a.Version != b.Version || a.BuildTime != b.BuildTime || a.Snapshot != b.Snapshot
+	return a.Version != b.Version || a.BuildTime != b.BuildTime || a.Snapshot != b.Snapshot || a.FIPS != b.FIPS
 }
