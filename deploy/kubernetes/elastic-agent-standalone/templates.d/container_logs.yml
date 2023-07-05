@@ -1,6 +1,6 @@
 inputs:
-  - name: filestream-generic
-    id: hints-container-logs-${kubernetes.hints.container_id}
+  - name: hints-filestream-container-logs
+    id: hints-filestream-container-logs-${kubernetes.hints.container_id}
     type: filestream
     use_output: default
     streams:
