@@ -68,6 +68,7 @@ type VersionInfo struct {
 	Commit    string    `yaml:"commit"`
 	BuildTime time.Time `yaml:"build_time"`
 	Snapshot  bool      `yaml:"snapshot"`
+	FIPS      bool      `yaml:"fips"`
 }
 
 // Info returns current version information.
@@ -77,6 +78,7 @@ func Info() VersionInfo {
 		Commit:    Commit(),
 		BuildTime: BuildTime(),
 		Snapshot:  Snapshot(),
+		FIPS:      FIPS(),
 	}
 }
 
@@ -93,5 +95,8 @@ func (v VersionInfo) String() string {
 	sb.WriteString(" at ")
 	sb.WriteString(v.BuildTime.Format("2006-01-02 15:04:05 -0700 MST"))
 	sb.WriteString(")")
+	if v.FIPS {
+		sb.WriteString(" [FIPS]")
+	}
 	return sb.String()
 }
