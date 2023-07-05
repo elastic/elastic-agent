@@ -7,10 +7,10 @@
 package release
 
 import (
-	"crypto/internal/boring/fipstls"
+	"crypto/boring"
 )
 
 // FIPS returns true if FIPS boringcrypto is enabled.
 func FIPS() bool {
-	return fipstls.Required()
+	return boring.Enabled()
 }
