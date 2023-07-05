@@ -832,6 +832,9 @@ func packageAgent(platforms []string, packagingFn func()) {
 					panic(err)
 				}
 
+				packagesMissing := false
+				packagesCopied := 0
+
 				if !requiredPackagesPresent(pwd, b, version, requiredPackages) {
 					cmd := exec.Command("mage", "package")
 					cmd.Dir = pwd
@@ -859,10 +862,16 @@ func packageAgent(platforms []string, packagingFn func()) {
 					os.MkdirAll(targetPath, 0755)
 					for _, f := range files {
 						targetFile := filepath.Join(targetPath, filepath.Base(f))
+						packagesCopied += 1
 						if err := sh.Copy(targetFile, f); err != nil {
 							panic(err)
 						}
 					}
+				}
+				// a very basic footcannon protector; if packages are missing and we need to rebuild them, check to see if those files were copied
+				// if we needed to repackage beats but still somehow copied nothing, could indicate an issue. Usually due to beats and agent being at different versions.
+				if packagesMissing && packagesCopied == 0 {
+					fmt.Printf(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
 				}
 			}
 		}
