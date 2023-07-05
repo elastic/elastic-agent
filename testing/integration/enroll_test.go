@@ -42,7 +42,7 @@ type EnrollRunner struct {
 
 func (runner *EnrollRunner) SetupSuite() {
 	runner.T().Logf("In SetupSuite")
-	agentFixture, err := define.NewFixture(runner.T())
+	agentFixture, err := define.NewFixture(runner.T(), define.Version())
 	runner.agentFixture = agentFixture
 	require.NoError(runner.T(), err)
 }
@@ -77,7 +77,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	runner.T().Logf("created policy: %s", policy.ID)
 
 	runner.T().Cleanup(func() {
-		//After: unenroll
+		// After: unenroll
 		err = tools.UnEnrollAgent(runner.requirementsInfo.KibanaClient)
 		require.NoError(runner.T(), err)
 	})

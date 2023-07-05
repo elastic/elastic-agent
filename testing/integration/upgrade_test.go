@@ -154,7 +154,7 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 
 	// Upgrade Watcher check disabled until
 	// https://github.com/elastic/elastic-agent/issues/2977 is resolved.
-	//checkUpgradeWatcherRan(s.T(), s.agentFixture)
+	// checkUpgradeWatcherRan(s.T(), s.agentFixture)
 
 	s.T().Log("Getting Agent version...")
 	newVersion, err := tools.GetAgentVersion(kibClient)
@@ -198,9 +198,7 @@ type StandaloneUpgradeTestSuite struct {
 // Before suite
 func (s *StandaloneUpgradeTestSuite) SetupSuite() {
 
-	agentFixture, err := define.NewFixture(
-		s.T(),
-	)
+	agentFixture, err := define.NewFixture(s.T(), define.Version())
 
 	require.NoError(s.T(), err)
 
@@ -448,9 +446,7 @@ func newStandaloneUpgradeRetryDownloadTestSuite(info *define.Info, toVersion *ve
 
 // Before suite
 func (s *StandaloneUpgradeRetryDownloadTestSuite) SetupSuite() {
-	agentFixture, err := define.NewFixture(
-		s.T(),
-	)
+	agentFixture, err := define.NewFixture(s.T(), define.Version())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
