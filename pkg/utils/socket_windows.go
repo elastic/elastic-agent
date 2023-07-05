@@ -33,9 +33,8 @@ func SocketURLWithFallback(id, dir string) string {
 	u := &url.URL{}
 	u.Path = "/"
 	u.Scheme = SocketScheme
-	dir = "/"
 
-	candidateURL := u.JoinPath(dir, filename)
+	candidateURL := u.JoinPath("/", filename)
 	// the base64 URLEncoding of 24 bits will be less than 256 characters
 	return candidateURL.String()
 }
