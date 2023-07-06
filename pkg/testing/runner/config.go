@@ -30,6 +30,9 @@ type Config struct {
 
 	// VerboseMode passed along a verbose mode flag to tests
 	VerboseMode bool
+
+	// Timestamp enables timestamps on the console output.
+	Timestamp bool
 }
 
 // Validate returns an error if the information is invalid.
