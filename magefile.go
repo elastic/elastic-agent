@@ -1319,7 +1319,7 @@ func (Integration) Check() error {
 }
 
 // runs only the integration tests that support local mode
-// it accepts as an optional argument the test name to run.
+// it takes as argument the test name to run or all if we want to run them all.
 func (Integration) Local(ctx context.Context, testName string) error {
 	if shouldBuildAgent() {
 		// need only local package for current platform
@@ -1335,7 +1335,11 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	params := devtools.DefaultGoTestIntegrationArgs()
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
-	params.TestName = testName
+	if testName == "all" {
+		params.TestName = ""
+	} else {
+		params.TestName = testName
+	}
 	return devtools.GoTest(ctx, params)
 }
 
