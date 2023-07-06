@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -29,8 +30,39 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
-//go:embed endpoint_security_package_policy.json
-var endpointPackagePolicyJSON []byte
+// type PolicyResponse struct {
+// 	Item AgentPolicy `json:"item"`
+// }
+
+// type AgentPolicy struct {
+// 	ID     string `json:"id,omitempty"`
+// 	Inputs []AgentPolicyInput
+// 	// Name of the policy. Required to create a policy.
+// 	Name string `json:"name"`
+// 	// Namespace of the policy. Required to create a policy.
+// 	Namespace          string                           `json:"namespace"`
+// 	Description        string                           `json:"description,omitempty"`
+// 	MonitoringEnabled  []kibana.MonitoringEnabledOption `json:"monitoring_enabled,omitempty"`
+// 	DataOutputID       string                           `json:"data_output_id,omitempty"`
+// 	MonitoringOutputID string                           `json:"monitoring_output_id,omitempty"`
+// 	FleetServerHostID  string                           `json:"fleet_server_host_id,omitempty"`
+// 	DownloadSourceID   string                           `json:"download_source_id,omitempty"`
+// 	UnenrollTimeout    int                              `json:"unenroll_timeout,omitempty"`
+// 	InactivityTImeout  int                              `json:"inactivity_timeout,omitempty"`
+// 	AgentFeatures      []map[string]interface{}         `json:"agent_features,omitempty"`
+// 	UpdatedOn          time.Time                        `json:"updated_on"`
+// 	UpdatedBy          string                           `json:"updated_by"`
+// 	Revision           int                              `json:"revision"`
+// 	IsProtected        bool                             `json:"is_protected"`
+// 	PackagePolicies    []map[string]interface{}         `json:"package_policies"`
+// }
+
+// type AgentPolicyInput struct {
+// 	ID              string `json:"id"`
+// 	Name            string `json:"name"`
+// 	Type            string `json:"type"`
+// 	PackagePolicyID string `json:"package_policy_id"`
+// }
 
 // https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#createPackagePolicy
 // request https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#package_policy_request
@@ -69,40 +101,6 @@ type PackagePolicy struct {
 	Description string                      `json:"description"`
 }
 
-type PolicyResponse struct {
-	Item AgentPolicy `json:"item"`
-}
-
-type AgentPolicy struct {
-	ID     string `json:"id,omitempty"`
-	Inputs []AgentPolicyInput
-	// Name of the policy. Required to create a policy.
-	Name string `json:"name"`
-	// Namespace of the policy. Required to create a policy.
-	Namespace          string                           `json:"namespace"`
-	Description        string                           `json:"description,omitempty"`
-	MonitoringEnabled  []kibana.MonitoringEnabledOption `json:"monitoring_enabled,omitempty"`
-	DataOutputID       string                           `json:"data_output_id,omitempty"`
-	MonitoringOutputID string                           `json:"monitoring_output_id,omitempty"`
-	FleetServerHostID  string                           `json:"fleet_server_host_id,omitempty"`
-	DownloadSourceID   string                           `json:"download_source_id,omitempty"`
-	UnenrollTimeout    int                              `json:"unenroll_timeout,omitempty"`
-	InactivityTImeout  int                              `json:"inactivity_timeout,omitempty"`
-	AgentFeatures      []map[string]interface{}         `json:"agent_features,omitempty"`
-	UpdatedOn          time.Time                        `json:"updated_on"`
-	UpdatedBy          string                           `json:"updated_by"`
-	Revision           int                              `json:"revision"`
-	IsProtected        bool                             `json:"is_protected"`
-	PackagePolicies    []map[string]interface{}         `json:"package_policies"`
-}
-
-type AgentPolicyInput struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	Type            string `json:"type"`
-	PackagePolicyID string `json:"package_policy_id"`
-}
-
 // https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#fleet_server_health_check_400_response
 type FleetErrorResponse struct {
 	StatusCode int    `json:"statusCode"`
@@ -120,7 +118,7 @@ func TestEndpointSecurity(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t)
+	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
 	policyID := enrollAgentInFleet(t, info, fixture)
@@ -221,19 +219,34 @@ func enrollAgentInFleet(t *testing.T, info *define.Info, fixture *atesting.Fixtu
 	return policy.ID
 }
 
+type endpointPackageTemplateVars struct {
+	PolicyID string
+	Version  string
+}
+
+//go:embed endpoint_security_package.json.tmpl
+var endpointPackagePolicyTemplate string
+
 // Installs the Elastic Defend package to cause the agent to install the endpoint-security service.
 func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) {
 	t.Helper()
 
 	t.Log("Creating endpoint package policy request")
-	packagePolicyReq := PackagePolicyRequest{}
-	err := json.Unmarshal(endpointPackagePolicyJSON, &packagePolicyReq)
+	tmpl, err := template.New("pkgpolicy").Parse(endpointPackagePolicyTemplate)
 	require.NoError(t, err)
 
-	// TODO: Set the Package.Version to the last minor release.
-	packagePolicyReq.PolicyID = policyID
-	jsonPackagePolicyReq, err := json.Marshal(packagePolicyReq)
+	var pkgPolicyBuf bytes.Buffer
+	err = tmpl.Execute(&pkgPolicyBuf, endpointPackageTemplateVars{
+		PolicyID: policyID,
+		Version:  "8.9.0",
+	})
 	require.NoError(t, err)
+
+	// Make sure the templated value is actually valid JSON before making the API request.
+	// Using json.Unmarshal will give us the actual syntax error, calling json.Valid() would not.
+	packagePolicyReq := PackagePolicyRequest{}
+	err = json.Unmarshal(pkgPolicyBuf.Bytes(), &packagePolicyReq)
+	require.NoErrorf(t, err, "Templated package policy is not valid JSON:\n%s", pkgPolicyBuf.String())
 
 	t.Log("POST /api/fleet/package_policies")
 	pkgCtx, pkgCancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -244,7 +257,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 		"/api/fleet/package_policies",
 		nil,
 		nil,
-		bytes.NewReader(jsonPackagePolicyReq),
+		bytes.NewReader(pkgPolicyBuf.Bytes()),
 	)
 	require.NoError(t, err)
 	defer pkgResp.Body.Close()
