@@ -7,7 +7,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -198,6 +197,7 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, c *ssh.Client, logger
 		_ = session.Run("bash")
 		_ = session.Close()
 
+<<<<<<< HEAD
 		// fetch the contents for each package
 		for _, pkg := range batch.SudoTests {
 			resultPkg, err := getRunnerPackageResult(ctx, c, pkg, prefix)
@@ -205,6 +205,35 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, c *ssh.Client, logger
 				return OSRunnerResult{}, err
 			}
 			result.SudoPackages = append(result.SudoPackages, resultPkg)
+=======
+func runTests(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient *ssh.Client, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
+	execTest := strings.NewReader(script)
+
+	session, err := sshClient.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start session: %w", err)
+	}
+
+	session.Stdout = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stdout): ", name))
+	session.Stderr = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stderr): ", name))
+	session.Stdin = execTest
+
+	// allowed to fail because tests might fail
+	logger.Logf("Running %s tests...", name)
+	err = session.Run("bash")
+	if err != nil {
+		logger.Logf("%s tests failed: %s", name, err)
+	}
+	// this seems to always return an error
+	_ = session.Close()
+
+	var result []OSRunnerPackageResult
+	// fetch the contents for each package
+	for _, pkg := range tests {
+		resultPkg, err := getRunnerPackageResult(ctx, sshClient, pkg, prefix)
+		if err != nil {
+			return nil, err
+>>>>>>> 576d3f8cbb (Add support for timestamps on runner (#2998))
 		}
 	}
 	return result, nil
