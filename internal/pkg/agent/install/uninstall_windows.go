@@ -1,0 +1,153 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+//go:build windows
+
+package install
+
+import (
+	"fmt"
+	"io/fs"
+	"syscall"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+)
+
+func isBlockingOnExe(err error) bool {
+	if err == nil {
+		return false
+	}
+	path := getPathFromError(err)
+	return path != ""
+}
+
+func removeBlockingExe(blockingErr error) (string, error) {
+	path := getPathFromError(blockingErr)
+	if path == "" {
+		return "", nil
+	}
+
+	// open handle for delete only
+	h, err := openDeleteHandle(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to open handler for %q: %w", path, err)
+	}
+
+	// rename handle
+	err = renameHandle(h)
+	if err != nil {
+		windows.CloseHandle(h)
+		return "", fmt.Errorf("failed to rename handler for %q: %w", path, err)
+	}
+	windows.CloseHandle(h)
+
+	// re-open handle
+	h, err = openDeleteHandle(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to open handler after rename for %q: %w", path, err)
+	}
+
+	// disposite the handle
+	err = depositeHandle(h)
+	if err != nil {
+		windows.CloseHandle(h)
+		return "", fmt.Errorf("failed to deposite handler for %q: %w", path, err)
+	}
+	windows.CloseHandle(h)
+	return path, nil
+}
+
+func getPathFromError(blockingErr error) string {
+	fsErr, ok := blockingErr.(*fs.PathError)
+	if !ok {
+		return ""
+	}
+	errno, ok := fsErr.Err.(syscall.Errno)
+	if !ok {
+		return ""
+	}
+	if errno == syscall.ERROR_ACCESS_DENIED {
+		return fsErr.Path
+	}
+	return ""
+}
+
+func openDeleteHandle(path string) (windows.Handle, error) {
+	wPath, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, err
+	}
+	handle, err := windows.CreateFile(
+		wPath,
+		windows.DELETE,
+		0,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_ATTRIBUTE_NORMAL,
+		0,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return handle, nil
+}
+
+func renameHandle(hHandle windows.Handle) error {
+	wRename, err := windows.UTF16FromString(":agentrm")
+	if err != nil {
+		return err
+	}
+
+	var rename fileRenameInfo
+	lpwStream := &wRename[0]
+	rename.FileNameLength = uint32(unsafe.Sizeof(lpwStream))
+
+	windows.NewLazyDLL("kernel32.dll").NewProc("RtlCopyMemory").Call(
+		uintptr(unsafe.Pointer(&rename.FileName[0])),
+		uintptr(unsafe.Pointer(lpwStream)),
+		unsafe.Sizeof(lpwStream),
+	)
+
+	err = windows.SetFileInformationByHandle(
+		hHandle,
+		windows.FileRenameInfo,
+		(*byte)(unsafe.Pointer(&rename)),
+		uint32(unsafe.Sizeof(rename)+unsafe.Sizeof(lpwStream)),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func depositeHandle(hHandle windows.Handle) error {
+	var deleteFile fileDispositionInfo
+	deleteFile.DeleteFile = true
+
+	err := windows.SetFileInformationByHandle(
+		hHandle,
+		windows.FileDispositionInfo,
+		(*byte)(unsafe.Pointer(&deleteFile)),
+		uint32(unsafe.Sizeof(deleteFile)),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type fileRenameInfo struct {
+	Union struct {
+		ReplaceIfExists bool
+		Flags           uint32
+	}
+	RootDirectory  windows.Handle
+	FileNameLength uint32
+	FileName       [1]uint16
+}
+
+type fileDispositionInfo struct {
+	DeleteFile bool
+}
