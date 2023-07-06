@@ -99,7 +99,7 @@ inputs:
     message: Healthy
 `
 
-func TestFakeComponentIntegrationTestSuite(t *testing.T) {
+func TestFakeComponent(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Local: true,
 	})
