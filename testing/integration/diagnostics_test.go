@@ -115,7 +115,7 @@ func verifyDiagnosticArchive(t *testing.T, diagArchive string, avi *client.Versi
 	assert.ElementsMatch(t, extractKeysFromMap(expectedExtractedFiles), extractKeysFromMap(actualExtractedDiagFiles))
 }
 
-func TestDiagnosticsCommandIntegrationTestSuite(t *testing.T) {
+func TestDiagnosticsCommand(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Local: true,
 	})
