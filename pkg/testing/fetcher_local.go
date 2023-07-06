@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	semver "github.com/elastic/elastic-agent/pkg/version"
 )
 
 type localFetcher struct {
@@ -48,16 +50,21 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 	if err != nil {
 		return nil, err
 	}
-	mainBuild := fmt.Sprintf("elastic-agent-%s-%s", version, suffix)
+
+	ver, err := semver.ParseVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("invalid version: %q: %w", ver, err)
+	}
+
+	mainBuildfmt := "elastic-agent-%s-%s"
+	if f.snapshotOnly && !ver.IsSnapshot() {
+		mainBuildfmt = "elastic-agent-%s-SNAPSHOT-%s"
+	}
+
+	mainBuild := fmt.Sprintf(mainBuildfmt, version, suffix)
 	mainBuildPath := filepath.Join(f.dir, mainBuild)
 	build := mainBuild
 	buildPath := mainBuildPath
-	_, err = os.Stat(buildPath)
-	if err != nil || f.snapshotOnly {
-		// try to use a snapshot (or always with snapshotOnly)
-		build = fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", version, suffix)
-		buildPath = filepath.Join(f.dir, build)
-	}
 	_, err = os.Stat(buildPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find build at %s: %w", f.dir, err)
