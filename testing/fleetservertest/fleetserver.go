@@ -29,24 +29,24 @@ type options struct {
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
 // If a route is called and its handler (the *Fn field) is nil a
 // http.StatusNotImplemented error will be returned.
-func NewServer(h *Handlers, optns ...Option) *Server {
-	opts := options{}
-	for _, o := range optns {
-		o(&opts)
+func NewServer(h *Handlers, opts ...Option) *Server {
+	os := options{}
+	for _, o := range opts {
+		o(&os)
 	}
 
-	if opts.logFn != nil {
-		h.logFn = opts.logFn
+	if os.logFn != nil {
+		h.logFn = os.logFn
 	}
-	if opts.agentID != "" {
-		h.AgentID = opts.agentID
+	if os.agentID != "" {
+		h.AgentID = os.agentID
 	}
 
 	mux := NewRouter(h)
 
 	address := ":0"
-	if opts.address != "" {
-		address = opts.address
+	if os.address != "" {
+		address = os.address
 	}
 
 	l, err := net.Listen("tcp", address) //nolint:gosec // it's a test
@@ -107,11 +107,11 @@ func NewServerWithFakeComponent(
 	handlers := &Handlers{
 		APIKey:          apiKey.Key,
 		EnrollmentToken: enrolmentToken,
-		AgentID:         agentID, // as there is no enroll, the agentID needs to be manually set
+		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
 		CheckinFn:       NewHandlerCheckinFakeComponent(nextAction),
 		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
 		AckFn:           NewHandlerAckWithAcker(acker),
-		StatusFn:        NewHandlerStatusHealthy(),
+		StatusFn:        NewHandlerStatusHealth(),
 	}
 
 	return NewServer(handlers, opts...)

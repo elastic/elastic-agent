@@ -26,7 +26,7 @@ import (
 // There is no authentication and the enrollment token is ignored, thus it can
 // be any value.
 func TestRunFleetServer(t *testing.T) {
-	t.Skip("use this test if you want a mock fleet-server running to enroll a real agent")
+	// t.Skip("use this test if you want a mock fleet-server running to enroll a real agent")
 	agentID := "agentID"
 	actionID := "ActionID"
 	policyID := "policyID"
@@ -117,7 +117,7 @@ func ExampleNewServer_status() {
 	apiKey := "aAPIKey"
 	ts := NewServer(&Handlers{
 		APIKey:   apiKey,
-		StatusFn: NewHandlerStatusHealthy(),
+		StatusFn: NewHandlerStatusHealth(),
 	})
 
 	r, err := http.NewRequest(http.MethodGet, ts.URL+PathStatus, nil) //nolint:noctx // it's a test
@@ -214,7 +214,7 @@ func ExampleNewServer_ack() {
 	// &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}, fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
 }
 
-func ExampleNewServer_enroll() {
+func ExampleNewServer_enrol() {
 	nowStr := "2009-11-10T23:00:00+00:00"
 	now, err := time.Parse(time.RFC3339, nowStr)
 	if err != nil {
@@ -247,12 +247,12 @@ func ExampleNewServer_enroll() {
 		},
 	})
 	if err != nil {
-		panic(fmt.Sprintf("could not execute enroll command: %v", err))
+		panic(fmt.Sprintf("could not execute enrol command: %v", err))
 	}
 
 	bs, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
-		panic(fmt.Sprintf("could not marshal enroll response: %v", err))
+		panic(fmt.Sprintf("could not marshal enrol response: %v", err))
 	}
 	fmt.Println(string(bs))
 
@@ -578,7 +578,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	handlers := &Handlers{
 		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
 		AckFn:     NewHandlerAckWithAcker(acker),
-		StatusFn:  NewHandlerStatusHealthy(),
+		StatusFn:  NewHandlerStatusHealth(),
 	}
 	ts := NewServer(handlers, WithAgentID(agentID)) // as there is no enrol, the agentID needs to be manually set
 

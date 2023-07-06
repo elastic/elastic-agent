@@ -20,10 +20,14 @@ import (
 // for rendered OpenAPI definition. If any of the handlers are nil, a
 // http.StatusNotImplemented is returned for the route.
 //
-// For the moment there is no authentication.
+// Authentication is made extracting he API key or enrollment token,
+// from the HeaderAuthorization header and compared against API.APIKey or
+// API.EnrollmentToken. API.EnrollmentToken is used for Enroll requests and
+// API.APIKey for all others.
+// TODO(Anderson): fix me!
 type Handlers struct {
 	// AgentID is the ID of agent communicating with this fleet-server:
-	//  - on Enroll this ID is set and returned to the enrolling agent,
+	//  - on Enrol this ID is set and returned to the enrolling agent,
 	//  - on all other API calls using an agent ID, if the ID sent is different,
 	// fleet-server will return a 404.
 	AgentID string
@@ -53,7 +57,7 @@ type Handlers struct {
 		ctx context.Context,
 		h *Handlers,
 		userAgent string,
-		enrollmentToken string,
+		enrolmentToken string,
 		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
 
 	ArtifactFn func(
@@ -277,7 +281,7 @@ func (h *Handlers) AgentEnroll(w http.ResponseWriter, r *http.Request) {
 	if err := d.Decode(&enrollRequestParam); err != nil {
 		respondAsJSON(http.StatusBadRequest, HTTPError{
 			StatusCode: http.StatusBadRequest,
-			Message:    fmt.Sprintf("could not decode enroll request: %v", err),
+			Message:    fmt.Sprintf("could not decode enrol request: %v", err),
 		}, w)
 		return
 	}

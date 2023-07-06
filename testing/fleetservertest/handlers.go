@@ -223,14 +223,14 @@ func NewHandlerCheckinFakeComponent(next func() (CheckinAction, *HTTPError)) fun
 			}
 		}
 
-		// simulate long poll
+		// simulate long pool
 		time.Sleep(data.Delay)
 
 		return &resp, nil
 	}
 }
 
-func NewHandlerStatusHealthy() func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
+func NewHandlerStatusHealth() func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
 	return func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
 		return &StatusResponse{
 			Name:   "fleet-server",
@@ -240,7 +240,7 @@ func NewHandlerStatusHealthy() func(ctx context.Context, _ *Handlers) (*StatusRe
 	}
 }
 
-func NewHandlerStatusUnhealthy() func(ctx context.Context) (*StatusResponse, *HTTPError) {
+func NewHandlerStatusUnhealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
 	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
 		return &StatusResponse{
 			Name:   "fleet-server",

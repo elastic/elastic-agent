@@ -10,11 +10,17 @@ import (
 	"text/template"
 )
 
+// TmplPolicy is all the data used to create a policy. Therefore, all the properties
+// should be populated with valid JSON without the surrounding double quotes.
+// Check the actionPolicyChangeTmpl for details.
 type TmplPolicy struct {
-	AckToken   string
-	AgentID    string
-	ActionID   string
-	PolicyID   string
+	AckToken string
+	AgentID  string
+	ActionID string
+	PolicyID string
+	// FleetHosts should be a JSON array without the square brackets:
+	// - `"host1", "host2"`
+	// = `"host"`
 	FleetHosts string
 	SourceURI  string
 	CreatedAt  string
@@ -59,7 +65,7 @@ const (
 	actionPolicyChangeTmpl = `
     {
       "agent_id": "{{.AgentID}}",
-      "created_at": "{{.CreatedAt}}",
+      "created_at": "2023-05-31T11:37:50.607Z",
       "data": {
         "policy": {
           "agent": {
