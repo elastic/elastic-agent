@@ -250,7 +250,7 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 
 // runMachine runs the batch on the machine.
 func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
-	logger.Logf("Starting SSH; connect with `ssh -i ./ogc-cache/id_rsa %s@%s`", machine.PublicIP, machine.Layout.Username)
+	logger.Logf("Starting SSH; connect with `ssh -i ./ogc-cache/id_rsa %s@%s`", machine.Layout.Username, machine.PublicIP)
 	client := NewSSHClient(machine.PublicIP, machine.Layout.Username, sshAuth)
 	err := client.ConnectWithTimeout(ctx, 10*time.Minute)
 	if err != nil {

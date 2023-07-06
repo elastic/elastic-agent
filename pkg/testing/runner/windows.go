@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/magefile/mage/mg"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -125,8 +124,8 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger 
 			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
 		}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (stdout): ", logger.Prefix()))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (stderr): ", logger.Prefix()))
+		session.Stdout = newPrefixOutput(logger, "Test output (stdout): ")
+		session.Stderr = newPrefixOutput(logger, "Test output (stderr): ")
 		session.Stdin = execTest
 		// allowed to fail because tests might fail
 		_ = session.Run("powershell -noprofile -noninteractive -")
@@ -152,8 +151,8 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger 
 			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
 		}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (sudo) (stdout): ", logger.Prefix()))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (sudo) (stderr): ", logger.Prefix()))
+		session.Stdout = newPrefixOutput(logger, "Test output (sudo) (stdout): ")
+		session.Stderr = newPrefixOutput(logger, "Test output (sudo) (stderr): ")
 		session.Stdin = execTest
 		// allowed to fail because tests might fail
 		_ = session.Run("powershell -noprofile -noninteractive -")
