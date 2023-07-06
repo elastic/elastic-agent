@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator/state"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -88,7 +88,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 			client,
 			scheduler,
 			noop.New(),
-			&emptyStateFetcher{},
+			emptyStateFetcher,
 			stateStore,
 		)
 
@@ -227,7 +227,7 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			&emptyStateFetcher{},
+			emptyStateFetcher,
 			stateStore,
 		)
 		require.NoError(t, err)
@@ -279,7 +279,7 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			&emptyStateFetcher{},
+			emptyStateFetcher,
 			stateStore,
 		)
 		require.NoError(t, err)
@@ -400,10 +400,8 @@ type testAgentInfo struct{}
 
 func (testAgentInfo) AgentID() string { return "agent-secret" }
 
-type emptyStateFetcher struct{}
-
-func (e *emptyStateFetcher) State() state.State {
-	return state.State{}
+func emptyStateFetcher() coordinator.State {
+	return coordinator.State{}
 }
 
 func runFleetGateway(ctx context.Context, g gateway.FleetGateway) <-chan error {

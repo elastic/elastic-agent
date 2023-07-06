@@ -7,7 +7,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -20,7 +19,7 @@ import (
 type DebianRunner struct{}
 
 // Prepare the test
-func (DebianRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
+func (DebianRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
 	// prepare build-essential and unzip
 	//
 	// apt-get update and install are so terrible that we have to place this in a loop, because in some cases the
@@ -33,7 +32,7 @@ func (DebianRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, arc
 			logger.Logf("Running apt-get update")
 			// `-o APT::Update::Error-Mode=any` ensures that any warning is tried as an error, so the retry
 			// will occur (without this we get random failures)
-			stdOut, errOut, err := c.ExecWithRetry(updateCtx, "sudo", []string{"apt-get", "update", "-o APT::Update::Error-Mode=any"}, 15*time.Second)
+			stdOut, errOut, err := sshClient.ExecWithRetry(updateCtx, "sudo", []string{"apt-get", "update", "-o APT::Update::Error-Mode=any"}, 15*time.Second)
 			if err != nil {
 				return fmt.Errorf("failed to run apt-get update: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 			}
@@ -43,7 +42,7 @@ func (DebianRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, arc
 				installCtx, installCancel := context.WithTimeout(ctx, 1*time.Minute)
 				defer installCancel()
 				logger.Logf("Install build-essential and unzip")
-				stdOut, errOut, err = c.ExecWithRetry(installCtx, "sudo", []string{"apt-get", "install", "-y", "build-essential", "unzip"}, 5*time.Second)
+				stdOut, errOut, err = sshClient.ExecWithRetry(installCtx, "sudo", []string{"apt-get", "install", "-y", "build-essential", "unzip"}, 5*time.Second)
 				if err != nil {
 					return fmt.Errorf("failed to install build-essential and unzip: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 				}
@@ -66,19 +65,19 @@ func (DebianRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, arc
 	logger.Logf("Installing golang %s (%s)", goVersion, arch)
 	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.linux-%s.tar.gz", goVersion, arch)
 	filename := path.Base(downloadURL)
-	stdOut, errOut, err := c.Exec(ctx, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)
+	stdOut, errOut, err := sshClient.Exec(ctx, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to download go from %s with curl: %w (stdout: %s, stderr: %s)", downloadURL, err, stdOut, errOut)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "sudo", []string{"tar", "-C", "/usr/local", "-xzf", filename}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "sudo", []string{"tar", "-C", "/usr/local", "-xzf", filename}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to extract go to /usr/local with tar: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "sudo", []string{"ln", "-s", "/usr/local/go/bin/go", "/usr/bin/go"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "sudo", []string{"ln", "-s", "/usr/local/go/bin/go", "/usr/bin/go"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to symlink /usr/local/go/bin/go to /usr/bin/go: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "sudo", []string{"ln", "-s", "/usr/local/go/bin/gofmt", "/usr/bin/gofmt"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "sudo", []string{"ln", "-s", "/usr/local/go/bin/gofmt", "/usr/bin/gofmt"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to symlink /usr/local/go/bin/gofmt to /usr/bin/gofmt: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
@@ -86,11 +85,11 @@ func (DebianRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, arc
 	// copy the archive and extract it on the host
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
-	err = c.Copy(repoArchive, destRepoName)
+	err = sshClient.Copy(repoArchive, destRepoName)
 	if err != nil {
 		return fmt.Errorf("failed to SCP repo archive %s: %w", repoArchive, err)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "unzip", []string{destRepoName, "-d", "agent"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "unzip", []string{destRepoName, "-d", "agent"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to unzip %s to agent directory: %w (stdout: %s, stderr: %s)", destRepoName, err, stdOut, errOut)
 	}
@@ -99,23 +98,23 @@ func (DebianRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, arc
 	logger.Logf("Running make mage and prepareOnRemote")
 	envs := `GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH"`
 	installMage := strings.NewReader(fmt.Sprintf(`cd agent && %s make mage && %s mage integration:prepareOnRemote`, envs, envs))
-	stdOut, errOut, err = c.Exec(ctx, "bash", nil, installMage)
+	stdOut, errOut, err = sshClient.Exec(ctx, "bash", nil, installMage)
 	if err != nil {
 		return fmt.Errorf("failed to to perform make mage and prepareOnRemote: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
 	// place the build for the agent on the host
 	logger.Logf("Copying agent build %s", filepath.Base(buildPath))
-	err = c.Copy(buildPath, filepath.Base(buildPath))
+	err = sshClient.Copy(buildPath, filepath.Base(buildPath))
 	if err != nil {
 		return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
 	}
 	insideAgentDir := filepath.Join("agent", buildPath)
-	stdOut, errOut, err = c.Exec(ctx, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", filepath.Dir(insideAgentDir), err, stdOut, errOut)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "mv", []string{filepath.Base(buildPath), insideAgentDir}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "mv", []string{filepath.Base(buildPath), insideAgentDir}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to move %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
 	}
@@ -124,7 +123,7 @@ func (DebianRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, arc
 }
 
 // Run the test
-func (DebianRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
+func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {
@@ -138,72 +137,68 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger L
 		}
 	}
 
+	logArg := ""
+	if verbose {
+		logArg = "-v"
+	}
 	var result OSRunnerResult
 	if len(tests) > 0 {
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(tests, ","))
 		vars = extendVars(vars, env)
-		logger.Logf("Starting tests")
-		logArg := ""
-		if verbose {
-			logArg = "-v"
-		}
+
 		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
-		execTest := strings.NewReader(script)
-
-		session, err := c.NewSession()
+		results, err := runTests(ctx, logger, "non-sudo", prefix, script, sshClient, batch.Tests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
+			return OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
 		}
-
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (stdout): ", logger.Prefix()))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (stderr): ", logger.Prefix()))
-		session.Stdin = execTest
-		// allowed to fail because tests might fail
-		_ = session.Run("bash")
-		_ = session.Close()
-
-		// fetch the contents for each package
-		for _, pkg := range batch.Tests {
-			resultPkg, err := getRunnerPackageResult(ctx, c, pkg, prefix)
-			if err != nil {
-				return OSRunnerResult{}, err
-			}
-			result.Packages = append(result.Packages, resultPkg)
-		}
+		result.Packages = results
 	}
 
 	if len(sudoTests) > 0 {
 		prefix := fmt.Sprintf("%s-sudo", prefix)
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(sudoTests, ","))
 		vars = extendVars(vars, env)
-		logger.Logf("Starting sudo tests")
-		logArg := ""
-		if verbose {
-			logArg = "-v"
-		}
 		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
-		execTest := strings.NewReader(script)
 
-		session, err := c.NewSession()
+		results, err := runTests(ctx, logger, "sudo", prefix, script, sshClient, batch.SudoTests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
+			return OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
 		}
+		result.SudoPackages = results
+	}
 
-		session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (sudo) (stdout): ", logger.Prefix()))
-		session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (sudo) (stderr): ", logger.Prefix()))
-		session.Stdin = execTest
-		// allowed to fail because tests might fail
-		_ = session.Run("bash")
-		_ = session.Close()
+	return result, nil
+}
 
-		// fetch the contents for each package
-		for _, pkg := range batch.SudoTests {
-			resultPkg, err := getRunnerPackageResult(ctx, c, pkg, prefix)
-			if err != nil {
-				return OSRunnerResult{}, err
-			}
-			result.SudoPackages = append(result.SudoPackages, resultPkg)
+func runTests(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient SSHClient, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
+	execTest := strings.NewReader(script)
+
+	session, err := sshClient.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start session: %w", err)
+	}
+
+	session.Stdout = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stdout): ", name))
+	session.Stderr = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stderr): ", name))
+	session.Stdin = execTest
+
+	// allowed to fail because tests might fail
+	logger.Logf("Running %s tests...", name)
+	err = session.Run("bash")
+	if err != nil {
+		logger.Logf("%s tests failed: %s", name, err)
+	}
+	// this seems to always return an error
+	_ = session.Close()
+
+	var result []OSRunnerPackageResult
+	// fetch the contents for each package
+	for _, pkg := range tests {
+		resultPkg, err := getRunnerPackageResult(ctx, sshClient, pkg, prefix)
+		if err != nil {
+			return nil, err
 		}
+		result = append(result, resultPkg)
 	}
 	return result, nil
 }

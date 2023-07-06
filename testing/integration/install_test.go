@@ -34,7 +34,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t)
+	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -80,7 +80,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t)
+	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.

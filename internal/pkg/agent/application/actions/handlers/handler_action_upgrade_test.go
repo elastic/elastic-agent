@@ -51,16 +51,31 @@ func (u *mockUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
 }
 
 func TestUpgradeHandler(t *testing.T) {
+	// Create a cancellable context that will shut down the coordinator after
+	// the test.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	log, _ := logger.New("", false)
-	ack := noopacker.New()
 	agentInfo, _ := info.NewAgentInfo(true)
 	msgChan := make(chan string)
-	upgradeMgr := &mockUpgradeManager{msgChan: msgChan}
-	specs := component.RuntimeSpecs{}
-	c := coordinator.New(log, configuration.DefaultConfiguration(), logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
+
+	// Create and start the coordinator
+	c := coordinator.New(
+		log,
+		configuration.DefaultConfiguration(),
+		logger.DefaultLogLevel,
+		agentInfo,
+		component.RuntimeSpecs{},
+		nil,
+		&mockUpgradeManager{msgChan: msgChan},
+		nil, nil, nil, nil, nil, false)
+	//nolint:errcheck // We don't need the termination state of the Coordinator
+	go c.Run(ctx)
+
 	u := NewUpgrade(log, c)
-	ctx := context.Background()
 	a := fleetapi.ActionUpgrade{Version: "8.3.0", SourceURI: "http://localhost"}
+	ack := noopacker.New()
 	err := u.Handle(ctx, &a, ack)
 	require.NoError(t, err)
 	msg := <-msgChan
@@ -68,19 +83,33 @@ func TestUpgradeHandler(t *testing.T) {
 }
 
 func TestUpgradeHandlerSameVersion(t *testing.T) {
+	// Create a cancellable context that will shut down the coordinator after
+	// the test.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	log, _ := logger.New("", false)
-	ack := noopacker.New()
 	agentInfo, _ := info.NewAgentInfo(true)
 	msgChan := make(chan string)
-	upgradeMgr := &mockUpgradeManager{msgChan: msgChan}
-	specs := component.RuntimeSpecs{}
-	c := coordinator.New(log, configuration.DefaultConfiguration(), logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
+
+	// Create and start the Coordinator
+	c := coordinator.New(
+		log,
+		configuration.DefaultConfiguration(),
+		logger.DefaultLogLevel,
+		agentInfo,
+		component.RuntimeSpecs{},
+		nil,
+		&mockUpgradeManager{msgChan: msgChan},
+		nil, nil, nil, nil, nil, false)
+	//nolint:errcheck // We don't need the termination state of the Coordinator
+	go c.Run(ctx)
+
 	u := NewUpgrade(log, c)
-	ctx1 := context.Background()
-	ctx2 := context.Background()
 	a := fleetapi.ActionUpgrade{Version: "8.3.0", SourceURI: "http://localhost"}
-	err1 := u.Handle(ctx1, &a, ack)
-	err2 := u.Handle(ctx2, &a, ack)
+	ack := noopacker.New()
+	err1 := u.Handle(ctx, &a, ack)
+	err2 := u.Handle(ctx, &a, ack)
 	require.NoError(t, err1)
 	require.NoError(t, err2)
 	msg := <-msgChan
@@ -88,22 +117,36 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 }
 
 func TestUpgradeHandlerNewVersion(t *testing.T) {
+	// Create a cancellable context that will shut down the coordinator after
+	// the test.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	log, _ := logger.New("", false)
-	ack := noopacker.New()
 	agentInfo, _ := info.NewAgentInfo(true)
 	msgChan := make(chan string)
-	upgradeMgr := &mockUpgradeManager{msgChan: msgChan}
-	specs := component.RuntimeSpecs{}
-	c := coordinator.New(log, configuration.DefaultConfiguration(), logger.DefaultLogLevel, agentInfo, specs, nil, upgradeMgr, nil, nil, nil, nil, nil, false)
+
+	// Create and start the Coordinator
+	c := coordinator.New(
+		log,
+		configuration.DefaultConfiguration(),
+		logger.DefaultLogLevel,
+		agentInfo,
+		component.RuntimeSpecs{},
+		nil,
+		&mockUpgradeManager{msgChan: msgChan},
+		nil, nil, nil, nil, nil, false)
+	//nolint:errcheck // We don't need the termination state of the Coordinator
+	go c.Run(ctx)
+
 	u := NewUpgrade(log, c)
-	ctx1 := context.Background()
-	ctx2 := context.Background()
 	a1 := fleetapi.ActionUpgrade{Version: "8.2.0", SourceURI: "http://localhost"}
 	a2 := fleetapi.ActionUpgrade{Version: "8.5.0", SourceURI: "http://localhost"}
-	err1 := u.Handle(ctx1, &a1, ack)
+	ack := noopacker.New()
+	err1 := u.Handle(ctx, &a1, ack)
 	require.NoError(t, err1)
 	time.Sleep(1 * time.Second)
-	err2 := u.Handle(ctx2, &a2, ack)
+	err2 := u.Handle(ctx, &a2, ack)
 	require.NoError(t, err2)
 	msg1 := <-msgChan
 	require.Equal(t, "canceled 8.2.0", msg1)

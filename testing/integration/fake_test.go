@@ -105,7 +105,7 @@ type FakeComponentIntegrationTestSuite struct {
 }
 
 func (s *FakeComponentIntegrationTestSuite) SetupSuite() {
-	f, err := define.NewFixture(s.T())
+	f, err := define.NewFixture(s.T(), define.Version())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())

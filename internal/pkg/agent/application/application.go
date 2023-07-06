@@ -54,7 +54,7 @@ func New(
 	}
 	log.With("inputs", specs.Inputs()).Info("Detected available inputs and outputs")
 
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to determine capabilities: %w", err)
 	}

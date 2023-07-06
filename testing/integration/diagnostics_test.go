@@ -23,7 +23,6 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
@@ -41,6 +40,7 @@ var diagnosticsFiles = []string{
 	"local-config.yaml",
 	"mutex.pprof.gz",
 	"pre-config.yaml",
+	"local-config.yaml",
 	"state.yaml",
 	"threadcreate.pprof.gz",
 	"variables.yaml",
@@ -67,7 +67,7 @@ type DiagnosticsIntegrationTestSuite struct {
 }
 
 func (s *DiagnosticsIntegrationTestSuite) SetupSuite() {
-	f, err := define.NewFixture(s.T())
+	f, err := define.NewFixture(s.T(), define.Version())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -105,27 +105,27 @@ func (s *DiagnosticsIntegrationTestSuite) TestDiagnosticsFromHealthyAgent() {
 
 	err := s.f.Run(ctx, integrationtest.State{
 		Configure:  simpleConfig2,
-		AgentState: atesting.NewClientState(client.Healthy),
-		Components: map[string]atesting.ComponentState{
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: map[string]integrationtest.ComponentState{
 			"fake-default": {
-				State: atesting.NewClientState(client.Healthy),
-				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
-						State: atesting.NewClientState(client.Healthy),
+				State: integrationtest.NewClientState(client.Healthy),
+				Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+					integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
+						State: integrationtest.NewClientState(client.Healthy),
 					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
-						State: atesting.NewClientState(client.Healthy),
+					integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+						State: integrationtest.NewClientState(client.Healthy),
 					},
 				},
 			},
 			"fake-shipper-default": {
-				State: atesting.NewClientState(client.Healthy),
-				Units: map[atesting.ComponentUnitKey]atesting.ComponentUnitState{
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
-						State: atesting.NewClientState(client.Healthy),
+				State: integrationtest.NewClientState(client.Healthy),
+				Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+					integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
+						State: integrationtest.NewClientState(client.Healthy),
 					},
-					atesting.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
-						State: atesting.NewClientState(client.Healthy),
+					integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
+						State: integrationtest.NewClientState(client.Healthy),
 					},
 				},
 			},

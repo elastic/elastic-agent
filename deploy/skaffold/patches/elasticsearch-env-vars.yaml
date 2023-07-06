@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: elastic-agent-standalone
+spec:
+  template:
+    spec:
+      containers:
+        - name: elastic-agent-standalone
+          env:
+            - name: ES_USERNAME
+              value: ""
+              valueFrom:
+                configMapKeyRef:
+                  name: fleet-es-configmap
+                  key: ES_USERNAME
+            # The basic authentication password used to connect to Elasticsearch
+            - name: ES_PASSWORD
+              value: ""
+              valueFrom:
+                configMapKeyRef:
+                  name: fleet-es-configmap
+                  key: ES_PASSWORD
+            # The Elasticsearch host to communicate with
+            - name: ES_HOST
+              value: ""
+              valueFrom:
+                configMapKeyRef:
+                  name: fleet-es-configmap
+                  key: ES_HOST

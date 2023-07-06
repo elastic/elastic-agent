@@ -8,7 +8,9 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -30,7 +32,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -38,6 +39,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
+
+const fastWatcherCfg = `
+agent.upgrade.watcher:
+  grace_period: 1m
+  error_check.interval: 15s
+  crash_check.interval: 15s
+`
 
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -85,7 +93,17 @@ func (s *FleetManagedUpgradeTestSuite) SetupSuite() {
 		s.agentFromVersion,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
-	require.NoError(s.T(), err)
+	s.Require().NoError(err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err = agentFixture.Prepare(ctx)
+	s.Require().NoError(err, "error preparing agent fixture")
+
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	s.Require().NoError(err, "error configuring agent fixture")
+
 	s.agentFixture = agentFixture
 }
 
@@ -134,8 +152,9 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 	s.T().Log(`Waiting for enrolled Agent status to be "online"...`)
 	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 3*time.Minute, 15*time.Second, "Agent status is not online")
 
-	s.T().Log("Waiting for upgrade marker to be removed...")
-	require.Eventually(s.T(), upgradeMarkerRemoved, 10*time.Minute, 20*time.Second)
+	// Upgrade Watcher check disabled until
+	// https://github.com/elastic/elastic-agent/issues/2977 is resolved.
+	// checkUpgradeWatcherRan(s.T(), s.agentFixture)
 
 	s.T().Log("Getting Agent version...")
 	newVersion, err := tools.GetAgentVersion(kibClient)
@@ -150,15 +169,6 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 func (s *FleetManagedUpgradeTestSuite) TearDownTest() {
 	s.T().Log("Un-enrolling Elastic Agent...")
 	assert.NoError(s.T(), tools.UnEnrollAgent(s.requirementsInfo.KibanaClient))
-}
-
-func upgradeMarkerRemoved() bool {
-	marker, err := upgrade.LoadMarker()
-	if err != nil {
-		return false
-	}
-
-	return marker == nil
 }
 
 func TestStandaloneUpgrade(t *testing.T) {
@@ -188,9 +198,7 @@ type StandaloneUpgradeTestSuite struct {
 // Before suite
 func (s *StandaloneUpgradeTestSuite) SetupSuite() {
 
-	agentFixture, err := define.NewFixture(
-		s.T(),
-	)
+	agentFixture, err := define.NewFixture(s.T(), define.Version())
 
 	require.NoError(s.T(), err)
 
@@ -198,6 +206,10 @@ func (s *StandaloneUpgradeTestSuite) SetupSuite() {
 	defer cancel()
 	err = agentFixture.Prepare(ctx)
 	s.Require().NoError(err, "error preparing agent fixture")
+
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	s.Require().NoError(err, "error configuring agent fixture")
+
 	s.agentFixture = agentFixture
 }
 
@@ -323,21 +335,29 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
-	updateMarkerFile := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", ".update-marker")
+	checkUpgradeWatcherRan(s.T(), s.agentFixture)
 
-	s.Require().FileExists(updateMarkerFile)
+	version, err := c.Version(ctx)
+	s.Require().NoError(err, "error checking version after upgrade")
+	s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+}
 
-	// The checks of the update marker makes the test time out since it runs for more than 10 minutes :(
-	// A dedicated issue to address this has been opened: https://github.com/elastic/elastic-agent/issues/2796
+// checkUpgradeWatcherRan asserts that the Upgrade Watcher finished running. We use the
+// presence of the update marker file as evidence that the Upgrade Watcher is still running
+// and the absence of that file as evidence that the Upgrade Watcher is no longer running.
+func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture) {
+	t.Helper()
+	t.Log("Waiting for upgrade watcher to finish running...")
 
-	// s.Require().Eventuallyf(func() bool {
-	// 	_, err := os.Stat(updateMarkerFile)
-	// 	return errors.Is(err, fs.ErrNotExist)
-	// }, 10*time.Minute, 1*time.Second, "agent never removed update marker")
+	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
+	require.FileExists(t, updateMarkerFile)
 
-	// version, err := c.Version(ctx)
-	// s.Require().NoError(err, "error checking version after upgrade")
-	// s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+	now := time.Now()
+	require.Eventuallyf(t, func() bool {
+		_, err := os.Stat(updateMarkerFile)
+		return errors.Is(err, fs.ErrNotExist)
+	}, 2*time.Minute, 15*time.Second, "agent never removed update marker")
+	t.Logf("Upgrade Watcher completed in %s", time.Now().Sub(now))
 }
 
 func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVersion *version.ParsedSemVer, agentProject tools.Project) string {
@@ -381,7 +401,12 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
+	// We go back TWO minors because sometimes we are in a situation where
+	// the current version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
 	previousVersion, err := currentVersion.GetPreviousMinor()
+	require.NoError(t, err)
+	previousVersion, err = previousVersion.GetPreviousMinor()
 	require.NoError(t, err)
 
 	// For testing the upgrade we actually perform a downgrade
@@ -421,9 +446,7 @@ func newStandaloneUpgradeRetryDownloadTestSuite(info *define.Info, toVersion *ve
 
 // Before suite
 func (s *StandaloneUpgradeRetryDownloadTestSuite) SetupSuite() {
-	agentFixture, err := define.NewFixture(
-		s.T(),
-	)
+	agentFixture, err := define.NewFixture(s.T(), define.Version())
 	s.Require().NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -431,6 +454,10 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) SetupSuite() {
 
 	err = agentFixture.Prepare(ctx)
 	s.Require().NoError(err, "error preparing agent fixture")
+
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	s.Require().NoError(err, "error configuring agent fixture")
+
 	s.agentFixture = agentFixture
 }
 
@@ -522,6 +549,8 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) TestUpgradeStandaloneElasticAg
 	// Wait for upgrade command to finish executing
 	s.T().Log("Waiting for upgrade to finish")
 	wg.Wait()
+
+	checkUpgradeWatcherRan(s.T(), s.agentFixture)
 
 	s.T().Log("Check Agent version to ensure upgrade is successful")
 	currentVersion, err = s.getVersion(ctx)
