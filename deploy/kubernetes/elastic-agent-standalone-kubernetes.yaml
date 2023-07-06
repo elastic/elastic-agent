@@ -359,29 +359,6 @@ data:
               #     match: after
             paths:
               - /var/log/containers/*${kubernetes.container.id}.log
-      - name: filestream-generic
-        id: hints-container-logs-${kubernetes.hints.container_id}
-        type: filestream
-        use_output: default
-        streams:
-          - id: hints-container-logs-${kubernetes.hints.container_id}
-            condition: ${kubernetes.hints.generic_logs.container_logs.enabled} == true
-            data_stream:
-              dataset: kubernetes.hints.container_logs
-              type: logs
-            exclude_files: [ ]
-            exclude_lines: [ ]
-            parsers:
-              - container:
-                  format: auto
-                  stream: ${kubernetes.hints.generic_logs.stream|'all'}
-            paths:
-              - /var/log/containers/*${kubernetes.hints.container_id}.log
-            prospector:
-              scanner:
-                symlinks: true
-            tags: [ ]
-        data_stream.namespace: default
       - id: audit-log
         type: filestream
         use_output: default
@@ -712,7 +689,7 @@ spec:
       #        mountPath: /etc/elastic-agent/inputs.d
       containers:
         - name: elastic-agent-standalone
-          image: docker.elastic.co/beats/elastic-agent:8.3.0
+          image: docker.elastic.co/beats/elastic-agent:8.8.1
           args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           env:
             # The basic authentication username used to connect to Elasticsearch
