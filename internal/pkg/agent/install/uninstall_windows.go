@@ -7,6 +7,7 @@
 package install
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"syscall"
@@ -38,10 +39,10 @@ func removeBlockingExe(blockingErr error) (string, error) {
 	// rename handle
 	err = renameHandle(h)
 	if err != nil {
-		windows.CloseHandle(h)
+		_ = windows.CloseHandle(h)
 		return "", fmt.Errorf("failed to rename handler for %q: %w", path, err)
 	}
-	windows.CloseHandle(h)
+	_ = windows.CloseHandle(h)
 
 	// re-open handle
 	h, err = openDeleteHandle(path)
@@ -52,24 +53,22 @@ func removeBlockingExe(blockingErr error) (string, error) {
 	// disposite the handle
 	err = depositeHandle(h)
 	if err != nil {
-		windows.CloseHandle(h)
+		_ = windows.CloseHandle(h)
 		return "", fmt.Errorf("failed to deposite handler for %q: %w", path, err)
 	}
-	windows.CloseHandle(h)
+	_ = windows.CloseHandle(h)
 	return path, nil
 }
 
 func getPathFromError(blockingErr error) string {
-	fsErr, ok := blockingErr.(*fs.PathError)
-	if !ok {
-		return ""
-	}
-	errno, ok := fsErr.Err.(syscall.Errno)
-	if !ok {
-		return ""
-	}
-	if errno == syscall.ERROR_ACCESS_DENIED {
-		return fsErr.Path
+	var perr *fs.PathError
+	if errors.As(blockingErr, &perr) {
+		var errno syscall.Errno
+		if errors.As(perr.Err, &errno) {
+			if errno == syscall.ERROR_ACCESS_DENIED {
+				return perr.Path
+			}
+		}
 	}
 	return ""
 }
