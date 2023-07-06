@@ -1,0 +1,48 @@
+// begin 8.8.2 relnotes
+
+[[release-notes-8.8.2]]
+==  8.8.2
+
+Review important information about the  8.8.2 release.
+
+[discrete]
+[[security-updates-8.8.2]]
+=== Security updates
+
+
+elastic-agent::
+
+* Updated Go version to 1.19.10. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2846[#https://github.com/elastic/elastic-agent/pull/2846] 
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.8.2]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Log start and stop operations from service runtime at `INFO` rather than `DEBUG` level. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2879[#https://github.com/elastic/elastic-agent/pull/2879] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2864[#https://github.com/elastic/elastic-agent/issues/2864]
+
+
+
+
+[discrete]
+[[bug-fixes-8.8.2]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Explicitly specify timeout units as seconds in the Endpoint spec file. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2870[#https://github.com/elastic/elastic-agent/pull/2870] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2863[#https://github.com/elastic/elastic-agent/issues/2863]
+* Fix logs collection In diagnostics when {agent} is running on K8s. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2905[#https://github.com/elastic/elastic-agent/pull/2905] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2899[#https://github.com/elastic/elastic-agent/issues/2899]
+
+// end 8.8.2 relnotes

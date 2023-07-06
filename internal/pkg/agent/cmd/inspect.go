@@ -138,7 +138,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return err
 		}
-		return printConfig(fullCfg, l, streams)
+		return printConfig(fullCfg, streams)
 	}
 
 	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait)
@@ -167,9 +167,18 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
-		components, binaryMapping, err := specs.PolicyToComponents(cfg, lvl, agentInfo)
+		components, err := specs.PolicyToComponents(cfg, lvl, agentInfo)
 		if err != nil {
 			return fmt.Errorf("failed to get binary mappings: %w", err)
+		}
+
+		// The monitoring config depends on a map from component id to
+		// binary name.
+		binaryMapping := make(map[string]string)
+		for _, component := range components {
+			if spec := component.InputSpec; spec != nil {
+				binaryMapping[component.ID] = spec.BinaryName
+			}
 		}
 		monitorCfg, err := monitorFn(cfg, components, binaryMapping)
 		if err != nil {
@@ -203,26 +212,12 @@ func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams)
 	return err
 }
 
-func printConfig(cfg *config.Config, l *logger.Logger, streams *cli.IOStreams) error {
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
-	if err != nil {
-		return err
-	}
-
+func printConfig(cfg *config.Config, streams *cli.IOStreams) error {
 	mapStr, err := cfg.ToMapStr()
 	if err != nil {
 		return err
 	}
-	newCfg, err := caps.Apply(mapStr)
-	if err != nil {
-		return errors.New(err, "failed to apply capabilities")
-	}
-	newMap, ok := newCfg.(map[string]interface{})
-	if !ok {
-		return errors.New("config returned from capabilities has invalid type")
-	}
-
-	return printMapStringConfig(newMap, streams)
+	return printMapStringConfig(mapStr, streams)
 }
 
 type inspectComponentsOpts struct {
@@ -230,6 +225,11 @@ type inspectComponentsOpts struct {
 	showConfig    bool
 	showSpec      bool
 	variablesWait time.Duration
+}
+
+// returns true if the given Capabilities config blocks the given component.
+func blockedByCaps(c component.Component, caps capabilities.Capabilities) bool {
+	return !caps.AllowInput(c.InputType) || !caps.AllowOutput(c.OutputType)
 }
 
 func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponentsOpts, streams *cli.IOStreams) error {
@@ -270,38 +270,6 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return fmt.Errorf("failed to render components: %w", err)
 	}
 
-	// ID provided.
-	if opts.id != "" {
-		splitID := strings.SplitN(opts.id, "/", 2)
-		compID := splitID[0]
-		unitID := ""
-		if len(splitID) > 1 {
-			unitID = splitID[1]
-		}
-		comp, ok := findComponent(comps, compID)
-		if ok {
-			if unitID != "" {
-				unit, ok := findUnit(comp, unitID)
-				if ok {
-					return printUnit(unit, streams)
-				}
-				return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
-			}
-			if !opts.showSpec {
-				comp.InputSpec = nil
-				comp.ShipperSpec = nil
-			}
-			if !opts.showConfig {
-				for key, unit := range comp.Units {
-					unit.Config = nil
-					comp.Units[key] = unit
-				}
-			}
-			return printComponent(comp, streams)
-		}
-		return fmt.Errorf("unable to find component with ID: %s", compID)
-	}
-
 	// Hide configuration unless toggled on.
 	if !opts.showConfig {
 		for i, comp := range comps {
@@ -322,7 +290,44 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		}
 	}
 
-	return printComponents(comps, streams)
+	// ID provided.
+	if opts.id != "" {
+		splitID := strings.SplitN(opts.id, "/", 2)
+		compID := splitID[0]
+		unitID := ""
+		if len(splitID) > 1 {
+			unitID = splitID[1]
+		}
+		comp, ok := findComponent(comps, compID)
+		if ok {
+			if unitID != "" {
+				unit, ok := findUnit(comp, unitID)
+				if ok {
+					return printUnit(unit, streams)
+				}
+				return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
+			}
+			return printComponent(comp, streams)
+		}
+		return fmt.Errorf("unable to find component with ID: %s", compID)
+	}
+
+	// Separate any components that are blocked by capabilities config
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
+	if err != nil {
+		return err
+	}
+	allowed := []component.Component{}
+	blocked := []component.Component{}
+	for _, c := range comps {
+		if blockedByCaps(c, caps) {
+			blocked = append(blocked, c)
+		} else {
+			allowed = append(allowed, c)
+		}
+	}
+
+	return printComponents(allowed, blocked, streams)
 }
 
 func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
@@ -346,10 +351,6 @@ func getMonitoringFn(cfg map[string]interface{}) (component.GenerateMonitoringCf
 }
 
 func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration) (map[string]interface{}, logp.Level, error) {
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
-	if err != nil {
-		return nil, logp.InfoLevel, fmt.Errorf("failed to determine capabilities: %w", err)
-	}
 
 	cfg, err := operations.LoadFullAgentConfig(l, cfgPath, true)
 	if err != nil {
@@ -366,16 +367,6 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	ast, err := transpiler.NewAST(m)
 	if err != nil {
 		return nil, lvl, fmt.Errorf("could not create the AST from the configuration: %w", err)
-	}
-
-	var ok bool
-	updatedAst, err := caps.Apply(ast)
-	if err != nil {
-		return nil, lvl, fmt.Errorf("failed to apply capabilities: %w", err)
-	}
-	ast, ok = updatedAst.(*transpiler.AST)
-	if !ok {
-		return nil, lvl, fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
 	}
 
 	// Wait for the variables based on the timeout.
@@ -417,11 +408,17 @@ func getLogLevel(rawCfg *config.Config, cfgPath string) (logp.Level, error) {
 	return logger.DefaultLogLevel, nil
 }
 
-func printComponents(components []component.Component, streams *cli.IOStreams) error {
+func printComponents(
+	components []component.Component,
+	blocked []component.Component,
+	streams *cli.IOStreams,
+) error {
 	topLevel := struct {
 		Components []component.Component `yaml:"components"`
+		Blocked    []component.Component `yaml:"blocked_by_capabilities"`
 	}{
 		Components: components,
+		Blocked:    blocked,
 	}
 	data, err := yaml.Marshal(topLevel)
 	if err != nil {
