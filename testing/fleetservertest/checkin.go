@@ -59,7 +59,7 @@ const (
 	actionPolicyChangeTmpl = `
     {
       "agent_id": "{{.AgentID}}",
-      "created_at": "2023-05-31T11:37:50.607Z",
+      "created_at": "{{.CreatedAt}}",
       "data": {
         "policy": {
           "agent": {

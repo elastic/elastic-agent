@@ -247,12 +247,12 @@ func ExampleNewServer_enroll() {
 		},
 	})
 	if err != nil {
-		panic(fmt.Sprintf("could not execute enrol command: %v", err))
+		panic(fmt.Sprintf("could not execute enroll command: %v", err))
 	}
 
 	bs, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
-		panic(fmt.Sprintf("could not marshal enrol response: %v", err))
+		panic(fmt.Sprintf("could not marshal enroll response: %v", err))
 	}
 	fmt.Println(string(bs))
 

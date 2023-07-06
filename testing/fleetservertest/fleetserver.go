@@ -107,7 +107,7 @@ func NewServerWithFakeComponent(
 	handlers := &Handlers{
 		APIKey:          apiKey.Key,
 		EnrollmentToken: enrolmentToken,
-		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
+		AgentID:         agentID, // as there is no enroll, the agentID needs to be manually set
 		CheckinFn:       NewHandlerCheckinFakeComponent(nextAction),
 		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
 		AckFn:           NewHandlerAckWithAcker(acker),

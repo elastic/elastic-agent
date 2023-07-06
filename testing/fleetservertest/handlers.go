@@ -223,7 +223,7 @@ func NewHandlerCheckinFakeComponent(next func() (CheckinAction, *HTTPError)) fun
 			}
 		}
 
-		// simulate long pool
+		// simulate long poll
 		time.Sleep(data.Delay)
 
 		return &resp, nil
