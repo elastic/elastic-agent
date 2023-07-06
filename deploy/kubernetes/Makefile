@@ -17,7 +17,7 @@ KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
 generate-k8s: $(ALL)
 
 test: generate-k8s
-	for FILE in $(shell ls *-kubernetes.yaml); do \
+	for FILE in $(shell ls *-kubernetes.yaml | grep -v elastic-agent-standalone-ksm); do \
 		BEAT=$$(echo $$FILE | cut -d \- -f 1); \
 		kubectl create -f $$FILE; \
 	done
@@ -36,7 +36,7 @@ ifdef WITHOUTCONFIG
 else
 	@echo "Generating $@-kubernetes.yaml"
 	@rm -f $@-kubernetes.yaml
-	@for f in $(shell ls $@/*.yaml); do \
+	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-ksm); do \
 		sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $$f >> $@-kubernetes.yaml; \
 		echo --- >> $@-kubernetes.yaml; \
 	done
