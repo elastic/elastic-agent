@@ -18,7 +18,7 @@ require (
 	github.com/elastic/elastic-agent-libs v0.3.9-0.20230608184016-1f368a55a6ac
 	github.com/elastic/elastic-agent-system-metrics v0.6.1
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
-	github.com/elastic/go-elasticsearch/v8 v8.8.1
+	github.com/elastic/go-elasticsearch/v8 v8.8.2
 	github.com/elastic/go-licenser v0.4.1
 	github.com/elastic/go-sysinfo v1.11.0
 	github.com/elastic/go-ucfg v0.8.6
