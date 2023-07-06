@@ -1319,12 +1319,8 @@ func (Integration) Check() error {
 }
 
 // runs only the integration tests that support local mode
-<<<<<<< HEAD
-func (Integration) Local(ctx context.Context) error {
-=======
 // it takes as argument the test name to run or all if we want to run them all.
 func (Integration) Local(ctx context.Context, testName string) error {
->>>>>>> b0b88d69cb (mage integration:local is now accepting all as an argument if you want to run all local test (#3009))
 	if shouldBuildAgent() {
 		// need only local package for current platform
 		devtools.Platforms = devtools.Platforms.Select(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
@@ -1339,14 +1335,11 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	params := devtools.DefaultGoTestIntegrationArgs()
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
-<<<<<<< HEAD
-=======
 	if testName == "all" {
 		params.TestName = ""
 	} else {
 		params.TestName = testName
 	}
->>>>>>> b0b88d69cb (mage integration:local is now accepting all as an argument if you want to run all local test (#3009))
 	return devtools.GoTest(ctx, params)
 }
 
