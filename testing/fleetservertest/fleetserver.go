@@ -5,63 +5,114 @@
 package fleetservertest
 
 import (
-	"context"
-	"io"
+	"fmt"
+	"net"
+	"net/http"
 	"net/http/httptest"
+	"time"
 )
 
-// API holds the handlers for the fleet-api, see https://petstore.swagger.io/?url=https://raw.githubusercontent.com/elastic/fleet-server/main/model/openapi.yml
-// for rendered OpenAPI definition. If any of the handlers are nil, a
-// http.StatusNotImplemented is returned for the route.
-type API struct {
-	AckFn func(
-		ctx context.Context,
-		id string,
-		ackRequest AckRequest) (*AckResponse, *HTTPError)
+type Server struct {
+	*httptest.Server
+}
 
-	CheckinFn func(
-		ctx context.Context,
-		id string,
-		userAgent string,
-		acceptEncoding string,
-		checkinRequest CheckinRequest) (*CheckinResponse, *HTTPError)
+var timeNow = time.Now
 
-	EnrollFn func(
-		ctx context.Context,
-		id string,
-		userAgent string,
-		enrollRequest EnrollRequest) (*EnrollResponse, *HTTPError)
+type Option func(o *options)
 
-	ArtifactFn func(
-		ctx context.Context,
-		id string,
-		sha2 string) *HTTPError
-
-	StatusFn func(
-		ctx context.Context) (*StatusResponse, *HTTPError)
-
-	UploadBeginFn func(
-		ctx context.Context,
-		requestBody UploadBeginRequest) (*UploadBeginResponse, *HTTPError)
-
-	UploadChunkFn func(
-		ctx context.Context,
-		id string,
-		chunkNum int32,
-		xChunkSHA2 string,
-		body io.ReadCloser) *HTTPError
-
-	UploadCompleteFn func(
-		ctx context.Context,
-		id string,
-		uploadCompleteRequest UploadCompleteRequest) *HTTPError
+type options struct {
+	address string
+	logFn   func(format string, a ...any)
+	agentID string
 }
 
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
-// If a route is called and its handler (the *Fn field) is nil a.
+// If a route is called and its handler (the *Fn field) is nil a
 // http.StatusNotImplemented error will be returned.
-func NewServer(api API) *httptest.Server {
-	mux := NewRouter(Handlers{api: api})
+func NewServer(h *Handlers, opts ...Option) *Server {
+	os := options{}
+	for _, o := range opts {
+		o(&os)
+	}
 
-	return httptest.NewServer(mux)
+	if os.logFn != nil {
+		h.logFn = os.logFn
+	}
+	if os.agentID != "" {
+		h.AgentID = os.agentID
+	}
+
+	mux := NewRouter(h)
+
+	address := ":0"
+	if os.address != "" {
+		address = os.address
+	}
+
+	l, err := net.Listen("tcp", address) //nolint:gosec // it's a test
+	if err != nil {
+		panic(fmt.Sprintf("NewServer failed to create a net.Listener: %v", err))
+	}
+
+	s := Server{
+		Server: &httptest.Server{
+			Listener: l,
+			Config:   &http.Server{Handler: mux}}, //nolint:gosec // it's a test
+	}
+	s.Start()
+
+	return &s
+}
+
+// WithRequestLog sets the server to log every request using logFn.
+func WithRequestLog(logFn func(format string, a ...any)) Option {
+	return func(o *options) {
+		o.logFn = logFn
+	}
+}
+
+// WithAddress will set the address the server will listen on. The format is as
+// defined by net.Listen for a tcp connection.
+func WithAddress(addr string) Option {
+	return func(o *options) {
+		o.address = addr
+	}
+}
+
+// WithAgentID sets the agentID considered enrolled with the server. If enroll
+// isn't called or the agentID 'manually' set, the server will reject the requests.
+func WithAgentID(id string) Option {
+	return func(o *options) {
+		o.agentID = id
+	}
+}
+
+// NewServerWithFakeComponent returns mock Fleet Server ready to use for Agent's
+// e2e tests. The server has the Status, Checkin, Enroll and Ack handlers
+// configured. You need to implement:
+//   - nextAction, called on every checkin to get the actions to return
+//   - acker, responsible for ack-ing the actions.
+//
+// See TestRunFleetServer and ExampleNewServer_checkin_and_ackWithAcker for more
+// details on how to use it and define `nextAction` and `acker`.
+func NewServerWithFakeComponent(
+	apiKey APIKey,
+	enrolmentToken string,
+	agentID string,
+	policyID string,
+	nextAction func() (CheckinAction, *HTTPError),
+	acker func(id string) (AckResponseItem, bool),
+	opts ...Option) *Server {
+
+	handlers := &Handlers{
+		APIKey:          apiKey.Key,
+		EnrollmentToken: enrolmentToken,
+		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
+		CheckinFn:       NewHandlerCheckinFakeComponent(nextAction),
+		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
+		AckFn:           NewHandlerAckWithAcker(acker),
+		StatusFn:        NewHandlerStatusHealth(),
+	}
+
+	return NewServer(handlers, opts...)
 }

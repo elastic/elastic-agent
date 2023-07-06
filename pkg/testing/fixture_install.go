@@ -48,7 +48,9 @@ func (e EnrollOpts) toCmdArgs() []string {
 type InstallOpts struct {
 	BasePath       string // --base-path
 	Force          bool   // --force
+	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
+	ProxyURL       string // --proxy-url
 
 	EnrollOpts
 }
@@ -61,8 +63,14 @@ func (i InstallOpts) toCmdArgs() []string {
 	if i.Force {
 		args = append(args, "--force")
 	}
+	if i.Insecure {
+		args = append(args, "--insecure")
+	}
 	if i.NonInteractive {
 		args = append(args, "--non-interactive")
+	}
+	if i.ProxyURL != "" {
+		args = append(args, "--proxy-url="+i.ProxyURL)
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
