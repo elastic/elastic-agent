@@ -20,11 +20,7 @@ import (
 // for rendered OpenAPI definition. If any of the handlers are nil, a
 // http.StatusNotImplemented is returned for the route.
 //
-// Authentication is made extracting he API key or enrollment token,
-// from the HeaderAuthorization header and compared against API.APIKey or
-// API.EnrollmentToken. API.EnrollmentToken is used for Enroll requests and
-// API.APIKey for all others.
-// TODO(Anderson): fix me!
+// For the moment there is no authentication.
 type Handlers struct {
 	// AgentID is the ID of agent communicating with this fleet-server:
 	//  - on Enrol this ID is set and returned to the enrolling agent,

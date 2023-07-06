@@ -230,7 +230,7 @@ func NewHandlerCheckinFakeComponent(next func() (CheckinAction, *HTTPError)) fun
 	}
 }
 
-func NewHandlerStatusHealth() func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
+func NewHandlerStatusHealthy() func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
 	return func(ctx context.Context, _ *Handlers) (*StatusResponse, *HTTPError) {
 		return &StatusResponse{
 			Name:   "fleet-server",
@@ -240,7 +240,7 @@ func NewHandlerStatusHealth() func(ctx context.Context, _ *Handlers) (*StatusRes
 	}
 }
 
-func NewHandlerStatusUnhealth() func(ctx context.Context) (*StatusResponse, *HTTPError) {
+func NewHandlerStatusUnhealthy() func(ctx context.Context) (*StatusResponse, *HTTPError) {
 	return func(ctx context.Context) (*StatusResponse, *HTTPError) {
 		return &StatusResponse{
 			Name:   "fleet-server",
