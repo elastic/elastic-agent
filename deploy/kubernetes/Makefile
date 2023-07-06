@@ -1,4 +1,6 @@
 ALL=elastic-agent-standalone elastic-agent-managed
+ALL=elastic-agent-standalone elastic-agent-managed
+
 BEAT_VERSION=$(shell grep '^:stack-version:' ../../version/docs/version.asciidoc | cut -c 17- )
 BRANCH_VERSION=$(shell grep '^:doc-branch:' ../../version/docs/version.asciidoc | cut -c 14- )
 
@@ -91,23 +93,29 @@ else
 endif
 
 
-# ## ci-create-kustomize-default : Create default kustomize folder 
-# .PHONY: ci-create-kustomize $(ALL)
-# ci-create-kustomize: $(ALL)
+## ci-create-kustomize-default : Create default kustomize folder 
+.PHONY: ci-create-kustomize $(ALL)
+ci-create-kustomize: $(ALL)
 
-# $(ALL):
-# 	@echo "Generating $@ kustomize-default files"
-# 	@for f in $(shell ls $@/*.yaml); do \
-# 		cp -r $$f  $(KUSTOMIZE_DEFAULT)/$@/base; \
-# 	done
+ifdef GENERATEKUSTOMIZE
+$(ALL):
+	@echo "Generating $@ kustomize-default files"
+	@for f in $(shell ls $@/*.yaml); do \
+		cp -r $$f  $(KUSTOMIZE_DEFAULT)/$@/base; \
+	done
 
-# 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $@/$@-daemonset.yaml > $(KUSTOMIZE_DEFAULT)/$@/base/$@-daemonset.yaml
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" $@/$@-daemonset.yaml > $(KUSTOMIZE_DEFAULT)/$@/base/$@-daemonset.yaml
 
-# 	@echo "Generating $@ kustomize-ksm-autosharding files"
-# 	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
-# 		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base; \
-# 	done
+	@echo "Generating $@ kustomize-ksm-autosharding files"
+	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
+		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base; \
+	done
 
-# 	mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/
-# 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base/$@-daemonset.yaml
-# 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/hostNetwork: true/hostNetwork: false/g" -e "s/DaemonSet/StatefulSet/g" -e "s/agent-node-datastreams/agent-ksm-datastreams/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/$@-statefulset.yaml
+	mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base/$@-daemonset.yaml
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/hostNetwork: true/hostNetwork: false/g" -e "s/DaemonSet/StatefulSet/g" -e "s/agent-node-datastreams/agent-ksm-datastreams/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/$@-statefulset.yaml
+
+else
+	echo "No KSM templates generated. Please run: KUSTOMIZE=tue make ci-create-kustomize "
+
+endif
