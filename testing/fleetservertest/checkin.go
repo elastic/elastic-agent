@@ -20,7 +20,7 @@ type TmplPolicy struct {
 	PolicyID string
 	// FleetHosts should be a JSON array without the square brackets:
 	// - `"host1", "host2"`
-	// = `"host"`
+	// - `"host"`
 	FleetHosts string
 	SourceURI  string
 	CreatedAt  string

@@ -26,7 +26,7 @@ import (
 // There is no authentication and the enrollment token is ignored, thus it can
 // be any value.
 func TestRunFleetServer(t *testing.T) {
-	// t.Skip("use this test if you want a mock fleet-server running to enroll a real agent")
+	t.Skip("use this test if you want a mock fleet-server running to enroll a real agent")
 	agentID := "agentID"
 	actionID := "ActionID"
 	policyID := "policyID"
