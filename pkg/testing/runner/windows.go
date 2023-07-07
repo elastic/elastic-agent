@@ -7,37 +7,41 @@ package runner
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 // WindowsRunner is a handler for running tests on Windows
 type WindowsRunner struct{}
 
 // Prepare the test
-func (WindowsRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
+func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
 	// install chocolatey
 	logger.Logf("Installing chocolatey")
 	chocoInstall := `"[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"`
-	stdOut, errOut, err := sshRunPowershell(ctx, c, chocoInstall)
+	stdOut, errOut, err := sshRunPowershell(ctx, sshClient, chocoInstall)
 	if err != nil {
 		return fmt.Errorf("failed to install chocolatey: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 	// reconnect to get updated environment variables (1 minute as it should be quick to reconnect)
-	err = c.ReconnectWithTimeout(ctx, 1*time.Minute)
+	err = sshClient.ReconnectWithTimeout(ctx, 1*time.Minute)
+	if err != nil {
+		return fmt.Errorf("failed to reconnect: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+	}
 
 	// install curl
 	logger.Logf("Installing curl")
-	stdOut, errOut, err = c.Exec(ctx, "choco", []string{"install", "-y", "curl"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "choco", []string{"install", "-y", "curl"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to install curl: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 	// install make
 	logger.Logf("Installing make")
-	stdOut, errOut, err = c.Exec(ctx, "choco", []string{"install", "-y", "make"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "choco", []string{"install", "-y", "make"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to install make: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
@@ -46,52 +50,55 @@ func (WindowsRunner) Prepare(ctx context.Context, c SSHClient, logger Logger, ar
 	logger.Logf("Installing golang %s (%s)", goVersion, arch)
 	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.windows-%s.msi", goVersion, arch)
 	filename := path.Base(downloadURL)
-	stdOut, errOut, err = c.Exec(ctx, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to download go from %s with curl: %w (stdout: %s, stderr: %s)", downloadURL, err, stdOut, errOut)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "msiexec", []string{"/i", filename, "/qn"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "msiexec", []string{"/i", filename, "/qn"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to install go: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 	// reconnect to get updated environment variables (1 minute as it should be quick to reconnect)
-	err = c.ReconnectWithTimeout(ctx, 1*time.Minute)
+	err = sshClient.ReconnectWithTimeout(ctx, 1*time.Minute)
+	if err != nil {
+		return fmt.Errorf("failed to reconnect: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+	}
 
 	// copy the archive and extract it on the host (tar exists and can extract zip on windows)
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
-	err = c.Copy(repoArchive, destRepoName)
+	err = sshClient.Copy(repoArchive, destRepoName)
 	if err != nil {
 		return fmt.Errorf("failed to SCP repo archive %s: %w", repoArchive, err)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "mkdir", []string{"agent"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "mkdir", []string{"agent"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to mkdir agent: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "tar", []string{"-xf", destRepoName, "-C", "agent"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "tar", []string{"-xf", destRepoName, "-C", "agent"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to unzip %s to agent directory: %w (stdout: %s, stderr: %s)", destRepoName, err, stdOut, errOut)
 	}
 
 	// install mage and prepare for testing
 	logger.Logf("Running make mage and prepareOnRemote")
-	stdOut, errOut, err = c.Exec(ctx, "cd", []string{"agent", "&&", "make", "mage", "&&", "mage", "integration:prepareOnRemote"}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "cd", []string{"agent", "&&", "make", "mage", "&&", "mage", "integration:prepareOnRemote"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to to perform make mage and prepareOnRemote: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
 	// place the build for the agent on the host
 	logger.Logf("Copying agent build %s", filepath.Base(buildPath))
-	err = c.Copy(buildPath, filepath.Base(buildPath))
+	err = sshClient.Copy(buildPath, filepath.Base(buildPath))
 	if err != nil {
 		return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
 	}
 	insideAgentDir := filepath.Join("agent", buildPath)
-	stdOut, errOut, err = c.Exec(ctx, "mkdir", []string{toWindowsPath(filepath.Dir(insideAgentDir))}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "mkdir", []string{toWindowsPath(filepath.Dir(insideAgentDir))}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", toWindowsPath(filepath.Dir(insideAgentDir)), err, stdOut, errOut)
 	}
-	stdOut, errOut, err = c.Exec(ctx, "move", []string{filepath.Base(buildPath), toWindowsPath(insideAgentDir)}, nil)
+	stdOut, errOut, err = sshClient.Exec(ctx, "move", []string{filepath.Base(buildPath), toWindowsPath(insideAgentDir)}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to move %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), toWindowsPath(insideAgentDir), err, stdOut, errOut)
 	}
@@ -139,8 +146,8 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger 
 	return result, nil
 }
 
-func sshRunPowershell(ctx context.Context, c SSHClient, cmd string) ([]byte, []byte, error) {
-	return c.Exec(ctx, "powershell", []string{
+func sshRunPowershell(ctx context.Context, sshClient SSHClient, cmd string) ([]byte, []byte, error) {
+	return sshClient.Exec(ctx, "powershell", []string{
 		"-NoProfile",
 		"-InputFormat", "None",
 		"-ExecutionPolicy", "Bypass",
@@ -211,20 +218,20 @@ func toWindowsPath(path string) string {
 	return strings.ReplaceAll(path, "/", "\\")
 }
 
-func getWindowsRunnerPackageResult(ctx context.Context, c SSHClient, pkg define.BatchPackageTests, prefix string) (OSRunnerPackageResult, error) {
+func getWindowsRunnerPackageResult(ctx context.Context, sshClient SSHClient, pkg define.BatchPackageTests, prefix string) (OSRunnerPackageResult, error) {
 	var err error
 	var resultPkg OSRunnerPackageResult
 	resultPkg.Name = pkg.Name
 	outputPath := fmt.Sprintf("%%home%%\\agent\\build\\TEST-go-remote-%s.%s", prefix, filepath.Base(pkg.Name))
-	resultPkg.Output, err = c.GetFileContents(ctx, outputPath+".out", WithContentFetchCommand("type"))
+	resultPkg.Output, err = sshClient.GetFileContents(ctx, outputPath+".out", WithContentFetchCommand("type"))
 	if err != nil {
 		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out", outputPath)
 	}
-	resultPkg.JSONOutput, err = c.GetFileContents(ctx, outputPath+".out.json", WithContentFetchCommand("type"))
+	resultPkg.JSONOutput, err = sshClient.GetFileContents(ctx, outputPath+".out.json", WithContentFetchCommand("type"))
 	if err != nil {
 		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out.json", outputPath)
 	}
-	resultPkg.XMLOutput, err = c.GetFileContents(ctx, outputPath+".xml", WithContentFetchCommand("type"))
+	resultPkg.XMLOutput, err = sshClient.GetFileContents(ctx, outputPath+".xml", WithContentFetchCommand("type"))
 	if err != nil {
 		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.xml", outputPath)
 	}
