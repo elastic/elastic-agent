@@ -211,6 +211,13 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 					p.logger.Debugf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
 					p.logger.Debugf("Generated hints mappings are :%v", hintsMapping)
+					processMapping := GenerateProcessMapping(hints, p.logger)
+					p.logger.Debugf("Generated Process mappings are :%v", processMapping)
+					if len(processMapping) > 0 {
+						for _, metaMap := range processMapping {
+							data.processors = append(data.processors, metaMap)
+						}
+					}
 					_ = p.comm.AddOrUpdate(
 						data.uid,
 						PodPriority,

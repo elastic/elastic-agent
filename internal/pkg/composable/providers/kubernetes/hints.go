@@ -26,6 +26,7 @@ const (
 	username    = "username"
 	password    = "password"
 	stream      = "stream" // this is the container stream: stdout/stderr
+	processors  = "processors"
 )
 
 type hintsBuilder struct {
@@ -130,6 +131,13 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 		value = strings.Replace(value, match, hintVal, -1)
 	}
 	return value
+}
+
+// GenerateProcessMapping gets a hint's map extracted from the annotations and spcifically extracts
+// processors mapping to be emitted.
+
+func GenerateProcessMapping(hints mapstr.M, logger *logp.Logger) []mapstr.M {
+	return utils.GetProcessors(hints, processors)
 }
 
 // GenerateHintsMapping gets a hint's map extracted from the annotations and constructs the final
