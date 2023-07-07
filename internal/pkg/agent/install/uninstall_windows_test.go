@@ -17,8 +17,14 @@ import (
 
 const simpleBlockForever = `
 package main
+
+import (
+    "math"
+    "time"
+)
+
 func main() {
-    select{}
+    <-time.After(time.Duration(math.MaxInt64))
 }
 `
 
