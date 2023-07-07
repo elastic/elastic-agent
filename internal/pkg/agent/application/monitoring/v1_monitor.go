@@ -15,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -28,9 +29,6 @@ const (
 	logFileFormat = "%s/logs/%s"
 	// args: data path, install path, pipeline name, application name
 	logFileFormatWin = "%s\\logs\\%s"
-
-	// args: pipeline name, application name
-	mbEndpointFileFormatWin = `npipe:///%s`
 
 	// args: pipeline name, application name
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
@@ -174,7 +172,7 @@ func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
 	}
 
 	appendix := make([]string, 0, 20)
-	endpoint := endpointPath(unit, b.operatingSystem)
+	endpoint := utils.SocketURLWithFallback(unit, paths.TempDir())
 	if endpoint != "" {
 		appendix = append(appendix,
 			"-E", "http.enabled=true",
@@ -213,7 +211,7 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	}
 
 	if b.config.C.MonitorMetrics {
-		metricsDrop := monitoringDrop(endpointPath(unit, b.operatingSystem))
+		metricsDrop := monitoringDrop(utils.SocketURLWithFallback(unit, paths.TempDir()))
 		drops = append(drops, metricsDrop)
 	}
 
@@ -229,7 +227,7 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 			}
 
 			// create
-			if err := os.MkdirAll(drop, 0775); err != nil {
+			if err := os.MkdirAll(drop, 0o775); err != nil {
 				return errors.New(err, fmt.Sprintf("failed to create directory %q", drop))
 			}
 
@@ -249,7 +247,7 @@ func (b *BeatsMonitor) Cleanup(unit string) error {
 		return nil
 	}
 
-	endpoint := monitoringFile(unit, b.operatingSystem)
+	endpoint := monitoringFile(unit)
 	if endpoint == "" {
 		return nil
 	}
@@ -432,7 +430,8 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 					"add_formatted_index": map[string]interface{}{
 						"index": "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
 					},
-				}},
+				},
+			},
 		},
 	}
 
@@ -527,6 +526,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	}
 	return defaultMonitoringNamespace
 }
+
 func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentIDToBinary map[string]string, monitoringOutputName string, componentList []component.Component) error {
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
@@ -606,7 +606,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 			continue
 		}
 
-		endpoints := []interface{}{prefixedEndpoint(endpointPath(unit, b.operatingSystem))}
+		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(unit, paths.TempDir()))}
 		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
 
 		if isSupportedBeatsBinary(binaryName) {
@@ -792,7 +792,7 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 	// iterate over the full component list, adding a monitoring output for every shipper binary.
 	for _, comp := range componentList {
 		if comp.ShipperSpec != nil { // a shipper unit
-			endpoints := []interface{}{prefixedEndpoint(endpointPath(comp.ID, b.operatingSystem))}
+			endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(comp.ID, paths.TempDir()))}
 			name := "shipper" // in other beats this is the binary name, but we can hard-code it here.
 			if comp.ShipperSpec.Spec.Name != "" {
 				name = comp.ShipperSpec.Spec.Name
@@ -828,7 +828,6 @@ func (b *BeatsMonitor) injectMetricsInput(cfg map[string]interface{}, componentI
 					"processors": createProcessorsForJSONInput(name, monitoringNamespace, b.agentInfo),
 				})
 		}
-
 	}
 
 	inputs := []interface{}{
@@ -949,27 +948,6 @@ func loggingPath(id, operatingSystem string) string {
 	return fmt.Sprintf(logFileFormat, paths.Home(), id)
 }
 
-func endpointPath(id, operatingSystem string) (endpointPath string) {
-	return endpointPathWithDir(id, operatingSystem, paths.TempDir(), string(filepath.Separator))
-}
-
-func endpointPathWithDir(id, operatingSystem, tempDir, separator string) (endpointPath string) {
-	id = strings.ReplaceAll(id, separator, "-")
-	if operatingSystem == windowsOS {
-		// on windows named pipe `/` separates pipe name from a computer/server name
-		id = strings.ReplaceAll(id, "/", "-")
-		return fmt.Sprintf(mbEndpointFileFormatWin, id)
-	}
-	// unix socket path must be less than 104 characters
-	path := fmt.Sprintf("unix://%s.sock", filepath.Join(tempDir, id))
-	if len(path) < 104 {
-		return path
-	}
-	// place in global /tmp (or /var/tmp on Darwin) to ensure that its small enough to fit; current path is way to long
-	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
-	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
-}
-
 func prefixedEndpoint(endpoint string) string {
 	if endpoint == "" || strings.HasPrefix(endpoint, httpPlusPrefix) || strings.HasPrefix(endpoint, httpPrefix) {
 		return endpoint
@@ -978,8 +956,8 @@ func prefixedEndpoint(endpoint string) string {
 	return httpPlusPrefix + endpoint
 }
 
-func monitoringFile(id, operatingSystem string) string {
-	endpoint := endpointPath(id, operatingSystem)
+func monitoringFile(id string) string {
+	endpoint := utils.SocketURLWithFallback(id, paths.TempDir())
 	if endpoint == "" {
 		return ""
 	}
