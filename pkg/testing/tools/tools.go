@@ -5,6 +5,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -52,7 +53,7 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
-func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
+func InstallAgentWithPolicy(ctx context.Context, t *testing.T, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
 	policy, err := kibClient.CreatePolicy(createPolicyReq)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create policy: %w", err)
@@ -77,7 +78,7 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 
 	// Enroll agent
 	t.Logf("Unpacking and installing Elastic Agent")
-	output, err := InstallAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
+	output, err := InstallAgent(ctx, fleetServerURL, enrollmentToken.APIKey, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 		return nil, fmt.Errorf("unable to enroll Elastic Agent: %w", err)

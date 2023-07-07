@@ -97,7 +97,7 @@ func TestFQDN(t *testing.T) {
 			},
 		},
 	}
-	policy, err := tools.InstallAgentWithPolicy(t, agentFixture, kibClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(ctx, t, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Verify that agent name is short hostname")

@@ -111,7 +111,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling Elastic Agent...")
-	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
+	output, err := tools.InstallAgent(ctx, fleetServerURL, enrollmentToken.APIKey, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 	}
@@ -175,7 +175,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	output, err := tools.InstallStandaloneAgent(agentFixture)
+	output, err := tools.InstallStandaloneAgent(ctx, agentFixture)
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
 
@@ -394,7 +394,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	require.NoError(t, err, "error configuring agent fixture")
 
 	t.Log("Install the built Agent")
-	output, err := tools.InstallStandaloneAgent(agentFixture)
+	output, err := tools.InstallStandaloneAgent(ctx, agentFixture)
 	t.Log(string(output))
 	require.NoError(t, err)
 

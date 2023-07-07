@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -97,7 +98,12 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
-		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
+		// 5 minute timeout, to ensure that it at least doesn't get stuck.
+		// original context is not used as it could have a timeout on the context
+		// for the install and we don't want that context to prevent the uninstall
+		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer uninstallCancel()
+		out, err := f.Uninstall(uninstallCtx, &UninstallOpts{Force: true})
 		f.setClient(nil)
 		if errors.Is(err, ErrNotInstalled) {
 			// Agent fixture has already been uninstalled, perhaps by

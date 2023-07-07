@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -53,7 +54,8 @@ func TestEnrollAndLog(t *testing.T) {
 	}
 	// Stage 1: Install
 	// As part of the cleanup process, we'll uninstall the agent
-	policy, err := tools.InstallAgentWithPolicy(t, agentFixture, kibClient, createPolicyReq)
+	ctx := context.Background()
+	policy, err := tools.InstallAgentWithPolicy(ctx, t, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 
