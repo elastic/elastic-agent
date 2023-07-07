@@ -27,8 +27,9 @@ type ProxyURL struct {
 	suite.Suite
 	fixture *integrationtest.Fixture
 
-	fleet *fleetservertest.Server
-	proxy *proxytest.Proxy
+	fleet  *fleetservertest.Server
+	proxy1 *proxytest.Proxy
+	proxy2 *proxytest.Proxy
 }
 
 func TestProxyURL(t *testing.T) {
@@ -46,7 +47,9 @@ func (p *ProxyURL) SetupTest() {
 	agentVersion := "8.10.0-SNAPSHOT"
 	p.setupFleet("http://" + fleetHost)
 
-	p.proxy = proxytest.New(p.T(),
+	p.proxy1 = proxytest.New(p.T(),
+		proxytest.WithRewrite(fleetHost, p.fleet.LocalhostURL))
+	p.proxy1 = proxytest.New(p.T(),
 		proxytest.WithRewrite(fleetHost, p.fleet.LocalhostURL))
 
 	f, err := define.NewFixture(p.T(),
@@ -72,7 +75,7 @@ func (p *ProxyURL) TestNoProxyInThePolicy() {
 			Force:          true,
 			NonInteractive: true,
 			Insecure:       true,
-			ProxyURL:       p.proxy.LocalhostURL,
+			ProxyURL:       p.proxy1.LocalhostURL,
 			EnrollOpts: integrationtest.EnrollOpts{
 				URL:             p.fleet.LocalhostURL,
 				EnrollmentToken: "anythingWillDO",
