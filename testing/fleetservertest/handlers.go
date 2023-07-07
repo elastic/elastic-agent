@@ -178,13 +178,18 @@ type CheckinAction struct {
 	Delay    time.Duration
 }
 
-// NewHandlerCheckinFakeComponent takes a generator function that returns the
-// actions to be sent on the next checkin. The actions format is a JSON list.
+// ActionsGenerator is a function which upon call returns the actions the
+// checkin handler will add to its repose to the Elastic Agent.
+// The actions format is a JSON list.
 // E.g.:
 //   - ["action1", "action2"]
 //   - ["action1"]
 //   - []
-func NewHandlerCheckinFakeComponent(next func() (CheckinAction, *HTTPError)) func(
+type ActionsGenerator func() (CheckinAction, *HTTPError)
+
+// NewHandlerCheckin takes an ActionsGenerator which is used to populate the
+// actions in the CheckinResponse.
+func NewHandlerCheckin(next ActionsGenerator) func(
 	ctx context.Context,
 	h *Handlers,
 	agentID string,
