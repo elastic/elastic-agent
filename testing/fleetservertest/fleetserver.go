@@ -9,11 +9,18 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"time"
 )
 
 type Server struct {
 	*httptest.Server
+
+	// Port is the port Server is listening on.
+	Port string
+
+	// LocalhostURL is the server URL as "http://localhost:PORT".
+	LocalhostURL string
 }
 
 var timeNow = time.Now
@@ -29,6 +36,9 @@ type options struct {
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
 // If a route is called and its handler (the *Fn field) is nil a
 // http.StatusNotImplemented error will be returned.
+// By default, it binds to all network interfaces, thus Server.URL is in the form
+// of http://[::]:PORT, not valid to be used directly. Use Server.LocalhostURL
+// or
 func NewServer(h *Handlers, opts ...Option) *Server {
 	os := options{}
 	for _, o := range opts {
@@ -61,13 +71,23 @@ func NewServer(h *Handlers, opts ...Option) *Server {
 	}
 	s.Start()
 
+	u, err := url.Parse(s.URL)
+	if err != nil {
+		panic(fmt.Sprintf("could parse fleet-server URL: %v", err))
+	}
+
+	s.Port = u.Port()
+	s.LocalhostURL = "http://localhost:" + s.Port
+
 	return &s
 }
 
 // WithRequestLog sets the server to log every request using logFn.
 func WithRequestLog(logFn func(format string, a ...any)) Option {
 	return func(o *options) {
-		o.logFn = logFn
+		o.logFn = func(format string, a ...any) {
+			logFn("[fleet-server] "+format, a...)
+		}
 	}
 }
 

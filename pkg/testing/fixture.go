@@ -6,6 +6,7 @@ package testing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -24,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
@@ -347,6 +349,68 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	return cmd.CombinedOutput()
 }
 
+type ExecErr struct {
+	err    error
+	Output []byte
+}
+
+func (e *ExecErr) Error() string {
+	return e.err.Error()
+}
+
+func (e *ExecErr) String() string {
+	return fmt.Sprintf("error: %v, output: %s", e.err, e.Output)
+}
+
+func (e *ExecErr) As(target any) bool {
+	switch target.(type) {
+	case *ExecErr:
+		target = e
+		return true
+	case ExecErr:
+		target = *e
+		return true
+	default:
+		return errors.As(e.err, &target)
+	}
+}
+
+func (e *ExecErr) Unwrap() error {
+	return e.err
+}
+
+// ExecStatus executes the status subcommand on the prepared Elastic Agent binary.
+// It returns the parsed output and the error from the execution. Keep in mind
+// the agent exits with status 1 if it's unhealthy, but it still outputs the
+// status successfully. Therefore, a not empty AgentStatusOutput is valid
+// regardless of the error. An empty AgentStatusOutput and non nil error
+// means the output could not be parsed.
+func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
+	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
+	status := AgentStatusOutput{}
+	if uerr := json.Unmarshal(out, &status); uerr != nil {
+		return AgentStatusOutput{},
+			fmt.Errorf("could not unmarshal agent status output: %w",
+				errors.Join(&ExecErr{
+					err:    err,
+					Output: out,
+				}, uerr))
+	}
+
+	return status, err
+}
+
+// IsHealthy returns if the prepared Elastic Agent reports itself as healthy.
+// It returns false, err if it cannot determine the state of the agent.
+func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) (bool, error) {
+	status, err := f.ExecStatus(ctx, opts...)
+	if err != nil {
+		return false, fmt.Errorf("agent status returned and error: %w", err)
+	}
+
+	return status.State == int(cproto.State_HEALTHY), nil
+}
+
 func (f *Fixture) ensurePrepared(ctx context.Context) error {
 	if f.workDir == "" {
 		return f.Prepare(ctx)
@@ -663,4 +727,41 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 		return fmt.Errorf("state management failed update configuration: %w", err)
 	}
 	return nil
+}
+
+type AgentStatusOutput struct {
+	Info struct {
+		ID        string `json:"id"`
+		Version   string `json:"version"`
+		Commit    string `json:"commit"`
+		BuildTime string `json:"build_time"`
+		Snapshot  bool   `json:"snapshot"`
+	} `json:"info"`
+	State      int    `json:"state"`
+	Message    string `json:"message"`
+	Components []struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		State   int    `json:"state"`
+		Message string `json:"message"`
+		Units   []struct {
+			UnitID   string `json:"unit_id"`
+			UnitType int    `json:"unit_type"`
+			State    int    `json:"state"`
+			Message  string `json:"message"`
+			Payload  struct {
+				OsqueryVersion string `json:"osquery_version"`
+			} `json:"payload"`
+		} `json:"units"`
+		VersionInfo struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+			Meta    struct {
+				BuildTime string `json:"build_time"`
+				Commit    string `json:"commit"`
+			} `json:"meta"`
+		} `json:"version_info,omitempty"`
+	} `json:"components"`
+	FleetState   int    `json:"FleetState"`
+	FleetMessage string `json:"FleetMessage"`
 }

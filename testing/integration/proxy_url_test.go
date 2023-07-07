@@ -12,20 +12,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
-	"path"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/testing/fleetservertest"
+	"github.com/elastic/elastic-agent/testing/proxytest"
 )
 
 type ProxyURL struct {
@@ -33,6 +34,7 @@ type ProxyURL struct {
 	fixture *integrationtest.Fixture
 
 	fleet *fleetservertest.Server
+	proxy *proxytest.Proxy
 
 	proxyURL string
 }
@@ -61,33 +63,13 @@ func (w logWriter) Write(p []byte) (n int, err error) {
 }
 
 func (p *ProxyURL) SetupSuite() {
-	t := p.T()
-
-	pwd, err := os.Getwd()
-	require.NoError(t, err, "could not get current working directory")
-	urlRewriter := path.Join(pwd, "testdata", "squid_url_rewrite")
+	fleetHost := "fleet.elastic.co"
 
 	agentVersion := "8.10.0-SNAPSHOT"
-	t.Log("setting up fleet-server mock")
-	p.setupFleet()
-	t.Log("done setting up fleet-server mock")
+	p.setupFleet("http://" + fleetHost)
 
-	t.Log("starting url rewrite program")
-	go func() {
-		cmd := exec.Command(urlRewriter)
-		cmd.Stderr = logWriter(t.Log)
-		cmd.Stdout = logWriter(t.Log)
-
-		err := cmd.Run()
-		if err != nil {
-			t.Logf("failed running: %q: %#v", urlRewriter, err)
-			os.Exit(1) // cannot FailNow a test on a goroutine
-		}
-	}()
-
-	t.Log("setting up squid proxy")
-	p.setupSquidProxy(urlRewriter)
-	t.Log("done setting up squid proxy")
+	p.proxy = proxytest.New(p.T(),
+		proxytest.WithRewrite(fleetHost, p.fleet.LocalhostURL))
 
 	f, err := define.NewFixture(p.T(),
 		agentVersion,
@@ -104,64 +86,7 @@ func (p *ProxyURL) SetupSuite() {
 	p.fixture = f
 }
 
-func (p *ProxyURL) setupMockProxy() {
-
-}
-
-func (p *ProxyURL) setupSquidProxy(urlRewriter string) {
-	t := p.T()
-	t.Helper()
-
-	t.Log("installing squid")
-	cmd := []string{"apt", "install", "-y", "squid=5.2-1ubuntu4.3"}
-	out, err := exec.Command(cmd[0], cmd[1:]...).Output()
-	if err != nil {
-		var eerr *exec.ExitError
-		if errors.As(err, &eerr) {
-			t.Logf("failed running: %q", strings.Join(cmd, " "))
-			t.Log("stdout:", string(out))
-			t.Log("stderr:", string(eerr.Stderr))
-		}
-
-		t.Fatalf("could install squid service")
-	}
-
-	t.Log("reading config")
-	conf, err := os.ReadFile("testdata/squid.conf")
-	require.NoError(t, err, "could not open squid config")
-
-	testfleetURL, err := url.Parse(p.fleet.URL)
-	require.NoError(t, err, "could parse fleet-server URL")
-
-	extraConf := "\n" +
-		"url_rewrite_program " + urlRewriter + "\n" +
-		"url_rewrite_extras " + "http://localhost:" + testfleetURL.Port() + "\n"
-	conf = append(conf, []byte(extraConf)...)
-	t.Log("saving config")
-	err = os.WriteFile("/etc/squid/squid.conf", conf, 0644)
-	require.NoError(p.T(), err, "could not save squid config")
-
-	t.Log("restarting squid")
-	cmd = []string{"systemctl", "restart", "squid.service"}
-	out, err = exec.Command(cmd[0], cmd[1:]...).Output()
-	if err != nil {
-		var eerr *exec.ExitError
-		if errors.As(err, &eerr) {
-			t.Logf("failed running: %q", strings.Join(cmd, " "))
-			t.Log("stdout:", string(out))
-			t.Log("stderr:", string(eerr.Stderr))
-		}
-
-		t.Fatalf("could restart squid service")
-	}
-
-	p.proxyURL = "http://localhost:3128" // default squid address
-}
-
-func (p *ProxyURL) setupFleet() {
-	// this value is hard coded on the squid URL rewrite program.
-	// See testdata/squid_url_rewrite.go
-	fleetHost := "http://fleet.elastic.co"
+func (p *ProxyURL) setupFleet(fleetHost string) {
 	agentID := "proxy-url-agent-id"
 	actionID := "ActionID"
 	policyID := "bedf2f42-a252-40bb-ab2b-8a7e1b874c7a"
@@ -225,27 +150,77 @@ func (p *ProxyURL) setupFleet() {
 		acker,
 		fleetservertest.WithRequestLog(log.Printf))
 	p.fleet = fleet
+	tmpl.FleetHosts = fmt.Sprintf("%q", fleet.LocalhostURL)
 
 	return
 }
 
-func (p *ProxyURL) Test1() {
+func (p *ProxyURL) TestNoProxyInThePolicy() {
+	t := p.T()
 	out, err := p.fixture.Install(
 		context.Background(),
 		&integrationtest.InstallOpts{
 			Force:          true,
 			NonInteractive: true,
 			Insecure:       true,
-			ProxyURL:       p.proxyURL,
+			ProxyURL:       p.proxy.LocalhostURL,
 			EnrollOpts: integrationtest.EnrollOpts{
-				URL:             p.fleet.URL,
+				URL:             p.fleet.LocalhostURL,
 				EnrollmentToken: "anythingWillDO",
 			}})
-
-	fmt.Println("========================================== Agent output ==========================================")
-	fmt.Println(string(out))
+	t.Log(string(out))
 	if err != nil {
-		fmt.Println("========================================== Agent ERROR ==========================================")
-		fmt.Printf("%v\n", err)
+		require.NoError(t, err, "failed to install agent")
 	}
+
+	status, err := p.fixture.ExecStatus(context.Background())
+	assert.Equal(t, status.FleetState, int(cproto.State_HEALTHY))
+	assert.NoError(t, err, "agent status errored: %v")
+}
+
+func (p *ProxyURL) setupSquidProxy(urlRewriter string) {
+	t := p.T()
+	t.Helper()
+
+	t.Log("installing squid")
+	cmd := []string{"apt", "install", "-y", "squid=5.2-1ubuntu4.3"}
+	out, err := exec.Command(cmd[0], cmd[1:]...).Output()
+	if err != nil {
+		var eerr *exec.ExitError
+		if errors.As(err, &eerr) {
+			t.Logf("failed running: %q", strings.Join(cmd, " "))
+			t.Log("stdout:", string(out))
+			t.Log("stderr:", string(eerr.Stderr))
+		}
+
+		t.Fatalf("could install squid service")
+	}
+
+	t.Log("reading config")
+	conf, err := os.ReadFile("testdata/squid.conf")
+	require.NoError(t, err, "could not open squid config")
+
+	extraConf := "\n" +
+		"url_rewrite_program " + urlRewriter + "\n" +
+		"url_rewrite_extras " + p.fleet.LocalhostURL + "\n"
+	conf = append(conf, []byte(extraConf)...)
+	t.Log("saving config")
+	err = os.WriteFile("/etc/squid/squid.conf", conf, 0644)
+	require.NoError(p.T(), err, "could not save squid config")
+
+	t.Log("restarting squid")
+	cmd = []string{"systemctl", "restart", "squid.service"}
+	out, err = exec.Command(cmd[0], cmd[1:]...).Output()
+	if err != nil {
+		var eerr *exec.ExitError
+		if errors.As(err, &eerr) {
+			t.Logf("failed running: %q", strings.Join(cmd, " "))
+			t.Log("stdout:", string(out))
+			t.Log("stderr:", string(eerr.Stderr))
+		}
+
+		t.Fatalf("could restart squid service")
+	}
+
+	p.proxyURL = "http://localhost:3128" // default squid address
 }
