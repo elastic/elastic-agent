@@ -71,9 +71,9 @@ func (p *ProxyURL) SetupTest() {
 	p.setupFleet("http://" + fleetHost)
 
 	p.proxy1 = proxytest.New(p.T(),
-		proxytest.WithRewrite(fleetHost, p.fleet.LocalhostURL))
+		proxytest.WithRewrite(fleetHost, "localhost:"+p.fleet.Port))
 	p.proxy2 = proxytest.New(p.T(),
-		proxytest.WithRewrite(fleetHost, p.fleet.LocalhostURL))
+		proxytest.WithRewrite(fleetHost, "localhost:"+p.fleet.Port))
 
 	f, err := define.NewFixture(p.T(),
 		p.agentVersion,
@@ -105,7 +105,6 @@ func (p *ProxyURL) TearDownTest() {
 func (p *ProxyURL) TestNoProxyInThePolicy() {
 	t := p.T()
 	ackToken := "ackToken-AckTokenTestNoProxyInThePolicy"
-	t.Skip()
 
 	// now that we have fleet and the proxy running, we can add actions which
 	// depend on them.
@@ -147,7 +146,6 @@ func (p *ProxyURL) TestNoProxyInThePolicy() {
 
 func (p *ProxyURL) TestEmptyProxyInThePolicy() {
 	t := p.T()
-	t.Skip()
 	ackToken := "AckToken-TestEmptyProxyInThePolicy"
 
 	p.policyData.FleetProxyURL = new(string)
@@ -199,7 +197,6 @@ func (p *ProxyURL) TestValidProxyInThePolicy() {
 	// depend on them.
 	action, err := fleetservertest.NewActionPolicyChange(
 		"actionID-TestValidProxyInThePolicy", p.policyData)
-	t.Logf("Action: %v", action)
 	require.NoError(p.T(), err, "could not generate action with policy")
 	p.checkinWithAcker.AddCheckin(
 		ackToken,
@@ -233,14 +230,12 @@ func (p *ProxyURL) TestValidProxyInThePolicy() {
 	}
 
 	if !assert.Eventually(t, func() bool {
-		t.Log("len(p.proxy2.ProxiedRequests()) =", len(p.proxy2.ProxiedRequests()))
-		t.Log("p.proxy2.ProxiedRequests() =", p.proxy2.ProxiedRequests())
-
 		for _, r := range p.proxy2.ProxiedRequests() {
-			t.Logf("proxy2 request: %v", r)
-			return strings.Contains(
+			if strings.Contains(
 				r,
-				fleetservertest.NewPathCheckin(p.policyData.AgentID))
+				fleetservertest.NewPathCheckin(p.policyData.AgentID)) {
+				return true
+			}
 		}
 
 		return false
