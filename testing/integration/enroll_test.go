@@ -8,6 +8,7 @@ package integration
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ func TestEnrollAndLog(t *testing.T) {
 	// Enroll agent in Fleet with a test policy
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
-		Namespace:   info.Namespace,
+		Namespace:   strings.ToLower(strings.Replace(info.Namespace, "-", "", -1)),
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
