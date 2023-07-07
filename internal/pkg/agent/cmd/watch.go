@@ -113,6 +113,9 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	// cleanup older versions,
 	// in windows it might leave self untouched, this will get cleaned up
 	// later at the start, because for windows we leave marker untouched.
+	//
+	// Why is this being skipped on Windows? The comment above is not clear.
+	// issue: https://github.com/elastic/elastic-agent/issues/3027
 	removeMarker := !isWindows()
 	err = upgrade.Cleanup(log, marker.Hash, removeMarker, false)
 	if err != nil {

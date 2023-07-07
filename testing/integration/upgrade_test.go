@@ -352,6 +352,8 @@ func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture) {
 	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
 	require.FileExists(t, updateMarkerFile)
 
+	// Checking for the marker deletion is skipped on windows because it is currently not removed.
+	// See issue for more information on this: https://github.com/elastic/elastic-agent/issues/3027
 	if runtime.GOOS == define.Windows {
 		t.Log("Upgrade marker is not removed on Windows, skip checking for upgrade marker deletion")
 		return
