@@ -101,6 +101,7 @@ func New(t *testing.T, optns ...Option) *Proxy {
 				break
 			case opts.rewriteHost != nil:
 				r.URL.Host = opts.rewriteHost(r.URL.Host)
+				break
 			}
 
 			s.proxiedRequestsMu.Lock()
