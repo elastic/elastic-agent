@@ -80,9 +80,14 @@ func NewHandlerAck() func(
 	}
 }
 
+// Acker is a function that for each actionID must return a AckResponseItem for
+// that action and if this ack errored or not.
+type Acker func(actionID string) (AckResponseItem, bool)
+
 // NewHandlerAckWithAcker takes an acker, a function that for each actionID must
 // return the expected AckResponseItem for that action and if this ack errored
 // or not.
+// TODO(Anderson): fix me
 func NewHandlerAckWithAcker(acker func(actionID string) (AckResponseItem, bool)) func(
 	ctx context.Context,
 	h *Handlers,
