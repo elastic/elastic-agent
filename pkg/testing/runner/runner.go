@@ -239,7 +239,12 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 
 // runMachine runs the batch on the machine.
 func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
-	logger.Logf("Starting SSH; connect with `ssh -i ./ogc-cache/id_rsa %s@%s`", machine.PublicIP, machine.Layout.Username)
+	sshPrivateKeyPath, err := filepath.Abs(filepath.Join(".ogc-cache", "id_rsa"))
+	if err != nil {
+		return OSRunnerResult{}, fmt.Errorf("failed to determine OGC SSH private key path: %w", err)
+	}
+
+	logger.Logf("Starting SSH; connect with `ssh -i %s %s@%s`", sshPrivateKeyPath, machine.Layout.Username, machine.PublicIP)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	client, err := sshConnect(connectCtx, machine.PublicIP, machine.Layout.Username, sshAuth)
