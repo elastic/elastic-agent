@@ -110,7 +110,7 @@ func (s *FQDN) TestFQDN() {
 			},
 		},
 	}
-	policy, err := tools.InstallAgentWithPolicy(s.T(), s.agentFixture, kibClient, s.requirementsInfo.ESClient, createPolicyReq)
+	policy, err := tools.InstallAgentWithPolicy(s.T(), s.agentFixture, kibClient, createPolicyReq)
 	require.NoError(s.T(), err)
 
 	s.T().Log("Verify that agent name is short hostname")
