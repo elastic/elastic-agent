@@ -352,6 +352,11 @@ func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture) {
 	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
 	require.FileExists(t, updateMarkerFile)
 
+	if runtime.GOOS == define.Windows {
+		t.Log("Upgrade marker is not removed on Windows, skip checking for upgrade marker deletion")
+		return
+	}
+
 	now := time.Now()
 	require.Eventuallyf(t, func() bool {
 		_, err := os.Stat(updateMarkerFile)

@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/magefile/mage/mg"
 	"path"
 	"path/filepath"
 	"strings"
@@ -117,55 +116,25 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger 
 
 	var result OSRunnerResult
 	if len(tests) > 0 {
-		logger.Logf("Starting tests")
-		execTest := strings.NewReader(toPowershellScript(agentVersion, prefix, mg.Verbose(), tests, env))
-		session, err := c.NewSession()
+		script := toPowershellScript(agentVersion, prefix, verbose, tests, env)
+
+		results, err := runTestsOnWindows(ctx, logger, "non-sudo", prefix, script, c, batch.SudoTests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
+			return OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
 		}
-
-		session.Stdout = newPrefixOutput(logger, "Test output (stdout): ")
-		session.Stderr = newPrefixOutput(logger, "Test output (stderr): ")
-		session.Stdin = execTest
-		// allowed to fail because tests might fail
-		_ = session.Run("powershell -noprofile -noninteractive -")
-		_ = session.Close()
-
-		// fetch the contents for each package
-		for _, pkg := range batch.Tests {
-			resultPkg, err := getWindowsRunnerPackageResult(ctx, c, pkg, prefix)
-			if err != nil {
-				return OSRunnerResult{}, err
-			}
-			result.Packages = append(result.Packages, resultPkg)
-		}
+		result.Packages = results
 	}
 
 	if len(sudoTests) > 0 {
 		prefix := fmt.Sprintf("%s-sudo", prefix)
-		logger.Logf("Starting sudo tests")
-		execTest := strings.NewReader(toPowershellScript(agentVersion, prefix, mg.Verbose(), sudoTests, env))
+		script := toPowershellScript(agentVersion, prefix, verbose, sudoTests, env)
 
-		session, err := c.NewSession()
+		results, err := runTestsOnWindows(ctx, logger, "sudo", prefix, script, c, batch.SudoTests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("failed to start session: %w", err)
+			return OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
 		}
+		result.SudoPackages = results
 
-		session.Stdout = newPrefixOutput(logger, "Test output (sudo) (stdout): ")
-		session.Stderr = newPrefixOutput(logger, "Test output (sudo) (stderr): ")
-		session.Stdin = execTest
-		// allowed to fail because tests might fail
-		_ = session.Run("powershell -noprofile -noninteractive -")
-		_ = session.Close()
-
-		// fetch the contents for each package
-		for _, pkg := range batch.SudoTests {
-			resultPkg, err := getWindowsRunnerPackageResult(ctx, c, pkg, prefix)
-			if err != nil {
-				return OSRunnerResult{}, err
-			}
-			result.SudoPackages = append(result.SudoPackages, resultPkg)
-		}
 	}
 	return result, nil
 }
@@ -204,6 +173,38 @@ func toPowershellScript(agentVersion string, prefix string, verbose bool, tests 
 	}
 	sb.WriteString("integration:testOnRemote\n")
 	return sb.String()
+}
+
+func runTestsOnWindows(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient SSHClient, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
+	execTest := strings.NewReader(script)
+
+	session, err := sshClient.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start session: %w", err)
+	}
+
+	session.Stdout = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stdout): ", name))
+	session.Stderr = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stderr): ", name))
+	session.Stdin = execTest
+	// allowed to fail because tests might fail
+	logger.Logf("Running %s tests...", name)
+	err = session.Run("powershell -noprofile -noninteractive -")
+	if err != nil {
+		logger.Logf("%s tests failed: %s", name, err)
+	}
+	// this seems to always return an error
+	_ = session.Close()
+
+	var result []OSRunnerPackageResult
+	// fetch the contents for each package
+	for _, pkg := range tests {
+		resultPkg, err := getWindowsRunnerPackageResult(ctx, sshClient, pkg, prefix)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, resultPkg)
+	}
+	return result, nil
 }
 
 func toWindowsPath(path string) string {

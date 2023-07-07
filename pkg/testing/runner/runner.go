@@ -28,6 +28,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 )
 
+const (
+	// PrepareTimeout is the amount of time to wait for a machine to be prepared.
+	PrepareTimeout = 30 * time.Minute
+	// TestTimeout is the amount of time to wait for all the tests to be ran.
+	TestTimeout = 1 * time.Hour
+)
+
 // OSRunnerPackageResult is the result for each package.
 type OSRunnerPackageResult struct {
 	// Name is the package name.
@@ -250,7 +257,7 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 
 // runMachine runs the batch on the machine.
 func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
-	logger.Logf("Starting SSH; connect with `ssh -i ./ogc-cache/id_rsa %s@%s`", machine.Layout.Username, machine.PublicIP)
+	logger.Logf("Starting SSH; connect with `ssh -i .ogc-cache/id_rsa %s@%s`", machine.Layout.Username, machine.PublicIP)
 	client := NewSSHClient(machine.PublicIP, machine.Layout.Username, sshAuth)
 	err := client.ConnectWithTimeout(ctx, 10*time.Minute)
 	if err != nil {
@@ -262,7 +269,9 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 
 	// prepare the host to run the tests
 	logger.Logf("Preparing instance")
-	err = batch.LayoutOS.Runner.Prepare(ctx, client, logger, batch.LayoutOS.OS.Arch, r.cfg.GOVersion, repoArchive, r.getBuildPath(batch))
+	prepareCtx, prepareCancel := context.WithTimeout(ctx, PrepareTimeout)
+	defer prepareCancel()
+	err = batch.LayoutOS.Runner.Prepare(prepareCtx, client, logger, batch.LayoutOS.OS.Arch, r.cfg.GOVersion, repoArchive, r.getBuildPath(batch))
 	if err != nil {
 		logger.Logf("Failed to prepare instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to prepare instance %s: %w", machine.InstanceName, err)
@@ -280,7 +289,6 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 		if resp == nil {
 			return OSRunnerResult{}, fmt.Errorf("cannot continue because stack never became ready")
 		}
-		logger.Logf("Will continue, stack is ready")
 		env = map[string]string{
 			"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
 			"ELASTICSEARCH_USERNAME": resp.Username,
@@ -289,8 +297,7 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 			"KIBANA_USERNAME":        resp.Username,
 			"KIBANA_PASSWORD":        resp.Password,
 		}
-		logger.Logf("Created Stack with Kibana host %s, %s/%s", resp.KibanaEndpoint, resp.Username, resp.Password)
-
+		logger.Logf("Stack is ready; Kibana: %s, %s/%s", resp.KibanaEndpoint, resp.Username, resp.Password)
 	}
 
 	// run the actual tests on the host
@@ -300,7 +307,9 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 	} else {
 		prefix = fmt.Sprintf("%s-%s-%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, strings.Replace(batch.LayoutOS.OS.Version, ".", "", -1))
 	}
-	result, err := batch.LayoutOS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
+	runCtx, runCancel := context.WithTimeout(ctx, TestTimeout)
+	defer runCancel()
+	result, err := batch.LayoutOS.Runner.Run(runCtx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
 	if err != nil {
 		logger.Logf("Failed to execute tests on instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", machine.InstanceName, err)

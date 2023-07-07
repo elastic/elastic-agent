@@ -147,7 +147,7 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, 
 		vars = extendVars(vars, env)
 
 		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
-		results, err := runTests(ctx, logger, "non-sudo", prefix, script, sshClient, batch.Tests)
+		results, err := runTestsOnLinux(ctx, logger, "non-sudo", prefix, script, sshClient, batch.Tests)
 		if err != nil {
 			return OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
 		}
@@ -160,7 +160,7 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, 
 		vars = extendVars(vars, env)
 		script := fmt.Sprintf(`cd agent && sudo %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
 
-		results, err := runTests(ctx, logger, "sudo", prefix, script, sshClient, batch.SudoTests)
+		results, err := runTestsOnLinux(ctx, logger, "sudo", prefix, script, sshClient, batch.SudoTests)
 		if err != nil {
 			return OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
 		}
@@ -170,7 +170,7 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, 
 	return result, nil
 }
 
-func runTests(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient SSHClient, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
+func runTestsOnLinux(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient SSHClient, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
 	execTest := strings.NewReader(script)
 
 	session, err := sshClient.NewSession()
