@@ -33,30 +33,28 @@ func removeBlockingExe(blockingErr error) (string, error) {
 	// open handle for delete only
 	h, err := openDeleteHandle(path)
 	if err != nil {
-		return "", fmt.Errorf("failed to open handler for %q: %w", path, err)
+		return "", fmt.Errorf("failed to open handle for %q: %w", path, err)
 	}
 
 	// rename handle
 	err = renameHandle(h)
-	if err != nil {
-		_ = windows.CloseHandle(h)
-		return "", fmt.Errorf("failed to rename handler for %q: %w", path, err)
-	}
 	_ = windows.CloseHandle(h)
+	if err != nil {
+		return "", fmt.Errorf("failed to rename handle for %q: %w", path, err)
+	}
 
 	// re-open handle
 	h, err = openDeleteHandle(path)
 	if err != nil {
-		return "", fmt.Errorf("failed to open handler after rename for %q: %w", path, err)
+		return "", fmt.Errorf("failed to open handle after rename for %q: %w", path, err)
 	}
 
-	// disposite the handle
-	err = depositeHandle(h)
-	if err != nil {
-		_ = windows.CloseHandle(h)
-		return "", fmt.Errorf("failed to deposite handler for %q: %w", path, err)
-	}
+	// dispose of the handle
+	err = disposeHandle(h)
 	_ = windows.CloseHandle(h)
+	if err != nil {
+		return "", fmt.Errorf("failed to dispose handle for %q: %w", path, err)
+	}
 	return path, nil
 }
 
@@ -121,7 +119,7 @@ func renameHandle(hHandle windows.Handle) error {
 	return nil
 }
 
-func depositeHandle(hHandle windows.Handle) error {
+func disposeHandle(hHandle windows.Handle) error {
 	var deleteFile fileDispositionInfo
 	deleteFile.DeleteFile = true
 
