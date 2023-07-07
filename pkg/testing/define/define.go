@@ -30,6 +30,7 @@ import (
 var osInfo *types.OSInfo
 var osInfoErr error
 var osInfoOnce sync.Once
+var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
 
 // Require defines what this test requires for it to be run by the test runner.
 //
@@ -196,7 +197,7 @@ func getNamespace(t *testing.T, local bool) (string, error) {
 	// Fleet API requires the namespace to be lowercased and not contain
 	// special characters.
 	namespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
-	namespace = regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(namespace, "")
+	namespace = noSpecialCharsRegexp.ReplaceAllString(namespace, "")
 
 	return namespace, nil
 }
