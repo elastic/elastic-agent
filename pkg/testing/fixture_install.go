@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/stretchr/testify/require"
 
@@ -107,7 +108,8 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.t.Cleanup(func() {
 		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
 		f.setClient(nil)
-		if errors.Is(err, ErrNotInstalled) {
+		if errors.Is(err, ErrNotInstalled) ||
+			strings.Contains(err.Error(), "elastic-agent: no such file or directory") {
 			// Agent fixture has already been uninstalled, perhaps by
 			// an explicit call to fixture.Uninstall, so nothing needs
 			// to be done here.

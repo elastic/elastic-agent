@@ -28,9 +28,9 @@ import (
 func TestRunFleetServer(t *testing.T) {
 	t.Skip("use this test if you want a mock fleet-server running to enroll a real agent")
 	agentID := "agentID"
-	actionID := "ActionID"
+	// actionID := "ActionID"
 	policyID := "policyID"
-	ackToken := "AckToken"
+	// ackToken := "AckToken"
 	enrolmentToken := "enrolmentToken" //nolint:gosec // it's a test
 	apiKey := APIKey{
 		ID:  "myKeyID",
@@ -47,9 +47,9 @@ func TestRunFleetServer(t *testing.T) {
 	var actionsIdx int
 
 	tmpl := TmplPolicy{
-		AckToken: ackToken,
-		AgentID:  agentID,
-		ActionID: actionID,
+		// AckToken: ackToken,
+		AgentID: agentID,
+		// ActionID: actionID,
 		PolicyID: policyID,
 		// FleetHosts needs to be changed after the server is running, so we can
 		// get the port the server is listening on. Therefore, the action generator
@@ -80,7 +80,7 @@ func TestRunFleetServer(t *testing.T) {
 		switch actionsIdx {
 		case 0:
 			return CheckinAction{
-					AckToken: tmpl.AckToken, Actions: []string{actions}},
+					AckToken: "tmpl.AckToken", Actions: []string{actions}},
 				nil
 		}
 
@@ -146,7 +146,7 @@ func ExampleNewServer_status() {
 
 func ExampleNewServer_checkin() {
 	agentID := "agentID"
-	tmpl := TmplPolicy{ActionID: "anActionID"}
+	tmpl := TmplPolicy{}
 
 	actions, err := NewActionPolicyChangeWithFakeComponent(tmpl)
 	if err != nil {
@@ -292,9 +292,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	agentID := "agentID"
 	policyID := "policyID"
 	tmpl := TmplPolicy{
-		AckToken:   "AckToken",
 		AgentID:    "AgentID",
-		ActionID:   "ActionID",
 		PolicyID:   policyID,
 		FleetHosts: `"host1", "host2"`,
 		SourceURI:  "http://source.uri",
@@ -363,9 +361,7 @@ func ExampleNewServer_checkin_withDelay() {
 	agentID := "agentID"
 	policyID := "policyID"
 	tmpl := TmplPolicy{
-		AckToken:   "AckToken",
 		AgentID:    "AgentID",
-		ActionID:   "ActionID",
 		PolicyID:   policyID,
 		FleetHosts: `"host1", "host2"`,
 		SourceURI:  "http://source.uri",
@@ -498,7 +494,6 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	agentID := "agentID"
 	actionID := "ActionID"
 	policyID := "policyID"
-	ackToken := "AckToken"
 	apiKey := APIKey{
 		ID:  "apiKey_key",
 		Key: "apiKey_id",
@@ -509,9 +504,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// create a POLICY_CHANGE action with a valid policy and the fake-inout
 	tmpl := TmplPolicy{
-		AckToken:   ackToken,
 		AgentID:    agentID,
-		ActionID:   actionID,
 		PolicyID:   policyID,
 		FleetHosts: `"host1", "host2"`,
 		SourceURI:  "http://source.uri",
