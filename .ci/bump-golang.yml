@@ -121,6 +121,7 @@ targets:
       content: 'ARG GO_VERSION={{ source "latestGoVersion" }}'
       files:
         - Dockerfile
+        - Dockerfile.skaffold
       matchpattern: 'ARG GO_VERSION=\d+.\d+.\d+'
   update-gomod:
     name: "Update go.mod"
