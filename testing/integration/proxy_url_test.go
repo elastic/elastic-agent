@@ -33,15 +33,8 @@ type ProxyURL struct {
 
 func TestProxyURL(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
-		// Isolate: true,
-		Local: true,
+		Local: false,
 		Sudo:  true,
-		OS: []define.OS{{
-			Type: define.Linux,
-			Arch: define.AMD64,
-			// Version: "22.04",
-			Distro: "ubuntu",
-		}},
 	})
 
 	suite.Run(t, &ProxyURL{})
