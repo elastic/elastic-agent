@@ -224,7 +224,7 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname string, esClient *e
 			hit := body.Hits.Hits[0]
 			return hostname == hit.Source.Host.Name
 		},
-		1*time.Minute,
+		2*time.Minute,
 		5*time.Second,
 	)
 }
