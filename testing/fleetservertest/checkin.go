@@ -20,9 +20,11 @@ type TmplPolicy struct {
 	// - `"host1", "host2"`
 	// - `"host"`
 	FleetHosts string
-	SourceURI  string
-	CreatedAt  string
-	Output     struct {
+	// AddFleetProxyURL bool
+	FleetProxyURL *string
+	SourceURI     string
+	CreatedAt     string
+	Output        struct {
 		APIKey string
 		Hosts  string
 		Type   string
@@ -210,6 +212,9 @@ const (
             }
           },
           "fleet": {
+            {{ if ne .FleetProxyURL nil }}
+            "proxy_url": "{{.FleetProxyURL}}",
+            {{ end }}
             "hosts": [{{.FleetHosts}}]
           },
           "id": "{{.PolicyID}}",
