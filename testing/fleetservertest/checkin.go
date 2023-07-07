@@ -14,9 +14,7 @@ import (
 // should be populated with valid JSON without the surrounding double quotes.
 // Check the actionPolicyChangeFakeComponentTmpl for details.
 type TmplPolicy struct {
-	AckToken string
 	AgentID  string
-	ActionID string
 	PolicyID string
 	// FleetHosts should be a JSON array without the square brackets:
 	// - `"host1", "host2"`
@@ -34,15 +32,13 @@ type TmplPolicy struct {
 // NewCheckinResponse returns a valid JSON encoded checkin response with
 // the provided actions.
 func NewCheckinResponse(ackToken string, actions ...string) string {
-	return fmt.Sprintf(checkinResponseJSONFakeComponent,
+	return fmt.Sprintf(checkinResponseJSON,
 		ackToken, fmt.Sprintf("[%s]", strings.Join(actions, ",")))
 }
 
-// NewActionPolicyChangeEmptyPolicy returns a POLICY_CHANGE action where
-// the policy contains no integration and monitoring disabled. All variable data in the policy comes from the data parameter.
-func NewActionPolicyChangeEmptyPolicy(data TmplPolicy) (string, error) {
-	t := template.Must(template.New("actionPolicyChangeFakeComponentTmpl").
-		Parse(actionPolicyChangeFakeComponentTmpl))
+func NewPolicy(data TmplPolicy) (string, error) {
+	t := template.Must(template.New("policyEmpryTmpl").
+		Parse(policyEmpryTmpl))
 
 	buf := &strings.Builder{}
 	err := t.Execute(buf, data)
@@ -51,6 +47,50 @@ func NewActionPolicyChangeEmptyPolicy(data TmplPolicy) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+type AckableAction struct {
+	ActionID string
+	data     string
+}
+
+func NewActionPolicyChange(actionID string, data TmplPolicy) (AckableAction, error) {
+	policy, err := NewPolicy(data)
+	if err != nil {
+		return AckableAction{}, fmt.Errorf("could not build policy: %w", err)
+	}
+
+	return NewAction(ActionTmpl{
+		AgentID:  data.AgentID,
+		Data:     policy,
+		ActionID: actionID,
+		Type:     "POLICY_CHANGE",
+	})
+}
+
+const actionTemplate = `{
+      "agent_id": "{{.AgentID}}",
+      "created_at": "2023-05-31T11:37:50.607Z",
+      "data": {{.Data}},
+      "id": "{{.ActionID}}",
+      "input_type": "",
+      "type": "{{.Type}}"
+    }`
+
+func NewAction(data ActionTmpl) (AckableAction, error) {
+	t := template.Must(template.New("actionTemplate").
+		Parse(actionTemplate))
+
+	buf := &strings.Builder{}
+	err := t.Execute(buf, data)
+	if err != nil {
+		return AckableAction{}, fmt.Errorf("failed executing actionTemplate: %w", err)
+	}
+
+	return AckableAction{
+		ActionID: data.ActionID,
+		data:     buf.String(),
+	}, nil
 }
 
 // NewActionPolicyChangeWithFakeComponent returns a POLICY_CHANGE action where
@@ -70,21 +110,12 @@ func NewActionPolicyChangeWithFakeComponent(data TmplPolicy) (string, error) {
 }
 
 const (
-	checkinResponseJSONFakeComponent = `
+	checkinResponseJSON = `
 {
   "ack_token": "%s",
   "action": "checkin",
   "actions": %s
 }`
-
-	actionTemplate = ` {
-      "agent_id": "{{.AgentID}}",
-      "created_at": "2023-05-31T11:37:50.607Z",
-      "data": {{.Data}},
-      "id": "{{.ActionID}}",
-      "input_type": "",
-      "type": "{{.Type}}"
-    }`
 
 	actionPolicyChangeFakeComponentTmpl = `
     {
@@ -157,11 +188,8 @@ const (
       "type": "POLICY_CHANGE"
     }`
 
-	actionPolicyChangeEmpryPolicyTmpl = `
+	policyEmpryTmpl = `
     {
-      "agent_id": "{{.AgentID}}",
-      "created_at": "2023-05-31T11:37:50.607Z",
-      "data": {
         "policy": {
           "agent": {
             "download": {
@@ -184,7 +212,7 @@ const (
           "fleet": {
             "hosts": [{{.FleetHosts}}]
           },
-          "id": "{{.ActionID}}",
+          "id": "{{.PolicyID}}",
           "inputs": [],
           "output_permissions": {
             "default": {}
@@ -203,9 +231,5 @@ const (
             "signature": "MEUCIQCfS6wPj/AvfFA79dwKATnvyFl/ZeyA8eKOLHg1XuA9NgIgNdhjIT+G/GZFqsVoWk5jThONhpqPhfiHLE5OkTdrwT0="
           }
         }
-      },
-      "id": "{{.ActionID}}",
-      "input_type": "",
-      "type": "POLICY_CHANGE"
-    }`
+      }`
 )

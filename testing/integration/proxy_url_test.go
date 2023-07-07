@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -118,12 +117,8 @@ func (p *ProxyURL) setupFleet(fleetHost string) {
 		Key: "apiKeyKey",
 	}
 
-	var actionsIdx int
-
-	tmpl := fleetservertest.TmplPolicy{
-		AckToken:   ackToken,
+	policyData := fleetservertest.TmplPolicy{
 		AgentID:    agentID,
-		ActionID:   actionID,
 		PolicyID:   policyID,
 		FleetHosts: fmt.Sprintf("%q", fleetHost),
 		SourceURI:  "http://source.uri",
@@ -138,41 +133,29 @@ func (p *ProxyURL) setupFleet(fleetHost string) {
 			Type:   "elasticsearch"},
 	}
 
-	nextAction := func() (fleetservertest.CheckinAction, *fleetservertest.HTTPError) {
-		defer func() { actionsIdx++ }()
-		actions, err := fleetservertest.NewActionPolicyChangeEmptyPolicy(tmpl)
-		if err != nil {
-			panic(fmt.Sprintf("failed to get new actions: %v", err))
-		}
-
-		switch actionsIdx {
-		case 0:
-			return fleetservertest.CheckinAction{
-					AckToken: tmpl.AckToken, Actions: []string{actions}},
-				nil
-		}
-
-		return fleetservertest.CheckinAction{}, nil
-	}
-
-	acker := func(id string) (fleetservertest.AckResponseItem, bool) {
-		return fleetservertest.AckResponseItem{
-			Status:  http.StatusOK,
-			Message: http.StatusText(http.StatusOK),
-		}, false
-	}
+	checkin := fleetservertest.NewCheckinActionsWithAcker()
 
 	fleet := fleetservertest.NewServerWithFakeComponent(
 		apiKey,
 		enrollmentToken,
 		agentID,
 		policyID,
-		nextAction,
-		acker,
-		// fleetservertest.WithRequestLog(log.Printf),
+		checkin.ActionsGenerator(),
+		checkin.Acker(),
+		fleetservertest.WithRequestLog(p.T().Logf),
 	)
 	p.fleet = fleet
-	tmpl.FleetHosts = fmt.Sprintf("%q", fleet.LocalhostURL)
+	policyData.FleetHosts = fmt.Sprintf("%q", fleet.LocalhostURL)
+
+	// now that we have fleet and the proxy running, we can add actions which
+	// depend on them.
+	action, err := fleetservertest.NewActionPolicyChange(actionID, policyData)
+	require.NoError(p.T(), err, "could not generate action with policy")
+	checkin.AddCheckin(
+		ackToken,
+		0,
+		action,
+	)
 
 	return
 }
@@ -223,10 +206,3 @@ func (p *ProxyURL) setupSquidProxy(urlRewriter string) {
 
 	p.proxyURL = "http://localhost:3128" // default squid address
 }
-
-// type logWriter func(args ...any)
-//
-// func (w logWriter) Write(p []byte) (n int, err error) {
-// 	w(string(p))
-// 	return len(p), nil
-// }
