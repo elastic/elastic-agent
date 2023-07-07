@@ -8,11 +8,7 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
 	"testing"
 	"time"
 
@@ -33,8 +29,6 @@ type ProxyURL struct {
 
 	fleet *fleetservertest.Server
 	proxy *proxytest.Proxy
-
-	proxyURL string
 }
 
 func TestProxyURL(t *testing.T) {
@@ -53,7 +47,7 @@ func TestProxyURL(t *testing.T) {
 	suite.Run(t, &ProxyURL{})
 }
 
-func (p *ProxyURL) SetupSuite() {
+func (p *ProxyURL) SetupTest() {
 	fleetHost := "fleet.elastic.co"
 
 	agentVersion := "8.10.0-SNAPSHOT"
@@ -158,51 +152,4 @@ func (p *ProxyURL) setupFleet(fleetHost string) {
 	)
 
 	return
-}
-
-func (p *ProxyURL) setupSquidProxy(urlRewriter string) {
-	t := p.T()
-	t.Helper()
-
-	t.Log("installing squid")
-	cmd := []string{"apt", "install", "-y", "squid=5.2-1ubuntu4.3"}
-	out, err := exec.Command(cmd[0], cmd[1:]...).Output()
-	if err != nil {
-		var eerr *exec.ExitError
-		if errors.As(err, &eerr) {
-			t.Logf("failed running: %q", strings.Join(cmd, " "))
-			t.Log("stdout:", string(out))
-			t.Log("stderr:", string(eerr.Stderr))
-		}
-
-		t.Fatalf("could install squid service")
-	}
-
-	t.Log("reading config")
-	conf, err := os.ReadFile("testdata/squid.conf")
-	require.NoError(t, err, "could not open squid config")
-
-	extraConf := "\n" +
-		"url_rewrite_program " + urlRewriter + "\n" +
-		"url_rewrite_extras " + p.fleet.LocalhostURL + "\n"
-	conf = append(conf, []byte(extraConf)...)
-	t.Log("saving config")
-	err = os.WriteFile("/etc/squid/squid.conf", conf, 0644)
-	require.NoError(p.T(), err, "could not save squid config")
-
-	t.Log("restarting squid")
-	cmd = []string{"systemctl", "restart", "squid.service"}
-	out, err = exec.Command(cmd[0], cmd[1:]...).Output()
-	if err != nil {
-		var eerr *exec.ExitError
-		if errors.As(err, &eerr) {
-			t.Logf("failed running: %q", strings.Join(cmd, " "))
-			t.Log("stdout:", string(out))
-			t.Log("stderr:", string(eerr.Stderr))
-		}
-
-		t.Fatalf("could restart squid service")
-	}
-
-	p.proxyURL = "http://localhost:3128" // default squid address
 }
