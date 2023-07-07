@@ -1,7 +1,6 @@
 package proxytest
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -24,18 +23,20 @@ type Proxy struct {
 	LocalhostURL string
 
 	// proxiedRequests stores a copy of every request this proxy receives.
-	proxiedRequests   []*http.Request
+	proxiedRequests   []string // []*http.Request
 	proxiedRequestsMu sync.Mutex
 }
 
 // ProxiedRequests returns a slice with a copy of every request the proxy received.
-func (p *Proxy) ProxiedRequests() []*http.Request {
+func (p *Proxy) ProxiedRequests() []string {
 	p.proxiedRequestsMu.Lock()
 	p.proxiedRequestsMu.Unlock()
 
-	rs := make([]*http.Request, len(p.proxiedRequests))
+	rs := make([]string, len(p.proxiedRequests))
+	// rs := make([]*http.Request, len(p.proxiedRequests))
 	for _, r := range p.proxiedRequests {
-		rs = append(rs, r.Clone(context.Background()))
+		rs = append(rs, r)
+		// rs = append(rs, r.Clone(context.Background()))
 	}
 
 	return rs
@@ -103,7 +104,8 @@ func New(t *testing.T, optns ...Option) *Proxy {
 			}
 
 			s.proxiedRequestsMu.Lock()
-			s.proxiedRequests = append(s.proxiedRequests, r.Clone(context.Background()))
+			s.proxiedRequests = append(s.proxiedRequests,
+				fmt.Sprintf("%s - %s %s %s", r.Method, r.URL.Scheme, r.URL.Host, r.URL.String()))
 			s.proxiedRequestsMu.Unlock()
 
 			r.RequestURI = ""
