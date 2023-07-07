@@ -76,20 +76,23 @@ func TestEnrollAndLog(t *testing.T) {
 	}
 
 	// Stage 3: Make sure metricbeat logs are populated
-	docs, err := tools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
-	require.NoError(t, err)
+	docs := findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 
 	// Stage 4: Make sure filebeat logs are populated
-	docs, err = tools.GetLogsForDatastream(info.ESClient, "elastic_agent.filebeat")
-	require.NoError(t, err)
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForDatastream(info.ESClient, "elastic_agent.filebeat")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("Filebeat: Got %d documents", len(docs.Hits.Hits))
 
 	// Stage 5: make sure we have no errors
-	docs, err = tools.CheckForErrorsInLogs(info.ESClient, []string{})
-	require.NoError(t, err)
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.CheckForErrorsInLogs(info.ESClient, []string{})
+	})
 	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
 	for _, doc := range docs.Hits.Hits {
 		t.Logf("%#v", doc.Source)
@@ -97,16 +100,36 @@ func TestEnrollAndLog(t *testing.T) {
 	require.Empty(t, docs.Hits.Hits)
 
 	// Stage 6: Make sure we have message confirming central management is running
-	docs, err = tools.FindMatchingLogLines(info.ESClient, "Parsed configuration and determined agent is managed by Fleet")
-	require.NoError(t, err)
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(info.ESClient, "Parsed configuration and determined agent is managed by Fleet")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
 	// Stage 7: check for starting messages
-	docs, err = tools.FindMatchingLogLines(info.ESClient, "metricbeat start running")
-	require.NoError(t, err)
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(info.ESClient, "metricbeat start running")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	docs, err = tools.FindMatchingLogLines(info.ESClient, "filebeat start running")
-	require.NoError(t, err)
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(info.ESClient, "filebeat start running")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
+}
+
+func findESDocs(t *testing.T, findFn func() (tools.Documents, error)) tools.Documents {
+	var docs tools.Documents
+
+	require.Eventually(
+		t,
+		func() bool {
+			var err error
+			docs, err = findFn()
+			return err == nil
+		},
+		3*time.Minute,
+		15*time.Second,
+	)
+
+	return docs
 }
