@@ -15,8 +15,9 @@ summary: Removed calls to fleet setup
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: Redundant calls to /api/fleet/setup were removed in favor of 
-kibana initiated calls.
+description: >- 
+  Redundant calls to /api/fleet/setup were removed in favor of 
+  kibana initiated calls.
 
 # Affected component; a word indicating the component this changeset affects.
 component: elastic-agent
