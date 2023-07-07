@@ -7,7 +7,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -181,12 +180,12 @@ func runTests(ctx context.Context, logger Logger, name string, prefix string, sc
 		return nil, fmt.Errorf("failed to start session: %w", err)
 	}
 
-	session.Stdout = newPrefixOutput(os.Stdout, fmt.Sprintf(">>> (%s) Test output (%s) (stdout): ", name, logger.Prefix()))
-	session.Stderr = newPrefixOutput(os.Stderr, fmt.Sprintf(">>> (%s) Test output (%s) (stderr): ", name, logger.Prefix()))
+	session.Stdout = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stdout): ", name))
+	session.Stderr = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stderr): ", name))
 	session.Stdin = execTest
 
 	// allowed to fail because tests might fail
-	logger.Logf("running %s tests...", name)
+	logger.Logf("Running %s tests...", name)
 	err = session.Run("bash")
 	if err != nil {
 		logger.Logf("%s tests failed: %s", name, err)
