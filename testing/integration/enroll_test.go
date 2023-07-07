@@ -36,10 +36,16 @@ func TestEnrollAndLog(t *testing.T) {
 
 	t.Logf("In TestEnroll")
 	kibClient := info.KibanaClient
+	
+	// Fleet API requires the namespace to be lowercased and not contain
+	// special characters.
+	policyNamespace := strings.ToLower(info.Namespace)
+	policyNamespace = regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(policyNamespace, "")
+	
 	// Enroll agent in Fleet with a test policy
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
-		Namespace:   strings.ToLower(strings.Replace(info.Namespace, "-", "", -1)),
+		Namespace:   policyNamespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
