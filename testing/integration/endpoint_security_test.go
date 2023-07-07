@@ -113,8 +113,8 @@ func TestEndpointSecurity(t *testing.T) {
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
 		Isolate: false,
-		Sudo:    true,                                                  // requires Agent installation
-		OS:      []define.OS{{Type: define.Linux, Arch: define.AMD64}}, // only run on Linux AMD64 during development.
+		Sudo:    true, // requires Agent installation
+		// OS:      []define.OS{{Type: define.Linux, Arch: define.AMD64}}, // only run on Linux AMD64 during development.
 	})
 
 	// Get path to Elastic Agent executable
@@ -227,6 +227,9 @@ type endpointPackageTemplateVars struct {
 //go:embed endpoint_security_package.json.tmpl
 var endpointPackagePolicyTemplate string
 
+// TODO: Setup a GitHub Action to update this for each release of https://github.com/elastic/endpoint-package
+const endpointPackageVersion = "8.9.0"
+
 // Installs the Elastic Defend package to cause the agent to install the endpoint-security service.
 func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) {
 	t.Helper()
@@ -238,7 +241,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 	var pkgPolicyBuf bytes.Buffer
 	err = tmpl.Execute(&pkgPolicyBuf, endpointPackageTemplateVars{
 		PolicyID: policyID,
-		Version:  "8.9.0",
+		Version:  endpointPackageVersion,
 	})
 	require.NoError(t, err)
 
