@@ -153,9 +153,9 @@ func ExampleNewServer_checkin() {
 		panic(fmt.Sprintf("failed to get new actions: %v", err))
 	}
 
-	// NewHandlerCheckinFakeComponent
+	// NewHandlerCheckin
 	ts := NewServer(&Handlers{
-		CheckinFn: NewHandlerCheckinFakeComponent(func() (CheckinAction, *HTTPError) {
+		CheckinFn: NewHandlerCheckin(func() (CheckinAction, *HTTPError) {
 			return CheckinAction{Actions: []string{actions}}, nil
 		})},
 		WithAgentID(agentID))
@@ -327,7 +327,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 
 	ts := NewServer(&Handlers{
 		AgentID:   agentID, // as there is no enrol, the agentID needs to be manually set
-		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
+		CheckinFn: NewHandlerCheckin(nextAction),
 	})
 
 	// 1st call, nextAction() will return a POLICY_CHANGE.
@@ -395,7 +395,7 @@ func ExampleNewServer_checkin_withDelay() {
 
 	ts := NewServer(&Handlers{
 		AgentID:   agentID, // as there is no enrol, the agentID needs to be manually set
-		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
+		CheckinFn: NewHandlerCheckin(nextAction),
 	})
 
 	// 1st - call actions have a delay.
@@ -576,7 +576,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	// 3rd - define the implementation for the fleet-server handlers we'll use
 	// and create the mock fleet-server
 	handlers := &Handlers{
-		CheckinFn: NewHandlerCheckinFakeComponent(nextAction),
+		CheckinFn: NewHandlerCheckin(nextAction),
 		AckFn:     NewHandlerAckWithAcker(acker),
 		StatusFn:  NewHandlerStatusHealth(),
 	}

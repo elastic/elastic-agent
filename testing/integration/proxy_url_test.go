@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -55,13 +54,6 @@ func TestProxyURL(t *testing.T) {
 	suite.Run(t, &ProxyURL{})
 }
 
-type logWriter func(args ...any)
-
-func (w logWriter) Write(p []byte) (n int, err error) {
-	w(string(p))
-	return len(p), nil
-}
-
 func (p *ProxyURL) SetupSuite() {
 	fleetHost := "fleet.elastic.co"
 
@@ -84,6 +76,35 @@ func (p *ProxyURL) SetupSuite() {
 	p.Require().NoError(err, "SetupSuite: fixture.Prepare failed")
 
 	p.fixture = f
+}
+
+func (p *ProxyURL) TestNoProxyInThePolicy() {
+	t := p.T()
+	out, err := p.fixture.Install(
+		context.Background(),
+		&integrationtest.InstallOpts{
+			Force:          true,
+			NonInteractive: true,
+			Insecure:       true,
+			ProxyURL:       p.proxy.LocalhostURL,
+			EnrollOpts: integrationtest.EnrollOpts{
+				URL:             p.fleet.LocalhostURL,
+				EnrollmentToken: "anythingWillDO",
+			}})
+	if err != nil {
+		t.Log(string(out))
+		require.NoError(t, err, "failed to install agent")
+	}
+
+	var status integrationtest.AgentStatusOutput
+	if !assert.Eventually(t, func() bool {
+		status, err = p.fixture.ExecStatus(context.Background())
+		return status.FleetState == int(cproto.State_HEALTHY)
+	}, 30*time.Second, 5*time.Second) {
+		t.Errorf("want fleet state %d, got %d",
+			cproto.State_HEALTHY, status.FleetState)
+		t.Logf("agent status: %v", status)
+	}
 }
 
 func (p *ProxyURL) setupFleet(fleetHost string) {
@@ -119,7 +140,7 @@ func (p *ProxyURL) setupFleet(fleetHost string) {
 
 	nextAction := func() (fleetservertest.CheckinAction, *fleetservertest.HTTPError) {
 		defer func() { actionsIdx++ }()
-		actions, err := fleetservertest.NewActionPolicyChangeWithFakeComponent(tmpl)
+		actions, err := fleetservertest.NewActionPolicyChangeEmptyPolicy(tmpl)
 		if err != nil {
 			panic(fmt.Sprintf("failed to get new actions: %v", err))
 		}
@@ -148,34 +169,12 @@ func (p *ProxyURL) setupFleet(fleetHost string) {
 		policyID,
 		nextAction,
 		acker,
-		fleetservertest.WithRequestLog(log.Printf))
+		// fleetservertest.WithRequestLog(log.Printf),
+	)
 	p.fleet = fleet
 	tmpl.FleetHosts = fmt.Sprintf("%q", fleet.LocalhostURL)
 
 	return
-}
-
-func (p *ProxyURL) TestNoProxyInThePolicy() {
-	t := p.T()
-	out, err := p.fixture.Install(
-		context.Background(),
-		&integrationtest.InstallOpts{
-			Force:          true,
-			NonInteractive: true,
-			Insecure:       true,
-			ProxyURL:       p.proxy.LocalhostURL,
-			EnrollOpts: integrationtest.EnrollOpts{
-				URL:             p.fleet.LocalhostURL,
-				EnrollmentToken: "anythingWillDO",
-			}})
-	t.Log(string(out))
-	if err != nil {
-		require.NoError(t, err, "failed to install agent")
-	}
-
-	status, err := p.fixture.ExecStatus(context.Background())
-	assert.Equal(t, status.FleetState, int(cproto.State_HEALTHY))
-	assert.NoError(t, err, "agent status errored: %v")
 }
 
 func (p *ProxyURL) setupSquidProxy(urlRewriter string) {
@@ -224,3 +223,10 @@ func (p *ProxyURL) setupSquidProxy(urlRewriter string) {
 
 	p.proxyURL = "http://localhost:3128" // default squid address
 }
+
+// type logWriter func(args ...any)
+//
+// func (w logWriter) Write(p []byte) (n int, err error) {
+// 	w(string(p))
+// 	return len(p), nil
+// }

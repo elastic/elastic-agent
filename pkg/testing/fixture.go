@@ -403,6 +403,7 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
 	status := AgentStatusOutput{}
 	if uerr := json.Unmarshal(out, &status); uerr != nil {
+		fmt.Println(string(out))
 		return AgentStatusOutput{},
 			fmt.Errorf("could not unmarshal agent status output: %w",
 				errors.Join(&ExecErr{

@@ -12,7 +12,7 @@ import (
 
 // TmplPolicy is all the data used to create a policy. Therefore, all the properties
 // should be populated with valid JSON without the surrounding double quotes.
-// Check the actionPolicyChangeTmpl for details.
+// Check the actionPolicyChangeFakeComponentTmpl for details.
 type TmplPolicy struct {
 	AckToken string
 	AgentID  string
@@ -38,12 +38,27 @@ func NewCheckinResponse(ackToken string, actions ...string) string {
 		ackToken, fmt.Sprintf("[%s]", strings.Join(actions, ",")))
 }
 
+// NewActionPolicyChangeEmptyPolicy returns a POLICY_CHANGE action where
+// the policy contains no integration and monitoring disabled. All variable data in the policy comes from the data parameter.
+func NewActionPolicyChangeEmptyPolicy(data TmplPolicy) (string, error) {
+	t := template.Must(template.New("actionPolicyChangeFakeComponentTmpl").
+		Parse(actionPolicyChangeFakeComponentTmpl))
+
+	buf := &strings.Builder{}
+	err := t.Execute(buf, data)
+	if err != nil {
+		return "", fmt.Errorf("failed building action: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
 // NewActionPolicyChangeWithFakeComponent returns a POLICY_CHANGE action where
 // the policy contains one single integration. The integration uses the fake
 // component. All variable data in the policy comes from the data parameter.
 func NewActionPolicyChangeWithFakeComponent(data TmplPolicy) (string, error) {
-	t := template.Must(template.New("actionPolicyChangeTmpl").
-		Parse(actionPolicyChangeTmpl))
+	t := template.Must(template.New("actionPolicyChangeFakeComponentTmpl").
+		Parse(actionPolicyChangeFakeComponentTmpl))
 
 	buf := &strings.Builder{}
 	err := t.Execute(buf, data)
@@ -62,7 +77,16 @@ const (
   "actions": %s
 }`
 
-	actionPolicyChangeTmpl = `
+	actionTemplate = ` {
+      "agent_id": "{{.AgentID}}",
+      "created_at": "2023-05-31T11:37:50.607Z",
+      "data": {{.Data}},
+      "id": "{{.ActionID}}",
+      "input_type": "",
+      "type": "{{.Type}}"
+    }`
+
+	actionPolicyChangeFakeComponentTmpl = `
     {
       "agent_id": "{{.AgentID}}",
       "created_at": "2023-05-31T11:37:50.607Z",
@@ -110,6 +134,58 @@ const (
               }
             }
           ],
+          "output_permissions": {
+            "default": {}
+          },
+          "outputs": {
+            "default": {
+              "api_key": "{{.Output.APIKey}}",
+              "hosts": [{{.Output.Hosts}}],
+              "type": "{{.Output.Type}}"
+            }
+          },
+          "revision": 2,
+          "secret_references": [],
+          "signed": {
+            "data": "eyJpZCI6IjI0ZTRkMDMwLWZmYTctMTFlZC1iMDQwLTlkZWJhYTVmZWNiOCIsImFnZW50Ijp7InByb3RlY3Rpb24iOnsiZW5hYmxlZCI6ZmFsc2UsInVuaW5zdGFsbF90b2tlbl9oYXNoIjoibE9SU2FESVFxNG5nbFVNSndXaktyd2V4ajRJRFJKQStGdG9RZWVxS0gvST0iLCJzaWduaW5nX2tleSI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVE5QlBvSFVDeUx5RWxWcGZ3dktlRmRVdDZVOXdCYitRbFpOZjRjeTVlQXdLOVhoNEQ4ZkNsZ2NpUGVSczNqNjJpNklFZUd5dk9zOVUzK2ZFbHlVaWdnPT0ifX19",
+            "signature": "MEUCIQCfS6wPj/AvfFA79dwKATnvyFl/ZeyA8eKOLHg1XuA9NgIgNdhjIT+G/GZFqsVoWk5jThONhpqPhfiHLE5OkTdrwT0="
+          }
+        }
+      },
+      "id": "{{.ActionID}}",
+      "input_type": "",
+      "type": "POLICY_CHANGE"
+    }`
+
+	actionPolicyChangeEmpryPolicyTmpl = `
+    {
+      "agent_id": "{{.AgentID}}",
+      "created_at": "2023-05-31T11:37:50.607Z",
+      "data": {
+        "policy": {
+          "agent": {
+            "download": {
+              "sourceURI": "{{.SourceURI}}"
+            },
+            "monitoring": {
+              "namespace": "default",
+              "use_output": "default",
+              "enabled": false,
+              "logs": false,
+              "metrics": false
+            },
+            "features": {},
+            "protection": {
+              "enabled": false,
+              "uninstall_token_hash": "lORSaDIQq4nglUMJwWjKrwexj4IDRJA+FtoQeeqKH/I=",
+              "signing_key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQ9BPoHUCyLyElVpfwvKeFdUt6U9wBb+QlZNf4cy5eAwK9Xh4D8fClgciPeRs3j62i6IEeGyvOs9U3+fElyUigg=="
+            }
+          },
+          "fleet": {
+            "hosts": [{{.FleetHosts}}]
+          },
+          "id": "{{.ActionID}}",
+          "inputs": [],
           "output_permissions": {
             "default": {}
           },
