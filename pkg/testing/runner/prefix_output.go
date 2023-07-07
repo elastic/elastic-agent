@@ -6,19 +6,21 @@ package runner
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"strings"
 )
 
 // prefixOutput is an `io.Writer` that prefixes each written line with the provided prefix text
 type prefixOutput struct {
-	logger    Logger
+	output    io.Writer
 	prefix    string
 	remainder []byte
 }
 
-func newPrefixOutput(logger Logger, prefix string) *prefixOutput {
+func newPrefixOutput(output io.Writer, prefix string) *prefixOutput {
 	return &prefixOutput{
-		logger: logger,
+		output: output,
 		prefix: prefix,
 	}
 }
@@ -55,6 +57,6 @@ func (r *prefixOutput) Write(p []byte) (int, error) {
 			continue
 		}
 		str := strings.TrimSpace(string(line))
-		r.logger.Logf("%s%s", r.prefix, str)
+		_, _ = r.output.Write([]byte(fmt.Sprintf("%s%s\n", r.prefix, str)))
 	}
 }

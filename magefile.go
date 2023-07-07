@@ -1463,13 +1463,13 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 		return fmt.Errorf("error writing test out xml file: %w", err)
 	}
 	if results.Failures > 0 {
-		r.Logger().Logf("Testing completed (%d failures, %d successful)", results.Failures, results.Tests-results.Failures)
+		fmt.Printf(">>> Testing completed (%d failures, %d successful)\n", results.Failures, results.Tests-results.Failures)
 	} else {
-		r.Logger().Logf("Testing completed (%d successful)", results.Tests)
+		fmt.Printf(">>> Testing completed (%d successful)\n", results.Tests)
 	}
-	r.Logger().Logf("Console output written here: build/TEST-go-integration.out")
-	r.Logger().Logf("Console JSON output written here: build/TEST-go-integration.out.json")
-	r.Logger().Logf("JUnit XML written here: build/TEST-go-integration.xml")
+	fmt.Printf(">>> Console output written here: build/TEST-go-integration.out\n")
+	fmt.Printf(">>> Console JSON output written here: build/TEST-go-integration.out.json\n")
+	fmt.Printf(">>> JUnit XML written here: build/TEST-go-integration.xml\n")
 	if results.Failures > 0 {
 		os.Exit(1)
 	}
@@ -1527,7 +1527,6 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
-	timestamp := timestampEnabled()
 	r, err := runner.NewRunner(runner.Config{
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
@@ -1545,7 +1544,6 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 		Matrix:      matrix,
 		SingleTest:  singleTest,
 		VerboseMode: mg.Verbose(),
-		Timestamp:   timestamp,
 	}, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
@@ -1563,15 +1561,6 @@ func shouldBuildAgent() bool {
 		return false
 	}
 	return ret
-}
-
-func timestampEnabled() bool {
-	timestamp := os.Getenv("TEST_INTEG_TIMESTAMP")
-	if timestamp == "" {
-		return false
-	}
-	b, _ := strconv.ParseBool(timestamp)
-	return b
 }
 
 // Pre-requisite: user must have the gcloud CLI installed
