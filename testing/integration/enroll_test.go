@@ -29,13 +29,12 @@ func TestEnrollAndLog(t *testing.T) {
 	})
 	t.Logf("got namespace: %s", info.Namespace)
 
-	t.Logf("In SetupSuite")
 	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
-	t.Logf("In TestEnroll")
 	kibClient := info.KibanaClient
-	// Enroll agent in Fleet with a test policy
+
+	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
 		Namespace:   info.Namespace,
@@ -51,14 +50,14 @@ func TestEnrollAndLog(t *testing.T) {
 			},
 		},
 	}
-	// Stage 1: Install
+
 	// As part of the cleanup process, we'll uninstall the agent
 	policy, err := tools.InstallAgentWithPolicy(t, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 
 	t.Cleanup(func() {
-		// After: unenroll
+		t.Logf("Cleanup: unenrolling agent")
 		err = tools.UnEnrollAgent(info.KibanaClient)
 		require.NoError(t, err)
 	})
@@ -74,38 +73,70 @@ func TestEnrollAndLog(t *testing.T) {
 		t.Logf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
 	}
 
-	// Stage 3: Make sure metricbeat logs are populated
-	docs, err := tools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
-	require.NoError(t, err)
+	t.Log("Making sure metricbeat logs are populated")
+	docs := findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 
-	// Stage 4: Make sure filebeat logs are populated
-	docs, err = tools.GetLogsForDatastream(info.ESClient, "elastic_agent.filebeat")
-	require.NoError(t, err)
+	t.Log("Making sure filebeat logs are populated")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForDatastream(info.ESClient, "elastic_agent.filebeat")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("Filebeat: Got %d documents", len(docs.Hits.Hits))
 
-	// Stage 5: make sure we have no errors
-	docs, err = tools.CheckForErrorsInLogs(info.ESClient, []string{})
-	require.NoError(t, err)
+	t.Log("Making sure there are no error logs")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{})
+	})
 	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
 	for _, doc := range docs.Hits.Hits {
 		t.Logf("%#v", doc.Source)
 	}
 	require.Empty(t, docs.Hits.Hits)
 
-	// Stage 6: Make sure we have message confirming central management is running
-	docs, err = tools.FindMatchingLogLines(info.ESClient, "Parsed configuration and determined agent is managed by Fleet")
-	require.NoError(t, err)
+	t.Log("Making sure we have message confirming central management is running")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "Parsed configuration and determined agent is managed by Fleet")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
+	t.Log("Check for metricbeat starting message")
 	// Stage 7: check for starting messages
-	docs, err = tools.FindMatchingLogLines(info.ESClient, "metricbeat start running")
-	require.NoError(t, err)
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "metricbeat start running")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	docs, err = tools.FindMatchingLogLines(info.ESClient, "filebeat start running")
-	require.NoError(t, err)
+	t.Log("Check for filebeat starting message")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "filebeat start running")
+	})
 	require.NotZero(t, len(docs.Hits.Hits))
+}
+
+func findESDocs(t *testing.T, findFn func() (tools.Documents, error)) tools.Documents {
+	var docs tools.Documents
+
+	require.Eventually(
+		t,
+		func() bool {
+			var err error
+			docs, err = findFn()
+			return err == nil
+		},
+		3*time.Minute,
+		15*time.Second,
+	)
+
+	// TODO: remove after debugging
+	t.Log("--- debugging: results from ES --- START ---")
+	for _, doc := range docs.Hits.Hits {
+		t.Logf("%#v", doc.Source)
+	}
+	t.Log("--- debugging: results from ES --- END ---")
+
+	return docs
 }
