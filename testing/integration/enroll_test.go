@@ -89,7 +89,7 @@ func TestEnrollAndLog(t *testing.T) {
 
 	t.Log("Making sure there are no error logs")
 	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.CheckForErrorsInLogs(info.ESClient, []string{})
+		return tools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{})
 	})
 	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
 	for _, doc := range docs.Hits.Hits {
@@ -99,20 +99,20 @@ func TestEnrollAndLog(t *testing.T) {
 
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.FindMatchingLogLines(info.ESClient, "Parsed configuration and determined agent is managed by Fleet")
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "Parsed configuration and determined agent is managed by Fleet")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
 	t.Log("Check for metricbeat starting message")
 	// Stage 7: check for starting messages
 	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.FindMatchingLogLines(info.ESClient, "metricbeat start running")
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "metricbeat start running")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
 	t.Log("Check for filebeat starting message")
 	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.FindMatchingLogLines(info.ESClient, "filebeat start running")
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "filebeat start running")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 }
