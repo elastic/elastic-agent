@@ -20,6 +20,8 @@ type CheckinData struct {
 }
 
 type CheckinActionsWithAcker struct {
+	// mu is the mutex for any read or write operation on any of the
+	// CheckinActionsWithAcker properties.
 	mu sync.Mutex
 
 	checkinsSent int
@@ -29,14 +31,11 @@ type CheckinActionsWithAcker struct {
 // NewCheckinActionsWithAcker returns a new CheckinActionsWithAcker.
 // CheckinActionsWithAcker allows to add a set of action to be delivered in a
 // checkin. Each call to CheckinActionsWithAcker.AddCheckin will add the actions
-// to be returned in the "next" checkin. All checking must be added BEFORE any
-// checkin happens!
-// All actions can be acked only after they've been delivered.
+// to be returned in the "next" checkin.
+// All actions can only be acked after they've been delivered.
 // Use CheckinActionsWithAcker.ActionsGenerator and CheckinActionsWithAcker.Acker
 // to get closures encapsulating calls to CheckinActionsWithAcker.NextAction and
 // CheckinActionsWithAcker.Ack respectively.
-//
-// TODO: Make possible to add checkins on the fly.
 func NewCheckinActionsWithAcker() CheckinActionsWithAcker {
 	return CheckinActionsWithAcker{}
 }
@@ -48,11 +47,18 @@ func (c *CheckinActionsWithAcker) ActionsGenerator() ActionsGenerator {
 func (c *CheckinActionsWithAcker) Acker() Acker {
 	return func(actionID string) (AckResponseItem, bool) { return c.Ack(actionID) }
 }
+
 func (c *CheckinActionsWithAcker) NextAction() (CheckinAction, *HTTPError) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	defer func() { c.checkinsSent++ }()
+	defer func() {
+		// only increment up to the c.checkinDatas length, so once more checkins
+		// are added there, it can keep working.
+		if c.checkinsSent < len(c.checkinDatas) {
+			c.checkinsSent++
+		}
+	}()
 
 	// no more actions to send on checkin
 	if c.checkinsSent >= len(c.checkinDatas) {
@@ -123,4 +129,46 @@ func (c *CheckinActionsWithAcker) AddCheckin(
 		AckableAction: actions,
 		Delay:         delay,
 	})
+}
+
+// Checkins return all checkins added, regardless if they were sent or not.
+// To know the scent checkins, use CheckinsSent.
+func (c *CheckinActionsWithAcker) Checkins() []CheckinData {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var checkins []CheckinData
+	for _, ch := range c.checkinDatas {
+		checkins = append(checkins, ch)
+	}
+
+	return checkins
+}
+
+// CheckinsSent return all checkins already sent.
+func (c *CheckinActionsWithAcker) CheckinsSent() []CheckinData {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var checkins []CheckinData
+
+	for _, ch := range c.checkinDatas[:c.checkinsSent] {
+		checkins = append(checkins, ch)
+	}
+	return checkins
+}
+
+func (c *CheckinActionsWithAcker) Acked(actionID string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for i, checkin := range c.checkinDatas[:c.checkinsSent] {
+		for j, actionData := range checkin.AckableAction {
+			if actionData.ActionID == actionID {
+				return c.checkinDatas[i].AckableAction[j].acked
+			}
+		}
+	}
+
+	return false
 }
