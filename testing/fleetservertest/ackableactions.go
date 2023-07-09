@@ -85,16 +85,17 @@ func (c *CheckinActionsWithAcker) Ack(actionID string) (AckResponseItem, bool) {
 	}
 
 	// all checkins with actions have happened and have been acked.
-	if c.checkinsSent >= len(c.checkinDatas) {
+	if c.checkinsSent > len(c.checkinDatas) {
 		return AckResponseItem{
 			Status:  http.StatusNotFound,
 			Message: "no more actions to ack",
 		}, true
 	}
 
-	for _, checkin := range c.checkinDatas[:c.checkinsSent] {
-		for _, actionData := range checkin.AckableAction {
+	for i, checkin := range c.checkinDatas[:c.checkinsSent] {
+		for j, actionData := range checkin.AckableAction {
 			if actionData.ActionID == actionID {
+				c.checkinDatas[i].AckableAction[j].acked = true
 				return AckResponseItem{
 					Status:  http.StatusOK,
 					Message: http.StatusText(http.StatusOK),
