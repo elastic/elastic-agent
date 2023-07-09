@@ -63,7 +63,7 @@ func (runner *EnrollRunner) TestDropMonitoringLogs() {
 	// Enroll agent in Fleet with a test policy
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-monitoring-logs-%d", time.Now().Unix()),
-		Namespace:   "testdropmonitoringlogs",
+		Namespace:   runner.requirementsInfo.Namespace,
 		Description: "test policy for drop processors",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
@@ -103,7 +103,10 @@ func (runner *EnrollRunner) TestDropMonitoringLogs() {
 	// We cannot search for `component.id` because at the moment of writing
 	// this field is not mapped. There is an issue for that:
 	// https://github.com/elastic/integrations/issues/6545
-	docs, err := tools.GetLogsForAgentID(defineInfo.ESClient, agentID)
+
+	docs := findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForAgentID(defineInfo.ESClient, agentID)
+	})
 	require.NoError(t, err, "could not get logs from Agent ID: %q, err: %s",
 		agentID, err)
 
@@ -131,12 +134,14 @@ func (runner *EnrollRunner) TestDropMonitoringLogs() {
 }
 
 func (runner *EnrollRunner) TestEnroll() {
-	runner.T().Logf("In TestEnroll")
+	t := runner.T()
+	t.Logf("In TestEnroll")
+
 	kibClient := runner.requirementsInfo.KibanaClient
 	// Enroll agent in Fleet with a test policy
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
-		Namespace:   "enrolltest",
+		Namespace:   runner.requirementsInfo.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
@@ -151,62 +156,98 @@ func (runner *EnrollRunner) TestEnroll() {
 	}
 	// Stage 1: Install
 	// As part of the cleanup process, we'll uninstall the agent
-	policy, err := tools.InstallAgentWithPolicy(runner.T(), runner.agentFixture, kibClient, createPolicyReq)
-	require.NoError(runner.T(), err)
-	runner.T().Logf("created policy: %s", policy.ID)
+	policy, err := tools.InstallAgentWithPolicy(t, runner.agentFixture, kibClient, createPolicyReq)
+	require.NoError(t, err)
+	t.Logf("created policy: %s", policy.ID)
 
-	runner.T().Cleanup(func() {
+	t.Cleanup(func() {
 		//After: unenroll
+		t.Logf("Cleanup: unenrolling agent")
 		err = tools.UnEnrollAgent(runner.requirementsInfo.KibanaClient)
-		require.NoError(runner.T(), err)
+		require.NoError(t, err)
 	})
 
-	runner.T().Logf("sleeping for one minute...")
+	t.Logf("sleeping for one minute...")
 	time.Sleep(time.Second * 60)
 
 	// Stage 2: check indicies
 	// This is mostly for debugging
 	resp, err := tools.GetAllindicies(runner.requirementsInfo.ESClient)
-	require.NoError(runner.T(), err)
+	require.NoError(t, err)
 	for _, run := range resp {
-		runner.T().Logf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
+		t.Logf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
 	}
 
 	// Stage 3: Make sure metricbeat logs are populated
-	docs, err := tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.metricbeat")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
-	runner.T().Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
+	t.Log("Making sure metricbeat logs are populated")
+	docs := findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.metricbeat")
+	})
+	require.NotZero(t, len(docs.Hits.Hits))
+	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 
 	// Stage 4: Make sure filebeat logs are populated
-	docs, err = tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.filebeat")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
-	runner.T().Logf("Filebeat: Got %d documents", len(docs.Hits.Hits))
+	t.Log("Making sure filebeat logs are populated")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.filebeat")
+	})
+	require.NotZero(t, len(docs.Hits.Hits))
+	t.Logf("Filebeat: Got %d documents", len(docs.Hits.Hits))
 
 	// Stage 5: make sure we have no errors
-	docs, err = tools.CheckForErrorsInLogs(runner.requirementsInfo.ESClient, []string{})
-	require.NoError(runner.T(), err)
-	runner.T().Logf("errors: Got %d documents", len(docs.Hits.Hits))
+	t.Log("Making sure there are no error logs")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.CheckForErrorsInLogs(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, []string{})
+	})
+	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
 	for _, doc := range docs.Hits.Hits {
-		runner.T().Logf("%#v", doc.Source)
+		t.Logf("%#v", doc.Source)
 	}
-	require.Empty(runner.T(), docs.Hits.Hits)
+	require.Empty(t, docs.Hits.Hits)
 
 	// Stage 6: Make sure we have message confirming central management is running
-	docs, err = tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, "Parsed configuration and determined agent is managed by Fleet")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
+	t.Log("Making sure we have message confirming central management is running")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, "Parsed configuration and determined agent is managed by Fleet")
+	})
+	require.NotZero(t, len(docs.Hits.Hits))
 
 	// Stage 7: check for starting messages
-	docs, err = tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, "metricbeat start running")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, "metricbeat start running")
+	})
+	require.NotZero(t, len(docs.Hits.Hits))
 
-	docs, err = tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, "filebeat start running")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
+	t.Log("Check for filebeat starting message")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, "filebeat start running")
+	})
+	require.NotZero(t, len(docs.Hits.Hits))
 
+}
+
+func findESDocs(t *testing.T, findFn func() (tools.Documents, error)) tools.Documents {
+	var docs tools.Documents
+
+	require.Eventually(
+		t,
+		func() bool {
+			var err error
+			docs, err = findFn()
+			return err == nil
+		},
+		3*time.Minute,
+		15*time.Second,
+	)
+
+	// TODO: remove after debugging
+	t.Log("--- debugging: results from ES --- START ---")
+	for _, doc := range docs.Hits.Hits {
+		t.Logf("%#v", doc.Source)
+	}
+	t.Log("--- debugging: results from ES --- END ---")
+
+	return docs
 }
 
 type ESDocument struct {
