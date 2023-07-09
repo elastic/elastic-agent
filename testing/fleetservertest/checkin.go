@@ -53,6 +53,7 @@ func NewPolicy(data TmplPolicy) (string, error) {
 
 type AckableAction struct {
 	ActionID string
+	acked    bool
 	data     string
 }
 
