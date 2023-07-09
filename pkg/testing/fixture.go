@@ -400,6 +400,25 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 	return status, err
 }
 
+// ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
+// It returns the parsed output and the error from the execution or an empty
+// AgentInspectOutput and the unmarshalling error if it cannot unmarshal the
+// output.
+func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (AgentInspectOutput, error) {
+	out, err := f.Exec(ctx, []string{"inspect"}, opts...)
+	inspect := AgentInspectOutput{}
+	if uerr := yaml.Unmarshal(out, &inspect); uerr != nil {
+		return AgentInspectOutput{},
+			fmt.Errorf("could not unmarshal agent inspect output: %w",
+				errors.Join(&ExecErr{
+					err:    err,
+					Output: out,
+				}, uerr))
+	}
+
+	return inspect, err
+}
+
 // IsHealthy returns if the prepared Elastic Agent reports itself as healthy.
 // It returns false, err if it cannot determine the state of the agent.
 func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) (bool, error) {
@@ -764,4 +783,90 @@ type AgentStatusOutput struct {
 	} `json:"components"`
 	FleetState   int    `json:"FleetState"`
 	FleetMessage string `json:"FleetMessage"`
+}
+
+type AgentInspectOutput struct {
+	Agent struct {
+		Download struct {
+			SourceURI string `yaml:"sourceURI"`
+		} `yaml:"download"`
+		Features interface{} `yaml:"features"`
+		Headers  interface{} `yaml:"headers"`
+		ID       string      `yaml:"id"`
+		Logging  struct {
+			Level string `yaml:"level"`
+		} `yaml:"logging"`
+		Monitoring struct {
+			Enabled bool `yaml:"enabled"`
+			HTTP    struct {
+				Buffer  interface{} `yaml:"buffer"`
+				Enabled bool        `yaml:"enabled"`
+				Host    string      `yaml:"host"`
+				Port    int         `yaml:"port"`
+			} `yaml:"http"`
+			Logs      bool   `yaml:"logs"`
+			Metrics   bool   `yaml:"metrics"`
+			Namespace string `yaml:"namespace"`
+			UseOutput string `yaml:"use_output"`
+		} `yaml:"monitoring"`
+		Protection struct {
+			Enabled            bool   `yaml:"enabled"`
+			SigningKey         string `yaml:"signing_key"`
+			UninstallTokenHash string `yaml:"uninstall_token_hash"`
+		} `yaml:"protection"`
+	} `yaml:"agent"`
+	Fleet struct {
+		AccessAPIKey string `yaml:"access_api_key"`
+		Agent        struct {
+			ID string `yaml:"id"`
+		} `yaml:"agent"`
+		Enabled   bool     `yaml:"enabled"`
+		Host      string   `yaml:"host"`
+		Hosts     []string `yaml:"hosts"`
+		Protocol  string   `yaml:"protocol"`
+		ProxyURL  string   `yaml:"proxy_url"`
+		Reporting struct {
+			CheckFrequencySec int `yaml:"check_frequency_sec"`
+			Threshold         int `yaml:"threshold"`
+		} `yaml:"reporting"`
+		Ssl struct {
+			Renegotiation    string `yaml:"renegotiation"`
+			VerificationMode string `yaml:"verification_mode"`
+		} `yaml:"ssl"`
+		Timeout string `yaml:"timeout"`
+	} `yaml:"fleet"`
+	Host struct {
+		ID string `yaml:"id"`
+	} `yaml:"host"`
+	ID      string      `yaml:"id"`
+	Inputs  interface{} `yaml:"inputs"`
+	Outputs struct {
+		Default struct {
+			APIKey string   `yaml:"api_key"`
+			Hosts  []string `yaml:"hosts"`
+			Type   string   `yaml:"type"`
+		} `yaml:"default"`
+	} `yaml:"outputs"`
+	Path struct {
+		Config string `yaml:"config"`
+		Data   string `yaml:"data"`
+		Home   string `yaml:"home"`
+		Logs   string `yaml:"logs"`
+	} `yaml:"path"`
+	Revision int `yaml:"revision"`
+	Runtime  struct {
+		Arch   string `yaml:"arch"`
+		Os     string `yaml:"os"`
+		Osinfo struct {
+			Family  string `yaml:"family"`
+			Major   int    `yaml:"major"`
+			Minor   int    `yaml:"minor"`
+			Patch   int    `yaml:"patch"`
+			Type    string `yaml:"type"`
+			Version string `yaml:"version"`
+		} `yaml:"osinfo"`
+	} `yaml:"runtime"`
+	Signed struct {
+		Data string `yaml:"data"`
+	} `yaml:"signed"`
 }
