@@ -229,7 +229,7 @@ func NewHandlerCheckin(next ActionsGenerator) func(
 		if err != nil {
 			return nil, &HTTPError{
 				StatusCode: http.StatusInternalServerError,
-				Message:    fmt.Sprintf("failed to unmarshal policy: %v", err),
+				Message:    fmt.Sprintf("failed to CheckinResponse: %v", err),
 			}
 		}
 

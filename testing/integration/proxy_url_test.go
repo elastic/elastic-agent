@@ -31,13 +31,14 @@ type ProxyURL struct {
 
 	agentVersion string
 	fleet        *fleetservertest.Server
-	// fleetHost is the fleetHost to set on the agent, it's an invalid host so
-	// the agent won't be able to connect to fleet unless it's using a proxy.
-	fleetHost        string
-	proxy1           *proxytest.Proxy
-	proxy2           *proxytest.Proxy
-	checkinWithAcker *fleetservertest.CheckinActionsWithAcker
-	policyData       fleetservertest.TmplPolicy
+	// fleetNeedsProxyHost is the fleetHost to be set on the agent's enroll.
+	// It uses an invalid host so the agent won't be able to connect to fleet
+	// unless it's using a proxy.
+	fleetNeedsProxyHost string
+	proxy1              *proxytest.Proxy
+	proxy2              *proxytest.Proxy
+	checkinWithAcker    *fleetservertest.CheckinActionsWithAcker
+	policyData          fleetservertest.TmplPolicy
 }
 
 func TestProxyURL(t *testing.T) {
@@ -49,26 +50,11 @@ func TestProxyURL(t *testing.T) {
 	suite.Run(t, &ProxyURL{agentVersion: "8.10.0-SNAPSHOT"})
 }
 
-// func (p *ProxyURL) SetupSuite() {
-// 	f, err := define.NewFixture(p.T(),
-// 		p.agentVersion,
-// 		integrationtest.WithAllowErrors(),
-// 		integrationtest.WithLogOutput())
-// 	p.Require().NoError(err, "SetupSuite: NewFixture failed")
-//
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
-//
-// 	err = f.Prepare(ctx)
-// 	p.Require().NoError(err, "SetupSuite: fixture.Prepare failed")
-//
-// 	p.fixture = f
-// }
-
 func (p *ProxyURL) SetupTest() {
 	fleetHost := "fleet.elastic.co"
 
-	p.setupFleet("http://" + fleetHost)
+	p.fleetNeedsProxyHost = "http://" + fleetHost
+	p.setupFleet(p.fleetNeedsProxyHost)
 
 	p.proxy1 = proxytest.New(p.T(),
 		proxytest.WithRewrite(fleetHost, "localhost:"+p.fleet.Port))
@@ -102,8 +88,9 @@ func (p *ProxyURL) TearDownTest() {
 	}
 }
 
-func (p *ProxyURL) TestNoProxyInThePolicy() {
+func (p *ProxyURL) TestEnrollProxyAndNoProxyInThePolicy() {
 	t := p.T()
+
 	ackToken := "ackToken-AckTokenTestNoProxyInThePolicy"
 
 	// now that we have fleet and the proxy running, we can add actions which
@@ -125,7 +112,7 @@ func (p *ProxyURL) TestNoProxyInThePolicy() {
 			Insecure:       true,
 			ProxyURL:       p.proxy1.LocalhostURL,
 			EnrollOpts: integrationtest.EnrollOpts{
-				URL:             p.fleet.LocalhostURL,
+				URL:             p.fleetNeedsProxyHost,
 				EnrollmentToken: "anythingWillDO",
 			}})
 	if err != nil {
@@ -144,7 +131,7 @@ func (p *ProxyURL) TestNoProxyInThePolicy() {
 	}
 }
 
-func (p *ProxyURL) TestEmptyProxyInThePolicy() {
+func (p *ProxyURL) TestEnrollProxyAndEmptyProxyInThePolicy() {
 	t := p.T()
 	ackToken := "AckToken-TestEmptyProxyInThePolicy"
 
@@ -168,7 +155,7 @@ func (p *ProxyURL) TestEmptyProxyInThePolicy() {
 			Insecure:       true,
 			ProxyURL:       p.proxy1.LocalhostURL,
 			EnrollOpts: integrationtest.EnrollOpts{
-				URL:             p.fleet.LocalhostURL,
+				URL:             p.fleetNeedsProxyHost,
 				EnrollmentToken: "anythingWillDO",
 			}})
 	if err != nil {
@@ -187,8 +174,9 @@ func (p *ProxyURL) TestEmptyProxyInThePolicy() {
 	}
 }
 
-func (p *ProxyURL) TestValidProxyInThePolicy() {
+func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
 	t := p.T()
+
 	ackToken := "AckToken-TestValidProxyInThePolicy"
 
 	p.policyData.FleetProxyURL = new(string)
@@ -211,7 +199,7 @@ func (p *ProxyURL) TestValidProxyInThePolicy() {
 			Insecure:       true,
 			ProxyURL:       p.proxy1.LocalhostURL,
 			EnrollOpts: integrationtest.EnrollOpts{
-				URL:             p.fleet.LocalhostURL,
+				URL:             p.fleetNeedsProxyHost,
 				EnrollmentToken: "anythingWillDO",
 			}})
 	if err != nil {
@@ -219,6 +207,7 @@ func (p *ProxyURL) TestValidProxyInThePolicy() {
 		require.NoError(t, err, "failed to install agent")
 	}
 
+	// assert the agent is actually connected to fleet.
 	var status integrationtest.AgentStatusOutput
 	if !assert.Eventually(t, func() bool {
 		status, err = p.fixture.ExecStatus(context.Background())
@@ -229,6 +218,70 @@ func (p *ProxyURL) TestValidProxyInThePolicy() {
 		t.Logf("agent status: %v", status)
 	}
 
+	// ensure the agent is communicating through the proxy set in the policy
+	if !assert.Eventually(t, func() bool {
+		for _, r := range p.proxy2.ProxiedRequests() {
+			if strings.Contains(
+				r,
+				fleetservertest.NewPathCheckin(p.policyData.AgentID)) {
+				return true
+			}
+		}
+
+		return false
+	}, 30*time.Second, 5*time.Second) {
+		t.Errorf("did not find requests to the proxy defined in the policy")
+	}
+}
+
+func (p *ProxyURL) TestNoEnrollProxyAndProxyInThePolicy() {
+	t := p.T()
+	ackToken := "AckToken-TestValidProxyInThePolicy"
+
+	p.policyData.FleetHosts = fmt.Sprintf(`"%s"`, p.fleet.LocalhostURL)
+	p.policyData.FleetProxyURL = new(string)
+	*p.policyData.FleetProxyURL = p.proxy2.LocalhostURL
+	// now that we have fleet and the proxy running, we can add actions which
+	// depend on them.
+	action, err := fleetservertest.NewActionPolicyChange(
+		"actionID-TestValidProxyInThePolicy", p.policyData)
+	require.NoError(p.T(), err, "could not generate action with policy")
+	p.checkinWithAcker.AddCheckin(
+		ackToken,
+		0,
+		action,
+	)
+	t.Logf("fleet: %s, proxy1: %s, proxy2: %s",
+		p.fleet.LocalhostURL,
+		p.proxy1.LocalhostURL,
+		p.proxy2.LocalhostURL)
+	out, err := p.fixture.Install(
+		context.Background(),
+		&integrationtest.InstallOpts{
+			Force:          true,
+			NonInteractive: true,
+			Insecure:       true,
+			EnrollOpts: integrationtest.EnrollOpts{
+				URL:             p.fleet.LocalhostURL,
+				EnrollmentToken: "anythingWillDO",
+			}})
+	if err != nil {
+		t.Log(string(out))
+		require.NoError(t, err, "failed to install agent")
+	}
+
+	// assert the agent is actually connected to fleet.
+	var status integrationtest.AgentStatusOutput
+	if !assert.Eventually(t, func() bool {
+		status, err = p.fixture.ExecStatus(context.Background())
+		return status.FleetState == int(cproto.State_HEALTHY)
+	}, 30*time.Second, 5*time.Second) {
+		t.Errorf("want fleet state %d, got %d",
+			cproto.State_HEALTHY, status.FleetState)
+		t.Logf("agent status: %v", status)
+	}
+
+	// ensure the agent is communicating through the new proxy
 	if !assert.Eventually(t, func() bool {
 		for _, r := range p.proxy2.ProxiedRequests() {
 			if strings.Contains(
@@ -271,7 +324,7 @@ func (p *ProxyURL) setupFleet(fleetHost string) {
 
 	checkin := fleetservertest.NewCheckinActionsWithAcker()
 
-	fleet := fleetservertest.NewServerWithFakeComponent(
+	fleet := fleetservertest.NewServerWithHandlers(
 		apiKey,
 		enrollmentToken,
 		agentID,

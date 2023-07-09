@@ -94,7 +94,7 @@ func TestRunFleetServer(t *testing.T) {
 		}, false
 	}
 
-	ts := NewServerWithFakeComponent(
+	ts := NewServerWithHandlers(
 		apiKey,
 		enrolmentToken,
 		agentID,
