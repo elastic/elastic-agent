@@ -107,7 +107,7 @@ func WithAgentID(id string) Option {
 	}
 }
 
-// NewServerWithFakeComponent returns mock Fleet Server ready to use for Agent's
+// NewServerWithHandlers returns a Fleet Server ready for use to Agent's
 // e2e tests. The server has the Status, Checkin, Enroll and Ack handlers
 // configured. You need to implement:
 //   - nextAction, called on every checkin to get the actions to return
@@ -115,7 +115,7 @@ func WithAgentID(id string) Option {
 //
 // See TestRunFleetServer and ExampleNewServer_checkin_and_ackWithAcker for more
 // details on how to use it and define `nextAction` and `acker`.
-func NewServerWithFakeComponent(
+func NewServerWithHandlers(
 	apiKey APIKey,
 	enrolmentToken string,
 	agentID string,
