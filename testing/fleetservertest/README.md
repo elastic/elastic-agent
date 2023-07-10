@@ -14,7 +14,8 @@ by default. There is some work done for authentication on [auth.go](auth.go).
 
 ## tl;dr
 
-- See [`fleetservertest_test.go`](fleetserver_test.go) for examples.
+- See [testing/integration/proxy_url_test.go](../integration/proxy_url_test.go)
+- and [`fleetservertest_test.go`](fleetserver_test.go) for examples.
 
 - on `fleetservertest.Handlers` the `handlernameFn` properties are used for
 - implementing the handlers.By default, any not implemented handler returns a
@@ -49,6 +50,7 @@ ts := fleetservertest.NewServer(&Handlers{
 })
 ```
 
+- Check [`proxy_url_test.go`](../integration/proxy_url_test.go) for examples.
 - Check [`fleetserver_test.go`](fleetserver_test.go) for examples.
 - Check [`handlers.go`](handlers.go) for the available paths and handlers.
 - Check [`models.go`](models.go) for the request and response models or the [openapi](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/elastic/fleet-server/main/model/openapi.yml#/) definition.
