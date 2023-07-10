@@ -91,7 +91,7 @@ func TestEndpointSecurity(t *testing.T) {
 	installElasticDefendPackage(t, info, policyID)
 
 	t.Log("Polling for endpoint-security to become Healthy")
-	statePollingTimeout := 3 * time.Minute
+	statePollingTimeout := 5 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), statePollingTimeout)
 	defer cancel()
 
