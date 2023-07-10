@@ -1,4 +1,17 @@
 inputs:
+    - name: journald-iptables
+      type: journald
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.iptables.log.enabled} == true or ${kubernetes.hints.iptables.enabled} == true
+          data_stream:
+            dataset: iptables.log
+            type: logs
+          include_matches:
+            - _TRANSPORT=kernel
+          tags:
+            - iptables-log
+      data_stream.namespace: default
     - name: udp-iptables
       type: udp
       use_output: default
@@ -38,17 +51,4 @@ inputs:
           tags:
             - iptables-log
             - forwarded
-      data_stream.namespace: default
-    - name: journald-iptables
-      type: journald
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.iptables.log.enabled} == true or ${kubernetes.hints.iptables.enabled} == true
-          data_stream:
-            dataset: iptables.log
-            type: logs
-          include_matches:
-            - _TRANSPORT=kernel
-          tags:
-            - iptables-log
       data_stream.namespace: default

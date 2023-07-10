@@ -1,30 +1,4 @@
 inputs:
-    - name: filestream-postgresql
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.postgresql.log.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
-          data_stream:
-            dataset: postgresql.log
-            type: logs
-          exclude_files:
-            - .gz$
-          multiline:
-            match: after
-            negate: true
-            pattern: '^\d{4}-\d{2}-\d{2} '
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.postgresql.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags:
-            - postgresql-log
-      data_stream.namespace: default
     - name: postgresql/metrics-postgresql
       type: postgresql/metrics
       use_output: default
@@ -65,4 +39,30 @@ inputs:
           metricsets:
             - statement
           period: ${kubernetes.hints.postgresql.statement.period|kubernetes.hints.postgresql.period|'10s'}
+      data_stream.namespace: default
+    - name: filestream-postgresql
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.postgresql.log.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
+          data_stream:
+            dataset: postgresql.log
+            type: logs
+          exclude_files:
+            - .gz$
+          multiline:
+            match: after
+            negate: true
+            pattern: '^\d{4}-\d{2}-\d{2} '
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.postgresql.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - postgresql-log
       data_stream.namespace: default

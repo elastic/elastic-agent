@@ -1,4 +1,25 @@
 inputs:
+    - name: filestream-cockroachdb
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cockroachdb.container_logs.enabled} == true
+          data_stream:
+            dataset: cockroachdb.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
     - name: prometheus/metrics-cockroachdb
       type: prometheus/metrics
       use_output: default
@@ -20,25 +41,4 @@ inputs:
           ssl.certificate_authorities: null
           use_types: true
           username: null
-      data_stream.namespace: default
-    - name: filestream-cockroachdb
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.cockroachdb.container_logs.enabled} == true
-          data_stream:
-            dataset: cockroachdb.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
       data_stream.namespace: default

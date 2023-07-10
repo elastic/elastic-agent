@@ -1,4 +1,20 @@
 inputs:
+    - name: tcp-cyberarkpas
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cyberarkpas.audit.enabled} == true or ${kubernetes.hints.cyberarkpas.enabled} == true
+          data_stream:
+            dataset: cyberarkpas.audit
+            type: logs
+          host: localhost:9301
+          processors:
+            - add_locale: null
+          tags:
+            - cyberarkpas-audit
+            - forwarded
+          tcp: null
+      data_stream.namespace: default
     - name: udp-cyberarkpas
       type: udp
       use_output: default
@@ -38,20 +54,4 @@ inputs:
           tags:
             - forwarded
             - cyberarkpas-audit
-      data_stream.namespace: default
-    - name: tcp-cyberarkpas
-      type: tcp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.cyberarkpas.audit.enabled} == true or ${kubernetes.hints.cyberarkpas.enabled} == true
-          data_stream:
-            dataset: cyberarkpas.audit
-            type: logs
-          host: localhost:9301
-          processors:
-            - add_locale: null
-          tags:
-            - cyberarkpas-audit
-            - forwarded
-          tcp: null
       data_stream.namespace: default

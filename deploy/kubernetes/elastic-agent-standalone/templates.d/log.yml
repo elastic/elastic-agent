@@ -3,16 +3,20 @@ inputs:
       type: filestream
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.log.log.enabled} == true or ${kubernetes.hints.log.enabled} == true
+        - condition: ${kubernetes.hints.log.container_logs.enabled} == true
           data_stream:
-            dataset: log.log
+            dataset: log.container_logs
             type: logs
+          exclude_files: []
+          exclude_lines: []
           parsers:
             - container:
                 format: auto
-                stream: ${kubernetes.hints.log.log.stream|'all'}
-          paths: null
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
                 symlinks: true
+          tags: []
       data_stream.namespace: default
