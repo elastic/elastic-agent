@@ -111,18 +111,25 @@ func TestEndpointSecurity(t *testing.T) {
 			return false
 		}
 
-		foundEndpoint := false
+		foundEndpointInputUnit := false
+		foundEndpointOutputUnit := false
 		for _, comp := range state.Components {
-			if strings.Contains(comp.Name, "endpoint") {
-				foundEndpoint = true
-			}
-
+			isEndpointComponent := strings.Contains(comp.Name, "endpoint")
 			if comp.State != client.Healthy {
 				t.Logf("Component is not Healthy\n%+v", comp)
 				return false
 			}
 
 			for _, unit := range comp.Units {
+				if isEndpointComponent {
+					if unit.UnitType == client.UnitTypeInput {
+						foundEndpointInputUnit = true
+					}
+					if unit.UnitType == client.UnitTypeOutput {
+						foundEndpointOutputUnit = true
+					}
+				}
+
 				if unit.State != client.Healthy {
 					t.Logf("Unit is not Healthy\n%+v", unit)
 					return false
@@ -130,14 +137,16 @@ func TestEndpointSecurity(t *testing.T) {
 			}
 		}
 
-		if !foundEndpoint {
-			t.Logf("State did not contain endpoint!\n%+v", state)
+		// Ensure both the endpoint input and output units were found and healthy.
+		if !assert.True(t, foundEndpointInputUnit) || !assert.True(t, foundEndpointOutputUnit) {
+			t.Logf("State did not contain endpoint units!\n%+v", state)
 			return false
 		}
 
 		return true
 	}
 	require.Eventually(t, healthyEndpointFunc, statePollingTimeout, time.Second)
+	t.Logf("Verified endpoint component and units are healthy")
 }
 
 // Installs the agent, enrolls it in Fleet, and returns the created policy ID.
