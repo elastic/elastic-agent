@@ -9,49 +9,25 @@ if [[ -z "${WORKSPACE-""}" ]]; then
     export WORKSPACE
 fi
 
-if [[ -z "${SETUP_MAGE_VERSION-""}" ]]; then
-    SETUP_MAGE_VERSION="1.14.0"
-fi
-
-if [[ -z "${SETUP_GVM_VERSION-""}" ]]; then
-    SETUP_GVM_VERSION="v0.5.0"
-fi
-
-if [[ -z "${GO_VERSION-""}" ]]; then
-    GO_VERSION=$(cat "${WORKSPACE}/.go-version")
-fi
-
 # Retrieve version value
-export BEAT_VERSION=$(grep -oe "\d.\d.\d[-\w\d]*" ${WORKSPACE}/version/version.go)
+export BEAT_VERSION=$(grep -oE '\d+\.\d+\.\d+(\-\w+\d+)*' ${WORKSPACE}/version/version.go)
 export BRANCH="${BUILDKITE_BRANCH}"
 
-# Wrapper function for executing mage
-mage() {
-    go version
-    if ! [ -x "$(type -p mage | sed 's/mage is //g')" ];
-    then
-        echo "+++ Installing mage ${SETUP_MAGE_VERSION}"
-        make mage
-    fi
-    pushd "$WORKSPACE"
-    command "mage" "$@"
-    popd
-}
+# Install Go TODO: move to makefile
+if ! command -v go &>/dev/null; then
+  echo "Go is not installed. Installing Go..."
+  export GO_VERSION=`cat .go-version`
+  curl -O https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz
+  sudo tar -xf go$GO_VERSION.linux-amd64.tar.gz -C /usr/local
+  echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+  source ~/.bashrc
+  mkdir $HOME/go
+  mkdir $HOME/go/bin
+  export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+  echo "Go has been installed."
+else
+  echo "Go is already installed."
+fi
 
-# Wrapper function for executing go
-go(){
-    # Search for the go in the Path
-    if ! [ -x "$(type -p go | sed 's/go is //g')" ];
-    then
-        local _bin="${WORKSPACE}/bin"
-        mkdir -p "${_bin}"
-        retry 5 curl -sL -o "${_bin}/gvm" "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
-        chmod +x "${_bin}/gvm"
-        eval "$(command "${_bin}/gvm" "${GO_VERSION}" )"
-        export GOPATH=$(command go env GOPATH)
-        export PATH="${PATH}:${GOPATH}/bin"
-    fi
-    pushd "$WORKSPACE"
-    command go "$@"
-    popd
-}
+# Install mage
+make mage

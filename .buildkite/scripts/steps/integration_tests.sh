@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
-.buildkite/scripts/bootstrap.sh
+source .buildkite/scripts/bootstrap.sh
 
 # PACKAGE
 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=tar.gz mage package
