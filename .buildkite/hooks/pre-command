@@ -2,16 +2,15 @@
 
 set -euo pipefail
 
-
-DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
-    export DOCKER_USERNAME_SECRET=$(vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
-    export DOCKER_PASSWORD_SECRET=$(vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
-    docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
-    unset DOCKER_USERNAME_SECRET DOCKER_PASSWORD_SECRET
-  fi
+if command -v docker &>/dev/null; then
+  DOCKER_REGISTRY="docker.elastic.co"
+  DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
+  export DOCKER_USERNAME_SECRET=$(vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
+  export DOCKER_PASSWORD_SECRET=$(vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
+  docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+  unset DOCKER_USERNAME_SECRET DOCKER_PASSWORD_SECRET
+else
+  echo "+++ docker not found"
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
@@ -25,4 +24,4 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == 
   export API_KEY_TOKEN=$(vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa)
   echo ${API_KEY_TOKEN} > ./apiKey
   export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
- fi 
+ fi
