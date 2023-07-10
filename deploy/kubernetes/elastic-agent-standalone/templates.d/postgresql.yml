@@ -38,6 +38,8 @@ inputs:
           metricsets:
             - activity
           period: ${kubernetes.hints.postgresql.activity.period|kubernetes.hints.postgresql.period|'10s'}
+          username: ${kubernetes.hints.postgresql.activity.username|kubernetes.hints.postgresql.username|'postgres'}
+          password: ${kubernetes.hints.postgresql.activity.password|kubernetes.hints.postgresql.password|'postgres'}
         - condition: ${kubernetes.hints.postgresql.bgwriter.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.bgwriter
@@ -47,6 +49,8 @@ inputs:
           metricsets:
             - bgwriter
           period: ${kubernetes.hints.postgresql.bgwriter.period|kubernetes.hints.postgresql.period|'10s'}
+          username: ${kubernetes.hints.postgresql.activity.username|kubernetes.hints.postgresql.username|'postgres'}
+          password: ${kubernetes.hints.postgresql.bgwriter.password|kubernetes.hints.postgresql.password|'postgres'}
         - condition: ${kubernetes.hints.postgresql.database.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.database
@@ -56,6 +60,8 @@ inputs:
           metricsets:
             - database
           period: ${kubernetes.hints.postgresql.database.period|kubernetes.hints.postgresql.period|'10s'}
+          username: ${kubernetes.hints.postgresql.activity.username|kubernetes.hints.postgresql.username|'postgres'}
+          password: ${kubernetes.hints.postgresql.database.password|kubernetes.hints.postgresql.password|'postgres'}
         - condition: ${kubernetes.hints.postgresql.statement.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
           data_stream:
             dataset: postgresql.statement
@@ -65,4 +71,6 @@ inputs:
           metricsets:
             - statement
           period: ${kubernetes.hints.postgresql.statement.period|kubernetes.hints.postgresql.period|'10s'}
+          username: ${kubernetes.hints.postgresql.activity.username|kubernetes.hints.postgresql.username|'postgres'}
+          password: ${kubernetes.hints.postgresql.statement.password|kubernetes.hints.postgresql.password|'postgres'}
       data_stream.namespace: default
