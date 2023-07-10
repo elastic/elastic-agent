@@ -7,18 +7,20 @@
 package integration
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"regexp"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestEnrollAndLog(t *testing.T) {
@@ -47,17 +49,18 @@ func (runner *EnrollRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 }
 
-func (runner *EnrollRunner) SetupTest() {
-
-}
+func (runner *EnrollRunner) SetupTest() {}
 
 func (runner *EnrollRunner) TestEnroll() {
-	runner.T().Logf("In TestEnroll")
-	kibClient := runner.requirementsInfo.KibanaClient
-	// Enroll agent in Fleet with a test policy
+	t := runner.T()
+	info := runner.requirementsInfo
+
+	kibClient := info.KibanaClient
+
+	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
-		Namespace:   "enrolltest",
+		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
@@ -72,60 +75,136 @@ func (runner *EnrollRunner) TestEnroll() {
 	}
 	// Stage 1: Install
 	// As part of the cleanup process, we'll uninstall the agent
-	policy, err := tools.InstallAgentWithPolicy(runner.T(), runner.agentFixture, kibClient, createPolicyReq)
-	require.NoError(runner.T(), err)
-	runner.T().Logf("created policy: %s", policy.ID)
+	policy, err := tools.InstallAgentWithPolicy(t, runner.agentFixture, kibClient, createPolicyReq)
+	require.NoError(t, err)
+	t.Logf("created policy: %s", policy.ID)
 
-	runner.T().Cleanup(func() {
-		// After: unenroll
-		err = tools.UnEnrollAgent(runner.requirementsInfo.KibanaClient)
-		require.NoError(runner.T(), err)
+	t.Cleanup(func() {
+		//After: unenroll
+		t.Logf("Cleanup: unenrolling agent")
+		err = tools.UnEnrollAgent(info.KibanaClient)
+		require.NoError(t, err)
 	})
 
-	runner.T().Logf("sleeping for one minute...")
+	t.Logf("sleeping for one minute...")
 	time.Sleep(time.Second * 60)
 
 	// Stage 2: check indicies
 	// This is mostly for debugging
-	resp, err := tools.GetAllindicies(runner.requirementsInfo.ESClient)
-	require.NoError(runner.T(), err)
+	resp, err := tools.GetAllindicies(info.ESClient)
+	require.NoError(t, err)
 	for _, run := range resp {
-		runner.T().Logf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
+		t.Logf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
 	}
 
 	// Stage 3: Make sure metricbeat logs are populated
-	docs, err := tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.metricbeat")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
-	runner.T().Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
+	t.Log("Making sure metricbeat logs are populated")
+	docs := findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
+	})
+	require.NotZero(t, len(docs.Hits.Hits))
+	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 
-	// Stage 4: Make sure filebeat logs are populated
-	docs, err = tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.filebeat")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
-	runner.T().Logf("Filebeat: Got %d documents", len(docs.Hits.Hits))
-
-	// Stage 5: make sure we have no errors
-	docs, err = tools.CheckForErrorsInLogs(runner.requirementsInfo.ESClient, []string{})
-	require.NoError(runner.T(), err)
-	runner.T().Logf("errors: Got %d documents", len(docs.Hits.Hits))
+	// Stage 4: make sure we have no errors
+	t.Log("Making sure there are no error logs")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{})
+	})
+	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
 	for _, doc := range docs.Hits.Hits {
-		runner.T().Logf("%#v", doc.Source)
+		t.Logf("%#v", doc.Source)
 	}
-	require.Empty(runner.T(), docs.Hits.Hits)
+	require.Empty(t, docs.Hits.Hits)
 
-	// Stage 6: Make sure we have message confirming central management is running
-	docs, err = tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, "Parsed configuration and determined agent is managed by Fleet")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
+	// Stage 5: Make sure we have message confirming central management is running
+	t.Log("Making sure we have message confirming central management is running")
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "Parsed configuration and determined agent is managed by Fleet")
+	})
+	require.NotZero(t, len(docs.Hits.Hits))
 
-	// Stage 7: check for starting messages
-	docs, err = tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, "metricbeat start running")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
+	// Stage 6: verify logs from the monitoring components are not sent to the output
+	t.Log("Check monitoring logs")
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("could not get hostname to filter Agent: %s", err)
+	}
 
-	docs, err = tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, "filebeat start running")
-	require.NoError(runner.T(), err)
-	require.NotZero(runner.T(), len(docs.Hits.Hits))
+	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
+	require.NoError(t, err, "could not get Agent ID by hostname")
+	t.Logf("Agent ID: %q", agentID)
 
+	// We cannot search for `component.id` because at the moment of writing
+	// this field is not mapped. There is an issue for that:
+	// https://github.com/elastic/integrations/issues/6545
+
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForAgentID(info.ESClient, agentID)
+	})
+	require.NoError(t, err, "could not get logs from Agent ID: %q, err: %s",
+		agentID, err)
+
+	monRegExp := regexp.MustCompile(".*-monitoring$")
+	for i, d := range docs.Hits.Hits {
+		// Lazy way to navigate a map[string]any: convert to JSON then
+		// decode into a struct.
+		jsonData, err := json.Marshal(d.Source)
+		if err != nil {
+			t.Fatalf("could not encode document source as JSON: %s", err)
+		}
+
+		doc := ESDocument{}
+		if err := json.Unmarshal(jsonData, &doc); err != nil {
+			t.Fatalf("could not unmarshal document source: %s", err)
+		}
+
+		if monRegExp.MatchString(doc.Component.ID) {
+			t.Errorf("[%d] Document on index %q with 'component.id': %q "+
+				"and 'elastic_agent.id': %q. 'elastic_agent.id' must not "+
+				"end in '-monitoring'\n",
+				i, d.Index, doc.Component.ID, doc.ElasticAgent.ID)
+		}
+	}
+}
+
+func findESDocs(t *testing.T, findFn func() (tools.Documents, error)) tools.Documents {
+	var docs tools.Documents
+
+	require.Eventually(
+		t,
+		func() bool {
+			var err error
+			docs, err = findFn()
+			return err == nil
+		},
+		3*time.Minute,
+		15*time.Second,
+	)
+
+	// TODO: remove after debugging
+	t.Log("--- debugging: results from ES --- START ---")
+	for _, doc := range docs.Hits.Hits {
+		t.Logf("%#v", doc.Source)
+	}
+	t.Log("--- debugging: results from ES --- END ---")
+
+	return docs
+}
+
+type ESDocument struct {
+	ElasticAgent ElasticAgent `json:"elastic_agent"`
+	Component    Component    `json:"component"`
+	Host         Host         `json:"host"`
+}
+type ElasticAgent struct {
+	ID       string `json:"id"`
+	Version  string `json:"version"`
+	Snapshot bool   `json:"snapshot"`
+}
+type Component struct {
+	Binary string `json:"binary"`
+	ID     string `json:"id"`
+}
+type Host struct {
+	Hostname string `json:"hostname"`
 }
