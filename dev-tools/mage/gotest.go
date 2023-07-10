@@ -233,10 +233,6 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		)
 	}
 
-	if params.TestName != "" {
-		testArgs = append(testArgs, "-run", params.TestName)
-	}
-
 	testArgs = append(testArgs, params.ExtraFlags...)
 	testArgs = append(testArgs, params.Packages...)
 
