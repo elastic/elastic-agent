@@ -1,3 +1,34 @@
 steps:
-  - label: "Example test"
-    command: echo "Hello!"
+  - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
+    key: "dra-core-snapshot"
+    steps:
+    - label: ":hammer::package: Build and DRA Publish Elastic-Agent Core Snapshot"
+      if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_SNAPSHOT") == "true"
+      commands:
+        - .buildkite/scripts/steps/dra-build.sh
+        - .buildkite/scripts/steps/dra-publish.sh
+      key: "build-and-publish-dra-snapshot"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "snapshot"
+  - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
+    key: "dra-core-staging"
+    steps:
+    - label: ":hammer: Build Elastic-Agent Core staging"
+      if: build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_STAGING") == "true"
+      commands:
+        - .buildkite/scripts/steps/dra-build.sh
+        - .buildkite/scripts/steps/dra-publish.sh
+      key: "build-and-publish-dra-staging"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "staging"
+
+notify:
+  - slack: "#elastic-agent"
+    # only notify on main and release branches
+    if: build.pull_request.id == 'null'
