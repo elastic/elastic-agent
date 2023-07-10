@@ -53,13 +53,14 @@ func (runner *EnrollRunner) SetupTest() {}
 
 func (runner *EnrollRunner) TestEnroll() {
 	t := runner.T()
+	info := runner.requirementsInfo
 
-	kibClient := runner.requirementsInfo.KibanaClient
+	kibClient := info.KibanaClient
 
 	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
-		Namespace:   runner.requirementsInfo.Namespace,
+		Namespace:   info.Namespace,
 		Description: "test policy for agent enrollment",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
@@ -81,7 +82,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	t.Cleanup(func() {
 		//After: unenroll
 		t.Logf("Cleanup: unenrolling agent")
-		err = tools.UnEnrollAgent(runner.requirementsInfo.KibanaClient)
+		err = tools.UnEnrollAgent(info.KibanaClient)
 		require.NoError(t, err)
 	})
 
@@ -90,7 +91,7 @@ func (runner *EnrollRunner) TestEnroll() {
 
 	// Stage 2: check indicies
 	// This is mostly for debugging
-	resp, err := tools.GetAllindicies(runner.requirementsInfo.ESClient)
+	resp, err := tools.GetAllindicies(info.ESClient)
 	require.NoError(t, err)
 	for _, run := range resp {
 		t.Logf("%s: %d/%d deleted: %d\n", run.Index, run.DocsCount, run.StoreSizeBytes, run.DocsDeleted)
@@ -99,7 +100,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	// Stage 3: Make sure metricbeat logs are populated
 	t.Log("Making sure metricbeat logs are populated")
 	docs := findESDocs(t, func() (tools.Documents, error) {
-		return tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.metricbeat")
+		return tools.GetLogsForDatastream(info.ESClient, "elastic_agent.metricbeat")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
@@ -107,7 +108,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	// Stage 4: make sure we have no errors
 	t.Log("Making sure there are no error logs")
 	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.CheckForErrorsInLogs(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, []string{})
+		return tools.CheckForErrorsInLogs(info.ESClient, info.Namespace, []string{})
 	})
 	t.Logf("errors: Got %d documents", len(docs.Hits.Hits))
 	for _, doc := range docs.Hits.Hits {
@@ -118,7 +119,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	// Stage 5: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, "Parsed configuration and determined agent is managed by Fleet")
+		return tools.FindMatchingLogLines(info.ESClient, info.Namespace, "Parsed configuration and determined agent is managed by Fleet")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
@@ -129,7 +130,7 @@ func (runner *EnrollRunner) TestEnroll() {
 		t.Fatalf("could not get hostname to filter Agent: %s", err)
 	}
 
-	agentID, err := tools.GetAgentIDByHostname(runner.requirementsInfo.KibanaClient, hostname)
+	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
 	require.NoError(t, err, "could not get Agent ID by hostname")
 	t.Logf("Agent ID: %q", agentID)
 
@@ -138,7 +139,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	// https://github.com/elastic/integrations/issues/6545
 
 	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.GetLogsForAgentID(runner.requirementsInfo.ESClient, agentID)
+		return tools.GetLogsForAgentID(info.ESClient, agentID)
 	})
 	require.NoError(t, err, "could not get logs from Agent ID: %q, err: %s",
 		agentID, err)
