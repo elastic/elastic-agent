@@ -232,7 +232,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 			"-coverprofile="+params.CoverageProfileFile,
 		)
 	}
-	if params.TestName != "" && params.TestName !="Unit" {
+	if params.TestName != "" && params.TestName != "Unit" {
 		testArgs = append(testArgs, "-run", params.TestName)
 	}
 	
