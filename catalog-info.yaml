@@ -110,7 +110,7 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: Resource
 metadata:
-  name: buildkite-dra-artifacts
+  name: buildkite-elastic-agent-binary-dra
   description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
   links:
     - title: Pipeline
@@ -124,26 +124,20 @@ spec:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
     metadata:
-      name: dra-artifacts
+      name: elastic-agent-binary-dra
       description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
     spec:
-      pipeline_file: ".buildkite/pipeline.dra-artifacts.yml"
+      pipeline_file: ".buildkite/pipeline.elastic-agent-binary-dra.yml"
       provider_settings:
-        build_branches: true
         build_pull_request_forks: false
-        build_pull_requests: true
-        publish_commit_status: true
-        publish_commit_status_per_step: false
+        build_pull_requests: true # requires filter_enabled and filter_condition settings as below when used with buildkite-pr-bot
+        publish_commit_status: false # do not update status of commits for this pipeline
+        build_tags: false
+        build_branches: false
+        filter_enabled: true
+        filter_condition: >-
+          build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
-      schedules:
-        Daily 8_9:
-          branch: '8.9'
-          cronline: '@daily'
-          message: Builds daily `8.9` dra
-        Daily main:
-          branch: main
-          cronline: '@daily'
-          message: Builds daily `main` dra
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
