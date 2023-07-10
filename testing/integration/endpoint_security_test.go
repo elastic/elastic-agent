@@ -30,40 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
-// type PolicyResponse struct {
-// 	Item AgentPolicy `json:"item"`
-// }
-
-// type AgentPolicy struct {
-// 	ID     string `json:"id,omitempty"`
-// 	Inputs []AgentPolicyInput
-// 	// Name of the policy. Required to create a policy.
-// 	Name string `json:"name"`
-// 	// Namespace of the policy. Required to create a policy.
-// 	Namespace          string                           `json:"namespace"`
-// 	Description        string                           `json:"description,omitempty"`
-// 	MonitoringEnabled  []kibana.MonitoringEnabledOption `json:"monitoring_enabled,omitempty"`
-// 	DataOutputID       string                           `json:"data_output_id,omitempty"`
-// 	MonitoringOutputID string                           `json:"monitoring_output_id,omitempty"`
-// 	FleetServerHostID  string                           `json:"fleet_server_host_id,omitempty"`
-// 	DownloadSourceID   string                           `json:"download_source_id,omitempty"`
-// 	UnenrollTimeout    int                              `json:"unenroll_timeout,omitempty"`
-// 	InactivityTImeout  int                              `json:"inactivity_timeout,omitempty"`
-// 	AgentFeatures      []map[string]interface{}         `json:"agent_features,omitempty"`
-// 	UpdatedOn          time.Time                        `json:"updated_on"`
-// 	UpdatedBy          string                           `json:"updated_by"`
-// 	Revision           int                              `json:"revision"`
-// 	IsProtected        bool                             `json:"is_protected"`
-// 	PackagePolicies    []map[string]interface{}         `json:"package_policies"`
-// }
-
-// type AgentPolicyInput struct {
-// 	ID              string `json:"id"`
-// 	Name            string `json:"name"`
-// 	Type            string `json:"type"`
-// 	PackagePolicyID string `json:"package_policy_id"`
-// }
-
 // https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#createPackagePolicy
 // request https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#package_policy_request
 type PackagePolicyRequest struct {
