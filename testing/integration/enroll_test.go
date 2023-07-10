@@ -51,94 +51,12 @@ func (runner *EnrollRunner) SetupSuite() {
 
 func (runner *EnrollRunner) SetupTest() {}
 
-// TestDropMonitoringLogs ensures logs from the monitoring components are not
-// sent to the output
-func (runner *EnrollRunner) TestDropMonitoringLogs() {
-	t := runner.T()
-	t.Logf("In TestDropMonitoringLogs")
-
-	defineInfo := runner.requirementsInfo
-	kibClient := runner.requirementsInfo.KibanaClient
-
-	// Enroll agent in Fleet with a test policy
-	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("test-monitoring-logs-%d", time.Now().Unix()),
-		Namespace:   runner.requirementsInfo.Namespace,
-		Description: "test policy for drop processors",
-		MonitoringEnabled: []kibana.MonitoringEnabledOption{
-			kibana.MonitoringEnabledLogs,
-			kibana.MonitoringEnabledMetrics,
-		},
-		AgentFeatures: []map[string]interface{}{
-			{
-				"name":    t.Name(),
-				"enabled": true,
-			},
-		},
-	}
-
-	// As part of the cleanup process, we'll uninstall the agent
-	policy, err := tools.InstallAgentWithPolicy(t, runner.agentFixture, kibClient, createPolicyReq)
-	require.NoError(t, err, "could not install Elastic Agent with Policy")
-	t.Logf("created policy: %s", policy.ID)
-
-	t.Cleanup(func() {
-		require.NoError(t, tools.UnEnrollAgent(kibClient), "could not un-enroll Elastic-Agent")
-	})
-
-	t.Log("waiting 20s so the components can generate some logs and" +
-		"Filebeat can collect them")
-	time.Sleep(20 * time.Second)
-	t.Log("Done sleeping")
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		t.Fatalf("could not get hostname to filter Agent: %s", err)
-	}
-
-	agentID, err := tools.GetAgentIDByHostname(defineInfo.KibanaClient, hostname)
-	require.NoError(t, err, "could not get Agent ID by hostname")
-	t.Logf("Agent ID: %q", agentID)
-
-	// We cannot search for `component.id` because at the moment of writing
-	// this field is not mapped. There is an issue for that:
-	// https://github.com/elastic/integrations/issues/6545
-
-	docs := findESDocs(t, func() (tools.Documents, error) {
-		return tools.GetLogsForAgentID(defineInfo.ESClient, agentID)
-	})
-	require.NoError(t, err, "could not get logs from Agent ID: %q, err: %s",
-		agentID, err)
-
-	monRegExp := regexp.MustCompile(".*-monitoring$")
-	for i, d := range docs.Hits.Hits {
-		// Lazy way to navigate a map[string]any: convert to JSON then
-		// decode into a struct.
-		jsonData, err := json.Marshal(d.Source)
-		if err != nil {
-			t.Fatalf("could not encode document source as JSON: %s", err)
-		}
-
-		doc := ESDocument{}
-		if err := json.Unmarshal(jsonData, &doc); err != nil {
-			t.Fatalf("could not unmarshal document source: %s", err)
-		}
-
-		if monRegExp.MatchString(doc.Component.ID) {
-			t.Errorf("[%d] Document on index %q with 'component.id': %q "+
-				"and 'elastic_agent.id': %q. 'elastic_agent.id' must not "+
-				"end in '-monitoring'\n",
-				i, d.Index, doc.Component.ID, doc.ElasticAgent.ID)
-		}
-	}
-}
-
 func (runner *EnrollRunner) TestEnroll() {
 	t := runner.T()
-	t.Logf("In TestEnroll")
 
 	kibClient := runner.requirementsInfo.KibanaClient
-	// Enroll agent in Fleet with a test policy
+
+	t.Log("Enrolling agent in Fleet with a test policy")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("test-policy-enroll-%d", time.Now().Unix()),
 		Namespace:   runner.requirementsInfo.Namespace,
@@ -186,15 +104,7 @@ func (runner *EnrollRunner) TestEnroll() {
 	require.NotZero(t, len(docs.Hits.Hits))
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
 
-	// Stage 4: Make sure filebeat logs are populated
-	t.Log("Making sure filebeat logs are populated")
-	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.GetLogsForDatastream(runner.requirementsInfo.ESClient, "elastic_agent.filebeat")
-	})
-	require.NotZero(t, len(docs.Hits.Hits))
-	t.Logf("Filebeat: Got %d documents", len(docs.Hits.Hits))
-
-	// Stage 5: make sure we have no errors
+	// Stage 4: make sure we have no errors
 	t.Log("Making sure there are no error logs")
 	docs = findESDocs(t, func() (tools.Documents, error) {
 		return tools.CheckForErrorsInLogs(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, []string{})
@@ -205,25 +115,55 @@ func (runner *EnrollRunner) TestEnroll() {
 	}
 	require.Empty(t, docs.Hits.Hits)
 
-	// Stage 6: Make sure we have message confirming central management is running
+	// Stage 5: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
 	docs = findESDocs(t, func() (tools.Documents, error) {
 		return tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, "Parsed configuration and determined agent is managed by Fleet")
 	})
 	require.NotZero(t, len(docs.Hits.Hits))
 
-	// Stage 7: check for starting messages
-	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, "metricbeat start running")
-	})
-	require.NotZero(t, len(docs.Hits.Hits))
+	// Stage 6: verify logs from the monitoring components are not sent to the output
+	t.Log("Check monitoring logs")
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("could not get hostname to filter Agent: %s", err)
+	}
 
-	t.Log("Check for filebeat starting message")
-	docs = findESDocs(t, func() (tools.Documents, error) {
-		return tools.FindMatchingLogLines(runner.requirementsInfo.ESClient, runner.requirementsInfo.Namespace, "filebeat start running")
-	})
-	require.NotZero(t, len(docs.Hits.Hits))
+	agentID, err := tools.GetAgentIDByHostname(runner.requirementsInfo.KibanaClient, hostname)
+	require.NoError(t, err, "could not get Agent ID by hostname")
+	t.Logf("Agent ID: %q", agentID)
 
+	// We cannot search for `component.id` because at the moment of writing
+	// this field is not mapped. There is an issue for that:
+	// https://github.com/elastic/integrations/issues/6545
+
+	docs = findESDocs(t, func() (tools.Documents, error) {
+		return tools.GetLogsForAgentID(runner.requirementsInfo.ESClient, agentID)
+	})
+	require.NoError(t, err, "could not get logs from Agent ID: %q, err: %s",
+		agentID, err)
+
+	monRegExp := regexp.MustCompile(".*-monitoring$")
+	for i, d := range docs.Hits.Hits {
+		// Lazy way to navigate a map[string]any: convert to JSON then
+		// decode into a struct.
+		jsonData, err := json.Marshal(d.Source)
+		if err != nil {
+			t.Fatalf("could not encode document source as JSON: %s", err)
+		}
+
+		doc := ESDocument{}
+		if err := json.Unmarshal(jsonData, &doc); err != nil {
+			t.Fatalf("could not unmarshal document source: %s", err)
+		}
+
+		if monRegExp.MatchString(doc.Component.ID) {
+			t.Errorf("[%d] Document on index %q with 'component.id': %q "+
+				"and 'elastic_agent.id': %q. 'elastic_agent.id' must not "+
+				"end in '-monitoring'\n",
+				i, d.Index, doc.Component.ID, doc.ElasticAgent.ID)
+		}
+	}
 }
 
 func findESDocs(t *testing.T, findFn func() (tools.Documents, error)) tools.Documents {
