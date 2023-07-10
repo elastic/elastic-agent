@@ -265,14 +265,14 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				},
 			}
 
-			actionStore, err := NewActionStore(log, storage.NewDiskStore(actionStorePath))
+			actionStore, err := newActionStore(log, storage.NewDiskStore(actionStorePath))
 			require.NoError(t, err)
 
-			require.Empty(t, actionStore.Actions())
-			actionStore.Add(ActionPolicyChange)
-			err = actionStore.Save()
+			require.Empty(t, actionStore.actions())
+			actionStore.add(ActionPolicyChange)
+			err = actionStore.save()
 			require.NoError(t, err)
-			require.Len(t, actionStore.Actions(), 1)
+			require.Len(t, actionStore.actions(), 1)
 
 			withFile(func(t *testing.T, stateStorePath string) {
 				err = migrateStateStore(log, actionStorePath, stateStorePath)
@@ -281,7 +281,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				stateStore, err := NewStateStore(log, storage.NewDiskStore(stateStorePath))
 				require.NoError(t, err)
 				stateStore.SetAckToken(ackToken)
-				diff := cmp.Diff(actionStore.Actions(), stateStore.Actions())
+				diff := cmp.Diff(actionStore.actions(), stateStore.Actions())
 				if diff != "" {
 					t.Error(diff)
 				}

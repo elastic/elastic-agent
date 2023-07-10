@@ -34,6 +34,10 @@ inputs:
           metricsets:
             - collstats
           period: ${kubernetes.hints.mongodb.collstats.period|kubernetes.hints.mongodb.period|'10s'}
+          ssl.certificate: null
+          ssl.enabled: false
+          ssl.key: null
+          ssl.verification_mode: null
         - condition: ${kubernetes.hints.mongodb.dbstats.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.dbstats
@@ -43,6 +47,10 @@ inputs:
           metricsets:
             - dbstats
           period: ${kubernetes.hints.mongodb.dbstats.period|kubernetes.hints.mongodb.period|'10s'}
+          ssl.certificate: null
+          ssl.enabled: false
+          ssl.key: null
+          ssl.verification_mode: null
         - condition: ${kubernetes.hints.mongodb.metrics.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.metrics
@@ -61,6 +69,10 @@ inputs:
           metricsets:
             - replstatus
           period: ${kubernetes.hints.mongodb.replstatus.period|kubernetes.hints.mongodb.period|'10s'}
+          ssl.certificate: null
+          ssl.enabled: false
+          ssl.key: null
+          ssl.verification_mode: null
         - condition: ${kubernetes.hints.mongodb.status.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.status
@@ -70,4 +82,8 @@ inputs:
           metricsets:
             - status
           period: ${kubernetes.hints.mongodb.status.period|kubernetes.hints.mongodb.period|'10s'}
+          ssl.certificate: null
+          ssl.enabled: false
+          ssl.key: null
+          ssl.verification_mode: null
       data_stream.namespace: default

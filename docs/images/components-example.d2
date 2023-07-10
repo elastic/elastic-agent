@@ -1,0 +1,30 @@
+# A diagram of example components managed by Agent.
+# To regenerate the image after changing this file, run:
+#   d2 components-example.d2 components-example.svg
+# To live-edit this file with immediate regeneration of the diagram, run:
+#   d2 --watch components-example.d2 components-example.svg
+
+filebeat1: {
+  filestream-1 -> output
+  filestream-2 -> output
+}
+
+filebeat2: {
+  udp-1 -> output
+}
+
+metricbeat: {
+  metrics-1 -> output
+  metrics-2 -> output
+}
+
+endpoint: {
+  endpoint-1 -> output
+}
+
+filebeat1.output -> elasticsearch1
+metricbeat.output -> elasticsearch1
+
+filebeat2.output -> logstash
+
+endpoint.output -> elasticsearch2

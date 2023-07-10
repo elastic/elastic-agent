@@ -8,11 +8,12 @@ import (
 	"context"
 	"time"
 
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	agentclient "github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -26,8 +27,11 @@ import (
 // Max number of times an invalid API Key is checked
 const maxUnauthCounter int = 6
 
-// Const for decraded state or linter complains
-const degraded = "DEGRADED"
+// Consts for states at fleet checkin
+const fleetStateDegraded = "DEGRADED"
+const fleetStateOnline = "online"
+const fleetStateError = "error"
+const fleetStateStarting = "starting"
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
@@ -71,7 +75,7 @@ type fleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	stateFetcher       coordinator.StateFetcher
+	stateFetcher       func() coordinator.State
 	stateStore         stateStore
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
@@ -83,7 +87,7 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
-	stateFetcher coordinator.StateFetcher,
+	stateFetcher func() coordinator.State,
 	stateStore stateStore,
 ) (gateway.FleetGateway, error) {
 
@@ -107,7 +111,7 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
-	stateFetcher coordinator.StateFetcher,
+	stateFetcher func() coordinator.State,
 	stateStore stateStore,
 ) (gateway.FleetGateway, error) {
 	return &fleetGateway{
@@ -218,6 +222,7 @@ func (f *fleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		}
 
 		f.checkinFailCounter = 0
+		f.errCh <- nil
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}
@@ -240,7 +245,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 		case eaclient.UnitStateHealthy:
 			return "HEALTHY"
 		case eaclient.UnitStateDegraded:
-			return degraded
+			return fleetStateDegraded
 		case eaclient.UnitStateFailed:
 			return "FAILED"
 		case eaclient.UnitStateStopping:
@@ -268,10 +273,10 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 		state := item.State
 
 		var shipperReference *fleetapi.CheckinShipperReference
-		if component.Shipper != nil {
+		if component.ShipperRef != nil {
 			shipperReference = &fleetapi.CheckinShipperReference{
-				ComponentID: component.Shipper.ComponentID,
-				UnitID:      component.Shipper.UnitID,
+				ComponentID: component.ShipperRef.ComponentID,
+				UnitID:      component.ShipperRef.UnitID,
 			}
 		}
 		checkinComponent := fleetapi.CheckinComponent{
@@ -303,7 +308,7 @@ func (f *fleetGateway) convertToCheckinComponents(components []runtime.Component
 }
 
 func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
-	ecsMeta, err := info.Metadata()
+	ecsMeta, err := info.Metadata(f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
 	}
@@ -315,7 +320,7 @@ func (f *fleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher.State(false)
+	state := f.stateFetcher()
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components)
@@ -377,9 +382,11 @@ func (f *fleetGateway) SetClient(c client.Sender) {
 func agentStateToString(state agentclient.State) string {
 	switch state {
 	case agentclient.Healthy:
-		return "online"
+		return fleetStateOnline
 	case agentclient.Failed:
-		return "error"
+		return fleetStateError
+	case agentclient.Starting:
+		return fleetStateStarting
 	}
-	return degraded
+	return fleetStateDegraded
 }

@@ -1,4 +1,19 @@
 inputs:
+    - name: apache/metrics-apache
+      type: apache/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.apache.status.enabled} == true or ${kubernetes.hints.apache.enabled} == true
+          data_stream:
+            dataset: apache.status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.apache.status.host|kubernetes.hints.apache.host|'http://127.0.0.1'}
+          metricsets:
+            - status
+          period: ${kubernetes.hints.apache.status.period|kubernetes.hints.apache.period|'30s'}
+          server_status_path: /server-status
+      data_stream.namespace: default
     - name: filestream-apache
       type: filestream
       use_output: default
@@ -116,19 +131,4 @@ inputs:
           tags:
             - forwarded
             - apache-error
-      data_stream.namespace: default
-    - name: apache/metrics-apache
-      type: apache/metrics
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.apache.status.enabled} == true or ${kubernetes.hints.apache.enabled} == true
-          data_stream:
-            dataset: apache.status
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.apache.status.host|kubernetes.hints.apache.host|'http://127.0.0.1'}
-          metricsets:
-            - status
-          period: ${kubernetes.hints.apache.status.period|kubernetes.hints.apache.period|'30s'}
-          server_status_path: /server-status
       data_stream.namespace: default

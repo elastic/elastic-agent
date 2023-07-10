@@ -52,14 +52,15 @@ func ExpectedConfig(cfg map[string]interface{}) (*proto.UnitExpectedConfig, erro
 	if err != nil {
 		return nil, err
 	}
-	err = decoder.Decode(cfg)
-	if err != nil {
+
+	if err := decoder.Decode(cfg); err != nil {
 		return nil, rewrapErr(err)
 	}
-	err = setSource(result, cfg)
-	if err != nil {
+
+	if err := setSource(result, cfg); err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 

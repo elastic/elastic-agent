@@ -54,37 +54,6 @@ pull_request_rules:
         message: |
           This pull request has been automatically closed by Mergify.
           There are some other up-to-date pull requests.
-  - name: automatic approval for automated pull requests with bump updates
-    conditions:
-      - author=apmmachine
-      - check-success=fleet-ci/pr-merge
-      - label=automation
-      - files~=^testing/environments/snapshot.*\.yml$
-    actions:
-      review:
-        type: APPROVE
-        message: Automatically approving mergify
-  - name: automatic squash and merge with success checks and the files matching the regex ^testing/environments/snapshot* are modified.
-    conditions:
-      - check-success=fleet-ci/pr-merge
-      - label=automation
-      - files~=^testing/environments/snapshot.*\.yml$
-      - "#approved-reviews-by>=1"
-    actions:
-      queue:
-        method: squash
-        name: default
-  - name: delete upstream branch after merging changes on testing/environments/snapshot* or it's closed
-    conditions:
-      - or:
-        - merged
-        - closed
-      - and:
-        - label=automation
-        - head~=^update-stack-version
-        - files~=^testing/environments/snapshot.*\.yml$
-    actions:
-      delete_head_branch:
   - name: delete upstream branch after merging changes on .go-version or it's closed
     conditions:
       - or:
@@ -243,6 +212,45 @@ pull_request_rules:
           - "{{ author }}"
         branches:
           - "8.6"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 8.7 branch
+    conditions:
+      - merged
+      - label=backport-v8.7.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "8.7"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 8.8 branch
+    conditions:
+      - merged
+      - label=backport-v8.8.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "8.8"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 8.9 branch
+    conditions:
+      - merged
+      - label=backport-v8.9.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "8.9"
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"

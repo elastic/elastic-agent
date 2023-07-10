@@ -19,15 +19,17 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
-	componentIDKey    = "componentID"
-	metricsPathKey    = "metricsPath"
-	timeout           = 10 * time.Second
-	apmPrefix         = "apm-server"
-	apmTypePrefix     = "apm"
-	fleetServerPrefix = "fleet-server"
+	componentIDKey         = "componentID"
+	metricsPathKey         = "metricsPath"
+	timeout                = 10 * time.Second
+	apmPrefix              = "apm-server"
+	apmTypePrefix          = "apm"
+	fleetServerPrefix      = "fleet-server"
+	profilingServicePrefix = "pf-elastic-"
 )
 
 var redirectPathAllowlist = map[string]struct{}{
@@ -39,6 +41,7 @@ var redirectPathAllowlist = map[string]struct{}{
 var redirectableProcesses = []string{
 	apmTypePrefix,
 	fleetServerPrefix,
+	profilingServicePrefix,
 }
 
 func processHandler(coord *coordinator.Coordinator, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
@@ -77,7 +80,7 @@ func processHandler(coord *coordinator.Coordinator, statsHandler func(http.Respo
 			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
 		}
 
-		state := coord.State(false)
+		state := coord.State()
 
 		for _, c := range state.Components {
 			if matchesCloudProcessID(&c.Component, componentID) {
@@ -117,7 +120,7 @@ func isProcessRedirectable(componentID string) bool {
 }
 
 func redirectToPath(w http.ResponseWriter, r *http.Request, id, path, operatingSystem string) error {
-	endpoint := prefixedEndpoint(endpointPath(id, operatingSystem))
+	endpoint := prefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
 	metricsBytes, statusCode, metricsErr := processMetrics(r.Context(), endpoint, path)
 	if metricsErr != nil {
 		return metricsErr

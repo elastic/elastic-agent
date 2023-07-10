@@ -8,7 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
@@ -37,7 +38,13 @@ type Expression struct {
 
 // Eval evaluates the expression using a visitor and the provided methods registry, will return true
 // or any evaluation errors.
-func (e *Expression) Eval(store VarStore) (result bool, err error) {
+// Variable expressions that don't exist in the VarStore will evaluate to
+// Null, but will still be considered valid if allowMissingVars is true.
+// Otherwise they will return an error.
+// Evaluation does not use logical short circuiting: for example,
+// the expression "${validVariable} or ${invalidVariable}" will generate
+// an error even if ${validVariable} is true.
+func (e *Expression) Eval(store VarStore, allowMissingVars bool) (result bool, err error) {
 	// Antlr can panic on errors so we have to recover somehow.
 	defer func() {
 		r := recover()
@@ -46,7 +53,7 @@ func (e *Expression) Eval(store VarStore) (result bool, err error) {
 		}
 	}()
 
-	visitor := &expVisitor{vars: store}
+	visitor := &expVisitor{vars: store, allowMissingVars: allowMissingVars}
 	r := visitor.Visit(e.tree)
 
 	if visitor.err != nil {
@@ -62,13 +69,45 @@ func New(expression string) (*Expression, error) {
 		return nil, ErrEmptyExpression
 	}
 
+	errorListener := newErrorListener()
 	input := antlr.NewInputStream(expression)
 	lexer := parser.NewEqlLexer(input)
 	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errorListener)
 	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	p := parser.NewEqlParser(tokens)
 	p.RemoveErrorListeners()
+	p.AddErrorListener(errorListener)
 	tree := p.ExpList()
 
+	if errorListener.errors != nil {
+		return nil, errorListener.errors
+	}
+
 	return &Expression{expression: expression, tree: tree}, nil
+}
+
+// A simple listener that collects errors reported by antlr for reporting
+// from eql.New. Create via newErrorListener.
+type errorListener struct {
+	antlr.ErrorListener
+
+	// "errors" uses multierror to store all parse errors in a single
+	// error object.
+	errors error
+}
+
+func newErrorListener() *errorListener {
+	return &errorListener{antlr.NewDefaultErrorListener(), nil}
+}
+
+func (el *errorListener) SyntaxError(
+	recognizer antlr.Recognizer,
+	offendingSymbol interface{},
+	line, column int,
+	msg string,
+	e antlr.RecognitionException,
+) {
+	el.errors = multierror.Append(el.errors,
+		fmt.Errorf("condition line %d column %d: %v", line, column, msg))
 }

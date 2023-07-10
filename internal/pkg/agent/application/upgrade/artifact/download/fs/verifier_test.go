@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -33,6 +34,7 @@ var (
 )
 
 func TestFetchVerify(t *testing.T) {
+	log, _ := logger.New("", false)
 	timeout := 15 * time.Second
 	dropPath := filepath.Join("testdata", "drop")
 	installPath := filepath.Join("testdata", "install")
@@ -62,7 +64,7 @@ func TestFetchVerify(t *testing.T) {
 	assert.NoError(t, err)
 
 	downloader := NewDownloader(config)
-	verifier, err := NewVerifier(config, true, nil)
+	verifier, err := NewVerifier(log, config, true, nil)
 	assert.NoError(t, err)
 
 	// first download verify should fail:
@@ -167,10 +169,11 @@ func prepareFetchVerifyTests(dropPath, targetDir, targetFilePath, hashTargetFile
 	}
 
 	corruptedHash := append([]byte{1, 2, 3, 4, 5, 6}, hashContent[6:]...)
-	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666) //nolint:gosec // no sweat, it's a test
+	return ioutil.WriteFile(hashTargetFilePath, corruptedHash, 0666)
 }
 
 func TestVerify(t *testing.T) {
+	log, _ := logger.New("", false)
 	targetDir, err := ioutil.TempDir(os.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
@@ -203,7 +206,7 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testVerifier, err := NewVerifier(config, true, nil)
+	testVerifier, err := NewVerifier(log, config, true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,11 +233,11 @@ func prepareTestCase(a artifact.Artifact, version string, cfg *artifact.Config) 
 	hash := sha512.Sum512(content)
 	hashContent := fmt.Sprintf("%x %s", hash, filename)
 
-	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), content, 0644); err != nil { //nolint:gosec // no sweat, it's a test
+	if err := ioutil.WriteFile(filepath.Join(cfg.DropPath, filename), content, 0644); err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644) //nolint:gosec // no sweat, it's a test
+	return ioutil.WriteFile(filepath.Join(cfg.DropPath, filename+".sha512"), []byte(hashContent), 0644)
 }
 
 func assertFileExists(t testing.TB, path string) {

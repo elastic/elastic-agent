@@ -15,27 +15,32 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
+
+const snapshotURIFormat = "https://snapshots.elastic.co/%s-%s/downloads/"
 
 type Downloader struct {
 	downloader      download.Downloader
-	versionOverride string
+	versionOverride *agtversion.ParsedSemVer
 }
 
 // NewDownloader creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
-func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride string) (download.Downloader, error) {
+// We need to pass the versionOverride separately from the config as
+// artifact.Config struct is part of agent configuration and a version
+// override makes no sense there
+func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (download.Downloader, error) {
 	cfg, err := snapshotConfig(config, versionOverride)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating snapshot config: %w", err)
 	}
 
 	httpDownloader, err := http.NewDownloader(log, cfg)
 	if err != nil {
-		return nil, errors.New(err, "failed to create snapshot downloader")
+		return nil, fmt.Errorf("failed to create snapshot downloader: %w", err)
 	}
 
 	return &Downloader{
@@ -52,7 +57,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 	cfg, err := snapshotConfig(c, e.versionOverride)
 	if err != nil {
-		return errors.New(err, "snapshot.downloader: failed to generate snapshot config")
+		return fmt.Errorf("snapshot.downloader: failed to generate snapshot config: %w", err)
 	}
 
 	return reloader.Reload(cfg)
@@ -64,7 +69,7 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	return e.downloader.Download(ctx, a, version)
 }
 
-func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.Config, error) {
+func snapshotConfig(config *artifact.Config, versionOverride *agtversion.ParsedSemVer) (*artifact.Config, error) {
 	snapshotURI, err := snapshotURI(versionOverride, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect remote snapshot repo, proceeding with configured: %w", err)
@@ -82,13 +87,21 @@ func snapshotConfig(config *artifact.Config, versionOverride string) (*artifact.
 	}, nil
 }
 
-func snapshotURI(versionOverride string, config *artifact.Config) (string, error) {
+func snapshotURI(versionOverride *agtversion.ParsedSemVer, config *artifact.Config) (string, error) {
+	// snapshot downloader is used also by the 'localremote' impl in case of agent currently running off a snapshot build:
+	// the 'localremote' downloader does not pass a specific version, implying that we should update to the latest snapshot
+	// build of the same <major>.<minor>.<patch>-SNAPSHOT version
 	version := release.Version()
-	if versionOverride != "" {
-		versionOverride = strings.TrimSuffix(versionOverride, "-SNAPSHOT")
-		version = versionOverride
+	if versionOverride != nil {
+		if versionOverride.BuildMetadata() != "" {
+			// we know exactly which snapshot build we want to target
+			return fmt.Sprintf(snapshotURIFormat, versionOverride.CoreVersion(), versionOverride.BuildMetadata()), nil
+		}
+
+		version = versionOverride.CoreVersion()
 	}
 
+	// we go through the artifact API to find the location of the latest snapshot build for the specified version
 	client, err := config.HTTPTransportSettings.Client(httpcommon.WithAPMHTTPInstrumentation())
 	if err != nil {
 		return "", err

@@ -22,6 +22,11 @@ func cleanNonMatchingVersionsFromDownloads(log *logger.Logger, version string) e
 	log.Debugw("Cleaning up non-matching downloaded versions", "version", version, "downloads.path", downloadsPath)
 
 	files, err := os.ReadDir(downloadsPath)
+	if os.IsNotExist(err) {
+		// nothing to clean up
+		return nil
+	}
+
 	if err != nil {
 		return fmt.Errorf("unable to read directory %q: %w", paths.Downloads(), err)
 	}

@@ -8,8 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
@@ -24,10 +25,13 @@ type null struct{}
 // Null is returned when the variable doesn't exist.
 var Null = &null{}
 
+// expVisitor is an antlr visitor that evaluates EQL expressions, looking
+// up variables in those expressions via the configured VarStore.
 type expVisitor struct {
 	antlr.ParseTreeVisitor
-	err  error
-	vars VarStore
+	err              error
+	vars             VarStore
+	allowMissingVars bool
 }
 
 func (v *expVisitor) Visit(tree antlr.ParseTree) interface{} {
@@ -260,6 +264,25 @@ func (v *expVisitor) VisitVariableExp(ctx *parser.VariableExpContext) interface{
 			return resolved
 		}
 	}
+	if !v.allowMissingVars {
+		names := []string{}
+		for _, entry := range ctx.AllVariable() {
+			// Wrap the name in quotes for use in error
+			names = append(names, fmt.Sprintf("%q", entry.GetText()))
+		}
+		// None of the variables could be resolved and allowMissingVars is
+		// false, generate an appropriate error.
+		line := ctx.GetStart().GetLine()
+		column := ctx.GetStart().GetColumn()
+		if len(names) == 1 {
+			v.err = fmt.Errorf("unknown variable at line %v column %v: %v", line, column, names[0])
+		} else {
+			v.err = fmt.Errorf("all variables were unknown at line %v column %v: %v", line, column, strings.Join(names, ", "))
+		}
+	}
+	// Return Null even if allowMissingVars is false -- if we return nil
+	// here it reports a confusing typecheck error instead of propagating
+	// back and returning the variable error we set above.
 	return Null
 }
 

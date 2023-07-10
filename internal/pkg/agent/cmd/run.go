@@ -13,16 +13,18 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
 	"gopkg.in/yaml.v2"
 
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-
 	"github.com/elastic/elastic-agent-libs/api"
+	"github.com/elastic/elastic-agent-libs/logp"
+	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
+
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -34,8 +36,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/server"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -43,30 +45,58 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/server"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/version"
 )
 
 const (
-	agentName = "elastic-agent"
+	agentName            = "elastic-agent"
+	fleetInitTimeoutName = "FLEET_SERVER_INIT_TIMEOUT"
 )
 
 type cfgOverrider func(cfg *configuration.Configuration)
 
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Start the elastic-agent.",
-		Run: func(_ *cobra.Command, _ []string) {
-			if err := run(nil); err != nil && !errors.Is(err, context.Canceled) {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+		Short: "Start the Elastic Agent",
+		Long:  "This command starts the Elastic Agent.",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			// done very early so the encrypted store is never used
+			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
+			if disableEncryptedStore {
+				storage.DisableEncryptionDarwin()
 			}
+			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
+			testingMode, _ := cmd.Flags().GetBool("testing-mode")
+			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+
+				return err
+			}
+			return nil
 		},
 	}
+
+	// --disable-encrypted-store only has meaning on Mac OS, and it disables the encrypted disk store
+	// feature of the Elastic Agent. On Mac OS root privileges are required to perform the disk
+	// store encryption, by setting this flag it disables that feature and allows the Elastic Agent to
+	// run as non-root.
+	cmd.Flags().Bool("disable-encrypted-store", false, "Disable the encrypted disk storage (Only useful on Mac OS)")
+
+	// --testing-mode is a hidden flag that spawns the Elastic Agent in testing mode
+	// it is hidden because we really don't want users to execute Elastic Agent to run
+	// this way, only the integration testing framework runs the Elastic Agent in this mode
+	cmd.Flags().Bool("testing-mode", false, "Run with testing mode enabled")
+
+	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
+	_ = cmd.Flags().MarkHidden("testing-mode")
+
+	return cmd
 }
 
-func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
+func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -74,6 +104,10 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		service.NotifyTermination()
 		service.WaitExecutionDone()
 	}()
+
+	if err := handleUpgrade(); err != nil {
+		return fmt.Errorf("error checking for and handling upgrade: %w", err)
+	}
 
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	if err := locker.TryLock(); err != nil {
@@ -92,22 +126,32 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 	var stopBeat = func() {
 		close(stop)
 	}
-	service.HandleSignals(stopBeat, cancel)
+
+	defer cancel()
+	go service.ProcessWindowsControlEvents(stopBeat)
 
 	cfg, err := loadConfig(override)
 	if err != nil {
 		return err
 	}
 
-	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
+	logLvl := logger.DefaultLogLevel
+	if cfg.Settings.LoggingConfig != nil {
+		logLvl = cfg.Settings.LoggingConfig.Level
+	}
+	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
 	if err != nil {
 		return err
 	}
 
-	cfg, err = tryDelayEnroll(ctx, logger, cfg, override)
+	l := baseLogger.With("log", map[string]interface{}{
+		"source": agentName,
+	})
+
+	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
 		err = errors.New(err, "failed to perform delayed enrollment")
-		logger.Error(err)
+		l.Error(err)
 		return err
 	}
 	pathConfigFile := paths.AgentConfigFile()
@@ -127,7 +171,21 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		return fmt.Errorf("failed to read/write secrets: %w", err)
 	}
 
-	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg), createAgentID)
+	// Migrate .yml files if the corresponding .enc does not exist
+
+	// the encrypted config does not exist but the unencrypted file does
+	err = migration.MigrateToEncryptedConfig(l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
+	if err != nil {
+		return errors.New(err, "error migrating fleet config")
+	}
+
+	// the encrypted state does not exist but the unencrypted file does
+	err = migration.MigrateToEncryptedConfig(l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
+	if err != nil {
+		return errors.New(err, "error migrating agent state")
+	}
+
+	agentInfo, err := info.NewAgentInfoWithLog(defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
 		return errors.New(err,
 			"could not load agent info",
@@ -135,21 +193,33 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 			errors.M(errors.MetaKeyPath, pathConfigFile))
 	}
 
+	// Ensure that the log level now matches what is configured in the agentInfo.
+	if agentInfo.LogLevel() != "" {
+		var lvl logp.Level
+		err = lvl.Unpack(agentInfo.LogLevel())
+		if err != nil {
+			l.Error(errors.New(err, "failed to parse agent information log level"))
+		} else {
+			logLvl = lvl
+			logger.SetLevel(lvl)
+		}
+	}
+
 	// initiate agent watcher
-	if err := upgrade.InvokeWatcher(logger); err != nil {
+	if err := upgrade.InvokeWatcher(l); err != nil {
 		// we should not fail because watcher is not working
-		logger.Error(errors.New(err, "failed to invoke rollback watcher"))
+		l.Error(errors.New(err, "failed to invoke rollback watcher"))
 	}
 
 	if allowEmptyPgp, _ := release.PGP(); allowEmptyPgp {
-		logger.Info("Elastic Agent has been built with security disabled. Elastic Agent will not verify signatures of upgrade artifact.")
+		l.Info("Elastic Agent has been built with security disabled. Elastic Agent will not verify signatures of upgrade artifact.")
 	}
 
 	execPath, err := reexecPath()
 	if err != nil {
 		return err
 	}
-	rexLogger := logger.Named("reexec")
+	rexLogger := l.Named("reexec")
 	rex := reexec.NewManager(rexLogger, execPath)
 
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
@@ -157,21 +227,22 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 		return fmt.Errorf("could not initiate APM tracer: %w", err)
 	}
 	if tracer != nil {
-		logger.Info("APM instrumentation enabled")
+		l.Info("APM instrumentation enabled")
 		defer func() {
 			tracer.Flush(nil)
 			tracer.Close()
 		}()
 	} else {
-		logger.Info("APM instrumentation disabled")
+		l.Info("APM instrumentation disabled")
 	}
 
-	coord, err := application.New(logger, agentInfo, rex, tracer, modifiers...)
+	coord, configMgr, composable, err := application.New(l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return err
 	}
+	defer composable.Close()
 
-	serverStopFn, err := setupMetrics(logger, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	serverStopFn, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return err
 	}
@@ -181,7 +252,16 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
-	control := server.New(logger.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+	control := server.New(l.Named("control"), agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+
+	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
+	// the configuration will come in over the control protocol, so we set the config setting on the control protocol
+	// server so when the configuration comes in it gets passed to the coordinator
+	testingSetter, ok := configMgr.(server.TestModeConfigSetter)
+	if ok {
+		control.SetTestModeConfigSetter(testingSetter)
+	}
+
 	// start the control listener
 	if err := control.Start(); err != nil {
 		return err
@@ -190,6 +270,7 @@ func run(override cfgOverrider, modifiers ...component.PlatformModifier) error {
 
 	appDone := make(chan bool)
 	appErr := make(chan error)
+	// Spawn the main Coordinator goroutine
 	go func() {
 		err := coord.Run(ctx)
 		close(appDone)
@@ -205,15 +286,19 @@ LOOP:
 	for {
 		select {
 		case <-stop:
+			l.Info("service.ProcessWindowsControlEvents invoked stop function. Shutting down")
 			break LOOP
 		case <-appDone:
+			l.Info("application done, coordinator exited")
 			logShutdown = false
 			break LOOP
 		case <-rex.ShutdownChan():
+			l.Info("reexec shutdown channel triggered")
 			isRex = true
 			logShutdown = false
 			break LOOP
 		case sig := <-signals:
+			l.Infof("signal %q received", sig)
 			if sig == syscall.SIGHUP {
 				rexLogger.Infof("SIGHUP triggered re-exec")
 				isRex = true
@@ -225,13 +310,13 @@ LOOP:
 	}
 
 	if logShutdown {
-		logger.Info("Shutting down Elastic Agent and sending last events...")
+		l.Info("Shutting down Elastic Agent and sending last events...")
 	}
 	cancel()
 	err = <-appErr
 
 	if logShutdown {
-		logger.Info("Shutting down completed.")
+		l.Info("Shutting down completed.")
 	}
 	if isRex {
 		rex.ShutdownComplete()
@@ -323,10 +408,10 @@ func getOverwrites(rawConfig *config.Config) error {
 	return nil
 }
 
-func defaultLogLevel(cfg *configuration.Configuration) string {
+func defaultLogLevel(cfg *configuration.Configuration, currentLevel string) string {
 	if configuration.IsStandalone(cfg.Fleet) {
 		// for standalone always take the one from config and don't override
-		return ""
+		return currentLevel
 	}
 
 	defaultLogLevel := logger.DefaultLogLevel.String()
@@ -341,6 +426,7 @@ func defaultLogLevel(cfg *configuration.Configuration) string {
 func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configuration.Configuration, override cfgOverrider) (*configuration.Configuration, error) {
 	enrollPath := paths.AgentEnrollFile()
 	if _, err := os.Stat(enrollPath); err != nil {
+		//nolint:nilerr // ignore the error, this is expected
 		// no enrollment file exists or failed to stat it; nothing to do
 		return cfg, nil
 	}
@@ -477,4 +563,41 @@ func setupMetrics(
 
 func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
 	return cfg != nil && cfg.HTTP.Enabled
+}
+
+// handleUpgrade checks if agent is being run as part of an
+// ongoing upgrade operation, i.e. being re-exec'd and performs
+// any upgrade-specific work, if needed.
+func handleUpgrade() error {
+	upgradeMarker, err := upgrade.LoadMarker()
+	if err != nil {
+		return fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
+	}
+
+	if upgradeMarker == nil {
+		// We're not being upgraded. Nothing more to do.
+		return nil
+	}
+
+	// In v8.8.0, we introduced a new installation marker file to indicate that
+	// an Agent was running as installed. When an installed Agent that's older
+	// than v8.8.0 is upgraded, this installation marker file is not present.
+	// So, in such cases, we need to create it manually post-upgrade.
+	// Otherwise, the upgrade will be unsuccessful (see
+	// https://github.com/elastic/elastic-agent/issues/2645).
+
+	// Only an installed Elastic Agent can be self-upgraded. So, if the
+	// installation marker file is already present, we're all set.
+	if info.RunningInstalled() {
+		return nil
+	}
+
+	// Otherwise, we're being upgraded from a version of an installed Agent
+	// that didn't use an installation marker file (that is, before v8.8.0).
+	// So create the file now.
+	if err := info.CreateInstallMarker(paths.Top()); err != nil {
+		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
+	}
+
+	return nil
 }

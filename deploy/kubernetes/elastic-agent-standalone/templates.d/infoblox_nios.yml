@@ -1,4 +1,21 @@
 inputs:
+    - name: udp-infoblox_nios
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
+          data_stream:
+            dataset: infoblox_nios.log
+            type: logs
+          fields:
+            _conf:
+                tz_offset: local
+          fields_under_root: true
+          host: localhost:9028
+          tags:
+            - forwarded
+            - infoblox_nios-log
+      data_stream.namespace: default
     - name: filestream-infoblox_nios
       type: filestream
       use_output: default
@@ -40,23 +57,6 @@ inputs:
                 tz_offset: local
           fields_under_root: true
           host: localhost:9027
-          tags:
-            - forwarded
-            - infoblox_nios-log
-      data_stream.namespace: default
-    - name: udp-infoblox_nios
-      type: udp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
-          data_stream:
-            dataset: infoblox_nios.log
-            type: logs
-          fields:
-            _conf:
-                tz_offset: local
-          fields_under_root: true
-          host: localhost:9028
           tags:
             - forwarded
             - infoblox_nios-log

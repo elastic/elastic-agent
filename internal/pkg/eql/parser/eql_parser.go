@@ -2,130 +2,151 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// Code generated from Eql.g4 by ANTLR 4.7.1. DO NOT EDIT.
+// Code generated from Eql.g4 by ANTLR 4.12.0. DO NOT EDIT.
 
 package parser // Eql
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
+	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import errors
 var _ = fmt.Printf
-var _ = reflect.Copy
 var _ = strconv.Itoa
-
-var parserATN = []uint16{
-	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 35, 144,
-	4, 2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 4, 5, 9, 5, 4, 6, 9, 6, 4, 7, 9, 7,
-	4, 8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 4, 11, 9, 11, 3, 2, 3, 2, 3, 2, 3,
-	3, 3, 3, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 5, 4, 33, 10, 4, 3, 5, 3, 5, 3,
-	5, 5, 5, 38, 10, 5, 3, 6, 3, 6, 3, 6, 7, 6, 43, 10, 6, 12, 6, 14, 6, 46,
-	11, 6, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7,
-	3, 7, 3, 7, 3, 7, 3, 7, 5, 7, 63, 10, 7, 3, 7, 3, 7, 3, 7, 5, 7, 68, 10,
-	7, 3, 7, 3, 7, 3, 7, 5, 7, 73, 10, 7, 3, 7, 3, 7, 3, 7, 3, 7, 5, 7, 79,
-	10, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7,
-	3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7,
-	3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 7, 7, 111, 10, 7, 12, 7, 14,
-	7, 114, 11, 7, 3, 8, 3, 8, 3, 8, 7, 8, 119, 10, 8, 12, 8, 14, 8, 122, 11,
-	8, 3, 9, 3, 9, 3, 9, 7, 9, 127, 10, 9, 12, 9, 14, 9, 130, 11, 9, 3, 10,
-	3, 10, 3, 10, 3, 10, 3, 11, 3, 11, 3, 11, 7, 11, 139, 10, 11, 12, 11, 14,
-	11, 142, 11, 11, 3, 11, 2, 3, 12, 12, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
-	2, 7, 3, 2, 19, 20, 3, 2, 27, 28, 3, 2, 14, 16, 3, 2, 12, 13, 4, 2, 25,
-	25, 27, 28, 2, 165, 2, 22, 3, 2, 2, 2, 4, 25, 3, 2, 2, 2, 6, 32, 3, 2,
-	2, 2, 8, 37, 3, 2, 2, 2, 10, 39, 3, 2, 2, 2, 12, 78, 3, 2, 2, 2, 14, 115,
-	3, 2, 2, 2, 16, 123, 3, 2, 2, 2, 18, 131, 3, 2, 2, 2, 20, 135, 3, 2, 2,
-	2, 22, 23, 5, 12, 7, 2, 23, 24, 7, 2, 2, 3, 24, 3, 3, 2, 2, 2, 25, 26,
-	9, 2, 2, 2, 26, 5, 3, 2, 2, 2, 27, 33, 7, 27, 2, 2, 28, 33, 7, 28, 2, 2,
-	29, 33, 7, 21, 2, 2, 30, 33, 7, 22, 2, 2, 31, 33, 5, 4, 3, 2, 32, 27, 3,
-	2, 2, 2, 32, 28, 3, 2, 2, 2, 32, 29, 3, 2, 2, 2, 32, 30, 3, 2, 2, 2, 32,
-	31, 3, 2, 2, 2, 33, 7, 3, 2, 2, 2, 34, 38, 7, 25, 2, 2, 35, 38, 7, 26,
-	2, 2, 36, 38, 5, 6, 4, 2, 37, 34, 3, 2, 2, 2, 37, 35, 3, 2, 2, 2, 37, 36,
-	3, 2, 2, 2, 38, 9, 3, 2, 2, 2, 39, 44, 5, 8, 5, 2, 40, 41, 7, 3, 2, 2,
-	41, 43, 5, 8, 5, 2, 42, 40, 3, 2, 2, 2, 43, 46, 3, 2, 2, 2, 44, 42, 3,
-	2, 2, 2, 44, 45, 3, 2, 2, 2, 45, 11, 3, 2, 2, 2, 46, 44, 3, 2, 2, 2, 47,
-	48, 8, 7, 1, 2, 48, 49, 7, 29, 2, 2, 49, 50, 5, 12, 7, 2, 50, 51, 7, 30,
-	2, 2, 51, 79, 3, 2, 2, 2, 52, 53, 7, 24, 2, 2, 53, 79, 5, 12, 7, 19, 54,
-	79, 5, 4, 3, 2, 55, 56, 7, 35, 2, 2, 56, 57, 5, 10, 6, 2, 57, 58, 7, 34,
-	2, 2, 58, 79, 3, 2, 2, 2, 59, 60, 7, 25, 2, 2, 60, 62, 7, 29, 2, 2, 61,
-	63, 5, 14, 8, 2, 62, 61, 3, 2, 2, 2, 62, 63, 3, 2, 2, 2, 63, 64, 3, 2,
-	2, 2, 64, 79, 7, 30, 2, 2, 65, 67, 7, 31, 2, 2, 66, 68, 5, 16, 9, 2, 67,
-	66, 3, 2, 2, 2, 67, 68, 3, 2, 2, 2, 68, 69, 3, 2, 2, 2, 69, 79, 7, 32,
-	2, 2, 70, 72, 7, 33, 2, 2, 71, 73, 5, 20, 11, 2, 72, 71, 3, 2, 2, 2, 72,
-	73, 3, 2, 2, 2, 73, 74, 3, 2, 2, 2, 74, 79, 7, 34, 2, 2, 75, 79, 9, 3,
-	2, 2, 76, 79, 7, 21, 2, 2, 77, 79, 7, 22, 2, 2, 78, 47, 3, 2, 2, 2, 78,
-	52, 3, 2, 2, 2, 78, 54, 3, 2, 2, 2, 78, 55, 3, 2, 2, 2, 78, 59, 3, 2, 2,
-	2, 78, 65, 3, 2, 2, 2, 78, 70, 3, 2, 2, 2, 78, 75, 3, 2, 2, 2, 78, 76,
-	3, 2, 2, 2, 78, 77, 3, 2, 2, 2, 79, 112, 3, 2, 2, 2, 80, 81, 12, 21, 2,
-	2, 81, 82, 9, 4, 2, 2, 82, 111, 5, 12, 7, 22, 83, 84, 12, 20, 2, 2, 84,
-	85, 9, 5, 2, 2, 85, 111, 5, 12, 7, 21, 86, 87, 12, 18, 2, 2, 87, 88, 7,
-	6, 2, 2, 88, 111, 5, 12, 7, 19, 89, 90, 12, 17, 2, 2, 90, 91, 7, 7, 2,
-	2, 91, 111, 5, 12, 7, 18, 92, 93, 12, 16, 2, 2, 93, 94, 7, 11, 2, 2, 94,
-	111, 5, 12, 7, 17, 95, 96, 12, 15, 2, 2, 96, 97, 7, 10, 2, 2, 97, 111,
-	5, 12, 7, 16, 98, 99, 12, 14, 2, 2, 99, 100, 7, 9, 2, 2, 100, 111, 5, 12,
-	7, 15, 101, 102, 12, 13, 2, 2, 102, 103, 7, 8, 2, 2, 103, 111, 5, 12, 7,
-	14, 104, 105, 12, 12, 2, 2, 105, 106, 7, 17, 2, 2, 106, 111, 5, 12, 7,
-	13, 107, 108, 12, 11, 2, 2, 108, 109, 7, 18, 2, 2, 109, 111, 5, 12, 7,
-	12, 110, 80, 3, 2, 2, 2, 110, 83, 3, 2, 2, 2, 110, 86, 3, 2, 2, 2, 110,
-	89, 3, 2, 2, 2, 110, 92, 3, 2, 2, 2, 110, 95, 3, 2, 2, 2, 110, 98, 3, 2,
-	2, 2, 110, 101, 3, 2, 2, 2, 110, 104, 3, 2, 2, 2, 110, 107, 3, 2, 2, 2,
-	111, 114, 3, 2, 2, 2, 112, 110, 3, 2, 2, 2, 112, 113, 3, 2, 2, 2, 113,
-	13, 3, 2, 2, 2, 114, 112, 3, 2, 2, 2, 115, 120, 5, 12, 7, 2, 116, 117,
-	7, 4, 2, 2, 117, 119, 5, 12, 7, 2, 118, 116, 3, 2, 2, 2, 119, 122, 3, 2,
-	2, 2, 120, 118, 3, 2, 2, 2, 120, 121, 3, 2, 2, 2, 121, 15, 3, 2, 2, 2,
-	122, 120, 3, 2, 2, 2, 123, 128, 5, 6, 4, 2, 124, 125, 7, 4, 2, 2, 125,
-	127, 5, 6, 4, 2, 126, 124, 3, 2, 2, 2, 127, 130, 3, 2, 2, 2, 128, 126,
-	3, 2, 2, 2, 128, 129, 3, 2, 2, 2, 129, 17, 3, 2, 2, 2, 130, 128, 3, 2,
-	2, 2, 131, 132, 9, 6, 2, 2, 132, 133, 7, 5, 2, 2, 133, 134, 5, 6, 4, 2,
-	134, 19, 3, 2, 2, 2, 135, 140, 5, 18, 10, 2, 136, 137, 7, 4, 2, 2, 137,
-	139, 5, 18, 10, 2, 138, 136, 3, 2, 2, 2, 139, 142, 3, 2, 2, 2, 140, 138,
-	3, 2, 2, 2, 140, 141, 3, 2, 2, 2, 141, 21, 3, 2, 2, 2, 142, 140, 3, 2,
-	2, 2, 14, 32, 37, 44, 62, 67, 72, 78, 110, 112, 120, 128, 140,
-}
-var deserializer = antlr.NewATNDeserializer(nil)
-var deserializedATN = deserializer.DeserializeFromUInt16(parserATN)
-
-var literalNames = []string{
-	"", "'|'", "','", "':'", "'=='", "'!='", "'>'", "'<'", "'>='", "'<='",
-	"'+'", "'-'", "'*'", "'/'", "'%'", "", "", "", "", "", "", "", "", "",
-	"", "", "", "'('", "')'", "'['", "']'", "'{'", "'}'", "'${'",
-}
-var symbolicNames = []string{
-	"", "", "", "", "EQ", "NEQ", "GT", "LT", "GTE", "LTE", "ADD", "SUB", "MUL",
-	"DIV", "MOD", "AND", "OR", "TRUE", "FALSE", "FLOAT", "NUMBER", "WHITESPACE",
-	"NOT", "NAME", "VNAME", "STEXT", "DTEXT", "LPAR", "RPAR", "LARR", "RARR",
-	"LDICT", "RDICT", "BEGIN_VARIABLE",
-}
-
-var ruleNames = []string{
-	"expList", "boolean", "constant", "variable", "variableExp", "exp", "arguments",
-	"array", "key", "dict",
-}
-var decisionToDFA = make([]*antlr.DFA, len(deserializedATN.DecisionToState))
-
-func init() {
-	for index, ds := range deserializedATN.DecisionToState {
-		decisionToDFA[index] = antlr.NewDFA(ds, index)
-	}
-}
+var _ = sync.Once{}
 
 type EqlParser struct {
 	*antlr.BaseParser
 }
 
+var eqlParserStaticData struct {
+	once                   sync.Once
+	serializedATN          []int32
+	literalNames           []string
+	symbolicNames          []string
+	ruleNames              []string
+	predictionContextCache *antlr.PredictionContextCache
+	atn                    *antlr.ATN
+	decisionToDFA          []*antlr.DFA
+}
+
+func eqlParserInit() {
+	staticData := &eqlParserStaticData
+	staticData.literalNames = []string{
+		"", "'|'", "','", "':'", "'=='", "'!='", "'>'", "'<'", "'>='", "'<='",
+		"'+'", "'-'", "'*'", "'/'", "'%'", "", "", "", "", "", "", "", "", "",
+		"", "", "", "'('", "')'", "'['", "']'", "'{'", "'}'", "'${'",
+	}
+	staticData.symbolicNames = []string{
+		"", "", "", "", "EQ", "NEQ", "GT", "LT", "GTE", "LTE", "ADD", "SUB",
+		"MUL", "DIV", "MOD", "AND", "OR", "TRUE", "FALSE", "FLOAT", "NUMBER",
+		"WHITESPACE", "NOT", "NAME", "VNAME", "STEXT", "DTEXT", "LPAR", "RPAR",
+		"LARR", "RARR", "LDICT", "RDICT", "BEGIN_VARIABLE",
+	}
+	staticData.ruleNames = []string{
+		"expList", "boolean", "constant", "variable", "variableExp", "exp",
+		"arguments", "array", "key", "dict",
+	}
+	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.serializedATN = []int32{
+		4, 1, 33, 142, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 1, 0, 1,
+		0, 1, 0, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 3, 2, 31, 8, 2, 1, 3,
+		1, 3, 1, 3, 3, 3, 36, 8, 3, 1, 4, 1, 4, 1, 4, 5, 4, 41, 8, 4, 10, 4, 12,
+		4, 44, 9, 4, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5,
+		1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 3, 5, 61, 8, 5, 1, 5, 1, 5, 1, 5, 3, 5, 66,
+		8, 5, 1, 5, 1, 5, 1, 5, 3, 5, 71, 8, 5, 1, 5, 1, 5, 1, 5, 1, 5, 3, 5, 77,
+		8, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5,
+		1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5,
+		1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 5, 5, 109, 8, 5, 10, 5, 12, 5,
+		112, 9, 5, 1, 6, 1, 6, 1, 6, 5, 6, 117, 8, 6, 10, 6, 12, 6, 120, 9, 6,
+		1, 7, 1, 7, 1, 7, 5, 7, 125, 8, 7, 10, 7, 12, 7, 128, 9, 7, 1, 8, 1, 8,
+		1, 8, 1, 8, 1, 9, 1, 9, 1, 9, 5, 9, 137, 8, 9, 10, 9, 12, 9, 140, 9, 9,
+		1, 9, 0, 1, 10, 10, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 0, 5, 1, 0, 17,
+		18, 1, 0, 25, 26, 1, 0, 12, 14, 1, 0, 10, 11, 2, 0, 23, 23, 25, 26, 163,
+		0, 20, 1, 0, 0, 0, 2, 23, 1, 0, 0, 0, 4, 30, 1, 0, 0, 0, 6, 35, 1, 0, 0,
+		0, 8, 37, 1, 0, 0, 0, 10, 76, 1, 0, 0, 0, 12, 113, 1, 0, 0, 0, 14, 121,
+		1, 0, 0, 0, 16, 129, 1, 0, 0, 0, 18, 133, 1, 0, 0, 0, 20, 21, 3, 10, 5,
+		0, 21, 22, 5, 0, 0, 1, 22, 1, 1, 0, 0, 0, 23, 24, 7, 0, 0, 0, 24, 3, 1,
+		0, 0, 0, 25, 31, 5, 25, 0, 0, 26, 31, 5, 26, 0, 0, 27, 31, 5, 19, 0, 0,
+		28, 31, 5, 20, 0, 0, 29, 31, 3, 2, 1, 0, 30, 25, 1, 0, 0, 0, 30, 26, 1,
+		0, 0, 0, 30, 27, 1, 0, 0, 0, 30, 28, 1, 0, 0, 0, 30, 29, 1, 0, 0, 0, 31,
+		5, 1, 0, 0, 0, 32, 36, 5, 23, 0, 0, 33, 36, 5, 24, 0, 0, 34, 36, 3, 4,
+		2, 0, 35, 32, 1, 0, 0, 0, 35, 33, 1, 0, 0, 0, 35, 34, 1, 0, 0, 0, 36, 7,
+		1, 0, 0, 0, 37, 42, 3, 6, 3, 0, 38, 39, 5, 1, 0, 0, 39, 41, 3, 6, 3, 0,
+		40, 38, 1, 0, 0, 0, 41, 44, 1, 0, 0, 0, 42, 40, 1, 0, 0, 0, 42, 43, 1,
+		0, 0, 0, 43, 9, 1, 0, 0, 0, 44, 42, 1, 0, 0, 0, 45, 46, 6, 5, -1, 0, 46,
+		47, 5, 27, 0, 0, 47, 48, 3, 10, 5, 0, 48, 49, 5, 28, 0, 0, 49, 77, 1, 0,
+		0, 0, 50, 51, 5, 22, 0, 0, 51, 77, 3, 10, 5, 17, 52, 77, 3, 2, 1, 0, 53,
+		54, 5, 33, 0, 0, 54, 55, 3, 8, 4, 0, 55, 56, 5, 32, 0, 0, 56, 77, 1, 0,
+		0, 0, 57, 58, 5, 23, 0, 0, 58, 60, 5, 27, 0, 0, 59, 61, 3, 12, 6, 0, 60,
+		59, 1, 0, 0, 0, 60, 61, 1, 0, 0, 0, 61, 62, 1, 0, 0, 0, 62, 77, 5, 28,
+		0, 0, 63, 65, 5, 29, 0, 0, 64, 66, 3, 14, 7, 0, 65, 64, 1, 0, 0, 0, 65,
+		66, 1, 0, 0, 0, 66, 67, 1, 0, 0, 0, 67, 77, 5, 30, 0, 0, 68, 70, 5, 31,
+		0, 0, 69, 71, 3, 18, 9, 0, 70, 69, 1, 0, 0, 0, 70, 71, 1, 0, 0, 0, 71,
+		72, 1, 0, 0, 0, 72, 77, 5, 32, 0, 0, 73, 77, 7, 1, 0, 0, 74, 77, 5, 19,
+		0, 0, 75, 77, 5, 20, 0, 0, 76, 45, 1, 0, 0, 0, 76, 50, 1, 0, 0, 0, 76,
+		52, 1, 0, 0, 0, 76, 53, 1, 0, 0, 0, 76, 57, 1, 0, 0, 0, 76, 63, 1, 0, 0,
+		0, 76, 68, 1, 0, 0, 0, 76, 73, 1, 0, 0, 0, 76, 74, 1, 0, 0, 0, 76, 75,
+		1, 0, 0, 0, 77, 110, 1, 0, 0, 0, 78, 79, 10, 19, 0, 0, 79, 80, 7, 2, 0,
+		0, 80, 109, 3, 10, 5, 20, 81, 82, 10, 18, 0, 0, 82, 83, 7, 3, 0, 0, 83,
+		109, 3, 10, 5, 19, 84, 85, 10, 16, 0, 0, 85, 86, 5, 4, 0, 0, 86, 109, 3,
+		10, 5, 17, 87, 88, 10, 15, 0, 0, 88, 89, 5, 5, 0, 0, 89, 109, 3, 10, 5,
+		16, 90, 91, 10, 14, 0, 0, 91, 92, 5, 9, 0, 0, 92, 109, 3, 10, 5, 15, 93,
+		94, 10, 13, 0, 0, 94, 95, 5, 8, 0, 0, 95, 109, 3, 10, 5, 14, 96, 97, 10,
+		12, 0, 0, 97, 98, 5, 7, 0, 0, 98, 109, 3, 10, 5, 13, 99, 100, 10, 11, 0,
+		0, 100, 101, 5, 6, 0, 0, 101, 109, 3, 10, 5, 12, 102, 103, 10, 10, 0, 0,
+		103, 104, 5, 15, 0, 0, 104, 109, 3, 10, 5, 11, 105, 106, 10, 9, 0, 0, 106,
+		107, 5, 16, 0, 0, 107, 109, 3, 10, 5, 10, 108, 78, 1, 0, 0, 0, 108, 81,
+		1, 0, 0, 0, 108, 84, 1, 0, 0, 0, 108, 87, 1, 0, 0, 0, 108, 90, 1, 0, 0,
+		0, 108, 93, 1, 0, 0, 0, 108, 96, 1, 0, 0, 0, 108, 99, 1, 0, 0, 0, 108,
+		102, 1, 0, 0, 0, 108, 105, 1, 0, 0, 0, 109, 112, 1, 0, 0, 0, 110, 108,
+		1, 0, 0, 0, 110, 111, 1, 0, 0, 0, 111, 11, 1, 0, 0, 0, 112, 110, 1, 0,
+		0, 0, 113, 118, 3, 10, 5, 0, 114, 115, 5, 2, 0, 0, 115, 117, 3, 10, 5,
+		0, 116, 114, 1, 0, 0, 0, 117, 120, 1, 0, 0, 0, 118, 116, 1, 0, 0, 0, 118,
+		119, 1, 0, 0, 0, 119, 13, 1, 0, 0, 0, 120, 118, 1, 0, 0, 0, 121, 126, 3,
+		4, 2, 0, 122, 123, 5, 2, 0, 0, 123, 125, 3, 4, 2, 0, 124, 122, 1, 0, 0,
+		0, 125, 128, 1, 0, 0, 0, 126, 124, 1, 0, 0, 0, 126, 127, 1, 0, 0, 0, 127,
+		15, 1, 0, 0, 0, 128, 126, 1, 0, 0, 0, 129, 130, 7, 4, 0, 0, 130, 131, 5,
+		3, 0, 0, 131, 132, 3, 4, 2, 0, 132, 17, 1, 0, 0, 0, 133, 138, 3, 16, 8,
+		0, 134, 135, 5, 2, 0, 0, 135, 137, 3, 16, 8, 0, 136, 134, 1, 0, 0, 0, 137,
+		140, 1, 0, 0, 0, 138, 136, 1, 0, 0, 0, 138, 139, 1, 0, 0, 0, 139, 19, 1,
+		0, 0, 0, 140, 138, 1, 0, 0, 0, 12, 30, 35, 42, 60, 65, 70, 76, 108, 110,
+		118, 126, 138,
+	}
+	deserializer := antlr.NewATNDeserializer(nil)
+	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
+	atn := staticData.atn
+	staticData.decisionToDFA = make([]*antlr.DFA, len(atn.DecisionToState))
+	decisionToDFA := staticData.decisionToDFA
+	for index, state := range atn.DecisionToState {
+		decisionToDFA[index] = antlr.NewDFA(state, index)
+	}
+}
+
+// EqlParserInit initializes any static state used to implement EqlParser. By default the
+// static state used to implement the parser is lazily initialized during the first call to
+// NewEqlParser(). You can call this function if you wish to initialize the static state ahead
+// of time.
+func EqlParserInit() {
+	staticData := &eqlParserStaticData
+	staticData.once.Do(eqlParserInit)
+}
+
+// NewEqlParser produces a new parser instance for the optional input antlr.TokenStream.
 func NewEqlParser(input antlr.TokenStream) *EqlParser {
+	EqlParserInit()
 	this := new(EqlParser)
-
 	this.BaseParser = antlr.NewBaseParser(input)
-
-	this.Interpreter = antlr.NewParserATNSimulator(this, deserializedATN, decisionToDFA, antlr.NewPredictionContextCache())
-	this.RuleNames = ruleNames
-	this.LiteralNames = literalNames
-	this.SymbolicNames = symbolicNames
+	staticData := &eqlParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
+	this.RuleNames = staticData.ruleNames
+	this.LiteralNames = staticData.literalNames
+	this.SymbolicNames = staticData.symbolicNames
 	this.GrammarFileName = "Eql.g4"
 
 	return this
@@ -190,6 +211,10 @@ type IExpListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Exp() IExpContext
+	EOF() antlr.TerminalNode
+
 	// IsExpListContext differentiates from other interfaces.
 	IsExpListContext()
 }
@@ -222,7 +247,13 @@ func NewExpListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 func (s *ExpListContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ExpListContext) Exp() IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -266,6 +297,9 @@ func (s *ExpListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) ExpList() (localctx IExpListContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, EqlParserRULE_expList)
 
@@ -304,6 +338,10 @@ type IBooleanContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
+
+	// Getter signatures
+	TRUE() antlr.TerminalNode
+	FALSE() antlr.TerminalNode
 
 	// IsBooleanContext differentiates from other interfaces.
 	IsBooleanContext()
@@ -375,6 +413,9 @@ func (s *BooleanContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Boolean() (localctx IBooleanContext) {
+	this := p
+	_ = this
+
 	localctx = NewBooleanContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, EqlParserRULE_boolean)
 	var _la int
@@ -417,6 +458,13 @@ type IConstantContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
+
+	// Getter signatures
+	STEXT() antlr.TerminalNode
+	DTEXT() antlr.TerminalNode
+	FLOAT() antlr.TerminalNode
+	NUMBER() antlr.TerminalNode
+	Boolean() IBooleanContext
 
 	// IsConstantContext differentiates from other interfaces.
 	IsConstantContext()
@@ -466,7 +514,13 @@ func (s *ConstantContext) NUMBER() antlr.TerminalNode {
 }
 
 func (s *ConstantContext) Boolean() IBooleanContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IBooleanContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IBooleanContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -506,6 +560,9 @@ func (s *ConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Constant() (localctx IConstantContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, EqlParserRULE_constant)
 
@@ -578,6 +635,11 @@ type IVariableContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NAME() antlr.TerminalNode
+	VNAME() antlr.TerminalNode
+	Constant() IConstantContext
+
 	// IsVariableContext differentiates from other interfaces.
 	IsVariableContext()
 }
@@ -618,7 +680,13 @@ func (s *VariableContext) VNAME() antlr.TerminalNode {
 }
 
 func (s *VariableContext) Constant() IConstantContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IConstantContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IConstantContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -658,6 +726,9 @@ func (s *VariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Variable() (localctx IVariableContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, EqlParserRULE_variable)
 
@@ -716,6 +787,10 @@ type IVariableExpContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllVariable() []IVariableContext
+	Variable(i int) IVariableContext
+
 	// IsVariableExpContext differentiates from other interfaces.
 	IsVariableExpContext()
 }
@@ -748,12 +823,20 @@ func NewVariableExpContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 func (s *VariableExpContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *VariableExpContext) AllVariable() []IVariableContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IVariableContext)(nil)).Elem())
-	var tst = make([]IVariableContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IVariableContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IVariableContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IVariableContext); ok {
 			tst[i] = t.(IVariableContext)
+			i++
 		}
 	}
 
@@ -761,7 +844,17 @@ func (s *VariableExpContext) AllVariable() []IVariableContext {
 }
 
 func (s *VariableExpContext) Variable(i int) IVariableContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IVariableContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IVariableContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -801,6 +894,9 @@ func (s *VariableExpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *EqlParser) VariableExp() (localctx IVariableExpContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableExpContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, EqlParserRULE_variableExp)
 	var _la int
@@ -854,7 +950,6 @@ type IExpContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsExpContext differentiates from other interfaces.
 	IsExpContext()
 }
@@ -931,12 +1026,20 @@ func (s *ExpArithmeticNEQContext) NEQ() antlr.TerminalNode {
 }
 
 func (s *ExpArithmeticNEQContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -944,7 +1047,17 @@ func (s *ExpArithmeticNEQContext) AllExp() []IExpContext {
 }
 
 func (s *ExpArithmeticNEQContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1008,12 +1121,20 @@ func (s *ExpArithmeticEQContext) EQ() antlr.TerminalNode {
 }
 
 func (s *ExpArithmeticEQContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -1021,7 +1142,17 @@ func (s *ExpArithmeticEQContext) AllExp() []IExpContext {
 }
 
 func (s *ExpArithmeticEQContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1085,12 +1216,20 @@ func (s *ExpArithmeticGTEContext) GTE() antlr.TerminalNode {
 }
 
 func (s *ExpArithmeticGTEContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -1098,7 +1237,17 @@ func (s *ExpArithmeticGTEContext) AllExp() []IExpContext {
 }
 
 func (s *ExpArithmeticGTEContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1162,12 +1311,20 @@ func (s *ExpArithmeticLTEContext) LTE() antlr.TerminalNode {
 }
 
 func (s *ExpArithmeticLTEContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -1175,7 +1332,17 @@ func (s *ExpArithmeticLTEContext) AllExp() []IExpContext {
 }
 
 func (s *ExpArithmeticLTEContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1239,12 +1406,20 @@ func (s *ExpArithmeticGTContext) GT() antlr.TerminalNode {
 }
 
 func (s *ExpArithmeticGTContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -1252,7 +1427,17 @@ func (s *ExpArithmeticGTContext) AllExp() []IExpContext {
 }
 
 func (s *ExpArithmeticGTContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1312,12 +1497,20 @@ func (s *ExpArithmeticMulDivModContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *ExpArithmeticMulDivModContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -1325,7 +1518,17 @@ func (s *ExpArithmeticMulDivModContext) AllExp() []IExpContext {
 }
 
 func (s *ExpArithmeticMulDivModContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1395,7 +1598,13 @@ func (s *ExpDictContext) RDICT() antlr.TerminalNode {
 }
 
 func (s *ExpDictContext) Dict() IDictContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IDictContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IDictContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1551,12 +1760,20 @@ func (s *ExpLogicalAndContext) AND() antlr.TerminalNode {
 }
 
 func (s *ExpLogicalAndContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -1564,7 +1781,17 @@ func (s *ExpLogicalAndContext) AllExp() []IExpContext {
 }
 
 func (s *ExpLogicalAndContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1628,12 +1855,20 @@ func (s *ExpLogicalORContext) OR() antlr.TerminalNode {
 }
 
 func (s *ExpLogicalORContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -1641,7 +1876,17 @@ func (s *ExpLogicalORContext) AllExp() []IExpContext {
 }
 
 func (s *ExpLogicalORContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1739,7 +1984,13 @@ func (s *ExpVariableContext) BEGIN_VARIABLE() antlr.TerminalNode {
 }
 
 func (s *ExpVariableContext) VariableExp() IVariableExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IVariableExpContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IVariableExpContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1801,7 +2052,13 @@ func (s *ExpArrayContext) RARR() antlr.TerminalNode {
 }
 
 func (s *ExpArrayContext) Array() IArrayContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IArrayContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IArrayContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1855,7 +2112,13 @@ func (s *ExpNotContext) NOT() antlr.TerminalNode {
 }
 
 func (s *ExpNotContext) Exp() IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1909,7 +2172,13 @@ func (s *ExpInParenContext) LPAR() antlr.TerminalNode {
 }
 
 func (s *ExpInParenContext) Exp() IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -1963,7 +2232,13 @@ func (s *ExpBooleanContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *ExpBooleanContext) Boolean() IBooleanContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IBooleanContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IBooleanContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -2023,12 +2298,20 @@ func (s *ExpArithmeticAddSubContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *ExpArithmeticAddSubContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -2036,7 +2319,17 @@ func (s *ExpArithmeticAddSubContext) AllExp() []IExpContext {
 }
 
 func (s *ExpArithmeticAddSubContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -2106,7 +2399,13 @@ func (s *ExpFunctionContext) RPAR() antlr.TerminalNode {
 }
 
 func (s *ExpFunctionContext) Arguments() IArgumentsContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IArgumentsContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IArgumentsContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -2170,12 +2469,20 @@ func (s *ExpArithmeticLTContext) LT() antlr.TerminalNode {
 }
 
 func (s *ExpArithmeticLTContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -2183,7 +2490,17 @@ func (s *ExpArithmeticLTContext) AllExp() []IExpContext {
 }
 
 func (s *ExpArithmeticLTContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -2219,6 +2536,9 @@ func (p *EqlParser) Exp() (localctx IExpContext) {
 }
 
 func (p *EqlParser) exp(_p int) (localctx IExpContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewExpContext(p, p.GetParserRuleContext(), _parentState)
@@ -2324,7 +2644,7 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if ((_la-17)&-(0x1f+1)) == 0 && ((1<<uint((_la-17)))&((1<<(EqlParserTRUE-17))|(1<<(EqlParserFALSE-17))|(1<<(EqlParserFLOAT-17))|(1<<(EqlParserNUMBER-17))|(1<<(EqlParserNOT-17))|(1<<(EqlParserNAME-17))|(1<<(EqlParserSTEXT-17))|(1<<(EqlParserDTEXT-17))|(1<<(EqlParserLPAR-17))|(1<<(EqlParserLARR-17))|(1<<(EqlParserLDICT-17))|(1<<(EqlParserBEGIN_VARIABLE-17)))) != 0 {
+		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&11523719168) != 0 {
 			{
 				p.SetState(59)
 				p.Arguments()
@@ -2348,7 +2668,7 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if ((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<EqlParserTRUE)|(1<<EqlParserFALSE)|(1<<EqlParserFLOAT)|(1<<EqlParserNUMBER)|(1<<EqlParserSTEXT)|(1<<EqlParserDTEXT))) != 0 {
+		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&102629376) != 0 {
 			{
 				p.SetState(64)
 				p.Array()
@@ -2372,7 +2692,7 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if ((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<EqlParserNAME)|(1<<EqlParserSTEXT)|(1<<EqlParserDTEXT))) != 0 {
+		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&109051904) != 0 {
 			{
 				p.SetState(69)
 				p.Dict()
@@ -2449,7 +2769,7 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 					p.SetState(79)
 					_la = p.GetTokenStream().LA(1)
 
-					if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<EqlParserMUL)|(1<<EqlParserDIV)|(1<<EqlParserMOD))) != 0) {
+					if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&28672) != 0) {
 						p.GetErrorHandler().RecoverInline(p)
 					} else {
 						p.GetErrorHandler().ReportMatch(p)
@@ -2687,6 +3007,10 @@ type IArgumentsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllExp() []IExpContext
+	Exp(i int) IExpContext
+
 	// IsArgumentsContext differentiates from other interfaces.
 	IsArgumentsContext()
 }
@@ -2719,12 +3043,20 @@ func NewArgumentsContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 func (s *ArgumentsContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ArgumentsContext) AllExp() []IExpContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExpContext)(nil)).Elem())
-	var tst = make([]IExpContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IExpContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpContext); ok {
 			tst[i] = t.(IExpContext)
+			i++
 		}
 	}
 
@@ -2732,7 +3064,17 @@ func (s *ArgumentsContext) AllExp() []IExpContext {
 }
 
 func (s *ArgumentsContext) Exp(i int) IExpContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -2772,6 +3114,9 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Arguments() (localctx IArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, EqlParserRULE_arguments)
 	var _la int
@@ -2826,6 +3171,10 @@ type IArrayContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllConstant() []IConstantContext
+	Constant(i int) IConstantContext
+
 	// IsArrayContext differentiates from other interfaces.
 	IsArrayContext()
 }
@@ -2858,12 +3207,20 @@ func NewArrayContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoki
 func (s *ArrayContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ArrayContext) AllConstant() []IConstantContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IConstantContext)(nil)).Elem())
-	var tst = make([]IConstantContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IConstantContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IConstantContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IConstantContext); ok {
 			tst[i] = t.(IConstantContext)
+			i++
 		}
 	}
 
@@ -2871,7 +3228,17 @@ func (s *ArrayContext) AllConstant() []IConstantContext {
 }
 
 func (s *ArrayContext) Constant(i int) IConstantContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IConstantContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IConstantContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -2911,6 +3278,9 @@ func (s *ArrayContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Array() (localctx IArrayContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, EqlParserRULE_array)
 	var _la int
@@ -2965,6 +3335,12 @@ type IKeyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Constant() IConstantContext
+	NAME() antlr.TerminalNode
+	STEXT() antlr.TerminalNode
+	DTEXT() antlr.TerminalNode
+
 	// IsKeyContext differentiates from other interfaces.
 	IsKeyContext()
 }
@@ -2997,7 +3373,13 @@ func NewKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoking
 func (s *KeyContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *KeyContext) Constant() IConstantContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IConstantContext)(nil)).Elem(), 0)
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IConstantContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -3049,6 +3431,9 @@ func (s *KeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Key() (localctx IKeyContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, EqlParserRULE_key)
 	var _la int
@@ -3074,7 +3459,7 @@ func (p *EqlParser) Key() (localctx IKeyContext) {
 		p.SetState(129)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<EqlParserNAME)|(1<<EqlParserSTEXT)|(1<<EqlParserDTEXT))) != 0) {
+		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&109051904) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -3099,6 +3484,10 @@ type IDictContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
+
+	// Getter signatures
+	AllKey() []IKeyContext
+	Key(i int) IKeyContext
 
 	// IsDictContext differentiates from other interfaces.
 	IsDictContext()
@@ -3132,12 +3521,20 @@ func NewDictContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokin
 func (s *DictContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *DictContext) AllKey() []IKeyContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IKeyContext)(nil)).Elem())
-	var tst = make([]IKeyContext, len(ts))
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IKeyContext); ok {
+			len++
+		}
+	}
 
-	for i, t := range ts {
-		if t != nil {
+	tst := make([]IKeyContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IKeyContext); ok {
 			tst[i] = t.(IKeyContext)
+			i++
 		}
 	}
 
@@ -3145,7 +3542,17 @@ func (s *DictContext) AllKey() []IKeyContext {
 }
 
 func (s *DictContext) Key(i int) IKeyContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IKeyContext)(nil)).Elem(), i)
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IKeyContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
 
 	if t == nil {
 		return nil
@@ -3185,6 +3592,9 @@ func (s *DictContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Dict() (localctx IDictContext) {
+	this := p
+	_ = this
+
 	localctx = NewDictContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, EqlParserRULE_dict)
 	var _la int
@@ -3247,6 +3657,9 @@ func (p *EqlParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int
 }
 
 func (p *EqlParser) Exp_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 19)

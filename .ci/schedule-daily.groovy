@@ -39,7 +39,8 @@ def runBuilds(Map args = [:]) {
           job: "elastic-agent/elastic-agent-mbp/${branch}",
           parameters: [
             booleanParam(name: 'integration_tests_ci', value: true),
-            booleanParam(name: 'end_to_end_tests_ci', value: true)
+            // Disable running e2e until we fix the 2e2 testing suite
+            booleanParam(name: 'end_to_end_tests_ci', value: false)
           ],
           wait: false, propagate: false)
     quietPeriod += args.quietPeriodFactor

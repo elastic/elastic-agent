@@ -39,6 +39,16 @@ type requestClient struct {
 	lastErrOcc time.Time
 }
 
+func (r *requestClient) SetLastError(err error) {
+	r.lastUsed = time.Now().UTC()
+	r.lastErr = err
+	if err != nil {
+		r.lastErrOcc = r.lastUsed
+	} else {
+		r.lastErrOcc = time.Time{}
+	}
+}
+
 // Client wraps a http.Client and takes care of making the raw calls, the client should
 // stay simple and specifics should be implemented in external action instead of adding new methods
 // to the client. For authenticated calls or sending fields on every request, create a custom RoundTripper
@@ -160,20 +170,20 @@ func (c *Client) Send(
 	}
 
 	c.log.Debugf("Request method: %s, path: %s, reqID: %s", method, path, reqID)
-	c.clientLock.Lock()
-	defer c.clientLock.Unlock()
 
 	var resp *http.Response
 	var multiErr error
 
-	c.sortClients()
-	for i, requester := range c.clients {
+	clients := c.sortClients()
+
+	for i, requester := range clients {
 		req, err := requester.newRequest(method, path, params, body)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"fail to create HTTP request using method %s to %s: %w",
 				method, path, err)
 		}
+		c.log.Debugf("Creating new request to request URL %s", req.URL.String())
 
 		// Add generals headers to the request, we are dealing exclusively with JSON.
 		// Content-Type / Accepted type can be overridden by the caller.
@@ -194,15 +204,16 @@ func (c *Client) Send(
 			}
 		}
 
-		requester.lastUsed = time.Now().UTC()
-
 		resp, err = requester.client.Do(req.WithContext(ctx))
-		if err != nil {
-			requester.lastErr = err
-			requester.lastErrOcc = time.Now().UTC()
 
+		// Using the same lock that was used for sorting above
+		c.clientLock.Lock()
+		requester.SetLastError(err)
+		c.clientLock.Unlock()
+
+		if err != nil {
 			msg := fmt.Sprintf("requester %d/%d to host %s errored",
-				i, len(c.clients), requester.host)
+				i, len(clients), requester.host)
 			multiErr = multierror.Append(multiErr, fmt.Errorf("%s: %w", msg, err))
 
 			// Using debug level as the error is only relevant if all clients fail.
@@ -210,8 +221,6 @@ func (c *Client) Send(
 			continue
 		}
 
-		requester.lastErr = nil
-		requester.lastErrOcc = time.Time{}
 		return resp, nil
 	}
 
@@ -244,11 +253,15 @@ func newClient(
 }
 
 // sortClients sort the clients according to the following priority:
-//  - never used
-//  - without errors, last used first when more than one does not have errors
-//  - last errored.
+//   - never used
+//   - without errors, last used first when more than one does not have errors
+//   - last errored.
+//
 // It also removes the last error after retryOnBadConnTimeout has elapsed.
-func (c *Client) sortClients() {
+func (c *Client) sortClients() []*requestClient {
+	c.clientLock.Lock()
+	defer c.clientLock.Unlock()
+
 	now := time.Now().UTC()
 
 	sort.Slice(c.clients, func(i, j int) bool {
@@ -291,11 +304,16 @@ func (c *Client) sortClients() {
 		// Lastly, the one that errored last
 		return c.clients[i].lastUsed.Before(c.clients[j].lastUsed)
 	})
+
+	// return a copy of the slice so we can iterate over it without the lock
+	res := make([]*requestClient, len(c.clients))
+	copy(res, c.clients)
+	return res
 }
 
 func (r requestClient) newRequest(method string, path string, params url.Values, body io.Reader) (*http.Request, error) {
 	path = strings.TrimPrefix(path, "/")
 	newPath := strings.Join([]string{r.host, path, "?", params.Encode()}, "")
 
-	return http.NewRequest(method, newPath, body)
+	return http.NewRequestWithContext(context.TODO(), method, newPath, body)
 }

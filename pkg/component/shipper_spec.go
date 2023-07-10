@@ -12,7 +12,7 @@ type ShipperSpec struct {
 	Description string      `config:"description" yaml:"description" validate:"required"`
 	Platforms   []string    `config:"platforms" yaml:"platforms" validate:"required,min=1"`
 	Outputs     []string    `config:"outputs" yaml:"outputs" validate:"required,min=1"`
-	Runtime     RuntimeSpec `config:"runtime" yaml:"runtime"`
+	Runtime     RuntimeSpec `config:"runtime,omitempty" yaml:"runtime,omitempty"`
 
 	Command *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
 }

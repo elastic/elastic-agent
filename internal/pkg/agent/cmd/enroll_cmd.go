@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	"go.elastic.co/apm"
 	"gopkg.in/yaml.v2"
 
@@ -26,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -80,12 +81,14 @@ type enrollCmdFleetServerOption struct {
 	ElasticsearchCASHA256 string
 	ElasticsearchInsecure bool
 	ServiceToken          string
+	ServiceTokenPath      string
 	PolicyID              string
 	Host                  string
 	Port                  uint16
 	InternalPort          uint16
 	Cert                  string
 	CertKey               string
+	CertKeyPassphrasePath string
 	Insecure              bool
 	SpawnAgent            bool
 	Headers               map[string]string
@@ -230,6 +233,8 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	if localFleetServer {
 		// Ensure that the agent does not use a proxy configuration
 		// when connecting to the local fleet server.
+		// Note that when running fleet-server the enroll request will be sent to :8220,
+		// however when the agent is running afterwards requests will be sent to :8221
 		c.remoteConfig.Transport.Proxy.Disable = true
 	}
 
@@ -254,7 +259,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	}
 
 	if c.options.FixPermissions {
-		err = install.FixPermissions()
+		err = install.FixPermissions(paths.Top())
 		if err != nil {
 			return errors.New(err, "failed to fix permissions")
 		}
@@ -301,6 +306,9 @@ func (c *enrollCmd) writeDelayEnroll(streams *cli.IOStreams) error {
 func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig map[string]interface{}) (string, error) {
 	c.log.Debug("verifying communication with running Elastic Agent daemon")
 	agentRunning := true
+	if c.options.FleetServer.InternalPort == 0 {
+		c.options.FleetServer.InternalPort = defaultFleetServerInternalPort
+	}
 	_, err := getDaemonState(ctx)
 	if err != nil {
 		if !c.options.FleetServer.SpawnAgent {
@@ -323,10 +331,10 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 
 	//nolint:dupl // duplicate because same params are passed
 	fleetConfig, err := createFleetServerBootstrapConfig(
-		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken,
+		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
 		c.options.FleetServer.PolicyID,
 		c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
-		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+		c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
 		c.options.FleetServer.Headers,
 		c.options.ProxyURL,
 		c.options.ProxyDisabled,
@@ -336,6 +344,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 	if err != nil {
 		return "", err
 	}
+	c.options.FleetServer.InternalPort = fleetConfig.Server.InternalPort
 
 	configToStore := map[string]interface{}{
 		"agent": agentConfig,
@@ -495,7 +504,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]interface{}) error {
 	cmd := fleetapi.NewEnrollCmd(c.client)
 
-	metadata, err := info.Metadata()
+	metadata, err := info.Metadata(c.log)
 	if err != nil {
 		return errors.New(err, "acquiring metadata failed")
 	}
@@ -528,10 +537,10 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	if localFleetServer {
 		//nolint:dupl // not duplicates, just similar params are passed
 		serverConfig, err := createFleetServerBootstrapConfig(
-			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken,
+			c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
 			c.options.FleetServer.PolicyID,
 			c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
-			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
+			c.options.FleetServer.Cert, c.options.FleetServer.CertKey, c.options.FleetServer.CertKeyPassphrasePath, c.options.FleetServer.ElasticsearchCA, c.options.FleetServer.ElasticsearchCASHA256,
 			c.options.FleetServer.Headers,
 			c.options.ProxyURL, c.options.ProxyDisabled, c.options.ProxyHeaders,
 			c.options.FleetServer.ElasticsearchInsecure,
@@ -545,6 +554,9 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		// use internal URL for future requests
 		if c.options.InternalURL != "" {
 			fleetConfig.Client.Host = c.options.InternalURL
+			// fleet-server will bind the internal listenter to localhost:8221
+			// InternalURL is localhost:8221, however cert uses $HOSTNAME, so we need to disable hostname verification.
+			fleetConfig.Client.Transport.TLS.VerificationMode = tlscommon.VerifyCertificate
 		}
 	}
 
@@ -875,9 +887,9 @@ func storeAgentInfo(s saver, reader io.Reader) error {
 }
 
 func createFleetServerBootstrapConfig(
-	connStr, serviceToken, policyID, host string,
+	connStr, serviceToken, serviceTokenPath, policyID, host string,
 	port uint16, internalPort uint16,
-	cert, key, esCA, esCASHA256 string,
+	cert, key, passphrasePath, esCA, esCASHA256 string,
 	headers map[string]string,
 	proxyURL string,
 	proxyDisabled bool,
@@ -886,7 +898,7 @@ func createFleetServerBootstrapConfig(
 ) (*configuration.FleetAgentConfig, error) {
 	localFleetServer := connStr != ""
 
-	es, err := configuration.ElasticsearchFromConnStr(connStr, serviceToken, insecure)
+	es, err := configuration.ElasticsearchFromConnStr(connStr, serviceToken, serviceTokenPath, insecure)
 	if err != nil {
 		return nil, err
 	}
@@ -947,8 +959,9 @@ func createFleetServerBootstrapConfig(
 	if cert != "" || key != "" {
 		cfg.Server.TLS = &tlscommon.Config{
 			Certificate: tlscommon.CertificateConfig{
-				Certificate: cert,
-				Key:         key,
+				Certificate:    cert,
+				Key:            key,
+				PassphrasePath: passphrasePath,
 			},
 		}
 		if insecure {
@@ -1016,6 +1029,7 @@ func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) 
 	}
 
 	pc := &struct {
+		Headers        map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
 		LogLevel       string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
 		MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
 	}{

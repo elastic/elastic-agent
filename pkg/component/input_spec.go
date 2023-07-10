@@ -16,9 +16,9 @@ type InputSpec struct {
 	Aliases     []string    `config:"aliases,omitempty" yaml:"aliases,omitempty"`
 	Description string      `config:"description" yaml:"description" validate:"required"`
 	Platforms   []string    `config:"platforms" yaml:"platforms" validate:"required,min=1"`
-	Outputs     []string    `config:"outputs" yaml:"outputs" validate:"required,min=1"`
-	Shippers    []string    `config:"shippers" yaml:"shippers"`
-	Runtime     RuntimeSpec `config:"runtime" yaml:"runtime"`
+	Outputs     []string    `config:"outputs,omitempty" yaml:"outputs,omitempty"`
+	Shippers    []string    `config:"shippers,omitempty" yaml:"shippers,omitempty"`
+	Runtime     RuntimeSpec `config:"runtime,omitempty" yaml:"runtime,omitempty"`
 
 	Command *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
 	Service *ServiceSpec `config:"service,omitempty" yaml:"service,omitempty"`
@@ -38,6 +38,9 @@ func (s *InputSpec) Validate() error {
 				return fmt.Errorf("input '%s' defines the platform '%s' more than once", s.Name, a)
 			}
 		}
+	}
+	if len(s.Outputs) == 0 && len(s.Shippers) == 0 {
+		return fmt.Errorf("input '%s' must define at least one output or one shipper", s.Name)
 	}
 	for i, a := range s.Outputs {
 		for j, b := range s.Outputs {

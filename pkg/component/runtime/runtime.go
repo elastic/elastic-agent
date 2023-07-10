@@ -17,8 +17,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// ComponentRuntime manages runtime lifecycle operations for a component and stores its state.
-type ComponentRuntime interface {
+// componentRuntime manages runtime lifecycle operations for a component and stores its state.
+type componentRuntime interface {
 	// Run starts the runtime for the component.
 	//
 	// Called by Manager inside a goroutine. Run does not return until the passed in context is done. Run is always
@@ -53,23 +53,27 @@ type ComponentRuntime interface {
 	Teardown() error
 }
 
-// NewComponentRuntime creates the proper runtime based on the input specification for the component.
-func NewComponentRuntime(comp component.Component, logger *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
+// newComponentRuntime creates the proper runtime based on the input specification for the component.
+func newComponentRuntime(
+	comp component.Component,
+	logger *logger.Logger,
+	monitor MonitoringManager,
+) (componentRuntime, error) {
 	if comp.Err != nil {
-		return NewFailedRuntime(comp)
+		return newFailedRuntime(comp)
 	}
 	if comp.InputSpec != nil {
 		if comp.InputSpec.Spec.Command != nil {
-			return NewCommandRuntime(comp, logger, monitor)
+			return newCommandRuntime(comp, logger, monitor)
 		}
 		if comp.InputSpec.Spec.Service != nil {
-			return NewServiceRuntime(comp, logger)
+			return newServiceRuntime(comp, logger)
 		}
 		return nil, errors.New("unknown component runtime")
 	}
 	if comp.ShipperSpec != nil {
 		if comp.ShipperSpec.Spec.Command != nil {
-			return NewCommandRuntime(comp, logger, monitor)
+			return newCommandRuntime(comp, logger, monitor)
 		}
 		return nil, errors.New("components for shippers can only support command runtime")
 	}
@@ -81,8 +85,10 @@ type componentRuntimeState struct {
 	logger  *logger.Logger
 	comm    *runtimeComm
 
-	currComp component.Component
-	runtime  ComponentRuntime
+	id         string
+	currCompMx sync.RWMutex
+	currComp   component.Component
+	runtime    componentRuntime
 
 	shuttingDown atomic.Bool
 
@@ -98,7 +104,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := NewComponentRuntime(comp, logger, monitor)
+	runtime, err := newComponentRuntime(comp, logger, monitor)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +113,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 		manager:  m,
 		logger:   logger,
 		comm:     comm,
+		id:       comp.ID,
 		currComp: comp,
 		runtime:  runtime,
 		latestState: ComponentState{
@@ -117,45 +124,56 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 		actions: make(map[string]func(response *proto.ActionResponse)),
 	}
 
+	// Start the goroutine that spawns and monitors the component runtime.
+	go state.runLoop()
+
+	return state, nil
+}
+
+func (s *componentRuntimeState) runLoop() {
 	// start the go-routine that operates the runtime for the component
 	runtimeRunner := runner.Start(context.Background(), func(ctx context.Context) error {
-		defer comm.destroy()
-		_ = runtime.Run(ctx, comm)
+		defer s.comm.destroy()
+		_ = s.runtime.Run(ctx, s.comm)
 		return nil
 	})
 
-	// start the go-routine that watches for updates from the component
-	runner.Start(context.Background(), func(ctx context.Context) error {
-		for {
-			select {
-			case <-ctx.Done():
+	for {
+		select {
+		case <-runtimeRunner.Done():
+			// Exit from the watcher loop only when the runner is done
+			return
+		case componentState := <-s.runtime.Watch():
+			s.latestMx.Lock()
+			s.latestState = componentState
+			s.latestMx.Unlock()
+			if s.manager.stateChanged(s, componentState) {
 				runtimeRunner.Stop()
-			case <-runtimeRunner.Done():
-				// Exit from the watcher loop only when the runner is done
-				// This is the same behaviour as before this change, just refactored and cleaned up
-				return nil
-			case s := <-runtime.Watch():
-				state.latestMx.Lock()
-				state.latestState = s
-				state.latestMx.Unlock()
-				if state.manager.stateChanged(state, s) {
-					runtimeRunner.Stop()
-				}
-			case ar := <-comm.actionsResponse:
-				state.actionsMx.Lock()
-				callback, ok := state.actions[ar.Id]
-				if ok {
-					delete(state.actions, ar.Id)
-				}
-				state.actionsMx.Unlock()
-				if ok {
-					callback(ar)
-				}
+			}
+		case ar := <-s.comm.actionsResponse:
+			s.actionsMx.Lock()
+			callback, ok := s.actions[ar.Id]
+			if ok {
+				delete(s.actions, ar.Id)
+			}
+			s.actionsMx.Unlock()
+			if ok {
+				callback(ar)
 			}
 		}
-	})
+	}
+}
 
-	return state, nil
+func (s *componentRuntimeState) getCurrent() component.Component {
+	s.currCompMx.RLock()
+	defer s.currCompMx.RUnlock()
+	return s.currComp
+}
+
+func (s *componentRuntimeState) setCurrent(current component.Component) {
+	s.currCompMx.Lock()
+	s.currComp = current
+	s.currCompMx.Unlock()
 }
 
 func (s *componentRuntimeState) start() error {

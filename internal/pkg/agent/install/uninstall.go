@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -29,9 +28,9 @@ import (
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile string) error {
+func Uninstall(cfgFile, topPath string) error {
 	// uninstall the current service
-	svc, err := newService()
+	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
@@ -63,53 +62,86 @@ func Uninstall(cfgFile string) error {
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(paths.InstallPath)
+	err = RemovePath(topPath)
 	if err != nil {
-		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
-			// possible to fail on Windows, because elastic-agent.exe is running from
-			// this directory.
-			return nil
-		}
 		return errors.New(
 			err,
-			fmt.Sprintf("failed to remove installation directory (%s)", paths.InstallPath),
-			errors.M("directory", paths.InstallPath))
+			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
+			errors.M("directory", paths.Top()))
 	}
 
 	return nil
 }
 
 // RemovePath helps with removal path where there is a probability
-// of running into self which might prevent removal.
-// Removal will be initiated 2 seconds after a call.
+// of running into an executable running that might prevent removal
+// on Windows.
 func RemovePath(path string) error {
+	var previousPath string
 	cleanupErr := os.RemoveAll(path)
-	if cleanupErr != nil && isBlockingOnSelf(cleanupErr) {
-		delayedRemoval(path)
+	for cleanupErr != nil && isBlockingOnExe(cleanupErr) {
+		// remove the blocking exe
+		hardPath, hardErr := removeBlockingExe(cleanupErr)
+		if hardErr != nil {
+			// failed to remove the blocking exe (cannot continue)
+			return hardErr
+		}
+		// this if statement is being defensive and ensuring that an
+		// infinite loop to remove the same path does not occur
+		if hardPath != "" {
+			if previousPath == hardPath {
+				// no reason the previous path should be the same
+				// removeBlockingExe did not work correctly
+				//
+				// cleanupErr will contain the real error
+				return cleanupErr
+			}
+			previousPath = hardPath
+		}
+		// try to remove the original path now again
+		cleanupErr = os.RemoveAll(path)
 	}
-
 	return cleanupErr
 }
 
-func isBlockingOnSelf(err error) bool {
-	// cannot remove self, this is expected on windows
-	// fails with  remove {path}}\elastic-agent.exe: Access is denied
-	return runtime.GOOS == "windows" &&
-		err != nil &&
-		strings.Contains(err.Error(), "elastic-agent.exe") &&
-		strings.Contains(err.Error(), "Access is denied")
+func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
+	if len(exceptions) == 0 {
+		return RemovePath(path)
+	}
+
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		if containsString(f.Name(), exceptions, runtime.GOOS != component.Windows) {
+			continue
+		}
+
+		err = RemovePath(filepath.Join(path, f.Name()))
+		if !bestEffort && err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
-func delayedRemoval(path string) {
-	// The installation path will still exists because we are executing from that
-	// directory. So cmd.exe is spawned that sleeps for 2 seconds (using ping, recommend way from
-	// from Windows) then rmdir is performed.
-	//nolint:gosec // it's not tainted
-	rmdir := exec.Command(
-		filepath.Join(os.Getenv("windir"), "system32", "cmd.exe"),
-		"/C", "ping", "-n", "2", "127.0.0.1", "&&", "rmdir", "/s", "/q", path)
-	_ = rmdir.Start()
+func containsString(str string, a []string, caseSensitive bool) bool {
+	if !caseSensitive {
+		str = strings.ToLower(str)
+	}
+	for _, v := range a {
+		if !caseSensitive {
+			v = strings.ToLower(v)
+		}
+		if str == v {
+			return true
+		}
+	}
 
+	return false
 }
 
 func uninstallComponents(ctx context.Context, cfgFile string) error {
@@ -148,8 +180,19 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 		return nil
 	}
 
+	// check caps so we don't try uninstalling things that were already
+	// prevented from installing
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
+	if err != nil {
+		return err
+	}
+
 	// remove each service component
 	for _, comp := range comps {
+		if !caps.AllowInput(comp.InputType) || !caps.AllowOutput(comp.OutputType) {
+			// This component is not active
+			continue
+		}
 		if err := uninstallComponent(ctx, log, comp); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
@@ -167,7 +210,7 @@ func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Confi
 	if err != nil {
 		return nil, errors.New("failed to create a map from config", err)
 	}
-	allComps, err := specs.ToComponents(mm, nil)
+	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
@@ -208,22 +251,6 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		if err != nil {
 			return nil, errors.New("inserting rendered inputs failed", err)
 		}
-	}
-
-	// apply caps
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
-	if err != nil {
-		return nil, err
-	}
-
-	astIface, err := caps.Apply(ast)
-	if err != nil {
-		return nil, err
-	}
-
-	newAst, ok := astIface.(*transpiler.AST)
-	if ok {
-		ast = newAst
 	}
 
 	finalConfig, err := ast.Map()

@@ -23,12 +23,12 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 const (
-	packagePermissions = 0660
+	packagePermissions = 0o660
 
 	// downloadProgressIntervalPercentage defines how often to report the current download progress when percentage
 	// of time has passed in the overall interval for the complete download to complete. 5% is a good default, as
@@ -39,10 +39,6 @@ const (
 	// passed is this percentage or more of the total allotted time to download.
 	warningProgressIntervalPercentage = 0.75
 )
-
-var headers = map[string]string{
-	"User-Agent": fmt.Sprintf("Beat elastic-agent v%s", release.Version()),
-}
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
@@ -55,12 +51,13 @@ type Downloader struct {
 func NewDownloader(log progressLogger, config *artifact.Config) (*Downloader, error) {
 	client, err := config.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
+		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	client.Transport = withHeaders(client.Transport, headers)
+	client.Transport = download.WithHeaders(client.Transport, download.Headers)
 	return NewDownloaderWithClient(log, config, *client), nil
 }
 
@@ -82,7 +79,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 		return errors.New(err, "http.downloader: failed to generate client out of config")
 	}
 
-	client.Transport = withHeaders(client.Transport, headers)
+	client.Transport = download.WithHeaders(client.Transport, download.Headers)
 
 	e.client = *client
 	e.config = c
@@ -177,7 +174,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 
 	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
-		if err := os.MkdirAll(destinationDir, 0755); err != nil {
+		if err := os.MkdirAll(destinationDir, 0o755); err != nil {
 			return "", err
 		}
 	}

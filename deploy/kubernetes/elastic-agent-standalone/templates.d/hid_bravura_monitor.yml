@@ -1,15 +1,4 @@
 inputs:
-    - name: winlog-hid_bravura_monitor
-      type: winlog
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.hid_bravura_monitor.winlog.enabled} == true or ${kubernetes.hints.hid_bravura_monitor.enabled} == true
-          data_stream:
-            dataset: hid_bravura_monitor.winlog
-            type: logs
-          name: Hitachi-Hitachi ID Systems-Hitachi ID Suite/Operational
-          tags: null
-      data_stream.namespace: default
     - name: filestream-hid_bravura_monitor
       type: filestream
       use_output: default
@@ -38,5 +27,16 @@ inputs:
                 target: ""
           prospector.scanner.exclude_files:
             - .gz$
+          tags: null
+      data_stream.namespace: default
+    - name: winlog-hid_bravura_monitor
+      type: winlog
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.hid_bravura_monitor.winlog.enabled} == true or ${kubernetes.hints.hid_bravura_monitor.enabled} == true
+          data_stream:
+            dataset: hid_bravura_monitor.winlog
+            type: logs
+          name: Hitachi-Hitachi ID Systems-Hitachi ID Suite/Operational
           tags: null
       data_stream.namespace: default

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.elastic.co/ecszap"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
 
@@ -26,6 +27,9 @@ const agentName = "elastic-agent"
 
 const iso8601Format = "2006-01-02T15:04:05.000Z0700"
 
+// Level is the level used in agent.
+type Level = logp.Level
+
 // DefaultLogLevel used in agent and its processes.
 const DefaultLogLevel = logp.InfoLevel
 
@@ -37,6 +41,8 @@ type Logger = logp.Logger
 
 // Config is a logging config.
 type Config = logp.Config
+
+var internalLevelEnabler *zap.AtomicLevel
 
 // New returns a configured ECS Logger
 func New(name string, logInternal bool) (*Logger, error) {
@@ -66,14 +72,14 @@ func NewWithoutConfig(name string) *Logger {
 }
 
 func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	commonCfg, err := toCommonConfig(cfg)
+	commonCfg, err := ToCommonConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	var outputs []zapcore.Core
 	if logInternal {
-		internal, err := makeInternalFileOutput(cfg)
+		internal, err := MakeInternalFileOutput(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +93,7 @@ func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 	return logp.NewLogger(name), nil
 }
 
-func toCommonConfig(cfg *Config) (*config.C, error) {
+func ToCommonConfig(cfg *Config) (*config.C, error) {
 	// work around custom types and common config
 	// when custom type is transformed to common.Config
 	// value is determined based on reflect value which is incorrect
@@ -105,6 +111,15 @@ func toCommonConfig(cfg *Config) (*config.C, error) {
 	return commonLogp, nil
 }
 
+// SetLevel changes the overall log level of the global logger.
+func SetLevel(lvl logp.Level) {
+	zapLevel := lvl.ZapLevel()
+	logp.SetLevel(zapLevel)
+	if internalLevelEnabler != nil {
+		internalLevelEnabler.SetLevel(zapLevel)
+	}
+}
+
 // DefaultLoggingConfig returns default configuration for agent logging.
 func DefaultLoggingConfig() *Config {
 	cfg := logp.DefaultConfig(logp.DefaultEnvironment)
@@ -113,6 +128,7 @@ func DefaultLoggingConfig() *Config {
 	cfg.ToFiles = true
 	cfg.Files.Path = paths.Logs()
 	cfg.Files.Name = agentName
+	cfg.Files.MaxSize = 20 * 1024 * 1024
 
 	return &cfg
 }
@@ -120,12 +136,13 @@ func DefaultLoggingConfig() *Config {
 // makeInternalFileOutput creates a zapcore.Core logger that cannot be changed with configuration.
 //
 // This is the logger that the spawned filebeat expects to read the log file from and ship to ES.
-func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
+func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
 	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
-
+	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
+	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
 	rotator, err := file.NewFileRotator(filename,
 		file.MaxSizeBytes(defaultCfg.Files.MaxSize),
 		file.MaxBackups(defaultCfg.Files.MaxBackups),
@@ -139,13 +156,13 @@ func makeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	}
 
 	encoderConfig := ecszap.ECSCompatibleEncoderConfig(logp.JSONEncoderConfig())
-	encoderConfig.EncodeTime = utcTimestampEncode
+	encoderConfig.EncodeTime = UtcTimestampEncode
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
-	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, cfg.Level.ZapLevel())), nil
+	return ecszap.WrapCore(zapcore.NewCore(encoder, rotator, internalLevelEnabler)), nil
 }
 
-// utcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
-func utcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+// UtcTimestampEncode is a zapcore.TimeEncoder that formats time.Time in ISO-8601 in UTC.
+func UtcTimestampEncode(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	type appendTimeEncoder interface {
 		AppendTimeLayout(time.Time, string)
 	}

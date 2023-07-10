@@ -238,8 +238,8 @@ func (f *fakeActionOutputRuntime) Unit() *client.Unit {
 }
 
 func (f *fakeActionOutputRuntime) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this to stop
 		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
@@ -251,11 +251,12 @@ func (f *fakeActionOutputRuntime) Update(u *client.Unit) error {
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != fakeActionOutput {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != fakeActionOutput {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 	// nothing to really do
 	return nil
@@ -321,45 +322,6 @@ func (f *fakeActionOutputRuntime) received(ctx context.Context, id string, event
 	return false
 }
 
-// recordEventAction is an action that returns a result only once an event comes over the fake shipper protocol
-type recordEventAction struct {
-	f *fakeActionOutputRuntime
-}
-
-func (r *recordEventAction) Name() string {
-	return "record_event"
-}
-
-func (r *recordEventAction) Execute(ctx context.Context, params map[string]interface{}) (map[string]interface{}, error) {
-	eventIDRaw, ok := params[recordActionEventID]
-	if !ok {
-		return nil, fmt.Errorf("missing required 'id' parameter")
-	}
-	eventID, ok := eventIDRaw.(string)
-	if !ok {
-		return nil, fmt.Errorf("'id' parameter not string type, got %T", eventIDRaw)
-	}
-	r.f.logger.Trace().Str(recordActionEventID, eventID).Msg("registering record event action")
-	c := r.f.subscribe(eventID)
-	defer r.f.unsubscribe(eventID)
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case e, ok := <-c:
-		r.f.logger.Trace().Fields(map[string]interface{}{
-			"timestamp": e.Generated.AsTime(),
-			"content":   e.Content.AsMap(),
-		}).Msg("record_event action got subscribed event")
-		if !ok {
-			return nil, fmt.Errorf("never recieved event")
-		}
-		return map[string]interface{}{
-			"timestamp": e.Generated.String(),
-			"event":     e.Content.AsMap(),
-		}, nil
-	}
-}
-
 type fakeShipperInput struct {
 	common.UnimplementedFakeEventProtocolServer
 
@@ -419,28 +381,40 @@ func (f *fakeShipperInput) Unit() *client.Unit {
 }
 
 func (f *fakeShipperInput) Update(u *client.Unit) error {
-	expected, _, config := u.Expected()
-	if expected == client.UnitStateStopped {
+	if u.Type() != client.UnitTypeOutput {
+		return nil // right now, it deals only with output
+	}
+
+	expected := u.Expected()
+	if expected.State == client.UnitStateStopped {
 		// agent is requesting this to stop
-		f.logger.Debug().Str("state", client.UnitStateStopping.String()).Str("message", stoppingMsg).Msg("updating unit state")
+		f.logger.Debug().
+			Str("state", client.UnitStateStopping.String()).
+			Str("message", stoppingMsg).
+			Msg("updating unit state")
 		_ = u.UpdateState(client.UnitStateStopping, stoppingMsg, nil)
+
 		go func() {
 			if f.srv != nil {
 				f.srv.Stop()
-				f.wg.Wait()
+				_ = f.wg.Wait()
 				f.srv = nil
 			}
-			f.logger.Debug().Str("state", client.UnitStateStopped.String()).Str("message", stoppedMsg).Msg("updating unit state")
+			f.logger.Debug().
+				Str("state", client.UnitStateStopped.String()).
+				Str("message", stoppedMsg).
+				Msg("updating unit state")
 			_ = u.UpdateState(client.UnitStateStopped, stoppedMsg, nil)
 		}()
 		return nil
 	}
 
-	if config.Type == "" {
+	if expected.Config.Type == "" {
 		return fmt.Errorf("unit missing config type")
 	}
-	if config.Type != fakeActionOutput {
-		return fmt.Errorf("unit type changed with the same unit ID: %s", config.Type)
+	if expected.Config.Type != fakeActionOutput {
+		return fmt.Errorf("unit type changed with the same unit ID: %s",
+			expected.Config.Type)
 	}
 	// nothing to really do
 	return nil
@@ -452,49 +426,6 @@ func (f *fakeShipperInput) SendEvent(ctx context.Context, event *common.Event) (
 		return nil, err
 	}
 	return &common.EventResponse{}, nil
-}
-
-// killAction is an action that causes the whole component to exit (used in testing to simulate crashes)
-type killAction struct {
-	logger zerolog.Logger
-}
-
-func (s *killAction) Name() string {
-	return "kill"
-}
-
-func (s *killAction) Execute(_ context.Context, _ map[string]interface{}) (map[string]interface{}, error) {
-	s.logger.Trace().Msg("executing kill action")
-	os.Exit(1)
-	return nil, nil
-}
-
-func newRunningUnit(logger zerolog.Logger, manager *stateManager, unit *client.Unit) (runningUnit, error) {
-	_, logLevel, config := unit.Expected()
-	if config.Type == "" {
-		return nil, fmt.Errorf("unit config type empty")
-	}
-	if unit.Type() == client.UnitTypeOutput {
-		switch config.Type {
-		case fakeActionOutput:
-			return newFakeActionOutputRuntime(logger, logLevel, unit, config)
-		}
-		return nil, fmt.Errorf("unknown output unit config type: %s", config.Type)
-	} else if unit.Type() == client.UnitTypeInput {
-		switch config.Type {
-		case fakeShipper:
-			return newFakeShipperInput(logger, logLevel, manager, unit, config)
-		}
-		return nil, fmt.Errorf("unknown input unit config type: %s", config.Type)
-	}
-	return nil, fmt.Errorf("unknown unit type: %+v", unit.Type())
-}
-
-func newUnitKey(unit *client.Unit) unitKey {
-	return unitKey{
-		unitType: unit.Type(),
-		unitID:   unit.ID(),
-	}
 }
 
 func toZerologLevel(level client.UnitLogLevel) zerolog.Level {

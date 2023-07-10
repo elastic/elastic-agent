@@ -12,7 +12,6 @@ import (
 
 // Spec a components specification.
 type Spec struct {
-	Name     string        `yaml:"name,omitempty"`
 	Version  int           `config:"version" yaml:"version" validate:"required"`
 	Inputs   []InputSpec   `config:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Shippers []ShipperSpec `config:"shippers,omitempty" yaml:"shippers,omitempty"`
@@ -64,7 +63,7 @@ func (s *Spec) Validate() error {
 
 // RuntimeSpec is the specification for runtime options.
 type RuntimeSpec struct {
-	Preventions []RuntimePreventionSpec `config:"preventions" yaml:"preventions"`
+	Preventions []RuntimePreventionSpec `config:"preventions,omitempty" yaml:"preventions,omitempty"`
 }
 
 // RuntimePreventionSpec is the specification that prevents an input to run at execution time.
@@ -75,10 +74,12 @@ type RuntimePreventionSpec struct {
 
 // CommandSpec is the specification for an input that executes as a subprocess.
 type CommandSpec struct {
-	Args     []string           `config:"args,omitempty" yaml:"args,omitempty"`
-	Env      []CommandEnvSpec   `config:"env,omitempty" yaml:"env,omitempty"`
-	Timeouts CommandTimeoutSpec `config:"timeouts" yaml:"timeouts"`
-	Log      CommandLogSpec     `config:"log" yaml:"log"`
+	Args                    []string           `config:"args,omitempty" yaml:"args,omitempty"`
+	Env                     []CommandEnvSpec   `config:"env,omitempty" yaml:"env,omitempty"`
+	Timeouts                CommandTimeoutSpec `config:"timeouts,omitempty" yaml:"timeouts,omitempty"`
+	Log                     CommandLogSpec     `config:"log,omitempty" yaml:"log,omitempty"`
+	RestartMonitoringPeriod time.Duration      `config:"restart_monitoring_period,omitempty" yaml:"restart_monitoring_period,omitempty"`
+	MaxRestartsPerPeriod    int                `config:"maximum_restarts_per_period,omitempty" yaml:"maximum_restarts_per_period,omitempty"`
 }
 
 // CommandEnvSpec is the specification that defines environment variables that will be set to execute the subprocess.
@@ -89,9 +90,9 @@ type CommandEnvSpec struct {
 
 // CommandTimeoutSpec is the timeout specification for subprocess.
 type CommandTimeoutSpec struct {
-	Checkin time.Duration `config:"checkin" yaml:"checkin"`
-	Restart time.Duration `config:"restart" yaml:"restart"`
-	Stop    time.Duration `config:"stop" yaml:"stop"`
+	Checkin time.Duration `config:"checkin,omitempty" yaml:"checkin,omitempty"`
+	Restart time.Duration `config:"restart,omitempty" yaml:"restart,omitempty"`
+	Stop    time.Duration `config:"stop,omitempty" yaml:"stop,omitempty"`
 }
 
 // InitDefaults initialized the defaults for the timeouts.
@@ -103,11 +104,11 @@ func (t *CommandTimeoutSpec) InitDefaults() {
 
 // CommandLogSpec is the log specification for subprocess.
 type CommandLogSpec struct {
-	LevelKey   string   `config:"level_key" yaml:"level_key"`
-	TimeKey    string   `config:"time_key" yaml:"time_key"`
-	TimeFormat string   `config:"time_format" yaml:"time_format"`
-	MessageKey string   `config:"message_key" yaml:"message_key"`
-	IgnoreKeys []string `config:"ignore_keys" yaml:"ignore_keys"`
+	LevelKey   string   `config:"level_key,omitempty" yaml:"level_key,omitempty"`
+	TimeKey    string   `config:"time_key,omitempty" yaml:"time_key,omitempty"`
+	TimeFormat string   `config:"time_format,omitempty" yaml:"time_format,omitempty"`
+	MessageKey string   `config:"message_key,omitempty" yaml:"message_key,omitempty"`
+	IgnoreKeys []string `config:"ignore_keys,omitempty" yaml:"ignore_keys,omitempty"`
 }
 
 // InitDefaults initialized the defaults for the timeouts.
@@ -120,7 +121,7 @@ func (t *CommandLogSpec) InitDefaults() {
 
 // ServiceTimeoutSpec is the timeout specification for subprocess.
 type ServiceTimeoutSpec struct {
-	Checkin time.Duration `config:"checkin" yaml:"checkin"`
+	Checkin time.Duration `config:"checkin,omitempty" yaml:"checkin,omitempty"`
 }
 
 // InitDefaults initialized the defaults for the timeouts.
@@ -133,7 +134,7 @@ type ServiceSpec struct {
 	CPort      int                   `config:"cport" yaml:"cport" validate:"required"`
 	Log        *ServiceLogSpec       `config:"log,omitempty" yaml:"log,omitempty"`
 	Operations ServiceOperationsSpec `config:"operations" yaml:"operations" validate:"required"`
-	Timeouts   ServiceTimeoutSpec    `config:"timeouts" yaml:"timeouts"`
+	Timeouts   ServiceTimeoutSpec    `config:"timeouts,omitempty" yaml:"timeouts,omitempty"`
 }
 
 // ServiceLogSpec is the specification for the log path that the service logs to.
@@ -153,4 +154,9 @@ type ServiceOperationsCommandSpec struct {
 	Args    []string         `config:"args,omitempty" yaml:"args,omitempty"`
 	Env     []CommandEnvSpec `config:"env,omitempty" yaml:"env,omitempty"`
 	Timeout time.Duration    `config:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Retry   RetryConfig
+}
+
+type RetryConfig struct {
+	InitInterval time.Duration `config:"init_interval,omitempty" yaml:"init_interval,omitempty"`
 }

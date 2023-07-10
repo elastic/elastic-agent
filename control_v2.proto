@@ -1,0 +1,282 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+syntax = "proto3";
+
+package cproto;
+
+option cc_enable_arenas = true;
+option go_package = "internal/pkg/agent/control/v2/cproto";
+import "google/protobuf/timestamp.proto";
+
+// State codes for the current state.
+enum State {
+  STARTING = 0;
+  CONFIGURING = 1;
+  HEALTHY = 2;
+  DEGRADED = 3;
+  FAILED = 4;
+  STOPPING = 5;
+  STOPPED = 6;
+  UPGRADING = 7;
+  ROLLBACK = 8;
+}
+
+// Unit Type running inside a component.
+enum UnitType {
+  INPUT = 0;
+  OUTPUT = 1;
+}
+
+// Action status codes for restart and upgrade response.
+enum ActionStatus {
+  // Action was successful.
+  SUCCESS = 0;
+  // Action failed.
+  FAILURE = 1;
+}
+
+// pprof endpoint that can be requested.
+enum PprofOption {
+	ALLOCS = 0;
+	BLOCK = 1;
+	CMDLINE = 2;
+	GOROUTINE = 3;
+	HEAP = 4;
+	MUTEX = 5;
+	PROFILE = 6;
+	THREADCREATE = 7;
+	TRACE = 8;
+}
+
+// Empty message.
+message Empty {
+}
+
+// Version response message.
+message VersionResponse {
+  // Current running version.
+  string version = 1;
+  // Current running commit.
+  string commit = 2;
+  // Current running build time.
+  string buildTime = 3;
+  // Current running version is a snapshot.
+  bool snapshot = 4;
+}
+
+message RestartResponse {
+  // Response status.
+  ActionStatus status = 1;
+  // Error message when it fails to trigger restart.
+  string error = 2;
+}
+
+// Upgrade request message.
+message UpgradeRequest {
+  // (Optional) Version to upgrade to.
+  //
+  // If not provided Elastic Agent will auto discover the latest version in the same major
+  // to upgrade to. If wanting to upgrade to a new major that major must be present in the
+  // this version field.
+  string version = 1;
+
+  // (Optional) Use a different source URI then configured.
+  //
+  // If provided the upgrade process will use the provided sourceURI instead of the configured
+  // sourceURI in the configuration.
+  string sourceURI = 2;
+
+  // (Optional) Overrides predefined behavior for agent package verification.
+  //
+  // If provided Elastic Agent package is not checked for signature during upgrade.
+  bool skipVerify = 3;
+
+  // (Optional) Overrides predefined behavior for agent package verification.
+  //
+  // If provided Elastic Agent package is checked against these pgp keys as well.
+  repeated string pgpBytes = 4;
+}
+
+// A upgrade response message.
+message UpgradeResponse {
+  // Response status.
+  ActionStatus status = 1;
+
+  // Version that is being upgraded to.
+  string version = 2;
+
+  // Error message when it fails to trigger upgrade.
+  string error = 3;
+}
+
+message ComponentUnitState {
+  // Type of unit in the component.
+  UnitType unit_type = 1;
+  // ID of the unit in the component.
+  string unit_id = 2;
+  // Current state.
+  State state = 3;
+  // Current state message.
+  string message = 4;
+  // Current state payload.
+  string payload = 5;
+}
+
+// Version information reported by the component to Elastic Agent.
+message ComponentVersionInfo {
+  // Name of the component.
+  string name = 1;
+  // Version of the component.
+  string version = 2;
+  // Extra meta information about the version.
+  map<string, string> meta = 3;
+}
+
+// Current state of a running component by Elastic Agent.
+message ComponentState {
+  // Unique component ID.
+  string id = 1;
+  // Component name.
+  string name = 2;
+  // Current state.
+  State state = 3;
+  // Current state message.
+  string message = 4;
+  // Current units running in the component.
+  repeated ComponentUnitState units = 5;
+  // Current version information for the running component.
+  ComponentVersionInfo version_info = 6;
+}
+
+message StateAgentInfo {
+  // Current ID of the Agent.
+  string id = 1;
+  // Current running version.
+  string version = 2;
+  // Current running commit.
+  string commit = 3;
+  // Current running build time.
+  string buildTime = 4;
+  // Current running version is a snapshot.
+  bool snapshot = 5;
+}
+
+// StateResponse is the current state of Elastic Agent.
+message StateResponse {
+  // Overall information of Elastic Agent.
+  StateAgentInfo info = 1;
+  // Overall state of Elastic Agent.
+  State state = 2;
+  // Overall state message of Elastic Agent.
+  string message = 3;
+  // State of each component in Elastic Agent.
+  repeated ComponentState components = 4;
+  // Fleet connectivity state of Elastic Agent.
+  State fleetState = 5;
+  // Fleet connectivity state message of Elastic Agent.
+  string fleetMessage = 6;
+}
+
+// DiagnosticFileResult is a file result from a diagnostic result.
+message DiagnosticFileResult {
+  // Human readable name of the diagnostic result content.
+  string name = 1;
+  // Filename to use to store the diagnostic to the disk.
+  string filename = 2;
+  // Human readable description of the information this diagnostic provides.
+  string description = 3;
+  // Content-Type of the resulting content.
+  string content_type = 4;
+  // Actual file content.
+  bytes content = 5;
+  // Timestamp the content was generated at.
+  google.protobuf.Timestamp generated = 6;
+}
+
+// DiagnosticAgentRequest is request to gather diagnostic information about the Elastic Agent.
+message DiagnosticAgentRequest {
+}
+
+// DiagnosticAgentResponse is response to gathered diagnostic information about the Elastic Agent.
+message DiagnosticAgentResponse {
+  // Diagnostic results for the agent.
+  repeated DiagnosticFileResult results = 1;
+}
+
+// DiagnosticUnitRequest specifies a specific unit to gather diagnostics from.
+message DiagnosticUnitRequest {
+  // ID of the component.
+  string component_id = 1;
+  // Type of unit.
+  UnitType unit_type = 2;
+  // ID of the unit.
+  string unit_id = 3;
+}
+
+// DiagnosticUnitsRequest allows a diagnostic request to specify the units to target.
+message DiagnosticUnitsRequest {
+  // Specific units to target. (If no units are given then a result for all units is provided).
+  repeated DiagnosticUnitRequest units = 1;
+}
+
+// DiagnosticUnitResponse is diagnostic information about a specific unit.
+message DiagnosticUnitResponse {
+  // ID of the component.
+  string component_id = 1;
+  // Type of unit.
+  UnitType unit_type = 2;
+  // ID of the unit.
+  string unit_id = 3;
+  // Error message for the failure fetching diagnostic information for this unit.
+  string error = 4;
+  // Diagnostic results for the unit.
+  repeated DiagnosticFileResult results = 5;
+}
+
+// DiagnosticUnitsResponse is response to gathered units diagnostic information.
+message DiagnosticUnitsResponse {
+  // Diagnostics results per unit.
+  repeated DiagnosticUnitResponse units = 2;
+}
+
+// ConfigureRequest sends a new configuration for the running Elastic Agent to use.
+message ConfigureRequest {
+  // Config to use.
+  string config = 1;
+}
+
+service ElasticAgentControl {
+  // Fetches the currently running version of the Elastic Agent.
+  rpc Version(Empty) returns (VersionResponse);
+
+  // Fetches the currently states of the Elastic Agent.
+  rpc State(Empty) returns (StateResponse);
+
+  // Streams the current state of the Elastic Agent to the client.
+  //
+  // Client will continue to get updated StateResponse when any state
+  // of the Elastic Agent has changed.
+  rpc StateWatch(Empty) returns (stream StateResponse);
+
+  // Restart restarts the current running Elastic Agent.
+  rpc Restart(Empty) returns (RestartResponse);
+
+  // Upgrade starts the upgrade process of Elastic Agent.
+  rpc Upgrade(UpgradeRequest) returns (UpgradeResponse);
+
+  // Gather diagnostic information for the running Elastic Agent.
+  rpc DiagnosticAgent(DiagnosticAgentRequest) returns (DiagnosticAgentResponse);
+
+  // Gather diagnostic information for the running units.
+  rpc DiagnosticUnits(DiagnosticUnitsRequest) returns (stream DiagnosticUnitResponse);
+
+  // Configure adjusts the running Elastic Agent configuration with the configuration
+  // provided over the RPC.
+  //
+  // This is only allowed if the Elastic Agent is spawned in TESTING_MODE. Calling this
+  // on any Elastic Agent that is not in TESTING_MODE will result in an error being
+  // returned and nothing occurring.
+  rpc Configure(ConfigureRequest) returns (Empty);
+}

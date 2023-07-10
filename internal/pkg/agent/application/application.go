@@ -6,9 +6,13 @@ package application
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/elastic/elastic-agent/pkg/features"
 
 	"go.elastic.co/apm"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
@@ -28,55 +32,89 @@ import (
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	log *logger.Logger,
+	baseLogger *logger.Logger,
+	logLevel logp.Level,
 	agentInfo *info.AgentInfo,
 	reexec coordinator.ReExecManager,
 	tracer *apm.Tracer,
+	testingMode bool,
+	fleetInitTimeout time.Duration,
+	disableMonitoring bool,
 	modifiers ...component.PlatformModifier,
-) (*coordinator.Coordinator, error) {
+) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 	platform, err := component.LoadPlatformDetail(modifiers...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to gather system information: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to gather system information: %w", err)
 	}
 	log.Info("Gathered system information")
 
 	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
 	if err != nil {
-		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 	log.With("inputs", specs.Inputs()).Info("Detected available inputs and outputs")
 
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
-		return nil, fmt.Errorf("failed to determine capabilities: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to determine capabilities: %w", err)
 	}
 	log.Info("Determined allowed capabilities")
 
 	pathConfigFile := paths.ConfigFile()
-	rawConfig, err := config.LoadFile(pathConfigFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+
+	var rawConfig *config.Config
+	if testingMode {
+		// testing mode doesn't read any configuration from the disk
+		rawConfig, err = config.NewConfigFrom("")
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		// monitoring is always disabled in testing mode
+		disableMonitoring = true
+	} else {
+		rawConfig, err = config.LoadFile(pathConfigFile)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+		}
 	}
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
+	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
-	monitor := monitoring.New(cfg.Settings.V1MonitoringEnabled, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
+	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
 
-	runtime, err := runtime.NewManager(log, cfg.Settings.GRPC.String(), agentInfo, tracer, monitor, cfg.Settings.GRPC)
+	runtime, err := runtime.NewManager(
+		log,
+		baseLogger,
+		cfg.Settings.GRPC.String(),
+		agentInfo,
+		tracer,
+		monitor,
+		cfg.Settings.GRPC,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
 	}
 
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
 	var compModifiers []coordinator.ComponentsModifier
 	var composableManaged bool
-	if configuration.IsStandalone(cfg.Fleet) {
+	var isManaged bool
+	if testingMode {
+		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
+
+		// testing mode uses a config manager that takes configuration from over the control protocol
+		configMgr = newTestingModeConfigManager(log)
+	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
 		loader := config.NewLoader(log, paths.ExternalInputs())
@@ -89,10 +127,11 @@ func New(
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
 	} else {
+		isManaged = true
 		var store storage.Store
 		store, cfg, err = mergeFleetConfig(rawConfig)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
@@ -105,11 +144,13 @@ func New(
 
 			composableManaged = true
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
-				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo))
+				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
+				EndpointSignedComponentModifier(),
+			)
 
-			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime)
+			managed, err = newManagedConfigManager(log, agentInfo, cfg, store, runtime, fleetInitTimeout)
 			if err != nil {
-				return nil, err
+				return nil, nil, nil, err
 			}
 			configMgr = managed
 		}
@@ -117,16 +158,23 @@ func New(
 
 	composable, err := composable.New(log, rawConfig, composableManaged)
 	if err != nil {
-		return nil, errors.New(err, "failed to initialize composable controller")
+		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, composable, caps, monitor, isManaged, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
 		managed.coord = coord
 	}
-	return coord, nil
+
+	// It is important that feature flags from configuration are applied as late as possible.  This will ensure that
+	// any feature flag change callbacks are registered before they get called by `features.Apply`.
+	if err := features.Apply(rawConfig); err != nil {
+		return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
+	}
+
+	return coord, configMgr, composable, nil
 }
 
 func mergeFleetConfig(rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {

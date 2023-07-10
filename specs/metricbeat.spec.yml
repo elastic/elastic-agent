@@ -17,14 +17,20 @@ inputs:
       - redis
     shippers: &shippers
       - shipper
-    command:
-      args: &args
+    command: &command
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
+      args:
         - "-E"
         - "setup.ilm.enabled=false"
         - "-E"
         - "setup.template.enabled=false"
         - "-E"
         - "management.enabled=true"
+        - "-E"
+        - "management.restart_on_output_change=true"
         - "-E"
         - "logging.level=info"
         - "-E"
@@ -38,271 +44,250 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: elasticsearch/metrics
     description: "Elasticsearch metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
+  - name: enterprisesearch/metrics
+    description: "Enterprise search metrics"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
   - name: kibana/metrics
     description: "Kibana metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: kubernetes/metrics
     description: "Kubernetes metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: linux/metrics
     description: "Linux metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: logstash/metrics
     description: "Logstash metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: mongodb/metrics
     description: "Mongodb metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: mysql/metrics
     description: "MySQL metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: postgresql/metrics
     description: "PostgreSQL metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: redis/metrics
     description: "Redis metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: system/metrics
     description: "System metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: uwsgi/metrics
     description: "UWSGI metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: windows/metrics
     description: "Windows metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: aws/metrics
     description: "AWS metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: awsfargate/metrics
     description: "AWS Fargate metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: azure/metrics
     description: "Azure metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: cloudfoundry/metrics
     description: "PCF Cloudfoundry metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: containerd/metrics
     description: "Containerd metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: mssql/metrics
     description: "Microsoft SQL Server metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: oracle/metrics
     description: "Oracle Database metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: syncgateway/metrics
     description: "Couchbase Sync Gateway metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: http/metrics
     description: "HTTP metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: activemq/metrics
     description: "ActiveMQ metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: apache/metrics
     description: "Apache metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: etcd/metrics
     description: "Etcd metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: gcp/metrics
     description: "GCP metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: haproxy/metrics
     description: "HAProxy metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: iis/metrics
     description: "IIS metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: jolokia/metrics
     description: "Jolokia metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: kafka/metrics
     description: "Kafka metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
+  - name: memcached/metrics
+    description: "Memcached metrics"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
   - name: nats/metrics
     description: "NATS metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: nginx/metrics
     description: "NGINX metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: prometheus/metrics
     description: "Prometheus metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: rabbitmq/metrics
     description: "RabbitMQ metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: sql/metrics
     description: "SQL metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: stan/metrics
     description: "Stan metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
+  - name: statsd/metrics
+    description: "Statsd metrics"
+    platforms: *platforms
+    outputs: *outputs
+    shippers: *shippers
+    command: *command
   - name: traefik/metrics
     description: "Traefik metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: vsphere/metrics
     description: "VSphere metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command
   - name: zookeeper/metrics
     description: "ZooKeeper metrics"
     platforms: *platforms
     outputs: *outputs
     shippers: *shippers
-    command:
-      args: *args
+    command: *command

@@ -7,6 +7,7 @@ package composable_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -130,4 +131,90 @@ func TestController(t *testing.T) {
 	localMap, ok = local.(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "value2", localMap["key1"])
+}
+
+func TestCancellation(t *testing.T) {
+	cfg, err := config.NewConfigFrom(map[string]interface{}{
+		"providers": map[string]interface{}{
+			"env": map[string]interface{}{
+				"enabled": "false",
+			},
+			"local": map[string]interface{}{
+				"vars": map[string]interface{}{
+					"key1": "value1",
+				},
+			},
+			"local_dynamic": map[string]interface{}{
+				"items": []map[string]interface{}{
+					{
+						"vars": map[string]interface{}{
+							"key1": "value1",
+						},
+						"processors": []map[string]interface{}{
+							{
+								"add_fields": map[string]interface{}{
+									"fields": map[string]interface{}{
+										"add": "value1",
+									},
+									"to": "dynamic",
+								},
+							},
+						},
+					},
+					{
+						"vars": map[string]interface{}{
+							"key1": "value2",
+						},
+						"processors": []map[string]interface{}{
+							{
+								"add_fields": map[string]interface{}{
+									"fields": map[string]interface{}{
+										"add": "value2",
+									},
+									"to": "dynamic",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	log, err := logger.New("", false)
+	require.NoError(t, err)
+
+	// try with variable deadlines
+	timeout := 50 * time.Millisecond
+	for i := 1; i <= 10; i++ {
+		t.Run(fmt.Sprintf("test run %d", i), func(t *testing.T) {
+			c, err := composable.New(log, cfg, false)
+			require.NoError(t, err)
+			defer c.Close()
+
+			ctx, cancelFn := context.WithTimeout(context.Background(), timeout)
+			defer cancelFn()
+			err = c.Run(ctx)
+			// test will time out and fail if cancellation is not proper
+			if err != nil {
+				require.True(t, errors.Is(err, context.DeadlineExceeded))
+			}
+		})
+		timeout += 10 * time.Millisecond
+	}
+
+	t.Run("immediate cancellation", func(t *testing.T) {
+		c, err := composable.New(log, cfg, false)
+		require.NoError(t, err)
+		defer c.Close()
+
+		ctx, cancelFn := context.WithTimeout(context.Background(), 0)
+		cancelFn()
+		err = c.Run(ctx)
+		// test will time out and fail if cancellation is not proper
+		if err != nil {
+			require.True(t, errors.Is(err, context.DeadlineExceeded))
+		}
+	})
 }

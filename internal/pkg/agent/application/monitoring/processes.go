@@ -46,7 +46,7 @@ func processesHandler(coord *coordinator.Coordinator) func(http.ResponseWriter, 
 
 		procs := make([]process, 0)
 
-		state := coord.State(false)
+		state := coord.State()
 
 		for _, c := range state.Components {
 			if c.Component.InputSpec != nil {

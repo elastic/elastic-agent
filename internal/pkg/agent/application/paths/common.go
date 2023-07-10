@@ -22,6 +22,7 @@ const (
 	// AgentLockFileName is the name of the overall Elastic Agent file lock.
 	AgentLockFileName = "agent.lock"
 	tempSubdir        = "tmp"
+	tempSubdirPerms   = 0770
 
 	darwin = "darwin"
 )
@@ -85,7 +86,7 @@ func TempDir() string {
 	tmpDir := filepath.Join(Data(), tempSubdir)
 	tmpCreator.Do(func() {
 		// create tempdir as it probably don't exists
-		_ = os.MkdirAll(tmpDir, 0750)
+		_ = os.MkdirAll(tmpDir, tempSubdirPerms)
 	})
 	return tmpDir
 }

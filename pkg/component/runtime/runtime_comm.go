@@ -11,18 +11,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-
-	protobuf "google.golang.org/protobuf/proto"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-
-	"github.com/gofrs/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	protobuf "google.golang.org/protobuf/proto"
 
+	"github.com/gofrs/uuid"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -33,7 +30,11 @@ type Communicator interface {
 	// to the provided services.
 	WriteConnInfo(w io.Writer, services ...client.Service) error
 	// CheckinExpected sends the expected state to the component.
-	CheckinExpected(expected *proto.CheckinExpected)
+	//
+	// observed is the observed message received from the component and what was used to compute the provided
+	// expected message. In the case that `CheckinExpected` is being called from a configuration change resulting
+	// in a previously observed message not being present then `nil` should be passed in for observed.
+	CheckinExpected(expected *proto.CheckinExpected, observed *proto.CheckinObserved)
 	// CheckinObserved receives the observed state from the component.
 	CheckinObserved() <-chan *proto.CheckinObserved
 }
@@ -52,10 +53,12 @@ type runtimeComm struct {
 	checkinDone chan bool
 	checkinLock sync.RWMutex
 
-	checkinExpectedLock sync.Mutex
-	checkinExpected     chan *proto.CheckinExpected
-
+	checkinExpected chan *proto.CheckinExpected
 	checkinObserved chan *proto.CheckinObserved
+
+	initCheckinObserved   *proto.CheckinObserved
+	initCheckinExpectedCh chan *proto.CheckinExpected
+	initCheckinObservedMx sync.Mutex
 
 	actionsConn     bool
 	actionsDone     chan bool
@@ -86,7 +89,7 @@ func newRuntimeComm(logger *logger.Logger, listenAddr string, ca *authority.Cert
 		token:           token.String(),
 		cert:            pair,
 		checkinConn:     true,
-		checkinExpected: make(chan *proto.CheckinExpected, 1), // size of 1 channel to keep the latest expected checkin state
+		checkinExpected: make(chan *proto.CheckinExpected, 1),
 		checkinObserved: make(chan *proto.CheckinObserved),
 		actionsConn:     true,
 		actionsRequest:  make(chan *proto.ActionRequest),
@@ -129,7 +132,10 @@ func (c *runtimeComm) WriteConnInfo(w io.Writer, services ...client.Service) err
 	return nil
 }
 
-func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected) {
+func (c *runtimeComm) CheckinExpected(
+	expected *proto.CheckinExpected,
+	observed *proto.CheckinObserved,
+) {
 	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
 		expected.AgentInfo = &proto.CheckinAgentInfo{
 			Id:       c.agentInfo.AgentID(),
@@ -140,19 +146,35 @@ func (c *runtimeComm) CheckinExpected(expected *proto.CheckinExpected) {
 		expected.AgentInfo = nil
 	}
 
-	// Lock to avoid race if this function is called from the different go routines
-	c.checkinExpectedLock.Lock()
+	// we need to determine if the communicator is currently in the initial observed message path
+	// in the case that it is we send the expected state over a different channel
+	c.initCheckinObservedMx.Lock()
+	initObserved := c.initCheckinObserved
+	expectedCh := c.initCheckinExpectedCh
+	if initObserved != nil {
+		// the next call to `CheckinExpected` must be from the initial `CheckinObserved` message
+		if observed != initObserved {
+			// not the initial observed message; we don't send it
+			c.initCheckinObservedMx.Unlock()
+			return
+		}
+		// it is the expected from the initial observed message
+		// clear the initial state
+		c.initCheckinObserved = nil
+		c.initCheckinExpectedCh = nil
+		c.initCheckinObservedMx.Unlock()
+		expectedCh <- expected
+		return
+	}
+	c.initCheckinObservedMx.Unlock()
 
-	// Empty the channel
+	// not in the initial observed message path; send it over the standard channel
+	// clear channel making it the latest expected message
 	select {
 	case <-c.checkinExpected:
 	default:
 	}
-
-	// Put the new expected state in
 	c.checkinExpected <- expected
-
-	c.checkinExpectedLock.Unlock()
 }
 
 func (c *runtimeComm) CheckinObserved() <-chan *proto.CheckinObserved {
@@ -184,12 +206,30 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		c.checkinLock.Unlock()
 	}()
 
+	initExp := make(chan *proto.CheckinExpected)
 	recvDone := make(chan bool)
 	sendDone := make(chan bool)
 	go func() {
 		defer func() {
 			close(sendDone)
 		}()
+
+		// initial startup waits for the first expected message from the dedicated initExp channel
+		select {
+		case <-checkinDone:
+			return
+		case <-recvDone:
+			return
+		case expected := <-initExp:
+			err := server.Send(expected)
+			if err != nil {
+				if reportableErr(err) {
+					c.logger.Debugf("check-in stream failed to send initial expected state: %s", err)
+				}
+				return
+			}
+		}
+
 		for {
 			var expected *proto.CheckinExpected
 			select {
@@ -210,6 +250,22 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		}
 	}()
 
+	// at this point the client is connected, and it has sent it's first initial checkin
+	// the initial expected message must come before the sender goroutine will send any other
+	// expected messages. `CheckinExpected` method will also drop any expected messages that do not
+	// match the observed message to ensure that the expected that we receive is from the initial
+	// observed state.
+	c.initCheckinObservedMx.Lock()
+	c.initCheckinObserved = init
+	c.initCheckinExpectedCh = initExp
+	// clears the latest queued expected message
+	select {
+	case <-c.checkinExpected:
+	default:
+	}
+	c.initCheckinObservedMx.Unlock()
+
+	// send the initial message (manager then calls `CheckinExpected` method with the result)
 	c.checkinObserved <- init
 
 	go func() {

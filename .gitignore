@@ -1,4 +1,6 @@
 # Directories
+/.agent-testing
+/.ogc-cache
 /.vagrant
 /.idea
 /.vscode

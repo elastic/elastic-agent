@@ -1,5 +1,0 @@
-kind: feature
-summary: Service runtime for V2
-description: Service runtime for V2, tailored specifically for Endpoint service.
-pr: 1529
-issue: 1069

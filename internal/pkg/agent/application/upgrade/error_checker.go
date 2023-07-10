@@ -9,16 +9,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/control/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
-	statusCheckPeriod        = 30 * time.Second
 	statusCheckMissesAllowed = 4 // enable 2 minute start
 )
 
@@ -31,15 +31,17 @@ type ErrorChecker struct {
 	notifyChan      chan error
 	log             *logger.Logger
 	agentClient     client.Client
+	checkInterval   time.Duration
 }
 
 // NewErrorChecker creates a new error checker.
-func NewErrorChecker(ch chan error, log *logger.Logger) (*ErrorChecker, error) {
+func NewErrorChecker(ch chan error, log *logger.Logger, checkInterval time.Duration) (*ErrorChecker, error) {
 	c := client.New()
 	ec := &ErrorChecker{
-		notifyChan:  ch,
-		agentClient: c,
-		log:         log,
+		notifyChan:    ch,
+		agentClient:   c,
+		log:           log,
+		checkInterval: checkInterval,
 	}
 
 	return ec, nil
@@ -49,7 +51,7 @@ func NewErrorChecker(ch chan error, log *logger.Logger) (*ErrorChecker, error) {
 func (ch *ErrorChecker) Run(ctx context.Context) {
 	ch.log.Debug("Error checker started")
 	for {
-		t := time.NewTimer(statusCheckPeriod)
+		t := time.NewTimer(ch.checkInterval)
 		select {
 		case <-ctx.Done():
 			t.Stop()

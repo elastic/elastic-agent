@@ -12,14 +12,12 @@ inputs:
           parsers:
             - container:
                 format: auto
-                stream: ${kubernetes.hints.nginx_ingress_controller.access.stream|'all'}
+                stream: stdout
           paths:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           processors:
             - add_locale: null
-          prospector:
-            scanner:
-                symlinks: true
+          prospector.scanner.symlinks: true
           tags:
             - nginx-ingress-controller-access
         - condition: ${kubernetes.hints.nginx_ingress_controller.error.enabled} == true or ${kubernetes.hints.nginx_ingress_controller.enabled} == true
@@ -35,7 +33,7 @@ inputs:
           parsers:
             - container:
                 format: auto
-                stream: ${kubernetes.hints.nginx_ingress_controller.error.stream|'all'}
+                stream: stderr
           paths:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           processors:
@@ -45,9 +43,7 @@ inputs:
                         regexp:
                             message: '^[A-Z]{1}[0-9]{4} '
             - add_locale: null
-          prospector:
-            scanner:
-                symlinks: true
+          prospector.scanner.symlinks: true
           tags:
             - nginx-ingress-controller-error
       data_stream.namespace: default

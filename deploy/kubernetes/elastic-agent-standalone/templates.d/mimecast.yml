@@ -16,11 +16,11 @@ inputs:
           request.transforms:
             - set:
                 target: body.meta.pagination.pageSize
-                value: 500
+                value: 100
             - set:
-                default: '[{"endDateTime": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "startDateTime":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05+0700"]]"}]'
+                default: '[{"endDateTime": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "startDateTime":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
                 target: body.data
-                value: '[{"endDateTime": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "startDateTime":"[[.cursor.next_date]]"}]'
+                value: '[{"endDateTime": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "startDateTime":"[[.cursor.next_date]]"}]'
                 value_type: json
             - set:
                 target: header.x-mc-app-id
@@ -38,6 +38,8 @@ inputs:
           request.url: https://eu-api.mimecast.com/api/audit/get-audit-events
           response.decode_as: application/json
           response.pagination:
+            - delete:
+                target: body.data
             - set:
                 fail_on_template_error: true
                 target: body.meta.pagination.pageToken
@@ -59,9 +61,9 @@ inputs:
           request.method: POST
           request.transforms:
             - set:
-                default: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05+0700"]]"}]'
+                default: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
                 target: body.data
-                value: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "from":"[[.cursor.eventTime]]"}]'
+                value: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.eventTime]]"}]'
                 value_type: json
             - set:
                 target: header.x-mc-app-id
@@ -79,6 +81,8 @@ inputs:
           request.url: https://eu-api.mimecast.com/api/dlp/get-logs
           response.decode_as: application/json
           response.pagination:
+            - delete:
+                target: body.data
             - set:
                 fail_on_template_error: true
                 target: body.meta.pagination.pageToken
@@ -124,11 +128,6 @@ inputs:
                 value: '*/*'
           request.url: https://eu-api.mimecast.com/api/audit/get-siem-logs
           response.decode_as: application/zip
-          response.pagination:
-            - set:
-                target: body.data
-                value: '[{"type":"MTA","fileFormat":"json", "compress":true, "token": "[[.last_response.header.Get "mc-siem-token"]]"}]'
-                value_type: json
           response.split:
             target: body.data
             transforms:
@@ -150,9 +149,9 @@ inputs:
           request.method: POST
           request.transforms:
             - set:
-                default: '[{"feedType": "malware_customer","fileType": "stix","compress": false,"end": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "start":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05+0700"]]"}]'
+                default: '[{"feedType": "malware_customer","fileType": "stix","compress": false,"end": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "start":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
                 target: body.data
-                value: '[{"feedType": "malware_customer","fileType": "stix","compress": false,"end": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "start":"[[formatDate (.cursor.next_date)  "2006-01-02T15:04:05+0700"]]"}]'
+                value: '[{"feedType": "malware_customer","fileType": "stix","compress": false,"token": "[[.last_response.header.Get "x-mc-threat-feed-next-token"]]", "end": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "start":"[[formatDate (.cursor.next_date)  "2006-01-02T15:04:05-0700"]]"}]'
                 value_type: json
             - set:
                 target: header.x-mc-app-id
@@ -169,11 +168,6 @@ inputs:
                 value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/ttp/threat-intel/get-feed:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
           request.url: https://eu-api.mimecast.com/api/ttp/threat-intel/get-feed
           response.decode_as: application/json
-          response.pagination:
-            - set:
-                target: body.data
-                value: '[{"feedType": "malware_customer","fileType": "stix","compress": false,"token": "[[.last_response.header.Get "x-mc-threat-feed-next-token"]]","end": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "start":"[[.cursor.next_date]]"}]'
-                value_type: json
           response.split:
             target: body.objects
             transforms:
@@ -195,9 +189,9 @@ inputs:
           request.method: POST
           request.transforms:
             - set:
-                default: '[{"feedType": "malware_grid","fileType": "stix","compress": false,"end": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "start":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05+0700"]]"}]'
+                default: '[{"feedType": "malware_grid","fileType": "stix","compress": false,"end": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "start":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
                 target: body.data
-                value: '[{"feedType": "malware_grid","fileType": "stix","compress": false,"end": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "start":"[[formatDate (.cursor.next_date)  "2006-01-02T15:04:05+0700"]]"}]'
+                value: '[{"feedType": "malware_grid","fileType": "stix","compress": false,"token": "[[.last_response.header.Get "x-mc-threat-feed-next-token"]]", "end": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "start":"[[formatDate (.cursor.next_date)  "2006-01-02T15:04:05-0700"]]"}]'
                 value_type: json
             - set:
                 target: header.x-mc-app-id
@@ -214,11 +208,6 @@ inputs:
                 value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/ttp/threat-intel/get-feed:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
           request.url: https://eu-api.mimecast.com/api/ttp/threat-intel/get-feed
           response.decode_as: application/json
-          response.pagination:
-            - set:
-                target: body.data
-                value: '[{"feedType": "malware_grid","fileType": "stix","compress": false,"token": "[[.last_response.header.Get "x-mc-threat-feed-next-token"]]","end": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "start":"[[.cursor.next_date]]"}]'
-                value_type: json
           response.split:
             target: body.objects
             transforms:
@@ -240,9 +229,9 @@ inputs:
           request.method: POST
           request.transforms:
             - set:
-                default: '[{"oldestFirst": false, "route": "all", "result":"all","to": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05+0700"]]"}]'
+                default: '[{"oldestFirst": false, "route": "all", "result":"all","to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
                 target: body.data
-                value: '[{"oldestFirst": false, "route": "all", "result":"all","to": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "from":"[[.cursor.next_date]]"}]'
+                value: '[{"oldestFirst": false, "route": "all", "result":"all","to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.next_date]]"}]'
                 value_type: json
             - set:
                 target: header.x-mc-app-id
@@ -260,6 +249,8 @@ inputs:
           request.url: https://eu-api.mimecast.com/api/ttp/attachment/get-logs
           response.decode_as: application/json
           response.pagination:
+            - delete:
+                target: body.data
             - set:
                 fail_on_template_error: true
                 target: body.meta.pagination.pageToken
@@ -283,9 +274,9 @@ inputs:
           request.method: POST
           request.transforms:
             - set:
-                default: '[{"oldestFirst": false,"to": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05+0700"]]"}]'
+                default: '[{"oldestFirst": false,"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
                 target: body.data
-                value: '[{"oldestFirst": false,"to": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "from":"[[.cursor.next_date]]"}]'
+                value: '[{"oldestFirst": false,"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.next_date]]"}]'
                 value_type: json
             - set:
                 target: header.x-mc-app-id
@@ -303,6 +294,8 @@ inputs:
           request.url: https://eu-api.mimecast.com/api/ttp/impersonation/get-logs
           response.decode_as: application/json
           response.pagination:
+            - delete:
+                target: body.data
             - set:
                 fail_on_template_error: true
                 target: body.meta.pagination.pageToken
@@ -326,9 +319,9 @@ inputs:
           request.method: POST
           request.transforms:
             - set:
-                default: '[{"oldestFirst": false,"scanResult": "all","route":"all","to": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05+0700"]]"}]'
+                default: '[{"oldestFirst": false,"scanResult": "all","route":"all","to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
                 target: body.data
-                value: '[{"oldestFirst": false,"scanResult": "all","route":"all","to": "[[formatDate (now) "2006-01-02T15:04:05+0700"]]", "from":"[[.cursor.next_date]]"}]'
+                value: '[{"oldestFirst": false,"scanResult": "all","route":"all","to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.next_date]]"}]'
                 value_type: json
             - set:
                 target: header.x-mc-app-id
@@ -346,6 +339,8 @@ inputs:
           request.url: https://eu-api.mimecast.com/api/ttp/url/get-logs
           response.decode_as: application/json
           response.pagination:
+            - delete:
+                target: body.data
             - set:
                 fail_on_template_error: true
                 target: body.meta.pagination.pageToken

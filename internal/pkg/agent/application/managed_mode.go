@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -21,10 +22,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/uploader"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
@@ -32,17 +35,21 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// dispatchFlushInterval is the max time between calls to dispatcher.Dispatch
+const dispatchFlushInterval = time.Minute * 5
+
 type managedConfigManager struct {
-	log         *logger.Logger
-	agentInfo   *info.AgentInfo
-	cfg         *configuration.Configuration
-	client      *remote.Client
-	store       storage.Store
-	stateStore  *store.StateStore
-	actionQueue *queue.ActionQueue
-	dispatcher  *dispatcher.ActionDispatcher
-	runtime     *runtime.Manager
-	coord       *coordinator.Coordinator
+	log              *logger.Logger
+	agentInfo        *info.AgentInfo
+	cfg              *configuration.Configuration
+	client           *remote.Client
+	store            storage.Store
+	stateStore       *store.StateStore
+	actionQueue      *queue.ActionQueue
+	dispatcher       *dispatcher.ActionDispatcher
+	runtime          *runtime.Manager
+	coord            *coordinator.Coordinator
+	fleetInitTimeout time.Duration
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
@@ -54,6 +61,7 @@ func newManagedConfigManager(
 	cfg *configuration.Configuration,
 	storeSaver storage.Store,
 	runtime *runtime.Manager,
+	fleetInitTimeout time.Duration,
 ) (*managedConfigManager, error) {
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
@@ -80,17 +88,18 @@ func newManagedConfigManager(
 	}
 
 	return &managedConfigManager{
-		log:         log,
-		agentInfo:   agentInfo,
-		cfg:         cfg,
-		client:      client,
-		store:       storeSaver,
-		stateStore:  stateStore,
-		actionQueue: actionQueue,
-		dispatcher:  actionDispatcher,
-		runtime:     runtime,
-		ch:          make(chan coordinator.ConfigChange),
-		errCh:       make(chan error),
+		log:              log,
+		agentInfo:        agentInfo,
+		cfg:              cfg,
+		client:           client,
+		store:            storeSaver,
+		stateStore:       stateStore,
+		actionQueue:      actionQueue,
+		dispatcher:       actionDispatcher,
+		runtime:          runtime,
+		fleetInitTimeout: fleetInitTimeout,
+		ch:               make(chan coordinator.ConfigChange),
+		errCh:            make(chan error),
 	}, nil
 }
 
@@ -163,7 +172,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
 		} else {
-			err = m.initFleetServer(ctx)
+			err = m.initFleetServer(ctx, m.cfg.Fleet.Server)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
@@ -175,7 +184,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.agentInfo,
 		m.client,
 		actionAcker,
-		m.coord,
+		m.coord.State,
 		m.stateStore,
 	)
 	if err != nil {
@@ -206,20 +215,27 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return gateway.Run(ctx)
 	})
 
-	// pass actions collected from gateway to dispatcher
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case actions := <-gateway.Actions():
-				m.dispatcher.Dispatch(ctx, actionAcker, actions...)
-			}
-		}
-	}()
+	go runDispatcher(ctx, m.dispatcher, gateway, actionAcker, dispatchFlushInterval)
 
 	<-ctx.Done()
 	return gatewayRunner.Err()
+}
+
+// runDispatcher passes actions collected from gateway to dispatcher or calls Dispatch with no actions every flushInterval.
+func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, fleetGateway gateway.FleetGateway, actionAcker acker.Acker, flushInterval time.Duration) {
+	t := time.NewTimer(flushInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C: // periodically call the dispatcher to handle scheduled actions.
+			actionDispatcher.Dispatch(ctx, actionAcker)
+			t.Reset(flushInterval)
+		case actions := <-fleetGateway.Actions():
+			actionDispatcher.Dispatch(ctx, actionAcker, actions...)
+			t.Reset(flushInterval)
+		}
+	}
 }
 
 // ActionErrors returns the error channel for actions.
@@ -246,14 +262,19 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 	return false
 }
 
-func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
+
+	if m.fleetInitTimeout == 0 {
+		m.fleetInitTimeout = 30 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, m.fleetInitTimeout)
 	defer cancel()
 
-	m.log.Debugf("injecting basic fleet-server for first start")
+	m.log.Debugf("injecting basic fleet-server for first start, will wait %s", m.fleetInitTimeout)
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("timeout while waiting for fleet server start: %w", ctx.Err())
 	case m.ch <- &localConfigChange{injectFleetServerInput}:
 	}
 
@@ -297,8 +318,8 @@ func fleetServerRunning(state runtime.ComponentState) bool {
 	return false
 }
 
-func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *handlers.PolicyChange {
-	policyChanger := handlers.NewPolicyChange(
+func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *handlers.PolicyChangeHandler {
+	policyChanger := handlers.NewPolicyChangeHandler(
 		m.log,
 		m.agentInfo,
 		m.cfg,
@@ -349,8 +370,18 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	)
 
 	m.dispatcher.MustRegister(
+		&fleetapi.ActionDiagnostics{},
+		handlers.NewDiagnostics(
+			m.log,
+			m.coord,
+			m.cfg.Settings.MonitoringConfig.Diagnostics.Limit,
+			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),
+		),
+	)
+
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionApp{},
-		handlers.NewAppAction(m.log, m.coord),
+		handlers.NewAppAction(m.log, m.coord, m.agentInfo.AgentID()),
 	)
 
 	m.dispatcher.MustRegister(

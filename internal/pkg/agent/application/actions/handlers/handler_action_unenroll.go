@@ -7,12 +7,17 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+)
+
+const (
+	unenrollTimeout = 15 * time.Second
 )
 
 type stateStore interface {
@@ -60,19 +65,21 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		a = nil
 	}
 
-	h.ch <- &policyChange{
-		ctx:    ctx,
-		cfg:    config.New(),
-		action: a,
-		acker:  acker,
-		commit: true,
-	}
+	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true)
+	h.ch <- unenrollPolicy
 
 	if h.stateStore != nil {
 		// backup action for future start to avoid starting fleet gateway loop
 		h.stateStore.Add(a)
-		h.stateStore.Save()
+		if err := h.stateStore.Save(); err != nil {
+			h.log.Warnf("Failed to update state store: %v", err)
+		}
 	}
+
+	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
+	defer cancel()
+
+	unenrollPolicy.WaitAck(unenrollCtx)
 
 	// close fleet gateway loop
 	for _, c := range h.closers {

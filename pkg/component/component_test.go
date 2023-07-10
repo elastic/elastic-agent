@@ -8,9 +8,22 @@ package component
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/go-ucfg"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -36,8 +49,10 @@ func TestToComponents(t *testing.T) {
 		Name     string
 		Platform PlatformDetail
 		Policy   map[string]interface{}
+		LogLevel logp.Level
 		Err      string
 		Result   []Component
+		headers  HeadersProvider
 	}{
 		{
 			Name:     "Empty policy",
@@ -192,7 +207,7 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 			},
-			Err: `invalid 'inputs.1.id', has a duplicate id "filestream" (id is required to be unique)`,
+			Err: `invalid 'inputs.1.id', has a duplicate id "filestream". Please add a unique value for the 'id' key to each input in the agent policy`,
 		},
 		{
 			Name:     "Invalid: inputs entry id not a string",
@@ -295,9 +310,11 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID:        "unknown-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       ErrInputNotSupported,
+					InputType:  "unknown",
+					OutputType: "elasticsearch",
+					ID:         "unknown-default",
+					InputSpec:  &InputRuntimeSpec{},
+					Err:        ErrInputNotSupported,
 					Units: []Unit{
 						{
 							ID:       "unknown-default",
@@ -331,19 +348,25 @@ func TestToComponents(t *testing.T) {
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
-						"type": "endpoint",
-						"id":   "endpoint-0",
+						"type": "fleet-server",
+						"id":   "fleet-server-0",
 					},
 				},
 			},
 			Result: []Component{
 				{
-					ID:        "endpoint-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       ErrOutputNotSupported,
+					InputType:  "fleet-server",
+					OutputType: "logstash",
+					ID:         "fleet-server-default",
+					Err:        ErrOutputNotSupported,
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "fleet-server",
+						BinaryName: "fleet-server",
+						BinaryPath: filepath.Join("..", "..", "specs", "fleet-server"),
+					},
 					Units: []Unit{
 						{
-							ID:       "endpoint-default",
+							ID:       "fleet-server-default",
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
@@ -351,12 +374,12 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 						{
-							ID:       "endpoint-default-endpoint-0",
+							ID:       "fleet-server-default-fleet-server-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "endpoint",
-								"id":   "endpoint-0",
+								"type": "fleet-server",
+								"id":   "fleet-server-0",
 							}),
 						},
 					},
@@ -393,9 +416,11 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID:        "endpoint-default",
-					InputSpec: &InputRuntimeSpec{},
-					Err:       NewErrInputRuntimeCheckFail("No support for RHEL7 on arm64"),
+					InputType:  "endpoint",
+					OutputType: "elasticsearch",
+					ID:         "endpoint-default",
+					InputSpec:  &InputRuntimeSpec{},
+					Err:        NewErrInputRuntimeCheckFail("No support for RHEL7 on arm64"),
 					Units: []Unit{
 						{
 							ID:       "endpoint-default",
@@ -450,7 +475,9 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID: "filestream-default",
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					ID:         "filestream-default",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -547,6 +574,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -565,6 +594,117 @@ func TestToComponents(t *testing.T) {
 							ID:       "filestream-default-filestream-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "Debug log level",
+			Platform: linuxAMD64Platform,
+			LogLevel: logp.DebugLevel,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-1",
+						"enabled": false,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: client.UnitLogLevelDebug,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: client.UnitLogLevelDebug,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "Unique log level",
+			Platform: linuxAMD64Platform,
+			LogLevel: logp.ErrorLevel,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":      "filestream",
+						"id":        "filestream-0",
+						"enabled":   true,
+						"log_level": "debug",
+					},
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-1",
+						"enabled": false,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: client.UnitLogLevelError,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: client.UnitLogLevelDebug,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
 								"id":   "filestream-0",
@@ -649,6 +789,8 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -684,6 +826,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -719,6 +863,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -738,7 +884,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-0",
 							}, "log"),
 						},
@@ -754,6 +900,8 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -773,13 +921,15 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-2",
 							}, "log"),
 						},
 					},
 				},
 				{
+					InputType:  "log",
+					OutputType: "logstash",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -799,13 +949,15 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-3",
 							}, "log"),
 						},
 					},
 				},
 				{
+					InputType:  "log",
+					OutputType: "redis",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -825,13 +977,15 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-4",
 							}, "log"),
 						},
 					},
 				},
 				{
+					InputType:  "apm",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "apm",
 						BinaryName: "apm-server",
@@ -887,7 +1041,9 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID: "filestream-default",
+					ID:         "filestream-default",
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -912,13 +1068,15 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "filestream-default",
 					},
 				},
 				{
-					ID: "shipper-default",
+					ID:         "shipper-default",
+					OutputType: "elasticsearch",
 					ShipperSpec: &ShipperRuntimeSpec{
 						ShipperType: "shipper",
 						BinaryName:  "shipper",
@@ -931,9 +1089,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": true,
-								},
 							}),
 						},
 						{
@@ -941,7 +1096,8 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "filestream-default",
+								"id":   "filestream-default",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "filestream-default-filestream-0",
@@ -963,8 +1119,10 @@ func TestToComponents(t *testing.T) {
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
 					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"shipper": map[string]interface{}{},
+						"type": "elasticsearch",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"other": map[string]interface{}{
 						"type": "elasticsearch",
@@ -973,12 +1131,16 @@ func TestToComponents(t *testing.T) {
 						},
 					},
 					"stashit": map[string]interface{}{
-						"type":    "logstash",
-						"shipper": map[string]interface{}{},
+						"type": "logstash",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"redis": map[string]interface{}{
-						"type":    "redis",
-						"shipper": map[string]interface{}{},
+						"type": "redis",
+						"shipper": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 				},
 				"inputs": []interface{}{
@@ -1038,7 +1200,9 @@ func TestToComponents(t *testing.T) {
 			},
 			Result: []Component{
 				{
-					ID: "filestream-default",
+					ID:         "filestream-default",
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1072,13 +1236,16 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "filestream-default",
 					},
 				},
 				{
-					ID: "filestream-other",
+					ID:         "filestream-other",
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
 						BinaryName: "filebeat",
@@ -1091,9 +1258,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": false,
-								},
 							}),
 						},
 						{
@@ -1117,7 +1281,9 @@ func TestToComponents(t *testing.T) {
 					},
 				},
 				{
-					ID: "log-default",
+					ID:         "log-default",
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1137,7 +1303,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-0",
 							}, "log"),
 						},
@@ -1151,13 +1317,15 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-default",
 						UnitID:      "log-default",
 					},
 				},
 				{
-					ID: "shipper-default",
+					ID:         "shipper-default",
+					OutputType: "elasticsearch",
 					ShipperSpec: &ShipperRuntimeSpec{
 						ShipperType: "shipper",
 						BinaryName:  "shipper",
@@ -1169,7 +1337,8 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "filestream-default",
+								"id":   "filestream-default",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "filestream-default-filestream-0",
@@ -1193,12 +1362,13 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "log-default",
+								"id":   "log-default",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "log-default-logfile-0",
 										"config": map[string]interface{}{
-											"type": "logfile",
+											"type": "log",
 											"id":   "logfile-0",
 										},
 									},
@@ -1217,14 +1387,15 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "elasticsearch",
-								"shipper": map[string]interface{}{},
+								"type": "elasticsearch",
 							}),
 						},
 					},
 				},
 				{
-					ID: "log-other",
+					ID:         "log-other",
+					InputType:  "log",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1237,9 +1408,6 @@ func TestToComponents(t *testing.T) {
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
-								"shipper": map[string]interface{}{
-									"enabled": false,
-								},
 							}),
 						},
 						{
@@ -1247,14 +1415,16 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-2",
 							}, "log"),
 						},
 					},
 				},
 				{
-					ID: "log-stashit",
+					ID:         "log-stashit",
+					InputType:  "log",
+					OutputType: "logstash",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1274,18 +1444,20 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-3",
 							}, "log"),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-stashit",
 						UnitID:      "log-stashit",
 					},
 				},
 				{
-					ID: "shipper-stashit",
+					ID:         "shipper-stashit",
+					OutputType: "logstash",
 					ShipperSpec: &ShipperRuntimeSpec{
 						ShipperType: "shipper",
 						BinaryName:  "shipper",
@@ -1297,12 +1469,13 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "log-stashit",
+								"id":   "log-stashit",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "log-stashit-logfile-3",
 										"config": map[string]interface{}{
-											"type": "logfile",
+											"type": "log",
 											"id":   "logfile-3",
 										},
 									},
@@ -1314,14 +1487,15 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "logstash",
-								"shipper": map[string]interface{}{},
+								"type": "logstash",
 							}),
 						},
 					},
 				},
 				{
-					ID: "log-redis",
+					ID:         "log-redis",
+					InputType:  "log",
+					OutputType: "redis",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
 						BinaryName: "filebeat",
@@ -1341,18 +1515,20 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "logfile",
+								"type": "log",
 								"id":   "logfile-4",
 							}, "log"),
 						},
 					},
-					Shipper: &ShipperReference{
+					ShipperRef: &ShipperReference{
+						ShipperType: "shipper",
 						ComponentID: "shipper-redis",
 						UnitID:      "log-redis",
 					},
 				},
 				{
-					ID: "shipper-redis",
+					ID:         "shipper-redis",
+					OutputType: "redis",
 					ShipperSpec: &ShipperRuntimeSpec{
 						ShipperType: "shipper",
 						BinaryName:  "shipper",
@@ -1364,12 +1540,13 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"id": "log-redis",
+								"id":   "log-redis",
+								"type": "shipper",
 								"units": []interface{}{
 									map[string]interface{}{
 										"id": "log-redis-logfile-4",
 										"config": map[string]interface{}{
-											"type": "logfile",
+											"type": "log",
 											"id":   "logfile-4",
 										},
 									},
@@ -1381,14 +1558,15 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "redis",
-								"shipper": map[string]interface{}{},
+								"type": "redis",
 							}),
 						},
 					},
 				},
 				{
-					ID: "apm-default",
+					ID:         "apm-default",
+					InputType:  "apm",
+					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "apm",
 						BinaryName: "apm-server",
@@ -1400,8 +1578,7 @@ func TestToComponents(t *testing.T) {
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
-								"type":    "elasticsearch",
-								"shipper": map[string]interface{}{},
+								"type": "elasticsearch",
 							}),
 						},
 						{
@@ -1417,6 +1594,286 @@ func TestToComponents(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:     "Alias representation",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "logfile",
+						"id":      "some-id",
+						"enabled": true,
+					},
+					map[string]interface{}{
+						"type":    "log",
+						"id":      "log-1",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "log",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "log",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "log-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "log-default-some-id",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "log",
+								"id":   "some-id",
+							}),
+						},
+						{
+							ID:       "log-default-log-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "log",
+								"id":   "log-1",
+							}),
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "Headers injection",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+								"headers": map[string]interface{}{
+									"header-one": "val-1",
+								},
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+			headers: &testHeadersProvider{headers: map[string]string{
+				"header-one": "val-1",
+			}},
+		}, {
+			Name:     "Headers injection merge",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+						"headers": map[string]interface{}{
+							"header-two": "val-2",
+						},
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+								"headers": map[string]interface{}{
+									"header-two": "val-2",
+									"header-one": "val-1",
+								},
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+			headers: &testHeadersProvider{headers: map[string]string{
+				"header-one": "val-1",
+			}},
+		},
+		{
+			Name:     "Headers injection not injecting kafka",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "kafka",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "kafka",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "kafka",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+			headers: &testHeadersProvider{headers: map[string]string{
+				"header-one": "val-1",
+			}},
+		},
+		{
+			Name:     "Headers injection not injecting logstash",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "logstash",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":    "filestream",
+						"id":      "filestream-0",
+						"enabled": true,
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "logstash",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "filebeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "logstash",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+				},
+			},
+			headers: &testHeadersProvider{headers: map[string]string{
+				"header-one": "val-1",
+			}},
+		},
 	}
 
 	for _, scenario := range scenarios {
@@ -1424,7 +1881,7 @@ func TestToComponents(t *testing.T) {
 			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
 			require.NoError(t, err)
 
-			result, err := runtime.ToComponents(scenario.Policy, nil)
+			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers)
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -1437,16 +1894,24 @@ func TestToComponents(t *testing.T) {
 					if expected.Err != nil {
 						assert.Equal(t, expected.Err, actual.Err)
 						assert.EqualValues(t, expected.Units, actual.Units)
-					} else if expected.InputSpec != nil {
+					} else {
+						assert.NoError(t, actual.Err, "Expected no error for component "+actual.ID)
+					}
+					assert.Equal(t, expected.InputType, actual.InputType, "%q: component %q has wrong input type", scenario.Name, actual.ID)
+					assert.Equal(t, expected.OutputType, actual.OutputType, "%q: component %q has wrong output type", scenario.Name, actual.ID)
+					if expected.InputSpec != nil {
 						assert.Nil(t, actual.ShipperSpec)
 						assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
 						assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
 						assert.Equal(t, expected.InputSpec.BinaryPath, actual.InputSpec.BinaryPath)
+						for i, eu := range expected.Units {
+							assert.EqualValues(t, eu.Config, actual.Units[i].Config)
+						}
 						assert.EqualValues(t, expected.Units, actual.Units)
-						if expected.Shipper != nil {
-							assert.Equal(t, *expected.Shipper, *actual.Shipper)
+						if expected.ShipperRef != nil {
+							assert.Equal(t, *expected.ShipperRef, *actual.ShipperRef)
 						} else {
-							assert.Nil(t, actual.Shipper)
+							assert.Nil(t, actual.ShipperRef)
 						}
 					} else if expected.ShipperSpec != nil {
 						assert.Nil(t, actual.InputSpec)
@@ -1454,7 +1919,7 @@ func TestToComponents(t *testing.T) {
 						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
 						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
 
-						assert.Nil(t, actual.Shipper)
+						assert.Nil(t, actual.ShipperRef)
 						assert.Len(t, actual.Units, len(expected.Units))
 						for i := range expected.Units {
 							assertEqualUnitExpectedConfigs(t, &expected.Units[i], &actual.Units[i])
@@ -1463,6 +1928,103 @@ func TestToComponents(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPreventionsAreValid(t *testing.T) {
+	// Test that all spec file preventions use valid syntax and variable names.
+
+	specFiles, err := specFilesForDirectory(filepath.Join("..", "..", "specs"))
+	require.NoError(t, err)
+
+	// Create placeholder variables containing all valid variable names
+	// for spec file prevention conditions. We don't care what the values
+	// are, because we aren't checking the behavior of the preventions for
+	// specific platforms, just making sure that they don't reference any
+	// invalid variables.
+	// This test intentionally uses a fixed variable list instead of
+	// calling varsForPlatform(), to make sure anyone who adds support for
+	// new variables sees this message:
+	// If you find yourself wanting to update this test to add a new
+	// value because Agent now supports additional variables, make sure
+	// you update `docs/component-specs.md` in the same PR to document
+	// the change.
+	vars, err := transpiler.NewVars("", map[string]interface{}{
+		"runtime": map[string]interface{}{
+			"platform": "platform",
+			"os":       "os",
+			"arch":     "arch",
+			"family":   "family",
+			"major":    "major",
+			"minor":    "minor",
+		},
+		"user": map[string]interface{}{
+			"root": false,
+		},
+	}, nil)
+	require.NoError(t, err)
+
+	for path, spec := range specFiles {
+		for _, input := range spec.Inputs {
+			for _, prevention := range input.Runtime.Preventions {
+				_, err := eql.Eval(prevention.Condition, vars, false)
+				assert.NoErrorf(t, err, "input '%v' in spec file '%v' has error in prevention [%v]",
+					input.Name, path, prevention.Condition)
+			}
+		}
+		for _, shipper := range spec.Shippers {
+			for _, prevention := range shipper.Runtime.Preventions {
+				_, err := eql.Eval(prevention.Condition, vars, false)
+				assert.NoErrorf(t, err, "shipper '%v' in spec file '%v' has error in prevention [%v]",
+					shipper.Name, path, prevention.Condition)
+			}
+		}
+	}
+}
+
+func TestSpecDurationsAreValid(t *testing.T) {
+	// Test that durations specified in all spec files explicitly specify valid units.
+
+	specFiles, err := specFilesForDirectory(filepath.Join("..", "..", "specs"))
+	require.NoError(t, err)
+
+	// Recursively reflect on component.Spec struct to find time.Duration fields
+	// and gather their paths.
+	for specFilePath, spec := range specFiles {
+		specFilePath, err = filepath.Abs(specFilePath)
+		require.NoError(t, err)
+
+		// Gather all duration fields' YAML paths so we an check if the
+		// value at each path is valid.
+		durationFieldPaths := gatherDurationFieldPaths(spec, "")
+
+		// Parse each spec file's YAML into a ucfg.Config object for
+		// easy access to field values via their paths.
+		data, err := os.ReadFile(specFilePath)
+		require.NoError(t, err)
+
+		var v map[string]interface{}
+		err = yaml.Unmarshal(data, &v)
+		require.NoError(t, err)
+
+		cfg, err := ucfg.NewFrom(v, ucfg.PathSep("."))
+		require.NoError(t, err)
+
+		for _, durationFieldPath := range durationFieldPaths {
+			exists, err := cfg.Has(durationFieldPath, -1, ucfg.PathSep("."))
+			if !exists {
+				continue
+			}
+			require.NoError(t, err)
+
+			value, err := cfg.String(durationFieldPath, -1, ucfg.PathSep("."))
+			require.NoError(t, err)
+
+			// Ensure that value can be parsed as a time.Duration. This parsing will
+			// fail if there is no unit suffix explicitly specified.
+			_, err = time.ParseDuration(value)
+			assert.NoErrorf(t, err, "in spec file [%s], field [%s] has invalid value [%s]: %s", specFilePath, durationFieldPath, value, err)
+		}
 	}
 }
 
@@ -1580,4 +2142,65 @@ func mustExpectedConfigForceType(cfg map[string]interface{}, forceType string) *
 	res := MustExpectedConfig(cfg)
 	res.Type = forceType
 	return res
+}
+
+type testHeadersProvider struct {
+	headers map[string]string
+}
+
+func (h *testHeadersProvider) Headers() map[string]string {
+	return h.headers
+}
+
+func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
+	var gatheredPaths []string
+
+	rt := reflect.TypeOf(s)
+	rv := reflect.ValueOf(s)
+
+	switch rt.Kind() {
+	case reflect.Int64:
+		// If this is a time.Duration value, we gather its path.
+		if rv.Type().PkgPath() == "time" && rv.Type().Name() == "Duration" {
+			gatheredPaths = append(gatheredPaths, pathSoFar)
+			return gatheredPaths
+		}
+
+	case reflect.Slice:
+		// Recurse on slice elements
+		for i := 0; i < rv.Len(); i++ {
+			morePaths := gatherDurationFieldPaths(rv.Index(i).Interface(), pathSoFar+"."+strconv.Itoa(i))
+			gatheredPaths = append(gatheredPaths, morePaths...)
+		}
+		return gatheredPaths
+
+	case reflect.Struct:
+		// Recurse on the struct's fields
+		if pathSoFar != "" {
+			pathSoFar += "."
+		}
+		for i := 0; i < rv.NumField(); i++ {
+			tags := rt.Field(i).Tag
+			yamlTag := tags.Get("yaml")
+			yamlFieldName, _, _ := strings.Cut(yamlTag, ",")
+			yamlFieldPath := pathSoFar + yamlFieldName
+
+			morePaths := gatherDurationFieldPaths(rv.Field(i).Interface(), yamlFieldPath)
+			gatheredPaths = append(gatheredPaths, morePaths...)
+		}
+		return gatheredPaths
+
+	case reflect.Ptr:
+		if rv.IsNil() {
+			// Nil pointer, nothing more to do
+			return gatheredPaths
+		}
+
+		// Recurse on the dereferenced pointer value.
+		morePaths := gatherDurationFieldPaths(rv.Elem().Interface(), pathSoFar)
+		gatheredPaths = append(gatheredPaths, morePaths...)
+		return gatheredPaths
+	}
+
+	return gatheredPaths
 }

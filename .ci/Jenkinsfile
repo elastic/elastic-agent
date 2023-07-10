@@ -3,7 +3,7 @@
 @Library('apm@current') _
 
 pipeline {
-  agent { label 'ubuntu-20.04 && immutable' }
+  agent { label 'ubuntu-22 && immutable' }
   environment {
     REPO = "elastic-agent"
     BASE_DIR = "src/github.com/elastic/${env.REPO}"
@@ -57,7 +57,7 @@ pipeline {
         stashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
         dir("${BASE_DIR}"){
           setEnvVar('ONLY_DOCS', isGitRegionMatch(patterns: [ '.*\\.(asciidoc|md)' ], shouldMatchAll: true).toString())
-          setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
+          setEnvVar('PACKAGING_CHANGES', isGitRegionMatch(patterns: [ '(^dev-tools/packaging/.*|.ci/Jenkinsfile|.go-version|Dockerfile)' ], shouldMatchAll: false).toString())
           setEnvVar('K8S_CHANGES', isGitRegionMatch(patterns: [ '(^deploy/kubernetes/.*|^version/docs/version.asciidoc|.ci/Jenkinsfile)' ], shouldMatchAll: false).toString())
           setEnvVar('EXT_WINDOWS_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
           setEnvVar('EXT_M1_CHANGES', isGitRegionMatch(patterns: [ '.ci/Jenkinsfile' ], shouldMatchAll: false).toString())
@@ -92,7 +92,7 @@ pipeline {
           axis {
             name 'PLATFORM'
             // Orka workers are not healthy (memory and connectivity issues)
-            values 'ubuntu-20.04 && immutable', 'aws && aarch64', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable' //, 'macos12 && x86_64'
+            values 'ubuntu-22 && immutable', 'aws && aarch64 && gobld/diskSizeGb:200', 'windows-2016 && windows-immutable', 'windows-2022 && windows-immutable' //, 'macos12 && x86_64'
           }
         }
         stages {
@@ -152,7 +152,7 @@ pipeline {
               // Always when running builds on branches/tags
               // Enable if k8s related changes.
               allOf {
-                expression { return env.PLATFORM == 'ubuntu-20.04 && immutable' }
+                expression { return env.PLATFORM == 'ubuntu-22 && immutable' }
                 anyOf {
                   not { changeRequest() }                           // If no PR
                   expression { return env.K8S_CHANGES == "true" }
@@ -160,7 +160,7 @@ pipeline {
               }
             }
             steps {
-              runK8s(k8sVersion: 'v1.25.0-beta.0', kindVersion: 'v0.14.0', context: "K8s-${PLATFORM}")
+              runK8s(k8sVersion: 'v1.26.0', kindVersion: 'v0.17.0', context: "K8s-${PLATFORM}")
             }
           }
           stage('Package') {
@@ -227,12 +227,12 @@ pipeline {
       }
       failFast false
       matrix {
-        agent {label 'ubuntu-20.04 && immutable'}
+        agent {label 'ubuntu-22 && immutable'}
         options { skipDefaultCheckout() }
         axes {
           axis {
             name 'K8S_VERSION'
-            values "v1.25.0","v1.24.3", "v1.23.6", "v1.22.9"
+            values "v1.26.0","v1.25.0","v1.24.3", "v1.23.6"
           }
         }
         stages {
@@ -240,7 +240,7 @@ pipeline {
             steps {
               deleteDir()
               unstashV2(name: 'source', bucket: "${JOB_GCS_BUCKET}", credentialsId: "${JOB_GCS_CREDENTIALS}")
-              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.14.0', context: "K8s-${K8S_VERSION}")
+              runK8s(k8sVersion: K8S_VERSION, kindVersion: 'v0.17.0', context: "K8s-${K8S_VERSION}")
             }
             post {
               always {
@@ -261,7 +261,7 @@ pipeline {
         }
       }
       failFast false
-        agent {label 'ubuntu-20.04 && immutable'}
+        agent {label 'ubuntu-22 && immutable'}
         options { skipDefaultCheckout() }
         stages {
           stage('OpenKibanaPR') {
@@ -400,11 +400,10 @@ pipeline {
     }
     stage('e2e tests') {
       when {
-        // Always when running builds on branches/tags
-        // Enable if e2e related changes.
+        // Disable until we fix the e2e test.
+        // This should be running when there is a comment or the e2e label
         beforeAgent true
         anyOf {
-          not { changeRequest() }
           // package artifacts are not generated if ONLY_DOCS, therefore e2e should not run if ONLY_DOCS
           expression { return isE2eEnabled() && env.ONLY_DOCS == "false"}
         }

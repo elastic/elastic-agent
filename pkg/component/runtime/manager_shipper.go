@@ -9,8 +9,10 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func (m *Manager) connectShippers(components []component.Component) error {
@@ -52,7 +54,7 @@ func (m *Manager) connectShippers(components []component.Component) error {
 
 			// cleanup any pairs that are no-longer used
 			for pairID := range conn.pairs {
-				touch, _ := pairsTouched[pairID]
+				touch := pairsTouched[pairID]
 				if !touch {
 					delete(conn.pairs, pairID)
 				}
@@ -63,7 +65,7 @@ func (m *Manager) connectShippers(components []component.Component) error {
 
 	// cleanup any shippers that are no-longer used
 	for shipperID := range m.shipperConns {
-		touch, _ := shippersTouched[shipperID]
+		touch := shippersTouched[shipperID]
 		if !touch {
 			delete(m.shipperConns, shipperID)
 		}
@@ -71,14 +73,14 @@ func (m *Manager) connectShippers(components []component.Component) error {
 
 	// connect the output units with the same connection information
 	for i, comp := range components {
-		if comp.Shipper != nil {
-			conn, ok := m.shipperConns[comp.Shipper.ComponentID]
+		if comp.ShipperRef != nil {
+			conn, ok := m.shipperConns[comp.ShipperRef.ComponentID]
 			if !ok {
-				return fmt.Errorf("component %q references a non-existing shipper %q", comp.ID, comp.Shipper.ComponentID)
+				return fmt.Errorf("component %q references a non-existing shipper %q", comp.ID, comp.ShipperRef.ComponentID)
 			}
 			pair, ok := conn.pairs[comp.ID]
 			if !ok {
-				return fmt.Errorf("component %q references shipper %q that doesn't know about the component", comp.ID, comp.Shipper.ComponentID)
+				return fmt.Errorf("component %q references shipper %q that doesn't know about the component", comp.ID, comp.ShipperRef.ComponentID)
 			}
 			for j, unit := range comp.Units {
 				if unit.Type == client.UnitTypeOutput {
@@ -124,4 +126,8 @@ func injectShipperConn(cfg *proto.UnitExpectedConfig, addr string, ca *authority
 		"key":         string(pair.Key),
 	}
 	return component.ExpectedConfig(source)
+}
+
+func getShipperAddr(componentID string) string {
+	return utils.SocketURLWithFallback(componentID, paths.TempDir())
 }

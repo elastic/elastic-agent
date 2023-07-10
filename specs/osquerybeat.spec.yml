@@ -12,7 +12,12 @@ inputs:
       - container/arm64
     outputs:
       - elasticsearch
+      - logstash
     command:
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
       args:
         - "-E"
         - "setup.ilm.enabled=false"
@@ -20,6 +25,8 @@ inputs:
         - "setup.template.enabled=false"
         - "-E"
         - "management.enabled=true"
+        - "-E"
+        - "management.restart_on_output_change=true"
         - "-E"
         - "logging.level=info"
         - "-E"

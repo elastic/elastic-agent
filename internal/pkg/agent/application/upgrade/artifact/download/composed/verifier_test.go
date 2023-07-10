@@ -18,7 +18,7 @@ type ErrorVerifier struct {
 	called bool
 }
 
-func (d *ErrorVerifier) Verify(a artifact.Artifact, version string) error {
+func (d *ErrorVerifier) Verify(a artifact.Artifact, version string, _ ...string) error {
 	d.called = true
 	return errors.New("failing")
 }
@@ -29,7 +29,7 @@ type FailVerifier struct {
 	called bool
 }
 
-func (d *FailVerifier) Verify(a artifact.Artifact, version string) error {
+func (d *FailVerifier) Verify(a artifact.Artifact, version string, _ ...string) error {
 	d.called = true
 	return &download.InvalidSignatureError{}
 }
@@ -40,7 +40,7 @@ type SuccVerifier struct {
 	called bool
 }
 
-func (d *SuccVerifier) Verify(a artifact.Artifact, version string) error {
+func (d *SuccVerifier) Verify(a artifact.Artifact, version string, _ ...string) error {
 	d.called = true
 	return nil
 }

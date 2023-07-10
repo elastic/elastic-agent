@@ -7,33 +7,32 @@ package info
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
-const (
-	darwin = "darwin"
-)
+// MarkerFileName is the name of the file that's created by
+// `elastic-agent install` in the Agent's topPath folder to
+// indicate that the Agent executing from the binary under
+// the same topPath folder is an installed Agent.
+const MarkerFileName = ".installed"
 
 // RunningInstalled returns true when executing Agent is the installed Agent.
-//
-// This verifies the running executable path based on hard-coded paths
-// for each platform type.
 func RunningInstalled() bool {
-	expectedPaths := []string{filepath.Join(paths.InstallPath, paths.BinaryName)}
-	if runtime.GOOS == darwin {
-		// For the symlink on darwin the execPath is /usr/local/bin/elastic-agent
-		expectedPaths = append(expectedPaths, paths.ShellWrapperPath)
+	// Check if install marker created by `elastic-agent install` exists
+	markerFilePath := filepath.Join(paths.Top(), MarkerFileName)
+	if _, err := os.Stat(markerFilePath); err != nil {
+		return false
 	}
-	execPath, _ := os.Executable()
-	execPath, _ = filepath.Abs(execPath)
 
-	execPath = filepath.Join(paths.ExecDir(filepath.Dir(execPath)), filepath.Base(execPath))
-	for _, expected := range expectedPaths {
-		if paths.ArePathsEqual(expected, execPath) {
-			return true
-		}
+	return true
+}
+
+func CreateInstallMarker(topPath string) error {
+	markerFilePath := filepath.Join(topPath, MarkerFileName)
+	if _, err := os.Create(markerFilePath); err != nil {
+		return err
 	}
-	return false
+
+	return nil
 }

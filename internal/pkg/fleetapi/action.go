@@ -33,6 +33,8 @@ const (
 	ActionTypeInputAction = "INPUT_ACTION"
 	// ActionTypeCancel specifies a cancel action.
 	ActionTypeCancel = "CANCEL"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
 )
 
 // Error values that the Action interface can return
@@ -46,6 +48,7 @@ type Action interface {
 	fmt.Stringer
 	Type() string
 	ID() string
+	AckEvent() AckEvent
 }
 
 // ScheduledAction is an Action that may be executed at a later date
@@ -80,6 +83,11 @@ type RetryableAction interface {
 	SetError(error)
 }
 
+type Signed struct {
+	Data      string `yaml:"data" json:"data" mapstructure:"data"`
+	Signature string `yaml:"signature" json:"signature" mapstructure:"signature"`
+}
+
 // FleetAction represents an action from fleet-server.
 // should copy the action definition in fleet-server/model/schema.json
 type FleetAction struct {
@@ -95,6 +103,16 @@ type FleetAction struct {
 	//Timestamp string // disabled, agent does not care when the document was created
 	//UserID string // disabled, agent does not care
 	//MinimumExecutionDuration int64 // disabled, used by fleet-server for scheduling
+	Signed *Signed `yaml:"signed,omitempty" json:"signed,omitempty"`
+}
+
+func newAckEvent(id, aType string) AckEvent {
+	return AckEvent{
+		EventType: "ACTION_RESULT",
+		SubType:   "ACKNOWLEDGED",
+		ActionID:  id,
+		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", id, aType),
+	}
 }
 
 // ActionUnknown is an action that is not know by the current version of the Agent and we don't want
@@ -135,6 +153,16 @@ func (a *ActionUnknown) OriginalType() string {
 	return a.originalType
 }
 
+func (a *ActionUnknown) AckEvent() AckEvent {
+	return AckEvent{
+		EventType: "ACTION_RESULT", // TODO Discuss EventType/SubType needed - by default only ACTION_RESULT was used - what is (or was) the intended purpose of these attributes? Are they documented? Can we change them to better support acking an error or a retry?
+		SubType:   "ACKNOWLEDGED",
+		ActionID:  a.ActionID,
+		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
+		Error:     fmt.Sprintf("Action %q of type %q is unknown to the elastic-agent", a.ActionID, a.originalType),
+	}
+}
+
 // ActionPolicyReassign is a request to apply a new
 type ActionPolicyReassign struct {
 	ActionID   string `yaml:"action_id"`
@@ -158,6 +186,10 @@ func (a *ActionPolicyReassign) Type() string {
 // ID returns the ID of the Action.
 func (a *ActionPolicyReassign) ID() string {
 	return a.ActionID
+}
+
+func (a *ActionPolicyReassign) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionPolicyChange is a request to apply a new
@@ -186,6 +218,10 @@ func (a *ActionPolicyChange) ID() string {
 	return a.ActionID
 }
 
+func (a *ActionPolicyChange) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
+}
+
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
 	ActionID         string `yaml:"action_id"`
@@ -205,6 +241,26 @@ func (a *ActionUpgrade) String() string {
 	s.WriteString(", type: ")
 	s.WriteString(a.ActionType)
 	return s.String()
+}
+
+func (a *ActionUpgrade) AckEvent() AckEvent {
+	event := newAckEvent(a.ActionID, a.ActionType)
+	if a.Err != nil {
+		// FIXME Do we want to change EventType/SubType here?
+		event.Error = a.Err.Error()
+		var payload struct {
+			Retry   bool `json:"retry"`
+			Attempt int  `json:"retry_attempt,omitempty"`
+		}
+		payload.Retry = true
+		payload.Attempt = a.Retry
+		if a.Retry < 1 { // retry is set to -1 if it will not re attempt
+			payload.Retry = false
+		}
+		p, _ := json.Marshal(payload)
+		event.Payload = p
+	}
+	return event
 }
 
 // Type returns the type of the Action.
@@ -292,6 +348,10 @@ func (a *ActionUnenroll) ID() string {
 	return a.ActionID
 }
 
+func (a *ActionUnenroll) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
+}
+
 // ActionSettings is a request to change agent settings.
 type ActionSettings struct {
 	ActionID   string `yaml:"action_id"`
@@ -318,6 +378,10 @@ func (a *ActionSettings) String() string {
 	s.WriteString(", log_level: ")
 	s.WriteString(a.LogLevel)
 	return s.String()
+}
+
+func (a *ActionSettings) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionCancel is a request to cancel an action.
@@ -348,6 +412,54 @@ func (a *ActionCancel) String() string {
 	return s.String()
 }
 
+func (a *ActionCancel) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
+}
+
+// ActionDiagnostics is a request to gather and upload a diagnostics bundle.
+type ActionDiagnostics struct {
+	ActionID   string `json:"action_id"`
+	ActionType string `json:"type"`
+	UploadID   string `json:"-"`
+	Err        error  `json:"-"`
+}
+
+// ID returns the ID of the action.
+func (a *ActionDiagnostics) ID() string {
+	return a.ActionID
+}
+
+// Type returns the type of the action.
+func (a *ActionDiagnostics) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionDiagnostics) String() string {
+	var s strings.Builder
+	s.WriteString("action_id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+func (a *ActionDiagnostics) AckEvent() AckEvent {
+	event := newAckEvent(a.ActionID, a.ActionType)
+	if a.Err != nil {
+		event.Error = a.Err.Error()
+	}
+	if a.UploadID != "" {
+		var data struct {
+			UploadID string `json:"upload_id"`
+		}
+		data.UploadID = a.UploadID
+		p, _ := json.Marshal(data)
+		event.Data = p
+	}
+
+	return event
+}
+
 // ActionApp is the application action request.
 type ActionApp struct {
 	ActionID    string                 `json:"id" mapstructure:"id"`
@@ -358,6 +470,7 @@ type ActionApp struct {
 	Response    map[string]interface{} `json:"response,omitempty" mapstructure:"response,omitempty"`
 	StartedAt   string                 `json:"started_at,omitempty" mapstructure:"started_at,omitempty"`
 	CompletedAt string                 `json:"completed_at,omitempty" mapstructure:"completed_at,omitempty"`
+	Signed      *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 	Error       string                 `json:"error,omitempty" mapstructure:"error,omitempty"`
 }
 
@@ -380,6 +493,21 @@ func (a *ActionApp) ID() string {
 // Type returns the type of the Action.
 func (a *ActionApp) Type() string {
 	return a.ActionType
+}
+
+func (a *ActionApp) AckEvent() AckEvent {
+	return AckEvent{
+		EventType:       "ACTION_RESULT",
+		SubType:         "ACKNOWLEDGED",
+		ActionID:        a.ActionID,
+		Message:         fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
+		ActionInputType: a.InputType,
+		ActionData:      a.Data,
+		ActionResponse:  a.Response,
+		StartedAt:       a.StartedAt,
+		CompletedAt:     a.CompletedAt,
+		Error:           a.Error,
+	}
 }
 
 // MarshalMap marshals ActionApp into a corresponding map
@@ -421,12 +549,14 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 				ActionType: response.ActionType,
 			}
 		case ActionTypeInputAction:
+			// Only INPUT_ACTION type actions could possibly be signed https://github.com/elastic/elastic-agent/pull/2348
 			action = &ActionApp{
 				ActionID:   response.ActionID,
 				ActionType: response.ActionType,
 				InputType:  response.InputType,
 				Timeout:    response.Timeout,
 				Data:       response.Data,
+				Signed:     response.Signed,
 			}
 		case ActionTypeUnenroll:
 			action = &ActionUnenroll{
@@ -465,6 +595,16 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 			if err := json.Unmarshal(response.Data, action); err != nil {
 				return errors.New(err,
 					"fail to decode CANCEL_ACTION action",
+					errors.TypeConfig)
+			}
+		case ActionTypeDiagnostics:
+			action = &ActionDiagnostics{
+				ActionID:   response.ActionID,
+				ActionType: response.ActionType,
+			}
+			if err := json.Unmarshal(response.Data, action); err != nil {
+				return errors.New(err,
+					"fail to decode REQUEST_DIAGNOSTICS_ACTION action",
 					errors.TypeConfig)
 			}
 		default:
@@ -553,6 +693,16 @@ func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			if err := yaml.Unmarshal(n.Data, action); err != nil {
 				return errors.New(err,
 					"fail to decode CANCEL_ACTION action",
+					errors.TypeConfig)
+			}
+		case ActionTypeDiagnostics:
+			action = &ActionDiagnostics{
+				ActionID:   n.ActionID,
+				ActionType: n.ActionType,
+			}
+			if err := yaml.Unmarshal(n.Data, action); err != nil {
+				return errors.New(err,
+					"fail to decode REQUEST_DIAGNOSTICS_ACTION action",
 					errors.TypeConfig)
 			}
 		default:

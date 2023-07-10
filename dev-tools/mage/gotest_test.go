@@ -33,14 +33,13 @@ var gotestHelperMode = os.Getenv(envGoTestHelper) == "1"
 // TestGoTest_CaptureOutput sets the `GOTEST_WANT_HELPER` environment variable when it executes the tests.
 // each test helper must check if it is driven by this function or not:
 //
-//         func TestGoTest_Helper_X(t *testing.T) {
-//           if !gotestHelperMode {
-//             return
-//           }
+//	func TestGoTest_Helper_X(t *testing.T) {
+//	  if !gotestHelperMode {
+//	    return
+//	  }
 //
-//           // sample test
-//         }
-//
+//	  // sample test
+//	}
 func TestGoTest_CaptureOutput(t *testing.T) {
 	errNonZero := "go test returned a non-zero value"
 	makeArgs := func(test string) GoTestArgs {
@@ -194,48 +193,48 @@ func TestGoTest_Helper_AssertOutput(t *testing.T) {
 var wantTestAssertOutput = `(?sm:
 === Failed
 === FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/assert_fails.*
-    gotest_test.go:\d+:.*
-        	Error Trace:	gotest_test.go:\d+.*
+    .*gotest_test.go:\d+:.*
+        	Error Trace:	.*gotest_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/assert_fails.*
     --- FAIL: TestGoTest_Helper_AssertOutput/assert_fails .*
 === FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/assert_with_message .*
-    gotest_test.go:\d+:.*
-        	Error Trace:	gotest_test.go:\d+.*
+    .*gotest_test.go:\d+:.*
+        	Error Trace:	.*gotest_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/assert_with_message.*
         	Messages:   	My message.*
     --- FAIL: TestGoTest_Helper_AssertOutput/assert_with_message .*
 === FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/assert_with_messagef .*
-    gotest_test.go:\d+:.*
-        	Error Trace:	gotest_test.go:\d+.*
+    .*gotest_test.go:\d+:.*
+        	Error Trace:	.*gotest_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/assert_with_messagef.*
         	Messages:   	My message with arguments: 42.*
     --- FAIL: TestGoTest_Helper_AssertOutput/assert_with_messagef .*
 === FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/require_fails .*
-    gotest_test.go:\d+:.*
-        	Error Trace:	gotest_test.go:\d+.*
+    .*gotest_test.go:\d+:.*
+        	Error Trace:	.*gotest_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/require_fails.*
     --- FAIL: TestGoTest_Helper_AssertOutput/require_fails .*
 === FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/require_with_message .*
-    gotest_test.go:\d+:.*
-        	Error Trace:	gotest_test.go:\d+.*
+    .*gotest_test.go:\d+:.*
+        	Error Trace:	.*gotest_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/require_with_message.*
         	Messages:   	My message.*
     --- FAIL: TestGoTest_Helper_AssertOutput/require_with_message .*
 === FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/require_with_messagef .*
-    gotest_test.go:\d+:.*
-        	Error Trace:	gotest_test.go:\d+.*
+    .*gotest_test.go:\d+:.*
+        	Error Trace:	.*gotest_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/require_with_messagef.*
         	Messages:   	My message with arguments: 42.*
     --- FAIL: TestGoTest_Helper_AssertOutput/require_with_messagef .*
 === FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/equals_map .*
-    gotest_test.go:\d+:.*
-        	Error Trace:	gotest_test.go:\d+.*
+    .*gotest_test.go:\d+:.*
+        	Error Trace:	.*gotest_test.go:\d+.*
         	Error:      	Not equal:.*
 \s+expected: map\[string\]interface \{\}\{"a":1, "b":true, "c":"test", "e":map\[string\]interface \{\}\{"x":"y"\}\}.*
 \s+actual  : map\[string\]interface \{\}\{"a":42, "b":false, "c":"test"\}.*

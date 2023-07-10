@@ -6,11 +6,11 @@ package mage
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
 
@@ -19,6 +19,12 @@ const packageSpecFile = "dev-tools/packaging/packages.yml"
 // Packages defines the set of packages to be built when the package target is
 // executed.
 var Packages []OSPackageArgs
+
+// UseElasticAgentCorePackaging configures the package target to build binary packages
+// for an Elastic Agent.
+func UseElasticAgentCorePackaging() {
+	MustUsePackaging("elastic_agent_core", packageSpecFile)
+}
 
 // UseCommunityBeatPackaging configures the package target to build packages for
 // a community Beat.
@@ -115,12 +121,12 @@ func LoadLocalNamedSpec(name string) {
 func LoadNamedSpec(name string, files ...string) error {
 	specs, err := LoadSpecs(files...)
 	if err != nil {
-		return errors.Wrap(err, "failed to load spec file")
+		return fmt.Errorf("failed to load spec file: %w", err)
 	}
 
 	packages, found := specs[name]
 	if !found {
-		return errors.Errorf("%v not found in package specs", name)
+		return fmt.Errorf("%v not found in package specs", name)
 	}
 
 	log.Printf("%v package spec loaded from %v", name, files)
@@ -134,7 +140,7 @@ func LoadSpecs(files ...string) (map[string][]OSPackageArgs, error) {
 	for _, file := range files {
 		d, err := ioutil.ReadFile(file)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to read from spec file")
+			return nil, fmt.Errorf("failed to read from spec file: %w", err)
 		}
 		data = append(data, d)
 	}
@@ -145,7 +151,7 @@ func LoadSpecs(files ...string) (map[string][]OSPackageArgs, error) {
 
 	var packages PackageYAML
 	if err := yaml.Unmarshal(bytes.Join(data, []byte{'\n'}), &packages); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal spec data")
+		return nil, fmt.Errorf("failed to unmarshal spec data: %w", err)
 	}
 
 	return packages.Specs, nil

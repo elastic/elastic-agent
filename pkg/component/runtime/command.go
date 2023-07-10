@@ -15,6 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -41,7 +44,7 @@ const (
 
 type MonitoringManager interface {
 	EnrichArgs(string, string, []string) []string
-	Prepare() error
+	Prepare(string) error
 	Cleanup(string) error
 }
 
@@ -50,9 +53,11 @@ type procState struct {
 	state *os.ProcessState
 }
 
-// CommandRuntime provides the command runtime for running a component as a subprocess.
-type CommandRuntime struct {
-	logger  *logger.Logger
+// commandRuntime provides the command runtime for running a component as a subprocess.
+type commandRuntime struct {
+	logStd *logWriter
+	logErr *logWriter
+
 	current component.Component
 	monitor MonitoringManager
 
@@ -67,17 +72,18 @@ type CommandRuntime struct {
 	state          ComponentState
 	lastCheckin    time.Time
 	missedCheckins int
+	restartBucket  *rate.Limiter
 }
 
-// NewCommandRuntime creates a new command runtime for the provided component.
-func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor MonitoringManager) (ComponentRuntime, error) {
-	c := &CommandRuntime{
+// newCommandRuntime creates a new command runtime for the provided component.
+func newCommandRuntime(comp component.Component, log *logger.Logger, monitor MonitoringManager) (*commandRuntime, error) {
+	c := &commandRuntime{
 		current:     comp,
 		monitor:     monitor,
 		ch:          make(chan ComponentState),
-		actionCh:    make(chan actionMode),
+		actionCh:    make(chan actionMode, 1),
 		procCh:      make(chan procState),
-		compCh:      make(chan component.Component),
+		compCh:      make(chan component.Component, 1),
 		actionState: actionStop,
 		state:       newComponentState(&comp),
 	}
@@ -85,11 +91,13 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 	if cmdSpec == nil {
 		return nil, errors.New("must have command defined in specification")
 	}
-	c.logger = logger.With("component", map[string]interface{}{
-		"id":     comp.ID,
-		"type":   c.getSpecType(),
-		"binary": c.getSpecBinaryName(),
-	})
+	ll, unitLevels := getLogLevels(comp)
+	c.logStd = createLogWriter(c.current, log, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStdout)
+	ll, unitLevels = getLogLevels(comp) // don't want to share mapping of units (so new map is generated)
+	c.logErr = createLogWriter(c.current, log, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName(), ll, unitLevels, logSourceStderr)
+
+	c.restartBucket = newRateLimiter(cmdSpec.RestartMonitoringPeriod, cmdSpec.MaxRestartsPerPeriod)
+
 	return c, nil
 }
 
@@ -98,7 +106,7 @@ func NewCommandRuntime(comp component.Component, logger *logger.Logger, monitor 
 // Called by Manager inside a goroutine. Run does not return until the passed in context is done. Run is always
 // called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
-func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
+func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 	cmdSpec := c.getCommandSpec()
 	checkinPeriod := cmdSpec.Timeouts.Checkin
 	restartPeriod := cmdSpec.Timeouts.Restart
@@ -132,11 +140,15 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				}
 			}
 		case newComp := <-c.compCh:
+			c.current = newComp
+			c.syncLogLevels()
+
 			sendExpected := c.state.syncExpected(&newComp)
 			changed := c.state.syncUnits(&newComp)
 			if sendExpected || c.state.unsettled() {
-				comm.CheckinExpected(c.state.toCheckinExpected())
+				comm.CheckinExpected(c.state.toCheckinExpected(), nil)
 			}
+
 			if changed {
 				c.sendObserved()
 			}
@@ -161,7 +173,7 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 				sendExpected = true
 			}
 			if sendExpected {
-				comm.CheckinExpected(c.state.toCheckinExpected())
+				comm.CheckinExpected(c.state.toCheckinExpected(), checkin)
 			}
 			if changed {
 				c.sendObserved()
@@ -211,14 +223,19 @@ func (c *CommandRuntime) Run(ctx context.Context, comm Communicator) error {
 // Watch returns the channel that sends component state.
 //
 // Channel should send a new state anytime a state for a unit or the whole component changes.
-func (c *CommandRuntime) Watch() <-chan ComponentState {
+func (c *commandRuntime) Watch() <-chan ComponentState {
 	return c.ch
 }
 
 // Start starts the component.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Start() error {
+func (c *commandRuntime) Start() error {
+	// clear channel so it's the latest action
+	select {
+	case <-c.actionCh:
+	default:
+	}
 	c.actionCh <- actionStart
 	return nil
 }
@@ -226,7 +243,12 @@ func (c *CommandRuntime) Start() error {
 // Update updates the currComp runtime with a new-revision for the component definition.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Update(comp component.Component) error {
+func (c *commandRuntime) Update(comp component.Component) error {
+	// clear channel so it's the latest component
+	select {
+	case <-c.compCh:
+	default:
+	}
 	c.compCh <- comp
 	return nil
 }
@@ -234,7 +256,12 @@ func (c *CommandRuntime) Update(comp component.Component) error {
 // Stop stops the component.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Stop() error {
+func (c *commandRuntime) Stop() error {
+	// clear channel so it's the latest action
+	select {
+	case <-c.actionCh:
+	default:
+	}
 	c.actionCh <- actionStop
 	return nil
 }
@@ -242,20 +269,25 @@ func (c *CommandRuntime) Stop() error {
 // Teardown tears down the component.
 //
 // Non-blocking and never returns an error.
-func (c *CommandRuntime) Teardown() error {
+func (c *commandRuntime) Teardown() error {
+	// clear channel so it's the latest action
+	select {
+	case <-c.actionCh:
+	default:
+	}
 	c.actionCh <- actionTeardown
 	return nil
 }
 
 // forceCompState force updates the state for the entire component, forcing that state on all units.
-func (c *CommandRuntime) forceCompState(state client.UnitState, msg string) {
+func (c *commandRuntime) forceCompState(state client.UnitState, msg string) {
 	if c.state.forceState(state, msg) {
 		c.sendObserved()
 	}
 }
 
 // compState updates just the component state not all the units.
-func (c *CommandRuntime) compState(state client.UnitState) {
+func (c *commandRuntime) compState(state client.UnitState) {
 	msg := stateUnknownMessage
 	if state == client.UnitStateHealthy {
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
@@ -271,11 +303,11 @@ func (c *CommandRuntime) compState(state client.UnitState) {
 	}
 }
 
-func (c *CommandRuntime) sendObserved() {
+func (c *commandRuntime) sendObserved() {
 	c.ch <- c.state.Copy()
 }
 
-func (c *CommandRuntime) start(comm Communicator) error {
+func (c *commandRuntime) start(comm Communicator) error {
 	if c.proc != nil {
 		// already running
 		return nil
@@ -301,7 +333,7 @@ func (c *CommandRuntime) start(comm Communicator) error {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}
 
-	if err := c.monitor.Prepare(); err != nil {
+	if err := c.monitor.Prepare(c.current.ID); err != nil {
 		return err
 	}
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
@@ -311,22 +343,25 @@ func (c *CommandRuntime) start(comm Communicator) error {
 	_ = os.MkdirAll(dataPath, 0755)
 	args = append(args, "-E", "path.data="+dataPath)
 
+	// reset checkin state before starting the process.
+	c.lastCheckin = time.Time{}
+	c.missedCheckins = 0
+
 	proc, err := process.Start(path,
 		process.WithArgs(args),
 		process.WithEnv(env),
-		process.WithCmdOptions(attachOutErr(c.current, c.getCommandSpec(), c.getSpecType(), c.getSpecBinaryName()), dirPath(workDir)))
+		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir)))
 	if err != nil {
 		return err
 	}
-	c.lastCheckin = time.Time{}
-	c.missedCheckins = 0
+
 	c.proc = proc
 	c.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: spawned pid '%d'", c.proc.PID))
 	c.startWatcher(proc, comm)
 	return nil
 }
 
-func (c *CommandRuntime) stop(ctx context.Context) error {
+func (c *commandRuntime) stop(ctx context.Context) error {
 	if c.proc == nil {
 		// already stopped, ensure that state of the component is also stopped
 		if c.state.State != client.UnitStateStopped {
@@ -341,7 +376,6 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
-
 	cmdSpec := c.getCommandSpec()
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
@@ -357,7 +391,7 @@ func (c *CommandRuntime) stop(ctx context.Context) error {
 	return c.proc.Stop()
 }
 
-func (c *CommandRuntime) startWatcher(info *process.Info, comm Communicator) {
+func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	go func() {
 		err := comm.WriteConnInfo(info.Stdin)
 		if err != nil {
@@ -377,12 +411,17 @@ func (c *CommandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	}()
 }
 
-func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
+func (c *commandRuntime) handleProc(state *os.ProcessState) bool {
 	switch c.actionState {
 	case actionStart:
-		// should still be running
-		stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
-		c.forceCompState(client.UnitStateFailed, stopMsg)
+		if c.restartBucket != nil && c.restartBucket.Allow() {
+			stopMsg := fmt.Sprintf("Suppressing FAILED state due to restart for '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+			c.forceCompState(client.UnitStateStopped, stopMsg)
+		} else {
+			// report failure only if bucket is full of restart events
+			stopMsg := fmt.Sprintf("Failed: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
+			c.forceCompState(client.UnitStateFailed, stopMsg)
+		}
 		return true
 	case actionStop, actionTeardown:
 		// stopping (should have exited)
@@ -396,11 +435,11 @@ func (c *CommandRuntime) handleProc(state *os.ProcessState) bool {
 	return false
 }
 
-func (c *CommandRuntime) workDirPath() string {
+func (c *commandRuntime) workDirPath() string {
 	return filepath.Join(paths.Run(), c.current.ID)
 }
 
-func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
+func (c *commandRuntime) workDir(uid int, gid int) (string, error) {
 	path := c.workDirPath()
 	err := os.MkdirAll(path, runDirMod)
 	if err != nil {
@@ -420,7 +459,7 @@ func (c *CommandRuntime) workDir(uid int, gid int) (string, error) {
 	return path, nil
 }
 
-func (c *CommandRuntime) getSpecType() string {
+func (c *commandRuntime) getSpecType() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.InputType
 	}
@@ -430,7 +469,7 @@ func (c *CommandRuntime) getSpecType() string {
 	return ""
 }
 
-func (c *CommandRuntime) getSpecBinaryName() string {
+func (c *commandRuntime) getSpecBinaryName() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.BinaryName
 	}
@@ -440,7 +479,7 @@ func (c *CommandRuntime) getSpecBinaryName() string {
 	return ""
 }
 
-func (c *CommandRuntime) getSpecBinaryPath() string {
+func (c *commandRuntime) getSpecBinaryPath() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.BinaryPath
 	}
@@ -450,7 +489,7 @@ func (c *CommandRuntime) getSpecBinaryPath() string {
 	return ""
 }
 
-func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
+func (c *commandRuntime) getCommandSpec() *component.CommandSpec {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.Spec.Command
 	}
@@ -460,19 +499,67 @@ func (c *CommandRuntime) getCommandSpec() *component.CommandSpec {
 	return nil
 }
 
-func attachOutErr(comp component.Component, cmdSpec *component.CommandSpec, typeStr string, binaryName string) process.CmdOption {
+func (c *commandRuntime) syncLogLevels() {
+	ll, unitLevels := getLogLevels(c.current)
+	c.logStd.SetLevels(ll, unitLevels)
+	ll, unitLevels = getLogLevels(c.current) // don't want to share mapping of units (so new map is generated)
+	c.logErr.SetLevels(ll, unitLevels)
+}
+
+func attachOutErr(stdOut *logWriter, stdErr *logWriter) process.CmdOption {
 	return func(cmd *exec.Cmd) error {
-		dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(comp.ID, "-", "_"), "/", "_"))
-		logger := logger.NewWithoutConfig("").With("component", map[string]interface{}{
+		cmd.Stdout = stdOut
+		cmd.Stderr = stdErr
+		return nil
+	}
+}
+
+func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *component.CommandSpec, typeStr string, binaryName string, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
+	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
+	logger := baseLog.With(
+		"component", map[string]interface{}{
 			"id":      comp.ID,
 			"type":    typeStr,
 			"binary":  binaryName,
 			"dataset": dataset,
-		})
-		cmd.Stdout = newLogWriter(logger.Core(), cmdSpec.Log)
-		cmd.Stderr = newLogWriter(logger.Core(), cmdSpec.Log)
-		return nil
+		},
+		"log", map[string]interface{}{
+			"source": comp.ID,
+		},
+	)
+	return newLogWriter(logger.Core(), cmdSpec.Log, ll, unitLevels, src)
+}
+
+// getLogLevels returns the lowest log level and a mapping between each unit and its defined log level.
+func getLogLevels(comp component.Component) (zapcore.Level, map[string]zapcore.Level) {
+	baseLevel := zapcore.ErrorLevel
+	unitLevels := make(map[string]zapcore.Level)
+	for _, unit := range comp.Units {
+		ll := toZapcoreLevel(unit.LogLevel)
+		unitLevels[unit.ID] = ll
+		if ll < baseLevel {
+			baseLevel = ll
+		}
 	}
+	return baseLevel, unitLevels
+}
+
+func toZapcoreLevel(unitLevel client.UnitLogLevel) zapcore.Level {
+	switch unitLevel {
+	case client.UnitLogLevelError:
+		return zapcore.ErrorLevel
+	case client.UnitLogLevelWarn:
+		return zapcore.WarnLevel
+	case client.UnitLogLevelInfo:
+		return zapcore.InfoLevel
+	case client.UnitLogLevelDebug:
+		return zapcore.DebugLevel
+	case client.UnitLogLevelTrace:
+		// zap doesn't support trace
+		return zapcore.DebugLevel
+	}
+	// unknown level (default to info)
+	return zapcore.InfoLevel
 }
 
 func dirPath(path string) process.CmdOption {
@@ -480,4 +567,20 @@ func dirPath(path string) process.CmdOption {
 		cmd.Dir = path
 		return nil
 	}
+}
+
+func newRateLimiter(restartMonitoringPeriod time.Duration, maxEventsPerPeriod int) *rate.Limiter {
+	if restartMonitoringPeriod <= 0 || maxEventsPerPeriod <= 0 {
+		return nil
+	}
+
+	period := restartMonitoringPeriod.Seconds()
+	events := float64(maxEventsPerPeriod)
+	frequency := events / period
+	if frequency > 0 {
+		bucketSize := rate.Limit(frequency)
+		return rate.NewLimiter(bucketSize, maxEventsPerPeriod)
+	}
+
+	return nil
 }

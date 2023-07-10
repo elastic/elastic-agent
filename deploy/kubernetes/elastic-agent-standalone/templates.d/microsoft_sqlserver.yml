@@ -1,4 +1,16 @@
 inputs:
+    - name: winlog-microsoft_sqlserver
+      type: winlog
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.microsoft_sqlserver.audit.enabled} == true or ${kubernetes.hints.microsoft_sqlserver.enabled} == true
+          data_stream:
+            dataset: microsoft_sqlserver.audit
+            type: logs
+          event_id: 33205
+          ignore_older: 72h
+          name: Security
+      data_stream.namespace: default
     - name: filestream-microsoft_sqlserver
       type: filestream
       use_output: default
@@ -34,9 +46,10 @@ inputs:
             dataset: microsoft_sqlserver.performance
             type: metrics
           driver: mssql
-          dynamic_counter_name: Memory Grants Pending
+          dynamic_counter_name: Memory Grants Pend%
           hosts:
-            - sqlserver://${kubernetes.hints.microsoft_sqlserver.performance.username|kubernetes.hints.microsoft_sqlserver.username|'domain\username'}:${kubernetes.hints.microsoft_sqlserver.performance.password|kubernetes.hints.microsoft_sqlserver.password|'verysecurepassword'}@${kubernetes.hints.microsoft_sqlserver.performance.host|kubernetes.hints.microsoft_sqlserver.host|'localhost'}:1433
+            - sqlserver://${kubernetes.hints.microsoft_sqlserver.performance.username|kubernetes.hints.microsoft_sqlserver.username|'domain\username'}:${kubernetes.hints.microsoft_sqlserver.performance.password|kubernetes.hints.microsoft_sqlserver.password|'verysecurepassword'}@${kubernetes.hints.microsoft_sqlserver.performance.host|kubernetes.hints.microsoft_sqlserver.host|'localhost'}
+          merge_results: true
           metricsets:
             - query
           period: ${kubernetes.hints.microsoft_sqlserver.performance.period|kubernetes.hints.microsoft_sqlserver.period|'60s'}
@@ -74,15 +87,15 @@ inputs:
               response_format: table
             - query: SELECT cntr_value As 're_compilations_per_sec' FROM sys.dm_os_performance_counters WHERE counter_name = 'SQL Re-Compilations/sec'
               response_format: table
-            - query: SELECT counter_name As 'dynamic_counter.name', cntr_value As 'dynamic_counter.value' FROM sys.dm_os_performance_counters WHERE counter_name= 'Memory Grants Pending'
-              response_format: table
+            - query: SELECT counter_name, cntr_value FROM sys.dm_os_performance_counters WHERE counter_name like 'Memory Grants Pend%'
+              response_format: variables
         - condition: ${kubernetes.hints.microsoft_sqlserver.transaction_log.enabled} == true and ${kubernetes.hints.microsoft_sqlserver.enabled} == true
           data_stream:
             dataset: microsoft_sqlserver.transaction_log
             type: metrics
           driver: mssql
           hosts:
-            - sqlserver://${kubernetes.hints.microsoft_sqlserver.transaction_log.username|kubernetes.hints.microsoft_sqlserver.username|'domain\username'}:${kubernetes.hints.microsoft_sqlserver.transaction_log.password|kubernetes.hints.microsoft_sqlserver.password|'verysecurepassword'}@${kubernetes.hints.microsoft_sqlserver.transaction_log.host|kubernetes.hints.microsoft_sqlserver.host|'localhost'}:1433
+            - sqlserver://${kubernetes.hints.microsoft_sqlserver.transaction_log.username|kubernetes.hints.microsoft_sqlserver.username|'domain\username'}:${kubernetes.hints.microsoft_sqlserver.transaction_log.password|kubernetes.hints.microsoft_sqlserver.password|'verysecurepassword'}@${kubernetes.hints.microsoft_sqlserver.transaction_log.host|kubernetes.hints.microsoft_sqlserver.host|'localhost'}
           metricsets:
             - query
           period: ${kubernetes.hints.microsoft_sqlserver.transaction_log.period|kubernetes.hints.microsoft_sqlserver.period|'60s'}
@@ -112,16 +125,4 @@ inputs:
               response_format: table
             - query: SELECT 'msdb' As 'database_name', total_log_size_in_bytes As total_log_size_bytes, used_log_space_in_bytes As used_log_space_bytes, used_log_space_in_percent As used_log_space_pct, log_space_in_bytes_since_last_backup FROM sys.dm_db_log_space_usage msdb
               response_format: table
-      data_stream.namespace: default
-    - name: winlog-microsoft_sqlserver
-      type: winlog
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.microsoft_sqlserver.audit.enabled} == true or ${kubernetes.hints.microsoft_sqlserver.enabled} == true
-          data_stream:
-            dataset: microsoft_sqlserver.audit
-            type: logs
-          event_id: 33205
-          ignore_older: 72h
-          name: Security
       data_stream.namespace: default

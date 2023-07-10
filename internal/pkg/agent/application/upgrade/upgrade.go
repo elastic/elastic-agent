@@ -31,20 +31,17 @@ const (
 	agentName       = "elastic-agent"
 	hashLen         = 6
 	agentCommitFile = ".elastic-agent.active.commit"
+	runDirMod       = 0770
 )
 
-var (
-	agentArtifact = artifact.Artifact{
-		Name:     "Elastic Agent",
-		Cmd:      agentName,
-		Artifact: "beats/" + agentName,
-	}
-)
+var agentArtifact = artifact.Artifact{
+	Name:     "Elastic Agent",
+	Cmd:      agentName,
+	Artifact: "beats/" + agentName,
+}
 
-var (
-	// ErrSameVersion error is returned when the upgrade results in the same installed version.
-	ErrSameVersion = errors.New("upgrade did not occur because its the same version")
-)
+// ErrSameVersion error is returned when the upgrade results in the same installed version.
+var ErrSameVersion = errors.New("upgrade did not occur because its the same version")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -111,7 +108,7 @@ func (u *Upgrader) Upgradeable() bool {
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
@@ -122,7 +119,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	sourceURI = u.sourceURI(sourceURI)
-	archivePath, err := u.downloadArtifact(ctx, version, sourceURI)
+	archivePath, err := u.downloadArtifact(ctx, version, sourceURI, skipVerifyOverride, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
@@ -148,6 +145,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	if err := copyActionStore(u.log, newHash); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
+	}
+
+	if err := copyRunDirectory(u.log, newHash); err != nil {
+		return nil, errors.New(err, "failed to copy run directory")
 	}
 
 	if err := ChangeSymlink(ctx, u.log, newHash); err != nil {
@@ -244,9 +245,32 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 			return err
 		}
 
-		if err := os.WriteFile(newActionStorePath, currentActionStore, 0600); err != nil {
+		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func copyRunDirectory(log *logger.Logger, newHash string) error {
+	newRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, newHash), "run")
+	oldRunPath := filepath.Join(filepath.Dir(paths.Home()), fmt.Sprintf("%s-%s", agentName, release.ShortCommit()), "run")
+
+	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
+
+	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
+		return errors.New(err, "failed to create run directory")
+	}
+
+	err := copyDir(log, oldRunPath, newRunPath, true)
+	if os.IsNotExist(err) {
+		// nothing to copy, operation ok
+		log.Debugw("Run directory not present", "old_run_path", oldRunPath)
+		return nil
+	}
+	if err != nil {
+		return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
 	}
 
 	return nil
@@ -255,7 +279,7 @@ func copyActionStore(log *logger.Logger, newHash string) error {
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.
 // this goes through runtime directory of agent and copies all the state files created by processes to new versioned
 // home directory with updated process name to match new version.
-func shutdownCallback(_ *logger.Logger, homePath, prevVersion, newVersion, newHash string) reexec.ShutdownCallbackFn {
+func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHash string) reexec.ShutdownCallbackFn {
 	if release.Snapshot() {
 		// SNAPSHOT is part of newVersion
 		prevVersion += "-SNAPSHOT"
@@ -273,7 +297,7 @@ func shutdownCallback(_ *logger.Logger, homePath, prevVersion, newVersion, newHa
 		for _, processDir := range processDirs {
 			newDir := strings.ReplaceAll(processDir, prevVersion, newVersion)
 			newDir = strings.ReplaceAll(newDir, oldHome, newHome)
-			if err := copyDir(processDir, newDir); err != nil {
+			if err := copyDir(l, processDir, newDir, true); err != nil {
 				return err
 			}
 		}
@@ -319,11 +343,26 @@ func readDirs(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-func copyDir(from, to string) error {
+func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
+	var onErr func(src, dst string, err error) error
+
+	if ignoreErrs {
+		onErr = func(src, dst string, err error) error {
+			if err == nil {
+				return nil
+			}
+
+			// ignore all errors, just log them
+			l.Infof("ignoring error: failed to copy %q to %q: %s", src, dst, err.Error())
+			return nil
+		}
+	}
+
 	return copy.Copy(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
-		Sync: true,
+		Sync:    true,
+		OnError: onErr,
 	})
 }

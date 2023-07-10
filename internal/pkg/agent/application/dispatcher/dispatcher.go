@@ -132,6 +132,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 		strings.Join(detectTypes(actions), ", "),
 	)
 
+	var reportedErr error
 	for _, action := range actions {
 		if err = ctx.Err(); err != nil {
 			ad.errCh <- err
@@ -146,14 +147,18 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, acker acker.Acker, act
 				continue
 			}
 			ad.log.Debugf("Failed to dispatch action '%+v', error: %+v", action, err)
-			ad.errCh <- err
+			reportedErr = err
 			continue
 		}
 		ad.log.Debugf("Successfully dispatched action: '%+v'", action)
 	}
 
 	if err = acker.Commit(ctx); err != nil {
-		ad.errCh <- err
+		reportedErr = err
+	}
+
+	if len(actions) > 0 {
+		ad.errCh <- reportedErr
 	}
 }
 

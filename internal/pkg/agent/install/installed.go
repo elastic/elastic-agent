@@ -28,9 +28,9 @@ const (
 )
 
 // Status returns the installation status of Agent.
-func Status() (StatusType, string) {
-	expected := filepath.Join(paths.InstallPath, paths.BinaryName)
-	status, reason := checkService()
+func Status(topPath string) (StatusType, string) {
+	expected := filepath.Join(topPath, paths.BinaryName)
+	status, reason := checkService(topPath)
 	if checkPackageInstall() {
 		if status == Installed {
 			return PackageInstall, "service running"
@@ -53,8 +53,8 @@ func Status() (StatusType, string) {
 }
 
 // checkService only checks the status of the service.
-func checkService() (StatusType, string) {
-	svc, err := newService()
+func checkService(topPath string) (StatusType, string) {
+	svc, err := newService(topPath)
 	if err != nil {
 		return NotInstalled, "unable to check service status"
 	}

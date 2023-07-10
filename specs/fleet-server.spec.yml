@@ -16,4 +16,6 @@ inputs:
       args:
         - "--agent-mode"
         - "-E"
+        - "logging.level=debug"
+        - "-E"
         - "logging.to_stderr=true"

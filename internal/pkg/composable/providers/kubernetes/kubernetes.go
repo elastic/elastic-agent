@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
-	"github.com/elastic/elastic-agent-libs/logp"
 
 	k8s "k8s.io/client-go/kubernetes"
 
@@ -57,8 +56,8 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 
 // Run runs the kubernetes context provider.
 func (p *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
-	if p.config.Hints.Enabled() {
-		betalogger := logp.NewLogger("cfgwarn")
+	if p.config.Hints.Enabled {
+		betalogger := p.logger.Named("cfgwarn")
 		betalogger.Warnf("BETA: Hints' feature is beta.")
 	}
 	eventers := make([]Eventer, 0, 3)

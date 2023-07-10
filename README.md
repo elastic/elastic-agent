@@ -1,5 +1,13 @@
 # Elastic Agent
 
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_elastic-agent&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_elastic-agent)
+
+## Architecture / internal docs
+
+- [Agent architecture](docs/architecture.md)
+- [Component spec files](docs/component-specs.md)
+- [Policy configuration](docs/agent-policy.md)
+
 ## Developer docs
 
 The source files for the general Elastic Agent documentation are currently stored
@@ -23,7 +31,7 @@ summary: Fix a panic caused by a race condition when installing the Elastic Agen
 pr: https://github.com/elastic/elastic-agent/pull/823
 ```
 
-## Testing
+### Packaging
 
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
@@ -31,41 +39,40 @@ Prerequisites:
 - [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
 - [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) to add changelog fragments for changelog generation
 
-If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
-```
-export DOCKER_BUILDKIT=0
-export COMPOSE_DOCKER_CLI_BUILD=0
-export DOCKER_DEFAULT_PLATFORM=linux/amd64
+To build a local version of the agent for development, run the command below. The following platforms are supported:
+* darwin/amd64
+* darwin/arm64
+* linux/amd64
+* linux/arm64
+* windows/amd64
+
+```sh
+# DEV=true disable signature verification to allow replacing binaries in the components sub-directory of the package.
+# EXTERNAL=true downloads the matching version of the binaries that are packaged with agent (Beats for example).
+# SNAPSHOT=true indicates that this is a snapshot version and not a release version.
+# PLATFORMS=linux/amd64 builds an agent that will run on 64 bit Linux systems.
+# PACKAGES=tar.gz produces a tar.gz package
+DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
 ```
 
-If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
-```
-export DOCKER_BUILDKIT=0
-export COMPOSE_DOCKER_CLI_BUILD=0
-export DOCKER_DEFAULT_PLATFORM=linux/amd64
+The resulting package will be produced in the build/distributions directory. The version is controlled by the value in [version.go](version/version.go).
+To install the agent extract the package and run the install command:
+
+```sh
+cd build/distributions
+tar xvfz build/distributions/elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64.tar.gz
+cd build/distributions/elastic-agent-8.8.0-SNAPSHOT-darwin-aarch64
+sudo elastic-agent install
 ```
 
-If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
-```
-export DOCKER_BUILDKIT=0
-export COMPOSE_DOCKER_CLI_BUILD=0
-export DOCKER_DEFAULT_PLATFORM=linux/amd64
-```
+For basic use the agent binary can be run directly, with the `sudo elastic-agent run` command.
 
-If you are on a Mac with M1 chip, don't forget to export some docker variable to be able to build for AMD
-```
-export DOCKER_BUILDKIT=0
-export COMPOSE_DOCKER_CLI_BUILD=0
-export DOCKER_DEFAULT_PLATFORM=linux/amd64
-```
-
-In Linux operating systems that you can not run docker as a root user you need to follow [linux-postinstall steps](https://docs.docker.com/engine/install/linux-postinstall/)
-
-### Testing docker container
+### Docker
 
 Running Elastic Agent in a docker container is a common use case. To build the Elastic Agent and create a docker image run the following command:
 
 ```
+# Use PLATFORMS=linux/arm64 if you are using an ARM based Mac.
 DEV=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=docker mage package
 ```
 
@@ -143,6 +150,34 @@ kubectl apply -f elastic-agent-${ELASTIC_AGENT_MODE}-kubernetes.yaml
 ```
 kubectl -n kube-system get pods -l app=elastic-agent
 ```
+
+## Testing on Elastic Cloud
+
+Elastic employees can create an Elastic Cloud deployment with a locally
+built Elastic Agent, by pushing images to an internal Docker repository. The images will be
+based on the SNAPSHOT images with the version defined in `version/version.go`.
+
+Prerequisite to running following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
+
+Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.
+
+For more advanced scenarios:
+Running `make build_elastic_agent_docker_image` in `testing/environments/cloud` will build and push the images.
+Running `make push_elastic_agent_docker_image` in `testing/environments/cloud` will publish built docker image to CI docker repository.
+
+Once docker images are published you can run `EC_API_KEY=your_api_key make apply` from `testing/environments/cloud` directory to deploy them to Elastic Cloud.
+To get `EC_API_KEY` follow [this guide](https://www.elastic.co/guide/en/cloud/current/ec-api-authentication.html)
+
+The custom images are tagged with the current version, commit and timestamp. The
+timestamp is included to force a new Docker image to be used, which enables pushing new
+binaries without recreating the deployment.
+
+To specify custom images create your `docker_image.auto.tfvars` file similar to `docker_image.auto.tfvars.sample`.
+
+You can also use `mage cloud:image` and `mage cloud:push` respectively from repo root directory.
+To deploy your changes use `make apply` (from `testing/environments/cloud`) with `EC_API_KEY` instead of `make deploy_local` described above.
+
+SNAPSHOT images are used by default. To use non-snapshot image specify `SNAPSHOT=false` explicitly.
 
 ## Updating dependencies/PRs
 Even though we prefer `mage` to our automation, we still have some

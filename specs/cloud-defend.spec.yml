@@ -1,14 +1,18 @@
 version: 2
 inputs:
-  - name: cloud_defend
-    description: "Cloud defend for containers"
+  - name: cloud_defend/control
+    description: "Defend for containers"
     platforms: &platforms
+      - linux/amd64
+      - linux/arm64
       - container/amd64
       - container/arm64
     outputs: &outputs
       - elasticsearch
-    command:
-      args: &args
-        - "run"
-        - "--fleet-managed"
-        - "--process-managed"
+    runtime:
+      preventions:
+        - condition: ${user.root} == false
+          message: "Elastic Agent must be running as root"
+    command: &args
+      args:
+        - "--agent-managed"

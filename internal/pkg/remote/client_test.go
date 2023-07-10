@@ -18,6 +18,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -58,8 +59,8 @@ func TestPortDefaults(t *testing.T) {
 			c, err := NewWithConfig(l, cfg, nil)
 			require.NoError(t, err)
 
-			c.sortClients()
-			r, err := c.clients[0].newRequest(http.MethodGet, "/", nil, strings.NewReader(""))
+			clients := c.sortClients()
+			r, err := clients[0].newRequest(http.MethodGet, "/", nil, strings.NewReader(""))
 			require.NoError(t, err)
 
 			if tc.ExpectedPort > 0 {
@@ -133,6 +134,84 @@ func TestHTTPClient(t *testing.T) {
 		},
 	))
 
+	// This test for the bug that was introduced in agent 8.6 where the long polling checkin request was blocking the second request for acks
+	//
+	// There are two requests being issued in the test in the following sequence:
+	// 1. The first request starts.
+	// 2. The second request starts only after the first request handler is started execution.
+	// 3. The second request should complete, while the first request is still in progress.
+	// 4. The first request handler is signaled to complete only after the second request completes.
+	//
+	// This test timed out before the fix https://github.com/elastic/elastic-agent/pull/2406
+	//
+	// ➜  go test -timeout 30s -run "^\QTestHTTPClient\E$/^\QTwo_requests\E$" github.com/elastic/elastic-agent/internal/pkg/remote
+	// panic: test timed out after 30s
+	// running tests:
+	// 	TestHTTPClient (30s)
+	// 	TestHTTPClient/Two_requests (30s)
+	//
+	// The test passes after the fix https://github.com/elastic/elastic-agent/pull/2406
+	var wgInReq, wgSecondReq sync.WaitGroup
+	t.Run("Two requests blocking test", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/longpoll", func(w http.ResponseWriter, r *http.Request) {
+				// Signal that the long poll request handle is called
+				// The second request is waiting on this to test that the second request doesn't block
+				wgInReq.Done()
+
+				// Wait until the second request is done
+				wgSecondReq.Wait()
+
+				// This will block this request until the second request completes
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, successResp)
+			})
+			mux.HandleFunc("/second", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, successResp)
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			cfg := config.MustNewConfigFrom(map[string]interface{}{
+				"host": host,
+			})
+
+			client, err := NewWithRawConfig(nil, cfg, nil)
+			require.NoError(t, err)
+
+			issueRequest := func(ctx context.Context, path string) error {
+				resp, err := client.Send(ctx, http.MethodGet, path, nil, nil, nil)
+				if err != nil {
+					return err
+				}
+				defer resp.Body.Close()
+				return nil
+			}
+
+			wgInReq.Add(1)
+			wgSecondReq.Add(1)
+
+			// Issue long poll request
+			g, ctx := errgroup.WithContext(ctx)
+			g.Go(func() error {
+				return issueRequest(ctx, "/longpoll")
+			})
+
+			// The second request should not block waiting on the first request to complete
+			g.Go(func() error {
+				// Wait until the first request handler is hit
+				wgInReq.Wait()
+				err := issueRequest(ctx, "/second")
+				wgSecondReq.Done()
+				return err
+			})
+
+			err = g.Wait()
+			require.NoError(t, err)
+		},
+	))
+
 	t.Run("Simple call with a prefix path", withServer(
 		func(t *testing.T) *http.ServeMux {
 			mux := http.NewServeMux()
@@ -194,8 +273,8 @@ func TestHTTPClient(t *testing.T) {
 				{host: "http://must.fail-3.co/"},
 			}}
 
-		resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
-		assert.Contains(t, err.Error(), "http://must.fail-3.co/") // error contains last host
+		resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil) //nolint:bodyclose // wad
+		assert.Contains(t, err.Error(), "http://must.fail-3.co/")                   // error contains last host
 		assert.Nil(t, resp)
 	})
 
@@ -299,9 +378,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, one, client.clients[0])
+		assert.Equal(t, one, clients[0])
 	})
 
 	t.Run("Picks second requester when first has error", func(t *testing.T) {
@@ -314,9 +393,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, two, client.clients[0])
+		assert.Equal(t, two, clients[0])
 	})
 
 	t.Run("Picks second requester when first has been used", func(t *testing.T) {
@@ -327,9 +406,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, two, client.clients[0])
+		assert.Equal(t, two, clients[0])
 	})
 
 	t.Run("Picks second requester when it's the oldest", func(t *testing.T) {
@@ -345,9 +424,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two, three)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, two, client.clients[0])
+		assert.Equal(t, two, clients[0])
 	})
 
 	t.Run("Picks third requester when second has error and first is last used", func(t *testing.T) {
@@ -364,9 +443,9 @@ func TestSortClients(t *testing.T) {
 		}
 		client := &Client{clients: []*requestClient{one, two, three}}
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, three, client.clients[0])
+		assert.Equal(t, three, clients[0])
 	})
 
 	t.Run("Picks second requester when its oldest and all have old errors", func(t *testing.T) {
@@ -388,9 +467,9 @@ func TestSortClients(t *testing.T) {
 		client, err := newClient(nil, Config{}, one, two, three)
 		require.NoError(t, err)
 
-		client.sortClients()
+		clients := client.sortClients()
 
-		assert.Equal(t, two, client.clients[0])
+		assert.Equal(t, two, clients[0])
 	})
 }
 

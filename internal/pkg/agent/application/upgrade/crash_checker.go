@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	defaultCheckPeriod = 10 * time.Second
-	evaluatedPeriods   = 6 // with 10s period this means we evaluate 60s of agent run
-	crashesAllowed     = 2 // means that within 60s one restart is allowed, additional one is considered crash
+	evaluatedPeriods = 6 // with 10s period this means we evaluate 60s of agent run
+	crashesAllowed   = 2 // means that within 60s one restart is allowed, additional one is considered crash
 )
 
 type serviceHandler interface {
@@ -29,25 +28,25 @@ type serviceHandler interface {
 
 // CrashChecker checks agent for crash pattern in Elastic Agent lifecycle.
 type CrashChecker struct {
-	notifyChan  chan error
-	q           *disctintQueue
-	log         *logger.Logger
-	sc          serviceHandler
-	checkPeriod time.Duration
+	notifyChan    chan error
+	q             *disctintQueue
+	log           *logger.Logger
+	sc            serviceHandler
+	checkInterval time.Duration
 }
 
 // NewCrashChecker creates a new crash checker.
-func NewCrashChecker(ctx context.Context, ch chan error, log *logger.Logger) (*CrashChecker, error) {
+func NewCrashChecker(ctx context.Context, ch chan error, log *logger.Logger, checkInterval time.Duration) (*CrashChecker, error) {
 	q, err := newDistinctQueue(evaluatedPeriods)
 	if err != nil {
 		return nil, err
 	}
 
 	c := &CrashChecker{
-		notifyChan:  ch,
-		q:           q,
-		log:         log,
-		checkPeriod: defaultCheckPeriod,
+		notifyChan:    ch,
+		q:             q,
+		log:           log,
+		checkInterval: checkInterval,
 	}
 
 	if err := c.Init(ctx, log); err != nil {
@@ -66,7 +65,7 @@ func (ch *CrashChecker) Run(ctx context.Context) {
 	ch.log.Debug("Crash checker started")
 	for {
 		ch.log.Debugf("watcher having PID: %d", os.Getpid())
-		t := time.NewTimer(ch.checkPeriod)
+		t := time.NewTimer(ch.checkInterval)
 
 		select {
 		case <-ctx.Done():
@@ -82,7 +81,7 @@ func (ch *CrashChecker) Run(ctx context.Context) {
 			restarts := ch.q.Distinct()
 			ch.log.Debugf("retrieved service PID [%d] changed %d times within %d", pid, restarts, evaluatedPeriods)
 			if restarts > crashesAllowed {
-				ch.notifyChan <- errors.New(fmt.Sprintf("service restarted '%d' times within '%v' seconds", restarts, ch.checkPeriod.Seconds()))
+				ch.notifyChan <- errors.New(fmt.Sprintf("service restarted '%d' times within '%v' seconds", restarts, ch.checkInterval.Seconds()))
 			}
 		}
 	}
