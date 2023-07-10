@@ -220,6 +220,7 @@ func enrollAgentInFleet(t *testing.T, info *define.Info, fixture *atesting.Fixtu
 }
 
 type endpointPackageTemplateVars struct {
+	ID       string
 	Name     string
 	PolicyID string
 	Version  string
@@ -239,8 +240,10 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 	tmpl, err := template.New("pkgpolicy").Parse(endpointPackagePolicyTemplate)
 	require.NoError(t, err)
 
+	packagePolicyID := uuid.New().String()
 	var pkgPolicyBuf bytes.Buffer
 	err = tmpl.Execute(&pkgPolicyBuf, endpointPackageTemplateVars{
+		ID:       packagePolicyID,
 		Name:     "Defend-" + info.Namespace,
 		PolicyID: policyID,
 		Version:  endpointPackageVersion,
