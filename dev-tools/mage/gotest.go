@@ -233,7 +233,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		)
 	}
 
-	if params.TestName != "" {
+	if params.TestName != "" && params.TestName != "Unit" {
 		testArgs = append(testArgs, "-run", params.TestName)
 	}
 
