@@ -95,7 +95,7 @@ func (p *ProxyURL) TestEnrollProxyAndNoProxyInThePolicy() {
 
 	// now that we have fleet and the proxy running, we can add actions which
 	// depend on them.
-	action, err := fleetservertest.NewActionPolicyChange(
+	action, err := fleetservertest.NewActionWithEmptyPolicyChange(
 		"actionID-TestNoProxyInThePolicyactionID", p.policyData)
 	require.NoError(p.T(), err, "could not generate action with policy")
 	p.checkinWithAcker.AddCheckin(
@@ -139,7 +139,7 @@ func (p *ProxyURL) TestEnrollProxyAndEmptyProxyInThePolicy() {
 	*p.policyData.FleetProxyURL = ""
 	// now that we have fleet and the proxy running, we can add actions which
 	// depend on them.
-	action, err := fleetservertest.NewActionPolicyChange(
+	action, err := fleetservertest.NewActionWithEmptyPolicyChange(
 		"actionID-TestEmptyProxyInThePolicy", p.policyData)
 	require.NoError(p.T(), err, "could not generate action with policy")
 	p.checkinWithAcker.AddCheckin(
@@ -183,7 +183,7 @@ func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
 	*p.policyData.FleetProxyURL = p.proxy2.LocalhostURL
 	// now that we have fleet and the proxy running, we can add actions which
 	// depend on them.
-	action, err := fleetservertest.NewActionPolicyChange(
+	action, err := fleetservertest.NewActionWithEmptyPolicyChange(
 		"actionID-TestValidProxyInThePolicy", p.policyData)
 	require.NoError(p.T(), err, "could not generate action with policy")
 	p.checkinWithAcker.AddCheckin(
@@ -243,7 +243,7 @@ func (p *ProxyURL) TestNoEnrollProxyAndProxyInThePolicy() {
 	*p.policyData.FleetProxyURL = p.proxy2.LocalhostURL
 	// now that we have fleet and the proxy running, we can add actions which
 	// depend on them.
-	action, err := fleetservertest.NewActionPolicyChange(
+	action, err := fleetservertest.NewActionWithEmptyPolicyChange(
 		"actionID-TestValidProxyInThePolicy", p.policyData)
 	require.NoError(p.T(), err, "could not generate action with policy")
 	p.checkinWithAcker.AddCheckin(
@@ -306,7 +306,7 @@ func (p *ProxyURL) TestRemoveProxyFromThePolicy() {
 	*p.policyData.FleetProxyURL = p.proxy2.LocalhostURL
 	// now that we have fleet and the proxy running, we can add actions which
 	// depend on them.
-	action, err := fleetservertest.NewActionPolicyChange(
+	action, err := fleetservertest.NewActionWithEmptyPolicyChange(
 		"actionID-TestRemoveProxyFromThePolicy", p.policyData)
 	require.NoError(p.T(), err, "could not generate action with policy")
 	p.checkinWithAcker.AddCheckin(
@@ -366,7 +366,7 @@ func (p *ProxyURL) TestRemoveProxyFromThePolicy() {
 	want := *pp.FleetProxyURL
 	pp.FleetProxyURL = nil
 	actionIDRemoveProxyFromPolicy := "actionIDRemoveProxyFromPolicy-actionID-TestRemoveProxyFromThePolicy"
-	action, err = fleetservertest.NewActionPolicyChange(
+	action, err = fleetservertest.NewActionWithEmptyPolicyChange(
 		actionIDRemoveProxyFromPolicy, pp)
 	require.NoError(p.T(), err, "could not generate action with policy")
 	p.checkinWithAcker.AddCheckin(

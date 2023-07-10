@@ -38,7 +38,8 @@ func NewCheckinResponse(ackToken string, actions ...string) string {
 		ackToken, fmt.Sprintf("[%s]", strings.Join(actions, ",")))
 }
 
-func NewPolicy(data TmplPolicy) (string, error) {
+// NewEmptyPolicy returns an policy without any input and monitoring disabled.
+func NewEmptyPolicy(data TmplPolicy) (string, error) {
 	t := template.Must(template.New("policyEmpryTmpl").
 		Parse(policyEmpryTmpl))
 
@@ -57,8 +58,8 @@ type AckableAction struct {
 	data     string
 }
 
-func NewActionPolicyChange(actionID string, data TmplPolicy) (AckableAction, error) {
-	policy, err := NewPolicy(data)
+func NewActionWithEmptyPolicyChange(actionID string, data TmplPolicy) (AckableAction, error) {
+	policy, err := NewEmptyPolicy(data)
 	if err != nil {
 		return AckableAction{}, fmt.Errorf("could not build policy: %w", err)
 	}
@@ -96,20 +97,26 @@ func NewAction(data ActionTmpl) (AckableAction, error) {
 	}, nil
 }
 
-// NewActionPolicyChangeWithFakeComponent returns a POLICY_CHANGE action where
-// the policy contains one single integration. The integration uses the fake
-// component. All variable data in the policy comes from the data parameter.
-func NewActionPolicyChangeWithFakeComponent(data TmplPolicy) (string, error) {
+// NewActionPolicyChangeWithFakeComponent returns a AckableAction where
+// the policy, AckableAction.data, contains one single integration. The
+// integration uses the fake component. All variable data in the policy
+// comes from the data parameter.
+func NewActionPolicyChangeWithFakeComponent(actionID string, data TmplPolicy) (AckableAction, error) {
 	t := template.Must(template.New("actionPolicyChangeFakeComponentTmpl").
 		Parse(actionPolicyChangeFakeComponentTmpl))
 
 	buf := &strings.Builder{}
 	err := t.Execute(buf, data)
 	if err != nil {
-		return "", fmt.Errorf("failed building action: %w", err)
+		return AckableAction{}, fmt.Errorf("failed building action: %w", err)
 	}
 
-	return buf.String(), nil
+	return NewAction(ActionTmpl{
+		AgentID:  data.AgentID,
+		ActionID: actionID,
+		Data:     buf.String(),
+		Type:     "POLICY_CHANGE",
+	})
 }
 
 const (
@@ -122,9 +129,6 @@ const (
 
 	actionPolicyChangeFakeComponentTmpl = `
     {
-      "agent_id": "{{.AgentID}}",
-      "created_at": "2023-05-31T11:37:50.607Z",
-      "data": {
         "policy": {
           "agent": {
             "download": {
@@ -147,7 +151,7 @@ const (
           "fleet": {
             "hosts": [{{.FleetHosts}}]
           },
-          "id": "{{.ActionID}}",
+          "id": "{{.PolicyID}}",
           "inputs": [
             {
               "id": "fake-input",
@@ -185,11 +189,7 @@ const (
             "signature": "MEUCIQCfS6wPj/AvfFA79dwKATnvyFl/ZeyA8eKOLHg1XuA9NgIgNdhjIT+G/GZFqsVoWk5jThONhpqPhfiHLE5OkTdrwT0="
           }
         }
-      },
-      "id": "{{.ActionID}}",
-      "input_type": "",
-      "type": "POLICY_CHANGE"
-    }`
+      }`
 
 	policyEmpryTmpl = `
     {
