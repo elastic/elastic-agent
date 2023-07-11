@@ -2,7 +2,7 @@
 
 set -uo pipefail
 
-.buildkite/scripts/bootstrap.sh
+source .buildkite/scripts/bootstrap.sh
 
 echo "+++ Setting DRA params"
 # Shared secret path containing the dra creds for project teams

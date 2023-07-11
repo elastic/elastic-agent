@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-.buildkite/scripts/bootstrap.sh
+source .buildkite/scripts/bootstrap.sh
 
 echo "+++ Build Agent artifacts"
 mage packageAgentCore
