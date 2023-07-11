@@ -33,8 +33,7 @@ function run_release_manager() {
         --workflow "${WORKFLOW}" \
         --version "${BEAT_VERSION}" \
         --artifact-set main \
-        $dry_run \
-        #
+        $dry_run
 }
 
 run_release_manager
