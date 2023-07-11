@@ -832,6 +832,9 @@ func packageAgent(platforms []string, packagingFn func()) {
 					panic(err)
 				}
 
+				packagesMissing := false
+				packagesCopied := 0
+
 				if !requiredPackagesPresent(pwd, b, version, requiredPackages) {
 					cmd := exec.Command("mage", "package")
 					cmd.Dir = pwd
@@ -859,10 +862,16 @@ func packageAgent(platforms []string, packagingFn func()) {
 					os.MkdirAll(targetPath, 0755)
 					for _, f := range files {
 						targetFile := filepath.Join(targetPath, filepath.Base(f))
+						packagesCopied += 1
 						if err := sh.Copy(targetFile, f); err != nil {
 							panic(err)
 						}
 					}
+				}
+				// a very basic footcannon protector; if packages are missing and we need to rebuild them, check to see if those files were copied
+				// if we needed to repackage beats but still somehow copied nothing, could indicate an issue. Usually due to beats and agent being at different versions.
+				if packagesMissing && packagesCopied == 0 {
+					fmt.Printf(">>> WARNING: no packages were copied, but we repackaged beats anyway. Check binary to see if intended beats are there.")
 				}
 			}
 		}
@@ -1310,7 +1319,8 @@ func (Integration) Check() error {
 }
 
 // runs only the integration tests that support local mode
-func (Integration) Local(ctx context.Context) error {
+// it takes as argument the test name to run or all if we want to run them all.
+func (Integration) Local(ctx context.Context, testName string) error {
 	if shouldBuildAgent() {
 		// need only local package for current platform
 		devtools.Platforms = devtools.Platforms.Select(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
@@ -1325,6 +1335,11 @@ func (Integration) Local(ctx context.Context) error {
 	params := devtools.DefaultGoTestIntegrationArgs()
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
+	if testName == "all" {
+		params.RunExpr = ""
+	} else {
+		params.RunExpr = testName
+	}
 	return devtools.GoTest(ctx, params)
 }
 
@@ -1411,7 +1426,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		testName := fmt.Sprintf("remote-%s", testPrefix)
 		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
 		params := mage.GoTestArgs{
-			TestName:        testName,
+			LogName:         testName,
 			OutputFile:      fileName + ".out",
 			JUnitReportFile: fileName + ".xml",
 			Packages:        []string{packageName},
@@ -1463,13 +1478,13 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 		return fmt.Errorf("error writing test out xml file: %w", err)
 	}
 	if results.Failures > 0 {
-		fmt.Printf(">>> Testing completed (%d failures, %d successful)\n", results.Failures, results.Tests-results.Failures)
+		r.Logger().Logf("Testing completed (%d failures, %d successful)", results.Failures, results.Tests-results.Failures)
 	} else {
-		fmt.Printf(">>> Testing completed (%d successful)\n", results.Tests)
+		r.Logger().Logf("Testing completed (%d successful)", results.Tests)
 	}
-	fmt.Printf(">>> Console output written here: build/TEST-go-integration.out\n")
-	fmt.Printf(">>> Console JSON output written here: build/TEST-go-integration.out.json\n")
-	fmt.Printf(">>> JUnit XML written here: build/TEST-go-integration.xml\n")
+	r.Logger().Logf("Console output written here: build/TEST-go-integration.out")
+	r.Logger().Logf("Console JSON output written here: build/TEST-go-integration.out.json")
+	r.Logger().Logf("JUnit XML written here: build/TEST-go-integration.xml")
 	if results.Failures > 0 {
 		os.Exit(1)
 	}
@@ -1527,6 +1542,7 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
+	timestamp := timestampEnabled()
 	r, err := runner.NewRunner(runner.Config{
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
@@ -1544,6 +1560,7 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 		Matrix:      matrix,
 		SingleTest:  singleTest,
 		VerboseMode: mg.Verbose(),
+		Timestamp:   timestamp,
 	}, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
@@ -1561,6 +1578,15 @@ func shouldBuildAgent() bool {
 		return false
 	}
 	return ret
+}
+
+func timestampEnabled() bool {
+	timestamp := os.Getenv("TEST_INTEG_TIMESTAMP")
+	if timestamp == "" {
+		return false
+	}
+	b, _ := strconv.ParseBool(timestamp)
+	return b
 }
 
 // Pre-requisite: user must have the gcloud CLI installed

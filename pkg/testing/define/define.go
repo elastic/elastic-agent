@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -29,6 +30,7 @@ import (
 var osInfo *types.OSInfo
 var osInfoErr error
 var osInfoOnce sync.Once
+var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
 
 // Require defines what this test requires for it to be run by the test runner.
 //
@@ -63,8 +65,9 @@ func Version() string {
 	return ver
 }
 
-// NewFixture returns a new Elastic Agent testing fixture.
-func NewFixture(t *testing.T, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+// NewFixture returns a new Elastic Agent testing fixture with a LocalFetcher and
+// the agent logging to the test logger.
+func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	buildsDir := os.Getenv("AGENT_BUILD_DIR")
 	if buildsDir == "" {
 		projectDir, err := findProjectRoot()
@@ -73,9 +76,10 @@ func NewFixture(t *testing.T, opts ...atesting.FixtureOpt) (*atesting.Fixture, e
 		}
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
+
 	f := atesting.LocalFetcher(buildsDir)
 	opts = append(opts, atesting.WithFetcher(f), atesting.WithLogOutput())
-	return atesting.NewFixture(t, Version(), opts...)
+	return atesting.NewFixture(t, version, opts...)
 }
 
 // findProjectRoot finds the root directory of the project, by finding the go.mod file.
@@ -189,7 +193,13 @@ func getNamespace(t *testing.T, local bool) (string, error) {
 	name := fmt.Sprintf("%s-%s", prefix, t.Name())
 	hasher := sha256.New()
 	hasher.Write([]byte(name))
-	return base64.URLEncoding.EncodeToString(hasher.Sum(nil)), nil
+
+	// Fleet API requires the namespace to be lowercased and not contain
+	// special characters.
+	namespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
+	namespace = noSpecialCharsRegexp.ReplaceAllString(namespace, "")
+
+	return namespace, nil
 }
 
 // getESClient creates the elasticsearch client from the information passed from the test runner.

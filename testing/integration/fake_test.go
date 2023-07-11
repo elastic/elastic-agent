@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -99,27 +99,23 @@ inputs:
     message: Healthy
 `
 
-type FakeComponentIntegrationTestSuite struct {
-	suite.Suite
-	f *atesting.Fixture
-}
+func TestFakeComponent(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local: true,
+	})
 
-func (s *FakeComponentIntegrationTestSuite) SetupSuite() {
-	f, err := define.NewFixture(s.T())
-	s.Require().NoError(err)
+	f, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	err = f.Prepare(ctx, fakeComponent, fakeShipper)
-	s.Require().NoError(err)
-	s.f = f
-}
+	require.NoError(t, err)
 
-func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	err := s.f.Run(ctx, atesting.State{
+	err = f.Run(ctx, atesting.State{
 		Configure:  simpleConfig1,
 		AgentState: atesting.NewClientState(client.Healthy),
 		Components: map[string]atesting.ComponentState{
@@ -163,14 +159,7 @@ func (s *FakeComponentIntegrationTestSuite) TestAllHealthy() {
 			},
 		},
 	})
-	s.Require().NoError(err)
-}
-
-func TestFakeComponentIntegrationTestSuite(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Local: true,
-	})
-	suite.Run(t, new(FakeComponentIntegrationTestSuite))
+	require.NoError(t, err)
 }
 
 func mustAbs(path string) string {

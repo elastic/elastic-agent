@@ -78,13 +78,8 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(topPath)
+	err = RemovePath(topPath)
 	if err != nil {
-		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
-			// possible to fail on Windows, because elastic-agent.exe is running from
-			// this directory.
-			return nil
-		}
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
@@ -95,14 +90,33 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 }
 
 // RemovePath helps with removal path where there is a probability
-// of running into self which might prevent removal.
-// Removal will be initiated 2 seconds after a call.
+// of running into an executable running that might prevent removal
+// on Windows.
 func RemovePath(path string) error {
+	var previousPath string
 	cleanupErr := os.RemoveAll(path)
-	if cleanupErr != nil && isBlockingOnSelf(cleanupErr) {
-		delayedRemoval(path)
+	for cleanupErr != nil && isBlockingOnExe(cleanupErr) {
+		// remove the blocking exe
+		hardPath, hardErr := removeBlockingExe(cleanupErr)
+		if hardErr != nil {
+			// failed to remove the blocking exe (cannot continue)
+			return hardErr
+		}
+		// this if statement is being defensive and ensuring that an
+		// infinite loop to remove the same path does not occur
+		if hardPath != "" {
+			if previousPath == hardPath {
+				// no reason the previous path should be the same
+				// removeBlockingExe did not work correctly
+				//
+				// cleanupErr will contain the real error
+				return cleanupErr
+			}
+			previousPath = hardPath
+		}
+		// try to remove the original path now again
+		cleanupErr = os.RemoveAll(path)
 	}
-
 	return cleanupErr
 }
 

@@ -29,12 +29,19 @@ import (
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
+const (
+	defaultUpgradeFallbackPGP = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
+)
+
 func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI string, skipVerifyOverride bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
+
+	pgpBytes = appendFallbackPGP(pgpBytes)
+
 	// do not update source config
 	settings := *u.settings
 	if sourceURI != "" {
@@ -81,8 +88,17 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, version, sourceURI stri
 	return path, nil
 }
 
-func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
+func appendFallbackPGP(pgpBytes []string) []string {
+	if pgpBytes == nil {
+		pgpBytes = make([]string, 0, 1)
+	}
 
+	fallbackPGP := download.PgpSourceURIPrefix + defaultUpgradeFallbackPGP
+	pgpBytes = append(pgpBytes, fallbackPGP)
+	return pgpBytes
+}
+
+func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Downloader, error) {
 	if !version.IsSnapshot() {
 		return localremote.NewDownloader(log, settings)
 	}

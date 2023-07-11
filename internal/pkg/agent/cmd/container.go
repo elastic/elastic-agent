@@ -106,9 +106,8 @@ The following actions are possible and grouped based on the actions.
 * Preparing Kibana for Fleet
   This prepares the Fleet plugin that exists inside of Kibana. This must either be enabled here or done externally
   before Fleet Server will actually successfully start. All the Kibana variables are not needed in case Elastic Agent
-  should not setup Fleet. To manually trigger KIBANA_FLEET_SETUP navigate to Kibana -> Fleet -> Agents and enable it.
+  should not setup Fleet.
 
-  KIBANA_FLEET_SETUP - set to 1 enables the setup of Fleet in Kibana by Elastic Agent. This was previously FLEET_SETUP.
   KIBANA_FLEET_HOST - Kibana host accessible from Fleet Server. [$KIBANA_HOST]
   KIBANA_FLEET_USERNAME - Kibana username to service token [$KIBANA_USERNAME]
   KIBANA_FLEET_PASSWORD - Kibana password to service token [$KIBANA_PASSWORD]
@@ -273,20 +272,8 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		return run(logToStderr, false, initTimeout, isContainer)
 	}
 
-	if cfg.Kibana.Fleet.Setup || cfg.FleetServer.Enable {
+	if cfg.FleetServer.Enable {
 		err = ensureServiceToken(streams, &cfg)
-		if err != nil {
-			return err
-		}
-	}
-	if cfg.Kibana.Fleet.Setup {
-		client, err = kibanaClient(cfg.Kibana, cfg.Kibana.Headers)
-		if err != nil {
-			return err
-		}
-
-		logInfo(streams, "Performing setup of Fleet in Kibana\n")
-		err = kibanaSetup(cfg, client, streams)
 		if err != nil {
 			return err
 		}
@@ -513,18 +500,6 @@ func buildFleetServerConnStr(cfg fleetServerConfig) (string, error) {
 	return fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, path), nil
 }
 
-func kibanaSetup(cfg setupConfig, client *kibana.Client, streams *cli.IOStreams) error {
-	err := performPOST(cfg, client, "/api/fleet/setup", streams.Err, "Kibana Fleet setup")
-	if err != nil {
-		return err
-	}
-	err = performPOST(cfg, client, "/api/fleet/agents/setup", streams.Err, "Kibana Fleet Agents setup")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOStreams) (*kibanaPolicy, error) {
 	var policies kibanaPolicies
 	err := performGET(cfg, client, "/api/fleet/agent_policies", &policies, streams.Err, "Kibana fetch policy")
@@ -697,28 +672,6 @@ func performGET(cfg setupConfig, client *kibana.Client, path string, response in
 			return nil
 		}
 		return json.Unmarshal(result, response)
-	}
-	return lastErr
-}
-
-func performPOST(cfg setupConfig, client *kibana.Client, path string, writer io.Writer, msg string) error {
-	var lastErr error
-	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Connection.Request("POST", path, nil, nil, nil)
-		if err != nil || code >= 400 {
-			if err != nil {
-				err = fmt.Errorf("http POST request to %s%s fails: %w. Response: %s",
-					client.Connection.URL, path, err, truncateString(result))
-			} else {
-				err = fmt.Errorf("http POST request to %s%s fails. StatusCode: %d Response: %s",
-					client.Connection.URL, path, code, truncateString(result))
-			}
-			lastErr = err
-			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
-			<-time.After(cfg.Kibana.RetrySleepDuration)
-			continue
-		}
-		return nil
 	}
 	return lastErr
 }

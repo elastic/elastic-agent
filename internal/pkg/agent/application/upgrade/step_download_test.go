@@ -30,6 +30,28 @@ func (md *mockDownloader) Download(ctx context.Context, agentArtifact artifact.A
 	return md.downloadPath, md.downloadErr
 }
 
+func TestFallbackIsAppended(t *testing.T) {
+	testCases := []struct {
+		name        string
+		passedBytes []string
+		expectedLen int
+	}{
+		{"nil input", nil, 1},
+		{"empty input", []string{}, 1},
+		{"valid input", []string{"pgp-bytes"}, 2},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := appendFallbackPGP(tc.passedBytes)
+			// check default fallback is passed and is very last
+			require.NotNil(t, res)
+			require.Equal(t, tc.expectedLen, len(res))
+			require.Equal(t, download.PgpSourceURIPrefix+defaultUpgradeFallbackPGP, res[len(res)-1])
+		})
+	}
+}
+
 func TestDownloadWithRetries(t *testing.T) {
 	expectedDownloadPath := "https://artifacts.elastic.co/downloads/beats/elastic-agent"
 	testLogger, obs := logger.NewTesting("TestDownloadWithRetries")
