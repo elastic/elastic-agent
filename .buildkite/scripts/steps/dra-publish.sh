@@ -18,6 +18,9 @@ function run_release_manager() {
     dry_run=""
     if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
         dry_run="--dry-run"
+        # force main branch on PR's or it won't execute
+        # because the PR branche does not have a project folder in release-manager
+        BRANCH=main
     fi
     docker run --rm \
         --name release-manager \
@@ -27,12 +30,12 @@ function run_release_manager() {
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
         docker.elastic.co/infra/release-manager:latest \
         cli collect \
-        --project agent-core \
+        --project elastic-agent-core \
         --branch "${BRANCH}" \
         --commit "${BUILDKITE_COMMIT}" \
         --workflow "${WORKFLOW}" \
         --version "${BEAT_VERSION}" \
-        --artifact-set main \
+        --artifact-set agent-core \
         $dry_run
 }
 

@@ -5,5 +5,9 @@ set -euo pipefail
 source .buildkite/scripts/bootstrap.sh
 
 echo "+++ Build Agent artifacts"
-mage packageAgentCore
+SNAPSHOT=""
+if [ "$WORKFLOW" == "snapshot" ]; then
+    SNAPSHOT="true"
+fi
+SNAPSHOT=$SNAPSHOT mage packageAgentCore
 chmod -R 777 build/distributions

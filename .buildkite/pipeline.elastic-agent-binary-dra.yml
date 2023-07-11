@@ -1,5 +1,3 @@
-env:
-  RUN_SNAPSHOT: "true"
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
     key: "dra-core-snapshot"
@@ -18,7 +16,7 @@ steps:
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
     steps:
-    - label: ":hammer: Build Elastic-Agent Core staging"
+    - label: ":hammer::package:  Build and DRA Publish Elastic-Agent Core staging"
       if: build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_STAGING") == "true"
       commands:
         - .buildkite/scripts/steps/dra-build.sh

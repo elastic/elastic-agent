@@ -9,8 +9,8 @@ if [[ -z "${WORKSPACE-""}" ]]; then
     export WORKSPACE
 fi
 
-# Retrieve version value
-export BEAT_VERSION=$(grep -oE '\d+\.\d+\.\d+(\-\w+\d+)*' ${WORKSPACE}/version/version.go)
+# Retrieve version value - will match versions like 8.8.0 and also 8.8.0-er1
+export BEAT_VERSION=`grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' ${WORKSPACE}/version/version.go`
 export BRANCH="${BUILDKITE_BRANCH}"
 
 # Install Go TODO: move to makefile
@@ -19,10 +19,7 @@ if ! command -v go &>/dev/null; then
   export GO_VERSION=`cat .go-version`
   curl -O https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz
   sudo tar -xf go$GO_VERSION.linux-amd64.tar.gz -C /usr/local
-  echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-  source ~/.bashrc
-  mkdir $HOME/go
-  mkdir $HOME/go/bin
+  mkdir -p $HOME/go/bin
   export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
   echo "Go has been installed."
 else
