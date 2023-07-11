@@ -22,6 +22,7 @@ import (
 func makeComponentState(name string, proxiedActions []string) runtime.ComponentComponentState {
 	return runtime.ComponentComponentState{
 		Component: component.Component{
+			InputType: name,
 			Units: []component.Unit{
 				{
 					Type:   client.UnitTypeInput,
