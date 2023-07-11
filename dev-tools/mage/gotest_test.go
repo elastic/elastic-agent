@@ -44,7 +44,7 @@ func TestGoTest_CaptureOutput(t *testing.T) {
 	errNonZero := "go test returned a non-zero value"
 	makeArgs := func(test string) GoTestArgs {
 		return GoTestArgs{
-			TestName:   "asserts",
+			LogName:    "asserts",
 			Packages:   []string{"."},
 			Env:        map[string]string{envGoTestHelper: "1"},
 			ExtraFlags: []string{"-test.run", test},

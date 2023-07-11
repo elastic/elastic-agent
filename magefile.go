@@ -1426,7 +1426,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		testName := fmt.Sprintf("remote-%s", testPrefix)
 		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
 		params := mage.GoTestArgs{
-			TestName:        testName,
+			LogName:         testName,
 			OutputFile:      fileName + ".out",
 			JUnitReportFile: fileName + ".xml",
 			Packages:        []string{packageName},
