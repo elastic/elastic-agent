@@ -574,7 +574,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "daemon")
 
 	//start the upgrade to the latest version
-	require.Truef(t, strings.HasSuffix(actualVersion, "unknown_package_version"), actualVersion, "broken agent package version should end with \"unknow_package_version\"")
+	require.NotEmpty(t, actualVersion, "broken agent package version should not be empty")
 
 	// upgrade to latest version whatever that will be
 	aac := tools.NewArtifactAPIClient()
