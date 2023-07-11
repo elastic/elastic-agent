@@ -235,6 +235,41 @@ func GetLogsForDatastream(client elastictransport.Interface, index string) (Docu
 	return GetLogsForDatastreamWithContext(context.Background(), client, index)
 }
 
+// GetLogsForAgentID returns any logs associated with the agent ID
+func GetLogsForAgentID(client elastictransport.Interface, id string) (Documents, error) {
+	indexQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"data_stream.dataset": "elastic_agent.*",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(indexQuery)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithIndex("*.ds-logs*"),
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithPretty(),
+		es.Search.WithContext(context.Background()),
+		es.Search.WithQuery(fmt.Sprintf(`elastic_agent.id:%s`, id)),
+		// magic number, we try to get all entries it helps debugging test failures
+		es.Search.WithSize(300),
+	)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	return handleDocsResponse(res)
+}
+
 // GetLogsForDatastreamWithContext returns any logs associated with the datastream
 func GetLogsForDatastreamWithContext(ctx context.Context, client elastictransport.Interface, index string) (Documents, error) {
 	indexQuery := map[string]interface{}{
