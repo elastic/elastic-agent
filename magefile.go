@@ -1336,9 +1336,9 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
 	if testName == "all" {
-		params.TestName = ""
+		params.RunExpr = ""
 	} else {
-		params.TestName = testName
+		params.RunExpr = testName
 	}
 	return devtools.GoTest(ctx, params)
 }
@@ -1426,7 +1426,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		testName := fmt.Sprintf("remote-%s", testPrefix)
 		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
 		params := mage.GoTestArgs{
-			TestName:        testName,
+			LogName:         testName,
 			OutputFile:      fileName + ".out",
 			JUnitReportFile: fileName + ".xml",
 			Packages:        []string{packageName},

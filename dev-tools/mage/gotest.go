@@ -28,7 +28,8 @@ import (
 // GoTestArgs are the arguments used for the "go*Test" targets and they define
 // how "go test" is invoked. "go test" is always invoked with -v for verbose.
 type GoTestArgs struct {
-	TestName            string            // Test name used in logging.
+	LogName             string            // Test name used in logging.
+	RunExpr             string            // Expression to pass to the -run argument of go test.
 	Race                bool              // Enable race detector.
 	Tags                []string          // Build tags to enable.
 	ExtraFlags          []string          // Extra flags to pass to 'go test'.
@@ -49,7 +50,7 @@ type TestBinaryArgs struct {
 func makeGoTestArgs(name string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s", strings.Replace(strings.ToLower(name), " ", "_", -1))
 	params := GoTestArgs{
-		TestName:        name,
+		LogName:         name,
 		Race:            RaceDetector,
 		Packages:        []string{"./..."},
 		OutputFile:      fileName + ".out",
@@ -66,7 +67,7 @@ func makeGoTestArgsForModule(name, module string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s-%s", strings.Replace(strings.ToLower(name), " ", "_", -1),
 		strings.Replace(strings.ToLower(module), " ", "_", -1))
 	params := GoTestArgs{
-		TestName:        fmt.Sprintf("%s-%s", name, module),
+		LogName:         fmt.Sprintf("%s-%s", name, module),
 		Race:            RaceDetector,
 		Packages:        []string{fmt.Sprintf("./module/%s/...", module)},
 		OutputFile:      fileName + ".out",
@@ -182,7 +183,7 @@ func InstallGoTestTools() {
 func GoTest(ctx context.Context, params GoTestArgs) error {
 	mg.Deps(InstallGoTestTools)
 
-	fmt.Println(">> go test:", params.TestName, "Testing")
+	fmt.Println(">> go test:", params.LogName, "Testing")
 
 	// We use gotestsum to drive the tests and produce a junit report.
 	// The tool runs `go test -json` in order to produce a structured log which makes it easier
@@ -233,8 +234,8 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		)
 	}
 
-	if params.TestName != "" {
-		testArgs = append(testArgs, "-run", params.TestName)
+	if params.RunExpr != "" {
+		testArgs = append(testArgs, "-run", params.RunExpr)
 	}
 
 	testArgs = append(testArgs, params.ExtraFlags...)
@@ -336,11 +337,11 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
-		fmt.Println(">> go test:", params.TestName, "Test Failed")
+		fmt.Println(">> go test:", params.LogName, "Test Failed")
 		return errors.Wrap(goTestErr, "go test returned a non-zero value")
 	}
 
-	fmt.Println(">> go test:", params.TestName, "Test Passed")
+	fmt.Println(">> go test:", params.LogName, "Test Passed")
 	return nil
 }
 
