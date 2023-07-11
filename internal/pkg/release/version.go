@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	hashLen                     = 6
-	unknownPackageVersionSuffix = "+unknown_package_version"
+	hashLen = 6
 )
 
 // snapshot is a flag marking build as a snapshot.
@@ -54,13 +53,7 @@ func BuildTime() time.Time {
 
 // Version returns the version of the application.
 func Version() string {
-	pkgVersion, err := version.GetAgentPackageVersion()
-	if err == nil && pkgVersion != "" {
-		return pkgVersion
-	}
-
-	// Fallback to beats qualified version + unknown package version
-	return version.GetDefaultVersion() + unknownPackageVersionSuffix
+	return version.GetAgentPackageVersion()
 }
 
 // Snapshot returns true if binary was built as snapshot.

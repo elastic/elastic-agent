@@ -533,7 +533,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	f, err := define.NewFixture(t)
+	f, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.

@@ -24,6 +24,8 @@ func TestVersion(t *testing.T) {
 		expectedVersion := "1.2.3-test"
 		err = os.WriteFile(pkgVerFile, []byte(expectedVersion), 0o644)
 		require.NoError(t, err)
+		err = version.InitVersionInformation()
+		require.NoError(t, err)
 		actualVersion := Version()
 		assert.Equal(t, expectedVersion, actualVersion)
 	})
@@ -36,6 +38,8 @@ func TestVersion(t *testing.T) {
 		expectedVersionXtra := "\t   \n \r\n" + expectedVersion + "   \t \n\n\n\r\n"
 		err = os.WriteFile(pkgVerFile, []byte(expectedVersionXtra), 0o644)
 		require.NoError(t, err)
+		err = version.InitVersionInformation()
+		require.NoError(t, err)
 		actualVersion := Version()
 		assert.Equal(t, expectedVersion, actualVersion)
 	})
@@ -47,10 +51,11 @@ func TestVersion(t *testing.T) {
 		pkgVerFile, err := version.GetAgentPackageVersionFilePath()
 		require.NoError(t, err)
 		t.Cleanup(func() { os.Remove(pkgVerFile) })
-		beatsVersion := version.GetDefaultVersion()
-		expectedVersion := beatsVersion + unknownPackageVersionSuffix
+		expectedVersion := version.GetDefaultVersion()
 		err = os.WriteFile(pkgVerFile, []byte("1.2.3-test"), 0o200)
 		require.NoError(t, err)
+		err = version.InitVersionInformation()
+		assert.Error(t, err)
 		actualVersion := Version()
 		assert.Equal(t, expectedVersion, actualVersion)
 	})
@@ -60,8 +65,9 @@ func TestVersion(t *testing.T) {
 		require.NoError(t, err)
 		_, err = os.Stat(pkgVerFile)
 		require.ErrorIs(t, err, fs.ErrNotExist)
-		beatsVersion := version.GetDefaultVersion()
-		expectedVersion := beatsVersion + unknownPackageVersionSuffix
+		err = version.InitVersionInformation()
+		assert.Error(t, err)
+		expectedVersion := version.GetDefaultVersion()
 		actualVersion := Version()
 		assert.Equal(t, expectedVersion, actualVersion)
 	})

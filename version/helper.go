@@ -22,25 +22,39 @@ func GetDefaultVersion() string {
 }
 
 var (
-	buildTime = "unknown"
-	commit    = "unknown"
-	qualifier = ""
+	buildTime      = "unknown"
+	commit         = "unknown"
+	qualifier      = ""
+	packageVersion = ""
 )
 
 const PackageVersionFileName = ".package.version"
 
-// GetAgentPackageVersion retrieves the version saved in .package.version in the same
-// directory as the agent executable
-func GetAgentPackageVersion() (string, error) {
+// InitVersionInformation initialize the package version string reading from the
+// corresponding file. This function is not thread-safe and should be called once
+// before any calls to Version() has been done
+func InitVersionInformation() error {
 	packageVersionFilePath, err := GetAgentPackageVersionFilePath()
 	if err != nil {
-		return "", fmt.Errorf("retrieving package version file path: %w", err)
+		// fallback to default binary version
+		packageVersion = GetDefaultVersion()
+		return fmt.Errorf("retrieving package version file path: %w", err)
 	}
 	versionBytes, err := os.ReadFile(packageVersionFilePath)
 	if err != nil {
-		return "", fmt.Errorf("reading package version from file %q: %w", packageVersionFilePath, err)
+		// fallback to default binary version
+		packageVersion = GetDefaultVersion()
+		return fmt.Errorf("reading package version from file %q: %w", packageVersionFilePath, err)
 	}
-	return strings.TrimSpace(string(versionBytes)), nil
+	packageVersion = strings.TrimSpace(string(versionBytes))
+	return nil
+}
+
+// GetAgentPackageVersion retrieves the version saved in .package.version in the same
+// directory as the agent executable.
+// This function must be called AFTER InitVersionInformation() has initialized the module vars
+func GetAgentPackageVersion() string {
+	return packageVersion
 }
 
 // GetAgentPackageVersionFilePath returns the path where the package version file

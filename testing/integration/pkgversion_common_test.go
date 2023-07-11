@@ -8,10 +8,12 @@ package integration
 
 import (
 	"context"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"gopkg.in/yaml.v2"
@@ -38,9 +40,7 @@ func testAgentPackageVersion(ctx context.Context, f *integrationtest.Fixture, bi
 		pkgVersion := strings.TrimSpace(string(pkgVersionBytes))
 		t.Logf("package version file content: %q", pkgVersion)
 
-		if pkgVersion == "" {
-			t.Skip("elastic agent has been packaged without specifying a package version")
-		}
+		require.NotEmpty(t, pkgVersion, "elastic agent has been packaged with an empty package version")
 
 		// check the version returned by the running agent
 		actualVersionBytes := getAgentVersion(t, f, context.Background(), binaryOnly)
@@ -62,9 +62,39 @@ func getAgentVersion(t *testing.T, f *integrationtest.Fixture, ctx context.Conte
 	if binaryOnly {
 		args = append(args, "--binary-only")
 	}
-	actualVersionBytes, err := f.Exec(ctx, args)
+	versionCmd, err := f.PrepareAgentCommand(ctx, args)
+	require.NoError(t, err, "error preparing agent version command")
+
+	actualVersionBytes, err := versionCmd.Output()
 	require.NoError(t, err, "error executing 'version' command. Output %q", string(actualVersionBytes))
 	return actualVersionBytes
+}
+
+// getAgentVersion retrieves the agent version yaml output via CLI
+func getAgentVersionOutput(t *testing.T, f *integrationtest.Fixture, ctx context.Context, binaryOnly bool) (stdout []byte, stderr []byte, state *os.ProcessState) {
+	args := []string{"version", "--yaml"}
+	if binaryOnly {
+		args = append(args, "--binary-only")
+	}
+	versionCmd, err := f.PrepareAgentCommand(ctx, args)
+	require.NoError(t, err, "error preparing agent version command")
+
+	stderrReader, err := versionCmd.StderrPipe()
+	require.NoError(t, err, "error get stderr pipe for agent version command")
+
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var readingErr error
+		stderr, readingErr = io.ReadAll(stderrReader)
+		require.NoError(t, readingErr, "error reading agent version command stderr")
+	}()
+
+	stdout, err = versionCmd.Output()
+	state = versionCmd.ProcessState
+	wg.Wait()
+	return
 }
 
 // unmarshalVersionOutput retrieves the version string for binary or daemon from "version" subcommand yaml output
