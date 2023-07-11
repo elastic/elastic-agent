@@ -29,6 +29,7 @@ import (
 // how "go test" is invoked. "go test" is always invoked with -v for verbose.
 type GoTestArgs struct {
 	TestName            string            // Test name used in logging.
+	RunExpr             string            // Expression to pass to the -run argument of go test.
 	Race                bool              // Enable race detector.
 	Tags                []string          // Build tags to enable.
 	ExtraFlags          []string          // Extra flags to pass to 'go test'.
@@ -233,8 +234,8 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		)
 	}
 
-	if params.TestName != "" {
-		testArgs = append(testArgs, "-run", params.TestName)
+	if params.RunExpr != "" {
+		testArgs = append(testArgs, "-run", params.RunExpr)
 	}
 
 	testArgs = append(testArgs, params.ExtraFlags...)
