@@ -30,6 +30,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
+const endpointHealthPollingTimeout = 2 * time.Minute
+
 // https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#createPackagePolicy
 // request https://www.elastic.co/guide/en/fleet/8.8/fleet-apis.html#package_policy_request
 type PackagePolicyRequest struct {
@@ -91,8 +93,7 @@ func TestEndpointSecurity(t *testing.T) {
 	installElasticDefendPackage(t, info, policyID)
 
 	t.Log("Polling for endpoint-security to become Healthy")
-	statePollingTimeout := 10 * time.Minute
-	ctx, cancel := context.WithTimeout(context.Background(), statePollingTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
 	defer cancel()
 
 	agentClient := fixture.Client()
@@ -145,7 +146,7 @@ func TestEndpointSecurity(t *testing.T) {
 
 		return true
 	}
-	require.Eventually(t, healthyEndpointFunc, statePollingTimeout, time.Second, "Endpoint component or units are not healthy.")
+	require.Eventually(t, healthyEndpointFunc, endpointHealthPollingTimeout, time.Second, "Endpoint component or units are not healthy.")
 	t.Logf("Verified endpoint component and units are healthy")
 }
 
