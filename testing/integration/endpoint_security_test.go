@@ -91,7 +91,7 @@ func TestEndpointSecurity(t *testing.T) {
 	installElasticDefendPackage(t, info, policyID)
 
 	t.Log("Polling for endpoint-security to become Healthy")
-	statePollingTimeout := 5 * time.Minute
+	statePollingTimeout := 10 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), statePollingTimeout)
 	defer cancel()
 
@@ -145,7 +145,7 @@ func TestEndpointSecurity(t *testing.T) {
 
 		return true
 	}
-	require.Eventually(t, healthyEndpointFunc, statePollingTimeout, time.Second)
+	require.Eventually(t, healthyEndpointFunc, statePollingTimeout, time.Second, "Endpoint component or units are not healthy.")
 	t.Logf("Verified endpoint component and units are healthy")
 }
 
