@@ -59,7 +59,7 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 	mainBuildfmt := "elastic-agent-%s-%s"
 	if f.snapshotOnly && !ver.IsSnapshot() {
 		if ver.Prerelease() == "" {
-			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), ver.Prerelease()+"SNAPSHOT", ver.BuildMetadata())
+			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "SNAPSHOT", ver.BuildMetadata())
 		} else {
 			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), ver.Prerelease()+"-SNAPSHOT", ver.BuildMetadata())
 		}
