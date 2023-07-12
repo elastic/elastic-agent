@@ -87,9 +87,9 @@ func InstallFleetPackage(ctx context.Context, kib *kibana.Client, req *PackagePo
 		fleetErr := FleetErrorResponse{}
 		err = json.Unmarshal(pkgRespBytes, &fleetErr)
 		if err != nil {
-			return nil, fmt.Errorf("unmarshalling http error response with code %s: %w", resp.StatusCode, err)
+			return nil, fmt.Errorf("unmarshalling http error response with code %d: %w", resp.StatusCode, err)
 		}
-		return nil, fmt.Errorf("http error response with code %s: %+v", resp.StatusCode, fleetErr)
+		return nil, fmt.Errorf("http error response with code %d: %+v", resp.StatusCode, fleetErr)
 	}
 
 	pkgPolicyResp := PackagePolicyResponse{}
