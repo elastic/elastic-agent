@@ -20,6 +20,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
+const hashExt = ".sha512"
+
 var (
 	// ErrUnsupportedPlatform returned when the operating system and architecture combination is not supported.
 	ErrUnsupportedPlatform = errors.New("platform is not supported")

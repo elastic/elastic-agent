@@ -25,41 +25,52 @@ func TestLocalFetcher(t *testing.T) {
 	// t.Skip()
 	baseVersion := "8.7.0"
 	snapshotContent := []byte("snapshot contents")
+	snapshotContentHash := []byte("snapshot contents hash")
 	noSnapshotContent := []byte("not snapshot contents")
+	noSnapshotContentHash := []byte("not snapshot contents hash")
 
 	testdata := t.TempDir()
 	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
 	require.NoError(t, err)
 
 	snapshotPath := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix)
-	notSnapshotPath := fmt.Sprintf("elastic-agent-%s-%s", baseVersion, suffix)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPath), snapshotContent, 0644))
+	snapshotPathHash := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s%s", baseVersion, suffix, hashExt)
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPathHash), snapshotContentHash, 0644))
+	notSnapshotPath := fmt.Sprintf("elastic-agent-%s-%s", baseVersion, suffix)
 	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPath), noSnapshotContent, 0644))
+	notSnapshotPathHash := fmt.Sprintf("elastic-agent-%s-%s%s", baseVersion, suffix, hashExt)
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPathHash), noSnapshotContentHash, 0644))
 
 	tcs := []struct {
-		name    string
-		version string
-		opts    []localFetcherOpt
-		want    []byte
+		name     string
+		version  string
+		opts     []localFetcherOpt
+		want     []byte
+		wantHash []byte
 	}{
 		{
-			name:    "IgnoreSnapshot",
-			version: baseVersion,
-			want:    noSnapshotContent,
+			name:     "IgnoreSnapshot",
+			version:  baseVersion,
+			want:     noSnapshotContent,
+			wantHash: noSnapshotContentHash,
 		}, {
-			name:    "SnapshotOnly",
-			version: baseVersion,
-			opts:    []localFetcherOpt{WithLocalSnapshotOnly()},
-			want:    snapshotContent,
+			name:     "SnapshotOnly",
+			version:  baseVersion,
+			opts:     []localFetcherOpt{WithLocalSnapshotOnly()},
+			want:     snapshotContent,
+			wantHash: snapshotContentHash,
 		}, {
-			name:    "version with snapshot",
-			version: baseVersion + "-SNAPSHOT",
-			want:    snapshotContent,
+			name:     "version with snapshot",
+			version:  baseVersion + "-SNAPSHOT",
+			want:     snapshotContent,
+			wantHash: snapshotContentHash,
 		}, {
-			name:    "version with snapshot and SnapshotOnly",
-			version: baseVersion + "-SNAPSHOT",
-			opts:    []localFetcherOpt{WithLocalSnapshotOnly()},
-			want:    snapshotContent,
+			name:     "version with snapshot and SnapshotOnly",
+			version:  baseVersion + "-SNAPSHOT",
+			opts:     []localFetcherOpt{WithLocalSnapshotOnly()},
+			want:     snapshotContent,
+			wantHash: snapshotContentHash,
 		},
 	}
 
@@ -77,5 +88,9 @@ func TestLocalFetcher(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, string(tc.want), string(content))
+		contentHash, err := os.ReadFile(filepath.Join(tmp, got.Name()+hashExt))
+		require.NoError(t, err)
+
+		assert.Equal(t, string(tc.wantHash), string(contentHash))
 	}
 }
