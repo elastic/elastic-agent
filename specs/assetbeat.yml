@@ -1,0 +1,44 @@
+version: 2
+inputs:
+  - name: assetbeat
+    description: "Assetbeat"
+    platforms: &platforms
+      - linux/amd64
+      - linux/arm64
+    outputs: &outputs
+      - elasticsearch
+    command: &command
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
+      args:
+        - "-E"
+        - "setup.ilm.enabled=false"
+        - "-E"
+        - "setup.template.enabled=false"
+        - "-E"
+        - "management.enabled=true"
+        - "-E"
+        - "management.restart_on_output_change=true"
+        - "-E"
+        - "logging.level=info"
+        - "-E"
+        - "logging.to_stderr=true"
+        - "-E"
+        - "gc_percent=${ASSETBEAT_GOGC:100}"
+  - name: assets_k8s
+    description: "Kubernetes assets"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
+  - name: assets_aws
+    description: "AWS assets"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
+  - name: assets_gcp
+    description: "GCP Assets"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
