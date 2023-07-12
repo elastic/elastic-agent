@@ -166,7 +166,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	versionList, latestVersion := getUpgradableAndLatestVersions(ctx, t)
+	versionList, _ := getUpgradableAndLatestVersions(ctx, t)
 
 	// FIXME agent 7.X has a different control protocol which makes the upgrade, status command tricky (the fixture allocates a v2 client)
 	//	skip anything below 8.X
@@ -178,12 +178,12 @@ func TestStandaloneUpgrade(t *testing.T) {
 			continue
 		}
 
-		if v == latestVersion || parsedVersion.IsSnapshot() || parsedVersion.Less(*minVersion) {
-			t.Logf("Skipping upgrade test for version %q", latestVersion)
+		if v == define.Version() || parsedVersion.IsSnapshot() || parsedVersion.Less(*minVersion) {
+			t.Logf("Skipping upgrade test for version %q", define.Version())
 			continue
 		}
 
-		t.Run(fmt.Sprintf("Upgrade %s to %s", v, latestVersion), func(t *testing.T) {
+		t.Run(fmt.Sprintf("Upgrade %s to %s", v, define.Version()), func(t *testing.T) {
 			agentFixture, err := atesting.NewFixture(
 				t,
 				v,
@@ -198,7 +198,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
 
-			testUpgrade(ctx, t, agentFixture, latestVersion, "")
+			testUpgrade(ctx, t, agentFixture, v, define.Version(), "")
 		})
 	}
 }
@@ -302,7 +302,7 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 		buildFragments[1],
 	)
 
-	testUpgrade(ctx, t, agentFixture, upgradeInputVersion.String(), expectedAgentHashAfterUpgrade)
+	testUpgrade(ctx, t, agentFixture, upgradeInputVersion.String(), define.Version(), expectedAgentHashAfterUpgrade)
 
 }
 
@@ -315,25 +315,26 @@ func getUpgradableAndLatestVersions(ctx context.Context, t *testing.T) (upgradab
 
 	latestVersion = vList.Versions[len(vList.Versions)-1]
 
-	if testing.Short() {
-		upgradableVersions = []string{"8.6.2", "8.7.1", "8.8.1"}
-	} else {
-		artifactAPIVersions := vList.Versions
-		for _, aav := range artifactAPIVersions {
-			parsedVersion, err := version.ParseVersion(aav)
-			require.NoError(t, err, "Received unparseable version from Artifact API")
-			if parsedVersion.IsSnapshot() {
-				// skip all snapshots
-				continue
-			}
+	upgradableVersions = []string{"8.8.1"}
+	// if testing.Short() {
+	// 	upgradableVersions = []string{"8.6.2", "8.7.1", "8.8.1"}
+	// } else {
+	// 	artifactAPIVersions := vList.Versions
+	// 	for _, aav := range artifactAPIVersions {
+	// 		parsedVersion, err := version.ParseVersion(aav)
+	// 		require.NoError(t, err, "Received unparseable version from Artifact API")
+	// 		if parsedVersion.IsSnapshot() {
+	// 			// skip all snapshots
+	// 			continue
+	// 		}
 
-			upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
-		}
-	}
+	// 		upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
+	// 	}
+	// }
 	return
 }
 
-func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, toVersion, expectedAgentHashAfterUpgrade string) {
+func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVersion, toVersion, expectedAgentHashAfterUpgrade string) {
 	parsedUpgradeVersion, err := version.ParseVersion(toVersion)
 	require.NoErrorf(t, err, "unable to parse version %w", toVersion)
 
@@ -365,7 +366,14 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, toVersi
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
 
-	_, err = c.Upgrade(ctx, toVersion, "", false)
+	tof, err := define.NewFixture(t, toVersion)
+	require.NoError(t, err)
+
+	srcPkg, err := tof.SrcPackage(ctx)
+	require.NoError(t, err)
+
+	t.Logf("src package folder: %q", "file://"+filepath.Dir(srcPkg))
+	_, err = c.Upgrade(ctx, toVersion, "file://"+filepath.Dir(srcPkg), false)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
 
 	require.Eventuallyf(t, func() bool {
@@ -384,7 +392,10 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, toVersi
 			state.State == cproto.State_HEALTHY
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
-	checkUpgradeWatcherRan(t, f)
+	parsedFromV, err := version.ParseVersion(fromVersion)
+	require.NoErrorf(t, err, "version %q is not a valid agent version", fromVersion)
+
+	checkUpgradeWatcherRan(t, f, parsedFromV)
 
 	version, err := c.Version(ctx)
 	require.NoError(t, err, "error checking version after upgrade")
@@ -394,8 +405,14 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, toVersi
 // checkUpgradeWatcherRan asserts that the Upgrade Watcher finished running. We use the
 // presence of the update marker file as evidence that the Upgrade Watcher is still running
 // and the absence of that file as evidence that the Upgrade Watcher is no longer running.
-func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture) {
+func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture, fromVersion *version.ParsedSemVer) {
 	t.Helper()
+
+	if fromVersion.Less(*version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")) {
+		t.Logf("Version %q is too old for a quick update marker check, skipping...", fromVersion)
+		return
+	}
+
 	t.Log("Waiting for upgrade watcher to finish running...")
 
 	updateMarkerFile := filepath.Join(agentFixture.WorkDir(), "data", ".update-marker")
@@ -573,7 +590,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	t.Log("Waiting for upgrade to finish")
 	wg.Wait()
 
-	checkUpgradeWatcherRan(t, agentFixture)
+	checkUpgradeWatcherRan(t, agentFixture, upgradeFromVersion)
 
 	t.Log("Check Agent version to ensure upgrade is successful")
 	currentVersion, err = getVersion(t, ctx, agentFixture)

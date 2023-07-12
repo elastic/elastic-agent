@@ -42,7 +42,8 @@ type Fixture struct {
 	allowErrs       bool
 	connectTimout   time.Duration
 
-	workDir string
+	srcPackage string
+	workDir    string
 
 	installed   bool
 	installOpts *InstallOpts
@@ -153,6 +154,7 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	if err != nil {
 		return err
 	}
+	f.srcPackage = src
 	filename := filepath.Base(src)
 	name, _, err := splitFileType(filename)
 	if err != nil {
@@ -189,6 +191,15 @@ func (f *Fixture) Configure(ctx context.Context, yamlConfig []byte) error {
 // must be called after `Install` is called.
 func (f *Fixture) WorkDir() string {
 	return f.workDir
+}
+
+// SrcPackage returns the location on disk of the elastic agent package usded by this fixture.
+func (f *Fixture) SrcPackage(ctx context.Context) (string, error) {
+	err := f.ensurePrepared(ctx)
+	if err != nil {
+		return "", err
+	}
+	return f.srcPackage, nil
 }
 
 func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
