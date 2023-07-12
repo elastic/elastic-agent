@@ -53,6 +53,8 @@ func WaitForPolicyRevision(t *testing.T, client *kibana.Client, agentID string, 
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
 func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibClient *kibana.Client, createPolicyReq kibana.AgentPolicy) (*kibana.PolicyResponse, error) {
+	t.Helper()
+
 	policy, err := kibClient.CreatePolicy(createPolicyReq)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create policy: %w", err)
