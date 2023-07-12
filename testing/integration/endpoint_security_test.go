@@ -139,7 +139,7 @@ func TestEndpointSecurity(t *testing.T) {
 		}
 
 		// Ensure both the endpoint input and output units were found and healthy.
-		if !assert.True(t, foundEndpointInputUnit) || !assert.True(t, foundEndpointOutputUnit) {
+		if !foundEndpointInputUnit || !foundEndpointOutputUnit {
 			t.Logf("State did not contain endpoint units!\n%+v", state)
 			return false
 		}
