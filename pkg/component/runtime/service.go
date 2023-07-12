@@ -450,19 +450,21 @@ func (s *serviceRuntime) install(ctx context.Context) error {
 
 // uninstall executes the service uninstall command
 func (s *serviceRuntime) uninstall(ctx context.Context) error {
-	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl)
+	// Always retry for internal attempts to uninstall, because they are an attempt to converge the agent's current state
+	// with its desired state based on the agent policy.
+	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl, true)
 }
 
-// UninstallService uninstalls the service
-func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component) error {
-	return uninstallService(ctx, log, comp, executeServiceCommand)
+// UninstallService uninstalls the service. When shouldRetry is true the uninstall command will be retried until it succeeds.
+func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component, shouldRetry bool) error {
+	return uninstallService(ctx, log, comp, executeServiceCommand, shouldRetry)
 }
 
-func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc) error {
+func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc, shouldRetry bool) error {
 	if comp.InputSpec.Spec.Service.Operations.Uninstall == nil {
 		log.Errorf("missing uninstall spec for %s service", comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
 	log.Debugf("uninstall %s service", comp.InputSpec.BinaryName)
-	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, comp.InputSpec.Spec.Service.Operations.Uninstall, true)
+	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, comp.InputSpec.Spec.Service.Operations.Uninstall, shouldRetry)
 }
