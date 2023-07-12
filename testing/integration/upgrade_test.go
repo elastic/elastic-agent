@@ -1060,3 +1060,19 @@ type CustomPGP struct {
 	PGPUri  string
 	PGPPath string
 }
+
+// TestStandaloneUpgradeFailsRestart tests the scenario where upgrading to a new version
+// of Agent fails due to the new Agent binary not starting up. It checks that the Agent is
+// rolled back to the previous version.
+func TestStandaloneUpgradeFailsRestart(t *testing.T) {
+	// Install the current version of Agent.
+
+	// Create a fake Agent package that contains a fake binary that will
+	// deliberately fail to start.
+
+	// Try upgrading to the fake Agent package.
+
+	// Ensure that the Upgrade Watcher has stopped running.
+
+	// Ensure that the original version of Agent is running again.
+}
