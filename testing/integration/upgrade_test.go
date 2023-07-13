@@ -373,7 +373,7 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVer
 	require.NoError(t, err)
 
 	t.Logf("src package folder: %q", "file://"+filepath.Dir(srcPkg))
-	_, err = c.Upgrade(ctx, toVersion, "file://"+filepath.Dir(srcPkg), false)
+	_, err = c.Upgrade(ctx, toVersion, "file://"+filepath.Dir(srcPkg), true)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
 
 	require.Eventuallyf(t, func() bool {
