@@ -34,7 +34,7 @@ Unless -f is used this command will ask confirmation before performing removal.
 	}
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
-	cmd.Flags().String("uninstall-token", "", "Token that protects Agent with Endpoint from uninstall")
+	cmd.Flags().String("uninstall-token", "", "Uninstall token required for protected agent uninstall")
 
 	return cmd
 }
