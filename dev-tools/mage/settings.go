@@ -145,7 +145,7 @@ func initGlobals() {
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
-	
+
 	ManifestURL = EnvOr("ManifestURL", "")
 	PackagingFromManifest = ManifestURL != ""
 }
