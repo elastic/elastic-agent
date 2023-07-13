@@ -51,6 +51,7 @@ agent.upgrade.watcher:
 
 // notable versions used in tests
 var version_8_0_0 = version.NewParsedSemVer(8, 0, 0, "", "")
+var version_8_7_0 = version.NewParsedSemVer(8, 7, 0, "", "")
 var version_8_9_0_SNAPSHOT = version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")
 
 func TestFleetManagedUpgrade(t *testing.T) {
@@ -203,7 +204,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
 
-			testUpgrade(ctx, t, agentFixture, v, define.Version(), "")
+			testStandaloneUpgrade(ctx, t, agentFixture, v, define.Version(), "")
 		})
 	}
 }
@@ -306,7 +307,7 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 		buildFragments[1],
 	)
 
-	testUpgrade(ctx, t, agentFixture, upgradeInputVersion.String(), define.Version(), expectedAgentHashAfterUpgrade)
+	testStandaloneUpgrade(ctx, t, agentFixture, upgradeInputVersion.String(), define.Version(), expectedAgentHashAfterUpgrade)
 
 }
 
@@ -340,7 +341,7 @@ func getUpgradableAndLatestVersions(ctx context.Context, t *testing.T) (upgradab
 	return
 }
 
-func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVersion, toVersion, expectedAgentHashAfterUpgrade string) {
+func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVersion, toVersion, expectedAgentHashAfterUpgrade string) {
 	parsedFromVersion, err := version.ParseVersion(fromVersion)
 	require.NoErrorf(t, err, "unable to parse version %w", fromVersion)
 	parsedUpgradeVersion, err := version.ParseVersion(toVersion)
@@ -362,14 +363,23 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVer
 
 	t.Logf("Upgrading to version %q", toVersion)
 
-	tof, err := define.NewFixture(t, toVersion)
-	require.NoError(t, err)
+	sourceURI := ""
+	skipVerify := false
+	if version_8_7_0.Less(*parsedFromVersion) {
+		// if we are upgrading from a version > 8.7.0 (min version to skip signature verification) we pass :
+		// - a file:// sourceURI pointing the agent package under test
+		// - flag --skip-verify to bypass pgp signature verification (we don't produce signatures for PR/main builds)
+		tof, err := define.NewFixture(t, toVersion)
+		require.NoError(t, err)
 
-	srcPkg, err := tof.SrcPackage(ctx)
-	require.NoError(t, err)
+		srcPkg, err := tof.SrcPackage(ctx)
+		require.NoError(t, err)
+		sourceURI = "file://" + filepath.Dir(srcPkg)
+		t.Logf("set sourceURI to : %q", sourceURI)
+		skipVerify = true
+	}
 
-	t.Logf("src package folder: %q", "file://"+filepath.Dir(srcPkg))
-	_, err = c.Upgrade(ctx, toVersion, "file://"+filepath.Dir(srcPkg), true)
+	_, err = c.Upgrade(ctx, toVersion, sourceURI, skipVerify)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
 
 	require.Eventuallyf(t, func() bool {
