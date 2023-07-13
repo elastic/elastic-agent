@@ -89,3 +89,14 @@ that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
+
+### Using a different agent version from the stack version
+
+The agent version is used as a fallback for the stack version to use in integration tests
+if no other version is specified.
+
+If we need to use a different version between agent and stack we can specify the stack version
+using a separate env variable `AGENT_STACK_VERSION` like in this example (we used a
+custom package version for the agent):
+
+```AGENT_VERSION="8.10.0-testpkgversion.1-SNAPSHOT" AGENT_STACK_VERSION="8.10.0-SNAPSHOT" mage integration:test```

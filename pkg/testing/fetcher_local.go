@@ -58,10 +58,15 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 
 	mainBuildfmt := "elastic-agent-%s-%s"
 	if f.snapshotOnly && !ver.IsSnapshot() {
-		mainBuildfmt = "elastic-agent-%s-SNAPSHOT-%s"
+		if ver.Prerelease() == "" {
+			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "SNAPSHOT", ver.BuildMetadata())
+		} else {
+			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), ver.Prerelease()+"-SNAPSHOT", ver.BuildMetadata())
+		}
+
 	}
 
-	mainBuild := fmt.Sprintf(mainBuildfmt, version, suffix)
+	mainBuild := fmt.Sprintf(mainBuildfmt, ver, suffix)
 	mainBuildPath := filepath.Join(f.dir, mainBuild)
 	build := mainBuild
 	buildPath := mainBuildPath
