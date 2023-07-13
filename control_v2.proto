@@ -164,19 +164,28 @@ message StateAgentInfo {
 }
 
 // StateResponse is the current state of Elastic Agent.
+// Next unused id: 9
 message StateResponse {
   // Overall information of Elastic Agent.
   StateAgentInfo info = 1;
-  // Overall state of Elastic Agent.
+
+  // Overall state + message of Elastic Agent, aggregating errors in other
+  // states and components
   State state = 2;
-  // Overall state message of Elastic Agent.
   string message = 3;
-  // State of each component in Elastic Agent.
-  repeated ComponentState components = 4;
+
+  // State + message for the Agent Coordinator, reporting manager-level errors
+  // like failed policy updates.
+  State coordinatorState = 7;
+  string coordinatorMessage = 8;
+
   // Fleet connectivity state of Elastic Agent.
   State fleetState = 5;
   // Fleet connectivity state message of Elastic Agent.
   string fleetMessage = 6;
+
+  // State of each component in Elastic Agent.
+  repeated ComponentState components = 4;
 }
 
 // DiagnosticFileResult is a file result from a diagnostic result.

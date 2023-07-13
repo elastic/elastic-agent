@@ -14,12 +14,20 @@ import (
 
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
-	State        agentclient.State                 `yaml:"state"`
-	Message      string                            `yaml:"message"`
-	FleetState   agentclient.State                 `yaml:"fleet_state"`
-	FleetMessage string                            `yaml:"fleet_message"`
-	Components   []runtime.ComponentComponentState `yaml:"components"`
-	LogLevel     logp.Level                        `yaml:"log_level"`
+	// An overall state produced by aggregating
+	State   agentclient.State `yaml:"state"`
+	Message string            `yaml:"message"`
+
+	// The state of the Coordinator
+	CoordinatorState   agentclient.State `yaml:"coordinator_state"`
+	CoordinatorMessage string            `yaml:"coordinator_message"`
+
+	// The state of the
+	FleetState   agentclient.State `yaml:"fleet_state"`
+	FleetMessage string            `yaml:"fleet_message"`
+
+	Components []runtime.ComponentComponentState `yaml:"components"`
+	LogLevel   logp.Level                        `yaml:"log_level"`
 }
 
 type coordinatorOverrideState struct {
