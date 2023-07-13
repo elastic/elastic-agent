@@ -5,6 +5,8 @@
 package coordinator
 
 import (
+	"fmt"
+
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -156,8 +158,8 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 // components and units are also healthy (or in ephemeral non-error states).
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) generateReportableState() (s State) {
-	s.State = c.state.State
-	s.Message = c.state.Message
+	//s.State = c.state.State
+	//s.Message = c.state.Message
 	s.CoordinatorState = c.state.CoordinatorState
 	s.CoordinatorMessage = c.state.CoordinatorMessage
 	s.FleetState = c.state.FleetState
@@ -166,36 +168,47 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.Components = make([]runtime.ComponentComponentState, len(c.state.Components))
 	copy(s.Components, c.state.Components)
 
+	// Ordering of state aggregation:
+	// - Override state, if present
+	// - Errors applying the configured policy (report Failed)
+	// - Errors reported by managers (report Failed)
+	// - Errors in component/unit state (report Degraded)
 	if c.overrideState != nil {
-		// state has been overridden due to an action that is occurring
+		// state has been overridden by an upgrade in progress
 		s.State = c.overrideState.state
 		s.Message = c.overrideState.message
-	} else if s.State == agentclient.Healthy {
-		// if any of the managers are reporting an error then something is wrong
-		// or
-		// coordinator overall is reported is healthy; in the case any component or unit is not healthy then we report
-		// as degraded because we are not fully healthy
-		// TODO: We should aggregate these error messages into a readable list
-		// instead of only reporting the first one we encounter.
-		if c.runtimeMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.runtimeMgrErr.Error()
-		} else if c.configMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.configMgrErr.Error()
-		} else if c.actionsErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.actionsErr.Error()
-		} else if c.varsMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.varsMgrErr.Error()
-		} else if hasState(s.Components, client.UnitStateFailed) {
-			s.State = agentclient.Degraded
-			s.Message = "1 or more components/units in a failed state"
-		} else if hasState(s.Components, client.UnitStateDegraded) {
-			s.State = agentclient.Degraded
-			s.Message = "1 or more components/units in a degraded state"
-		}
+	} else if c.configErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Invalid policy: %s", c.configErr.Error())
+	} else if c.componentGenErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Invalid component model: %s", c.componentGenErr.Error())
+	} else if c.runtimeUpdateErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Runtime update failed: %s", c.runtimeUpdateErr.Error())
+	} else if c.runtimeMgrErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Runtime manager: %s", c.runtimeMgrErr.Error())
+	} else if c.configMgrErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())
+	} else if c.actionsErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Actions: %s", c.actionsErr.Error())
+	} else if c.varsMgrErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())
+	} else if hasState(s.Components, client.UnitStateFailed) {
+		s.State = agentclient.Degraded
+		s.Message = "1 or more components/units in a failed state"
+	} else if hasState(s.Components, client.UnitStateDegraded) {
+		s.State = agentclient.Degraded
+		s.Message = "1 or more components/units in a degraded state"
+	} else {
+		// If no error conditions apply, the global state inherits the current
+		// Coordinator state.
+		s.State = s.CoordinatorState
+		s.Message = s.CoordinatorMessage
 	}
 	return s
 }
