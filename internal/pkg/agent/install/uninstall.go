@@ -190,15 +190,7 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 
 	// remove each service component
 	for _, comp := range comps {
-<<<<<<< HEAD
-		if err := uninstallComponent(ctx, log, comp); err != nil {
-=======
-		if !caps.AllowInput(comp.InputType) || !caps.AllowOutput(comp.OutputType) {
-			// This component is not active
-			continue
-		}
 		if err := uninstallServiceComponent(ctx, log, comp); err != nil {
->>>>>>> 49961e9ed7 (Add an E2E test to ensure we can install Elastic Defend (#2963))
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
 	}
