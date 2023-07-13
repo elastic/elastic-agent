@@ -179,9 +179,9 @@ message StateResponse {
   State coordinatorState = 7;
   string coordinatorMessage = 8;
 
-  // Fleet connectivity state of Elastic Agent.
+  // Fleet state: healthy / "Connected" if the last RPC call to Fleet
+  // succeeded, otherwise failed with the associated error string.
   State fleetState = 5;
-  // Fleet connectivity state message of Elastic Agent.
   string fleetMessage = 6;
 
   // State of each component in Elastic Agent.

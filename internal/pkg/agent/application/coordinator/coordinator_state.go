@@ -80,6 +80,30 @@ func (c *Coordinator) setVarsManagerError(err error) {
 	c.stateNeedsRefresh = true
 }
 
+// setConfigError updates the error state for converting an incoming policy
+// into an AST.
+// Called on the main Coordinator goroutine.
+func (c *Coordinator) setConfigError(err error) {
+	c.configErr = err
+	c.stateNeedsRefresh = true
+}
+
+// setComponentGenError updates the error state for generating a component
+// model from an AST and variables.
+// Called on the main Coordinator goroutine.
+func (c *Coordinator) setComponentGenError(err error) {
+	c.componentGenErr = err
+	c.stateNeedsRefresh = true
+}
+
+// setRuntimeUpdateError updates the error state for sending a component model
+// update to the runtime manager.
+// Called on the main Coordinator goroutine.
+func (c *Coordinator) setRuntimeUpdateError(err error) {
+	c.runtimeUpdateErr = err
+	c.stateNeedsRefresh = true
+}
+
 // setOverrideState is the internal helper to set the override state and
 // set stateNeedsRefresh.
 // Must be called on the main Coordinator goroutine.
@@ -134,6 +158,8 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 func (c *Coordinator) generateReportableState() (s State) {
 	s.State = c.state.State
 	s.Message = c.state.Message
+	s.CoordinatorState = c.state.CoordinatorState
+	s.CoordinatorMessage = c.state.CoordinatorMessage
 	s.FleetState = c.state.FleetState
 	s.FleetMessage = c.state.FleetMessage
 	s.LogLevel = c.state.LogLevel
@@ -174,11 +200,11 @@ func (c *Coordinator) generateReportableState() (s State) {
 	return s
 }
 
-// setState changes the overall state of the coordinator.
+// setCoordinatorState changes the overall state of the coordinator.
 // Must be called on the main Coordinator goroutine.
-func (c *Coordinator) setState(state agentclient.State, message string) {
-	c.state.State = state
-	c.state.Message = message
+func (c *Coordinator) setCoordinatorState(state agentclient.State, message string) {
+	c.state.CoordinatorState = state
+	c.state.CoordinatorMessage = message
 	c.stateNeedsRefresh = true
 }
 
