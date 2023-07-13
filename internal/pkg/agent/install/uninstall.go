@@ -213,7 +213,7 @@ func uninstallComponents(ctx context.Context, cfgFile, uninstallToken string) er
 			// This component is not active
 			continue
 		}
-		if err := uninstallComponent(ctx, log, comp, uninstallToken); err != nil {
+		if err := uninstallServiceComponent(ctx, log, comp, uninstallToken); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
 			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
@@ -225,8 +225,11 @@ func uninstallComponents(ctx context.Context, cfgFile, uninstallToken string) er
 	return nil
 }
 
-func uninstallComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string) error {
-	return comprt.UninstallService(ctx, log, comp, uninstallToken)
+func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string) error {
+	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
+	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
+	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
+	return comprt.UninstallService(ctx, log, comp, uninstallToken, false)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
