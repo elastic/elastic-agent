@@ -190,7 +190,15 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 
 	// remove each service component
 	for _, comp := range comps {
+<<<<<<< HEAD
 		if err := uninstallComponent(ctx, log, comp); err != nil {
+=======
+		if !caps.AllowInput(comp.InputType) || !caps.AllowOutput(comp.OutputType) {
+			// This component is not active
+			continue
+		}
+		if err := uninstallServiceComponent(ctx, log, comp); err != nil {
+>>>>>>> 49961e9ed7 (Add an E2E test to ensure we can install Elastic Defend (#2963))
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
 	}
@@ -198,8 +206,11 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 	return nil
 }
 
-func uninstallComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
-	return comprt.UninstallService(ctx, log, comp)
+func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
+	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
+	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
+	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
+	return comprt.UninstallService(ctx, log, comp, false)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
