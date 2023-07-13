@@ -33,6 +33,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -47,6 +48,10 @@ agent.upgrade.watcher:
   error_check.interval: 15s
   crash_check.interval: 15s
 `
+
+// notable versions used in tests
+var version_8_0_0 = version.NewParsedSemVer(8, 0, 0, "", "")
+var version_8_9_0_SNAPSHOT = version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")
 
 func TestFleetManagedUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -170,7 +175,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 	// FIXME agent 7.X has a different control protocol which makes the upgrade, status command tricky (the fixture allocates a v2 client)
 	//	skip anything below 8.X
-	minVersion := version.NewParsedSemVer(8, 0, 0, "", "")
+	minVersion := version_8_0_0
 	for _, v := range versionList {
 		parsedVersion, err := version.ParseVersion(v)
 		if err != nil {
@@ -179,7 +184,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 		}
 
 		if v == define.Version() || parsedVersion.IsSnapshot() || parsedVersion.Less(*minVersion) {
-			t.Logf("Skipping upgrade test for version %q", define.Version())
+			t.Logf("Skipping upgrade test for version %q", v)
 			continue
 		}
 
@@ -211,11 +216,10 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 		Sudo:    true, // requires Agent installation
 	})
 
-	const minVersionString = "8.9.0-SNAPSHOT"
-	minVersion, _ := version.ParseVersion(minVersionString)
+	minVersion := version_8_9_0_SNAPSHOT
 	pv, err := version.ParseVersion(define.Version())
 	if pv.Less(*minVersion) {
-		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersionString)
+		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersion)
 	}
 
 	// prepare the agent fixture
@@ -315,26 +319,30 @@ func getUpgradableAndLatestVersions(ctx context.Context, t *testing.T) (upgradab
 
 	latestVersion = vList.Versions[len(vList.Versions)-1]
 
-	upgradableVersions = []string{"8.8.1"}
-	// if testing.Short() {
-	// 	upgradableVersions = []string{"8.6.2", "8.7.1", "8.8.1"}
-	// } else {
-	// 	artifactAPIVersions := vList.Versions
-	// 	for _, aav := range artifactAPIVersions {
-	// 		parsedVersion, err := version.ParseVersion(aav)
-	// 		require.NoError(t, err, "Received unparseable version from Artifact API")
-	// 		if parsedVersion.IsSnapshot() {
-	// 			// skip all snapshots
-	// 			continue
-	// 		}
+	// upgradableVersions = []string{"8.8.1"}
 
-	// 		upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
-	// 	}
-	// }
+	// TODO uncomment this when the extra go test flags can be passed
+	if testing.Short() {
+		upgradableVersions = []string{"8.6.2", "8.7.1", "8.8.1"}
+	} else {
+		artifactAPIVersions := vList.Versions
+		for _, aav := range artifactAPIVersions {
+			parsedVersion, err := version.ParseVersion(aav)
+			require.NoError(t, err, "Received unparseable version from Artifact API")
+			if parsedVersion.IsSnapshot() {
+				// skip all snapshots
+				continue
+			}
+
+			upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
+		}
+	}
 	return
 }
 
 func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVersion, toVersion, expectedAgentHashAfterUpgrade string) {
+	parsedFromVersion, err := version.ParseVersion(fromVersion)
+	require.NoErrorf(t, err, "unable to parse version %w", fromVersion)
 	parsedUpgradeVersion, err := version.ParseVersion(toVersion)
 	require.NoErrorf(t, err, "unable to parse version %w", toVersion)
 
@@ -344,27 +352,15 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVer
 
 	c := f.Client()
 
-	require.Eventually(t, func() bool {
-		err := c.Connect(ctx)
-		if err != nil {
-			t.Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
-
-	t.Logf("Upgrading to version %q", toVersion)
-
 	err = c.Connect(ctx)
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
+
+	require.Eventually(t, func() bool {
+		return checkAgentHealthAndVersion(t, ctx, c, parsedFromVersion.CoreVersion(), parsedFromVersion.IsSnapshot(), "")
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	t.Logf("Upgrading to version %q", toVersion)
 
 	tof, err := define.NewFixture(t, toVersion)
 	require.NoError(t, err)
@@ -377,19 +373,7 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVer
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
 
 	require.Eventuallyf(t, func() bool {
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("current agent state: %+v", state)
-		info := state.Info
-		if expectedAgentHashAfterUpgrade != "" {
-			return info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
-		}
-		return info.Version == parsedUpgradeVersion.CoreVersion() &&
-			info.Snapshot == parsedUpgradeVersion.IsSnapshot() &&
-			state.State == cproto.State_HEALTHY
+		return checkAgentHealthAndVersion(t, ctx, c, parsedUpgradeVersion.CoreVersion(), parsedUpgradeVersion.IsSnapshot(), expectedAgentHashAfterUpgrade)
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
 	parsedFromV, err := version.ParseVersion(fromVersion)
@@ -397,9 +381,28 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVer
 
 	checkUpgradeWatcherRan(t, f, parsedFromV)
 
-	version, err := c.Version(ctx)
-	require.NoError(t, err, "error checking version after upgrade")
-	require.Equal(t, expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+	if expectedAgentHashAfterUpgrade != "" {
+		version, err := c.Version(ctx)
+		assert.NoError(t, err, "error checking version after upgrade")
+		assert.Equal(t, expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+	}
+}
+
+func checkAgentHealthAndVersion(t *testing.T, ctx context.Context, c client.Client, expectedVersion string, snapshot bool, expectedHash string) bool {
+	t.Helper()
+	state, err := c.State(ctx)
+	if err != nil {
+		t.Logf("error getting the agent state: %v", err)
+		return false
+	}
+	t.Logf("current agent state: %+v", state)
+	info := state.Info
+	if expectedHash != "" {
+		return info.Commit == expectedHash && state.State == cproto.State_HEALTHY
+	}
+	return info.Version == expectedVersion &&
+		info.Snapshot == snapshot &&
+		state.State == cproto.State_HEALTHY
 }
 
 // checkUpgradeWatcherRan asserts that the Upgrade Watcher finished running. We use the
@@ -408,7 +411,7 @@ func testUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVer
 func checkUpgradeWatcherRan(t *testing.T, agentFixture *atesting.Fixture, fromVersion *version.ParsedSemVer) {
 	t.Helper()
 
-	if fromVersion.Less(*version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")) {
+	if fromVersion.Less(*version_8_9_0_SNAPSHOT) {
 		t.Logf("Version %q is too old for a quick update marker check, skipping...", fromVersion)
 		return
 	}
