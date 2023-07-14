@@ -1,4 +1,6 @@
 env:
+  DRA_PROJECT: "elastic-agent-core"
+  DRA_ARTIFACT_SET: "agent-core"
   RUN_SNAPSHOT: "true"
   RUN_STAGING: "true"
   FORCE_NO_DRA_DRY_RUN: "true"
@@ -27,8 +29,7 @@ steps:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        DRA_PROJECT: "elastic-agent-core"
-        DRA_ARTIFACT_SET: "agent-core"
+
         WORKFLOW: "snapshot"
 
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
@@ -55,8 +56,6 @@ steps:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        DRA_PROJECT: "elastic-agent-core"
-        DRA_ARTIFACT_SET: "agent-core"
         WORKFLOW: "staging"
 
 notify:
