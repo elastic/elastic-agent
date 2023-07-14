@@ -46,15 +46,14 @@ function run_release_manager() {
 }
 
 DRA_DRY_RUN="${DRA_DRY_RUN:="--dry-run"}"
-if [[ -n "${DRA_WORKFLOW:=""}" ]]; then
+WORKFLOW="${DRA_WORKFLOW:=""}"
+if [[ -z "${WORKFLOW:=""}" ]]; then
   if [[ "${ManifestURL}" =~ "staging" ]]; then
     WORKFLOW="staging"
   fi
   if [[ "${ManifestURL}" =~ "snapshots" ]]; then
     WORKFLOW="snapshot"
   fi
-else
-  WORKFLOW="${DRA_WORKFLOW}"
 fi
 echo "+++ Release Manager ${WORKFLOW}";
 run_release_manager "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW:=""}" "${DRA_DRY_RUN}"
