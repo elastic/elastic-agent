@@ -52,8 +52,9 @@ steps:
     - wait
 
     - label: ":hammer: DRA Publish Elastic-Agent Core staging"
-      commands:
-        - .buildkite/scripts/steps/dra-publish.sh
+      command: |
+        buildkite-agent artifact download "build/**/*" .
+        .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-staging"
       agents:
         provider: "gcp"
