@@ -68,7 +68,7 @@ steps:
     artifact_paths:
       - "build/distributions/**"
 
-  - label: "Publishing to DRA"
+  - label: ":elastic-stack: Publishing to DRA"
     key: dra-publish
     depends_on: package_elastic-agent
     agents:
