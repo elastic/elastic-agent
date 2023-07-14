@@ -16,3 +16,5 @@ echo  "+++ Generate dependencies report"
 ./dev-tools/dependencies-report
 mkdir -p build/distributions/reports
 mv dependencies.csv build/distributions/reports/dependencies.csv
+
+buildkite-agent artifact upload "build/**/*"

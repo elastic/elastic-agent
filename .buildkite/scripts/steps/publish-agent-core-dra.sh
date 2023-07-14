@@ -31,7 +31,7 @@ function run_release_manager() {
         $dry_run
 }
 
-buildkite-agent artifact download "build/" .
+buildkite-agent artifact download "build/**/*" .
 
 run_release_manager
 RM_EXIT_CODE=$?

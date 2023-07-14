@@ -7,8 +7,6 @@ steps:
       commands:
         - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-snapshot"
-      artifact_paths:
-        - "build/**"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
@@ -34,8 +32,6 @@ steps:
       commands:
         - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-staging"
-      artifact_paths:
-        - "build/**"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
