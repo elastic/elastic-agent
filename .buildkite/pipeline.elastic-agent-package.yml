@@ -86,5 +86,9 @@ steps:
         DRA_DRY_RUN=$(buildkite-agent meta-data get DRA_DRY_RUN --default "--dry-run")
         export DRA_DRY_RUN
       fi
+      if [[ -z "${BEAT_VERSION}" ]]; then
+        BEAT_VERSION=$(curl -s -XGET "${ManifestURL}" |jq '.version' -r | sed 's/-.*//')
+        export BEAT_VERSION
+      fi
 
       .buildkite/scripts/steps/dra-publish.sh
