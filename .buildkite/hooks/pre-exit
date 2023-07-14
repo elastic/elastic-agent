@@ -24,4 +24,8 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
     docker logout ${DOCKER_REGISTRY}
   fi
+
+  if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
+      unset VAULT_ADDR VAULT_ROLE_ID VAULT_SECRET_ID
+  fi
 fi

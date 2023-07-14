@@ -12,6 +12,15 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
     docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
     unset DOCKER_USERNAME_SECRET DOCKER_PASSWORD_SECRET
   fi
+
+  if [[ "$BUILDKITE_STEP_KEY" == "dra-publish" ]]; then
+    echo "+++ Setting DRA params"
+    DRA_SECRET=$(vault kv get -field=data -format=json kv/ci-shared/release/dra-role)
+    VAULT_ADDR_SECRET=$(echo DRA_SECRET | jq -r '.vault_addr')
+    VAULT_ROLE_ID_SECRET=$(echo DRA_SECRET | jq -r '.role_id')
+    VAULT_SECRET_ID_SECRET=$(echo DRA_SECRET | jq -r '.secret_id')
+    export VAULT_ADDR_SECRET VAULT_ROLE_ID_SECRET VAULT_SECRET_ID_SECRET
+  fi
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
