@@ -1133,13 +1133,19 @@ func TestStandaloneUpgradeFailsRestart(t *testing.T) {
 
 	// Try upgrading to the fake Agent package.
 	t.Logf("Attempting upgrade to %s using Agent package at %s", toVersion.String(), packagePath)
-	time.Sleep(5 * time.Minute)
-	//ctx, _ = context.WithTimeout(ctx, 2*time.Minute)
-	//_, err = c.Upgrade(ctx, toVersion.String(), "file://"+packagePath, true)
-	//require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion.String())
+	ctx, _ = context.WithTimeout(ctx, 2*time.Minute)
+	_, err = c.Upgrade(ctx, toVersion.String(), "file://"+packagePath, true)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion.String())
 
 	// Ensure that the Upgrade Watcher has stopped running.
+	checkUpgradeWatcherRan(t, f)
+
 	// Ensure that the original version of Agent is running again.
+	t.Log("Check Agent version to ensure rollback is successful")
+	currentVersion, err := getVersion(t, ctx, f)
+	require.NoError(t, err)
+	require.Equal(t, fromVersion, currentVersion.Binary.Version)
+	require.Equal(t, fromVersion, currentVersion.Daemon.Version)
 }
 
 func createFakeBrokenAgentPackage(t *testing.T, version *version.ParsedSemVer) string {
