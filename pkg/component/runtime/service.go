@@ -219,7 +219,7 @@ func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 	}
 
 	// Force component stopped state
-	s.log.Debugf("set %s service runtime to stopped state", name)
+	s.log.Debug("set %s service runtime to stopped state", name)
 	s.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: %s service runtime", name))
 }
 
@@ -448,11 +448,6 @@ func (s *serviceRuntime) install(ctx context.Context) error {
 
 // uninstall executes the service uninstall command
 func (s *serviceRuntime) uninstall(ctx context.Context) error {
-	if s.comp.InputSpec.Spec.Service.Operations.Uninstall == nil {
-		s.log.Errorf("missing uninstall spec for %s service", s.comp.InputSpec.BinaryName)
-		return ErrOperationSpecUndefined
-	}
-
 	// Always retry for internal attempts to uninstall, because they are an attempt to converge the agent's current state
 	// with its desired state based on the agent policy.
 	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl)
@@ -468,10 +463,6 @@ func uninstallService(ctx context.Context, log *logger.Logger, comp component.Co
 		log.Errorf("missing uninstall spec for %s service", comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
-
-	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
-	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
-	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
 	log.Debugf("uninstall %s service", comp.InputSpec.BinaryName)
 	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, comp.InputSpec.Spec.Service.Operations.Uninstall)
 }
