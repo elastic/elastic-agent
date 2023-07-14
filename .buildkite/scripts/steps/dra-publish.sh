@@ -26,6 +26,7 @@ function run_release_manager() {
         # force main branch on PR's or it won't execute
         # because the PR branch does not have a project folder in release-manager
         BRANCH=main
+        DRY_RUN="--dry-run"
     fi
     echo docker run --rm \
         --name release-manager \
@@ -45,7 +46,14 @@ function run_release_manager() {
 }
 
 DRA_DRY_RUN="${DRA_DRY_RUN:="--dry-run"}"
+if [[ "${ManifestURL}" =~ "staging" ]]; then
+  WORKFLOW="staging"
+fi
+if [[ "${ManifestURL}" =~ "snapshots" ]]; then
+  WORKFLOW="snapshot"
+fi
 run_release_manager "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW:=""}" "${DRA_DRY_RUN}"
+
 RM_EXIT_CODE=$?
 
 exit $RM_EXIT_CODE
