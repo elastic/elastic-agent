@@ -46,7 +46,7 @@ function run_release_manager() {
 }
 
 DRA_DRY_RUN="${DRA_DRY_RUN:="--dry-run"}"
-if [[ -z "${DRA_WORKFLOW}" ]]; then
+if [[ -n "${DRA_WORKFLOW:=""}" ]]; then
   if [[ "${ManifestURL}" =~ "staging" ]]; then
     WORKFLOW="staging"
   fi
