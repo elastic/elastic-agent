@@ -78,18 +78,16 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	path := fmt.Sprintf("elastic-agent-%s-%s", version, suffix)
 	downloadSrc := fmt.Sprintf("%s%s", uri, path)
 	return &artifactResult{
-		doer:      f.doer,
-		src:       downloadSrc,
-		path:      path,
-		fetchHash: true,
+		doer: f.doer,
+		src:  downloadSrc,
+		path: path,
 	}, nil
 }
 
 type artifactResult struct {
-	doer      httpDoer
-	src       string
-	path      string
-	fetchHash bool
+	doer httpDoer
+	src  string
+	path string
 }
 
 // Name is the name of the fetched result.
@@ -104,11 +102,10 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
 
-	if r.fetchHash {
-		err := DownloadPackage(ctx, l, r.doer, r.src+hashExt, filepath.Join(dir, r.path+hashExt))
-		if err != nil {
-			return fmt.Errorf("failed to download %s: %w", r.src, err)
-		}
+	// fetch package hash
+	err = DownloadPackage(ctx, l, r.doer, r.src+hashExt, filepath.Join(dir, r.path+hashExt))
+	if err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
 
 	return nil

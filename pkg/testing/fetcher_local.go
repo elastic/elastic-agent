@@ -69,13 +69,12 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 	if err != nil {
 		return nil, fmt.Errorf("failed to find build at %s: %w", f.dir, err)
 	}
-	return &localFetcherResult{src: f.dir, path: build, fetchHash: true}, nil
+	return &localFetcherResult{src: f.dir, path: build}, nil
 }
 
 type localFetcherResult struct {
-	src       string
-	path      string
-	fetchHash bool
+	src  string
+	path string
 }
 
 // Name is the name of the fetched result.
@@ -93,11 +92,10 @@ func (r *localFetcherResult) Fetch(_ context.Context, _ Logger, dir string) erro
 		return fmt.Errorf("error copying file: %w", err)
 	}
 
-	if r.fetchHash {
-		err := copyFile(fullPath+hashExt, path+hashExt)
-		if err != nil {
-			return fmt.Errorf("error copying file: %w", err)
-		}
+	// fetch artifact hash
+	err = copyFile(fullPath+hashExt, path+hashExt)
+	if err != nil {
+		return fmt.Errorf("error copying file: %w", err)
 	}
 
 	return nil
