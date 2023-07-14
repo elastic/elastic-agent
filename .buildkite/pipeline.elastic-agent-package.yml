@@ -70,6 +70,7 @@ steps:
 
   - label: "Publishing to DRA"
     key: dra-publish
+    depends_on: package_elastic-agent
     agents:
       provider: "gcp"
       machineType: "c2-standard-16"
