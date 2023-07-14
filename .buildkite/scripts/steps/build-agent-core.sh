@@ -19,5 +19,3 @@ echo  "+++ Generate dependencies report"
 ./dev-tools/dependencies-report
 mkdir -p build/distributions/reports
 mv dependencies.csv "build/distributions/reports/dependencies-${BEAT_VERSION_FULL}.csv"
-
-buildkite-agent artifact upload "build/distributions/**/*"

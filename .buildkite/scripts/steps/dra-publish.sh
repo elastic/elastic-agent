@@ -19,7 +19,7 @@ function run_release_manager() {
     fi
     docker run --rm \
         --name release-manager \
-        -e VAULT_ADDR="${VAULT_ADDR}" \
+        -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
         -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
         -e VAULT_SECRET_ID="${VAULT_SECRET}" \
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
@@ -34,7 +34,6 @@ function run_release_manager() {
         $dry_run
 }
 
-buildkite-agent artifact download "build/**/*" .
 chmod -R 777 build/distributions
 
 run_release_manager
