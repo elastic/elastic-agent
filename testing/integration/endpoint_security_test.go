@@ -89,53 +89,12 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	err = agentClient.Connect(ctx)
 	require.NoError(t, err)
 
-	healthyEndpointFunc := func() bool {
-		state, err := agentClient.State(ctx)
-		if err != nil {
-			t.Logf("Error getting agent state: %s", err)
-			return false
-		}
-
-		if state.State != client.Healthy {
-			t.Logf("Agent is not Healthy\n%+v", state)
-			return false
-		}
-
-		foundEndpointInputUnit := false
-		foundEndpointOutputUnit := false
-		for _, comp := range state.Components {
-			isEndpointComponent := strings.Contains(comp.Name, "endpoint")
-			if comp.State != client.Healthy {
-				t.Logf("Component is not Healthy\n%+v", comp)
-				return false
-			}
-
-			for _, unit := range comp.Units {
-				if isEndpointComponent {
-					if unit.UnitType == client.UnitTypeInput {
-						foundEndpointInputUnit = true
-					}
-					if unit.UnitType == client.UnitTypeOutput {
-						foundEndpointOutputUnit = true
-					}
-				}
-
-				if unit.State != client.Healthy {
-					t.Logf("Unit is not Healthy\n%+v", unit)
-					return false
-				}
-			}
-		}
-
-		// Ensure both the endpoint input and output units were found and healthy.
-		if !foundEndpointInputUnit || !foundEndpointOutputUnit {
-			t.Logf("State did not contain endpoint units!\n%+v", state)
-			return false
-		}
-
-		return true
-	}
-	require.Eventually(t, healthyEndpointFunc, endpointHealthPollingTimeout, time.Second, "Endpoint component or units are not healthy.")
+	require.Eventually(t,
+		func() bool { return endpointIsHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy.",
+	)
 	t.Logf("Verified endpoint component and units are healthy")
 }
 
@@ -178,53 +137,12 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	err = agentClient.Connect(ctx)
 	require.NoError(t, err)
 
-	healthyEndpointFunc := func() bool {
-		state, err := agentClient.State(ctx)
-		if err != nil {
-			t.Logf("Error getting agent state: %s", err)
-			return false
-		}
-
-		if state.State != client.Healthy {
-			t.Logf("Agent is not Healthy\n%+v", state)
-			return false
-		}
-
-		foundEndpointInputUnit := false
-		foundEndpointOutputUnit := false
-		for _, comp := range state.Components {
-			isEndpointComponent := strings.Contains(comp.Name, "endpoint")
-			if comp.State != client.Healthy {
-				t.Logf("Component is not Healthy\n%+v", comp)
-				return false
-			}
-
-			for _, unit := range comp.Units {
-				if isEndpointComponent {
-					if unit.UnitType == client.UnitTypeInput {
-						foundEndpointInputUnit = true
-					}
-					if unit.UnitType == client.UnitTypeOutput {
-						foundEndpointOutputUnit = true
-					}
-				}
-
-				if unit.State != client.Healthy {
-					t.Logf("Unit is not Healthy\n%+v", unit)
-					return false
-				}
-			}
-		}
-
-		// Ensure both the endpoint input and output units were found and healthy.
-		if !foundEndpointInputUnit || !foundEndpointOutputUnit {
-			t.Logf("State did not contain endpoint units!\n%+v", state)
-			return false
-		}
-
-		return true
-	}
-	require.Eventually(t, healthyEndpointFunc, endpointHealthPollingTimeout, time.Second, "Endpoint component or units are not healthy.")
+	require.Eventually(t,
+		func() bool { return endpointIsHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy.",
+	)
 	t.Logf("Verified endpoint component and units are healthy")
 
 	// Unenroll the agent
@@ -240,34 +158,39 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Waiting for inputs to stop")
-	unenrollAgentFunc := func() bool {
-		state, err := agentClient.State(ctx)
-		if err != nil {
-			t.Logf("Error getting agent state: %s", err)
-			return false
-		}
+	require.Eventually(t,
+		func() bool {
+			state, err := agentClient.State(ctx)
+			if err != nil {
+				t.Logf("Error getting agent state: %s", err)
+				return false
+			}
 
-		if state.State != client.Healthy {
-			t.Logf("Agent is not Healthy\n%+v", state)
-			return false
-		}
+			if state.State != client.Healthy {
+				t.Logf("Agent is not Healthy\n%+v", state)
+				return false
+			}
 
-		if len(state.Components) != 0 {
-			t.Logf("Components have not been stopped and uninstalled!\n%+v", state)
-			return false
-		}
+			if len(state.Components) != 0 {
+				t.Logf("Components have not been stopped and uninstalled!\n%+v", state)
+				return false
+			}
 
-		if state.FleetState != client.Failed {
-			t.Logf("Fleet state has not been marked as failed yet!\n%+v", state)
-			return false
-		}
+			if state.FleetState != client.Failed {
+				t.Logf("Fleet state has not been marked as failed yet!\n%+v", state)
+				return false
+			}
 
-		return true
-	}
-	require.Eventually(t, unenrollAgentFunc, endpointHealthPollingTimeout, time.Second, "All components not removed.")
+			return true
+		},
+		endpointHealthPollingTimeout,
+		time.Second,
+		"All components not removed.",
+	)
 	t.Logf("Verified endpoint component and units are removed")
 
-	// TODO: Verify the install directories are actually gone.
+	// Verify that the Endpoint directory was correctly removed.
+	// Regression test for https://github.com/elastic/elastic-agent/issues/3077
 	agentInstallPath := fixture.WorkDir()
 	files, err := os.ReadDir(filepath.Join(agentInstallPath, ".."))
 	require.NoError(t, err)
@@ -314,4 +237,53 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 	pkgResp, err := tools.InstallFleetPackage(ctx, info.KibanaClient, &packagePolicyReq)
 	require.NoError(t, err)
 	t.Logf("Endpoint package Policy Response:\n%+v", pkgResp)
+}
+
+func endpointIsHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {
+	t.Helper()
+
+	state, err := agentClient.State(ctx)
+	if err != nil {
+		t.Logf("Error getting agent state: %s", err)
+		return false
+	}
+
+	if state.State != client.Healthy {
+		t.Logf("Agent is not Healthy\n%+v", state)
+		return false
+	}
+
+	foundEndpointInputUnit := false
+	foundEndpointOutputUnit := false
+	for _, comp := range state.Components {
+		isEndpointComponent := strings.Contains(comp.Name, "endpoint")
+		if comp.State != client.Healthy {
+			t.Logf("Component is not Healthy\n%+v", comp)
+			return false
+		}
+
+		for _, unit := range comp.Units {
+			if isEndpointComponent {
+				if unit.UnitType == client.UnitTypeInput {
+					foundEndpointInputUnit = true
+				}
+				if unit.UnitType == client.UnitTypeOutput {
+					foundEndpointOutputUnit = true
+				}
+			}
+
+			if unit.State != client.Healthy {
+				t.Logf("Unit is not Healthy\n%+v", unit)
+				return false
+			}
+		}
+	}
+
+	// Ensure both the endpoint input and output units were found and healthy.
+	if !foundEndpointInputUnit || !foundEndpointOutputUnit {
+		t.Logf("State did not contain endpoint units!\n%+v", state)
+		return false
+	}
+
+	return true
 }
