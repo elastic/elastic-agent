@@ -17,13 +17,16 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
       commands:
-        - .buildkite/scripts/steps/publish-agent-core-dra.sh
+        - .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-snapshot"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
+        DRA_PROJECT: "elastic-agent-core"
+        DRA_ARTIFACT_SET: "agent-core"
         WORKFLOW: "snapshot"
+
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
     if: build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_STAGING") == "true"
@@ -42,12 +45,14 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core staging"
       commands:
-        - .buildkite/scripts/steps/publish-agent-core-dra.sh
+        - .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-staging"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
+        DRA_PROJECT: "elastic-agent-core"
+        DRA_ARTIFACT_SET: "agent-core"
         WORKFLOW: "staging"
 
 notify:

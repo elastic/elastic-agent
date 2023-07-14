@@ -22,12 +22,12 @@ function run_release_manager() {
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
         docker.elastic.co/infra/release-manager:latest \
         cli collect \
-        --project elastic-agent-core \
+        --project $DRA_PROJECT \
         --branch "${BRANCH}" \
         --commit "${BUILDKITE_COMMIT}" \
         --workflow "${WORKFLOW}" \
         --version "${BEAT_VERSION}" \
-        --artifact-set agent-core \
+        --artifact-set $DRA_ARTIFACT_SET \
         $dry_run
 }
 
