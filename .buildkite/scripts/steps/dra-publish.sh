@@ -5,9 +5,9 @@ set -uo pipefail
 source .buildkite/scripts/bootstrap.sh
 
 # Publish DRA artifacts
+FORCE_NO_DRA_DRY_RUN=$FORCE_NO_DRA_DRY_RUN
 function run_release_manager() {
     echo "+++ Publishing $BUILDKITE_BRANCH ${WORKFLOW} DRA artifacts..."
-    force_dry_run="${FORCE_NO_DRA_DRY_RUN}"
     dry_run=""
     if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
         dry_run="--dry-run"
@@ -15,7 +15,7 @@ function run_release_manager() {
         # because the PR branch does not have a project folder in release-manager
         BRANCH=main
     fi
-    if [ $force_dry_run == "true" ]; then
+    if [ "$FORCE_NO_DRA_DRY_RUN" == "true" ]; then
         dry_run=""
     fi
     docker run --rm \
