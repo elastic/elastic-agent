@@ -8,11 +8,14 @@ source .buildkite/scripts/bootstrap.sh
 function run_release_manager() {
     echo "+++ Publishing $BUILDKITE_BRANCH ${WORKFLOW} DRA artifacts..."
     dry_run=""
-    if [ "$BUILDKITE_PULL_REQUEST" != "false" || "$FORCE_NO_DRY_RUN" == "true"]; then
+    if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
         dry_run="--dry-run"
         # force main branch on PR's or it won't execute
         # because the PR branch does not have a project folder in release-manager
         BRANCH=main
+    fi
+    if [ "$FORCE_NO_DRA_DRY_RUN" == "true" ]; then
+        dry_run=""
     fi
     docker run --rm \
         --name release-manager \
