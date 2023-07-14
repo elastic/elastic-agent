@@ -1,6 +1,4 @@
 env:
-  RUN_SNAPSHOT: true
-  RUN_STAGING: true
   DRA_PROJECT: "elastic-agent-core"
   DRA_ARTIFACT_SET: "agent-core"
 steps:
