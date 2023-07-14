@@ -10,13 +10,7 @@ if [[ -z "${WORKSPACE-""}" ]]; then
 fi
 
 # Retrieve version value - will match versions like 8.8.0 and also 8.8.0-er1
-BEAT_VERSION=`grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' ${WORKSPACE}/version/version.go`
-SNAPSHOT=""
-if [ "$WORKFLOW" == "snapshot" ]; then
-    SNAPSHOT="true"
-    BEAT_VERSION="${BEAT_VERSION}-SNAPSHOT"
-fi
-export SNAPSHOT BEAT_VERSION
+export BEAT_VERSION=`grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' ${WORKSPACE}/version/version.go`
 export BRANCH="${BUILDKITE_BRANCH}"
 
 # Install Go TODO: move to makefile
