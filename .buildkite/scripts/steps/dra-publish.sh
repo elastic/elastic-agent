@@ -29,9 +29,9 @@ function run_release_manager() {
     fi
     echo docker run --rm \
         --name release-manager \
-        -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
+        -e VAULT_ADDR="${VAULT_ADDR_DRA}" \
         -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
-        -e VAULT_SECRET_ID="${VAULT_SECRET_ID_SECRET}" \
+        -e VAULT_SECRET_ID="${VAULT_SECRET}" \
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
         docker.elastic.co/infra/release-manager:latest \
         cli collect \
