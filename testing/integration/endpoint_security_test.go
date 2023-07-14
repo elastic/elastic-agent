@@ -98,6 +98,14 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	t.Logf("Verified endpoint component and units are healthy")
 }
 
+// Tests that the agent can install and uninstall the endpoint-security service while remaining
+// healthy. In this case endpoint-security is uninstalled because the agent was unenrolled, which
+// triggers the creation of an empty agent policy removing all inputs (only when not force
+// unenrolling). The empty agent policy triggers the uninstall of endpoint because endpoint was
+// removed from the policy.
+//
+// Like the CLI uinstall test, the agent is uninstalled from the command line at the end of the test
+// but at this point endpoint is already uninstalled at this point.
 func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
