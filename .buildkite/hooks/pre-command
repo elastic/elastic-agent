@@ -5,7 +5,7 @@ set -euo pipefail
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 
-DRA_SECRET_PATH="kv/ci-shared/release/dra-role"
+CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
