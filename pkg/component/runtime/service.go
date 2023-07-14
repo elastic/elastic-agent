@@ -219,7 +219,7 @@ func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 	}
 
 	// Force component stopped state
-	s.log.Debug("set %s service runtime to stopped state", name)
+	s.log.Debugf("set %s service runtime to stopped state", name)
 	s.forceCompState(client.UnitStateStopped, fmt.Sprintf("Stopped: %s service runtime", name))
 }
 
