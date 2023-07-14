@@ -58,9 +58,9 @@ fi
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" && ("$BUILDKITE_STEP_KEY" == "publish-dra-snapshot" || "$BUILDKITE_STEP_KEY" == "publish-dra-staging") ]]; then
   echo "+++ Setting DRA params"
   # Shared secret path containing the dra creds for project teams
-  DRA_CREDS=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
-  VAULT_ADDR=$(echo $DRA_CREDS | jq -r '.vault_addr')
-  VAULT_ROLE_ID_SECRET=$(echo $DRA_CREDS | jq -r '.role_id')
-  VAULT_SECRET=$(echo $DRA_CREDS | jq -r '.secret_id')
+  DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
+  VAULT_ADDR=$(echo ${DRA_CREDS_SECRET} | jq -r '.vault_addr')
+  VAULT_ROLE_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.role_id')
+  VAULT_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.secret_id')
   export VAULT_ADDR VAULT_ROLE_ID_SECRET VAULT_SECRET
 fi

@@ -5,7 +5,7 @@ steps:
     steps:
     - label: ":package: Build Elastic-Agent Core Snapshot"
       commands:
-        - .buildkite/scripts/steps/dra-build.sh
+        - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-snapshot"
       artifact_paths:
         - "build/**"
@@ -19,7 +19,7 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
       commands:
-        - .buildkite/scripts/steps/dra-publish.sh
+        - .buildkite/scripts/steps/publish-agent-core-dra.sh
       key: "publish-dra-snapshot"
       agents:
         provider: "gcp"
@@ -32,7 +32,7 @@ steps:
     steps:
     - label: ":package: Build Elastic-Agent Core staging"
       commands:
-        - .buildkite/scripts/steps/dra-build.sh
+        - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-staging"
       artifact_paths:
         - "build/**"
@@ -46,7 +46,7 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core staging"
       commands:
-        - .buildkite/scripts/steps/dra-publish.sh
+        - .buildkite/scripts/steps/publish-agent-core-dra.sh
       key: "publish-dra-staging"
       agents:
         provider: "gcp"
