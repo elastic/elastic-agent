@@ -21,7 +21,7 @@ function run_release_manager() {
       exit 1
     fi
 
-    echo "+++ Publishing $BUILDKITE_BRANCH ${WORKFLOW} DRA artifacts..."
+    echo "+++ :hammer_and_pick: Publishing $BUILDKITE_BRANCH ${WORKFLOW} DRA artifacts..."
     if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
         # force main branch on PR's or it won't execute
         # because the PR branch does not have a project folder in release-manager
