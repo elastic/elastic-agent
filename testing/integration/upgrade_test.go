@@ -8,6 +8,8 @@ package integration
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2client "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -1065,14 +1068,171 @@ type CustomPGP struct {
 // of Agent fails due to the new Agent binary not starting up. It checks that the Agent is
 // rolled back to the previous version.
 func TestStandaloneUpgradeFailsRestart(t *testing.T) {
-	// Install the current version of Agent.
+	define.Require(t, define.Requirements{
+		// We require sudo for this test to run
+		// `elastic-agent install`.
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	fromVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+	toVersion := version.NewParsedSemVer(
+		fromVersion.Major(), fromVersion.Minor()+1, 0,
+		"", "",
+	)
+
+	t.Logf("Installing the current version [%s] of Agent", fromVersion.String())
+
+	// Get path to Elastic Agent executable
+	f, err := define.NewFixture(t, fromVersion.String())
+	require.NoError(t, err)
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = f.Prepare(context.Background())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	output, err := tools.InstallStandaloneAgent(f)
+	t.Logf("Agent installation output: %q", string(output))
+	require.NoError(t, err)
+
+	c := f.Client()
+
+	t.Log("Waiting until Agent is healthy")
+	require.Eventually(t, func() bool {
+		err = c.Connect(ctx)
+		if err != nil {
+			t.Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("agent state: %+v", state)
+		return state.State == cproto.State_HEALTHY
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	// Reconnect
+	err = c.Connect(ctx)
+	require.NoError(t, err)
+	defer c.Disconnect()
 
 	// Create a fake Agent package that contains a fake binary that will
 	// deliberately fail to start.
+	packagePath := createFakeBrokenAgentPackage(t, toVersion)
 
 	// Try upgrading to the fake Agent package.
+	t.Logf("Attempting upgrade to %s using Agent package at %s", toVersion.String(), packagePath)
+	time.Sleep(5 * time.Minute)
+	//ctx, _ = context.WithTimeout(ctx, 2*time.Minute)
+	//_, err = c.Upgrade(ctx, toVersion.String(), "file://"+packagePath, true)
+	//require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion.String())
 
 	// Ensure that the Upgrade Watcher has stopped running.
-
 	// Ensure that the original version of Agent is running again.
+}
+
+func createFakeBrokenAgentPackage(t *testing.T, version *version.ParsedSemVer) string {
+	//t.Helper()
+	packageName := fmt.Sprintf("elastic-agent-%s-%s-%s", version.String(), runtime.GOOS, runtime.GOARCH)
+	commitHash := "abcdef0123456789abcdef0123456789abcdef01"
+
+	// Create folder structure for broken Agent package
+	tmpDir := t.TempDir()
+	packagePath := filepath.Join(tmpDir, packageName)
+	dataPath := filepath.Join(packagePath, "data", fmt.Sprintf("elastic-agent-%s", release.TrimCommit(commitHash)))
+
+	err := os.MkdirAll(dataPath, 0700)
+	require.NoError(t, err)
+
+	// Compile broken Agent binary
+	program := `package main
+
+import "os"
+
+func main() {
+    os.Exit(101)
+}
+`
+	programExePath := compileGoProgram(t, "elastic-agent", program)
+
+	// Move compiled broken Agent binary into correct path for packaging
+	agentExePath := filepath.Join(dataPath, filepath.Base(programExePath))
+	err = os.Rename(programExePath, agentExePath)
+	require.NoError(t, err)
+
+	// Create commit hash file
+	err = os.WriteFile(filepath.Join(packagePath, ".elastic-agent.active.commit"), []byte(commitHash), 0644)
+	require.NoError(t, err)
+
+	// Compress contents to create package archive
+	archiveFileExt := "tar.gz"
+	if runtime.GOOS == "windows" {
+		archiveFileExt = "zip"
+	}
+
+	archiveFileName := fmt.Sprintf("%s.%s", packageName, archiveFileExt)
+	archiveFilePath := filepath.Join(tmpDir, archiveFileName)
+
+	if runtime.GOOS == "windows" {
+		// Create .zip
+		// TODO
+	} else {
+		// Create .tar.gz
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "tar", "-cvzf", archiveFilePath, packageName)
+		cmd.Dir = tmpDir
+
+		err = cmd.Run()
+		require.NoError(t, err)
+	}
+
+	// Create archive hash file
+	hash := sha512.New()
+	data, err := os.ReadFile(archiveFilePath)
+	require.NoError(t, err)
+
+	_, err = hash.Write(data)
+	require.NoError(t, err)
+
+	data = []byte(hex.EncodeToString(hash.Sum(nil)))
+	err = os.WriteFile(archiveFilePath+".sha512", data, 0644)
+	require.NoError(t, err)
+
+	return tmpDir
+}
+
+func compileGoProgram(t *testing.T, programName, program string) string {
+	t.Helper()
+
+	tmpDirPath := t.TempDir()
+	programSrcPath := filepath.Join(tmpDirPath, programName+".go")
+	err := os.WriteFile(programSrcPath, []byte(program), 0600)
+	require.NoError(t, err)
+
+	programBinaryExt := ""
+	if runtime.GOOS == "windows" {
+		programBinaryExt = ".exe"
+	}
+	programBinaryPath := filepath.Join(tmpDirPath, programName+programBinaryExt)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", programBinaryPath, programSrcPath)
+
+	err = cmd.Run()
+	require.NoError(t, err)
+
+	return programBinaryPath
 }
