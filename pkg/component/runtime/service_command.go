@@ -49,7 +49,7 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 
 	proc, err := process.Start(binaryPath, opts...)
 	if err != nil {
-		return fmt.Errorf("failed starting the command with args %s: %w", args, err)
+		return fmt.Errorf("failed starting the command: %w", err)
 	}
 
 	// channel for the last error message from the stderr output
