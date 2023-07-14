@@ -35,6 +35,7 @@ function run_release_manager() {
 }
 
 buildkite-agent artifact download "build/**/*" .
+chmod -R 777 build/distributions
 
 run_release_manager
 RM_EXIT_CODE=$?
