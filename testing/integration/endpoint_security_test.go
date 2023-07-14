@@ -11,6 +11,8 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"text/template"
@@ -51,7 +53,7 @@ type endpointPackageTemplateVars struct {
 // The agent is automatically uninstalled as part of test cleanup when installed with
 // fxiture.Install via tools.InstallAgentWithPolicy. Failure to uninstall the agent will fail the
 // test automatically.
-func TestEndpointSecurity(t *testing.T) {
+func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
@@ -135,6 +137,150 @@ func TestEndpointSecurity(t *testing.T) {
 	}
 	require.Eventually(t, healthyEndpointFunc, endpointHealthPollingTimeout, time.Second, "Endpoint component or units are not healthy.")
 	t.Logf("Verified endpoint component and units are healthy")
+}
+
+func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack:   &define.Stack{},
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+		OS: []define.OS{
+			define.OS{Type: define.Linux, Arch: define.AMD64},
+		},
+	})
+
+	// Get path to agent executable.
+	fixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.New().String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	policyResp, err := tools.InstallAgentWithPolicy(t, fixture, info.KibanaClient, createPolicyReq)
+
+	t.Log("Installing Elastic Defend")
+	installElasticDefendPackage(t, info, policyResp.ID)
+
+	t.Log("Polling for endpoint-security to become Healthy")
+	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
+	defer cancel()
+
+	agentClient := fixture.Client()
+	err = agentClient.Connect(ctx)
+	require.NoError(t, err)
+
+	healthyEndpointFunc := func() bool {
+		state, err := agentClient.State(ctx)
+		if err != nil {
+			t.Logf("Error getting agent state: %s", err)
+			return false
+		}
+
+		if state.State != client.Healthy {
+			t.Logf("Agent is not Healthy\n%+v", state)
+			return false
+		}
+
+		foundEndpointInputUnit := false
+		foundEndpointOutputUnit := false
+		for _, comp := range state.Components {
+			isEndpointComponent := strings.Contains(comp.Name, "endpoint")
+			if comp.State != client.Healthy {
+				t.Logf("Component is not Healthy\n%+v", comp)
+				return false
+			}
+
+			for _, unit := range comp.Units {
+				if isEndpointComponent {
+					if unit.UnitType == client.UnitTypeInput {
+						foundEndpointInputUnit = true
+					}
+					if unit.UnitType == client.UnitTypeOutput {
+						foundEndpointOutputUnit = true
+					}
+				}
+
+				if unit.State != client.Healthy {
+					t.Logf("Unit is not Healthy\n%+v", unit)
+					return false
+				}
+			}
+		}
+
+		// Ensure both the endpoint input and output units were found and healthy.
+		if !foundEndpointInputUnit || !foundEndpointOutputUnit {
+			t.Logf("State did not contain endpoint units!\n%+v", state)
+			return false
+		}
+
+		return true
+	}
+	require.Eventually(t, healthyEndpointFunc, endpointHealthPollingTimeout, time.Second, "Endpoint component or units are not healthy.")
+	t.Logf("Verified endpoint component and units are healthy")
+
+	// Unenroll the agent
+	t.Logf("Unenrolling the agent")
+
+	hostname, err := os.Hostname()
+	require.NoError(t, err)
+
+	agentID, err := tools.GetAgentIDByHostname(info.KibanaClient, hostname)
+	require.NoError(t, err)
+
+	_, err = info.KibanaClient.UnEnrollAgent(kibana.UnEnrollAgentRequest{ID: agentID})
+	require.NoError(t, err)
+
+	t.Logf("Waiting for inputs to stop")
+	unenrollAgentFunc := func() bool {
+		state, err := agentClient.State(ctx)
+		if err != nil {
+			t.Logf("Error getting agent state: %s", err)
+			return false
+		}
+
+		if state.State != client.Healthy {
+			t.Logf("Agent is not Healthy\n%+v", state)
+			return false
+		}
+
+		if len(state.Components) != 0 {
+			t.Logf("Components have not been stopped and uninstalled!\n%+v", state)
+			return false
+		}
+
+		if state.FleetState != client.Failed {
+			t.Logf("Fleet state has not been marked as failed yet!\n%+v", state)
+			return false
+		}
+
+		return true
+	}
+	require.Eventually(t, unenrollAgentFunc, endpointHealthPollingTimeout, time.Second, "All components not removed.")
+	t.Logf("Verified endpoint component and units are removed")
+
+	// TODO: Verify the install directories are actually gone.
+	agentInstallPath := fixture.WorkDir()
+	files, err := os.ReadDir(filepath.Join(agentInstallPath, ".."))
+	require.NoError(t, err)
+
+	t.Logf("Checking directories at install path %s", agentInstallPath)
+	for _, f := range files {
+		if !f.IsDir() {
+			continue
+		}
+
+		t.Log("Found directory", f.Name())
+		require.False(t, strings.Contains(f.Name(), "Endpoint"), "Endpoint directory was not removed")
+	}
 }
 
 // Installs the Elastic Defend package to cause the agent to install the endpoint-security service.
