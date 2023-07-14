@@ -39,7 +39,7 @@ steps:
   - wait: ~
     if: build.env("ManifestURL") == null
 
-  - label: "Package elastic-agent"
+  - label: ":package: Package elastic-agent"
     key: package_elastic-agent
     agents:
       provider: "gcp"
@@ -49,6 +49,6 @@ steps:
       export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
       export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
 
-      .buildkite/scripts/package.sh
+      .buildkite/scripts/steps/package.sh
     artifact_paths:
       - "build/distributions/**"

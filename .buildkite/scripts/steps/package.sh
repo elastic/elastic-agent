@@ -3,7 +3,7 @@
 set -euo pipefail
 
 _SELF=$(dirname $0)
-source "${_SELF}/common.sh"
+source "${_SELF}/../common.sh"
 
 if test -z "${ManifestURL=:""}"; then
   echo "Missing variable ManifestURL, export it before use."
