@@ -133,7 +133,6 @@ func expandFile(src, dst string, args ...map[string]interface{}) error {
 		return err
 	}
 
-	//nolint:gosec // 0644 is required
 	if err = ioutil.WriteFile(createDir(dst), []byte(output), 0644); err != nil {
 		return fmt.Errorf("failed to write rendered template: %w", err)
 	}
@@ -354,7 +353,6 @@ func unzip(sourceFile, destinationDir string) error {
 
 // Tar compress a directory using tar + gzip algorithms
 func Tar(src string, targetFile string) error {
-	//nolint:forbidigo // pattern forbidden but we want it here
 	fmt.Printf(">> creating TAR file from directory: %s, target: %s\n", src, targetFile)
 
 	f, err := os.Create(targetFile)
@@ -375,7 +373,6 @@ func Tar(src string, targetFile string) error {
 
 		// if a symlink, skip file
 		if fi.Mode().Type() == os.ModeSymlink {
-			//nolint:forbidigo // pattern forbidden but we want it here
 			fmt.Printf(">> skipping symlink: %s\n", file)
 			return nil
 		}
@@ -739,7 +736,6 @@ func CreateSHA512File(file string) error {
 	}
 	out := fmt.Sprintf("%v  %v", computedHash, filepath.Base(file))
 
-	//nolint:gosec // permissions are correct
 	return os.WriteFile(file+".sha512", []byte(out), 0644)
 }
 
