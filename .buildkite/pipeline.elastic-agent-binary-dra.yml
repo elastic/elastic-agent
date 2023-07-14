@@ -1,15 +1,26 @@
-env:
-  RUN_SNAPSHOT: "true"
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
     key: "dra-core-snapshot"
+    if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_SNAPSHOT") == "true"
     steps:
-    - label: ":hammer::package: Build and DRA Publish Elastic-Agent Core Snapshot"
-      if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_SNAPSHOT") == "true"
+    - label: ":package: Build Elastic-Agent Core Snapshot"
       commands:
         - .buildkite/scripts/steps/dra-build.sh
+      key: "build-dra-snapshot"
+      artifact_paths:
+        - "build/**"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "snapshot"
+
+    - wait
+
+    - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
+      commands:
         - .buildkite/scripts/steps/dra-publish.sh
-      key: "build-and-publish-dra-snapshot"
+      key: "publish-dra-snapshot"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
@@ -17,13 +28,26 @@ steps:
         WORKFLOW: "snapshot"
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
+    if: build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_STAGING") == "true"
     steps:
-    - label: ":hammer::package:  Build and DRA Publish Elastic-Agent Core staging"
-      if: build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_STAGING") == "true"
+    - label: ":package: Build Elastic-Agent Core staging"
       commands:
         - .buildkite/scripts/steps/dra-build.sh
+      key: "build-dra-staging"
+      artifact_paths:
+        - "build/**"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "staging"
+
+    - wait
+
+    - label: ":hammer: DRA Publish Elastic-Agent Core staging"
+      commands:
         - .buildkite/scripts/steps/dra-publish.sh
-      key: "build-and-publish-dra-staging"
+      key: "publish-dra-staging"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
