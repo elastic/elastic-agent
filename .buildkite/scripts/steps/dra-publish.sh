@@ -17,9 +17,9 @@ function run_release_manager() {
     echo "+++ Publishing $BUILDKITE_BRANCH ${WORKFLOW} DRA artifacts..."
     dry_run=""
     if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
-        dry_run="--dry-run"
+        # dry_run="--dry-run"
         # force main branch on PR's or it won't execute
-        # because the PR branche does not have a project folder in release-manager
+        # because the PR branch does not have a project folder in release-manager
         BRANCH=main
     fi
     docker run --rm \
