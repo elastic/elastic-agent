@@ -51,7 +51,7 @@ type endpointPackageTemplateVars struct {
 // installed. The endpoint-security service is uninstalled when the agent is uninstalled.
 //
 // The agent is automatically uninstalled as part of test cleanup when installed with
-// fxiture.Install via tools.InstallAgentWithPolicy. Failure to uninstall the agent will fail the
+// fixture.Install via tools.InstallAgentWithPolicy. Failure to uninstall the agent will fail the
 // test automatically.
 func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -104,7 +104,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 // unenrolling). The empty agent policy triggers the uninstall of endpoint because endpoint was
 // removed from the policy.
 //
-// Like the CLI uinstall test, the agent is uninstalled from the command line at the end of the test
+// Like the CLI uninstall test, the agent is uninstalled from the command line at the end of the test
 // but at this point endpoint is already uninstalled at this point.
 func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
