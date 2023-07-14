@@ -1,9 +1,6 @@
 env:
   DRA_PROJECT: "elastic-agent-core"
   DRA_ARTIFACT_SET: "agent-core"
-  RUN_SNAPSHOT: "true"
-  RUN_STAGING: "true"
-  FORCE_NO_DRA_DRY_RUN: "true"
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
     key: "dra-core-snapshot"
