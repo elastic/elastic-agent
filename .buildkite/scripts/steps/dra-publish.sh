@@ -32,7 +32,7 @@ function run_release_manager() {
         BRANCH=main
         DRY_RUN="--dry-run"
     fi
-    echo docker run --rm \
+    docker run --rm \
         --name release-manager \
         -e VAULT_ADDR="${VAULT_ADDR_DRA}" \
         -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
