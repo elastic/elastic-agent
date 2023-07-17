@@ -13,7 +13,8 @@ inputs:
             - container:
                 format: auto
                 stream: ${kubernetes.hints.checkpoint.firewall.stream|'all'}
-          paths: null
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
           processors:
             - add_locale: null
             - add_fields:
