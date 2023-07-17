@@ -921,7 +921,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}()
 
 	err = c.generateAST(cfg)
-	//c.setConfigErr(err)
+	c.setConfigError(err)
 	if err != nil {
 		return err
 	}
