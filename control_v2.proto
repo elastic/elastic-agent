@@ -164,7 +164,7 @@ message StateAgentInfo {
 }
 
 // StateResponse is the current state of Elastic Agent.
-// Next unused id: 9
+// Next unused id: 7
 message StateResponse {
   // Overall information of Elastic Agent.
   StateAgentInfo info = 1;
@@ -173,11 +173,6 @@ message StateResponse {
   // states and components
   State state = 2;
   string message = 3;
-
-  // State + message for the Agent Coordinator, reporting manager-level errors
-  // like failed policy updates.
-  State coordinatorState = 7;
-  string coordinatorMessage = 8;
 
   // Fleet state: healthy / "Connected" if the last RPC call to Fleet
   // succeeded, otherwise failed with the associated error string.
