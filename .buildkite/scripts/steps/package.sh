@@ -15,3 +15,9 @@ mkdir -p $AGENT_DROP_PATH
 
 # Download the components from the ManifestURL and then package those downloaded into the $AGENT_DROP_PATH
 mage clean downloadManifest package
+
+echo  "+++ Generate dependencies report"
+BEAT_VERSION_FULL=$(curl -s -XGET "${ManifestURL}" |jq '.version' -r )
+bash "${_SELF}/../../../dev-tools/dependencies-report"
+mkdir -p build/distributions/reports
+mv dependencies.csv "build/distributions/reports/dependencies-${BEAT_VERSION_FULL}.csv"
