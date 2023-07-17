@@ -450,7 +450,7 @@ func (s *serviceRuntime) install(ctx context.Context) error {
 func (s *serviceRuntime) uninstall(ctx context.Context) error {
 	// Always retry for internal attempts to uninstall, because they are an attempt to converge the agent's current state
 	// with its desired state based on the agent policy.
-	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl, true)
+	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl)
 }
 
 // UninstallService uninstalls the service. When shouldRetry is true the uninstall command will be retried until it succeeds.
