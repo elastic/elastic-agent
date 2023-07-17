@@ -59,6 +59,10 @@ steps:
       fi
       if [[ -z "${ManifestURL}" ]]; then
         export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
+        if [[ -z "${ManifestURL}" ]]; then
+          echo ":broken_heart: Missing ManifestURL variable or empty string provided"
+          exit 1
+        fi
       fi
       if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
         export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
@@ -76,7 +80,7 @@ steps:
       machineType: "c2-standard-16"
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
-      DRA_PROJECT_ARTIFACT_ID: "elastic-agent-package"
+      DRA_PROJECT_ARTIFACT_ID: "agent-package"
     command: |
       buildkite-agent artifact download "build/**/*" .
       if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
