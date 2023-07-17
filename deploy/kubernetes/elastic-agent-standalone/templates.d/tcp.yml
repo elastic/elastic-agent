@@ -8,6 +8,7 @@ inputs:
             dataset: tcp.generic
             type: logs
           host: localhost:8080
+          timeout: ${kubernetes.hints.tcp.generic.timeout|kubernetes.hints.tcp.timeout|''}
       data_stream.namespace: default
     - name: filestream-tcp
       type: filestream

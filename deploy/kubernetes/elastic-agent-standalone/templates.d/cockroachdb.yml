@@ -15,11 +15,11 @@ inputs:
           metrics_path: /_status/vars
           metricsets:
             - collector
-          password: null
+          password: ${kubernetes.hints.cockroachdb.status.password|kubernetes.hints.cockroachdb.password|''}
           period: ${kubernetes.hints.cockroachdb.status.period|kubernetes.hints.cockroachdb.period|'10s'}
           ssl.certificate_authorities: null
           use_types: true
-          username: null
+          username: ${kubernetes.hints.cockroachdb.status.username|kubernetes.hints.cockroachdb.username|''}
       data_stream.namespace: default
     - name: filestream-cockroachdb
       type: filestream

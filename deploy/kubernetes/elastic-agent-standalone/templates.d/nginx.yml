@@ -52,7 +52,9 @@ inputs:
       type: httpjson
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.nginx.access.enabled} == true and ${kubernetes.hints.nginx.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.nginx.access.password|kubernetes.hints.nginx.password|''}
+          auth.basic.user: ${kubernetes.hints.nginx.access.username|kubernetes.hints.nginx.username|''}
+          condition: ${kubernetes.hints.nginx.access.enabled} == true and ${kubernetes.hints.nginx.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -88,7 +90,9 @@ inputs:
           tags:
             - forwarded
             - nginx-access
-        - condition: ${kubernetes.hints.nginx.error.enabled} == true and ${kubernetes.hints.nginx.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.nginx.error.password|kubernetes.hints.nginx.password|''}
+          auth.basic.user: ${kubernetes.hints.nginx.error.username|kubernetes.hints.nginx.username|''}
+          condition: ${kubernetes.hints.nginx.error.enabled} == true and ${kubernetes.hints.nginx.enabled} == true
           config_version: 2
           cursor:
             index_earliest:

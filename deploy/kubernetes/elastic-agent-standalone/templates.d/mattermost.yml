@@ -13,7 +13,8 @@ inputs:
             - container:
                 format: auto
                 stream: ${kubernetes.hints.mattermost.audit.stream|'all'}
-          paths: null
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
                 symlinks: true

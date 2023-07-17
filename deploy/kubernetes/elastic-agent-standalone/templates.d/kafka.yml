@@ -1,4 +1,40 @@
 inputs:
+    - name: kafka/metrics-kafka
+      type: kafka/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.kafka.broker.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
+          data_stream:
+            dataset: kafka.broker
+            type: metrics
+          hosts:
+            - localhost:8778
+          metricsets:
+            - broker
+          period: ${kubernetes.hints.kafka.broker.period|kubernetes.hints.kafka.period|'10s'}
+        - condition: ${kubernetes.hints.kafka.consumergroup.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
+          data_stream:
+            dataset: kafka.consumergroup
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kafka.consumergroup.host|kubernetes.hints.kafka.host|'localhost:9092'}
+          metricsets:
+            - consumergroup
+          password: ${kubernetes.hints.kafka.consumergroup.password|kubernetes.hints.kafka.password|''}
+          period: ${kubernetes.hints.kafka.consumergroup.period|kubernetes.hints.kafka.period|'10s'}
+          username: ${kubernetes.hints.kafka.consumergroup.username|kubernetes.hints.kafka.username|''}
+        - condition: ${kubernetes.hints.kafka.partition.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
+          data_stream:
+            dataset: kafka.partition
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kafka.partition.host|kubernetes.hints.kafka.host|'localhost:9092'}
+          metricsets:
+            - partition
+          password: ${kubernetes.hints.kafka.partition.password|kubernetes.hints.kafka.password|''}
+          period: ${kubernetes.hints.kafka.partition.period|kubernetes.hints.kafka.period|'10s'}
+          username: ${kubernetes.hints.kafka.partition.username|kubernetes.hints.kafka.username|''}
+      data_stream.namespace: default
     - name: filestream-kafka
       type: filestream
       use_output: default
@@ -26,36 +62,4 @@ inputs:
                 symlinks: true
           tags:
             - kafka-log
-      data_stream.namespace: default
-    - name: kafka/metrics-kafka
-      type: kafka/metrics
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.kafka.broker.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
-          data_stream:
-            dataset: kafka.broker
-            type: metrics
-          hosts:
-            - localhost:8778
-          metricsets:
-            - broker
-          period: ${kubernetes.hints.kafka.broker.period|kubernetes.hints.kafka.period|'10s'}
-        - condition: ${kubernetes.hints.kafka.consumergroup.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
-          data_stream:
-            dataset: kafka.consumergroup
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.kafka.consumergroup.host|kubernetes.hints.kafka.host|'localhost:9092'}
-          metricsets:
-            - consumergroup
-          period: ${kubernetes.hints.kafka.consumergroup.period|kubernetes.hints.kafka.period|'10s'}
-        - condition: ${kubernetes.hints.kafka.partition.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
-          data_stream:
-            dataset: kafka.partition
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.kafka.partition.host|kubernetes.hints.kafka.host|'localhost:9092'}
-          metricsets:
-            - partition
-          period: ${kubernetes.hints.kafka.partition.period|kubernetes.hints.kafka.period|'10s'}
       data_stream.namespace: default

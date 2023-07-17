@@ -9,6 +9,7 @@ inputs:
             type: logs
           host: localhost:8080
           max_message_size: 10KiB
+          timeout: ${kubernetes.hints.udp.generic.timeout|kubernetes.hints.udp.timeout|''}
       data_stream.namespace: default
     - name: filestream-udp
       type: filestream

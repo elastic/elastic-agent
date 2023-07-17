@@ -7,6 +7,7 @@ inputs:
           data_stream:
             dataset: panw.panos
             type: logs
+          framing: rfc6587
           host: localhost:9001
           max_message_size: 50KiB
           processors:
