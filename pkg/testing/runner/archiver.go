@@ -24,10 +24,16 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path to %s: %w", dir, err)
 	}
-	var stdout bytes.Buffer
-	processHandler, err := process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "-z"}), process.WithCmdOptions(attachOut(&stdout), workDir(dir)))
+
+	var allOutput bytes.Buffer
+	var trackedOutput bytes.Buffer
+	processHandler, err := process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "-z"}), process.WithCmdOptions(attachOut(&trackedOutput), workDir(dir)))
 	if err != nil {
 		return fmt.Errorf("failed to run git ls-files: %w", err)
+	}
+	_, err = io.Copy(&allOutput, &trackedOutput)
+	if err != nil {
+		return fmt.Errorf("failed to read stdout of git ls-files: %w", err)
 	}
 	processDone := <-processHandler.Wait()
 	if processDone.ExitCode() != 0 {
@@ -35,9 +41,14 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 	}
 
 	// Add files that are not yet tracked in git. Prevents a footcannon where someone writes code to a new file, then tests it before they add to git
-	processHandler, err = process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "--exclude-standard", "-o", "-z"}), process.WithCmdOptions(attachOut(&stdout), workDir(dir)))
+	var untrackedOutput bytes.Buffer
+	processHandler, err = process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "--exclude-standard", "-o", "-z"}), process.WithCmdOptions(attachOut(&untrackedOutput), workDir(dir)))
 	if err != nil {
 		return fmt.Errorf("failed to run git ls-files -o: %w", err)
+	}
+	_, err = io.Copy(&allOutput, &untrackedOutput)
+	if err != nil {
+		return fmt.Errorf("failed to read stdout of git ls-files -o: %w", err)
 	}
 	processDone = <-processHandler.Wait()
 	if processDone.ExitCode() != 0 {
@@ -53,7 +64,7 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 	zw := zip.NewWriter(archive)
 	defer zw.Close()
 
-	s := bufio.NewScanner(&stdout)
+	s := bufio.NewScanner(&allOutput)
 	s.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if i := strings.IndexRune(string(data), '\x00'); i >= 0 {
 			return i + 1, data[0:i], nil
