@@ -115,7 +115,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "error-default" {
 					break
 				}
@@ -224,7 +224,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -359,7 +359,7 @@ func TestManager_FakeInput_Features(t *testing.T) {
 			select {
 			case <-subscriptionCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != compID {
 					break
 				}
@@ -553,7 +553,7 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -727,7 +727,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -1008,7 +1008,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -1143,7 +1143,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -1287,7 +1287,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -1416,7 +1416,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -1561,7 +1561,7 @@ func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -1708,7 +1708,7 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -1853,7 +1853,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -1959,7 +1959,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -2176,7 +2176,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				state := ccs.State
 				if ccs.Component.ID == "fake-0" {
 					t.Logf("component fake-0 state changed: %+v", state)
@@ -2301,7 +2301,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				if ccs.Component.ID != "fake-default" {
 					break
 				}
@@ -2551,7 +2551,7 @@ func TestManager_FakeShipper(t *testing.T) {
 			select {
 			case <-subCtx.Done():
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				state := ccs.State
 				if ccs.Component.ID == "fake-shipper-default" {
 					t.Logf("shipper state changed: %+v", state)
@@ -2822,7 +2822,7 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 			case <-subCtx.Done():
 				close(stateProgressionCh)
 				return
-			case ccs := <-m.stateChangedChan:
+			case ccs := <-m.stateChangeChan:
 				state := ccs.State
 				if ccs.Component.ID == IDComp0 {
 					t.Logf("component %s state changed: %+v", IDComp0, state)

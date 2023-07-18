@@ -109,16 +109,23 @@ type Manager struct {
 
 	//subMx            sync.RWMutex
 	//subscriptions    map[string][]*Subscription
-	stateChangedChan chan ComponentComponentState
+	stateChangeChan chan ComponentComponentState
+	updateChan      chan updateRequest
+	errorChan       chan error
 	//subAllMx      sync.RWMutex
 	//subscribeAll  []*SubscriptionAll
 
-	errCh chan error
+	//errCh chan error
 
 	// upon creation the Manager is neither running not shutting down, thus both
 	// flags are needed.
 	running      atomic.Bool
 	shuttingDown atomic.Bool
+}
+
+type updateRequest struct {
+	components []component.Component
+	tearDown   bool
 }
 
 // NewManager creates a new manager.
@@ -146,10 +153,11 @@ func NewManager(
 		current:      make(map[string]*componentRuntimeState),
 		shipperConns: make(map[string]*shipperConn),
 		//subscriptions: make(map[string][]*Subscription),
-		stateChangedChan: make(chan ComponentComponentState),
-		errCh:            make(chan error),
-		monitor:          monitor,
-		grpcConfig:       grpcConfig,
+		stateChangeChan: make(chan ComponentComponentState),
+		updateChan:      make(chan updateRequest),
+		errorChan:       make(chan error),
+		monitor:         monitor,
+		grpcConfig:      grpcConfig,
 	}
 	return m, nil
 }
@@ -220,7 +228,25 @@ func (m *Manager) Run(ctx context.Context) error {
 		}
 	}()
 
-	<-ctx.Done()
+	// updateErrChan is a local placeholder that holds m.errorChan when
+	// we have a result to send from an update call and nil otherwise.
+	var updateErrChan chan error
+	var updateErr error
+	for ctx.Err() == nil {
+
+		select {
+		case <-ctx.Done():
+		case req := <-m.updateChan:
+			// Begin the update, and point updateErrChan at our error reporting
+			// channel so we can notify Coordinator of the result.
+			updateErr = m.update(req.components, req.tearDown)
+			updateErrChan = m.errorChan
+		case updateErrChan <- updateErr:
+			// We sent the most recent update result, clear the channel until the
+			// next update
+			updateErrChan = nil
+		}
+	}
 	m.running.Store(false)
 	m.shuttingDown.Store(true)
 	m.shutdown()
@@ -234,76 +260,9 @@ func (m *Manager) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// waitForReady waits until the manager is ready to be used.
-// Used for testing.
-//
-// This verifies that the GRPC server is up and running.
-func (m *Manager) waitForReady(ctx context.Context) error {
-	tk, err := uuid.NewV4()
-	if err != nil {
-		return err
-	}
-	token := tk.String()
-	name, err := genServerName()
-	if err != nil {
-		return err
-	}
-	pair, err := m.ca.GeneratePairWithName(name)
-	if err != nil {
-		return err
-	}
-	cert, err := tls.X509KeyPair(pair.Crt, pair.Key)
-	if err != nil {
-		return err
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(m.ca.Crt())
-	trans := credentials.NewTLS(&tls.Config{
-		ServerName:   name,
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
-		MinVersion:   tls.VersionTLS12,
-	})
-
-	m.waitMx.Lock()
-	m.waitReady[token] = waitForReady{
-		name: name,
-		cert: pair,
-	}
-	m.waitMx.Unlock()
-
-	defer func() {
-		m.waitMx.Lock()
-		delete(m.waitReady, token)
-		m.waitMx.Unlock()
-	}()
-
-	for {
-		m.netMx.RLock()
-		lis := m.listener
-		srv := m.server
-		m.netMx.RUnlock()
-		if lis != nil && srv != nil {
-			addr := m.getListenAddr()
-			c, err := grpc.Dial(addr, grpc.WithTransportCredentials(trans))
-			if err == nil {
-				_ = c.Close()
-				return nil
-			}
-		}
-
-		t := time.NewTimer(100 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-t.C:
-		}
-	}
-}
-
 // Errors returns channel that errors are reported on.
 func (m *Manager) Errors() <-chan error {
-	return m.errCh
+	return m.errorChan
 }
 
 // Update updates the currComp state of the running components.
@@ -318,7 +277,8 @@ func (m *Manager) Update(components []component.Component) error {
 	}
 	// teardown is true because the public `Update` method would be coming directly from
 	// policy so if a component was removed it needs to be torn down.
-	return m.update(components, true)
+	m.updateChan <- updateRequest{components, true}
+	return nil
 }
 
 // State returns the current component states.
@@ -471,106 +431,9 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 	return results
 }
 
-// Subscribe to changes in a component.
-//
-// Allows a component without that ID to exist. Once a component starts matching that ID then changes will start to
-// be provided over the channel. Cancelling the context results in the subscription being unsubscribed.
-//
-// Note: Not reading from a subscription channel will cause the Manager to block.
-/*func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscription {
-	sub := newSubscription(ctx)
-
-	// add latestState to channel
-	m.currentMx.RLock()
-	comp, ok := m.current[componentID]
-	m.currentMx.RUnlock()
-	if ok {
-		comp.latestMx.RLock()
-		latestState := comp.latestState.Copy()
-		comp.latestMx.RUnlock()
-		go func() {
-			select {
-			case <-ctx.Done():
-			case sub.ch <- latestState:
-			}
-		}()
-	}
-
-	// add subscription for future changes
-	m.subMx.Lock()
-	m.subscriptions[componentID] = append(m.subscriptions[componentID], sub)
-	m.subMx.Unlock()
-
-	go func() {
-		<-ctx.Done()
-
-		// unsubscribe
-		m.subMx.Lock()
-		defer m.subMx.Unlock()
-		for key, subs := range m.subscriptions {
-			for i, s := range subs {
-				if sub == s {
-					m.subscriptions[key] = append(m.subscriptions[key][:i], m.subscriptions[key][i+1:]...)
-					return
-				}
-			}
-		}
-	}()
-
-	return sub
+func (m *Manager) StateChangeChan() <-chan ComponentComponentState {
+	return m.stateChangeChan
 }
-*/
-// SubscribeAll subscribes to all changes in all components.
-//
-// This provides the current state for existing components at the time of first subscription. Cancelling the context
-// results in the subscription being unsubscribed.
-//
-// Note: Not reading from a subscription channel will cause the Manager to block.
-/*func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
-	sub := newSubscriptionAll(ctx)
-
-	// add the latest states
-	m.currentMx.RLock()
-	latest := make([]ComponentComponentState, 0, len(m.current))
-	for _, comp := range m.current {
-		comp.latestMx.RLock()
-		latest = append(latest, ComponentComponentState{Component: comp.getCurrent(), State: comp.latestState.Copy()})
-		comp.latestMx.RUnlock()
-	}
-	m.currentMx.RUnlock()
-	if len(latest) > 0 {
-		go func() {
-			for _, l := range latest {
-				select {
-				case <-ctx.Done():
-					return
-				case sub.ch <- l:
-				}
-			}
-		}()
-	}
-
-	// add subscription for future changes
-	m.subAllMx.Lock()
-	m.subscribeAll = append(m.subscribeAll, sub)
-	m.subAllMx.Unlock()
-
-	go func() {
-		<-ctx.Done()
-
-		// unsubscribe
-		m.subAllMx.Lock()
-		defer m.subAllMx.Unlock()
-		for i, s := range m.subscribeAll {
-			if sub == s {
-				m.subscribeAll = append(m.subscribeAll[:i], m.subscribeAll[i+1:]...)
-				return
-			}
-		}
-	}()
-
-	return sub
-}*/
 
 // Checkin is called by v1 sub-processes and has been removed.
 func (m *Manager) Checkin(_ proto.ElasticAgent_CheckinServer) error {
@@ -804,32 +667,12 @@ func (m *Manager) shutdown() {
 
 // stateChanged notifies of the state change and returns true if the state is final (stopped)
 func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentState) (exit bool) {
-	/*m.subAllMx.RLock()
-	for _, sub := range m.subscribeAll {
-		select {
-		case <-sub.ctx.Done():
-		case sub.ch <- ComponentComponentState{
-			Component: state.getCurrent(),
-			State:     latest,
-		}:
-		}
-	}
-	m.subAllMx.RUnlock()*/
+
 	// TODO: select on this with overall Manager channel
-	m.stateChangedChan <- ComponentComponentState{
+	m.stateChangeChan <- ComponentComponentState{
 		Component: state.getCurrent(),
 		State:     latest,
 	}
-
-	/*m.subMx.RLock()
-	subs := m.subscriptions[state.id]
-	for _, sub := range subs {
-		select {
-		case <-sub.ctx.Done():
-		case sub.ch <- latest:
-		}
-	}
-	m.subMx.RUnlock()*/
 
 	shutdown := state.shuttingDown.Load()
 	if shutdown && latest.State == client.UnitStateStopped {
@@ -963,4 +806,71 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 type waitForReady struct {
 	name string
 	cert *authority.Pair
+}
+
+// waitForReady waits until the manager is ready to be used.
+// Used for testing.
+//
+// This verifies that the GRPC server is up and running.
+func (m *Manager) waitForReady(ctx context.Context) error {
+	tk, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
+	token := tk.String()
+	name, err := genServerName()
+	if err != nil {
+		return err
+	}
+	pair, err := m.ca.GeneratePairWithName(name)
+	if err != nil {
+		return err
+	}
+	cert, err := tls.X509KeyPair(pair.Crt, pair.Key)
+	if err != nil {
+		return err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(m.ca.Crt())
+	trans := credentials.NewTLS(&tls.Config{
+		ServerName:   name,
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+		MinVersion:   tls.VersionTLS12,
+	})
+
+	m.waitMx.Lock()
+	m.waitReady[token] = waitForReady{
+		name: name,
+		cert: pair,
+	}
+	m.waitMx.Unlock()
+
+	defer func() {
+		m.waitMx.Lock()
+		delete(m.waitReady, token)
+		m.waitMx.Unlock()
+	}()
+
+	for {
+		m.netMx.RLock()
+		lis := m.listener
+		srv := m.server
+		m.netMx.RUnlock()
+		if lis != nil && srv != nil {
+			addr := m.getListenAddr()
+			c, err := grpc.Dial(addr, grpc.WithTransportCredentials(trans))
+			if err == nil {
+				_ = c.Close()
+				return nil
+			}
+		}
+
+		t := time.NewTimer(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.C:
+		}
+	}
 }

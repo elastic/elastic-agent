@@ -471,13 +471,10 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
 // watchRuntimeComponents listens for state updates from the runtime
 // manager, logs them, and forwards them to CoordinatorState.
 // Runs in its own goroutine created in Coordinator.Run.
-func (c *Coordinator) watchRuntimeComponents(
-	ctx context.Context,
-	subChan <-chan runtime.ComponentComponentState,
-) {
+func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 	state := make(map[string]runtime.ComponentState)
 
-	//var subChan <-chan runtime.ComponentComponentState
+	var subChan <-chan runtime.ComponentComponentState
 	// A real Coordinator will always have a runtime manager, but unit tests
 	// may not initialize all managers -- in that case we leave subChan nil,
 	// and just idle until Coordinator shuts down.
