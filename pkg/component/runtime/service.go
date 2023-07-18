@@ -29,9 +29,7 @@ var (
 	ErrInvalidServiceSpec = errors.New("invalid service spec")
 )
 
-// executeServiceCommandFunc executes the given binary according to configuration in spec. If shouldRetry == true,
-// the command will be retried indefinitely; otherwise, it will not be retried.
-type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec, shouldRetry bool) error
+type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error
 
 // serviceRuntime provides the command runtime for running a component as a service.
 type serviceRuntime struct {
@@ -435,7 +433,7 @@ func (s *serviceRuntime) check(ctx context.Context) error {
 		return ErrOperationSpecUndefined
 	}
 	s.log.Debugf("check if the %s is installed", s.comp.InputSpec.BinaryName)
-	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Check, false)
+	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Check)
 }
 
 // install executes the service install command
@@ -445,26 +443,26 @@ func (s *serviceRuntime) install(ctx context.Context) error {
 		return ErrOperationSpecUndefined
 	}
 	s.log.Debugf("install %s service", s.comp.InputSpec.BinaryName)
-	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Install, true)
+	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Install)
 }
 
 // uninstall executes the service uninstall command
 func (s *serviceRuntime) uninstall(ctx context.Context) error {
 	// Always retry for internal attempts to uninstall, because they are an attempt to converge the agent's current state
 	// with its desired state based on the agent policy.
-	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl, true)
+	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl)
 }
 
 // UninstallService uninstalls the service. When shouldRetry is true the uninstall command will be retried until it succeeds.
-func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component, shouldRetry bool) error {
-	return uninstallService(ctx, log, comp, executeServiceCommand, shouldRetry)
+func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component) error {
+	return uninstallService(ctx, log, comp, executeServiceCommand)
 }
 
-func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc, shouldRetry bool) error {
+func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc) error {
 	if comp.InputSpec.Spec.Service.Operations.Uninstall == nil {
 		log.Errorf("missing uninstall spec for %s service", comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
 	log.Debugf("uninstall %s service", comp.InputSpec.BinaryName)
-	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, comp.InputSpec.Spec.Service.Operations.Uninstall, shouldRetry)
+	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, comp.InputSpec.Spec.Service.Operations.Uninstall)
 }
