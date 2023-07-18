@@ -26,6 +26,7 @@ func (s *Subscription) Ch() <-chan ComponentState {
 	return s.ch
 }
 
+/*
 // SubscriptionAll provides a channel for notifications on all component state changes.
 type SubscriptionAll struct {
 	ctx context.Context
@@ -52,3 +53,4 @@ func NewSubscriptionAllWithChannel(ctx context.Context, evtChan chan ComponentCo
 func (s *SubscriptionAll) Ch() <-chan ComponentComponentState {
 	return s.ch
 }
+*/

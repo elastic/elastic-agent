@@ -111,12 +111,15 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe(subCtx, "error-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "error-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateStarting {
 					// initial is starting
@@ -217,12 +220,15 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
@@ -347,14 +353,17 @@ func TestManager_FakeInput_Features(t *testing.T) {
 	doneCh := make(chan struct{})
 
 	go func() {
-		sub := m.Subscribe(subscriptionCtx, compID)
 		var healthIteration int
 
 		for {
 			select {
 			case <-subscriptionCtx.Done():
 				return
-			case componentState := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != compID {
+					break
+				}
+				componentState := ccs.State
 				t.Logf("component state changed: %+v", componentState)
 
 				if componentState.State == client.UnitStateFailed {
@@ -540,12 +549,15 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 	go func() {
 		unitBad := true
 
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
@@ -711,12 +723,15 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 	go func() {
 		unitGood := true
 
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
@@ -989,12 +1004,15 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
@@ -1121,12 +1139,15 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 	go func() {
 		unit1Stopped := false
 
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
@@ -1262,12 +1283,15 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
@@ -1388,12 +1412,15 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 	go func() {
 		killed := false
 
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					if !killed {
@@ -1530,12 +1557,15 @@ func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
 	go func() {
 		killed := false
 
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					if !killed {
@@ -1674,12 +1704,15 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 		lastStoppedCount := 0
 		stoppedCount := 0
 
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					// should not go failed because we allow restart per period
@@ -1816,12 +1849,15 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 	go func() {
 		wasDegraded := false
 
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateStarting || state.State == client.UnitStateHealthy {
 					// starting and healthy are allowed
@@ -1919,12 +1955,15 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
@@ -2133,22 +2172,22 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 	subErrCh1 := make(chan error)
 	subErrCh2 := make(chan error)
 	go func() {
-		sub0 := m.Subscribe(subCtx, "fake-0")
-		sub1 := m.Subscribe(subCtx, "fake-1")
-		sub2 := m.Subscribe(subCtx, "fake-2")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub0.Ch():
-				t.Logf("component fake-0 state changed: %+v", state)
-				signalState(subErrCh0, &state, []client.UnitState{client.UnitStateHealthy})
-			case state := <-sub1.Ch():
-				t.Logf("component fake-1 state changed: %+v", state)
-				signalState(subErrCh1, &state, []client.UnitState{client.UnitStateHealthy})
-			case state := <-sub2.Ch():
-				t.Logf("component fake-2 state changed: %+v", state)
-				signalState(subErrCh2, &state, []client.UnitState{client.UnitStateHealthy})
+			case ccs := <-m.stateChangedChan:
+				state := ccs.State
+				if ccs.Component.ID == "fake-0" {
+					t.Logf("component fake-0 state changed: %+v", state)
+					signalState(subErrCh0, &state, []client.UnitState{client.UnitStateHealthy})
+				} else if ccs.Component.ID == "fake-1" {
+					t.Logf("component fake-1 state changed: %+v", state)
+					signalState(subErrCh1, &state, []client.UnitState{client.UnitStateHealthy})
+				} else if ccs.Component.ID == "fake-2" {
+					t.Logf("component fake-2 state changed: %+v", state)
+					signalState(subErrCh2, &state, []client.UnitState{client.UnitStateHealthy})
+				}
 			}
 		}
 	}()
@@ -2258,12 +2297,15 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 	defer subCancel()
 	subErrCh := make(chan error)
 	go func() {
-		sub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-sub.Ch():
+			case ccs := <-m.stateChangedChan:
+				if ccs.Component.ID != "fake-default" {
+					break
+				}
+				state := ccs.State
 				t.Logf("component state changed: %+v", state)
 				if state.State == client.UnitStateFailed {
 					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
@@ -2505,109 +2547,110 @@ func TestManager_FakeShipper(t *testing.T) {
 			return true, err
 		}
 
-		shipperSub := m.Subscribe(subCtx, "fake-shipper-default")
-		compSub := m.Subscribe(subCtx, "fake-default")
 		for {
 			select {
 			case <-subCtx.Done():
 				return
-			case state := <-shipperSub.Ch():
-				t.Logf("shipper state changed: %+v", state)
-				if state.State == client.UnitStateFailed {
-					subErrCh <- fmt.Errorf("shipper failed: %s", state.Message)
-				} else {
-					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							shipperInputOn = true
-							ok, err := sendEvent()
-							if ok {
-								if err != nil {
-									subErrCh <- err
-								} else {
-									// successful; turn it all off
-									err := m.Update([]component.Component{})
+			case ccs := <-m.stateChangedChan:
+				state := ccs.State
+				if ccs.Component.ID == "fake-shipper-default" {
+					t.Logf("shipper state changed: %+v", state)
+					if state.State == client.UnitStateFailed {
+						subErrCh <- fmt.Errorf("shipper failed: %s", state.Message)
+					} else {
+						unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}]
+						if ok {
+							if unit.State == client.UnitStateFailed {
+								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+							} else if unit.State == client.UnitStateHealthy {
+								shipperInputOn = true
+								ok, err := sendEvent()
+								if ok {
 									if err != nil {
 										subErrCh <- err
+									} else {
+										// successful; turn it all off
+										err := m.Update([]component.Component{})
+										if err != nil {
+											subErrCh <- err
+										}
 									}
 								}
+							} else if unit.State == client.UnitStateStopped {
+								subErrCh <- nil
+							} else if unit.State == client.UnitStateStarting {
+								// acceptable
+							} else {
+								// unknown state that should not have occurred
+								subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 							}
-						} else if unit.State == client.UnitStateStopped {
-							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting {
-							// acceptable
 						} else {
-							// unknown state that should not have occurred
-							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+							subErrCh <- errors.New("input unit missing: fake-default")
 						}
-					} else {
-						subErrCh <- errors.New("input unit missing: fake-default")
+						unit, ok = state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
+						if ok {
+							if unit.State == client.UnitStateFailed {
+								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+							} else if unit.State == client.UnitStateHealthy {
+								shipperOutputOn = true
+								ok, err := sendEvent()
+								if ok {
+									if err != nil {
+										subErrCh <- err
+									} else {
+										// successful; turn it all off
+										err := m.Update([]component.Component{})
+										if err != nil {
+											subErrCh <- err
+										}
+									}
+								}
+							} else if unit.State == client.UnitStateStopped {
+								subErrCh <- nil
+							} else if unit.State == client.UnitStateStarting {
+								// acceptable
+							} else {
+								// unknown state that should not have occurred
+								subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+							}
+						} else {
+							subErrCh <- errors.New("output unit missing: fake-default")
+						}
 					}
-					unit, ok = state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							shipperOutputOn = true
-							ok, err := sendEvent()
-							if ok {
-								if err != nil {
-									subErrCh <- err
-								} else {
-									// successful; turn it all off
-									err := m.Update([]component.Component{})
+				} else if ccs.Component.ID == "fake-default" {
+					t.Logf("component state changed: %+v", state)
+					if state.State == client.UnitStateFailed {
+						subErrCh <- fmt.Errorf("component failed: %s", state.Message)
+					} else {
+						unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
+						if ok {
+							if unit.State == client.UnitStateFailed {
+								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
+							} else if unit.State == client.UnitStateHealthy {
+								compConnected = true
+								ok, err := sendEvent()
+								if ok {
 									if err != nil {
 										subErrCh <- err
+									} else {
+										// successful; turn it all off
+										err := m.Update([]component.Component{})
+										if err != nil {
+											subErrCh <- err
+										}
 									}
 								}
+							} else if unit.State == client.UnitStateStopped {
+								subErrCh <- nil
+							} else if unit.State == client.UnitStateStarting || unit.State == client.UnitStateConfiguring {
+								// acceptable
+							} else {
+								// unknown state that should not have occurred
+								subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 							}
-						} else if unit.State == client.UnitStateStopped {
-							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting {
-							// acceptable
 						} else {
-							// unknown state that should not have occurred
-							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
+							subErrCh <- errors.New("unit missing: fake-input")
 						}
-					} else {
-						subErrCh <- errors.New("output unit missing: fake-default")
-					}
-				}
-			case state := <-compSub.Ch():
-				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateFailed {
-					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
-				} else {
-					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							compConnected = true
-							ok, err := sendEvent()
-							if ok {
-								if err != nil {
-									subErrCh <- err
-								} else {
-									// successful; turn it all off
-									err := m.Update([]component.Component{})
-									if err != nil {
-										subErrCh <- err
-									}
-								}
-							}
-						} else if unit.State == client.UnitStateStopped {
-							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting || unit.State == client.UnitStateConfiguring {
-							// acceptable
-						} else {
-							// unknown state that should not have occurred
-							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
-						}
-					} else {
-						subErrCh <- errors.New("unit missing: fake-input")
 					}
 				}
 			}
@@ -2774,28 +2817,28 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 	t.Cleanup(func() { drainErrChan(subErrCh1) })
 
 	go func() {
-		sub0 := m.Subscribe(subCtx, IDComp0)
-		sub1 := m.Subscribe(subCtx, IDComp1)
 		for {
 			select {
 			case <-subCtx.Done():
 				close(stateProgressionCh)
 				return
-			case state := <-sub0.Ch():
-				t.Logf("component %s state changed: %+v", IDComp0, state)
-				signalState(
-					subErrCh0,
-					&state,
-					[]client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
-				stateProgressionCh <- progressionStep{IDComp0, state}
-
-			case state := <-sub1.Ch():
-				t.Logf("component %s state changed: %+v", IDComp1, state)
-				signalState(
-					subErrCh1,
-					&state,
-					[]client.UnitState{client.UnitStateHealthy})
-				stateProgressionCh <- progressionStep{IDComp1, state}
+			case ccs := <-m.stateChangedChan:
+				state := ccs.State
+				if ccs.Component.ID == IDComp0 {
+					t.Logf("component %s state changed: %+v", IDComp0, state)
+					signalState(
+						subErrCh0,
+						&state,
+						[]client.UnitState{client.UnitStateHealthy, client.UnitStateStopped})
+					stateProgressionCh <- progressionStep{IDComp0, state}
+				} else if ccs.Component.ID == IDComp1 {
+					t.Logf("component %s state changed: %+v", IDComp1, state)
+					signalState(
+						subErrCh1,
+						&state,
+						[]client.UnitState{client.UnitStateHealthy})
+					stateProgressionCh <- progressionStep{IDComp1, state}
+				}
 			}
 		}
 	}()

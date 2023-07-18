@@ -101,7 +101,7 @@ type RuntimeManager interface {
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 
 	// SubscribeAll provides an interface to watch for changes in all components.
-	SubscribeAll(context.Context) *runtime.SubscriptionAll
+	//SubscribeAll(context.Context) *runtime.SubscriptionAll
 
 	// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 	// it performs diagnostics for all current units.
@@ -471,16 +471,19 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl logp.Level) error {
 // watchRuntimeComponents listens for state updates from the runtime
 // manager, logs them, and forwards them to CoordinatorState.
 // Runs in its own goroutine created in Coordinator.Run.
-func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
+func (c *Coordinator) watchRuntimeComponents(
+	ctx context.Context,
+	subChan <-chan runtime.ComponentComponentState,
+) {
 	state := make(map[string]runtime.ComponentState)
 
-	var subChan <-chan runtime.ComponentComponentState
+	//var subChan <-chan runtime.ComponentComponentState
 	// A real Coordinator will always have a runtime manager, but unit tests
 	// may not initialize all managers -- in that case we leave subChan nil,
 	// and just idle until Coordinator shuts down.
-	if c.runtimeMgr != nil {
+	/*if c.runtimeMgr != nil {
 		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
-	}
+	}*/
 	for {
 		select {
 		case <-ctx.Done():

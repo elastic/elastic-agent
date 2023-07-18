@@ -107,10 +107,11 @@ type Manager struct {
 
 	shipperConns map[string]*shipperConn
 
-	subMx         sync.RWMutex
-	subscriptions map[string][]*Subscription
-	subAllMx      sync.RWMutex
-	subscribeAll  []*SubscriptionAll
+	//subMx            sync.RWMutex
+	//subscriptions    map[string][]*Subscription
+	stateChangedChan chan ComponentComponentState
+	//subAllMx      sync.RWMutex
+	//subscribeAll  []*SubscriptionAll
 
 	errCh chan error
 
@@ -135,19 +136,20 @@ func NewManager(
 		return nil, err
 	}
 	m := &Manager{
-		logger:        logger,
-		baseLogger:    baseLogger,
-		ca:            ca,
-		listenAddr:    listenAddr,
-		agentInfo:     agentInfo,
-		tracer:        tracer,
-		waitReady:     make(map[string]waitForReady),
-		current:       make(map[string]*componentRuntimeState),
-		shipperConns:  make(map[string]*shipperConn),
-		subscriptions: make(map[string][]*Subscription),
-		errCh:         make(chan error),
-		monitor:       monitor,
-		grpcConfig:    grpcConfig,
+		logger:       logger,
+		baseLogger:   baseLogger,
+		ca:           ca,
+		listenAddr:   listenAddr,
+		agentInfo:    agentInfo,
+		tracer:       tracer,
+		waitReady:    make(map[string]waitForReady),
+		current:      make(map[string]*componentRuntimeState),
+		shipperConns: make(map[string]*shipperConn),
+		//subscriptions: make(map[string][]*Subscription),
+		stateChangedChan: make(chan ComponentComponentState),
+		errCh:            make(chan error),
+		monitor:          monitor,
+		grpcConfig:       grpcConfig,
 	}
 	return m, nil
 }
@@ -475,7 +477,7 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 // be provided over the channel. Cancelling the context results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Manager to block.
-func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscription {
+/*func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscription {
 	sub := newSubscription(ctx)
 
 	// add latestState to channel
@@ -517,14 +519,14 @@ func (m *Manager) Subscribe(ctx context.Context, componentID string) *Subscripti
 
 	return sub
 }
-
+*/
 // SubscribeAll subscribes to all changes in all components.
 //
 // This provides the current state for existing components at the time of first subscription. Cancelling the context
 // results in the subscription being unsubscribed.
 //
 // Note: Not reading from a subscription channel will cause the Manager to block.
-func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
+/*func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
 	sub := newSubscriptionAll(ctx)
 
 	// add the latest states
@@ -568,7 +570,7 @@ func (m *Manager) SubscribeAll(ctx context.Context) *SubscriptionAll {
 	}()
 
 	return sub
-}
+}*/
 
 // Checkin is called by v1 sub-processes and has been removed.
 func (m *Manager) Checkin(_ proto.ElasticAgent_CheckinServer) error {
@@ -802,7 +804,7 @@ func (m *Manager) shutdown() {
 
 // stateChanged notifies of the state change and returns true if the state is final (stopped)
 func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentState) (exit bool) {
-	m.subAllMx.RLock()
+	/*m.subAllMx.RLock()
 	for _, sub := range m.subscribeAll {
 		select {
 		case <-sub.ctx.Done():
@@ -812,9 +814,14 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 		}:
 		}
 	}
-	m.subAllMx.RUnlock()
+	m.subAllMx.RUnlock()*/
+	// TODO: select on this with overall Manager channel
+	m.stateChangedChan <- ComponentComponentState{
+		Component: state.getCurrent(),
+		State:     latest,
+	}
 
-	m.subMx.RLock()
+	/*m.subMx.RLock()
 	subs := m.subscriptions[state.id]
 	for _, sub := range subs {
 		select {
@@ -822,7 +829,7 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 		case sub.ch <- latest:
 		}
 	}
-	m.subMx.RUnlock()
+	m.subMx.RUnlock()*/
 
 	shutdown := state.shuttingDown.Load()
 	if shutdown && latest.State == client.UnitStateStopped {

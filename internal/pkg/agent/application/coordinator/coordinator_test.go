@@ -726,9 +726,9 @@ func (r *fakeRuntimeManager) PerformAction(ctx context.Context, comp component.C
 }
 
 // SubscribeAll provides an interface to watch for changes in all components.
-func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.SubscriptionAll {
+/*func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.SubscriptionAll {
 	return nil
-}
+}*/
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
