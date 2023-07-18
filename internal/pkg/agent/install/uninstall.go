@@ -188,9 +188,20 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 		return nil
 	}
 
+	// check caps so we don't try uninstalling things that were already
+	// prevented from installing
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
+	if err != nil {
+		return err
+	}
+
 	// remove each service component
 	for _, comp := range comps {
-		if err := uninstallComponent(ctx, log, comp); err != nil {
+		if !caps.AllowInput(comp.InputType) || !caps.AllowOutput(comp.OutputType) {
+			// This component is not active
+			continue
+		}
+		if err := uninstallServiceComponent(ctx, log, comp); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
 		}
 	}
@@ -198,8 +209,11 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 	return nil
 }
 
-func uninstallComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
-	return comprt.UninstallService(ctx, log, comp)
+func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
+	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
+	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
+	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
+	return comprt.UninstallService(ctx, log, comp, false)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
@@ -248,22 +262,6 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 		if err != nil {
 			return nil, errors.New("inserting rendered inputs failed", err)
 		}
-	}
-
-	// apply caps
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
-	if err != nil {
-		return nil, err
-	}
-
-	astIface, err := caps.Apply(ast)
-	if err != nil {
-		return nil, err
-	}
-
-	newAst, ok := astIface.(*transpiler.AST)
-	if ok {
-		ast = newAst
 	}
 
 	finalConfig, err := ast.Map()

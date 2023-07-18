@@ -34,7 +34,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t)
+	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -63,6 +63,7 @@ func TestInstallWithoutBasePath(t *testing.T) {
 
 	// Check that Agent was installed in default base path
 	checkInstallSuccess(t, topPath)
+	t.Run("check agent package version", testAgentPackageVersion(context.Background(), fixture, true))
 }
 
 func TestInstallWithBasePath(t *testing.T) {
@@ -77,7 +78,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	})
 
 	// Get path to Elastic Agent executable
-	fixture, err := define.NewFixture(t)
+	fixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
@@ -109,6 +110,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	// Check that Agent was installed in the custom base path
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
 	checkInstallSuccess(t, topPath)
+	t.Run("check agent package version", testAgentPackageVersion(context.Background(), fixture, true))
 }
 
 func checkInstallSuccess(t *testing.T, topPath string) {

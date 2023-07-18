@@ -11,7 +11,7 @@ shared:
     os: '{{.GOOS}}'
     arch: '{{.PackageArch}}'
     vendor: '{{.BeatVendor}}'
-    version: '{{ beat_version }}'
+    version: '{{ agent_package_version }}'
     license: '{{.BeatLicense}}'
     url: '{{.BeatURL}}'
     description: '{{.BeatDescription}}'
@@ -61,6 +61,10 @@ shared:
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/.package.version:
+        content: >
+          {{ agent_package_version }}
+        mode: 0644
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ commit_short }}/components:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
@@ -151,6 +155,10 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/.package.version':
+      content: >
+        {{ agent_package_version }}
+      mode: 0644
     <<: *agent_binary_common_files
 
   - &agent_darwin_app_bundle_files
@@ -168,6 +176,10 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/.package.version':
+      content: >
+        {{ agent_package_version }}
+      mode: 0644
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
@@ -756,6 +768,10 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          '.package.version':
+            content: >
+              {{ agent_package_version }}
+            mode: 0644
 
     - os: darwin
       types: [tgz]
@@ -944,6 +960,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        version: '{{ beat_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -954,6 +971,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        version: '{{ beat_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -964,6 +982,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        version: '{{ beat_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -974,6 +993,7 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        version: '{{ beat_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':

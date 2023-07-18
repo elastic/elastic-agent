@@ -18,9 +18,9 @@ import (
 )
 
 func dialContext(ctx context.Context, addr string, cp *x509.CertPool, serverName string) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, addr, grpc.WithContextDialer(dialer), grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(cp, serverName)))
+	return grpc.DialContext(ctx, npipe.TransformString(addr), grpc.WithContextDialer(dialer), grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(cp, serverName)))
 }
 
 func dialer(ctx context.Context, addr string) (net.Conn, error) {
-	return npipe.DialContext(addr)(ctx, "", "")
+	return npipe.DialContext(npipe.TransformString(addr))(ctx, "", "")
 }

@@ -154,4 +154,9 @@ type ServiceOperationsCommandSpec struct {
 	Args    []string         `config:"args,omitempty" yaml:"args,omitempty"`
 	Env     []CommandEnvSpec `config:"env,omitempty" yaml:"env,omitempty"`
 	Timeout time.Duration    `config:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Retry   RetryConfig
+}
+
+type RetryConfig struct {
+	InitInterval time.Duration `config:"init_interval,omitempty" yaml:"init_interval,omitempty"`
 }

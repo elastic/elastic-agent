@@ -7,7 +7,7 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -21,52 +21,76 @@ func TestLocalFetcher_Name(t *testing.T) {
 	require.Equal(t, "local", f.Name())
 }
 
-func TestLocalFetcher_IgnoresSnapshot(t *testing.T) {
-	td := t.TempDir()
+func TestLocalFetcher(t *testing.T) {
+	// t.Skip()
+	baseVersion := "8.7.0"
+	snapshotContent := []byte("snapshot contents")
+	snapshotContentHash := []byte("snapshot contents hash")
+	noSnapshotContent := []byte("not snapshot contents")
+	noSnapshotContentHash := []byte("not snapshot contents hash")
 
+	testdata := t.TempDir()
 	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
 	require.NoError(t, err)
 
-	snapshotPath := fmt.Sprintf("elastic-agent-8.7.0-SNAPSHOT-%s", suffix)
-	notSnapshotPath := fmt.Sprintf("elastic-agent-8.7.0-%s", suffix)
-	require.NoError(t, ioutil.WriteFile(filepath.Join(td, snapshotPath), []byte("snapshot contents"), 0644))
-	require.NoError(t, ioutil.WriteFile(filepath.Join(td, notSnapshotPath), []byte("not snapshot contents"), 0644))
+	snapshotPath := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s", baseVersion, suffix)
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPath), snapshotContent, 0644))
+	snapshotPathHash := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s%s", baseVersion, suffix, hashExt)
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, snapshotPathHash), snapshotContentHash, 0644))
+	notSnapshotPath := fmt.Sprintf("elastic-agent-%s-%s", baseVersion, suffix)
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPath), noSnapshotContent, 0644))
+	notSnapshotPathHash := fmt.Sprintf("elastic-agent-%s-%s%s", baseVersion, suffix, hashExt)
+	require.NoError(t, os.WriteFile(filepath.Join(testdata, notSnapshotPathHash), noSnapshotContentHash, 0644))
 
-	f := LocalFetcher(td)
+	tcs := []struct {
+		name     string
+		version  string
+		opts     []localFetcherOpt
+		want     []byte
+		wantHash []byte
+	}{
+		{
+			name:     "IgnoreSnapshot",
+			version:  baseVersion,
+			want:     noSnapshotContent,
+			wantHash: noSnapshotContentHash,
+		}, {
+			name:     "SnapshotOnly",
+			version:  baseVersion,
+			opts:     []localFetcherOpt{WithLocalSnapshotOnly()},
+			want:     snapshotContent,
+			wantHash: snapshotContentHash,
+		}, {
+			name:     "version with snapshot",
+			version:  baseVersion + "-SNAPSHOT",
+			want:     snapshotContent,
+			wantHash: snapshotContentHash,
+		}, {
+			name:     "version with snapshot and SnapshotOnly",
+			version:  baseVersion + "-SNAPSHOT",
+			opts:     []localFetcherOpt{WithLocalSnapshotOnly()},
+			want:     snapshotContent,
+			wantHash: snapshotContentHash,
+		},
+	}
 
-	tmp := t.TempDir()
-	res, err := f.Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "8.7.0")
-	require.NoError(t, err)
+	for _, tc := range tcs {
+		tmp := t.TempDir()
 
-	err = res.Fetch(context.Background(), t, tmp)
-	require.NoError(t, err)
-	content, err := ioutil.ReadFile(filepath.Join(tmp, res.Name()))
-	require.NoError(t, err)
+		f := LocalFetcher(testdata, tc.opts...)
+		got, err := f.Fetch(
+			context.Background(), runtime.GOOS, runtime.GOARCH, tc.version)
+		require.NoError(t, err)
 
-	assert.Equal(t, []byte("not snapshot contents"), content)
-}
+		err = got.Fetch(context.Background(), t, tmp)
+		require.NoError(t, err)
+		content, err := os.ReadFile(filepath.Join(tmp, got.Name()))
+		require.NoError(t, err)
 
-func TestLocalFetcher_SnapshotFirst(t *testing.T) {
-	td := t.TempDir()
+		assert.Equal(t, string(tc.want), string(content))
+		contentHash, err := os.ReadFile(filepath.Join(tmp, got.Name()+hashExt))
+		require.NoError(t, err)
 
-	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH)
-	require.NoError(t, err)
-
-	snapshotPath := fmt.Sprintf("elastic-agent-8.7.0-SNAPSHOT-%s", suffix)
-	notSnapshotPath := fmt.Sprintf("elastic-agent-8.7.0-%s", suffix)
-	require.NoError(t, ioutil.WriteFile(filepath.Join(td, snapshotPath), []byte("snapshot contents"), 0644))
-	require.NoError(t, ioutil.WriteFile(filepath.Join(td, notSnapshotPath), []byte("not snapshot contents"), 0644))
-
-	f := LocalFetcher(td, WithLocalSnapshotOnly())
-
-	tmp := t.TempDir()
-	res, err := f.Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "8.7.0")
-	require.NoError(t, err)
-
-	err = res.Fetch(context.Background(), t, tmp)
-	require.NoError(t, err)
-	content, err := ioutil.ReadFile(filepath.Join(tmp, res.Name()))
-	require.NoError(t, err)
-
-	assert.Equal(t, []byte("snapshot contents"), content)
+		assert.Equal(t, string(tc.wantHash), string(contentHash))
+	}
 }

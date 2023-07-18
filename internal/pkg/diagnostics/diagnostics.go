@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/version"
 )
 
 const (
@@ -63,6 +64,22 @@ func GlobalHooks() Hooks {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
 				return o
+			},
+		},
+		{
+			Name:        "package version",
+			Filename:    ".package.version",
+			ContentType: "text/plain",
+			Hook: func(_ context.Context) []byte {
+				pkgVersionPath, err := version.GetAgentPackageVersionFilePath()
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				fileBytes, err := os.ReadFile(pkgVersionPath)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
+				return fileBytes
 			},
 		},
 		{

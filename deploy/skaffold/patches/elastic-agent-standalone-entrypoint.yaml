@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: elastic-agent-standalone
+spec:
+  template:
+    spec:
+      containers:
+        - name: elastic-agent-standalone
+          command:
+            - /usr/share/elastic-agent/elastic-agent
+          args: ["container", "-c", "/etc/elastic-agent/agent.yml", "-e"]

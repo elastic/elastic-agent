@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/version"
 
 	"go.elastic.co/apm"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -42,6 +44,13 @@ func New(
 	disableMonitoring bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
+
+	err := version.InitVersionInformation()
+	if err != nil {
+		// non-fatal error, log a warning and move on
+		log.With("error.message", err).Warnf("Error initializing version information: falling back to %s", release.Version())
+	}
+
 	platform, err := component.LoadPlatformDetail(modifiers...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to gather system information: %w", err)
@@ -54,7 +63,7 @@ func New(
 	}
 	log.With("inputs", specs.Inputs()).Info("Detected available inputs and outputs")
 
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), log)
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to determine capabilities: %w", err)
 	}

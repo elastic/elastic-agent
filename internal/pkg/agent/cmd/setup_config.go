@@ -59,7 +59,6 @@ type kibanaConfig struct {
 type kibanaFleetConfig struct {
 	CA               string `config:"ca"`
 	Host             string `config:"host"`
-	Setup            bool   `config:"setup"`
 	Username         string `config:"username"`
 	Password         string `config:"password"`
 	ServiceToken     string `config:"service_token"`
@@ -111,7 +110,6 @@ func defaultAccessConfig() (setupConfig, error) {
 		},
 		Kibana: kibanaConfig{
 			Fleet: kibanaFleetConfig{
-				Setup:            envBool("KIBANA_FLEET_SETUP"),
 				Host:             envWithDefault("http://kibana:5601", "KIBANA_FLEET_HOST", "KIBANA_HOST"),
 				Username:         envWithDefault("elastic", "KIBANA_FLEET_USERNAME", "KIBANA_USERNAME", "ELASTICSEARCH_USERNAME"),
 				Password:         envWithDefault("changeme", "KIBANA_FLEET_PASSWORD", "KIBANA_PASSWORD", "ELASTICSEARCH_PASSWORD"),

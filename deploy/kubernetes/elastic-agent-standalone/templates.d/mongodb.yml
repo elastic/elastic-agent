@@ -33,11 +33,13 @@ inputs:
             - ${kubernetes.hints.mongodb.collstats.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - collstats
+          password: ${kubernetes.hints.mongodb.collstats.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.collstats.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
+          username: ${kubernetes.hints.mongodb.collstats.username|kubernetes.hints.mongodb.username|''}
         - condition: ${kubernetes.hints.mongodb.dbstats.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.dbstats
@@ -46,11 +48,13 @@ inputs:
             - ${kubernetes.hints.mongodb.dbstats.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - dbstats
+          password: ${kubernetes.hints.mongodb.dbstats.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.dbstats.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
+          username: ${kubernetes.hints.mongodb.dbstats.username|kubernetes.hints.mongodb.username|''}
         - condition: ${kubernetes.hints.mongodb.metrics.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.metrics
@@ -59,7 +63,13 @@ inputs:
             - ${kubernetes.hints.mongodb.metrics.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - metrics
+          password: ${kubernetes.hints.mongodb.metrics.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.metrics.period|kubernetes.hints.mongodb.period|'10s'}
+          ssl.certificate: null
+          ssl.enabled: false
+          ssl.key: null
+          ssl.verification_mode: null
+          username: ${kubernetes.hints.mongodb.metrics.username|kubernetes.hints.mongodb.username|''}
         - condition: ${kubernetes.hints.mongodb.replstatus.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.replstatus
@@ -68,11 +78,13 @@ inputs:
             - ${kubernetes.hints.mongodb.replstatus.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - replstatus
+          password: ${kubernetes.hints.mongodb.replstatus.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.replstatus.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
+          username: ${kubernetes.hints.mongodb.replstatus.username|kubernetes.hints.mongodb.username|''}
         - condition: ${kubernetes.hints.mongodb.status.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
           data_stream:
             dataset: mongodb.status
@@ -81,9 +93,11 @@ inputs:
             - ${kubernetes.hints.mongodb.status.host|kubernetes.hints.mongodb.host|'localhost:27017'}
           metricsets:
             - status
+          password: ${kubernetes.hints.mongodb.status.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.status.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
+          username: ${kubernetes.hints.mongodb.status.username|kubernetes.hints.mongodb.username|''}
       data_stream.namespace: default
