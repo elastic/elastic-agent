@@ -22,7 +22,7 @@ const (
 	// AgentLockFileName is the name of the overall Elastic Agent file lock.
 	AgentLockFileName = "agent.lock"
 	tempSubdir        = "tmp"
-	tempSubdirPerms   = 0770
+	tempSubdirPerms   = 0o770
 
 	darwin = "darwin"
 )
@@ -253,4 +253,9 @@ func binaryDir(baseDir string) string {
 // BinaryPath returns the application binary path that is concatenation of the directory and the agentName
 func BinaryPath(baseDir, agentName string) string {
 	return filepath.Join(binaryDir(baseDir), agentName)
+}
+
+// InstallPath returns the top level directory Agent will be installed into.
+func InstallPath(basePath string) string {
+	return filepath.Join(basePath, "Elastic", "Agent")
 }

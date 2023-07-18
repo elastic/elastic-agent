@@ -112,7 +112,15 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling Elastic Agent...")
-	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentToken.APIKey,
+		},
+	}
+	output, err := tools.InstallAgent(installOpts, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 	}
@@ -430,7 +438,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	defer restoreEtcHosts()
 
 	t.Log("Start the Agent upgrade")
-	var toVersion = upgradeToVersion.String()
+	toVersion := upgradeToVersion.String()
 	var wg sync.WaitGroup
 	go func() {
 		wg.Add(1)
@@ -573,7 +581,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 
 	actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "daemon")
 
-	//start the upgrade to the latest version
+	// start the upgrade to the latest version
 	require.NotEmpty(t, actualVersion, "broken agent package version should not be empty")
 
 	// upgrade to latest version whatever that will be
@@ -605,7 +613,6 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 			state.Info.Snapshot == parsedLatestVersion.IsSnapshot() &&
 			state.State == cproto.State_HEALTHY
 	}, 5*time.Minute, 10*time.Second, "agent never upgraded to expected version")
-
 }
 
 func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {

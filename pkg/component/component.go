@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -323,8 +324,7 @@ func (r *RuntimeSpecs) componentForInputType(
 	if componentErr == nil {
 		if output.shipperEnabled {
 			var shipperType string
-			shipperType, componentErr =
-				r.getSupportedShipperType(inputSpec, output.outputType)
+			shipperType, componentErr = r.getSupportedShipperType(inputSpec, output.outputType)
 
 			if componentErr == nil {
 				// We've found a valid shipper, construct the reference
@@ -406,8 +406,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 
 	// create the shipper components to go with the inputs
 	for shipperType := range shipperTypes {
-		shipperComponent, ok :=
-			r.componentForShipper(shipperType, output, components, featureFlags)
+		shipperComponent, ok := r.componentForShipper(shipperType, output, components, featureFlags)
 		if ok {
 			components = append(components, shipperComponent)
 		}
@@ -421,7 +420,6 @@ func (r *RuntimeSpecs) componentForShipper(
 	inputComponents []Component,
 	featureFlags *features.Flags,
 ) (Component, bool) {
-
 	shipperSpec := r.shipperSpecs[shipperType] // type always exists at this point
 	shipperCompID := fmt.Sprintf("%s-%s", shipperType, output.name)
 
@@ -833,6 +831,9 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 			"family":   platform.Family,
 			"major":    platform.Major,
 			"minor":    platform.Minor,
+			"install": map[string]interface{}{
+				"default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)),
+			},
 		},
 		"user": map[string]interface{}{
 			"root": hasRoot,
@@ -848,6 +849,7 @@ func validateRuntimeChecks(
 	if err != nil {
 		return err
 	}
+	preventionMessages := []string{}
 	for _, prevention := range runtime.Preventions {
 		expression, err := eql.New(prevention.Condition)
 		if err != nil {
@@ -862,8 +864,11 @@ func validateRuntimeChecks(
 		}
 		if preventionTrigger {
 			// true means the prevention valid (so input should not run)
-			return NewErrInputRuntimeCheckFail(prevention.Message)
+			preventionMessages = append(preventionMessages, prevention.Message)
 		}
+	}
+	if len(preventionMessages) > 0 {
+		return NewErrInputRuntimeCheckFail(strings.Join(preventionMessages, ", "))
 	}
 	return nil
 }
