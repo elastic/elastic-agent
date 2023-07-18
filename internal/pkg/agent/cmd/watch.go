@@ -116,7 +116,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	removeMarker := !isWindows()
 	err = upgrade.Cleanup(log, marker.Hash, removeMarker, false)
 	if err != nil {
-		log.Error("cleanup failed", err)
+		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
 }
