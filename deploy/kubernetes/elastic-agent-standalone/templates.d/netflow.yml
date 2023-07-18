@@ -23,6 +23,7 @@ inputs:
           tags:
             - netflow
             - forwarded
+          timeout: ${kubernetes.hints.netflow.log.timeout|kubernetes.hints.netflow.timeout|'}
       data_stream.namespace: default
     - name: filestream-netflow
       type: filestream

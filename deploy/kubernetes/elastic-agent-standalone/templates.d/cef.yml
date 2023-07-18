@@ -49,3 +49,23 @@ inputs:
             - cef
             - forwarded
       data_stream.namespace: default
+    - name: tcp-cef
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cef.log.enabled} == true or ${kubernetes.hints.cef.enabled} == true
+          data_stream:
+            dataset: cef.log
+            type: logs
+          host: localhost:9004
+          processors:
+            - rename:
+                fields:
+                    - from: message
+                      to: event.original
+            - decode_cef:
+                field: event.original
+          tags:
+            - cef
+            - forwarded
+      data_stream.namespace: default

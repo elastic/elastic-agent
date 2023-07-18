@@ -165,8 +165,6 @@ The path to this service's logs directory.
 - `args` (identical to `command.args`): the command-line arguments to pass for this operation
 - `env` (identical to `command.env`): the environment variables to set for this operation
 - `timeout`: the timeout duration for this operation.
-- `retry`: (optional) configuration for retrying the operation
-  - `init_interval`: interval before the first retry. The interval between subsequent retries will increase exponentially (with some random jitter).
 
 For example:
 

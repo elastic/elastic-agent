@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -77,8 +78,13 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	}
 
 	// remove existing directory
-	err = RemovePath(topPath)
+	err = os.RemoveAll(topPath)
 	if err != nil {
+		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
+			// possible to fail on Windows, because elastic-agent.exe is running from
+			// this directory.
+			return nil
+		}
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
@@ -89,33 +95,14 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 }
 
 // RemovePath helps with removal path where there is a probability
-// of running into an executable running that might prevent removal
-// on Windows.
+// of running into self which might prevent removal.
+// Removal will be initiated 2 seconds after a call.
 func RemovePath(path string) error {
-	var previousPath string
 	cleanupErr := os.RemoveAll(path)
-	for cleanupErr != nil && isBlockingOnExe(cleanupErr) {
-		// remove the blocking exe
-		hardPath, hardErr := removeBlockingExe(cleanupErr)
-		if hardErr != nil {
-			// failed to remove the blocking exe (cannot continue)
-			return hardErr
-		}
-		// this if statement is being defensive and ensuring that an
-		// infinite loop to remove the same path does not occur
-		if hardPath != "" {
-			if previousPath == hardPath {
-				// no reason the previous path should be the same
-				// removeBlockingExe did not work correctly
-				//
-				// cleanupErr will contain the real error
-				return cleanupErr
-			}
-			previousPath = hardPath
-		}
-		// try to remove the original path now again
-		cleanupErr = os.RemoveAll(path)
+	if cleanupErr != nil && isBlockingOnSelf(cleanupErr) {
+		delayedRemoval(path)
 	}
+
 	return cleanupErr
 }
 
@@ -159,7 +146,28 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func uninstallComponents(ctx context.Context, cfgFile, uninstallToken string) error {
+func isBlockingOnSelf(err error) bool {
+	// cannot remove self, this is expected on windows
+	// fails with  remove {path}}\elastic-agent.exe: Access is denied
+	return runtime.GOOS == "windows" &&
+		err != nil &&
+		strings.Contains(err.Error(), "elastic-agent.exe") &&
+		strings.Contains(err.Error(), "Access is denied")
+}
+
+func delayedRemoval(path string) {
+	// The installation path will still exists because we are executing from that
+	// directory. So cmd.exe is spawned that sleeps for 2 seconds (using ping, recommend way from
+	// from Windows) then rmdir is performed.
+	//nolint:gosec // it's not tainted
+	rmdir := exec.Command(
+		filepath.Join(os.Getenv("windir"), "system32", "cmd.exe"),
+		"/C", "ping", "-n", "2", "127.0.0.1", "&&", "rmdir", "/s", "/q", path)
+	_ = rmdir.Start()
+
+}
+
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string) error {
 	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 	if err != nil {
 		return err
@@ -229,7 +237,7 @@ func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp compo
 	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
 	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
 	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
-	return comprt.UninstallService(ctx, log, comp, uninstallToken, false)
+	return comprt.UninstallService(ctx, log, comp, uninstallToken)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
