@@ -1,5 +1,42 @@
 inputs:
+    - name: filestream-kibana
+      id: filestream-kibana-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.kibana.audit.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.audit
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.kibana.audit.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+        - condition: ${kubernetes.hints.kibana.log.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.kibana.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+      data_stream.namespace: default
     - name: http/metrics-kibana
+      id: http/metrics-kibana-${kubernetes.hints.container_id}
       type: http/metrics
       use_output: default
       streams:
@@ -26,6 +63,7 @@ inputs:
           username: ${kubernetes.hints.kibana.background_task_utilization.username|kubernetes.hints.kibana.username|''}
       data_stream.namespace: default
     - name: kibana/metrics-kibana
+      id: kibana/metrics-kibana-${kubernetes.hints.container_id}
       type: kibana/metrics
       use_output: default
       streams:
@@ -95,39 +133,4 @@ inputs:
           password: ${kubernetes.hints.kibana.status.password|kubernetes.hints.kibana.password|''}
           period: ${kubernetes.hints.kibana.status.period|kubernetes.hints.kibana.period|'10s'}
           username: ${kubernetes.hints.kibana.status.username|kubernetes.hints.kibana.username|''}
-      data_stream.namespace: default
-    - name: filestream-kibana
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.kibana.audit.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
-          data_stream:
-            dataset: kibana.audit
-            type: logs
-          exclude_files:
-            - .gz$
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.kibana.audit.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-        - condition: ${kubernetes.hints.kibana.log.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
-          data_stream:
-            dataset: kibana.log
-            type: logs
-          exclude_files:
-            - .gz$
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.kibana.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
       data_stream.namespace: default

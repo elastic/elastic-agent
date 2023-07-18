@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-modsecurity
+      id: filestream-modsecurity-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

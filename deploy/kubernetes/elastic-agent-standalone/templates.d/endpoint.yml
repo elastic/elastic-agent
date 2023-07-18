@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-endpoint
+      id: filestream-endpoint-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-mongodb
+      id: filestream-mongodb-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -22,6 +23,7 @@ inputs:
             - mongodb-logs
       data_stream.namespace: default
     - name: mongodb/metrics-mongodb
+      id: mongodb/metrics-mongodb-${kubernetes.hints.container_id}
       type: mongodb/metrics
       use_output: default
       streams:
@@ -51,7 +53,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.dbstats.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.dbstats.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: null
+          ssl.enabled: false
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.dbstats.username|kubernetes.hints.mongodb.username|''}
@@ -66,7 +68,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.metrics.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.metrics.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.metrics.username|kubernetes.hints.mongodb.username|''}

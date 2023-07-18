@@ -1,5 +1,6 @@
 inputs:
     - name: tcp-cyberarkpas
+      id: tcp-cyberarkpas-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -16,6 +17,7 @@ inputs:
           tcp: null
       data_stream.namespace: default
     - name: udp-cyberarkpas
+      id: udp-cyberarkpas-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:
@@ -32,6 +34,7 @@ inputs:
           udp: null
       data_stream.namespace: default
     - name: filestream-cyberarkpas
+      id: filestream-cyberarkpas-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

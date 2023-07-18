@@ -1,5 +1,6 @@
 inputs:
     - name: prometheus/metrics-prometheus
+      id: prometheus/metrics-prometheus-${kubernetes.hints.container_id}
       type: prometheus/metrics
       use_output: default
       streams:
@@ -58,14 +59,15 @@ inputs:
             - remote_write
           port: 9201
           rate_counters: true
-          ssl.certificate: null
+          ssl.certificate: /etc/pki/server/cert.pem
           ssl.enabled: null
-          ssl.key: /etc/pki/server/cert.key
+          ssl.key: null
           types_patterns.exclude: null
           types_patterns.include: null
           use_types: true
       data_stream.namespace: default
     - name: filestream-prometheus
+      id: filestream-prometheus-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

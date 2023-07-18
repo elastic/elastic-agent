@@ -1,5 +1,19 @@
 inputs:
+    - name: winlog-microsoft_sqlserver
+      id: winlog-microsoft_sqlserver-${kubernetes.hints.container_id}
+      type: winlog
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.microsoft_sqlserver.audit.enabled} == true or ${kubernetes.hints.microsoft_sqlserver.enabled} == true
+          data_stream:
+            dataset: microsoft_sqlserver.audit
+            type: logs
+          event_id: 33205
+          ignore_older: 72h
+          name: Security
+      data_stream.namespace: default
     - name: filestream-microsoft_sqlserver
+      id: filestream-microsoft_sqlserver-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -26,6 +40,7 @@ inputs:
             - mssql-logs
       data_stream.namespace: default
     - name: sql/metrics-microsoft_sqlserver
+      id: sql/metrics-microsoft_sqlserver-${kubernetes.hints.container_id}
       type: sql/metrics
       use_output: default
       streams:
@@ -115,16 +130,4 @@ inputs:
               response_format: table
             - query: USE [msdb] ; SELECT @@servername AS server_name, @@servicename AS instance_name, name As 'database_name', l.database_id, l.total_log_size_in_bytes As total_log_size_bytes, l.used_log_space_in_bytes As used_log_space_bytes, l.used_log_space_in_percent As used_log_space_pct, l.log_space_in_bytes_since_last_backup from sys.dm_db_log_space_usage l INNER JOIN sys.databases s ON l.database_id = s.database_id WHERE s.database_id = DB_ID('msdb') ;
               response_format: table
-      data_stream.namespace: default
-    - name: winlog-microsoft_sqlserver
-      type: winlog
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.microsoft_sqlserver.audit.enabled} == true or ${kubernetes.hints.microsoft_sqlserver.enabled} == true
-          data_stream:
-            dataset: microsoft_sqlserver.audit
-            type: logs
-          event_id: 33205
-          ignore_older: 72h
-          name: Security
       data_stream.namespace: default
