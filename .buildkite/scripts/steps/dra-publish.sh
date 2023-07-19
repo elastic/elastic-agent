@@ -2,7 +2,7 @@
 
 set -uo pipefail
 
-DRA_DRY_RUN="${DRA_DRY_RUN:="--dry-run"}"
+DRY_RUN="${DRA_DRY_RUN:="--dry-run"}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
 COMMIT="${DRA_COMMIT:=""}"
 BRANCH="${DRA_BRANCH:=""}"
@@ -28,8 +28,8 @@ fi
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager
 if [ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]; then
-    DRA_BRANCH=main
-    DRA_DRY_RUN="--dry-run"
+    BRANCH=main
+    DRY_RUN="--dry-run"
 fi
 
 # Listing Release manager
@@ -75,7 +75,7 @@ function run_release_manager_collect() {
 
 echo "+++ Release Manager ${WORKFLOW} / ${BRANCH} / ${COMMIT}";
 run_release_manager_list "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}"
-run_release_manager_collect "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}" "${DRA_DRY_RUN}"
+run_release_manager_collect "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}" "${DRY_RUN}"
 
 RM_EXIT_CODE=$?
 exit $RM_EXIT_CODE
