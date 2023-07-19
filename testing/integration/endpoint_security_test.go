@@ -95,7 +95,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 		time.Second,
 		"Endpoint component or units are not healthy.",
 	)
-	t.Logf("Verified endpoint component and units are healthy")
+	t.Log("Verified endpoint component and units are healthy")
 }
 
 // Tests that the agent can install and uninstall the endpoint-security service while remaining
@@ -151,10 +151,10 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 		time.Second,
 		"Endpoint component or units are not healthy.",
 	)
-	t.Logf("Verified endpoint component and units are healthy")
+	t.Log("Verified endpoint component and units are healthy")
 
 	// Unenroll the agent
-	t.Logf("Unenrolling the agent")
+	t.Log("Unenrolling the agent")
 
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
@@ -165,7 +165,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	_, err = info.KibanaClient.UnEnrollAgent(kibana.UnEnrollAgentRequest{ID: agentID})
 	require.NoError(t, err)
 
-	t.Logf("Waiting for inputs to stop")
+	t.Log("Waiting for inputs to stop")
 	require.Eventually(t,
 		func() bool {
 			state, err := agentClient.State(ctx)
@@ -195,7 +195,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 		time.Second,
 		"All components not removed.",
 	)
-	t.Logf("Verified endpoint component and units are removed")
+	t.Log("Verified endpoint component and units are removed")
 
 	// Verify that the Endpoint directory was correctly removed.
 	// Regression test for https://github.com/elastic/elastic-agent/issues/3077
