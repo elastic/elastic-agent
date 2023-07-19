@@ -90,7 +90,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t,
-		func() bool { return endpointIsHealthy(t, ctx, agentClient) },
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
 		endpointHealthPollingTimeout,
 		time.Second,
 		"Endpoint component or units are not healthy.",
@@ -146,7 +146,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t,
-		func() bool { return endpointIsHealthy(t, ctx, agentClient) },
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
 		endpointHealthPollingTimeout,
 		time.Second,
 		"Endpoint component or units are not healthy.",
@@ -247,7 +247,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 	t.Logf("Endpoint package Policy Response:\n%+v", pkgResp)
 }
 
-func endpointIsHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {
+func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {
 	t.Helper()
 
 	state, err := agentClient.State(ctx)
