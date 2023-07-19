@@ -1299,7 +1299,7 @@ func (Integration) Clean() error {
 	_, err := os.Stat(".ogc-cache")
 	if err == nil {
 		// .ogc-cache exists; need to run `Clean` from the runner
-		r, err := createTestRunner(false, "")
+		r, err := createTestRunner(false, "", "")
 		if err != nil {
 			return fmt.Errorf("error creating test runner: %w", err)
 		}
@@ -1335,6 +1335,10 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	params := devtools.DefaultGoTestIntegrationArgs()
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
+
+	goTestFlags := strings.SplitN(os.Getenv("GOTEST_FLAGS"), " ", -1)
+	params.ExtraFlags = goTestFlags
+
 	if testName == "all" {
 		params.RunExpr = ""
 	} else {
@@ -1400,6 +1404,9 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	if testsStr == "" {
 		return errors.New("TEST_DEFINE_TESTS environment variable must be set")
 	}
+
+	goTestFlags := strings.SplitN(os.Getenv("GOTEST_FLAGS"), " ", -1)
+
 	tests := strings.Split(testsStr, ",")
 	testsByPackage := make(map[string][]string)
 	for _, testStr := range tests {
@@ -1425,17 +1432,17 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		testPrefix := fmt.Sprintf("%s.%s", prefix, filepath.Base(packageName))
 		testName := fmt.Sprintf("remote-%s", testPrefix)
 		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
+		extraFlags := make([]string, 0, len(goTestFlags)+3)
+		extraFlags = append(extraFlags, goTestFlags...)
+		extraFlags = append(extraFlags, "-test.shuffle", "on",
+			"-test.timeout", "0", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
 			JUnitReportFile: fileName + ".xml",
 			Packages:        []string{packageName},
 			Tags:            []string{"integration"},
-			ExtraFlags: []string{
-				"-test.run", strings.Join(packageTests, "|"),
-				"-test.shuffle", "on",
-				"-test.timeout", "0",
-			},
+			ExtraFlags:      extraFlags,
 			Env: map[string]string{
 				"AGENT_VERSION":      version,
 				"TEST_DEFINE_PREFIX": testPrefix,
@@ -1450,11 +1457,13 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
-	batches, err := define.DetermineBatches("testing/integration", "integration")
+	goTestFlags := os.Getenv("GOTEST_FLAGS")
+
+	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
 		return fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(matrix, singleTest, batches...)
+	r, err := createTestRunner(matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -1491,7 +1500,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	return nil
 }
 
-func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
 	if err != nil {
 		return nil, err
@@ -1561,6 +1570,7 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 		SingleTest:  singleTest,
 		VerboseMode: mg.Verbose(),
 		Timestamp:   timestamp,
+		TestFlags:   goTestFlags,
 	}, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)

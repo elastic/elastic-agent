@@ -232,11 +232,10 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		)
 	}
 
+	testArgs = append(testArgs, params.ExtraFlags...)
 	if params.RunExpr != "" {
 		testArgs = append(testArgs, "-run", params.RunExpr)
 	}
-
-	testArgs = append(testArgs, params.ExtraFlags...)
 	testArgs = append(testArgs, params.Packages...)
 
 	args := append(gotestsumArgs, append([]string{"--"}, testArgs...)...)
