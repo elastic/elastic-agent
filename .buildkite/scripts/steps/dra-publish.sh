@@ -36,7 +36,7 @@ fi
 function run_release_manager_list() {
     local _project_id="${1}" _artifact_set="${2}" _workflow="${3}" _commit="${4}" _branch="${5}" _version="${6}"
     echo "+++ :hammer_and_pick: Release manager listing ${_branch} ${_workflow} DRA artifacts..."
-    echo docker run --rm \
+    docker run --rm \
         --name release-manager \
         -e VAULT_ADDR="${VAULT_ADDR_DRA}" \
         -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
@@ -56,7 +56,7 @@ function run_release_manager_list() {
 function run_release_manager_collect() {
     local _project_id="${1}" _artifact_set="${2}" _workflow="${3}" _commit="${4}" _branch="${5}" _version="${6}" _dry_run="${6}"
     echo "+++ :hammer_and_pick: Publishing ${_branch} ${_workflow} DRA artifacts..."
-    echo docker run --rm \
+    docker run --rm \
         --name release-manager \
         -e VAULT_ADDR="${VAULT_ADDR_DRA}" \
         -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
