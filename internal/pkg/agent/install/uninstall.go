@@ -213,7 +213,7 @@ func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp compo
 	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
 	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
 	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
-	return comprt.UninstallService(ctx, log, comp, false)
+	return comprt.UninstallService(ctx, log, comp)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
