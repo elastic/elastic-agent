@@ -7,6 +7,7 @@ package download
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 
@@ -195,7 +197,14 @@ func fetchPgpFromURI(uri string, client http.Client) ([]byte, error) {
 		return nil, err
 	}
 
-	resp, err := client.Get(uri)
+	ctx, cancelFn := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelFn()
+	// Change NewRequest to NewRequestWithContext and pass context it
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
