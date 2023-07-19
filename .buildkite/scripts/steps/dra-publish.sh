@@ -8,6 +8,13 @@ COMMIT="${DRA_COMMIT:=""}"
 BRANCH="${DRA_BRANCH:=""}"
 PACKAGE_VERSION="${DRA_VERSION:=""}"
 
+# force main branch on PR's or it won't execute
+# because the PR branch does not have a project folder in release-manager
+if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
+    BRANCH=main
+    DRY_RUN="--dry-run"
+fi
+
 if [[ -z "${WORKFLOW}" ]]; then
   echo "+++ Missing DRA workflow";
   exit 1
@@ -23,13 +30,6 @@ fi
 if [[ -z "${BRANCH:-""}" ]]; then
   echo "+++ Missing DRA_BRANCH";
   exit 1
-fi
-
-# force main branch on PR's or it won't execute
-# because the PR branch does not have a project folder in release-manager
-if [ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]; then
-    BRANCH=main
-    DRY_RUN="--dry-run"
 fi
 
 # Listing Release manager
@@ -54,7 +54,7 @@ function run_release_manager_list() {
 
 # Publish DRA artifacts
 function run_release_manager_collect() {
-    local _project_id="${1}" _artifact_set="${2}" _workflow="${3}" _commit="${4}" _branch="${5}" _version="${6}" _dry_run="${6}"
+    local _project_id="${1}" _artifact_set="${2}" _workflow="${3}" _commit="${4}" _branch="${5}" _version="${6}" _dry_run="${7}"
     echo "+++ :hammer_and_pick: Publishing ${_branch} ${_workflow} DRA artifacts..."
     docker run --rm \
         --name release-manager \
