@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -43,7 +44,7 @@ const (
 	// and restarted.
 	maxCheckinMisses = 3
 	// diagnosticTimeout is the maximum amount of time to wait for a diagnostic response from a unit.
-	diagnosticTimeout = 20 * time.Second
+	diagnosticTimeout = 40 * time.Second
 
 	// stopCheckRetryPeriod is a idle time between checks for component stopped state
 	stopCheckRetryPeriod = 200 * time.Millisecond
@@ -52,6 +53,8 @@ const (
 var (
 	// ErrNoUnit returned when manager is not controlling this unit.
 	ErrNoUnit = errors.New("no unit under control of this manager")
+	// ErrNoComponent returned when manager is not controlling this component
+	ErrNoComponent = errors.New("no component under control of this manager")
 )
 
 // ComponentComponentState provides a structure to map a component to current component state.
@@ -71,6 +74,13 @@ type ComponentUnitDiagnosticRequest struct {
 type ComponentUnitDiagnostic struct {
 	Component component.Component
 	Unit      component.Unit
+	Results   []*proto.ActionDiagnosticUnitResult
+	Err       error
+}
+
+// ComponentDiagnostic provides a structure to map a component to a diagnostic result.
+type ComponentDiagnostic struct {
+	Component component.Component
 	Results   []*proto.ActionDiagnosticUnitResult
 	Err       error
 }
@@ -405,9 +415,67 @@ func (m *Manager) PerformAction(ctx context.Context, comp component.Component, u
 	return respBody, nil
 }
 
+// PerformComponentDiagnostics executes the diagnostic action for the given components. If no components are provided then
+// it performs diagnostics for all running components.
+func (m *Manager) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]ComponentDiagnostic, error) {
+	if len(req) == 0 {
+		if len(req) == 0 {
+			m.currentMx.RLock()
+			for _, runtime := range m.current {
+				currComp := runtime.getCurrent()
+				req = append(req, currComp)
+			}
+			m.currentMx.RUnlock()
+		}
+	}
+
+	resp := []ComponentDiagnostic{}
+
+	diagnosticCount := len(req)
+	respChan := make(chan ComponentDiagnostic, diagnosticCount)
+	for diag := 0; diag < diagnosticCount; diag++ {
+		// transform the additional metrics field into JSON params
+		params := client.DiagnosticParams{}
+		if len(additionalMetrics) > 0 {
+			for _, param := range additionalMetrics {
+				params.AdditionalMetrics = append(params.AdditionalMetrics, param.String())
+			}
+		}
+		// perform diagnostics in parallel; if we have a CPU pprof request, it'll take 30 seconds each.
+		go func(iter int) {
+			diagResponse, err := m.performDiagAction(ctx, req[iter], component.Unit{}, proto.ActionRequest_COMPONENT, params)
+			respStruct := ComponentDiagnostic{
+				Component: req[iter],
+				Err:       err,
+				Results:   diagResponse,
+			}
+			respChan <- respStruct
+
+		}(diag)
+	}
+
+	// performDiagAction will have timeouts at various points,
+	// but for the sake of paranoia, create our own timeout
+	collectTimeout, cancel := context.WithTimeout(ctx, time.Minute*2)
+	defer cancel()
+
+	for res := 0; res < diagnosticCount; res++ {
+		select {
+		case <-collectTimeout.Done():
+			return nil, fmt.Errorf("got context done waiting for diagnostics")
+		case data := <-respChan:
+			resp = append(resp, data)
+		}
+	}
+
+	return resp, nil
+
+}
+
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
 func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDiagnosticRequest) []ComponentUnitDiagnostic {
+	m.logger.Info("Got request for unit Diagnostics")
 	// build results from units
 	var results []ComponentUnitDiagnostic
 	if len(req) > 0 {
@@ -458,7 +526,8 @@ func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDi
 			// already in error don't perform diagnostics
 			continue
 		}
-		diag, err := m.performDiagAction(ctx, r.Component, r.Unit)
+
+		diag, err := m.performDiagAction(ctx, r.Component, r.Unit, proto.ActionRequest_UNIT, client.DiagnosticParams{})
 		if err != nil {
 			r.Err = err
 		} else {
@@ -895,6 +964,17 @@ func (m *Manager) getRuntimeFromUnit(comp component.Component, unit component.Un
 	return nil
 }
 
+func (m *Manager) getRuntimeFromComponent(comp component.Component) *componentRuntimeState {
+	m.currentMx.RLock()
+	defer m.currentMx.RUnlock()
+	for _, currentComp := range m.current {
+		if currentComp.id == comp.ID {
+			return currentComp
+		}
+	}
+	return nil
+}
+
 func (m *Manager) getListenAddr() string {
 	addr := strings.SplitN(m.listenAddr, ":", 2)
 	if len(addr) == 2 && addr[1] == "0" {
@@ -909,7 +989,9 @@ func (m *Manager) getListenAddr() string {
 	return m.listenAddr
 }
 
-func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
+// performDiagAction creates a diagnostic ActionRequest and executes it against the runtime that's mapped to the specified component.
+// if the specified actionLevel is ActionRequest_COMPONENT, the unit field is ignored.
+func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit, actionLevel proto.ActionRequest_Level, params client.DiagnosticParams) ([]*proto.ActionDiagnosticUnitResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
 	defer cancel()
 
@@ -918,27 +1000,56 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 		return nil, err
 	}
 
-	runtime := m.getRuntimeFromUnit(comp, unit)
-	if runtime == nil {
-		return nil, ErrNoUnit
+	var runtime *componentRuntimeState
+	if actionLevel == proto.ActionRequest_UNIT {
+		runtime = m.getRuntimeFromUnit(comp, unit)
+		if runtime == nil {
+			return nil, ErrNoUnit
+		}
+	} else {
+		runtime = m.getRuntimeFromComponent(comp)
+		if runtime == nil {
+			return nil, ErrNoComponent
+		}
+	}
+
+	if len(params.AdditionalMetrics) > 0 {
+		m.logger.Debugf("Performing diagnostic action with params: %v", params.AdditionalMetrics)
+	}
+	marshalParams, err := json.Marshal(params)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling json for params: %w", err)
 	}
 
 	req := &proto.ActionRequest{
-		Id:       id.String(),
-		UnitId:   unit.ID,
-		UnitType: proto.UnitType(unit.Type),
-		Type:     proto.ActionRequest_DIAGNOSTICS,
+		Id:     id.String(),
+		Type:   proto.ActionRequest_DIAGNOSTICS,
+		Level:  actionLevel,
+		Params: marshalParams,
 	}
+
+	if actionLevel == proto.ActionRequest_UNIT {
+		req.UnitId = unit.ID
+		req.UnitType = proto.UnitType(unit.Type)
+	}
+
+	m.logger.Infof("runtime.performAction (%s) about to send an action response, id=%s", req.Level.String(), req.Id)
 	res, err := runtime.performAction(ctx, req)
+	// the only way this can return an error is a context Done(), be sure to make that explicit.
 	if err != nil {
-		return nil, err
+		m.logger.Infof("runtime.performAction (%s) got an error, id=%s: %s", req.Level.String(), req.Id, err)
+		if errors.Is(context.DeadlineExceeded, err) {
+			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", diagnosticTimeout, err)
+		}
+		return nil, fmt.Errorf("error running performAction: %w", err)
 	}
+	m.logger.Infof("runtime.performAction (%s) returned an action response, id=%s, number of responses: %d", req.Level.String(), res.Id, len(res.Diagnostic))
 	if res.Status == proto.ActionResponse_FAILED {
 		var respBody map[string]interface{}
 		if res.Result != nil {
 			err = json.Unmarshal(res.Result, &respBody)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error unmarshaling JSON in FAILED response: %w", err)
 			}
 			errMsgT, ok := respBody["error"]
 			if ok {

@@ -151,14 +151,19 @@ func (s *componentRuntimeState) runLoop() {
 				runtimeRunner.Stop()
 			}
 		case ar := <-s.comm.actionsResponse:
+			s.logger.Infof("got actionResponse in runLoop; id=%s diags=%d", ar.Id, len(ar.Diagnostic))
 			s.actionsMx.Lock()
+			s.logger.Infof("got mutex; got actionResponse in runLoop; id=%s diags=%d", ar.Id, len(ar.Diagnostic))
 			callback, ok := s.actions[ar.Id]
 			if ok {
 				delete(s.actions, ar.Id)
 			}
 			s.actionsMx.Unlock()
+			s.logger.Infof("unlocked mutex; got actionResponse in runLoop; id=%s diags=%d", ar.Id, len(ar.Diagnostic))
 			if ok {
+				s.logger.Infof("about to make callback; got actionResponse in runLoop; id=%s diags=%d", ar.Id, len(ar.Diagnostic))
 				callback(ar)
+				s.logger.Infof("made callback; got actionResponse in runLoop; id=%s diags=%d", ar.Id, len(ar.Diagnostic))
 			}
 		}
 	}
@@ -194,12 +199,16 @@ func (s *componentRuntimeState) performAction(ctx context.Context, req *proto.Ac
 		ch <- response
 	}
 
+	s.logger.Infof("in performAction; locking actionsMx for req %s", req.Id)
 	s.actionsMx.Lock()
+	s.logger.Infof("in performAction; got actionsMx for req %s", req.Id)
 	s.actions[req.Id] = callback
 	s.actionsMx.Unlock()
+	s.logger.Infof("in performAction; unlocked actionsMx for req %s", req.Id)
 
 	select {
 	case <-ctx.Done():
+		s.logger.Infof("in performAction; got ctx.Done for actionsRequest  %s", req.Id)
 		s.actionsMx.Lock()
 		delete(s.actions, req.Id)
 		s.actionsMx.Unlock()
@@ -211,6 +220,7 @@ func (s *componentRuntimeState) performAction(ctx context.Context, req *proto.Ac
 
 	select {
 	case <-ctx.Done():
+		s.logger.Infof("in performAction; got ctx.Done for resp  %s", req.Id)
 		s.actionsMx.Lock()
 		delete(s.actions, req.Id)
 		s.actionsMx.Unlock()

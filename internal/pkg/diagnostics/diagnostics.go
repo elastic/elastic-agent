@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"gopkg.in/yaml.v2"
@@ -122,13 +123,32 @@ func pprofDiag(name string, debug int) func(context.Context) []byte {
 	}
 }
 
+// CreateCPUProfile will gather a CPU profile over a given time duration.
+func CreateCPUProfile(ctx context.Context, period time.Duration) ([]byte, error) {
+	var writeBuf bytes.Buffer
+	err := pprof.StartCPUProfile(&writeBuf)
+	if err != nil {
+		return nil, fmt.Errorf("error starting CPU profile: %w", err)
+	}
+	tc := time.After(period)
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("Got context done")
+	case <-tc:
+		break
+	}
+
+	pprof.StopCPUProfile()
+	return writeBuf.Bytes(), nil
+}
+
 // ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics and local logs.
 // If any error is encountered when writing the contents of the archive it is returned.
-func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult) error {
+func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult, compDiags []client.DiagnosticComponentResult) error {
 	ts := time.Now().UTC()
 	zw := zip.NewWriter(w)
 	defer zw.Close()
-
+	log := logp.L()
 	// Write agent diagnostics content
 	for _, ad := range agentDiag {
 		zf, err := zw.CreateHeader(&zip.FileHeader{
@@ -152,6 +172,13 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 		compDir := strings.ReplaceAll(ud.ComponentID, "/", "-")
 		compDirs[compDir] = append(compDirs[compDir], ud)
 	}
+
+	componentResults := map[string]client.DiagnosticComponentResult{}
+	// handle component diagnostics
+	for _, comp := range compDiags {
+		compDir := strings.ReplaceAll(comp.ComponentID, "/", "-")
+		componentResults[compDir] = comp
+	}
 	// write each units diagnostics into its own directory
 	// layout becomes components/<component-id>/<unit-id>/<filename>
 	_, err := zw.CreateHeader(&zip.FileHeader{
@@ -160,8 +187,9 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 		Modified: ts,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating .zip header for components/ directory: %w", err)
 	}
+	// iterate over components
 	for dirName, units := range compDirs {
 		_, err := zw.CreateHeader(&zip.FileHeader{
 			Name:     fmt.Sprintf("components/%s/", dirName),
@@ -169,8 +197,47 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 			Modified: ts,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating .zip header for component directory: %w", err)
 		}
+		// create component diags
+		if comp, ok := componentResults[dirName]; ok {
+			// check for component-level errors
+			if comp.Err != nil {
+				w, err := zw.CreateHeader(&zip.FileHeader{
+					Name:     fmt.Sprintf("components/%s/error.txt", dirName),
+					Method:   zip.Deflate,
+					Modified: ts,
+				})
+				if err != nil {
+					return fmt.Errorf("error writing header for error.txt file for component %s: %s", comp.ComponentID, err)
+				}
+				_, err = w.Write([]byte(fmt.Sprintf("%s\n", comp.Err)))
+				if err != nil {
+					return fmt.Errorf("error writing error.txt file for component %s: %s", comp.ComponentID, err)
+				}
+
+			} else {
+				for _, res := range comp.Results {
+
+					filePath := fmt.Sprintf("components/%s/%s", dirName, res.Filename)
+					log.Infof("creating component diag directory at %s", filePath)
+					resFileWriter, err := zw.CreateHeader(&zip.FileHeader{
+						Name:     filePath,
+						Method:   zip.Deflate,
+						Modified: ts,
+					})
+					if err != nil {
+						return fmt.Errorf("error creating .zip header for %s: %w", res.Filename, err)
+					}
+					err = writeRedacted(errOut, resFileWriter, filePath, res)
+					if err != nil {
+						return fmt.Errorf("error writing %s in zip file: %w", res.Filename, err)
+					}
+				}
+			}
+
+		}
+		// create unit diags
 		for _, ud := range units {
 			unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
 			_, err := zw.CreateHeader(&zip.FileHeader{
@@ -179,7 +246,7 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 				Modified: ts,
 			})
 			if err != nil {
-				return err
+				return fmt.Errorf("error creating .zip header for unit directory: %w", err)
 			}
 			if ud.Err != nil {
 				w, err := zw.CreateHeader(&zip.FileHeader{
