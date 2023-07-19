@@ -27,7 +27,7 @@ fi
 
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager
-if [ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]; then
+if [[ -z "${BRANCH}" && "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
     BRANCH=main
     DRY_RUN="--dry-run"
 fi
