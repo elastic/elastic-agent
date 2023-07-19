@@ -69,7 +69,7 @@ Every test has access to its own unique namespace (a string value). This namespa
 be accessed from the `info.Namespace` field, where `info` is the struct value returned
 from the `define.Require(...)` call made at the start of the test.
 
-Namespaces should be used whenever test data is being written to or read from a store that's
+Namespaces should be used whenever test data is being written to or read from a persistent store that's
 shared across all tests. Most commonly, this store will be the Elasticsearch cluster that Agent
 components may index their data into. All tests share a single stack deployment and, therefore,
 a single Elasticsearch cluster as well.
@@ -78,6 +78,9 @@ Some examples of where namespaces should be used:
 * When creating a policy in Fleet. The Create Policy and Update Policy APIs takes a namespace parameter.
 * When searching for documents in `logs-*` or `metrics-*` data streams. Every document in these
   data streams has a `data_stream.namespace` field.
+
+:warning: Not using namespaces when accessing data in a shared persistent store can cause tests to
+be flaky.
 
 ## Troubleshooting Tips
 
