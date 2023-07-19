@@ -69,7 +69,7 @@ steps:
       fi
       .buildkite/scripts/steps/package.sh
     artifact_paths:
-      - "build/distributions/**"
+      - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
     key: dra-publish
