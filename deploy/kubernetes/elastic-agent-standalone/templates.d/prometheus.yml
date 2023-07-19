@@ -17,6 +17,7 @@ inputs:
           password: ${kubernetes.hints.prometheus.collector.password|kubernetes.hints.prometheus.password|'secret'}
           period: ${kubernetes.hints.prometheus.collector.period|kubernetes.hints.prometheus.period|'10s'}
           rate_counters: true
+          timeout: ${kubernetes.hints.prometheus.collector.timeout|kubernetes.hints.prometheus.timeout|''}
           use_types: true
           username: ${kubernetes.hints.prometheus.collector.username|kubernetes.hints.prometheus.username|'user'}
         - condition: ${kubernetes.hints.prometheus.query.enabled} == true and ${kubernetes.hints.prometheus.enabled} == true
@@ -57,9 +58,9 @@ inputs:
             - remote_write
           port: 9201
           rate_counters: true
-          ssl.certificate: /etc/pki/server/cert.pem
+          ssl.certificate: null
           ssl.enabled: null
-          ssl.key: null
+          ssl.key: /etc/pki/server/cert.key
           types_patterns.exclude: null
           types_patterns.include: null
           use_types: true

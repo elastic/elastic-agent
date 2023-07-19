@@ -322,32 +322,21 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 					},
 				},
 			},
-			"processors": []interface{}{
+			"processors": []any{
 				// drop all events from monitoring components (do it early)
 				// without dropping these events the filestream gets stuck in an infinite loop
 				// if filestream hits an issue publishing the events it logs an error which then filestream monitor
-				// will read from the logs and try to also publish that new log message (thus the infinite loop)
+				// will read from the logs and try to also publish that new log message (thus the infinite loop).
+				// The only way to identify a monitoring component by looking
+				// at their ID. They all end in `-monitoring`, e.g:
+				// - "beat/metrics-monitoring"
+				// - "filestream-monitoring"
+				// - "http/metrics-monitoring"
 				map[string]interface{}{
 					"drop_event": map[string]interface{}{
 						"when": map[string]interface{}{
-							"or": []interface{}{
-								map[string]interface{}{
-									"equals": map[string]interface{}{
-										"component.dataset": fmt.Sprintf("elastic_agent.filestream_%s", monitoringOutput),
-									},
-								},
-								// for consistency this monitor is also not shipped (fetch-able with diagnostics)
-								map[string]interface{}{
-									"equals": map[string]interface{}{
-										"component.dataset": fmt.Sprintf("elastic_agent.beats_metrics_%s", monitoringOutput),
-									},
-								},
-								// for consistency with this monitor is also not shipped (fetch-able with diagnostics)
-								map[string]interface{}{
-									"equals": map[string]interface{}{
-										"component.dataset": fmt.Sprintf("elastic_agent.http_metrics_%s", monitoringOutput),
-									},
-								},
+							"regexp": map[string]interface{}{
+								"component.id": ".*-monitoring$",
 							},
 						},
 					},

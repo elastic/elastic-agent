@@ -49,6 +49,8 @@ inputs:
             type: logs
           include_matches:
             - _TRANSPORT=kernel
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
           tags:
             - iptables-log
       data_stream.namespace: default

@@ -104,16 +104,29 @@ func GetIndicesWithContext(ctx context.Context, client elastictransport.Interfac
 }
 
 // FindMatchingLogLines returns any logs with message fields that match the given line
-func FindMatchingLogLines(client elastictransport.Interface, line string) (Documents, error) {
-	return FindMatchingLogLinesWithContext(context.Background(), client, line)
+func FindMatchingLogLines(client elastictransport.Interface, namespace, line string) (Documents, error) {
+	return FindMatchingLogLinesWithContext(context.Background(), client, namespace, line)
 }
 
 // FindMatchingLogLinesWithContext returns any logs with message fields that match the given line
-func FindMatchingLogLinesWithContext(ctx context.Context, client elastictransport.Interface, line string) (Documents, error) {
+func FindMatchingLogLinesWithContext(ctx context.Context, client elastictransport.Interface, namespace, line string) (Documents, error) {
 	queryRaw := map[string]interface{}{
 		"query": map[string]interface{}{
-			"match_phrase": map[string]interface{}{
-				"message": line,
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match_phrase": map[string]interface{}{
+							"message": line,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"data_stream.namespace": map[string]interface{}{
+								"value": namespace,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -142,17 +155,30 @@ func FindMatchingLogLinesWithContext(ctx context.Context, client elastictranspor
 
 // CheckForErrorsInLogs checks to see if any error-level lines exist
 // excludeStrings can be used to remove any particular error strings from logs
-func CheckForErrorsInLogs(client elastictransport.Interface, excludeStrings []string) (Documents, error) {
-	return CheckForErrorsInLogsWithContext(context.Background(), client, excludeStrings)
+func CheckForErrorsInLogs(client elastictransport.Interface, namespace string, excludeStrings []string) (Documents, error) {
+	return CheckForErrorsInLogsWithContext(context.Background(), client, namespace, excludeStrings)
 }
 
 // CheckForErrorsInLogsWithContext checks to see if any error-level lines exist
 // excludeStrings can be used to remove any particular error strings from logs
-func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictransport.Interface, excludeStrings []string) (Documents, error) {
+func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictransport.Interface, namespace string, excludeStrings []string) (Documents, error) {
 	queryRaw := map[string]interface{}{
 		"query": map[string]interface{}{
-			"match": map[string]interface{}{
-				"log.level": "error",
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{
+							"log.level": "error",
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"data_stream.namespace": map[string]interface{}{
+								"value": namespace,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -207,6 +233,41 @@ func CheckForErrorsInLogsWithContext(ctx context.Context, client elastictranspor
 // GetLogsForDatastream returns any logs associated with the datastream
 func GetLogsForDatastream(client elastictransport.Interface, index string) (Documents, error) {
 	return GetLogsForDatastreamWithContext(context.Background(), client, index)
+}
+
+// GetLogsForAgentID returns any logs associated with the agent ID
+func GetLogsForAgentID(client elastictransport.Interface, id string) (Documents, error) {
+	indexQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"data_stream.dataset": "elastic_agent.*",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(indexQuery)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithIndex("*.ds-logs*"),
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithPretty(),
+		es.Search.WithContext(context.Background()),
+		es.Search.WithQuery(fmt.Sprintf(`elastic_agent.id:%s`, id)),
+		// magic number, we try to get all entries it helps debugging test failures
+		es.Search.WithSize(300),
+	)
+	if err != nil {
+		return Documents{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	return handleDocsResponse(res)
 }
 
 // GetLogsForDatastreamWithContext returns any logs associated with the datastream

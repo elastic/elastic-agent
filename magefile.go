@@ -34,10 +34,10 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
+	bversion "github.com/elastic/elastic-agent/version"
 
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
@@ -674,7 +674,7 @@ func dockerCommitHash() string {
 func getVersion() string {
 	version, found := os.LookupEnv("BEAT_VERSION")
 	if !found {
-		version = release.Version()
+		version = bversion.GetDefaultVersion()
 	}
 	if !strings.Contains(version, "SNAPSHOT") {
 		if _, ok := os.LookupEnv(snapshotEnv); ok {
@@ -756,7 +756,7 @@ func runAgent(env map[string]string) error {
 func packageAgent(platforms []string, packagingFn func()) {
 	version, found := os.LookupEnv("BEAT_VERSION")
 	if !found {
-		version = release.Version()
+		version = bversion.GetDefaultVersion()
 	}
 
 	dropPath, found := os.LookupEnv(agentDropPath)
@@ -1336,9 +1336,9 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
 	if testName == "all" {
-		params.TestName = ""
+		params.RunExpr = ""
 	} else {
-		params.TestName = testName
+		params.RunExpr = testName
 	}
 	return devtools.GoTest(ctx, params)
 }
@@ -1426,7 +1426,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		testName := fmt.Sprintf("remote-%s", testPrefix)
 		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
 		params := mage.GoTestArgs{
-			TestName:        testName,
+			LogName:         testName,
 			OutputFile:      fileName + ".out",
 			JUnitReportFile: fileName + ".xml",
 			Packages:        []string{packageName},

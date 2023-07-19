@@ -58,10 +58,15 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 
 	mainBuildfmt := "elastic-agent-%s-%s"
 	if f.snapshotOnly && !ver.IsSnapshot() {
-		mainBuildfmt = "elastic-agent-%s-SNAPSHOT-%s"
+		if ver.Prerelease() == "" {
+			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "SNAPSHOT", ver.BuildMetadata())
+		} else {
+			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), ver.Prerelease()+"-SNAPSHOT", ver.BuildMetadata())
+		}
+
 	}
 
-	mainBuild := fmt.Sprintf(mainBuildfmt, version, suffix)
+	mainBuild := fmt.Sprintf(mainBuildfmt, ver, suffix)
 	mainBuildPath := filepath.Join(f.dir, mainBuild)
 	build := mainBuild
 	buildPath := mainBuildPath
@@ -85,27 +90,42 @@ func (r *localFetcherResult) Name() string {
 // Fetch performs the actual fetch into the provided directory.
 func (r *localFetcherResult) Fetch(_ context.Context, _ Logger, dir string) error {
 	fullPath := filepath.Join(r.src, r.path)
+	path := filepath.Join(dir, r.path)
 
-	reader, err := os.Open(fullPath)
+	err := copyFile(fullPath, path)
 	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", fullPath, err)
+		return fmt.Errorf("error copying file: %w", err)
+	}
+
+	// fetch artifact hash
+	err = copyFile(fullPath+hashExt, path+hashExt)
+	if err != nil {
+		return fmt.Errorf("error copying file: %w", err)
+	}
+
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	reader, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", src, err)
 	}
 	defer reader.Close()
 
-	path := filepath.Join(dir, r.path)
-	w, err := os.Create(path)
+	w, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", path, err)
+		return fmt.Errorf("failed to create file %s: %w", dst, err)
 	}
 	defer w.Close()
 
 	_, err = io.Copy(w, reader)
 	if err != nil {
-		return fmt.Errorf("failed to write file %s: %w", path, err)
+		return fmt.Errorf("failed to write file %s: %w", dst, err)
 	}
 	err = w.Sync()
 	if err != nil {
-		return fmt.Errorf("failed to sync file %s: %w", path, err)
+		return fmt.Errorf("failed to sync file %s: %w", dst, err)
 	}
 	return nil
 }
