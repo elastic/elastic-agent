@@ -6,6 +6,7 @@ package kubernetes
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -210,14 +211,14 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 				if len(hints) > 0 {
 					p.logger.Debugf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
-					p.logger.Debugf("Generated hints mappings are :%v", hintsMapping)
-					processMapping := GenerateProcessMapping(hints, p.logger)
-					p.logger.Debugf("Generated Process mappings are :%v", processMapping)
-					if len(processMapping) > 0 {
-						for _, metaMap := range processMapping {
-							data.processors = append(data.processors, metaMap)
-						}
-					}
+					p.logger.Debugf("Generated Pods  hints mappings are :%v", hintsMapping)
+					// processMapping := GenerateProcessMapping(hints, p.logger)
+					// p.logger.Debugf("Generated Process mappings are :%v", processMapping)
+					// if len(processMapping) > 0 {
+					// 	for _, metaMap := range processMapping {
+					// 		data.processors = append(data.processors, metaMap)
+					// 	}
+					// }
 					_ = p.comm.AddOrUpdate(
 						data.uid,
 						PodPriority,
@@ -444,8 +445,14 @@ func generateContainerData(
 
 				if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 					if !managed {
-						hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+						hintsMapping, processorMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 						if len(hintsMapping) > 0 {
+							if len(processorMapping) > 0 {
+								for _, entries := range processorMapping {
+									processors = append(processors, entries)
+								}
+							}
+
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
@@ -472,8 +479,13 @@ func generateContainerData(
 			k8sMapping["container"] = containerMeta
 			if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 				if !managed {
-					hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+					hintsMapping, processorMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 					if len(hintsMapping) > 0 {
+						if len(processorMapping) > 0 {
+							for _, entries := range processorMapping {
+								processors = append(processors, entries)
+							}
+						}
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
@@ -499,8 +511,10 @@ func generateContainerData(
 	}
 }
 
-func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) mapstr.M {
+func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) (mapstr.M, []mapstr.M) {
 	hintsMapping := mapstr.M{}
+	processorMapping := []mapstr.M{}
+
 	if ann, ok := k8sMapping["annotations"]; ok {
 		annotations, _ := ann.(mapstr.M)
 		hints := utils.GenerateHints(annotations, "", prefix)
@@ -509,6 +523,32 @@ func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 			hintsMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
 			logger.Debugf("Generated hints mappings are :%v", hintsMapping)
 		}
+		if procEntries, err := annotations.GetValue(prefix); err == nil {
+			if entries, ok := procEntries.(mapstr.M); ok {
+				for key := range entries {
+					parts := strings.Split(key, "/")
+					if len(parts) == 2 {
+						// Insert only if there is no entry already. container level annotations take
+						// higher priority.
+						if parts[1] == "processors" {
+							if procFields, ok := entries[key]; ok {
+								if fields, ok := procFields.(mapstr.M); ok {
+									for key2 := range fields {
+										rawvalue, err := fields.GetValue(key2)
+										processorMapping = append(processorMapping, rawvalue.(mapstr.M))
+										logger.Debugf("Generated Processor mappings are :%v", processorMapping)
+										if err != nil {
+											continue
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 	}
-	return hintsMapping
+	return hintsMapping, processorMapping
 }

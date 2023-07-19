@@ -136,9 +136,19 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 // GenerateProcessMapping gets a hint's map extracted from the annotations and spcifically extracts
 // processors mapping to be emitted.
 
-func GenerateProcessMapping(hints mapstr.M, logger *logp.Logger) []mapstr.M {
-	return utils.GetProcessors(hints, processors)
-}
+// func GenerateProcessMapping(hints mapstr.M, logger *logp.Logger) []mapstr.M {
+// 	processorMapping := []mapstr.M{}
+// 	if proc, found := hints["processors"]; found {
+// 		processorslist, _ := proc.(mapstr.M)
+// 		for k := range processorslist {
+// 			processorMapping = utils.GetProcessors(hints, k)
+// 			if len(processorMapping) > 0 {
+// 				logger.Debugf("Generated Process mappings are :%v", processorMapping)
+// 			}
+// 		}
+// 	}
+// 	return processorMapping
+// }
 
 // GenerateHintsMapping gets a hint's map extracted from the annotations and constructs the final
 // hints' mapping to be emitted.
