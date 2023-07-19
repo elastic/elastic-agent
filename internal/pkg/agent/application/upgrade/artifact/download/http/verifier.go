@@ -82,7 +82,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...string) error {
+func (v *Verifier) Verify(a artifact.Artifact, version string, skipDefaultPgp bool, pgpBytes ...string) error {
 	fullPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
@@ -97,7 +97,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...strin
 		return err
 	}
 
-	if err = v.verifyAsc(a, version, pgpBytes...); err != nil {
+	if err = v.verifyAsc(a, version, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
 			os.Remove(fullPath + ".asc")
@@ -108,9 +108,9 @@ func (v *Verifier) Verify(a artifact.Artifact, version string, pgpBytes ...strin
 	return nil
 }
 
-func (v *Verifier) verifyAsc(a artifact.Artifact, version string, pgpSources ...string) error {
+func (v *Verifier) verifyAsc(a artifact.Artifact, version string, skipDefaultPgp bool, pgpSources ...string) error {
 	var pgpBytes [][]byte
-	if len(v.pgpBytes) > 0 {
+	if len(v.pgpBytes) > 0 && !skipDefaultPgp {
 		v.log.Infof("Default PGP being appended")
 		pgpBytes = append(pgpBytes, v.pgpBytes)
 	}

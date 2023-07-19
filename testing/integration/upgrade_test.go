@@ -32,6 +32,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -273,7 +274,165 @@ func TestStandaloneUpgrade(t *testing.T) {
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
 
-	_, err = c.Upgrade(ctx, upgradeInputVersion.String(), "", false)
+	_, err = c.Upgrade(ctx, upgradeInputVersion.String(), "", false, false)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", upgradeInputVersion.String())
+
+	require.Eventuallyf(t, func() bool {
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("current agent state: %+v", state)
+		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
+	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
+
+	checkUpgradeWatcherRan(t, agentFixture)
+
+	version, err := c.Version(ctx)
+	require.NoError(t, err, "error checking version after upgrade")
+	require.Equal(t, expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+}
+
+func TestStandaloneUpgrade_FailInitialCheck(t *testing.T) {
+	define.Require(t, define.Requirements{
+		// Stack:   &define.Stack{},
+		Local:   false, // requires Agent installation
+		Isolate: true,
+		Sudo:    true, // requires Agent installation
+	})
+
+	agentFixture, err := define.NewFixture(t, define.Version())
+
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing agent fixture")
+
+	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
+	require.NoError(t, err, "error configuring agent fixture")
+
+	const minVersionString = "8.9.0-SNAPSHOT"
+	minVersion, _ := version.ParseVersion(minVersionString)
+	pv, err := version.ParseVersion(define.Version())
+	if pv.Less(*minVersion) {
+		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersionString)
+	}
+
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	output, err := tools.InstallStandaloneAgent(agentFixture)
+	t.Logf("Agent installation output: %q", string(output))
+	require.NoError(t, err)
+
+	c := agentFixture.Client()
+
+	require.Eventually(t, func() bool {
+		err := c.Connect(ctx)
+		if err != nil {
+			t.Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("agent state: %+v", state)
+		return state.State == cproto.State_HEALTHY
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	aac := tools.NewArtifactAPIClient()
+	vList, err := aac.GetVersions(ctx)
+	require.NoError(t, err, "error retrieving versions from Artifact API")
+	require.NotNil(t, vList)
+
+	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
+	for _, v := range vList.Versions {
+		pv, err := version.ParseVersion(v)
+		require.NoErrorf(t, err, "invalid version retrieved from artifact API: %q", v)
+		sortedParsedVersions = append(sortedParsedVersions, pv)
+	}
+
+	require.NotEmpty(t, sortedParsedVersions)
+
+	// normally the output of the versions returned by artifact API is already sorted in ascending order,
+	// if we want to sort in descending order we could use
+	sort.Sort(sort.Reverse(sortedParsedVersions))
+
+	var latestSnapshotVersion *version.ParsedSemVer
+	// fetch the latest SNAPSHOT build
+	for _, pv := range sortedParsedVersions {
+		if pv.IsSnapshot() {
+			latestSnapshotVersion = pv
+			break
+		}
+	}
+
+	require.NotNil(t, latestSnapshotVersion)
+
+	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
+	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
+	require.NoError(t, err)
+	// TODO if we don't have at least 2 builds, select the next older snapshot build
+	require.Greater(t, len(builds.Builds), 1)
+
+	// take the penultimate build of the snapshot (the builds are ordered from most to least recent)
+	upgradeVersionString := builds.Builds[1]
+
+	t.Logf("Targeting build %q of version %q", upgradeVersionString, latestSnapshotVersion)
+
+	buildDetails, err := aac.GetBuildDetails(ctx, latestSnapshotVersion.VersionWithPrerelease(), upgradeVersionString)
+	require.NoErrorf(t, err, "error accessing build details for version %q and buildID %q", latestSnapshotVersion.Original(), upgradeVersionString)
+	require.NotNil(t, buildDetails)
+	agentProject, ok := buildDetails.Build.Projects["elastic-agent"]
+	require.Truef(t, ok, "elastic agent project not found in version %q build %q", latestSnapshotVersion.Original(), upgradeVersionString)
+	t.Logf("agent build details: %+v", agentProject)
+	t.Logf("expected agent commit hash: %q", agentProject.CommitHash)
+	expectedAgentHashAfterUpgrade := agentProject.CommitHash
+
+	// Workaround until issue with Artifact API build commit hash are resolved
+	actualAgentHashAfterUpgrade := extractCommitHashFromArtifact(t, ctx, latestSnapshotVersion, agentProject)
+	require.NotEmpty(t, actualAgentHashAfterUpgrade)
+
+	t.Logf("Artifact API hash: %q Actual package hash: %q", expectedAgentHashAfterUpgrade, actualAgentHashAfterUpgrade)
+
+	// override the expected hash with the one extracted from the actual artifact
+	expectedAgentHashAfterUpgrade = actualAgentHashAfterUpgrade
+
+	buildFragments := strings.Split(upgradeVersionString, "-")
+	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
+
+	upgradeInputVersion := version.NewParsedSemVer(
+		latestSnapshotVersion.Major(),
+		latestSnapshotVersion.Minor(),
+		latestSnapshotVersion.Patch(),
+		latestSnapshotVersion.Prerelease(),
+		buildFragments[1],
+	)
+
+	t.Logf("Upgrading to version %q", upgradeInputVersion)
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "error connecting client to agent")
+	defer c.Disconnect()
+
+	var skipDefaultPgp = true      // skips default so we can set invalid one to be tried first before remote one is used
+	_, defaultPGP := release.PGP() // modify default PGP to become invalid
+	var customPgp = download.PgpSourceRawPrefix + strings.Replace(
+		string(defaultPGP),
+		"mQENBFI",
+		"abcDEFg",
+		1,
+	)
+
+	// upgrade agent without using default PGP and passing malformed one as new primary.
+	// remote fallback is appended and should result in successful upgrade
+	_, err = c.Upgrade(ctx, upgradeInputVersion.String(), "", false, skipDefaultPgp, customPgp)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", upgradeInputVersion.String())
 
 	require.Eventuallyf(t, func() bool {
@@ -589,7 +748,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
 
-	_, err = c.Upgrade(ctx, latestVersion, "", false)
+	_, err = c.Upgrade(ctx, latestVersion, "", false, false)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", latestVersion)
 	parsedLatestVersion, err := version.ParseVersion(latestVersion)
 	require.NoError(t, err)
