@@ -26,7 +26,6 @@ const (
 	username    = "username"
 	password    = "password"
 	stream      = "stream" // this is the container stream: stdout/stderr
-	processors  = "processors"
 )
 
 type hintsBuilder struct {
@@ -133,23 +132,6 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 	return value
 }
 
-// GenerateProcessMapping gets a hint's map extracted from the annotations and spcifically extracts
-// processors mapping to be emitted.
-
-// func GenerateProcessMapping(hints mapstr.M, logger *logp.Logger) []mapstr.M {
-// 	processorMapping := []mapstr.M{}
-// 	if proc, found := hints["processors"]; found {
-// 		processorslist, _ := proc.(mapstr.M)
-// 		for k := range processorslist {
-// 			processorMapping = utils.GetProcessors(hints, k)
-// 			if len(processorMapping) > 0 {
-// 				logger.Debugf("Generated Process mappings are :%v", processorMapping)
-// 			}
-// 		}
-// 	}
-// 	return processorMapping
-// }
-
 // GenerateHintsMapping gets a hint's map extracted from the annotations and constructs the final
 // hints' mapping to be emitted.
 func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger, containerID string) mapstr.M {
@@ -171,15 +153,6 @@ func GenerateHintsMapping(hints mapstr.M, kubeMeta mapstr.M, logger *logp.Logger
 		// a log input with a `"${kubernetes.hints.container_logs.enabled} == true"` condition
 		_, _ = integrationHints.Put("container_logs.enabled", true)
 	}
-
-	// TODO: add support for processors
-	// Processors should be data_stream specific.
-	// Add a basic processor as a base like:
-	//- add_fields:
-	//	  target: kubernetes
-	//	  fields:
-	//	    hints: true
-	// Blocked by https://github.com/elastic/elastic-agent/issues/735
 
 	integrationHost := builder.getFromMeta(builder.getHost(hints), kubeMeta)
 	if integrationHost != "" {
