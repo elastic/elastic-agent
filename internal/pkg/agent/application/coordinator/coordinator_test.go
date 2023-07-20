@@ -506,7 +506,7 @@ func createCoordinator(t *testing.T, opts ...CoordinatorOpt) (*Coordinator, *fak
 	rm, err := runtime.NewManager(l, l, "localhost:0", ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig())
 	require.NoError(t, err)
 
-	caps, err := capabilities.Load(paths.AgentCapabilitiesPath(), l)
+	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)
 
 	cfgMgr := newFakeConfigManager()
@@ -709,9 +709,9 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
-func (r *fakeRuntimeManager) Update(components []component.Component) error {
+func (r *fakeRuntimeManager) Update(model component.Model) error {
 	if r.updateCallback != nil {
-		return r.updateCallback(components)
+		return r.updateCallback(model.Components)
 	}
 	return nil
 }

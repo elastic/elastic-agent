@@ -1,26 +1,6 @@
 inputs:
-    - name: udp-snort
-      type: udp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.snort.log.enabled} == true or ${kubernetes.hints.snort.enabled} == true
-          data_stream:
-            dataset: snort.log
-            type: logs
-          host: localhost:9514
-          processors:
-            - add_locale: null
-            - add_fields:
-                fields:
-                    internal_networks:
-                        - private
-                    tz_offset: local
-                target: _tmp
-          tags:
-            - forwarded
-            - snort.log
-      data_stream.namespace: default
     - name: filestream-snort
+      id: filestream-snort-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -47,6 +27,28 @@ inputs:
           prospector:
             scanner:
                 symlinks: true
+          tags:
+            - forwarded
+            - snort.log
+      data_stream.namespace: default
+    - name: udp-snort
+      id: udp-snort-${kubernetes.hints.container_id}
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.snort.log.enabled} == true or ${kubernetes.hints.snort.enabled} == true
+          data_stream:
+            dataset: snort.log
+            type: logs
+          host: localhost:9514
+          processors:
+            - add_locale: null
+            - add_fields:
+                fields:
+                    internal_networks:
+                        - private
+                    tz_offset: local
+                target: _tmp
           tags:
             - forwarded
             - snort.log

@@ -52,15 +52,13 @@ type OSRunnerResult struct {
 // OSRunner provides an interface to run the tests on the OS.
 type OSRunner interface {
 	// Prepare prepares the runner to actual run on the host.
-	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error
+	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPaths []string) error
 	// Run runs the actual tests and provides the result.
 	Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
 }
 
 // Logger is a simple logging interface used by each runner type.
 type Logger interface {
-	// Prefix returns the prefix used for logging.
-	Prefix() string
 	// Logf logs the message for this runner.
 	Logf(format string, args ...any)
 }
@@ -82,6 +80,7 @@ type Result struct {
 // Runner runs the tests on remote instances.
 type Runner struct {
 	cfg            Config
+	logger         Logger
 	batches        []LayoutBatch
 	batchToCloud   map[string]*essCloudResponse
 	batchToCloudMx sync.RWMutex
@@ -107,11 +106,21 @@ func NewRunner(cfg Config, batches ...define.Batch) (*Runner, error) {
 			return nil, err
 		}
 	}
+	logger := &runnerLogger{
+		writer:    os.Stdout,
+		timestamp: cfg.Timestamp,
+	}
 	return &Runner{
 		cfg:          cfg,
+		logger:       logger,
 		batches:      layoutBatches,
 		batchToCloud: make(map[string]*essCloudResponse),
 	}, nil
+}
+
+// Logger returns the logger used by the runner.
+func (r *Runner) Logger() Logger {
+	return r.logger
 }
 
 // Run runs all the tests.
@@ -208,7 +217,7 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 					batch.LayoutOS.OS.Version,
 					batch.ID[len(batch.ID)-5:len(batch.ID)-1],
 				)
-				logger := &batchLogger{prefix: loggerPrefix}
+				logger := &batchLogger{wrapped: r.logger, prefix: loggerPrefix}
 				result, err := r.runMachine(ctx, sshAuth, logger, repoArchive, batch, m)
 				if err != nil {
 					logger.Logf("Failed for instance %s: %s\n", m.PublicIP, err)
@@ -230,7 +239,12 @@ func (r *Runner) runMachines(ctx context.Context, sshAuth ssh.AuthMethod, repoAr
 
 // runMachine runs the batch on the machine.
 func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch LayoutBatch, machine OGCMachine) (OSRunnerResult, error) {
-	logger.Logf("Starting SSH connection to %s", machine.PublicIP)
+	sshPrivateKeyPath, err := filepath.Abs(filepath.Join(".ogc-cache", "id_rsa"))
+	if err != nil {
+		return OSRunnerResult{}, fmt.Errorf("failed to determine OGC SSH private key path: %w", err)
+	}
+
+	logger.Logf("Starting SSH; connect with `ssh -i %s %s@%s`", sshPrivateKeyPath, machine.Layout.Username, machine.PublicIP)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	client, err := sshConnect(connectCtx, machine.PublicIP, machine.Layout.Username, sshAuth)
@@ -259,18 +273,19 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 		logger.Logf("Waiting for stack to be ready")
 		resp := <-ch
 		if resp == nil {
-			logger.Logf("Cannot continue because stack never became ready")
-		} else {
-			logger.Logf("Will continue stack is ready")
-			env = map[string]string{
-				"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
-				"ELASTICSEARCH_USERNAME": resp.Username,
-				"ELASTICSEARCH_PASSWORD": resp.Password,
-				"KIBANA_HOST":            resp.KibanaEndpoint,
-				"KIBANA_USERNAME":        resp.Username,
-				"KIBANA_PASSWORD":        resp.Password,
-			}
+			return OSRunnerResult{}, fmt.Errorf("cannot continue because stack never became ready")
 		}
+		logger.Logf("Will continue, stack is ready")
+		env = map[string]string{
+			"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
+			"ELASTICSEARCH_USERNAME": resp.Username,
+			"ELASTICSEARCH_PASSWORD": resp.Password,
+			"KIBANA_HOST":            resp.KibanaEndpoint,
+			"KIBANA_USERNAME":        resp.Username,
+			"KIBANA_PASSWORD":        resp.Password,
+		}
+		logger.Logf("Created Stack with Kibana host %s, %s/%s", resp.KibanaEndpoint, resp.Username, resp.Password)
+
 	}
 
 	// run the actual tests on the host
@@ -288,9 +303,11 @@ func (r *Runner) validate() error {
 	var requiredFiles []string
 	for _, b := range r.batches {
 		if !b.Skip {
-			buildPath := r.getBuildPath(b)
-			if !slices.Contains(requiredFiles, buildPath) {
-				requiredFiles = append(requiredFiles, buildPath)
+			buildPaths := r.getBuildPath(b)
+			for _, buildPath := range buildPaths {
+				if !slices.Contains(requiredFiles, buildPath) {
+					requiredFiles = append(requiredFiles, buildPath)
+				}
 			}
 		}
 	}
@@ -310,7 +327,7 @@ func (r *Runner) validate() error {
 }
 
 // getBuildPath returns the path of the build required for the test.
-func (r *Runner) getBuildPath(b LayoutBatch) string {
+func (r *Runner) getBuildPath(b LayoutBatch) []string {
 	arch := b.LayoutOS.OS.Arch
 	if arch == define.AMD64 {
 		arch = "x86_64"
@@ -319,7 +336,10 @@ func (r *Runner) getBuildPath(b LayoutBatch) string {
 	if b.LayoutOS.OS.Type == define.Windows {
 		ext = "zip"
 	}
-	return filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.LayoutOS.OS.Type, arch, ext))
+	hashExt := ".sha512"
+	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.LayoutOS.OS.Type, arch, ext))
+	packageHashName := packageName + hashExt
+	return []string{packageName, packageHashName}
 }
 
 // prepare prepares for the runner to run.
@@ -380,7 +400,7 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 	var signer ssh.Signer
 	if errors.Is(priErr, os.ErrNotExist) || errors.Is(pubErr, os.ErrNotExist) {
 		// either is missing (re-create)
-		fmt.Fprintf(os.Stdout, ">>> Create SSH keys to use for SSH\n")
+		r.logger.Logf("Create SSH keys to use for SSH")
 		_ = os.Remove(privateKey)
 		_ = os.Remove(publicKey)
 		pri, err := newSSHPrivateKey()
@@ -427,7 +447,7 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 func (r *Runner) createRepoArchive(ctx context.Context, repoDir string, dir string) (string, error) {
 	zipPath := filepath.Join(dir, "agent-repo.zip")
 	_ = os.Remove(zipPath) // start fresh
-	fmt.Fprintf(os.Stdout, ">>> Creating zip archive of repo to send to remote hosts\n")
+	r.logger.Logf("Creating zip archive of repo to send to remote hosts")
 	err := createRepoZipArchive(ctx, repoDir, zipPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create zip archive of repo: %w", err)
@@ -441,7 +461,7 @@ func (r *Runner) ogcPull(ctx context.Context) error {
 		"pull",
 		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
 	}
-	fmt.Fprintf(os.Stdout, ">>> Pulling latest ogc image\n")
+	r.logger.Logf("Pulling latest ogc image")
 	proc, err := process.Start("docker", process.WithContext(ctx), process.WithArgs(args))
 	if err != nil {
 		return fmt.Errorf("failed to run docker pull: %w", err)
@@ -482,14 +502,14 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 	defer r.batchToCloudMx.Unlock()
 	for _, version := range versions {
 		name := fmt.Sprintf("at-%s-%s", strings.Replace(emailParts[0], ".", "-", -1), strings.Replace(version, ".", "", -1))
-		fmt.Fprintf(os.Stdout, ">>> Creating ESS cloud %s (%s)\n", version, name)
+		r.logger.Logf("Creating ESS cloud %s (%s)", version, name)
 		resp, err := essClient.CreateDeployment(ctx, ess.CreateDeploymentRequest{
 			Name:    name,
 			Region:  r.cfg.ESS.Region,
 			Version: version,
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stdout, ">>> Failed to create ESS cloud %s: %s\n", version, err)
+			r.logger.Logf("Failed to create ESS cloud %s: %s", version, err)
 			return fmt.Errorf("failed to create ESS cloud for version %s: %w", version, err)
 		}
 		essResp := &essCloudResponse{
@@ -507,7 +527,7 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 			defer cancel()
 			ready, err := essClient.DeploymentIsReady(ctx, resp.resp.ID, 30*time.Second)
 			if err != nil {
-				fmt.Fprintf(os.Stdout, ">>> Failed to check for cloud %s to be ready: %s\n", version, err)
+				r.logger.Logf("Failed to check for cloud %s to be ready: %s", version, err)
 			}
 			resp.subMx.RLock()
 			subs := make([]chan *ess.CreateDeploymentResponse, len(resp.subCh))
@@ -553,7 +573,7 @@ func (r *Runner) cleanupCloud() {
 			return essClient.ShutdownDeployment(ctx, cloud.resp.ID)
 		}()
 		if err != nil {
-			fmt.Fprintf(os.Stdout, ">>> Failed to cleanup cloud %s: %s\n", cloud.resp.ID, err)
+			r.logger.Logf("Failed to cleanup cloud %s: %s", cloud.resp.ID, err)
 		}
 	}
 
@@ -603,7 +623,7 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal layouts YAML: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, ">>> Import layouts into ogc\n")
+	r.logger.Logf("Import layouts into ogc")
 	proc, err := r.ogcRun(ctx, []string{"layout", "import"}, true)
 	if err != nil {
 		return fmt.Errorf("failed to run ogc import: %w", err)
@@ -625,7 +645,7 @@ func (r *Runner) ogcImport(ctx context.Context) error {
 
 // ogcUp brings up all the instances.
 func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
-	fmt.Fprintf(os.Stdout, ">>> Bring up instances through ogc\n")
+	r.logger.Logf("Bring up instances through ogc")
 	var output bytes.Buffer
 	proc, err := r.ogcRun(ctx, []string{"up", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
@@ -642,7 +662,7 @@ func (r *Runner) ogcUp(ctx context.Context) ([]byte, error) {
 
 // ogcDown brings down all the instances.
 func (r *Runner) ogcDown(ctx context.Context) error {
-	fmt.Fprintf(os.Stdout, ">>> Bring down instances through ogc\n")
+	r.logger.Logf("Bring down instances through ogc")
 	var output bytes.Buffer
 	proc, err := r.ogcRun(ctx, []string{"down", LayoutIntegrationTag}, false, process.WithCmdOptions(attachOut(&output), attachErr(&output)))
 	if err != nil {
@@ -781,7 +801,8 @@ func mergePackageResult(pkg OSRunnerPackageResult, id string, batchName string, 
 		sudoStr = "true"
 	}
 	if pkg.Output != nil {
-		pkgWriter := newPrefixOutput(rawOutput, fmt.Sprintf("%s(%s)%s: ", pkg.Name, batchName, suffix))
+		rawLogger := &runnerLogger{writer: rawOutput, timestamp: false}
+		pkgWriter := newPrefixOutput(rawLogger, fmt.Sprintf("%s(%s)%s: ", pkg.Name, batchName, suffix))
 		_, err := pkgWriter.Write(pkg.Output)
 		if err != nil {
 			return fmt.Errorf("failed to write raw output from %s %s: %w", id, pkg.Name, err)
@@ -941,14 +962,24 @@ type essCloudResponse struct {
 	subMx sync.RWMutex
 }
 
-type batchLogger struct {
-	prefix string
+type runnerLogger struct {
+	writer    io.Writer
+	timestamp bool
 }
 
-func (b *batchLogger) Prefix() string {
-	return b.prefix
+func (l *runnerLogger) Logf(format string, args ...any) {
+	if l.timestamp {
+		_, _ = fmt.Fprintf(l.writer, "[%s] >>> %s\n", time.Now().Format(time.StampMilli), fmt.Sprintf(format, args...))
+	} else {
+		_, _ = fmt.Fprintf(l.writer, ">>> %s\n", fmt.Sprintf(format, args...))
+	}
+}
+
+type batchLogger struct {
+	wrapped Logger
+	prefix  string
 }
 
 func (b *batchLogger) Logf(format string, args ...any) {
-	fmt.Fprintf(os.Stdout, ">>> (%s) %s\n", b.prefix, fmt.Sprintf(format, args...))
+	b.wrapped.Logf("(%s) %s", b.prefix, fmt.Sprintf(format, args...))
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/version"
 )
 
 func troubleshootMessage() string {
@@ -38,6 +39,12 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return tryContainerLoadPaths()
 		},
+	}
+
+	// Init version information contained in package version file
+	err := version.InitVersionInformation()
+	if err != nil {
+		cmd.PrintErrf("Error initializing version information: %v\n", err)
 	}
 
 	// path flags

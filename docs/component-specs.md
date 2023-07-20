@@ -53,6 +53,17 @@ The platforms this input or shipper supports. Must contain one or more of the fo
 
 The output types this input or shipper supports. If this is an input, then inputs of this type can only target (non-shipper) output types in this list. If this is a shipper, then this shipper can only implement output types in this list.
 
+### `proxied_actions` (list of strings)
+
+The action types that should be forwarded to the corresponding component. Currently these actions types are sent ("proxied") to the components in parallel. The agent action handler awaits for actions responses. If any of the proxied actions fail, the action is considered failed by the agent.  Inital application for this was forwarding the Agent actions such as UNENROLL and UPGRADE to Endpoint service as a part of the Agent/Endpoint tamper protection feature.
+
+Example for Endpoint spec:
+```
+proxied_actions:
+  - UNENROLL
+  - UPGRADE
+```
+
 ### `shippers` (list of strings, input only)
 
 The shipper types this input supports. Inputs of this type can target any output type supported by the shippers in this list, as long as the output policy includes `shipper.enabled: true`. If an input supports more than one shipper implementing the same output type, then Agent will prefer the one that appears first in this list.

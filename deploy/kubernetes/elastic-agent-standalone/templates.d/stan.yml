@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-stan
+      id: filestream-stan-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -23,6 +24,7 @@ inputs:
             - stan-log
       data_stream.namespace: default
     - name: stan/metrics-stan
+      id: stan/metrics-stan-${kubernetes.hints.container_id}
       type: stan/metrics
       use_output: default
       streams:

@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-security_detection_engine
+      id: filestream-security_detection_engine-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

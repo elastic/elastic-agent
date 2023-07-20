@@ -9,8 +9,10 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func (m *Manager) connectShippers(components []component.Component) error {
@@ -124,4 +126,8 @@ func injectShipperConn(cfg *proto.UnitExpectedConfig, addr string, ca *authority
 		"key":         string(pair.Key),
 	}
 	return component.ExpectedConfig(source)
+}
+
+func getShipperAddr(componentID string) string {
+	return utils.SocketURLWithFallback(componentID, paths.TempDir())
 }

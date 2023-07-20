@@ -1,33 +1,6 @@
 inputs:
-    - name: synthetics/http-synthetics
-      type: synthetics/http
-      use_output: default
-      streams:
-        - __ui: null
-          check.request.method: null
-          condition: ${kubernetes.hints.synthetics.http.enabled} == true and ${kubernetes.hints.synthetics.enabled} == true
-          data_stream:
-            dataset: http
-            type: synthetics
-          enabled: true
-          max_redirects: null
-          name: null
-          processors:
-            - add_observer_metadata:
-                geo:
-                    name: Fleet managed
-            - add_fields:
-                fields:
-                    monitor.fleet_managed: true
-                target: ""
-          response.include_body: null
-          response.include_headers: null
-          schedule: '@every 3m'
-          timeout: null
-          type: http
-          urls: null
-      data_stream.namespace: default
     - name: synthetics/tcp-synthetics
+      id: synthetics/tcp-synthetics-${kubernetes.hints.container_id}
       type: synthetics/tcp
       use_output: default
       streams:
@@ -38,21 +11,23 @@ inputs:
             type: synthetics
           enabled: true
           hosts: ${kubernetes.hints.synthetics.tcp.host|kubernetes.hints.synthetics.host|''}
+          ipv4: true
+          ipv6: true
           name: null
           processors:
-            - add_observer_metadata:
-                geo:
-                    name: Fleet managed
             - add_fields:
                 fields:
                     monitor.fleet_managed: true
                 target: ""
           proxy_use_local_resolver: false
+          run_from.geo.name: Fleet managed
+          run_from.id: fleet_managed
           schedule: '@every 3m'
-          timeout: null
+          timeout: ${kubernetes.hints.synthetics.tcp.timeout|kubernetes.hints.synthetics.timeout|''}
           type: tcp
       data_stream.namespace: default
     - name: synthetics/icmp-synthetics
+      id: synthetics/icmp-synthetics-${kubernetes.hints.container_id}
       type: synthetics/icmp
       use_output: default
       streams:
@@ -63,21 +38,23 @@ inputs:
             type: synthetics
           enabled: true
           hosts: ${kubernetes.hints.synthetics.icmp.host|kubernetes.hints.synthetics.host|''}
+          ipv4: true
+          ipv6: true
           name: null
           processors:
-            - add_observer_metadata:
-                geo:
-                    name: Fleet managed
             - add_fields:
                 fields:
                     monitor.fleet_managed: true
                 target: ""
+          run_from.geo.name: Fleet managed
+          run_from.id: fleet_managed
           schedule: '@every 3m'
-          timeout: null
+          timeout: ${kubernetes.hints.synthetics.icmp.timeout|kubernetes.hints.synthetics.timeout|''}
           type: icmp
           wait: 1s
       data_stream.namespace: default
     - name: synthetics/browser-synthetics
+      id: synthetics/browser-synthetics-${kubernetes.hints.container_id}
       type: synthetics/browser
       use_output: default
       streams:
@@ -89,25 +66,21 @@ inputs:
           enabled: true
           name: null
           processors:
-            - add_observer_metadata:
-                geo:
-                    name: Fleet managed
             - add_fields:
                 fields:
                     monitor.fleet_managed: true
                 target: ""
+          run_from.geo.name: Fleet managed
+          run_from.id: fleet_managed
           schedule: '@every 3m'
           throttling: null
-          timeout: null
+          timeout: ${kubernetes.hints.synthetics.browser.timeout|kubernetes.hints.synthetics.timeout|''}
           type: browser
         - condition: ${kubernetes.hints.synthetics.browser_network.enabled} == true or ${kubernetes.hints.synthetics.enabled} == true
           data_stream:
             dataset: browser.network
             type: synthetics
           processors:
-            - add_observer_metadata:
-                geo:
-                    name: Fleet managed
             - add_fields:
                 fields:
                     monitor.fleet_managed: true
@@ -117,15 +90,13 @@ inputs:
             dataset: browser.screenshot
             type: synthetics
           processors:
-            - add_observer_metadata:
-                geo:
-                    name: Fleet managed
             - add_fields:
                 fields:
                     monitor.fleet_managed: true
                 target: ""
       data_stream.namespace: default
     - name: filestream-synthetics
+      id: filestream-synthetics-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -145,4 +116,36 @@ inputs:
             scanner:
                 symlinks: true
           tags: []
+      data_stream.namespace: default
+    - name: synthetics/http-synthetics
+      id: synthetics/http-synthetics-${kubernetes.hints.container_id}
+      type: synthetics/http
+      use_output: default
+      streams:
+        - __ui: null
+          check.request.method: null
+          condition: ${kubernetes.hints.synthetics.http.enabled} == true and ${kubernetes.hints.synthetics.enabled} == true
+          data_stream:
+            dataset: http
+            type: synthetics
+          enabled: true
+          ipv4: true
+          ipv6: true
+          max_redirects: null
+          name: null
+          password: ${kubernetes.hints.synthetics.http.password|kubernetes.hints.synthetics.password|''}
+          processors:
+            - add_fields:
+                fields:
+                    monitor.fleet_managed: true
+                target: ""
+          response.include_body: null
+          response.include_headers: null
+          run_from.geo.name: Fleet managed
+          run_from.id: fleet_managed
+          schedule: '@every 3m'
+          timeout: ${kubernetes.hints.synthetics.http.timeout|kubernetes.hints.synthetics.timeout|''}
+          type: http
+          urls: null
+          username: ${kubernetes.hints.synthetics.http.username|kubernetes.hints.synthetics.username|''}
       data_stream.namespace: default

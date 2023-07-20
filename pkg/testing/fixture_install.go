@@ -19,12 +19,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
+// ErrNotInstalled is returned in cases where Agent isn't installed
 var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:stylecheck // Elastic Agent is a proper noun
 
+// CmdOpts creates vectors of command arguments for different agent commands
 type CmdOpts interface {
 	toCmdArgs() []string
 }
 
+// EnrollOpts specifies the options for the enroll command
 type EnrollOpts struct {
 	URL             string // --url
 	EnrollmentToken string // --enrollment-token
@@ -41,6 +44,7 @@ func (e EnrollOpts) toCmdArgs() []string {
 	return args
 }
 
+// InstallOpts specifies the options for the install command
 type InstallOpts struct {
 	BasePath       string // --base-path
 	Force          bool   // --force
@@ -76,7 +80,7 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	}
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
-		return out, err
+		return out, fmt.Errorf("error running agent install command: %w", err)
 	}
 
 	f.installed = true
@@ -132,7 +136,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	}
 	out, err := f.Exec(ctx, uninstallArgs, opts...)
 	if err != nil {
-		return out, err
+		return out, fmt.Errorf("error running uninstall command: %w", err)
 	}
 
 	// Check that Elastic Agent files are actually removed
@@ -148,7 +152,7 @@ func (f *Fixture) Uninstall(ctx context.Context, uninstallOpts *UninstallOpts, o
 	}
 
 	if err != nil {
-		return out, err
+		return out, fmt.Errorf("error stating agent path: %w", err)
 	}
 
 	if err != nil && topPathStats != nil {
