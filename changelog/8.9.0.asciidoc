@@ -45,12 +45,10 @@ The 8.9.0 release adds the following new and notable features.
 
 CLI::
 
-* Add The Logs Subcommand To The Agent Cli. {CLI-pull}https://github.com/elastic/elastic-agent/pull/2745[#https://github.com/elastic/elastic-agent/pull/2745] {CLI-issue}https://github.com/elastic/elastic-agent/issues/114[#https://github.com/elastic/elastic-agent/issues/114]
+* Add the logs subcommand to the agent CLI. {CLI-pull}https://github.com/elastic/elastic-agent/pull/2745[#https://github.com/elastic/elastic-agent/pull/2745] {CLI-issue}https://github.com/elastic/elastic-agent/issues/114[#https://github.com/elastic/elastic-agent/issues/114]
 elastic-agent::
 
-* Allow Upgrade To Snapshots. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2752[#https://github.com/elastic/elastic-agent/pull/2752] 
-+
-Allow upgrade to a specific snapshot version by specifying the build id
+* Support upgrading to specific snapshots by specifying the build ID. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2752[#https://github.com/elastic/elastic-agent/pull/2752] 
 
 
 [discrete]
@@ -60,7 +58,7 @@ Allow upgrade to a specific snapshot version by specifying the build id
 
 Universal Profiling::
 
-* Deployment/Kubernetes - Add Elements For Universal Profiling. {Universal Profiling-pull}https://github.com/elastic/elastic-agent/pull/2881[#https://github.com/elastic/elastic-agent/pull/2881] 
+* Add additional elements to support the Universal Profiling integration. {Universal Profiling-pull}https://github.com/elastic/elastic-agent/pull/2881[#https://github.com/elastic/elastic-agent/pull/2881] 
 elastic-agent::
 
 * Lowercase Reported Hostnames Per Elastic Common Schema (Ecs) Guidelines For The Host.name Field. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2767[#https://github.com/elastic/elastic-agent/pull/2767] 
