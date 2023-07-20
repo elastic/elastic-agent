@@ -142,7 +142,11 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policyResp, err := tools.InstallAgentWithPolicy(t, fixture, info.KibanaClient, createPolicyReq)
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	policyResp, err := tools.InstallAgentWithPolicy(t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")

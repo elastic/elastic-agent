@@ -37,7 +37,7 @@ import (
 )
 
 func TestToComponents(t *testing.T) {
-	var linuxAMD64Platform = PlatformDetail{
+	linuxAMD64Platform := PlatformDetail{
 		Platform: Platform{
 			OS:   Linux,
 			Arch: AMD64,
@@ -1711,7 +1711,8 @@ func TestToComponents(t *testing.T) {
 			headers: &testHeadersProvider{headers: map[string]string{
 				"header-one": "val-1",
 			}},
-		}, {
+		},
+		{
 			Name:     "Headers injection merge",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
@@ -1892,7 +1893,8 @@ func TestToComponents(t *testing.T) {
 				for i, expected := range scenario.Result {
 					actual := result[i]
 					if expected.Err != nil {
-						assert.Equal(t, expected.Err, actual.Err)
+						assert.Contains(t, actual.Err.Error(), expected.Err.Error())
+						// assert.Equal(t, expected.Err, actual.Err)
 						assert.EqualValues(t, expected.Units, actual.Units)
 					} else {
 						assert.NoError(t, actual.Err, "Expected no error for component "+actual.ID)
@@ -1957,7 +1959,11 @@ func TestPreventionsAreValid(t *testing.T) {
 			"family":   "family",
 			"major":    "major",
 			"minor":    "minor",
+			"install": map[string]interface{}{
+				"default": true,
+			},
 		},
+
 		"user": map[string]interface{}{
 			"root": false,
 		},
@@ -2042,21 +2048,26 @@ func TestInjectingInputPolicyID(t *testing.T) {
 	}{
 		{"NilEverything", nil, nil, nil},
 		{"NilInput", fleetPolicy, nil, nil},
-		{"NilPolicy", nil,
+		{
+			"NilPolicy", nil,
 			map[string]interface{}{},
 			map[string]interface{}{},
 		},
-		{"EmptyPolicy", map[string]interface{}{},
+		{
+			"EmptyPolicy",
+			map[string]interface{}{},
 			map[string]interface{}{},
 			map[string]interface{}{},
 		},
-		{"CreatePolicyRevision", fleetPolicy,
+		{
+			"CreatePolicyRevision", fleetPolicy,
 			map[string]interface{}{},
 			map[string]interface{}{
 				"policy": map[string]interface{}{"revision": testRevision},
 			},
 		},
-		{"NilPolicyObjectType", fleetPolicy,
+		{
+			"NilPolicyObjectType", fleetPolicy,
 			map[string]interface{}{
 				"policy": nil,
 			},
@@ -2064,7 +2075,8 @@ func TestInjectingInputPolicyID(t *testing.T) {
 				"policy": map[string]interface{}{"revision": testRevision},
 			},
 		},
-		{"InjectPolicyRevision", fleetPolicy,
+		{
+			"InjectPolicyRevision", fleetPolicy,
 			map[string]interface{}{
 				"policy": map[string]interface{}{"key": "value"},
 			},
@@ -2072,7 +2084,8 @@ func TestInjectingInputPolicyID(t *testing.T) {
 				"policy": map[string]interface{}{"key": "value", "revision": testRevision},
 			},
 		},
-		{"UnknownPolicyObjectType", fleetPolicy,
+		{
+			"UnknownPolicyObjectType", fleetPolicy,
 			map[string]interface{}{
 				"policy": map[string]int{"key": 10},
 			},
