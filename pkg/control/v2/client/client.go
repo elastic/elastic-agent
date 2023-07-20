@@ -337,6 +337,8 @@ func (c *client) DiagnosticAgent(ctx context.Context, additionalMetrics []Additi
 }
 
 // DiagnosticComponents gathers diagnostic information for components running under elastic-agent
+// errors at the DiagnosticComponents() level are returned as an error value, errors at the level of individual components are returned in
+// the DiagnosticComponentResult struct.
 func (c *client) DiagnosticComponents(ctx context.Context, additionalMetrics []AdditionalMetrics, components ...DiagnosticComponentRequest) ([]DiagnosticComponentResult, error) {
 	reqs := make([]*cproto.DiagnosticComponentRequest, 0, len(components))
 	for _, u := range components {

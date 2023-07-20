@@ -340,12 +340,6 @@ func (c *runtimeComm) actions(server proto.ElasticAgent_ActionsServer) error {
 	go func() {
 		for {
 			resp, err := server.Recv()
-			if resp == nil {
-				c.logger.Infof("got nil action response from server. err=%s", err)
-			} else {
-				c.logger.Infof("got action response from server. id=%s diags=%d, err=%s", resp.Id, len(resp.Diagnostic), err)
-			}
-
 			if err != nil {
 				if reportableErr(err) {
 					c.logger.Debugf("check-in stream failed to receive data: %s", err)
@@ -353,9 +347,7 @@ func (c *runtimeComm) actions(server proto.ElasticAgent_ActionsServer) error {
 				close(recvDone)
 				return
 			}
-			c.logger.Infof("about to send response with id=%s diags=%d to actionsResponse", resp.Id, len(resp.Diagnostic))
 			c.actionsResponse <- resp
-			c.logger.Infof("sent response with id=%s diags=%d to actionsResponse", resp.Id, len(resp.Diagnostic))
 		}
 	}()
 

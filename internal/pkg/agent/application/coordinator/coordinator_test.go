@@ -738,8 +738,8 @@ func (r *fakeRuntimeManager) PerformDiagnostics(context.Context, ...runtime.Comp
 }
 
 // PerformComponentDiagnostics  executes the diagnostic action for the provided components.
-func (r *fakeRuntimeManager) PerformComponentDiagnostics(_ context.Context, _ []cproto.AdditionalDiagnosticRequest, _ ...component.Component) []runtime.ComponentDiagnostic {
-	return nil
+func (r *fakeRuntimeManager) PerformComponentDiagnostics(_ context.Context, _ []cproto.AdditionalDiagnosticRequest, _ ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	return nil, nil
 }
 
 func testBinary(t *testing.T, name string) string {

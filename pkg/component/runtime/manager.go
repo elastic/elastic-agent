@@ -475,7 +475,6 @@ func (m *Manager) PerformComponentDiagnostics(ctx context.Context, additionalMet
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
 func (m *Manager) PerformDiagnostics(ctx context.Context, req ...ComponentUnitDiagnosticRequest) []ComponentUnitDiagnostic {
-	m.logger.Info("Got request for unit Diagnostics")
 	// build results from units
 	var results []ComponentUnitDiagnostic
 	if len(req) > 0 {
@@ -668,7 +667,6 @@ func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 		t.Stop()
 	case <-t.C:
 		// close connection
-		m.logger.Debug("check-in stream never sent initial observed message; closing connection")
 		return status.Error(codes.DeadlineExceeded, "never sent initial observed message")
 	}
 	if !ok {
@@ -679,7 +677,6 @@ func (m *Manager) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	runtime := m.getRuntimeFromToken(initCheckin.Token)
 	if runtime == nil {
 		// no component runtime with token; close connection
-		m.logger.Debug("check-in stream sent an invalid token; closing connection")
 		return status.Error(codes.PermissionDenied, "invalid token")
 	}
 
@@ -1033,17 +1030,14 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 		req.UnitType = proto.UnitType(unit.Type)
 	}
 
-	m.logger.Infof("runtime.performAction (%s) about to send an action response, id=%s", req.Level.String(), req.Id)
 	res, err := runtime.performAction(ctx, req)
 	// the only way this can return an error is a context Done(), be sure to make that explicit.
 	if err != nil {
-		m.logger.Infof("runtime.performAction (%s) got an error, id=%s: %s", req.Level.String(), req.Id, err)
 		if errors.Is(context.DeadlineExceeded, err) {
 			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", diagnosticTimeout, err)
 		}
 		return nil, fmt.Errorf("error running performAction: %w", err)
 	}
-	m.logger.Infof("runtime.performAction (%s) returned an action response, id=%s, number of responses: %d", req.Level.String(), res.Id, len(res.Diagnostic))
 	if res.Status == proto.ActionResponse_FAILED {
 		var respBody map[string]interface{}
 		if res.Result != nil {
