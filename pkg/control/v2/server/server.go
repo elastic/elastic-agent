@@ -211,7 +211,7 @@ func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgen
 			}
 			res = append(res, &cproto.DiagnosticFileResult{
 				Name:        "cpuprofile",
-				Filename:    "cpu.prof",
+				Filename:    "cpu.pprof",
 				Description: "CPU profile",
 				ContentType: "application/octet-stream",
 				Content:     cpuResults,
