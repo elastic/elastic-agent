@@ -21,10 +21,15 @@ elastic-agent::
 
 [discrete]
 [[breaking-https://github.com/elastic/elastic-agent/pull/2890]]
-.Status Command, Change Human Output To Be A Summary, Added Full Output. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2890[#https://github.com/elastic/elastic-agent/pull/2890] 
+.Status command has been changed
 [%collapsible]
 ====
-status command has been changed, the default human output now uses a list format and summaries output. Full human output can be obtained with the new `full` option.
+*Details* +
+The {agent} `status` command has been changed so that the default human output now uses a list format and summaries output.
+
+*Impact* +
+Full human output can be obtained with the new `full` option.
+For for information, refer to {agent-pull}2890[#2890].
 ====
 
 
