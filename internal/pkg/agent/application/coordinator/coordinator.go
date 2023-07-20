@@ -455,7 +455,6 @@ func (c *Coordinator) PerformAction(ctx context.Context, comp component.Componen
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
 // Called from external goroutines.
-// TODO: change name to something like "PerformUnitDiagnostics"
 func (c *Coordinator) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	return c.runtimeMgr.PerformDiagnostics(ctx, req...)
 }

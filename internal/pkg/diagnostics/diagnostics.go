@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"gopkg.in/yaml.v2"
@@ -166,7 +165,6 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 	ts := time.Now().UTC()
 	zw := zip.NewWriter(w)
 	defer zw.Close()
-	log := logp.L()
 	// Write agent diagnostics content
 	for _, ad := range agentDiag {
 		zf, err := zw.CreateHeader(&zip.FileHeader{
@@ -229,7 +227,6 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 				for _, res := range comp.Results {
 
 					filePath := fmt.Sprintf("components/%s/%s", dirName, res.Filename)
-					log.Infof("creating component diag directory at %s", filePath)
 					resFileWriter, err := zw.CreateHeader(&zip.FileHeader{
 						Name:     filePath,
 						Method:   zip.Deflate,

@@ -314,7 +314,6 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
-		"-v", "/home/alexk/go/src/github.com/elastic/elastic-agent-client"+":"+"/go/src/github.com/elastic//elastic-agent-client",
 		"-w", workDir,
 		image,
 

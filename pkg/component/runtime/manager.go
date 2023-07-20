@@ -44,16 +44,16 @@ const (
 	// and restarted.
 	maxCheckinMisses = 3
 	// diagnosticTimeout is the maximum amount of time to wait for a diagnostic response from a unit.
-	diagnosticTimeout = 40 * time.Second
+	diagnosticTimeout = time.Minute
 
 	// stopCheckRetryPeriod is a idle time between checks for component stopped state
 	stopCheckRetryPeriod = 200 * time.Millisecond
 )
 
 var (
-	// ErrNoUnit returned when manager is not controlling this unit.
+	// ErrNoUnit is returned when manager is not controlling this unit.
 	ErrNoUnit = errors.New("no unit under control of this manager")
-	// ErrNoComponent returned when manager is not controlling this component
+	// ErrNoComponent is returned when manager is not controlling this component
 	ErrNoComponent = errors.New("no component under control of this manager")
 )
 
