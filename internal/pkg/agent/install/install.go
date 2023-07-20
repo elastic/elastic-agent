@@ -28,10 +28,17 @@ func Install(cfgFile, topPath string) error {
 		return errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
-	// uninstall current installation
-	err = Uninstall(cfgFile, topPath)
+	// Uninstall current installation
+	//
+	// There is no uninstall token for "install" command.
+	// Uninstall will fail on protected agent.
+	// The protected Agent will need to be uninstalled first before it can be installed.
+	err = Uninstall(cfgFile, topPath, "")
 	if err != nil {
-		return err
+		return errors.New(
+			err,
+			fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
+			errors.M("directory", filepath.Dir(topPath)))
 	}
 
 	// ensure parent directory exists, copy source into install path
