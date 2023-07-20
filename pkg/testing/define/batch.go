@@ -83,11 +83,15 @@ func DetermineBatches(dir string, testFlags string, buildTags ...string) ([]Batc
 	if !filepath.IsAbs(dir) && !strings.HasPrefix(dir, "./") {
 		dir = "./" + dir
 	}
-	flags := strings.SplitN(testFlags, " ", -1)
+
 	// run 'go test' and collect the JSON output to be parsed
 	// #nosec G204 -- test function code, it will be okay
 	cmdArgs := []string{"test", "-v", "--tags", strings.Join(buildTags, ","), "-json"}
-	cmdArgs = append(cmdArgs, flags...)
+	if testFlags != "" {
+		flags := strings.Split(testFlags, " ")
+		cmdArgs = append(cmdArgs, flags...)
+	}
+
 	cmdArgs = append(cmdArgs, dir)
 	testCmd := exec.Command("go", cmdArgs...)
 	output, err := testCmd.Output()
