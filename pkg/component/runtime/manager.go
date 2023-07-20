@@ -93,7 +93,10 @@ type Manager struct {
 	listener net.Listener
 	server   *grpc.Server
 
-	// waitMx synchronizes the access to waitReady only
+	// waitMx synchronizes the access to waitReady only.
+	// waitReady maps component names to their public+private TLS key.
+	// It is only populated during testing when the helper function
+	// waitForReady() is running.
 	waitMx    sync.RWMutex
 	waitReady map[string]waitForReady
 
@@ -279,34 +282,6 @@ func (m *Manager) Update(components []component.Component) error {
 	// policy so if a component was removed it needs to be torn down.
 	m.updateChan <- updateRequest{components, true}
 	return nil
-}
-
-// State returns the current component states.
-func (m *Manager) State() []ComponentComponentState {
-	m.currentMx.RLock()
-	defer m.currentMx.RUnlock()
-	states := make([]ComponentComponentState, 0, len(m.current))
-	for _, crs := range m.current {
-		crs.latestMx.RLock()
-		var legacyPID string
-		if crs.runtime != nil {
-			if commandRuntime, ok := crs.runtime.(*commandRuntime); ok {
-				if commandRuntime != nil {
-					procInfo := commandRuntime.proc
-					if procInfo != nil {
-						legacyPID = fmt.Sprint(commandRuntime.proc.PID)
-					}
-				}
-			}
-		}
-		states = append(states, ComponentComponentState{
-			Component: crs.getCurrent(),
-			State:     crs.latestState.Copy(),
-			LegacyPID: legacyPID,
-		})
-		crs.latestMx.RUnlock()
-	}
-	return states
 }
 
 // PerformAction executes an action on a unit.

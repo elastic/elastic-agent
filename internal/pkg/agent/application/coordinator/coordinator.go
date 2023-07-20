@@ -95,7 +95,7 @@ type RuntimeManager interface {
 	Update([]component.Component) error
 
 	// State returns the current components model state.
-	State() []runtime.ComponentComponentState
+	//State() []runtime.ComponentComponentState
 
 	// PerformAction executes an action on a unit.
 	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
