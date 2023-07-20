@@ -158,8 +158,6 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 // components and units are also healthy (or in ephemeral non-error states).
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) generateReportableState() (s State) {
-	//s.State = c.state.State
-	//s.Message = c.state.Message
 	s.CoordinatorState = c.state.CoordinatorState
 	s.CoordinatorMessage = c.state.CoordinatorMessage
 	s.FleetState = c.state.FleetState
