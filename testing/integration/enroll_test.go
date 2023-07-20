@@ -32,6 +32,9 @@ func TestEnrollAndLog(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
+
+	t.Skip("Test is flaky; see https://github.com/elastic/elastic-agent/issues/3081")
+
 	t.Logf("got namespace: %s", info.Namespace)
 	suite.Run(t, &EnrollRunner{requirementsInfo: info})
 }
