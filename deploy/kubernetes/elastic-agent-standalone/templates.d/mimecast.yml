@@ -1,5 +1,6 @@
 inputs:
     - name: httpjson-mimecast
+      id: httpjson-mimecast-${kubernetes.hints.container_id}
       type: httpjson
       use_output: default
       streams:
@@ -364,6 +365,7 @@ inputs:
             - mimecast-ttp-url
       data_stream.namespace: default
     - name: filestream-mimecast
+      id: filestream-mimecast-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

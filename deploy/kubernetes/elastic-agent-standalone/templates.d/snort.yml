@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-snort
+      id: filestream-snort-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -31,6 +32,7 @@ inputs:
             - snort.log
       data_stream.namespace: default
     - name: udp-snort
+      id: udp-snort-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:

@@ -1,5 +1,6 @@
 inputs:
     - name: kafka/metrics-kafka
+      id: kafka/metrics-kafka-${kubernetes.hints.container_id}
       type: kafka/metrics
       use_output: default
       streams:
@@ -36,6 +37,7 @@ inputs:
           username: ${kubernetes.hints.kafka.partition.username|kubernetes.hints.kafka.username|''}
       data_stream.namespace: default
     - name: filestream-kafka
+      id: filestream-kafka-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

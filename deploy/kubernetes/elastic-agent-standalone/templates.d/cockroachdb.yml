@@ -1,5 +1,6 @@
 inputs:
     - name: prometheus/metrics-cockroachdb
+      id: prometheus/metrics-cockroachdb-${kubernetes.hints.container_id}
       type: prometheus/metrics
       use_output: default
       streams:
@@ -22,6 +23,7 @@ inputs:
           username: ${kubernetes.hints.cockroachdb.status.username|kubernetes.hints.cockroachdb.username|''}
       data_stream.namespace: default
     - name: filestream-cockroachdb
+      id: filestream-cockroachdb-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

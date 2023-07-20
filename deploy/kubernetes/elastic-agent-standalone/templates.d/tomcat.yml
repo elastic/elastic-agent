@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-tomcat
+      id: filestream-tomcat-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -2771,6 +2772,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: udp-tomcat
+      id: udp-tomcat-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:
@@ -5533,6 +5535,7 @@ inputs:
           udp: null
       data_stream.namespace: default
     - name: tcp-tomcat
+      id: tcp-tomcat-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:

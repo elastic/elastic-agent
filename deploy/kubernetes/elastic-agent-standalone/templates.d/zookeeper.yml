@@ -1,5 +1,6 @@
 inputs:
     - name: zookeeper/metrics-zookeeper
+      id: zookeeper/metrics-zookeeper-${kubernetes.hints.container_id}
       type: zookeeper/metrics
       use_output: default
       streams:
@@ -32,6 +33,7 @@ inputs:
           period: ${kubernetes.hints.zookeeper.server.period|kubernetes.hints.zookeeper.period|'10s'}
       data_stream.namespace: default
     - name: filestream-zookeeper
+      id: filestream-zookeeper-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

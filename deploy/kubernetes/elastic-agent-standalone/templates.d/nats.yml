@@ -1,27 +1,6 @@
 inputs:
-    - name: filestream-nats
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.nats.log.enabled} == true or ${kubernetes.hints.nats.enabled} == true
-          data_stream:
-            dataset: nats.log
-            type: logs
-          exclude_files:
-            - .gz$
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.nats.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags:
-            - nats-log
-      data_stream.namespace: default
     - name: nats/metrics-nats
+      id: nats/metrics-nats-${kubernetes.hints.container_id}
       type: nats/metrics
       use_output: default
       streams:
@@ -79,4 +58,27 @@ inputs:
           metricsets:
             - subscriptions
           period: ${kubernetes.hints.nats.subscriptions.period|kubernetes.hints.nats.period|'10s'}
+      data_stream.namespace: default
+    - name: filestream-nats
+      id: filestream-nats-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.nats.log.enabled} == true or ${kubernetes.hints.nats.enabled} == true
+          data_stream:
+            dataset: nats.log
+            type: logs
+          exclude_files:
+            - .gz$
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.nats.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags:
+            - nats-log
       data_stream.namespace: default
