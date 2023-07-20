@@ -314,7 +314,7 @@ func TestStandaloneUpgrade_FailInitialCheck(t *testing.T) {
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
 
-	const minVersionString = "8.9.0-SNAPSHOT"
+	const minVersionString = "8.10.0-SNAPSHOT"
 	minVersion, _ := version.ParseVersion(minVersionString)
 	pv, err := version.ParseVersion(define.Version())
 	if pv.Less(*minVersion) {
