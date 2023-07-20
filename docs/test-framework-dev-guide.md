@@ -28,6 +28,7 @@ the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
 framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
 package for helper utilities.
 
+<<<<<<< HEAD
 ## Running tests
 
 Some one-time setup is required to run any integration and E2E tests. Run
@@ -48,6 +49,26 @@ on your local machine.
 Run `mage integration:single [testName]` to execute a single test under the `testing/integration` folder. Only the selected test will be executed on remote VMs.
 
 Run `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
+=======
+### Test namespaces
+
+Every test has access to its own unique namespace (a string value). This namespace can
+be accessed from the `info.Namespace` field, where `info` is the struct value returned
+from the `define.Require(...)` call made at the start of the test.
+
+Namespaces should be used whenever test data is being written to or read from a persistent store that's
+shared across all tests. Most commonly, this store will be the Elasticsearch cluster that Agent
+components may index their data into. All tests share a single stack deployment and, therefore,
+a single Elasticsearch cluster as well.
+
+Some examples of where namespaces should be used:
+* When creating a policy in Fleet. The Create Policy and Update Policy APIs takes a namespace parameter.
+* When searching for documents in `logs-*` or `metrics-*` data streams. Every document in these
+  data streams has a `data_stream.namespace` field.
+
+:warning: Not using namespaces when accessing data in a shared persistent store can cause tests to
+be flaky.
+>>>>>>> d2162bbb4f ([WIP] Fix flaky `TestFQDN` (#3097))
 
 ## Troubleshooting Tips
 
@@ -75,3 +96,17 @@ that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
+<<<<<<< HEAD
+=======
+
+### Using a different agent version from the stack version
+
+The agent version is used as a fallback for the stack version to use in integration tests
+if no other version is specified.
+
+If we need to use a different version between agent and stack we can specify the stack version
+using a separate env variable `AGENT_STACK_VERSION` like in this example (we used a
+custom package version for the agent):
+
+```AGENT_VERSION="8.10.0-testpkgversion.1-SNAPSHOT" AGENT_STACK_VERSION="8.10.0-SNAPSHOT" mage integration:test```
+>>>>>>> d2162bbb4f ([WIP] Fix flaky `TestFQDN` (#3097))
