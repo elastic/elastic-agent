@@ -15,7 +15,7 @@ steps:
       memory: "4G"
   - label: ":sonarqube: Continuous Code Inspection"
     env:
-      VAULT_SONAR_TOKEN_PATH: " kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
+      VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
     agents:
       image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
     command:
