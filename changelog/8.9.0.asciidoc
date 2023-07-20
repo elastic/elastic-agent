@@ -1,0 +1,79 @@
+// begin 8.9.0 relnotes
+
+[[release-notes-8.9.0]]
+==  8.9.0
+
+Review important information about the  8.9.0 release.
+
+
+
+[discrete]
+[[breaking-changes-8.9.0]]
+=== Breaking changes
+
+Breaking changes can prevent your application from optimal operation and
+performance. Before you upgrade, review the breaking changes, then mitigate the
+impact to your application.
+
+// TODO: add details and impact
+
+elastic-agent::
+
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/2890]]
+.Status Command, Change Human Output To Be A Summary, Added Full Output. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2890[#https://github.com/elastic/elastic-agent/pull/2890] 
+[%collapsible]
+====
+status command has been changed, the default human output now uses a list format and summaries output. Full human output can be obtained with the new `full` option.
+====
+
+
+
+
+
+[discrete]
+[[new-features-8.9.0]]
+=== New features
+
+The 8.9.0 release adds the following new and notable features.
+
+
+CLI::
+
+* Add The Logs Subcommand To The Agent Cli. {CLI-pull}https://github.com/elastic/elastic-agent/pull/2745[#https://github.com/elastic/elastic-agent/pull/2745] {CLI-issue}https://github.com/elastic/elastic-agent/issues/114[#https://github.com/elastic/elastic-agent/issues/114]
+elastic-agent::
+
+* Allow Upgrade To Snapshots. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2752[#https://github.com/elastic/elastic-agent/pull/2752] 
++
+Allow upgrade to a specific snapshot version by specifying the build id
+
+
+[discrete]
+[[enhancements-8.9.0]]
+=== Enhancements
+
+
+Universal Profiling::
+
+* Deployment/Kubernetes - Add Elements For Universal Profiling. {Universal Profiling-pull}https://github.com/elastic/elastic-agent/pull/2881[#https://github.com/elastic/elastic-agent/pull/2881] 
+elastic-agent::
+
+* Lowercase Reported Hostnames Per Elastic Common Schema (Ecs) Guidelines For The Host.name Field. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2767[#https://github.com/elastic/elastic-agent/pull/2767] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.9.0]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Change Monitoring Socket. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3096[#https://github.com/elastic/elastic-agent/pull/3096] {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2912[#https://github.com/elastic/elastic-agent/pull/2912] 
+* Fix Drop Processor For Monitoring Components. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2982[#https://github.com/elastic/elastic-agent/pull/2982] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2388[#https://github.com/elastic/elastic-agent/issues/2388]
+synthetics::
+
+* Bump Node To 18.16.0. {synthetics-pull}https://github.com/elastic/elastic-agent/pull/2696[#https://github.com/elastic/elastic-agent/pull/2696] 
+
+// end 8.9.0 relnotes
