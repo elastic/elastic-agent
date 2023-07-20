@@ -59,6 +59,10 @@ inputs:
     proxied_actions:
       - UNENROLL
       - UPGRADE
+    runtime:
+      preventions:
+        - condition: ${runtime.install.default} == false
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:
       cport: 6788
       log:
@@ -78,6 +82,8 @@ inputs:
       preventions:
         - condition: ${user.root} == false
           message: "Elastic Agent must be running as Administrator or SYSTEM"
+        - condition: ${runtime.install.default} == false
+          message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
     service:
       cport: 6788
       log:
