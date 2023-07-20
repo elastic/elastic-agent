@@ -437,8 +437,7 @@ func generateContainerData(
 
 				if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 					if !managed {
-						hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
-						processorMapping := getProcessorMapping(k8sMapping, logger, config.Prefix)
+						hintsMapping, processorMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 						if len(hintsMapping) > 0 {
 							if len(processorMapping) > 0 {
 								for _, processor := range processorMapping {
@@ -472,8 +471,7 @@ func generateContainerData(
 			k8sMapping["container"] = containerMeta
 			if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 				if !managed {
-					hintsMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
-					processorMapping := getProcessorMapping(k8sMapping, logger, config.Prefix)
+					hintsMapping, processorMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
 					if len(hintsMapping) > 0 {
 						if len(processorMapping) > 0 {
 							for _, processor := range processorMapping {
@@ -505,8 +503,9 @@ func generateContainerData(
 	}
 }
 
-func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) mapstr.M {
+func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) (mapstr.M, []mapstr.M) {
 	hintsMapping := mapstr.M{}
+	processorMapping := []mapstr.M{}
 
 	if ann, ok := k8sMapping["annotations"]; ok {
 		annotations, _ := ann.(mapstr.M)
@@ -515,21 +514,11 @@ func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 			logger.Debugf("Extracted hints are :%v", hints)
 			hintsMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
 			logger.Debugf("Generated hints mappings are :%v", hintsMapping)
+
+			processorMapping = utils.GetConfigs(annotations, prefix, "hints/processors")
+			logger.Debugf("Generated Processor mappings are :%v", processorMapping)
 		}
 
 	}
-	return hintsMapping
-}
-
-func getProcessorMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string) []mapstr.M {
-	processorMapping := []mapstr.M{}
-
-	if ann, ok := k8sMapping["annotations"]; ok {
-		annotations, _ := ann.(mapstr.M)
-		processorMapping := utils.GetConfigs(annotations, prefix, "hints/processors")
-		logger.Debugf("Generated Processor mappings are :%v", processorMapping)
-	}
-
-	return processorMapping
-
+	return hintsMapping, processorMapping
 }
