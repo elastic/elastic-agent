@@ -4,10 +4,37 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-  - label: "Integration tests"
-    key: "integration-tests"
-    command: ".buildkite/scripts/integration_tests.sh"
+  - label: "Unit tests"
+    key: "unit-tests"
+    command: ".buildkite/scripts/unit-tests.sh"
     artifact_paths:
       - "build/TEST-**"
     agents:
-      provider: "gcp"
+      image: "golang:${GO_VERSION}"
+      cpu: "8"
+      memory: "4G"
+  - label: ":sonarqube: Continuous Code Inspection"
+    env:
+      VAULT_SONAR_TOKEN_PATH: " kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
+    agents:
+      image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
+    command:
+      - "buildkite-agent artifact download build/TEST-go-unit.cov ."
+      - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
+      - "/scan-source-code.sh"
+    depends_on:
+      - "unit-tests"
+    retry:
+      manual:
+        allowed: true
+
+  # - label: "Integration tests"
+  #   key: "integration-tests"
+  #   command: ".buildkite/scripts/integration-tests.sh"
+  #   artifact_paths:
+  #     - "build/TEST-**"
+  #   agents:
+  #     provider: "gcp"
+  #   retry:
+  #     manual:
+  #       allowed: true
