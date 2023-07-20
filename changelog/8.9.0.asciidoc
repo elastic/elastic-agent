@@ -61,7 +61,7 @@ Universal Profiling::
 * Add additional elements to support the Universal Profiling integration. {Universal Profiling-pull}https://github.com/elastic/elastic-agent/pull/2881[#https://github.com/elastic/elastic-agent/pull/2881] 
 elastic-agent::
 
-* Lowercase Reported Hostnames Per Elastic Common Schema (Ecs) Guidelines For The Host.name Field. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2767[#https://github.com/elastic/elastic-agent/pull/2767] 
+* Lowercase reported hostnames per Elastic Common Schema (ECS) Guidelines for the `host.name` field.
 
 
 
@@ -73,10 +73,10 @@ elastic-agent::
 
 elastic-agent::
 
-* Change Monitoring Socket. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3096[#https://github.com/elastic/elastic-agent/pull/3096] {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2912[#https://github.com/elastic/elastic-agent/pull/2912] 
-* Fix Drop Processor For Monitoring Components. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2982[#https://github.com/elastic/elastic-agent/pull/2982] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2388[#https://github.com/elastic/elastic-agent/issues/2388]
+* Change monitoring socket to use a hash of the ID instead of the actual ID. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3096[#https://github.com/elastic/elastic-agent/pull/3096] {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2912[#https://github.com/elastic/elastic-agent/pull/2912] 
+* Fix the drop processor for monitoring component logs to use the `component.id` instead of the dataset. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/2982[#https://github.com/elastic/elastic-agent/pull/2982] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2388[#https://github.com/elastic/elastic-agent/issues/2388]
 synthetics::
 
-* Bump Node To 18.16.0. {synthetics-pull}https://github.com/elastic/elastic-agent/pull/2696[#https://github.com/elastic/elastic-agent/pull/2696] 
+* Update Node version to 18.16.0. {synthetics-pull}https://github.com/elastic/elastic-agent/pull/2696[#https://github.com/elastic/elastic-agent/pull/2696] 
 
 // end 8.9.0 relnotes
