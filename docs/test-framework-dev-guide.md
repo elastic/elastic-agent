@@ -14,21 +14,6 @@ ESS (QA) API Key to create on https://console.qa.cld.elstc.co/deployment-feature
 
 Warning: if you never created a deployment on it, you won't have permission to get this key so you will need to create one first.
 
-## Writing tests
-
-Write integration and E2E tests by adding them to the `testing/integration`
-folder.
-
-// TODO: Replace with a comprehensive write up of `define.*` directives,
-// environment variables, etc. useful when writing tests. Until then...
-
-Look at existing tests under the `testing/integration` for examples of how
-to write tests using the integration and E2E testing framework. Also look at
-the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
-framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
-package for helper utilities.
-
-<<<<<<< HEAD
 ## Running tests
 
 Some one-time setup is required to run any integration and E2E tests. Run
@@ -49,7 +34,21 @@ on your local machine.
 Run `mage integration:single [testName]` to execute a single test under the `testing/integration` folder. Only the selected test will be executed on remote VMs.
 
 Run `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
-=======
+
+## Writing tests
+
+Write integration and E2E tests by adding them to the `testing/integration`
+folder.
+
+// TODO: Replace with a comprehensive write up of `define.*` directives,
+// environment variables, etc. useful when writing tests. Until then...
+
+Look at existing tests under the `testing/integration` for examples of how
+to write tests using the integration and E2E testing framework. Also look at
+the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
+framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
+package for helper utilities.
+
 ### Test namespaces
 
 Every test has access to its own unique namespace (a string value). This namespace can
@@ -68,7 +67,6 @@ Some examples of where namespaces should be used:
 
 :warning: Not using namespaces when accessing data in a shared persistent store can cause tests to
 be flaky.
->>>>>>> d2162bbb4f ([WIP] Fix flaky `TestFQDN` (#3097))
 
 ## Troubleshooting Tips
 
@@ -96,8 +94,6 @@ that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
-<<<<<<< HEAD
-=======
 
 ### Using a different agent version from the stack version
 
@@ -109,4 +105,3 @@ using a separate env variable `AGENT_STACK_VERSION` like in this example (we use
 custom package version for the agent):
 
 ```AGENT_VERSION="8.10.0-testpkgversion.1-SNAPSHOT" AGENT_STACK_VERSION="8.10.0-SNAPSHOT" mage integration:test```
->>>>>>> d2162bbb4f ([WIP] Fix flaky `TestFQDN` (#3097))
