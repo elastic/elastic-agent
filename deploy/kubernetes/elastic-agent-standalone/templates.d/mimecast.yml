@@ -1,5 +1,6 @@
 inputs:
     - name: httpjson-mimecast
+      id: httpjson-mimecast-${kubernetes.hints.container_id}
       type: httpjson
       use_output: default
       streams:
@@ -43,27 +44,31 @@ inputs:
             - set:
                 fail_on_template_error: true
                 target: body.meta.pagination.pageToken
-                value: '[[.last_response.body.meta.pagination.next]]'
+                value: |-
+                    [[- if index .last_response.body.meta.pagination "next" -]]
+                      [[- .last_response.body.meta.pagination.next -]]
+                    [[- end -]]
           response.split:
+            ignore_empty_value: true
             target: body.data
           tags:
             - forwarded
             - mimecast-audit-events
         - condition: ${kubernetes.hints.mimecast.dlp_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
           config_version: "2"
-          cursor: null
+          cursor:
+            next_date:
+                value: '[[.first_event.eventTime]]'
           data_stream:
             dataset: mimecast.dlp_logs
             type: logs
           interval: 5m
-          next_date:
-            value: '[[.first_event.eventTime]]'
           request.method: POST
           request.transforms:
             - set:
                 default: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[formatDate (now (parseDuration "-5m")) "2006-01-02T15:04:05-0700"]]"}]'
                 target: body.data
-                value: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.eventTime]]"}]'
+                value: '[{"to": "[[formatDate (now) "2006-01-02T15:04:05-0700"]]", "from":"[[.cursor.next_date]]"}]'
                 value_type: json
             - set:
                 target: header.x-mc-app-id
@@ -88,6 +93,7 @@ inputs:
                 target: body.meta.pagination.pageToken
                 value: '[[.last_response.body.meta.pagination.next]]'
           response.split:
+            ignore_empty_value: true
             split:
                 target: body.dlpLogs
             target: body.data
@@ -169,6 +175,7 @@ inputs:
           request.url: https://eu-api.mimecast.com/api/ttp/threat-intel/get-feed
           response.decode_as: application/json
           response.split:
+            ignore_empty_value: true
             target: body.objects
             transforms:
                 - set:
@@ -209,6 +216,7 @@ inputs:
           request.url: https://eu-api.mimecast.com/api/ttp/threat-intel/get-feed
           response.decode_as: application/json
           response.split:
+            ignore_empty_value: true
             target: body.objects
             transforms:
                 - set:
@@ -219,13 +227,13 @@ inputs:
             - mimecast-threat-intel-feed-malware-grid
         - condition: ${kubernetes.hints.mimecast.ttp_ap_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
           config_version: "2"
-          cursor: null
+          cursor:
+            next_date:
+                value: '[[.first_event.date]]'
           data_stream:
             dataset: mimecast.ttp_ap_logs
             type: logs
           interval: 5m
-          next_date:
-            value: '[[.first_event.date]]'
           request.method: POST
           request.transforms:
             - set:
@@ -256,6 +264,7 @@ inputs:
                 target: body.meta.pagination.pageToken
                 value: '[[.last_response.body.meta.pagination.next]]'
           response.split:
+            ignore_empty_value: true
             split:
                 target: body.attachmentLogs
             target: body.data
@@ -264,13 +273,13 @@ inputs:
             - mimecast-ttp-ap
         - condition: ${kubernetes.hints.mimecast.ttp_ip_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
           config_version: "2"
-          cursor: null
+          cursor:
+            next_date:
+                value: '[[.first_event.eventTime]]'
           data_stream:
             dataset: mimecast.ttp_ip_logs
             type: logs
           interval: 5m
-          next_date:
-            value: '[[.first_event.eventTime]]'
           request.method: POST
           request.transforms:
             - set:
@@ -301,6 +310,7 @@ inputs:
                 target: body.meta.pagination.pageToken
                 value: '[[.last_response.body.meta.pagination.next]]'
           response.split:
+            ignore_empty_value: true
             split:
                 target: body.impersonationLogs
             target: body.data
@@ -346,6 +356,7 @@ inputs:
                 target: body.meta.pagination.pageToken
                 value: '[[.last_response.body.meta.pagination.next]]'
           response.split:
+            ignore_empty_value: true
             split:
                 target: body.clickLogs
             target: body.data
@@ -354,6 +365,7 @@ inputs:
             - mimecast-ttp-url
       data_stream.namespace: default
     - name: filestream-mimecast
+      id: filestream-mimecast-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

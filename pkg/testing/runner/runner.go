@@ -52,7 +52,7 @@ type OSRunnerResult struct {
 // OSRunner provides an interface to run the tests on the OS.
 type OSRunner interface {
 	// Prepare prepares the runner to actual run on the host.
-	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error
+	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPaths []string) error
 	// Run runs the actual tests and provides the result.
 	Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
 }
@@ -303,9 +303,11 @@ func (r *Runner) validate() error {
 	var requiredFiles []string
 	for _, b := range r.batches {
 		if !b.Skip {
-			buildPath := r.getBuildPath(b)
-			if !slices.Contains(requiredFiles, buildPath) {
-				requiredFiles = append(requiredFiles, buildPath)
+			buildPaths := r.getBuildPath(b)
+			for _, buildPath := range buildPaths {
+				if !slices.Contains(requiredFiles, buildPath) {
+					requiredFiles = append(requiredFiles, buildPath)
+				}
 			}
 		}
 	}
@@ -325,7 +327,7 @@ func (r *Runner) validate() error {
 }
 
 // getBuildPath returns the path of the build required for the test.
-func (r *Runner) getBuildPath(b LayoutBatch) string {
+func (r *Runner) getBuildPath(b LayoutBatch) []string {
 	arch := b.LayoutOS.OS.Arch
 	if arch == define.AMD64 {
 		arch = "x86_64"
@@ -334,7 +336,10 @@ func (r *Runner) getBuildPath(b LayoutBatch) string {
 	if b.LayoutOS.OS.Type == define.Windows {
 		ext = "zip"
 	}
-	return filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.LayoutOS.OS.Type, arch, ext))
+	hashExt := ".sha512"
+	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.LayoutOS.OS.Type, arch, ext))
+	packageHashName := packageName + hashExt
+	return []string{packageName, packageHashName}
 }
 
 // prepare prepares for the runner to run.

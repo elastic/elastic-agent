@@ -1,5 +1,28 @@
 inputs:
+    - name: filestream-pfsense
+      id: filestream-pfsense-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.pfsense.container_logs.enabled} == true
+          data_stream:
+            dataset: pfsense.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
     - name: udp-pfsense
+      id: udp-pfsense-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:
@@ -21,6 +44,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: tcp-pfsense
+      id: tcp-pfsense-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -38,25 +62,4 @@ inputs:
           tags:
             - pfsense
             - forwarded
-      data_stream.namespace: default
-    - name: filestream-pfsense
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.pfsense.container_logs.enabled} == true
-          data_stream:
-            dataset: pfsense.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
       data_stream.namespace: default

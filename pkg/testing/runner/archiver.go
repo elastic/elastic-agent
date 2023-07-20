@@ -15,8 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
@@ -24,24 +22,21 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path to %s: %w", dir, err)
 	}
-	var stdout bytes.Buffer
-	processHandler, err := process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "-z"}), process.WithCmdOptions(attachOut(&stdout), workDir(dir)))
+
+	projectFilesOutput, err := cmdBufferedOutput(exec.Command("git", "ls-files", "-z"), dir)
 	if err != nil {
-		return fmt.Errorf("failed to run git ls-files: %w", err)
-	}
-	processDone := <-processHandler.Wait()
-	if processDone.ExitCode() != 0 {
-		return fmt.Errorf("failed to run git ls-files: exited code %d", processDone.ExitCode())
+		return err
 	}
 
 	// Add files that are not yet tracked in git. Prevents a footcannon where someone writes code to a new file, then tests it before they add to git
-	processHandler, err = process.Start("git", process.WithContext(ctx), process.WithArgs([]string{"ls-files", "--exclude-standard", "-o", "-z"}), process.WithCmdOptions(attachOut(&stdout), workDir(dir)))
+	untrackedOutput, err := cmdBufferedOutput(exec.Command("git", "ls-files", "--exclude-standard", "-o", "-z"), dir)
 	if err != nil {
-		return fmt.Errorf("failed to run git ls-files -o: %w", err)
+		return err
 	}
-	processDone = <-processHandler.Wait()
-	if processDone.ExitCode() != 0 {
-		return fmt.Errorf("failed to run git ls-files -o: exited code %d", processDone.ExitCode())
+
+	_, err = io.Copy(&projectFilesOutput, &untrackedOutput)
+	if err != nil {
+		return fmt.Errorf("failed to read stdout of git ls-files -o: %w", err)
 	}
 
 	archive, err := os.Create(dest)
@@ -53,7 +48,7 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 	zw := zip.NewWriter(archive)
 	defer zw.Close()
 
-	s := bufio.NewScanner(&stdout)
+	s := bufio.NewScanner(&projectFilesOutput)
 	s.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if i := strings.IndexRune(string(data), '\x00'); i >= 0 {
 			return i + 1, data[0:i], nil
@@ -105,9 +100,13 @@ func createRepoZipArchive(ctx context.Context, dir string, dest string) error {
 	return nil
 }
 
-func workDir(dir string) process.CmdOption {
-	return func(cmd *exec.Cmd) error {
-		cmd.Dir = dir
-		return nil
+func cmdBufferedOutput(cmd *exec.Cmd, workDir string) (bytes.Buffer, error) {
+	var stdoutBuf bytes.Buffer
+	cmd.Dir = workDir
+	cmd.Stdout = &stdoutBuf
+	err := cmd.Run()
+	if err != nil {
+		return *bytes.NewBufferString(""), fmt.Errorf("failed to run cmd %s: %w", strings.Join(cmd.Args, " "), err)
 	}
+	return stdoutBuf, nil
 }

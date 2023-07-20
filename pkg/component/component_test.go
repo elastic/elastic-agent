@@ -17,23 +17,23 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/elastic/go-ucfg"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/structpb"
+	"gopkg.in/yaml.v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestToComponents(t *testing.T) {
@@ -2150,6 +2150,152 @@ type testHeadersProvider struct {
 
 func (h *testHeadersProvider) Headers() map[string]string {
 	return h.headers
+}
+
+// TestSignedMarshalUnmarshal will catch if the yaml library will get updated to v3 for example
+func TestSignedMarshalUnmarshal(t *testing.T) {
+	const data = "eyJAdGltZXN0YW1wIjoiMjAyMy0wNS0yMlQxNzoxOToyOC40NjNaIiwiZXhwaXJhdGlvbiI6IjIwMjMtMDYtMjFUMTc6MTk6MjguNDYzWiIsImFnZW50cyI6WyI3ZjY0YWI2NC1hNmM0LTQ2ZTMtODIyYS0zODUxZGVkYTJmY2UiXSwiYWN0aW9uX2lkIjoiNGYwODQ2MGYtMDE0Yy00ZDllLWJmOGEtY2FhNjQyNzRhZGU0IiwidHlwZSI6IlVORU5ST0xMIiwidHJhY2VwYXJlbnQiOiIwMC1iOTBkYTlmOGNjNzdhODk0OTc0ZWIxZTIzMGNmNjc2Yy1lOTNlNzk4YTU4ODg2MDVhLTAxIn0="
+	const signature = "MEUCIAxxsi9ff1zyV0+4fsJLqbP8Qb83tedU5iIFldtxEzEfAiEA0KUsrL7q+Fv7z6Boux3dY2P4emGi71jsMGanIZ552bM="
+
+	signed := Signed{
+		Data:      data,
+		Signature: signature,
+	}
+
+	b, err := yaml.Marshal(signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var newSigned Signed
+	err = yaml.Unmarshal(b, &newSigned)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diff := cmp.Diff(signed, newSigned)
+	if diff != "" {
+		t.Fatal(diff)
+	}
+
+	diff = cmp.Diff(true, signed.IsSigned())
+	if diff != "" {
+		t.Fatal(diff)
+	}
+
+	var nilSigned *Signed
+	diff = cmp.Diff(false, nilSigned.IsSigned())
+	if diff != "" {
+		t.Fatal(diff)
+	}
+
+	unsigned := Signed{}
+	diff = cmp.Diff(false, unsigned.IsSigned())
+	if diff != "" {
+		t.Fatal(diff)
+	}
+}
+
+func TestSignedFromPolicy(t *testing.T) {
+	const data = "eyJAdGltZXN0YW1wIjoiMjAyMy0wNS0yMlQxNzoxOToyOC40NjNaIiwiZXhwaXJhdGlvbiI6IjIwMjMtMDYtMjFUMTc6MTk6MjguNDYzWiIsImFnZW50cyI6WyI3ZjY0YWI2NC1hNmM0LTQ2ZTMtODIyYS0zODUxZGVkYTJmY2UiXSwiYWN0aW9uX2lkIjoiNGYwODQ2MGYtMDE0Yy00ZDllLWJmOGEtY2FhNjQyNzRhZGU0IiwidHlwZSI6IlVORU5ST0xMIiwidHJhY2VwYXJlbnQiOiIwMC1iOTBkYTlmOGNjNzdhODk0OTc0ZWIxZTIzMGNmNjc2Yy1lOTNlNzk4YTU4ODg2MDVhLTAxIn0="
+	const signature = "MEUCIAxxsi9ff1zyV0+4fsJLqbP8Qb83tedU5iIFldtxEzEfAiEA0KUsrL7q+Fv7z6Boux3dY2P4emGi71jsMGanIZ552bM="
+
+	tests := []struct {
+		name       string
+		policy     map[string]interface{}
+		wantSigned *Signed
+		wantErr    error
+	}{
+		{
+			name:    "not signed",
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed nil",
+			policy: map[string]interface{}{
+				"signed": nil,
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed not map",
+			policy: map[string]interface{}{
+				"signed": "",
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed empty",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed missing signature",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"data": data,
+				},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed missing data",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"signaure": signature,
+				},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed data invalid data type",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"data": 1,
+				},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed signature invalid data type",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"signature": 1,
+				},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed correct",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"data":      data,
+					"signature": signature,
+				},
+			},
+			wantSigned: &Signed{
+				Data:      data,
+				Signature: signature,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			signed, err := SignedFromPolicy(tc.policy)
+			diff := cmp.Diff(tc.wantSigned, signed)
+			if diff != "" {
+				t.Fatal(diff)
+			}
+
+			diff = cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
+			if diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
 }
 
 func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {

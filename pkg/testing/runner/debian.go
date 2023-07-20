@@ -21,7 +21,7 @@ import (
 type DebianRunner struct{}
 
 // Prepare the test
-func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
+func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPaths []string) error {
 	// prepare build-essential and unzip
 	//
 	// apt-get update and install are so terrible that we have to place this in a loop, because in some cases the
@@ -106,19 +106,21 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger L
 	}
 
 	// place the build for the agent on the host
-	logger.Logf("Copying agent build %s", filepath.Base(buildPath))
-	err = sshSCP(sshClient, buildPath, filepath.Base(buildPath))
-	if err != nil {
-		return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
-	}
-	insideAgentDir := filepath.Join("agent", buildPath)
-	stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", filepath.Dir(insideAgentDir), err, stdOut, errOut)
-	}
-	stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mv", []string{filepath.Base(buildPath), insideAgentDir}, nil)
-	if err != nil {
-		return fmt.Errorf("failed to move %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
+	for _, buildPath := range buildPaths {
+		logger.Logf("Copying agent build %s", filepath.Base(buildPath))
+		err = sshSCP(sshClient, buildPath, filepath.Base(buildPath))
+		if err != nil {
+			return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+		}
+		insideAgentDir := filepath.Join("agent", buildPath)
+		stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", filepath.Dir(insideAgentDir), err, stdOut, errOut)
+		}
+		stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mv", []string{filepath.Base(buildPath), insideAgentDir}, nil)
+		if err != nil {
+			return fmt.Errorf("failed to move %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
+		}
 	}
 
 	return nil

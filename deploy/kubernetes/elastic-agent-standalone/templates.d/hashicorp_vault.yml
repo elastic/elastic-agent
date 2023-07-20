@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-hashicorp_vault
+      id: filestream-hashicorp_vault-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -39,6 +40,7 @@ inputs:
             - hashicorp-vault-log
       data_stream.namespace: default
     - name: tcp-hashicorp_vault
+      id: tcp-hashicorp_vault-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -53,6 +55,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: prometheus/metrics-hashicorp_vault
+      id: prometheus/metrics-hashicorp_vault-${kubernetes.hints.container_id}
       type: prometheus/metrics
       use_output: default
       streams:
