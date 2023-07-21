@@ -10,9 +10,14 @@ steps:
     artifact_paths:
       - "build/TEST-**"
     agents:
-      image: "golang:${GO_VERSION}"
-      cpu: "8"
-      memory: "4G"
+      provider: "gcp"
+    retry:
+      manual:
+        allowed: true
+    # agents:
+    #   image: "golang:${GO_VERSION}"
+    #   cpu: "8"
+    #   memory: "4G"
   - label: ":sonarqube: Continuous Code Inspection"
     env:
       VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
