@@ -24,8 +24,6 @@ import (
 )
 
 func TestEnrollAndLog(t *testing.T) {
-	t.Skip("Test is flaky; see https://github.com/elastic/elastic-agent/issues/3081")
-
 	info := define.Require(t, define.Requirements{
 		OS: []define.OS{
 			{Type: define.Linux},
@@ -35,6 +33,7 @@ func TestEnrollAndLog(t *testing.T) {
 		Sudo:  true,
 	})
 	t.Logf("got namespace: %s", info.Namespace)
+	t.Skip("Test is flaky; see https://github.com/elastic/elastic-agent/issues/3081")
 	suite.Run(t, &EnrollRunner{requirementsInfo: info})
 }
 
