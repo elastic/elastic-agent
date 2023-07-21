@@ -7,6 +7,7 @@ steps:
   - label: "Unit tests"
     key: "unit-tests"
     command: ".buildkite/scripts/unit-tests.sh"
+    branches: "main"
     artifact_paths:
       - "build/TEST-**"
     agents:
@@ -14,10 +15,12 @@ steps:
     retry:
       manual:
         allowed: true
+    # Unit tests failed in the container
     # agents:
     #   image: "golang:${GO_VERSION}"
     #   cpu: "8"
     #   memory: "4G"
+
   - label: ":sonarqube: Continuous Code Inspection"
     env:
       VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
@@ -27,19 +30,20 @@ steps:
       - "buildkite-agent artifact download build/TEST-go-unit.cov ."
       - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
       - "/scan-source-code.sh"
+    branches: "main"
     depends_on:
       - "unit-tests"
     retry:
       manual:
         allowed: true
 
-  # - label: "Integration tests"
-  #   key: "integration-tests"
-  #   command: ".buildkite/scripts/integration-tests.sh"
-  #   artifact_paths:
-  #     - "build/TEST-**"
-  #   agents:
-  #     provider: "gcp"
-  #   retry:
-  #     manual:
-  #       allowed: true
+  - label: "Integration tests"
+    key: "integration-tests"
+    command: ".buildkite/scripts/integration-tests.sh"
+    artifact_paths:
+      - "build/TEST-**"
+    agents:
+      provider: "gcp"
+    retry:
+      manual:
+        allowed: true
