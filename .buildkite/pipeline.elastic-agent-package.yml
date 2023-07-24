@@ -51,9 +51,8 @@ steps:
   - label: ":package: Package elastic-agent"
     key: package_elastic-agent
     agents:
-      provider: "gcp"
-      image: "ubuntu-2204-lts-arm64"
-      machineType: "t2a-standard-8"
+      provider: "aws"
+      image: "core-ubuntu-2204-aarch64"
     command: |
       if [[ -z "${DEV}" ]]; then
         export DEV=$(buildkite-agent meta-data get DEV --default "true")
