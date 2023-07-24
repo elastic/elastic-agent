@@ -14,7 +14,7 @@ export AGENT_DROP_PATH=build/elastic-agent-drop
 mkdir -p $AGENT_DROP_PATH
 
 # Download the components from the ManifestURL and then package those downloaded into the $AGENT_DROP_PATH
-mage clean downloadManifest package ironbank
+mage clean downloadManifest package ironbank fixDRADockerArtifacts
 
 echo  "+++ Generate dependencies report"
 BEAT_VERSION_FULL=$(curl -s -XGET "${ManifestURL}" |jq '.version' -r )
