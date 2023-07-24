@@ -2617,7 +2617,6 @@ func TestManager_FakeShipper(t *testing.T) {
 							subErrCh <- errors.New("output unit missing: fake-default")
 						}
 					}
-<<<<<<< HEAD
 				} else if ccs.Component.ID == "fake-default" {
 					t.Logf("component state changed: %+v", state)
 					if state.State == client.UnitStateFailed {
@@ -2631,26 +2630,12 @@ func TestManager_FakeShipper(t *testing.T) {
 								compConnected = true
 								ok, err := sendEvent()
 								if ok {
-=======
-					unit, ok = state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							shipperOutputOn = true
-							ok, err := sendEvent()
-							if ok {
-								if err != nil {
-									subErrCh <- err
-								} else {
-									// successful; turn it all off
-									err := m.Update(component.Model{Components: []component.Component{}})
->>>>>>> 2a3dfaa4fd1bb0e0da48801b37dda570763dc1aa
+
 									if err != nil {
 										subErrCh <- err
 									} else {
 										// successful; turn it all off
-										err := m.Update([]component.Component{})
+										err := m.Update(component.Model{Components: []component.Component{}})
 										if err != nil {
 											subErrCh <- err
 										}
@@ -2667,46 +2652,6 @@ func TestManager_FakeShipper(t *testing.T) {
 						} else {
 							subErrCh <- errors.New("unit missing: fake-input")
 						}
-<<<<<<< HEAD
-=======
-					} else {
-						subErrCh <- errors.New("output unit missing: fake-default")
-					}
-				}
-			case state := <-compSub.Ch():
-				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateFailed {
-					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
-				} else {
-					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							compConnected = true
-							ok, err := sendEvent()
-							if ok {
-								if err != nil {
-									subErrCh <- err
-								} else {
-									// successful; turn it all off
-									err := m.Update(component.Model{Components: []component.Component{}})
-									if err != nil {
-										subErrCh <- err
-									}
-								}
-							}
-						} else if unit.State == client.UnitStateStopped {
-							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting || unit.State == client.UnitStateConfiguring {
-							// acceptable
-						} else {
-							// unknown state that should not have occurred
-							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
-						}
-					} else {
-						subErrCh <- errors.New("unit missing: fake-input")
->>>>>>> 2a3dfaa4fd1bb0e0da48801b37dda570763dc1aa
 					}
 				}
 			}
