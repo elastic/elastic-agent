@@ -52,6 +52,7 @@ steps:
     key: package_elastic-agent
     agents:
       provider: "gcp"
+      image: "ubuntu-2204-lts-arm64"
       machineType: "t2a-standard-8"
     command: |
       if [[ -z "${DEV}" ]]; then
