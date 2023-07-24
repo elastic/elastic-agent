@@ -6,7 +6,7 @@ env:
 steps:
   - label: "Unit tests"
     key: "unit-tests"
-    command: ".buildkite/scripts/unit-tests.sh"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
     branches: "main"
     artifact_paths:
       - "build/TEST-**"
@@ -39,7 +39,7 @@ steps:
 
   - label: "Integration tests"
     key: "integration-tests"
-    command: ".buildkite/scripts/integration-tests.sh"
+    command: ".buildkite/scripts/steps/integration-tests.sh"
     artifact_paths:
       - "build/TEST-**"
     agents:
