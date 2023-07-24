@@ -2599,7 +2599,7 @@ func TestManager_FakeShipper(t *testing.T) {
 										subErrCh <- err
 									} else {
 										// successful; turn it all off
-										err := m.Update([]component.Component{})
+										err := m.Update(component.Model{})
 										if err != nil {
 											subErrCh <- err
 										}

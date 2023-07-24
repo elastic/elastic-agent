@@ -127,8 +127,8 @@ type Manager struct {
 }
 
 type updateRequest struct {
-	components []component.Component
-	tearDown   bool
+	componentModel component.Model
+	tearDown       bool
 }
 
 // NewManager creates a new manager.
@@ -242,7 +242,7 @@ func (m *Manager) Run(ctx context.Context) error {
 		case req := <-m.updateChan:
 			// Begin the update, and point updateErrChan at our error reporting
 			// channel so we can notify Coordinator of the result.
-			updateErr = m.update(req.components, req.tearDown)
+			updateErr = m.update(req.componentModel, req.tearDown)
 			updateErrChan = m.errorChan
 		case updateErrChan <- updateErr:
 			// We sent the most recent update result, clear the channel until the
@@ -280,7 +280,7 @@ func (m *Manager) Update(model component.Model) error {
 	}
 	// teardown is true because the public `Update` method would be coming directly from
 	// policy so if a component was removed it needs to be torn down.
-	m.updateChan <- updateRequest{components, true}
+	m.updateChan <- updateRequest{model, true}
 	return nil
 }
 
