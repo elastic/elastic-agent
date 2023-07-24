@@ -1435,7 +1435,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		extraFlags := make([]string, 0, len(goTestFlags)+3)
 		extraFlags = append(extraFlags, goTestFlags...)
 		extraFlags = append(extraFlags, "-test.shuffle", "on",
-			"-test.timeout", "0", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
+			"-test.timeout", "0", "-test.run", "'^("+strings.Join(packageTests, "|")+")$'")
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
