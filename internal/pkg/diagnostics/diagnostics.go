@@ -150,7 +150,7 @@ func CreateCPUProfile(ctx context.Context, period time.Duration) ([]byte, error)
 	tc := time.After(period)
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("Got context done")
+		return nil, fmt.Errorf("got context done")
 	case <-tc:
 		break
 	}
@@ -292,11 +292,11 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 		Modified: ts,
 	})
 	if err != nil {
-		return fmt.Errorf("error writing header for error.txt file for component: %s", err)
+		return fmt.Errorf("error writing header for error.txt file for component: %w", err)
 	}
 	_, err = w.Write([]byte(fmt.Sprintf("%s\n", errBody)))
 	if err != nil {
-		return fmt.Errorf("error writing error.txt file for component: %s", err)
+		return fmt.Errorf("error writing error.txt file for component: %w", err)
 	}
 
 	return nil
