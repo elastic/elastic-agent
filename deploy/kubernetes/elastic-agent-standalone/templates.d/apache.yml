@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-apache
+      id: filestream-apache-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -41,6 +42,7 @@ inputs:
             - apache-error
       data_stream.namespace: default
     - name: httpjson-apache
+      id: httpjson-apache-${kubernetes.hints.container_id}
       type: httpjson
       use_output: default
       streams:
@@ -122,6 +124,7 @@ inputs:
             - apache-error
       data_stream.namespace: default
     - name: apache/metrics-apache
+      id: apache/metrics-apache-${kubernetes.hints.container_id}
       type: apache/metrics
       use_output: default
       streams:

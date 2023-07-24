@@ -708,9 +708,9 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
-func (r *fakeRuntimeManager) Update(components []component.Component) error {
+func (r *fakeRuntimeManager) Update(model component.Model) error {
 	if r.updateCallback != nil {
-		return r.updateCallback(components)
+		return r.updateCallback(model.Components)
 	}
 	return nil
 }

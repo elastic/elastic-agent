@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-symantec_endpoint
+      id: filestream-symantec_endpoint-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -28,6 +29,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: tcp-symantec_endpoint
+      id: tcp-symantec_endpoint-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -47,6 +49,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: udp-symantec_endpoint
+      id: udp-symantec_endpoint-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:

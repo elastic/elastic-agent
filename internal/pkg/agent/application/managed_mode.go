@@ -343,6 +343,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		&fleetapi.ActionUnenroll{},
 		handlers.NewUnenroll(
 			m.log,
+			m.coord,
 			m.ch,
 			[]context.CancelFunc{canceller},
 			m.stateStore,

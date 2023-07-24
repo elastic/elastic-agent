@@ -272,7 +272,7 @@ func (m *Manager) Errors() <-chan error {
 // Called from the main Coordinator goroutine.
 //
 // This returns as soon as possible, the work is performed in the background.
-func (m *Manager) Update(components []component.Component) error {
+func (m *Manager) Update(model component.Model) error {
 	shuttingDown := m.shuttingDown.Load()
 	if shuttingDown {
 		// ignore any updates once shutdown started
@@ -282,6 +282,34 @@ func (m *Manager) Update(components []component.Component) error {
 	// policy so if a component was removed it needs to be torn down.
 	m.updateChan <- updateRequest{components, true}
 	return nil
+}
+
+// State returns the current component states.
+func (m *Manager) State() []ComponentComponentState {
+	m.currentMx.RLock()
+	defer m.currentMx.RUnlock()
+	states := make([]ComponentComponentState, 0, len(m.current))
+	for _, crs := range m.current {
+		crs.latestMx.RLock()
+		var legacyPID string
+		if crs.runtime != nil {
+			if commandRuntime, ok := crs.runtime.(*commandRuntime); ok {
+				if commandRuntime != nil {
+					procInfo := commandRuntime.proc
+					if procInfo != nil {
+						legacyPID = fmt.Sprint(commandRuntime.proc.PID)
+					}
+				}
+			}
+		}
+		states = append(states, ComponentComponentState{
+			Component: crs.getCurrent(),
+			State:     crs.latestState.Copy(),
+			LegacyPID: legacyPID,
+		})
+		crs.latestMx.RUnlock()
+	}
+	return states
 }
 
 // PerformAction executes an action on a unit.
@@ -507,21 +535,21 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 // update updates the current state of the running components.
 //
 // This returns as soon as possible, work is performed in the background.
-func (m *Manager) update(components []component.Component, teardown bool) error {
+func (m *Manager) update(model component.Model, teardown bool) error {
 	// ensure that only one `update` can occur at the same time
 	m.updateMx.Lock()
 	defer m.updateMx.Unlock()
 
 	// prepare the components to add consistent shipper connection information between
 	// the connected components in the model
-	err := m.connectShippers(components)
+	err := m.connectShippers(model.Components)
 	if err != nil {
 		return err
 	}
 
 	touched := make(map[string]bool)
-	newComponents := make([]component.Component, 0, len(components))
-	for _, comp := range components {
+	newComponents := make([]component.Component, 0, len(model.Components))
+	for _, comp := range model.Components {
 		touched[comp.ID] = true
 		m.currentMx.RLock()
 		existing, ok := m.current[comp.ID]
@@ -552,7 +580,7 @@ func (m *Manager) update(components []component.Component, teardown bool) error 
 		var stoppedWg sync.WaitGroup
 		stoppedWg.Add(len(stop))
 		for _, existing := range stop {
-			_ = existing.stop(teardown)
+			_ = existing.stop(teardown, model.Signed)
 			// stop is async, wait for operation to finish,
 			// otherwise new instance may be started and components
 			// may fight for resources (e.g ports, files, locks)
@@ -626,7 +654,7 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) {
 func (m *Manager) shutdown() {
 	// don't tear down as this is just a shutdown, so components most likely will come back
 	// on next start of the manager
-	_ = m.update([]component.Component{}, false)
+	_ = m.update(component.Model{Components: []component.Component{}}, false)
 
 	// wait until all components are removed
 	for {

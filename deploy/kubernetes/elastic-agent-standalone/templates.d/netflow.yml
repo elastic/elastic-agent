@@ -1,5 +1,6 @@
 inputs:
     - name: netflow-netflow
+      id: netflow-netflow-${kubernetes.hints.container_id}
       type: netflow
       use_output: default
       streams:
@@ -26,6 +27,7 @@ inputs:
           timeout: ${kubernetes.hints.netflow.log.timeout|kubernetes.hints.netflow.timeout|'}
       data_stream.namespace: default
     - name: filestream-netflow
+      id: filestream-netflow-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

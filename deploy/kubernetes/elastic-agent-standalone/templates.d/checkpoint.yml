@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-checkpoint
+      id: filestream-checkpoint-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -34,6 +35,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: tcp-checkpoint
+      id: tcp-checkpoint-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -48,6 +50,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: udp-checkpoint
+      id: udp-checkpoint-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:

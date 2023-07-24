@@ -92,7 +92,7 @@ type RuntimeManager interface {
 	Runner
 
 	// Update updates the current components model.
-	Update([]component.Component) error
+	Update(model component.Model) error
 
 	// State returns the current components model state.
 	//State() []runtime.ComponentComponentState
@@ -1002,9 +1002,25 @@ func (c *Coordinator) process(ctx context.Context) (err error) {
 		return err
 	}
 
+	signed, err := component.SignedFromPolicy(c.derivedConfig)
+	if err != nil {
+		if !errors.Is(err, component.ErrNotFound) {
+			c.logger.Errorf("Failed to parse \"signed\" properties: %v", err)
+			return err
+		}
+
+		// Some "signed" properties are not found, continue.
+		c.logger.Debugf("Continue with missing \"signed\" properties: %v", err)
+	}
+
+	model := component.Model{
+		Components: c.componentModel,
+		Signed:     signed,
+	}
+
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", c.componentModel).Debug("Updating running component model")
-	err = c.runtimeMgr.Update(c.componentModel)
+	c.logger.With("components", model.Components).Debug("Updating running component model")
+	err = c.runtimeMgr.Update(model)
 	if err != nil {
 		return err
 	}
