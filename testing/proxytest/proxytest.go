@@ -26,22 +26,19 @@ type Proxy struct {
 	// LocalhostURL is the server URL as "http://localhost:PORT".
 	LocalhostURL string
 
-	// proxiedRequests stores a copy of every request this proxy receives.
-	proxiedRequests   []string // []*http.Request
+	// proxiedRequests is a "request log" for every request the proxy receives.
+	proxiedRequests   []string
 	proxiedRequestsMu sync.Mutex
 }
 
-// ProxiedRequests returns a slice with each URL request the proxy received.
+// ProxiedRequests returns a slice with the "request log" with every request the
+// proxy received.
 func (p *Proxy) ProxiedRequests() []string {
 	p.proxiedRequestsMu.Lock()
 	defer p.proxiedRequestsMu.Unlock()
 
 	rs := make([]string, len(p.proxiedRequests))
-	for _, r := range p.proxiedRequests {
-		rs = append(rs, r)
-	}
-
-	return rs
+	return append(rs, p.proxiedRequests...)
 }
 
 type Option func(o *options)
@@ -86,7 +83,7 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		o(&opts)
 	}
 
-	l, err := net.Listen("tcp", opts.addr) //nolint:gosec // it's a test
+	l, err := net.Listen("tcp", opts.addr) //nolint:gosec,nolintlint // it's a test
 	if err != nil {
 		t.Fatalf("NewServer failed to create a net.Listener: %v", err)
 	}
@@ -95,15 +92,14 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 	s.Server = &httptest.Server{
 		Listener: l,
+		//nolint:gosec,nolintlint // it's a test
 		Config: &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 			switch {
 			case opts.rewriteURL != nil:
 				opts.rewriteURL(r.URL)
-				break
 			case opts.rewriteHost != nil:
 				r.URL.Host = opts.rewriteHost(r.URL.Host)
-				break
 			}
 
 			s.proxiedRequestsMu.Lock()
@@ -121,6 +117,7 @@ func New(t *testing.T, optns ...Option) *Proxy {
 				_, _ = fmt.Fprint(w, msg)
 				return
 			}
+			defer resp.Body.Close()
 
 			w.WriteHeader(resp.StatusCode)
 			for k, v := range resp.Header {
