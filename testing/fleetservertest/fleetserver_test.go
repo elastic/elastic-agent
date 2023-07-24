@@ -117,7 +117,7 @@ func ExampleNewServer_status() {
 	apiKey := "aAPIKey"
 	ts := NewServer(&Handlers{
 		APIKey:   apiKey,
-		StatusFn: NewHandlerStatusHealth(),
+		StatusFn: NewHandlerStatusHealthy(),
 	})
 
 	r, err := http.NewRequest(http.MethodGet, ts.URL+PathStatus, nil) //nolint:noctx // it's a test
@@ -214,7 +214,7 @@ func ExampleNewServer_ack() {
 	// &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}, fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
 }
 
-func ExampleNewServer_enrol() {
+func ExampleNewServer_enroll() {
 	nowStr := "2009-11-10T23:00:00+00:00"
 	now, err := time.Parse(time.RFC3339, nowStr)
 	if err != nil {
@@ -247,12 +247,12 @@ func ExampleNewServer_enrol() {
 		},
 	})
 	if err != nil {
-		panic(fmt.Sprintf("could not execute enrol command: %v", err))
+		panic(fmt.Sprintf("could not execute enroll command: %v", err))
 	}
 
 	bs, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
-		panic(fmt.Sprintf("could not marshal enrol response: %v", err))
+		panic(fmt.Sprintf("could not marshal enroll response: %v", err))
 	}
 	fmt.Println(string(bs))
 
@@ -571,7 +571,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	handlers := &Handlers{
 		CheckinFn: NewHandlerCheckin(nextAction),
 		AckFn:     NewHandlerAckWithAcker(acker),
-		StatusFn:  NewHandlerStatusHealth(),
+		StatusFn:  NewHandlerStatusHealthy(),
 	}
 	ts := NewServer(handlers, WithAgentID(agentID)) // as there is no enrol, the agentID needs to be manually set
 

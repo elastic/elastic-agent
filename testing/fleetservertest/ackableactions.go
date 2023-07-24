@@ -138,11 +138,8 @@ func (c *CheckinActionsWithAcker) Checkins() []CheckinData {
 	defer c.mu.Unlock()
 
 	var checkins []CheckinData
-	for _, ch := range c.checkinDatas {
-		checkins = append(checkins, ch)
-	}
 
-	return checkins
+	return append(checkins, c.checkinDatas...)
 }
 
 // CheckinsSent return all checkins already sent.
@@ -152,10 +149,7 @@ func (c *CheckinActionsWithAcker) CheckinsSent() []CheckinData {
 
 	var checkins []CheckinData
 
-	for _, ch := range c.checkinDatas[:c.checkinsSent] {
-		checkins = append(checkins, ch)
-	}
-	return checkins
+	return append(checkins, c.checkinDatas[:c.checkinsSent]...)
 }
 
 func (c *CheckinActionsWithAcker) Acked(actionID string) bool {

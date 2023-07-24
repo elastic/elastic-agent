@@ -40,23 +40,23 @@ type options struct {
 // of http://[::]:PORT, not valid to be used directly. Use Server.LocalhostURL
 // or
 func NewServer(h *Handlers, opts ...Option) *Server {
-	os := options{}
+	optns := options{}
 	for _, o := range opts {
-		o(&os)
+		o(&optns)
 	}
 
-	if os.logFn != nil {
-		h.logFn = os.logFn
+	if optns.logFn != nil {
+		h.logFn = optns.logFn
 	}
-	if os.agentID != "" {
-		h.AgentID = os.agentID
+	if optns.agentID != "" {
+		h.AgentID = optns.agentID
 	}
 
 	mux := NewRouter(h)
 
 	address := ":0"
-	if os.address != "" {
-		address = os.address
+	if optns.address != "" {
+		address = optns.address
 	}
 
 	l, err := net.Listen("tcp", address) //nolint:gosec // it's a test
@@ -127,11 +127,11 @@ func NewServerWithHandlers(
 	handlers := &Handlers{
 		APIKey:          apiKey.Key,
 		EnrollmentToken: enrolmentToken,
-		AgentID:         agentID, // as there is no enrol, the agentID needs to be manually set
+		AgentID:         agentID, // as there is no enroll, the agentID needs to be manually set
 		CheckinFn:       NewHandlerCheckin(nextAction),
 		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
 		AckFn:           NewHandlerAckWithAcker(acker),
-		StatusFn:        NewHandlerStatusHealth(),
+		StatusFn:        NewHandlerStatusHealthy(),
 	}
 
 	return NewServer(handlers, opts...)
