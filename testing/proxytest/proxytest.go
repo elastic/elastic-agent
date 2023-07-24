@@ -31,16 +31,14 @@ type Proxy struct {
 	proxiedRequestsMu sync.Mutex
 }
 
-// ProxiedRequests returns a slice with a copy of every request the proxy received.
+// ProxiedRequests returns a slice with each URL request the proxy received.
 func (p *Proxy) ProxiedRequests() []string {
 	p.proxiedRequestsMu.Lock()
-	p.proxiedRequestsMu.Unlock()
+	defer p.proxiedRequestsMu.Unlock()
 
 	rs := make([]string, len(p.proxiedRequests))
-	// rs := make([]*http.Request, len(p.proxiedRequests))
 	for _, r := range p.proxiedRequests {
 		rs = append(rs, r)
-		// rs = append(rs, r.Clone(context.Background()))
 	}
 
 	return rs
