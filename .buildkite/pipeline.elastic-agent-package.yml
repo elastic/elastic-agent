@@ -52,7 +52,7 @@ steps:
     key: package_elastic-agent
     agents:
       provider: "gcp"
-      machineType: "c2-standard-16"
+      machineType: "t2a-standard-8"
     command: |
       if [[ -z "${DEV}" ]]; then
         export DEV=$(buildkite-agent meta-data get DEV --default "true")
