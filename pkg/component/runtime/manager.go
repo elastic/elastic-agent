@@ -284,34 +284,6 @@ func (m *Manager) Update(model component.Model) error {
 	return nil
 }
 
-// State returns the current component states.
-func (m *Manager) State() []ComponentComponentState {
-	m.currentMx.RLock()
-	defer m.currentMx.RUnlock()
-	states := make([]ComponentComponentState, 0, len(m.current))
-	for _, crs := range m.current {
-		crs.latestMx.RLock()
-		var legacyPID string
-		if crs.runtime != nil {
-			if commandRuntime, ok := crs.runtime.(*commandRuntime); ok {
-				if commandRuntime != nil {
-					procInfo := commandRuntime.proc
-					if procInfo != nil {
-						legacyPID = fmt.Sprint(commandRuntime.proc.PID)
-					}
-				}
-			}
-		}
-		states = append(states, ComponentComponentState{
-			Component: crs.getCurrent(),
-			State:     crs.latestState.Copy(),
-			LegacyPID: legacyPID,
-		})
-		crs.latestMx.RUnlock()
-	}
-	return states
-}
-
 // PerformAction executes an action on a unit.
 func (m *Manager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
 	id, err := uuid.NewV4()
