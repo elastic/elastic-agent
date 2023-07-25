@@ -51,7 +51,7 @@ steps:
   - group: ":Packaging Artefacts"
     key: "package"
     steps:
-      - label: ":package: Package elastic-agent"
+      - label: ":package: Cross Building and package elastic-agent"
         key: package_elastic-agent
         agents:
           provider: "gcp"
@@ -79,6 +79,9 @@ steps:
           provider: "aws"
           instanceType: "t4g.xlarge"
           imagePrefix: "core-ubuntu-2004-aarch64"
+        env:
+          PLATFORMS: "linux/arm64"
+          PACKAGES: "docker"
         command: |
           if [[ -z "${DEV}" ]]; then
             export DEV=$(buildkite-agent meta-data get DEV --default "true")
@@ -93,8 +96,6 @@ steps:
           if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
             export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
           fi
-          export PLATFORMS=linux/arm64
-          export PACKAGES=docker
           .buildkite/scripts/steps/package.sh
         artifact_paths:
           - "build/distributions/**/*"
@@ -104,13 +105,14 @@ steps:
     depends_on: package
     agents:
       provider: "gcp"
-      machineType: "c2-standard-16"
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
     command: |
       echo "+++ Restoring Artifacts"
       buildkite-agent artifact download "build/**/*" .
+      echo "+++ Changing permissions for the release manager"
+      sudo chown -R :1000 build/distributions/
       echo "+++ Running DRA publish step"
       if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
         export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
