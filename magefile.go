@@ -1436,7 +1436,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		testPrefix := fmt.Sprintf("%s.%s", prefix, filepath.Base(packageName))
 		testName := fmt.Sprintf("remote-%s", testPrefix)
 		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
-		extraFlags := make([]string, 0, len(goTestFlags)+3)
+		extraFlags := make([]string, 0, len(goTestFlags)+6)
 		if len(goTestFlags) > 0 {
 			extraFlags = append(extraFlags, goTestFlags...)
 		}
