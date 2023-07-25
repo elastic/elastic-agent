@@ -302,6 +302,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
 
 	t.Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)

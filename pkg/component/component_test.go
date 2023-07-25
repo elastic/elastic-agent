@@ -1894,7 +1894,6 @@ func TestToComponents(t *testing.T) {
 					actual := result[i]
 					if expected.Err != nil {
 						assert.Contains(t, actual.Err.Error(), expected.Err.Error())
-						// assert.Equal(t, expected.Err, actual.Err)
 						assert.EqualValues(t, expected.Units, actual.Units)
 					} else {
 						assert.NoError(t, actual.Err, "Expected no error for component "+actual.ID)
@@ -1952,6 +1951,9 @@ func TestPreventionsAreValid(t *testing.T) {
 	// you update `docs/component-specs.md` in the same PR to document
 	// the change.
 	vars, err := transpiler.NewVars("", map[string]interface{}{
+		"install": map[string]interface{}{
+			"in_default": true,
+		},
 		"runtime": map[string]interface{}{
 			"platform": "platform",
 			"os":       "os",
@@ -1959,11 +1961,7 @@ func TestPreventionsAreValid(t *testing.T) {
 			"family":   "family",
 			"major":    "major",
 			"minor":    "minor",
-			"install": map[string]interface{}{
-				"default": true,
-			},
 		},
-
 		"user": map[string]interface{}{
 			"root": false,
 		},

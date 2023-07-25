@@ -824,6 +824,9 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 		return nil, err
 	}
 	return transpiler.NewVars("", map[string]interface{}{
+		"install": map[string]interface{}{
+			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)),
+		},
 		"runtime": map[string]interface{}{
 			"platform": platform.String(),
 			"os":       platform.OS,
@@ -831,9 +834,6 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 			"family":   platform.Family,
 			"major":    platform.Major,
 			"minor":    platform.Minor,
-			"install": map[string]interface{}{
-				"default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)),
-			},
 		},
 		"user": map[string]interface{}{
 			"root": hasRoot,
