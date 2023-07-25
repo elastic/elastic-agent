@@ -50,7 +50,7 @@ agent.upgrade.watcher:
 `
 
 // notable versions used in tests
-var version_8_0_0 = version.NewParsedSemVer(8, 0, 0, "", "")
+//var version_8_0_0 = version.NewParsedSemVer(8, 0, 0, "", "")
 var version_8_7_0 = version.NewParsedSemVer(8, 7, 0, "", "")
 var version_8_9_0_SNAPSHOT = version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")
 
@@ -65,15 +65,11 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	upgradableVersions, latestVersion := getUpgradableAndLatestVersions(ctx, t)
+	upgradableVersions := getUpgradableVersions(ctx, t)
 
 	for _, uv := range upgradableVersions {
 
-		if uv == latestVersion {
-			t.Logf("Skipping upgrade test for version %q", latestVersion)
-			continue
-		}
-		t.Run(fmt.Sprintf("Upgrade managed agent from %s to %s", uv, latestVersion), func(t *testing.T) {
+		t.Run(fmt.Sprintf("Upgrade managed agent from %s to %s", uv, define.Version()), func(t *testing.T) {
 			agentFixture, err := atesting.NewFixture(
 				t,
 				uv,
@@ -85,7 +81,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
-			testUpgradeFleetManagedElasticAgent(t, info, agentFixture, latestVersion)
+			testUpgradeFleetManagedElasticAgent(t, info, agentFixture, define.Version())
 		})
 	}
 }
@@ -172,11 +168,8 @@ func TestStandaloneUpgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	versionList, _ := getUpgradableAndLatestVersions(ctx, t)
+	versionList := getUpgradableVersions(ctx, t)
 
-	// FIXME agent 7.X has a different control protocol which makes the upgrade, status command tricky (the fixture allocates a v2 client)
-	//	skip anything below 8.X
-	minVersion := version_8_0_0
 	for _, v := range versionList {
 		parsedVersion, err := version.ParseVersion(v)
 		if err != nil {
@@ -184,7 +177,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 			continue
 		}
 
-		if v == define.Version() || parsedVersion.IsSnapshot() || parsedVersion.Less(*minVersion) {
+		if v == define.Version() || parsedVersion.IsSnapshot() {
 			t.Logf("Skipping upgrade test for version %q", v)
 			continue
 		}
@@ -311,22 +304,17 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 
 }
 
-func getUpgradableAndLatestVersions(ctx context.Context, t *testing.T) (upgradableVersions []string, latestVersion string) {
+func getUpgradableVersions(ctx context.Context, t *testing.T) (upgradableVersions []string) {
 	t.Helper()
 	aac := tools.NewArtifactAPIClient()
 	vList, err := aac.GetVersions(ctx)
 	require.NoError(t, err, "error retrieving versions from Artifact API")
-	require.NotNil(t, vList)
+	require.NotEmpty(t, vList)
 
-	latestVersion = vList.Versions[len(vList.Versions)-1]
-
-	// upgradableVersions = []string{"8.8.1"}
-
-	// TODO uncomment this when the extra go test flags can be passed
 	if testing.Short() {
 		upgradableVersions = []string{"8.6.2", "8.7.1", "8.8.1"}
 	} else {
-		artifactAPIVersions := vList.Versions
+		artifactAPIVersions := vList.Versions[:len(vList.Versions)-1]
 		for _, aav := range artifactAPIVersions {
 			parsedVersion, err := version.ParseVersion(aav)
 			require.NoError(t, err, "Received unparseable version from Artifact API")
@@ -358,13 +346,13 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 	defer c.Disconnect()
 
 	require.Eventually(t, func() bool {
-		return checkAgentHealthAndVersion(t, ctx, c, parsedFromVersion.CoreVersion(), parsedFromVersion.IsSnapshot(), "")
+		return checkAgentHealthAndVersion(t, ctx, f, parsedFromVersion.CoreVersion(), parsedFromVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
 	t.Logf("Upgrading to version %q", toVersion)
 
-	sourceURI := ""
-	skipVerify := false
+	upgradeCmdArgs := []string{"upgrade", toVersion}
+
 	if version_8_7_0.Less(*parsedFromVersion) {
 		// if we are upgrading from a version > 8.7.0 (min version to skip signature verification) we pass :
 		// - a file:// sourceURI pointing the agent package under test
@@ -374,16 +362,16 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 
 		srcPkg, err := tof.SrcPackage(ctx)
 		require.NoError(t, err)
-		sourceURI = "file://" + filepath.Dir(srcPkg)
-		t.Logf("set sourceURI to : %q", sourceURI)
-		skipVerify = true
+		sourceURI := "file://" + filepath.Dir(srcPkg)
+		t.Logf("setting sourceURI to : %q", sourceURI)
+		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI, "--skip-verify")
 	}
 
-	_, err = c.Upgrade(ctx, toVersion, sourceURI, skipVerify)
+	_, err = f.Exec(ctx, upgradeCmdArgs)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
 
 	require.Eventuallyf(t, func() bool {
-		return checkAgentHealthAndVersion(t, ctx, c, parsedUpgradeVersion.CoreVersion(), parsedUpgradeVersion.IsSnapshot(), expectedAgentHashAfterUpgrade)
+		return checkAgentHealthAndVersion(t, ctx, f, parsedUpgradeVersion.CoreVersion(), parsedUpgradeVersion.IsSnapshot(), expectedAgentHashAfterUpgrade)
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
 	parsedFromV, err := version.ParseVersion(fromVersion)
@@ -392,19 +380,28 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 	checkUpgradeWatcherRan(t, f, parsedFromV)
 
 	if expectedAgentHashAfterUpgrade != "" {
-		version, err := c.Version(ctx)
+		aVersion, err := c.Version(ctx)
 		assert.NoError(t, err, "error checking version after upgrade")
-		assert.Equal(t, expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+		assert.Equal(t, expectedAgentHashAfterUpgrade, aVersion.Commit, "agent commit hash changed after upgrade")
 	}
 }
 
-func checkAgentHealthAndVersion(t *testing.T, ctx context.Context, c client.Client, expectedVersion string, snapshot bool, expectedHash string) bool {
+func checkAgentHealthAndVersion(t *testing.T, ctx context.Context, f *atesting.Fixture, expectedVersion string, snapshot bool, expectedHash string) bool {
 	t.Helper()
-	state, err := c.State(ctx)
+
+	stateOut, err := f.Exec(ctx, []string{"status", "--output", "yaml"})
 	if err != nil {
 		t.Logf("error getting the agent state: %v", err)
 		return false
 	}
+
+	var state client.AgentState
+	err = yaml.Unmarshal(stateOut, &state)
+	if err != nil {
+		t.Logf("error unmarshaling the agent state: %v", err)
+		return false
+	}
+
 	t.Logf("current agent state: %+v", state)
 	info := state.Info
 	if expectedHash != "" {
