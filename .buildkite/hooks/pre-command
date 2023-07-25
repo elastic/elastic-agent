@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+if [[ -z "${WORKSPACE-""}" ]]; then
+    export WORKSPACE=$(git rev-parse --show-toplevel)
+fi
+if [[ -z "${GO_VERSION-""}" ]]; then
+    export GO_VERSION=$(cat "${WORKSPACE}/.go-version")
+fi
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 
