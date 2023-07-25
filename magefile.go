@@ -1405,7 +1405,11 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		return errors.New("TEST_DEFINE_TESTS environment variable must be set")
 	}
 
-	goTestFlags := strings.SplitN(os.Getenv("GOTEST_FLAGS"), " ", -1)
+	var goTestFlags []string
+	rawTestFlags := os.Getenv("GOTEST_FLAGS")
+	if rawTestFlags != "" {
+		goTestFlags = strings.Split(rawTestFlags, " ")
+	}
 
 	tests := strings.Split(testsStr, ",")
 	testsByPackage := make(map[string][]string)
@@ -1433,9 +1437,11 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		testName := fmt.Sprintf("remote-%s", testPrefix)
 		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
 		extraFlags := make([]string, 0, len(goTestFlags)+3)
-		extraFlags = append(extraFlags, goTestFlags...)
+		if len(goTestFlags) > 0 {
+			extraFlags = append(extraFlags, goTestFlags...)
+		}
 		extraFlags = append(extraFlags, "-test.shuffle", "on",
-			"-test.timeout", "0", "-test.run", "'^("+strings.Join(packageTests, "|")+")$'")
+			"-test.timeout", "0", "-test.run", strings.Join(packageTests, "|"))
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
