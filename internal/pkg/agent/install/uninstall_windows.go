@@ -20,55 +20,67 @@ func isBlockingOnExe(err error) bool {
 	if err == nil {
 		return false
 	}
-	path := getPathFromError(err)
-	return path != ""
+	path, errno := getPathFromError(err)
+	if path == "" {
+		return false
+	}
+	return errno == syscall.ERROR_ACCESS_DENIED
 }
 
-func removeBlockingExe(blockingErr error) (string, error) {
-	path := getPathFromError(blockingErr)
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	path, errno := getPathFromError(err)
 	if path == "" {
-		return "", nil
+		return false
+	}
+	return errno == syscall.ERROR_ACCESS_DENIED || errno == windows.ERROR_SHARING_VIOLATION
+}
+
+func removeBlockingExe(blockingErr error) error {
+	path, _ := getPathFromError(blockingErr)
+	if path == "" {
+		return nil
 	}
 
 	// open handle for delete only
 	h, err := openDeleteHandle(path)
 	if err != nil {
-		return "", fmt.Errorf("failed to open handle for %q: %w", path, err)
+		return fmt.Errorf("failed to open handle for %q: %w", path, err)
 	}
 
 	// rename handle
 	err = renameHandle(h)
 	_ = windows.CloseHandle(h)
 	if err != nil {
-		return "", fmt.Errorf("failed to rename handle for %q: %w", path, err)
+		return fmt.Errorf("failed to rename handle for %q: %w", path, err)
 	}
 
 	// re-open handle
 	h, err = openDeleteHandle(path)
 	if err != nil {
-		return "", fmt.Errorf("failed to open handle after rename for %q: %w", path, err)
+		return fmt.Errorf("failed to open handle after rename for %q: %w", path, err)
 	}
 
 	// dispose of the handle
 	err = disposeHandle(h)
 	_ = windows.CloseHandle(h)
 	if err != nil {
-		return "", fmt.Errorf("failed to dispose handle for %q: %w", path, err)
+		return fmt.Errorf("failed to dispose handle for %q: %w", path, err)
 	}
-	return path, nil
+	return nil
 }
 
-func getPathFromError(blockingErr error) string {
+func getPathFromError(blockingErr error) (string, syscall.Errno) {
 	var perr *fs.PathError
 	if errors.As(blockingErr, &perr) {
 		var errno syscall.Errno
 		if errors.As(perr.Err, &errno) {
-			if errno == syscall.ERROR_ACCESS_DENIED {
-				return perr.Path
-			}
+			return perr.Path, errno
 		}
 	}
-	return ""
+	return "", 0
 }
 
 func openDeleteHandle(path string) (windows.Handle, error) {

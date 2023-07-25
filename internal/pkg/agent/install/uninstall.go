@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/kardianos/service"
 
@@ -92,31 +93,30 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 // of running into an executable running that might prevent removal
 // on Windows.
 func RemovePath(path string) error {
-	var previousPath string
-	cleanupErr := os.RemoveAll(path)
-	for cleanupErr != nil && isBlockingOnExe(cleanupErr) {
-		// remove the blocking exe
-		hardPath, hardErr := removeBlockingExe(cleanupErr)
-		if hardErr != nil {
-			// failed to remove the blocking exe (cannot continue)
-			return hardErr
+	const arbitraryTimeout = 2 * time.Second
+	var start time.Time
+	nextSleep := 1 * time.Millisecond
+	for {
+		err := os.RemoveAll(path)
+		if err == nil {
+			return nil
 		}
-		// this if statement is being defensive and ensuring that an
-		// infinite loop to remove the same path does not occur
-		if hardPath != "" {
-			if previousPath == hardPath {
-				// no reason the previous path should be the same
-				// removeBlockingExe did not work correctly
-				//
-				// cleanupErr will contain the real error
-				return cleanupErr
-			}
-			previousPath = hardPath
+		if isBlockingOnExe(err) {
+			// try to remove the blocking exe
+			err = removeBlockingExe(err)
 		}
-		// try to remove the original path now again
-		cleanupErr = os.RemoveAll(path)
+		if err == nil {
+			return nil
+		}
+		if !isRetryableError(err) {
+			return err
+		}
+		if start.IsZero() {
+			start = time.Now()
+		} else if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
+			return err
+		}
 	}
-	return cleanupErr
 }
 
 func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
