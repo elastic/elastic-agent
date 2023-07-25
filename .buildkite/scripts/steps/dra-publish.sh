@@ -73,6 +73,10 @@ function run_release_manager_collect() {
         "${_dry_run}"
 }
 
+echo "+++ Changing permissions for the release manager"
+chown -R :1000 build/distributions/
+chmod g+s build/distributions/
+
 echo "+++ Release Manager ${WORKFLOW} / ${BRANCH} / ${COMMIT}";
 run_release_manager_list "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}"
 run_release_manager_collect "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}" "${DRY_RUN}"
