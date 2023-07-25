@@ -54,6 +54,23 @@ var (
 	ErrNoUnit = errors.New("no unit under control of this manager")
 )
 
+type actionRequest struct {
+	ctx        context.Context
+	comp       component.Component
+	unit       component.Unit
+	name       string
+	actionType proto.ActionRequest_Type
+	params     map[string]interface{}
+
+	responseChan chan actionResponse
+}
+
+type actionResponse struct {
+	result      map[string]interface{}
+	diagnostics []*proto.ActionDiagnosticUnitResult
+	err         error
+}
+
 // ComponentComponentState provides a structure to map a component to current component state.
 type ComponentComponentState struct {
 	Component component.Component `yaml:"component"`
@@ -113,8 +130,11 @@ type Manager struct {
 	//subMx            sync.RWMutex
 	//subscriptions    map[string][]*Subscription
 	stateChangeChan chan ComponentComponentState
-	updateChan      chan updateRequest
-	errorChan       chan error
+
+	updateChan chan updateRequest
+	actionChan chan actionRequest
+
+	errorChan chan error
 	//subAllMx      sync.RWMutex
 	//subscribeAll  []*SubscriptionAll
 
@@ -286,38 +306,72 @@ func (m *Manager) Update(model component.Model) error {
 
 // PerformAction executes an action on a unit.
 func (m *Manager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
-	id, err := uuid.NewV4()
+	req := actionRequest{
+		ctx:        ctx,
+		comp:       comp,
+		unit:       unit,
+		name:       name,
+		actionType: proto.ActionRequest_CUSTOM,
+		params:     params,
+
+		responseChan: make(chan actionResponse, 1),
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case m.actionChan <- req:
+	}
+	// If the request sent, then we're guaranteed to get some response
+	response := <-req.responseChan
+	return response.result, response.err
+}
+
+func (m *Manager) handleAction(req actionRequest) (map[string]interface{}, error) {
+	runtime := m.getRuntimeFromUnit(req.comp, req.unit)
+	if runtime == nil {
+		return nil, ErrNoUnit
+	}
+
+	res, err := runtime.performAction(req)
 	if err != nil {
 		return nil, err
 	}
-	paramBytes := []byte("{}")
-	if params != nil {
-		paramBytes, err = json.Marshal(params)
+
+	if res.Result != nil {
+		err = json.Unmarshal(res.Result, &respBody)
 		if err != nil {
 			return nil, err
 		}
 	}
+	return respBody, nil
+}
+
+func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
 	runtime := m.getRuntimeFromUnit(comp, unit)
 	if runtime == nil {
 		return nil, ErrNoUnit
 	}
 
-	req := &proto.ActionRequest{
-		Id:       id.String(),
-		Name:     name,
-		Params:   paramBytes,
-		UnitId:   unit.ID,
-		UnitType: proto.UnitType(unit.Type),
-		Type:     proto.ActionRequest_CUSTOM,
-	}
+	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
+	defer cancel()
 
-	res, err := runtime.performAction(ctx, req)
+	id, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
 	}
 
-	var respBody map[string]interface{}
+	req := &proto.ActionRequest{
+		Id:       id.String(),
+		UnitId:   unit.ID,
+		UnitType: proto.UnitType(unit.Type),
+		Type:     proto.ActionRequest_DIAGNOSTICS,
+	}
+	res, err := runtime.performAction(req)
+	if err != nil {
+		return nil, err
+	}
 	if res.Status == proto.ActionResponse_FAILED {
+		var respBody map[string]interface{}
 		if res.Result != nil {
 			err = json.Unmarshal(res.Result, &respBody)
 			if err != nil {
@@ -331,15 +385,9 @@ func (m *Manager) PerformAction(ctx context.Context, comp component.Component, u
 				}
 			}
 		}
-		return nil, errors.New("generic action failure")
+		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
-	if res.Result != nil {
-		err = json.Unmarshal(res.Result, &respBody)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return respBody, nil
+	return res.Diagnostic, nil
 }
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
@@ -732,50 +780,6 @@ func (m *Manager) getListenAddr() string {
 		}
 	}
 	return m.listenAddr
-}
-
-func (m *Manager) performDiagAction(ctx context.Context, comp component.Component, unit component.Unit) ([]*proto.ActionDiagnosticUnitResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, diagnosticTimeout)
-	defer cancel()
-
-	id, err := uuid.NewV4()
-	if err != nil {
-		return nil, err
-	}
-
-	runtime := m.getRuntimeFromUnit(comp, unit)
-	if runtime == nil {
-		return nil, ErrNoUnit
-	}
-
-	req := &proto.ActionRequest{
-		Id:       id.String(),
-		UnitId:   unit.ID,
-		UnitType: proto.UnitType(unit.Type),
-		Type:     proto.ActionRequest_DIAGNOSTICS,
-	}
-	res, err := runtime.performAction(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	if res.Status == proto.ActionResponse_FAILED {
-		var respBody map[string]interface{}
-		if res.Result != nil {
-			err = json.Unmarshal(res.Result, &respBody)
-			if err != nil {
-				return nil, err
-			}
-			errMsgT, ok := respBody["error"]
-			if ok {
-				errMsg, ok := errMsgT.(string)
-				if ok {
-					return nil, errors.New(errMsg)
-				}
-			}
-		}
-		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
-	}
-	return res.Diagnostic, nil
 }
 
 type waitForReady struct {

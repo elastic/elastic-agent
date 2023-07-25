@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/gofrs/uuid"
 )
 
 // componentRuntime manages runtime lifecycle operations for a component and stores its state.
@@ -188,35 +190,81 @@ func (s *componentRuntimeState) stop(teardown bool, signed *component.Signed) er
 	return s.runtime.Stop()
 }
 
-func (s *componentRuntimeState) performAction(ctx context.Context, req *proto.ActionRequest) (*proto.ActionResponse, error) {
+func (s *componentRuntimeState) performAction(req actionRequest) (*proto.ActionResponse, error) {
+	rawID, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+	id := rawID.String()
+
+	paramBytes := []byte("{}")
+	if req.params != nil {
+		paramBytes, err = json.Marshal(req.params)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	protoReq := &proto.ActionRequest{
+		Id:       id,
+		Name:     req.name,
+		Params:   paramBytes,
+		UnitId:   req.unit.ID,
+		UnitType: proto.UnitType(req.unit.Type),
+		Type:     proto.ActionRequest_CUSTOM,
+	}
+
 	ch := make(chan *proto.ActionResponse)
 	callback := func(response *proto.ActionResponse) {
 		ch <- response
 	}
 
 	s.actionsMx.Lock()
-	s.actions[req.Id] = callback
+	s.actions[id] = callback
 	s.actionsMx.Unlock()
 
 	select {
-	case <-ctx.Done():
+	case <-req.ctx.Done():
 		s.actionsMx.Lock()
-		delete(s.actions, req.Id)
+		delete(s.actions, id)
 		s.actionsMx.Unlock()
-		return nil, ctx.Err()
-	case s.comm.actionsRequest <- req:
+		return nil, req.ctx.Err()
+	case s.comm.actionsRequest <- protoReq:
 	}
 
 	var resp *proto.ActionResponse
 
 	select {
-	case <-ctx.Done():
+	case <-req.ctx.Done():
 		s.actionsMx.Lock()
-		delete(s.actions, req.Id)
+		delete(s.actions, id)
 		s.actionsMx.Unlock()
-		return nil, ctx.Err()
+		return nil, req.ctx.Err()
 	case resp = <-ch:
 	}
+
+	var respBody map[string]interface{}
+	if resp.Result != nil {
+		err = json.Unmarshal(resp.Result, &respBody)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if resp.Status == proto.ActionResponse_FAILED {
+		if respBody != nil {
+			if errMsgT, ok := respBody["error"]; ok {
+				if errMsg, ok := errMsgT.(string); ok {
+					return nil, errors.New(errMsg)
+				}
+			}
+		}
+		// Failed status, but no error message in the body
+		return nil, errors.New("generic action failure")
+	}
+
+	resp.Diagnostic
+	//return respBody, nil
 
 	return resp, nil
 }
