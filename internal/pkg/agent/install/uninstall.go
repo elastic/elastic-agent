@@ -92,6 +92,10 @@ func Uninstall(cfgFile, topPath, uninstallToken string) error {
 // RemovePath helps with removal path where there is a probability
 // of running into an executable running that might prevent removal
 // on Windows.
+//
+// On Windows it is possible that a removal can spuriously error due
+// to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
+// seconds if it keeps getting that error.
 func RemovePath(path string) error {
 	const arbitraryTimeout = 2 * time.Second
 	var start time.Time
