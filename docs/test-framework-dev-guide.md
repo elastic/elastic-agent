@@ -68,6 +68,7 @@ We want to run only the test named "TestStandaloneUpgrade"
 ##### Run a tests matching a partial expression
 We want to run any test with "Upgrade" in the name
 `GOTEST_FLAGS="-test.run Upgrade" mage integration:test`
+
 ##### Run a single test and signal that we want the short version
 We pass a `-test.short` flag along with the name match
 `GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$ -test.short" mage integration:test`
