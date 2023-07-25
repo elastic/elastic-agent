@@ -77,6 +77,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 		},
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(t, fixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
 	installElasticDefendPackage(t, info, policyResp.ID)
@@ -133,6 +134,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 		},
 	}
 	policyResp, err := tools.InstallAgentWithPolicy(t, fixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
 	installElasticDefendPackage(t, info, policyResp.ID)
