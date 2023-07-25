@@ -86,8 +86,8 @@ type Acker func(actionID string) (AckResponseItem, bool)
 
 // NewHandlerAckWithAcker takes an acker, a function that for each actionID must
 // return the expected AckResponseItem for that action and if this ack errored
-// or not.
-// TODO(Anderson): fix me
+// or not, and returns a Ack handler which uses the provided acker when acking
+// agent actions.
 func NewHandlerAckWithAcker(acker func(actionID string) (AckResponseItem, bool)) func(
 	ctx context.Context,
 	h *Handlers,

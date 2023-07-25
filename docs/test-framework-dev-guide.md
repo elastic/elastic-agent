@@ -59,41 +59,9 @@ with `go test`. E.g.:
 TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
 ```
 
-#### Passing additional go test flags
-
-When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
-
-These flags are passed also when calculating batches for remote execution of integration tests.
-This allows for selecting a subset of test in a convenient way (see examples below)
-
-This feature is intended mostly for integration tests debugging/development without the need for
-new mage targets corresponding to a new set of test flags.
-
-A few examples:
-
-##### Run a single test with an exact match
-We want to run only the test named "TestStandaloneUpgrade"
-`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$" mage integration:test`
-
-##### Run a tests matching a partial expression
-We want to run any test with "Upgrade" in the name
-`GOTEST_FLAGS="-test.run Upgrade" mage integration:test`
-
-##### Run a single test and signal that we want the short version
-We pass a `-test.short` flag along with the name match
-`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$ -test.short" mage integration:test`
-
-##### Run a single test multiple times
-We pass a `-test.count` flag along with the name match
-`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$ -test.count 10" mage integration:test`
-
-##### Run specific tests
-We pass a `-test.run` flag along with the names of the tests we want to run in OR
-`GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
-
-##### Limitations
-Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
-is split on space, so not all combination of flags and their values may be correctly split.
+Tests with external dependencies might need more environment variables to be set
+when running they manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
+`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
 
 ## Writing tests
 
