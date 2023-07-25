@@ -48,32 +48,60 @@ steps:
   - wait: ~
     if: build.env("ManifestURL") == null
 
-  - label: ":package: Package elastic-agent"
-    key: package_elastic-agent
-    agents:
-      provider: "aws"
-      image: "core-ubuntu-2204-aarch64"
-    command: |
-      if [[ -z "${DEV}" ]]; then
-        export DEV=$(buildkite-agent meta-data get DEV --default "true")
-      fi
-      if [[ -z "${ManifestURL}" ]]; then
-        export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
-        if [[ -z "${ManifestURL}" ]]; then
-          echo ":broken_heart: Missing ManifestURL variable or empty string provided"
-          exit 1
-        fi
-      fi
-      if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
-        export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
-      fi
-      .buildkite/scripts/steps/package.sh
-    artifact_paths:
-      - "build/distributions/**/*"
+  - group: ":Packaging Artefacts"
+    key: "package"
+    steps:
+      - label: ":package: Package elastic-agent"
+        key: package_elastic-agent
+        agents:
+          provider: "gcp"
+          machineType: "c2-standard-16"
+        command: |
+          if [[ -z "${DEV}" ]]; then
+            export DEV=$(buildkite-agent meta-data get DEV --default "true")
+          fi
+          if [[ -z "${ManifestURL}" ]]; then
+            export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
+            if [[ -z "${ManifestURL}" ]]; then
+              echo ":broken_heart: Missing ManifestURL variable or empty string provided"
+              exit 1
+            fi
+          fi
+          if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+        artifact_paths:
+          - "build/distributions/**/*"
+      - label: ":package: Package ARM elastic-agent"
+        key: package_elastic-agent-arm
+        agents:
+          provider: "aws"
+          instanceType: "t4g.xlarge"
+          imagePrefix: "core-ubuntu-2004-aarch64"
+        command: |
+          if [[ -z "${DEV}" ]]; then
+            export DEV=$(buildkite-agent meta-data get DEV --default "true")
+          fi
+          if [[ -z "${ManifestURL}" ]]; then
+            export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
+            if [[ -z "${ManifestURL}" ]]; then
+              echo ":broken_heart: Missing ManifestURL variable or empty string provided"
+              exit 1
+            fi
+          fi
+          if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          export PLATFORMS=linux/arm64
+          export PACKAGES=docker
+          .buildkite/scripts/steps/package.sh
+        artifact_paths:
+          - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
     key: dra-publish
-    depends_on: package_elastic-agent
+    depends_on: package
     agents:
       provider: "gcp"
       machineType: "c2-standard-16"
