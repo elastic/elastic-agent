@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -32,9 +33,11 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	cmdVersion "github.com/elastic/elastic-agent/internal/pkg/basecmd/version"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
+	v2client "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -50,7 +53,7 @@ agent.upgrade.watcher:
 `
 
 // notable versions used in tests
-//var version_8_0_0 = version.NewParsedSemVer(8, 0, 0, "", "")
+var version_8_6_0 = version.NewParsedSemVer(8, 6, 0, "", "")
 var version_8_7_0 = version.NewParsedSemVer(8, 7, 0, "", "")
 var version_8_9_0_SNAPSHOT = version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")
 
@@ -389,13 +392,21 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 func checkAgentHealthAndVersion(t *testing.T, ctx context.Context, f *atesting.Fixture, expectedVersion string, snapshot bool, expectedHash string) bool {
 	t.Helper()
 
+	parsedExpectedVersion, err := version.ParseVersion(expectedVersion)
+	require.NoErrorf(t, err, "Expected version %q is not parseable", expectedVersion)
+
+	if parsedExpectedVersion.Less(*version_8_6_0) {
+		// we have to parse v1 state response
+		return checkLegacyAgentHealthAndVersion(t, ctx, f, expectedVersion, snapshot, expectedHash)
+	}
+
 	stateOut, err := f.Exec(ctx, []string{"status", "--output", "yaml"})
 	if err != nil {
 		t.Logf("error getting the agent state: %v", err)
 		return false
 	}
 
-	var state client.AgentState
+	var state v2client.AgentState
 	err = yaml.Unmarshal(stateOut, &state)
 	if err != nil {
 		t.Logf("error unmarshaling the agent state: %v", err)
@@ -405,11 +416,47 @@ func checkAgentHealthAndVersion(t *testing.T, ctx context.Context, f *atesting.F
 	t.Logf("current agent state: %+v", state)
 	info := state.Info
 	if expectedHash != "" {
-		return info.Commit == expectedHash && state.State == cproto.State_HEALTHY
+		return info.Commit == expectedHash && state.State == v2proto.State_HEALTHY
 	}
 	return info.Version == expectedVersion &&
 		info.Snapshot == snapshot &&
-		state.State == cproto.State_HEALTHY
+		state.State == v2proto.State_HEALTHY
+}
+
+func checkLegacyAgentHealthAndVersion(t *testing.T, ctx context.Context, f *atesting.Fixture, expectedVersion string, snapshot bool, expectedHash string) bool {
+	stateOut, err := f.Exec(ctx, []string{"status", "--output", "json"})
+	if err != nil {
+		t.Logf("error getting the agent state: %v", err)
+		return false
+	}
+
+	var state v1client.AgentStatus
+	err = json.Unmarshal(stateOut, &state)
+	if err != nil {
+		t.Logf("error unmarshaling the agent state: %v", err)
+		return false
+	}
+
+	t.Logf("current agent state: %+v", state)
+
+	versionOut, err := f.Exec(ctx, []string{"version", "--yaml"})
+	if err != nil {
+		t.Logf("error getting the agent version: %v", err)
+		return false
+	}
+	var aVersion cmdVersion.Output
+	err = yaml.Unmarshal(versionOut, &aVersion)
+	if err != nil {
+		t.Logf("error unmarshaling version output: %v", err)
+		return false
+	}
+	t.Logf("current agent version: %+v", aVersion)
+	if expectedHash != "" {
+		return aVersion.Daemon.Commit == expectedHash && state.Status == v1client.Healthy
+	}
+	return aVersion.Daemon.Version == expectedVersion &&
+		aVersion.Daemon.Snapshot == snapshot && state.Status == v1client.Healthy
+
 }
 
 // checkUpgradeWatcherRan asserts that the Upgrade Watcher finished running. We use the
@@ -689,7 +736,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 			return false
 		}
 		t.Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
+		return state.State == v2proto.State_HEALTHY
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
 	// get rid of the package version files in the installed directory
@@ -730,7 +777,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		t.Logf("current agent state: %+v", state)
 		return state.Info.Version == parsedLatestVersion.CoreVersion() &&
 			state.Info.Snapshot == parsedLatestVersion.IsSnapshot() &&
-			state.State == cproto.State_HEALTHY
+			state.State == v2proto.State_HEALTHY
 	}, 5*time.Minute, 10*time.Second, "agent never upgraded to expected version")
 }
 
