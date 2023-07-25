@@ -12,9 +12,34 @@ fi
 if [[ -z "${SETUP_GVM_VERSION-""}" ]]; then
     SETUP_GVM_VERSION=$(grep -oe "SETUP_GVM_VERSION\: [\"'].*[\"']" "$PIPELINE" | awk '{print $2}' | sed "s/'//g" )
 fi
-if [[ -z "${GO_VERSION-""}" ]]; then
-    GO_VERSION=$(cat "${WORKSPACE}/.go-version")
-fi
+
+getOSOptions() {
+  case $(uname | tr '[:upper:]' '[:lower:]') in
+    linux*)
+      export AGENT_OS_NAME=linux
+      ;;
+    darwin*)
+      export AGENT_OS_NAME=osx
+      ;;
+    msys*)
+      export AGENT_OS_NAME=windows
+      ;;
+    *)
+      export AGENT_OS_NAME=notset
+      ;;
+  esac
+  case $(uname -m | tr '[:upper:]' '[:lower:]') in
+    arm64*)
+      export AGENT_OS_ARCH=arm64
+      ;;
+    amd64*)
+      export AGENT_OS_ARCH=amd64
+      ;;
+    *)
+      export AGENT_OS_ARCH=notset
+      ;;
+  esac
+}
 
 # Wrapper function for executing mage
 mage() {
@@ -34,10 +59,11 @@ go(){
     # Search for the go in the Path
     if ! [ -x "$(type -p go | sed 's/go is //g')" ];
     then
-        echo "--- installing golang "${GO_VERSION}""
+        getOSOptions
+        echo "--- installing golang "${GO_VERSION}" for "${AGENT_OS_NAME}/${AGENT_OS_ARCH}" "
         local _bin="${WORKSPACE}/bin"
         mkdir -p "${_bin}"
-        retry 5 curl -sL -o "${_bin}/gvm" "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
+        retry 5 curl -sL -o "${_bin}/gvm" "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${AGENT_OS_NAME}-${AGENT_OS_ARCH}"
         chmod +x "${_bin}/gvm"
         eval "$(command "${_bin}/gvm" "${GO_VERSION}" )"
         export GOPATH=$(command go env GOPATH)
