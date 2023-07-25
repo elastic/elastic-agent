@@ -28,6 +28,8 @@ getOSOptions() {
       export AGENT_OS_NAME=notset
       ;;
   esac
+  # shellcheck disable=SC2046
+  echo $(uname -m | tr '[:upper:]' '[:lower:]')
   case $(uname -m | tr '[:upper:]' '[:lower:]') in
     arm64*)
       export AGENT_OS_ARCH=arm64
