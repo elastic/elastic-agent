@@ -1,22 +1,6 @@
 inputs:
-    - name: udp-infoblox_nios
-      type: udp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
-          data_stream:
-            dataset: infoblox_nios.log
-            type: logs
-          fields:
-            _conf:
-                tz_offset: local
-          fields_under_root: true
-          host: localhost:9028
-          tags:
-            - forwarded
-            - infoblox_nios-log
-      data_stream.namespace: default
     - name: filestream-infoblox_nios
+      id: filestream-infoblox_nios-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -34,7 +18,8 @@ inputs:
             - container:
                 format: auto
                 stream: ${kubernetes.hints.infoblox_nios.log.stream|'all'}
-          paths: null
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
           processors:
             - add_locale: null
           prospector:
@@ -45,6 +30,7 @@ inputs:
             - infoblox_nios-log
       data_stream.namespace: default
     - name: tcp-infoblox_nios
+      id: tcp-infoblox_nios-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -57,6 +43,24 @@ inputs:
                 tz_offset: local
           fields_under_root: true
           host: localhost:9027
+          tags:
+            - forwarded
+            - infoblox_nios-log
+      data_stream.namespace: default
+    - name: udp-infoblox_nios
+      id: udp-infoblox_nios-${kubernetes.hints.container_id}
+      type: udp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
+          data_stream:
+            dataset: infoblox_nios.log
+            type: logs
+          fields:
+            _conf:
+                tz_offset: local
+          fields_under_root: true
+          host: localhost:9028
           tags:
             - forwarded
             - infoblox_nios-log

@@ -1,3 +1,80 @@
+env:
+  DRA_PROJECT: "elastic-agent-core"
+  DRA_PROJECT_ARTIFACT_ID: "agent-core"
 steps:
-  - label: "Example test"
-    command: echo "Hello!"
+  - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
+    key: "dra-core-snapshot"
+    if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_SNAPSHOT") == "true"
+    steps:
+    - label: ":package: Build Elastic-Agent Core Snapshot"
+      commands:
+        - .buildkite/scripts/steps/build-agent-core.sh
+      key: "build-dra-snapshot"
+      artifact_paths:
+        - "build/distributions/**/*"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "snapshot"
+
+    - wait
+
+    - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
+      command: |
+        echo "+++ Restoring Artifacts"
+        buildkite-agent artifact download "build/**/*" .
+        echo "+++ Changing permissions for the release manager"
+        sudo chown -R :1000 build/distributions/
+        echo "+++ Running DRA publish step"
+        DRA_COMMIT=$BUILDKITE_COMMIT
+        export DRA_COMMIT
+        DRA_BRANCH=$BUILDKITE_BRANCH
+        export DRA_BRANCH
+        .buildkite/scripts/steps/dra-publish.sh
+      key: "publish-dra-snapshot"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "snapshot"
+
+  - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
+    key: "dra-core-staging"
+    if: build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_STAGING") == "true"
+    steps:
+    - label: ":package: Build Elastic-Agent Core staging"
+      commands:
+        - .buildkite/scripts/steps/build-agent-core.sh
+      key: "build-dra-staging"
+      artifact_paths:
+        - "build/distributions/**/*"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "staging"
+
+    - wait
+
+    - label: ":hammer: DRA Publish Elastic-Agent Core staging"
+      command: |
+        echo "+++ Restoring Artifacts"
+        buildkite-agent artifact download "build/**/*" .
+        echo "+++ Changing permissions for the release manager"
+        sudo chown -R :1000 build/distributions/
+        echo "+++ Running DRA publish step"
+        DRA_COMMIT=$BUILDKITE_COMMIT
+        export DRA_COMMIT
+        DRA_BRANCH=$BUILDKITE_BRANCH
+        export DRA_BRANCH
+        .buildkite/scripts/steps/dra-publish.sh
+      key: "publish-dra-staging"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "staging"
+
+notify:
+  - slack: "#ingest-notifications"

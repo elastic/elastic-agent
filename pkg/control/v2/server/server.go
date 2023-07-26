@@ -278,7 +278,7 @@ func stateToProto(state *coordinator.State, agentInfo *info.AgentInfo) (*cproto.
 			if unit.Payload != nil {
 				payload, err = json.Marshal(unit.Payload)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal componend %s unit %s payload: %w", comp.Component.ID, key.UnitID, err)
+					return nil, fmt.Errorf("failed to marshal component %s unit %s payload: %w", comp.Component.ID, key.UnitID, err)
 				}
 			}
 			units = append(units, &cproto.ComponentUnitState{

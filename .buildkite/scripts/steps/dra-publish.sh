@@ -39,7 +39,7 @@ function run_release_manager_list() {
     echo "+++ :hammer_and_pick: Release manager listing ${_branch} ${_workflow} DRA artifacts..."
     docker run --rm \
         --name release-manager \
-        -e VAULT_ADDR="${VAULT_ADDR_DRA}" \
+        -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
         -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
         -e VAULT_SECRET_ID="${VAULT_SECRET}" \
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
@@ -59,7 +59,7 @@ function run_release_manager_collect() {
     echo "+++ :hammer_and_pick: Publishing ${_branch} ${_workflow} DRA artifacts..."
     docker run --rm \
         --name release-manager \
-        -e VAULT_ADDR="${VAULT_ADDR_DRA}" \
+        -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
         -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
         -e VAULT_SECRET_ID="${VAULT_SECRET}" \
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
@@ -77,6 +77,6 @@ function run_release_manager_collect() {
 echo "+++ Release Manager ${WORKFLOW} / ${BRANCH} / ${COMMIT}";
 run_release_manager_list "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}"
 run_release_manager_collect "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}" "${DRY_RUN}"
-
 RM_EXIT_CODE=$?
+
 exit $RM_EXIT_CODE

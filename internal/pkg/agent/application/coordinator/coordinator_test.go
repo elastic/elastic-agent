@@ -165,10 +165,11 @@ func TestCoordinator_State_ConfigError_NotManaged(t *testing.T) {
 	cfgMgr.Config(ctx, cfg)
 
 	// set an error on cfg manager
-	cfgMgr.ReportError(ctx, errors.New("force error"))
+	const errorStr = "force error"
+	cfgMgr.ReportError(ctx, errors.New(errorStr))
 	assert.Eventually(t, func() bool {
 		state := coord.State()
-		return state.State == agentclient.Failed && state.Message == "force error"
+		return state.State == agentclient.Failed && strings.Contains(state.Message, "force error")
 	}, 3*time.Second, 10*time.Millisecond)
 
 	// clear error
@@ -708,9 +709,9 @@ func (r *fakeRuntimeManager) Run(ctx context.Context) error {
 
 func (r *fakeRuntimeManager) Errors() <-chan error { return nil }
 
-func (r *fakeRuntimeManager) Update(components []component.Component) error {
+func (r *fakeRuntimeManager) Update(model component.Model) error {
 	if r.updateCallback != nil {
-		return r.updateCallback(components)
+		return r.updateCallback(model.Components)
 	}
 	return nil
 }

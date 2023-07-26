@@ -5,6 +5,8 @@
 package coordinator
 
 import (
+	"fmt"
+
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -14,12 +16,20 @@ import (
 
 // State provides the current state of the coordinator along with all the current states of components and units.
 type State struct {
-	State        agentclient.State                 `yaml:"state"`
-	Message      string                            `yaml:"message"`
-	FleetState   agentclient.State                 `yaml:"fleet_state"`
-	FleetMessage string                            `yaml:"fleet_message"`
-	Components   []runtime.ComponentComponentState `yaml:"components"`
-	LogLevel     logp.Level                        `yaml:"log_level"`
+	// An overall state produced by aggregating
+	State   agentclient.State `yaml:"state"`
+	Message string            `yaml:"message"`
+
+	// The state of the Coordinator
+	CoordinatorState   agentclient.State `yaml:"coordinator_state"`
+	CoordinatorMessage string            `yaml:"coordinator_message"`
+
+	// The state of the
+	FleetState   agentclient.State `yaml:"fleet_state"`
+	FleetMessage string            `yaml:"fleet_message"`
+
+	Components []runtime.ComponentComponentState `yaml:"components"`
+	LogLevel   logp.Level                        `yaml:"log_level"`
 }
 
 type coordinatorOverrideState struct {
@@ -69,6 +79,30 @@ func (c *Coordinator) setConfigManagerActionsError(err error) {
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) setVarsManagerError(err error) {
 	c.varsMgrErr = err
+	c.stateNeedsRefresh = true
+}
+
+// setConfigError updates the error state for converting an incoming policy
+// into an AST.
+// Called on the main Coordinator goroutine.
+func (c *Coordinator) setConfigError(err error) {
+	c.configErr = err
+	c.stateNeedsRefresh = true
+}
+
+// setComponentGenError updates the error state for generating a component
+// model from an AST and variables.
+// Called on the main Coordinator goroutine.
+func (c *Coordinator) setComponentGenError(err error) {
+	c.componentGenErr = err
+	c.stateNeedsRefresh = true
+}
+
+// setRuntimeUpdateError updates the error state for sending a component model
+// update to the runtime manager.
+// Called on the main Coordinator goroutine.
+func (c *Coordinator) setRuntimeUpdateError(err error) {
+	c.runtimeUpdateErr = err
 	c.stateNeedsRefresh = true
 }
 
@@ -124,53 +158,64 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 // components and units are also healthy (or in ephemeral non-error states).
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) generateReportableState() (s State) {
-	s.State = c.state.State
-	s.Message = c.state.Message
+	s.CoordinatorState = c.state.CoordinatorState
+	s.CoordinatorMessage = c.state.CoordinatorMessage
 	s.FleetState = c.state.FleetState
 	s.FleetMessage = c.state.FleetMessage
 	s.LogLevel = c.state.LogLevel
 	s.Components = make([]runtime.ComponentComponentState, len(c.state.Components))
 	copy(s.Components, c.state.Components)
 
+	// Ordering of state aggregation:
+	// - Override state, if present
+	// - Errors applying the configured policy (report Failed)
+	// - Errors reported by managers (report Failed)
+	// - Errors in component/unit state (report Degraded)
 	if c.overrideState != nil {
-		// state has been overridden due to an action that is occurring
+		// state has been overridden by an upgrade in progress
 		s.State = c.overrideState.state
 		s.Message = c.overrideState.message
-	} else if s.State == agentclient.Healthy {
-		// if any of the managers are reporting an error then something is wrong
-		// or
-		// coordinator overall is reported is healthy; in the case any component or unit is not healthy then we report
-		// as degraded because we are not fully healthy
-		// TODO: We should aggregate these error messages into a readable list
-		// instead of only reporting the first one we encounter.
-		if c.runtimeMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.runtimeMgrErr.Error()
-		} else if c.configMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.configMgrErr.Error()
-		} else if c.actionsErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.actionsErr.Error()
-		} else if c.varsMgrErr != nil {
-			s.State = agentclient.Failed
-			s.Message = c.varsMgrErr.Error()
-		} else if hasState(s.Components, client.UnitStateFailed) {
-			s.State = agentclient.Degraded
-			s.Message = "1 or more components/units in a failed state"
-		} else if hasState(s.Components, client.UnitStateDegraded) {
-			s.State = agentclient.Degraded
-			s.Message = "1 or more components/units in a degraded state"
-		}
+	} else if c.configErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Invalid policy: %s", c.configErr.Error())
+	} else if c.componentGenErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Invalid component model: %s", c.componentGenErr.Error())
+	} else if c.runtimeUpdateErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Runtime update failed: %s", c.runtimeUpdateErr.Error())
+	} else if c.runtimeMgrErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Runtime manager: %s", c.runtimeMgrErr.Error())
+	} else if c.configMgrErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())
+	} else if c.actionsErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Actions: %s", c.actionsErr.Error())
+	} else if c.varsMgrErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())
+	} else if hasState(s.Components, client.UnitStateFailed) {
+		s.State = agentclient.Degraded
+		s.Message = "1 or more components/units in a failed state"
+	} else if hasState(s.Components, client.UnitStateDegraded) {
+		s.State = agentclient.Degraded
+		s.Message = "1 or more components/units in a degraded state"
+	} else {
+		// If no error conditions apply, the global state inherits the current
+		// Coordinator state.
+		s.State = s.CoordinatorState
+		s.Message = s.CoordinatorMessage
 	}
 	return s
 }
 
-// setState changes the overall state of the coordinator.
+// setCoordinatorState changes the overall state of the coordinator.
 // Must be called on the main Coordinator goroutine.
-func (c *Coordinator) setState(state agentclient.State, message string) {
-	c.state.State = state
-	c.state.Message = message
+func (c *Coordinator) setCoordinatorState(state agentclient.State, message string) {
+	c.state.CoordinatorState = state
+	c.state.CoordinatorMessage = message
 	c.stateNeedsRefresh = true
 }
 

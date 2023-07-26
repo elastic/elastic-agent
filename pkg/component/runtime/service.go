@@ -16,7 +16,13 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
+
+type actionModeSigned struct {
+	actionMode
+	signed *component.Signed
+}
 
 const (
 	defaultCheckServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
@@ -29,9 +35,7 @@ var (
 	ErrInvalidServiceSpec = errors.New("invalid service spec")
 )
 
-// executeServiceCommandFunc executes the given binary according to configuration in spec. If shouldRetry == true,
-// the command will be retried indefinitely; otherwise, it will not be retried.
-type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec, shouldRetry bool) error
+type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error
 
 // serviceRuntime provides the command runtime for running a component as a service.
 type serviceRuntime struct {
@@ -39,7 +43,7 @@ type serviceRuntime struct {
 	log  *logger.Logger
 
 	ch       chan ComponentState
-	actionCh chan actionMode
+	actionCh chan actionModeSigned
 	compCh   chan component.Component
 	statusCh chan service.Status
 
@@ -66,7 +70,7 @@ func newServiceRuntime(comp component.Component, logger *logger.Logger) (*servic
 		comp:                      comp,
 		log:                       logger.Named("service_runtime"),
 		ch:                        make(chan ComponentState),
-		actionCh:                  make(chan actionMode, 1),
+		actionCh:                  make(chan actionModeSigned, 1),
 		compCh:                    make(chan component.Component, 1),
 		statusCh:                  make(chan service.Status),
 		state:                     state,
@@ -83,7 +87,32 @@ func newServiceRuntime(comp component.Component, logger *logger.Logger) (*servic
 // Called by Manager inside a goroutine. Run does not return until the passed in context is done. Run is always
 // called before any of the other methods in the interface and once the context is done none of those methods should
 // ever be called again.
+//
+// ==================================================================================================
+//
+// Updated teardown sequence:
+//
+//  1. if tearing down already (tearingDown == true), continue with stop/uninstall
+//
+//  2. if not tearing down already (tearingDown == false)
+//     a. inject new signed payload for component
+//     b. reset check-in timer
+//     c. set teardown timeout timer
+//     d. set tearingDown=true
+//     c. send component update (with new signed payload)
+//     d. await for check-in after update or teardown timeout
+//     e. upon receiving check-in if (tearingDown == true), send teardown action to itself
+//
+// ==================================================================================================
 func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error) {
+	// The teardownCheckingTimeout is set to the same amount as the checkin timeout for now
+	teardownCheckinTimeout := s.checkinPeriod()
+	teardownCheckinTimer := time.NewTimer(teardownCheckinTimeout)
+	defer teardownCheckinTimer.Stop()
+
+	// Stop teardown checkin timeout timer initially
+	teardownCheckinTimer.Stop()
+
 	checkinTimer := time.NewTimer(s.checkinPeriod())
 	defer checkinTimer.Stop()
 
@@ -94,6 +123,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		cis            *connInfoServer
 		lastCheckin    time.Time
 		missedCheckins int
+		tearingDown    bool
 	)
 
 	cisStop := func() {
@@ -104,6 +134,55 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	}
 	defer cisStop()
 
+	onStop := func(am actionMode) {
+		// Stop check-in timer
+		s.log.Debugf("stop check-in timer for %s service", s.name())
+		checkinTimer.Stop()
+
+		// Stop connection info
+		s.log.Debugf("stop connection info for %s service", s.name())
+		cisStop()
+
+		// Stop service
+		s.stop(ctx, comm, lastCheckin, am == actionTeardown)
+	}
+
+	processTeardown := func(am actionMode, signed *component.Signed) error {
+		s.log.Debugf("start teardown for %s service", s.name())
+		// Inject new signed
+		newComp, err := injectSigned(s.comp, signed)
+		if err != nil {
+			s.log.Errorf("failed to inject signed configuration for %s service, err: %v", s.name(), err)
+			return err
+		}
+
+		// Set teardown timeout timer
+		teardownCheckinTimer.Reset(teardownCheckinTimeout)
+
+		// Process newComp update
+		// This should send component update that should cause service checkin
+		s.log.Debugf("process new comp config for %s service", s.name())
+		s.processNewComp(newComp, comm)
+		return nil
+	}
+
+	onTeardown := func(as actionModeSigned) {
+		tamperProtection := features.TamperProtection()
+		s.log.Debugf("got teardown for %s service, tearingDown==%v, tamperProtectoin=%v", s.name(), tearingDown, tamperProtection)
+
+		// If tamper protection is disabled do the old behavior
+		if !tamperProtection {
+			onStop(as.actionMode)
+			return
+		}
+
+		if !tearingDown {
+			tearingDown = true
+			err = processTeardown(as.actionMode, as.signed)
+		}
+
+	}
+
 	for {
 		var err error
 		select {
@@ -111,7 +190,8 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			s.log.Debug("context is done. exiting.")
 			return ctx.Err()
 		case as := <-s.actionCh:
-			switch as {
+			s.log.Debugf("got action %v for %s service", as.actionMode, s.name())
+			switch as.actionMode {
 			case actionStart:
 				// Initial state on start
 				lastCheckin = time.Time{}
@@ -137,17 +217,10 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 				// Start check-in timer
 				checkinTimer.Reset(s.checkinPeriod())
-			case actionStop, actionTeardown:
-				// Stop check-in timer
-				s.log.Debugf("stop check-in timer for %s service", s.name())
-				checkinTimer.Stop()
-
-				// Stop connection info
-				s.log.Debugf("stop connection info for %s service", s.name())
-				cisStop()
-
-				// Stop service
-				s.stop(ctx, comm, lastCheckin, as == actionTeardown)
+			case actionStop:
+				onStop(as.actionMode)
+			case actionTeardown:
+				onTeardown(as)
 			}
 			if err != nil {
 				s.forceCompState(client.UnitStateFailed, err.Error())
@@ -155,12 +228,56 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		case newComp := <-s.compCh:
 			s.processNewComp(newComp, comm)
 		case checkin := <-comm.CheckinObserved():
+			s.log.Debugf("got check-in for %s service, tearingDown=%v", s.name(), tearingDown)
 			s.processCheckin(checkin, comm, &lastCheckin)
+			// Got check-in upon teardown update
+			// tearingDown can be set to true only if tamper protection feature is enabled
+			if tearingDown {
+				tearingDown = false
+				teardownCheckinTimer.Stop()
+				onStop(actionTeardown)
+			}
 		case <-checkinTimer.C:
 			s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
 			checkinTimer.Reset(s.checkinPeriod())
+		case <-teardownCheckinTimer.C:
+			s.log.Debugf("got tearing down timeout for %s service", s.name())
+			// Teardown timed out
+			// tearingDown can be set to true only if tamper protection feature is enabled
+			if tearingDown {
+				tearingDown = false
+				onStop(actionTeardown)
+			}
 		}
 	}
+}
+
+func injectSigned(comp component.Component, signed *component.Signed) (component.Component, error) {
+	if signed == nil {
+		return comp, nil
+	}
+
+	const signedKey = "signed"
+	for i, unit := range comp.Units {
+		if unit.Type == client.UnitTypeInput {
+			unitCfgMap := unit.Config.Source.AsMap()
+
+			unitCfgMap[signedKey] = map[string]interface{}{
+				"data":      signed.Data,
+				"signature": signed.Signature,
+			}
+
+			unitCfg, err := component.ExpectedConfig(unitCfgMap)
+			if err != nil {
+				return comp, err
+			}
+
+			unit.Config = unitCfg
+			comp.Units[i] = unit
+		}
+	}
+
+	return comp, nil
 }
 
 func (s *serviceRuntime) start(ctx context.Context) (err error) {
@@ -354,7 +471,7 @@ func (s *serviceRuntime) Start() error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionStart
+	s.actionCh <- actionModeSigned{actionStart, nil}
 	return nil
 }
 
@@ -380,20 +497,20 @@ func (s *serviceRuntime) Stop() error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionStop
+	s.actionCh <- actionModeSigned{actionStop, nil}
 	return nil
 }
 
 // Teardown stop and uninstall the service.
 //
 // Non-blocking and never returns an error.
-func (s *serviceRuntime) Teardown() error {
+func (s *serviceRuntime) Teardown(signed *component.Signed) error {
 	// clear channel so it's the latest action
 	select {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionTeardown
+	s.actionCh <- actionModeSigned{actionTeardown, signed}
 	return nil
 }
 
@@ -435,7 +552,7 @@ func (s *serviceRuntime) check(ctx context.Context) error {
 		return ErrOperationSpecUndefined
 	}
 	s.log.Debugf("check if the %s is installed", s.comp.InputSpec.BinaryName)
-	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Check, false)
+	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Check)
 }
 
 // install executes the service install command
@@ -445,26 +562,65 @@ func (s *serviceRuntime) install(ctx context.Context) error {
 		return ErrOperationSpecUndefined
 	}
 	s.log.Debugf("install %s service", s.comp.InputSpec.BinaryName)
-	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Install, true)
+	return s.executeServiceCommandImpl(ctx, s.log, s.comp.InputSpec.BinaryPath, s.comp.InputSpec.Spec.Service.Operations.Install)
 }
 
 // uninstall executes the service uninstall command
 func (s *serviceRuntime) uninstall(ctx context.Context) error {
 	// Always retry for internal attempts to uninstall, because they are an attempt to converge the agent's current state
 	// with its desired state based on the agent policy.
-	return uninstallService(ctx, s.log, s.comp, s.executeServiceCommandImpl, true)
+	return uninstallService(ctx, s.log, s.comp, "", s.executeServiceCommandImpl)
 }
 
 // UninstallService uninstalls the service. When shouldRetry is true the uninstall command will be retried until it succeeds.
-func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component, shouldRetry bool) error {
-	return uninstallService(ctx, log, comp, executeServiceCommand, shouldRetry)
+func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string) error {
+	return uninstallService(ctx, log, comp, uninstallToken, executeServiceCommand)
 }
 
-func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, executeServiceCommandImpl executeServiceCommandFunc, shouldRetry bool) error {
+//nolint:gosec // was false flagged as hardcoded credentials by linter. it is not.
+const uninstallTokenArg = "--uninstall-token"
+
+// resolveUninstallTokenArg Resolves the uninstall token parameter.
+// If the uninstall spec arguments contains the --uninstall-token then
+// 1. Remove the argument if the value of uninstallToken is empty
+// or
+// 2. Inject the value of uninstallToken after the --uninstall-token argument
+//
+// If args do not contain "--uninstall-token", older endpoint spec, do nothing
+func resolveUninstallTokenArg(uninstallSpec *component.ServiceOperationsCommandSpec, uninstallToken string) *component.ServiceOperationsCommandSpec {
+	if uninstallSpec == nil {
+		return nil
+	}
+
+	spec := *uninstallSpec
+	for i, arg := range spec.Args {
+		if arg == uninstallTokenArg {
+			if uninstallToken == "" { // Remove --uninstall-token argument if the token is empty
+				spec.Args = append(spec.Args[:i], spec.Args[i+1:]...)
+			} else { // Inject token value after --uninstall-token argument
+				args := append(spec.Args[:i+1], uninstallToken)
+				spec.Args = append(args, spec.Args[i+1:]...)
+			}
+			break
+		}
+	}
+	return &spec
+}
+
+func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string, executeServiceCommandImpl executeServiceCommandFunc) error {
 	if comp.InputSpec.Spec.Service.Operations.Uninstall == nil {
 		log.Errorf("missing uninstall spec for %s service", comp.InputSpec.BinaryName)
 		return ErrOperationSpecUndefined
 	}
+
+	// If tamper protection feature flag is disabled, force uninstallToken value to empty,
+	// this will remove the --uninstall-token command arg
+	if !features.TamperProtection() {
+		uninstallToken = ""
+	}
+
+	uninstallSpec := resolveUninstallTokenArg(comp.InputSpec.Spec.Service.Operations.Uninstall, uninstallToken)
+
 	log.Debugf("uninstall %s service", comp.InputSpec.BinaryName)
-	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, comp.InputSpec.Spec.Service.Operations.Uninstall, shouldRetry)
+	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, uninstallSpec)
 }

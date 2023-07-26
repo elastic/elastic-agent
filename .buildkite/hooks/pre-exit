@@ -16,16 +16,7 @@ fi
 
 unset GOOGLE_APPLICATION_GCP_SECRET API_KEY_TOKEN
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-tests" ]]; then
+if command -v docker &>/dev/null; then
+  DOCKER_REGISTRY="docker.elastic.co"
   docker logout $DOCKER_REGISTRY
-fi
-
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
-    docker logout ${DOCKER_REGISTRY}
-  fi
-
-  if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
-      unset VAULT_ADDR VAULT_ROLE_ID VAULT_SECRET_ID
-  fi
 fi

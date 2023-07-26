@@ -49,6 +49,42 @@ pass `[testName]` to `go test` as `--run=[testName]`.
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
+#### Passing additional go test flags
+
+When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
+
+These flags are passed also when calculating batches for remote execution of integration tests.
+This allows for selecting a subset of test in a convenient way (see examples below)
+
+This feature is intended mostly for integration tests debugging/development without the need for
+new mage targets corresponding to a new set of test flags.
+
+A few examples:
+
+##### Run a single test with an exact match
+We want to run only the test named "TestStandaloneUpgrade"
+`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$" mage integration:test`
+
+##### Run a tests matching a partial expression
+We want to run any test with "Upgrade" in the name
+`GOTEST_FLAGS="-test.run Upgrade" mage integration:test`
+
+##### Run a single test and signal that we want the short version
+We pass a `-test.short` flag along with the name match
+`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$ -test.short" mage integration:test`
+
+##### Run a single test multiple times
+We pass a `-test.count` flag along with the name match
+`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$ -test.count 10" mage integration:test`
+
+##### Run specific tests
+We pass a `-test.run` flag along with the names of the tests we want to run in OR
+`GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
+
+##### Limitations
+Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
+is split on space, so not all combination of flags and their values may be correctly split.
+
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
@@ -62,6 +98,25 @@ to write tests using the integration and E2E testing framework. Also look at
 the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
 framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
 package for helper utilities.
+
+### Test namespaces
+
+Every test has access to its own unique namespace (a string value). This namespace can
+be accessed from the `info.Namespace` field, where `info` is the struct value returned
+from the `define.Require(...)` call made at the start of the test.
+
+Namespaces should be used whenever test data is being written to or read from a persistent store that's
+shared across all tests. Most commonly, this store will be the Elasticsearch cluster that Agent
+components may index their data into. All tests share a single stack deployment and, therefore,
+a single Elasticsearch cluster as well.
+
+Some examples of where namespaces should be used:
+* When creating a policy in Fleet. The Create Policy and Update Policy APIs takes a namespace parameter.
+* When searching for documents in `logs-*` or `metrics-*` data streams. Every document in these
+  data streams has a `data_stream.namespace` field.
+
+:warning: Not using namespaces when accessing data in a shared persistent store can cause tests to
+be flaky.
 
 ## Troubleshooting Tips
 

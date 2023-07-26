@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-hid_bravura_monitor
+      id: filestream-hid_bravura_monitor-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -30,6 +31,7 @@ inputs:
           tags: null
       data_stream.namespace: default
     - name: winlog-hid_bravura_monitor
+      id: winlog-hid_bravura_monitor-${kubernetes.hints.container_id}
       type: winlog
       use_output: default
       streams:
