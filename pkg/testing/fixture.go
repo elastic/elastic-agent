@@ -399,6 +399,7 @@ func (e *ExecErr) Unwrap() error {
 // status successfully. Therefore, a not empty AgentStatusOutput is valid
 // regardless of the error. An empty AgentStatusOutput and non nil error
 // means the output could not be parsed.
+// It should work with any 8.6+ agent
 func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
 	status := AgentStatusOutput{}
@@ -418,6 +419,7 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 // It returns the parsed output and the error from the execution or an empty
 // AgentInspectOutput and the unmarshalling error if it cannot unmarshal the
 // output.
+// It should work with any 8.6+ agent
 func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (AgentInspectOutput, error) {
 	out, err := f.Exec(ctx, []string{"inspect"}, opts...)
 	inspect := AgentInspectOutput{}
@@ -435,6 +437,7 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 
 // IsHealthy returns if the prepared Elastic Agent reports itself as healthy.
 // It returns false, err if it cannot determine the state of the agent.
+// It should work with any 8.6+ agent
 func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) (bool, error) {
 	status, err := f.ExecStatus(ctx, opts...)
 	if err != nil {

@@ -48,6 +48,9 @@ type options struct {
 	addr        string
 	rewriteHost func(string) string
 	rewriteURL  func(u *url.URL)
+	// logFn if set will be used to log every request.
+	logFn   func(format string, a ...any)
+	verbose bool
 }
 
 // WithAddress will set the address the server will listen on. The format is as
@@ -55,6 +58,24 @@ type options struct {
 func WithAddress(addr string) Option {
 	return func(o *options) {
 		o.addr = addr
+	}
+}
+
+// WithRequestLog sets the proxy to log every request using logFn. It uses name
+// as a prefix to the log.
+func WithRequestLog(name string, logFn func(format string, a ...any)) Option {
+	return func(o *options) {
+		o.logFn = func(format string, a ...any) {
+			logFn("[proxy-"+name+"]"+format, a...)
+		}
+	}
+}
+
+// WithVerboseLog sets the proxy to log every request verbosely. WithRequestLog
+// must be used as well, otherwise WithVerboseLog will not take effect.
+func WithVerboseLog() Option {
+	return func(o *options) {
+		o.verbose = true
 	}
 }
 
@@ -85,6 +106,10 @@ func New(t *testing.T, optns ...Option) *Proxy {
 	opts := options{addr: ":0"}
 	for _, o := range optns {
 		o(&opts)
+	}
+
+	if opts.logFn == nil {
+		opts.logFn = func(format string, a ...any) {}
 	}
 
 	l, err := net.Listen("tcp", opts.addr) //nolint:gosec,nolintlint // it's a test
