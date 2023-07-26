@@ -119,25 +119,7 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 						pkgFilename := path.Base(p)
 						downloadTarget := filepath.Join(targetPath, pkgFilename)
 						if _, err := os.Stat(downloadTarget); err != nil {
-							func(downloadUrl string, target string) {
-								parsedURL, errorUrl := url.Parse(downloadUrl)
-								if errorUrl != nil {
-									errGrp.Go(func() error { return errorInvalidManifestURL })
-								}
-								var valid = false
-								for _, manifestHost := range AllowedManifestHosts {
-									if manifestHost == parsedURL.Host {
-										valid = true
-									}
-								}
-								if !valid {
-									log.Printf("Not allowed %s, valid ones are %+v", parsedURL.Host, AllowedManifestHosts)
-									errGrp.Go(func() error { return errorNotAllowedManifestURL })
-								}
-								cleanUrl := fmt.Sprintf("https://%s%s", parsedURL.Host, parsedURL.Path)
-								download := func() (string, error) { return downloadFile(downloadsCtx, cleanUrl, target) }
-								errGrp.Go(func() error { _, err := doWithRetries(download); return err })
-							}(p, downloadTarget)
+							errGrp.Go(func() error { return downloadPackage(downloadsCtx, p, downloadTarget) })
 						}
 					}
 				} else if mg.Verbose() {
@@ -154,4 +136,24 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 
 	log.Printf("Downloads for manifest %q complete.", manifest)
 	return nil
+}
+
+func downloadPackage(ctx context.Context, downloadUrl string, target string) error {
+	parsedURL, errorUrl := url.Parse(downloadUrl)
+	if errorUrl != nil {
+		return errorInvalidManifestURL
+	}
+	var valid = false
+	for _, manifestHost := range AllowedManifestHosts {
+		if manifestHost == parsedURL.Host {
+			valid = true
+		}
+	}
+	if !valid {
+		log.Printf("Not allowed %s, valid ones are %+v", parsedURL.Host, AllowedManifestHosts)
+		return errorNotAllowedManifestURL
+	}
+	cleanUrl := fmt.Sprintf("https://%s%s", parsedURL.Host, parsedURL.Path)
+	_, err := doWithRetries(func() (string, error) { return downloadFile(ctx, cleanUrl, target) })
+	return err
 }
