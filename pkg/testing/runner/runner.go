@@ -264,7 +264,7 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 	}
 
 	// ensure that we have all the requirements for the stack if required
-	var env map[string]string
+	env := map[string]string{}
 	if batch.Batch.Stack != nil {
 		ch, err := r.getCloudForBatchID(batch.ID)
 		if err != nil {
@@ -276,17 +276,18 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 			return OSRunnerResult{}, fmt.Errorf("cannot continue because stack never became ready")
 		}
 		logger.Logf("Will continue, stack is ready")
-		env = map[string]string{
-			"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
-			"ELASTICSEARCH_USERNAME": resp.Username,
-			"ELASTICSEARCH_PASSWORD": resp.Password,
-			"KIBANA_HOST":            resp.KibanaEndpoint,
-			"KIBANA_USERNAME":        resp.Username,
-			"KIBANA_PASSWORD":        resp.Password,
-		}
-		logger.Logf("Created Stack with Kibana host %s, %s/%s", resp.KibanaEndpoint, resp.Username, resp.Password)
+		env["ELASTICSEARCH_HOST"] = resp.ElasticsearchEndpoint
+		env["ELASTICSEARCH_USERNAME"] = resp.Username
+		env["ELASTICSEARCH_PASSWORD"] = resp.Password
+		env["KIBANA_HOST"] = resp.KibanaEndpoint
+		env["KIBANA_USERNAME"] = resp.Username
+		env["KIBANA_PASSWORD"] = resp.Password
 
+		logger.Logf("Created Stack with Kibana host %s, %s/%s", resp.KibanaEndpoint, resp.Username, resp.Password)
 	}
+
+	// set the go test flags
+	env["GOTEST_FLAGS"] = r.cfg.TestFlags
 
 	// run the actual tests on the host
 	prefix := fmt.Sprintf("%s-%s-%s-%s", batch.LayoutOS.OS.Type, batch.LayoutOS.OS.Arch, batch.LayoutOS.OS.Distro, strings.Replace(batch.LayoutOS.OS.Version, ".", "", -1))
