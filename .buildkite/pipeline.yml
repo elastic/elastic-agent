@@ -7,7 +7,6 @@ steps:
   - label: "Unit tests"
     key: "unit-tests"
     command: ".buildkite/scripts/steps/unit-tests.sh"
-    branches: "main"
     artifact_paths:
       - "build/TEST-**"
     agents:
