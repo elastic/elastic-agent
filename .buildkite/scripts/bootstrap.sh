@@ -15,7 +15,7 @@ export BRANCH="${BUILDKITE_BRANCH}"
 
 if ! command -v go &>/dev/null; then
   echo "Go is not installed. Installing Go..."  
-  retry 5 curl -O https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz
+  curl -O https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz
   sudo tar -xf go$GO_VERSION.linux-amd64.tar.gz -C /usr/local
   mkdir -p $HOME/go/bin
   export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
