@@ -59,8 +59,9 @@ steps:
       - label: ":package: Cross Building and package elastic-agent"
         key: package_elastic-agent
         agents:
-          provider: "aws"
-          instance_type: 'c5d.2xlarge'
+          provider: "gcp"
+          machineType: "c2-standard-16"
+          diskSizeGb: 400
         command: |
           if [[ -z "${ManifestURL}" ]]; then
             export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
