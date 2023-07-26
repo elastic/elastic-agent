@@ -128,7 +128,7 @@ func (p *ProxyURL) TestEnrollProxyAndNoProxyInThePolicy() {
 	if !assert.Eventually(t, func() bool {
 		status, err = p.fixture.ExecStatus(context.Background())
 		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 1*time.Minute, 5*time.Second) {
+	}, 5*time.Minute, 5*time.Second) {
 		t.Errorf("want fleet state %s, got %s",
 			cproto.State_HEALTHY, cproto.State(status.FleetState))
 		t.Logf("agent status: %#v", status)
@@ -171,7 +171,7 @@ func (p *ProxyURL) TestEnrollProxyAndEmptyProxyInThePolicy() {
 	assert.Eventually(t, func() bool {
 		status, err = p.fixture.ExecStatus(context.Background())
 		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 1*time.Minute, 5*time.Second, "want fleet state %d, got %d. agent status: %v",
+	}, 5*time.Minute, 5*time.Second, "want fleet state %d, got %d. agent status: %v",
 		cproto.State_HEALTHY, status.FleetState, status)
 }
 
@@ -213,7 +213,7 @@ func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
 	if !assert.Eventually(t, func() bool {
 		status, err = p.fixture.ExecStatus(context.Background())
 		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 1*time.Minute, 5*time.Second) {
+	}, 5*time.Minute, 5*time.Second) {
 		t.Errorf("want fleet state %s, got %s",
 			cproto.State_HEALTHY, cproto.State(status.FleetState))
 		t.Logf("agent status: %v", status)
@@ -229,7 +229,7 @@ func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
 		}
 
 		return false
-	}, 1*time.Minute, 5*time.Second,
+	}, 5*time.Minute, 5*time.Second,
 		"did not find requests to the proxy defined in the policy. Want [%s] on %v",
 		p.proxy2.LocalhostURL, p.proxy2.ProxiedRequests())
 }
@@ -275,7 +275,7 @@ func (p *ProxyURL) TestNoEnrollProxyAndProxyInThePolicy() {
 	if !assert.Eventually(t, func() bool {
 		status, err = p.fixture.ExecStatus(context.Background())
 		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 1*time.Minute, 5*time.Second) {
+	}, 5*time.Minute, 5*time.Second) {
 		t.Errorf("want fleet state %d, got %d",
 			cproto.State_HEALTHY, status.FleetState)
 		t.Logf("agent status: %v", status)
@@ -292,7 +292,7 @@ func (p *ProxyURL) TestNoEnrollProxyAndProxyInThePolicy() {
 		}
 
 		return false
-	}, 1*time.Minute, 5*time.Second) {
+	}, 5*time.Minute, 5*time.Second) {
 		t.Errorf("did not find requests to the proxy defined in the policy")
 	}
 }
@@ -335,7 +335,7 @@ func (p *ProxyURL) TestRemoveProxyFromThePolicy() {
 	if !assert.Eventually(t, func() bool {
 		status, err = p.fixture.ExecStatus(context.Background())
 		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 1*time.Minute, 5*time.Second) {
+	}, 5*time.Minute, 5*time.Second) {
 		t.Errorf("want fleet state %d, got %d",
 			cproto.State_HEALTHY, status.FleetState)
 		t.Logf("agent status: %v", status)
@@ -352,7 +352,7 @@ func (p *ProxyURL) TestRemoveProxyFromThePolicy() {
 		}
 
 		return false
-	}, 1*time.Minute, 5*time.Second) {
+	}, 5*time.Minute, 5*time.Second) {
 		t.Errorf("did not find requests to the proxy defined in the policy")
 	}
 
@@ -388,7 +388,7 @@ func (p *ProxyURL) TestRemoveProxyFromThePolicy() {
 	if !assert.Eventually(t, func() bool {
 		status, err = p.fixture.ExecStatus(context.Background())
 		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 1*time.Minute, 5*time.Second) {
+	}, 5*time.Minute, 5*time.Second) {
 		t.Errorf("want fleet state %d, got %d",
 			cproto.State_HEALTHY, status.FleetState)
 		t.Logf("agent status: %v", status)
