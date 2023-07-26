@@ -441,8 +441,17 @@ func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *t
 			s.compState(client.UnitStateDegraded, *missedCheckins)
 		} else if *missedCheckins >= maxCheckinMisses {
 			// something is wrong; the service should be checking in
-			msg := fmt.Sprintf("Failed: %s service missed %d check-ins", s.name(), maxCheckinMisses)
-			s.forceCompState(client.UnitStateFailed, msg)
+			s.log.Warnf("%s service missed %d check-ins; trying to restart service", s.name(), maxCheckinMisses)
+
+			// service is expected to be running; try to restart it for
+			// 15 minutes.
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			defer cancel()
+
+			if err := s.start(ctx); err != nil {
+				msg := fmt.Sprintf("Failed to restart %s service after it missed %d check-ins: %s", s.name(), maxCheckinMisses, err.Error())
+				s.forceCompState(client.UnitStateFailed, msg)
+			}
 		}
 	}
 }
