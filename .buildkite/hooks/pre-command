@@ -2,13 +2,10 @@
 
 set -euo pipefail
 
-<<<<<<< HEAD
 export GO_VERSION=$(cat .go-version)
-=======
 function retry {
     local retries=$1
     shift
->>>>>>> e54b0a296d090b653f04e6d1405ae6492e306527
 
     local count=0
     until "$@"; do
