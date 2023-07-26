@@ -17,15 +17,6 @@ steps:
         default: ""
         required: true
         hint: "Link to the build manifest URL."
-      - select: "DEV"
-        key: "DEV"
-        required: "true"
-        options:
-          - label: "True"
-            value: "true"
-          - label: "False"
-            value: "false"
-        hint: "If DEV=true should be set or the packaging is done with DEV=false"
       - select: "Mage verbose"
         key: "MAGEFILE_VERBOSE"
         required: "false"
@@ -57,9 +48,6 @@ steps:
           provider: "gcp"
           machineType: "c2-standard-16"
         command: |
-          if [[ -z "${DEV}" ]]; then
-            export DEV=$(buildkite-agent meta-data get DEV --default "true")
-          fi
           if [[ -z "${ManifestURL}" ]]; then
             export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
             if [[ -z "${ManifestURL}" ]]; then
@@ -83,9 +71,6 @@ steps:
           PLATFORMS: "linux/arm64"
           PACKAGES: "docker"
         command: |
-          if [[ -z "${DEV}" ]]; then
-            export DEV=$(buildkite-agent meta-data get DEV --default "true")
-          fi
           if [[ -z "${ManifestURL}" ]]; then
             export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
             if [[ -z "${ManifestURL}" ]]; then
