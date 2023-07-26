@@ -119,8 +119,9 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 						pkgFilename := path.Base(p)
 						downloadTarget := filepath.Join(targetPath, pkgFilename)
 						if _, err := os.Stat(downloadTarget); err != nil {
-							downloadF := func() error { return downloadPackage(downloadsCtx, p, downloadTarget) }
-							errGrp.Go(downloadF)
+							errGrp.Go(func(ctx context.Context, url, target string) func() error {
+								return func() error { return downloadPackage(ctx, url, target) }
+							}(downloadsCtx, p, downloadTarget))
 						}
 					}
 				} else if mg.Verbose() {
