@@ -1,0 +1,64 @@
+env:
+  DRA_PROJECT: "elastic-agent-core"
+  DRA_ARTIFACT_SET: "agent-core"
+steps:
+  - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
+    key: "dra-core-snapshot"
+    if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_SNAPSHOT") == "true"
+    steps:
+    - label: ":package: Build Elastic-Agent Core Snapshot"
+      commands:
+        - .buildkite/scripts/steps/build-agent-core.sh
+      key: "build-dra-snapshot"
+      artifact_paths:
+        - "build/distributions/**/*"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "snapshot"
+
+    - wait
+
+    - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
+      command: |
+        buildkite-agent artifact download "build/**/*" .
+        .buildkite/scripts/steps/dra-publish.sh
+      key: "publish-dra-snapshot"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "snapshot"
+
+  - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
+    key: "dra-core-staging"
+    if: build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_STAGING") == "true"
+    steps:
+    - label: ":package: Build Elastic-Agent Core staging"
+      commands:
+        - .buildkite/scripts/steps/build-agent-core.sh
+      key: "build-dra-staging"
+      artifact_paths:
+        - "build/distributions/**/*"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "staging"
+
+    - wait
+
+    - label: ":hammer: DRA Publish Elastic-Agent Core staging"
+      command: |
+        buildkite-agent artifact download "build/**/*" .
+        .buildkite/scripts/steps/dra-publish.sh
+      key: "publish-dra-staging"
+      agents:
+        provider: "gcp"
+        machineType: "c2-standard-16"
+      env:
+        WORKFLOW: "staging"
+
+notify:
+  - slack: "#ingest-notifications"

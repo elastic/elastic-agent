@@ -6,8 +6,12 @@ env:
 steps:
   - label: "Integration tests"
     key: "integration-tests"
+<<<<<<< HEAD
     command: ".buildkite/scripts/integration_tests.sh"
     branches: "main"
+=======
+    command: ".buildkite/scripts/steps/integration_tests.sh"
+>>>>>>> 30dff79483 (Add buildkite pipeline to build elastic-agent binary artifacts (#3046))
     artifact_paths:
       - "build/TEST-**"
     agents:
