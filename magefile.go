@@ -1137,7 +1137,7 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		componentFile := strings.TrimSuffix(file, specSuffix)
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf(">>> Computing hash for %q failed: file not present\n", componentFile)
+			fmt.Printf(">>> Computing hash for %q failed: file not present %w \n", componentFile, err)
 			continue
 		} else if err != nil {
 			return err
