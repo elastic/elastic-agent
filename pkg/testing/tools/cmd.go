@@ -11,15 +11,7 @@ import (
 )
 
 // InstallAgent force install the Elastic Agent through agentFixture.
-func InstallAgent(fleetUrl string, enrollmentToken string, agentFixture *atesting.Fixture) ([]byte, error) {
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetUrl,
-			EnrollmentToken: enrollmentToken,
-		},
-	}
+func InstallAgent(installOpts atesting.InstallOpts, agentFixture *atesting.Fixture) ([]byte, error) {
 	return agentFixture.Install(context.Background(), &installOpts)
 }
 
