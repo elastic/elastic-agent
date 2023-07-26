@@ -219,7 +219,7 @@ func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
 	}
 
 	// ensure the agent is communicating through the proxy set in the policy
-	if !assert.Eventually(t, func() bool {
+	assert.Eventually(t, func() bool {
 		for _, r := range p.proxy2.ProxiedRequests() {
 			if strings.Contains(
 				r,
@@ -229,9 +229,7 @@ func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
 		}
 
 		return false
-	}, 30*time.Second, 5*time.Second) {
-		t.Errorf("did not find requests to the proxy defined in the policy")
-	}
+	}, 30*time.Second, 5*time.Second, "did not find requests to the proxy defined in the policy")
 }
 
 func (p *ProxyURL) TestNoEnrollProxyAndProxyInThePolicy() {
