@@ -223,7 +223,6 @@ func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
 	want := fleetservertest.NewPathCheckin(p.policyData.AgentID)
 	assert.Eventually(t, func() bool {
 		for _, r := range p.proxy2.ProxiedRequests() {
-			t.Log(r)
 			if strings.Contains(r, want) {
 				return true
 			}
