@@ -2,7 +2,12 @@
 
 set -euo pipefail
 
-source ../scripts/common.sh
+if [[ -z "${WORKSPACE-""}" ]]; then
+    WORKSPACE=$(git rev-parse --show-toplevel)
+    export WORKSPACE
+fi
+
+source "${WORKSPACE}/.buildkite/scripts/common.sh"
 
 if [[ -z "${GO_VERSION-""}" ]]; then
     export GO_VERSION=$(cat "${WORKSPACE}/.go-version")
