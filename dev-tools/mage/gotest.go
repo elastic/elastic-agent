@@ -232,6 +232,22 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		)
 	}
 
+	// Pass the go test extra flags BEFORE the RunExpr.
+	// TL;DR: This is needed to make sure that a -test.run flag specified in the GOTEST_FLAGS environment variable does
+	// not interfere with the batching done by the framework.
+	//
+	// Full explanation:
+	// The integration test framework runs the tests twice:
+	// - the first time we pass a special tag that make all the define statements in the tests skip the test and dump the requirements.
+	//   This output is processed by the integration test framework to discover the tests and the set of environments/machines
+	//   we will need to spawn and allocate the tests to the various machines. (see batch.go for details)
+	// - the second time we run the tests (here) the integration test framework adds a -test.run flag when launching go test
+	//   on the remote machine to make sure that only the tests corresponding to that batch are executed.
+	//
+	// By specifying the extra flags before the -test.run for the batch we make sure that the last flag definition "wins"
+	// (have a look at the unit test in batch_test.go), so that whatever run constraint is specified in GOTEST_FLAGS
+	// participates in the discovery and batching (1st go test execution) but doesn't override the actual execution on
+	// the remote machine (2nd go test execution).
 	testArgs = append(testArgs, params.ExtraFlags...)
 	if params.RunExpr != "" {
 		testArgs = append(testArgs, "-run", params.RunExpr)
