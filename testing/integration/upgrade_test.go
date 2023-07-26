@@ -200,7 +200,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
 
-			testStandaloneUpgrade(ctx, t, agentFixture, v, define.Version(), "")
+			testStandaloneUpgrade(ctx, t, agentFixture, v, define.Version(), "", true)
 		})
 	}
 }
@@ -303,7 +303,8 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 		buildFragments[1],
 	)
 
-	testStandaloneUpgrade(ctx, t, agentFixture, upgradeInputVersion.String(), define.Version(), expectedAgentHashAfterUpgrade)
+	t.Logf("Targeting upgrade to version %+v", upgradeInputVersion)
+	testStandaloneUpgrade(ctx, t, agentFixture, define.Version(), upgradeInputVersion.String(), expectedAgentHashAfterUpgrade, false)
 
 }
 
@@ -332,7 +333,7 @@ func getUpgradableVersions(ctx context.Context, t *testing.T) (upgradableVersion
 	return
 }
 
-func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVersion, toVersion, expectedAgentHashAfterUpgrade string) {
+func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVersion, toVersion, expectedAgentHashAfterUpgrade string, allowLocalPackage bool) {
 	parsedFromVersion, err := version.ParseVersion(fromVersion)
 	require.NoErrorf(t, err, "unable to parse version %w", fromVersion)
 	parsedUpgradeVersion, err := version.ParseVersion(toVersion)
@@ -352,11 +353,11 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 		return checkAgentHealthAndVersion(t, ctx, f, parsedFromVersion.CoreVersion(), parsedFromVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
-	t.Logf("Upgrading to version %q", toVersion)
+	t.Logf("Upgrading from version %q to version %q", fromVersion, toVersion)
 
 	upgradeCmdArgs := []string{"upgrade", toVersion}
 
-	if version_8_7_0.Less(*parsedFromVersion) {
+	if allowLocalPackage && version_8_7_0.Less(*parsedFromVersion) {
 		// if we are upgrading from a version > 8.7.0 (min version to skip signature verification) we pass :
 		// - a file:// sourceURI pointing the agent package under test
 		// - flag --skip-verify to bypass pgp signature verification (we don't produce signatures for PR/main builds)
