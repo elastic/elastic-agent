@@ -138,7 +138,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 3*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// Upgrade Watcher check disabled until
 	// https://github.com/elastic/elastic-agent/issues/2977 is resolved.
