@@ -38,6 +38,8 @@ steps:
   - label: "Integration tests"
     key: "integration-tests"
     command: ".buildkite/scripts/steps/integration-tests.sh"
+    depends_on:
+      - "unit-tests"
     artifact_paths:
       - "build/TEST-**"
     agents:
