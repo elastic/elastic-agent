@@ -2,7 +2,7 @@
 
 set -uo pipefail
 
-DRY_RUN="${DRA_DRY_RUN:=""}"
+DRY_RUN="${DRA_DRY_RUN}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
 COMMIT="${DRA_COMMIT:=""}"
 BRANCH="${DRA_BRANCH:=""}"
@@ -71,7 +71,7 @@ function run_release_manager_collect() {
         --workflow "${_workflow}" \
         --version "${_version}" \
         --artifact-set "${_artifact_set}" \
-        "${_dry_run}"
+        ${_dry_run}
 }
 
 echo "+++ Release Manager ${WORKFLOW} / ${BRANCH} / ${COMMIT}";
