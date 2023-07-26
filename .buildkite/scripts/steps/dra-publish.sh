@@ -12,8 +12,8 @@ PACKAGE_VERSION="${DRA_VERSION:=""}"
 # because the PR branch does not have a project folder in release-manager
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
     BRANCH=main
-#    DRY_RUN="--dry-run"
-#    echo "+++ Running in PR and setting branch main and --dry-run"
+    DRY_RUN="--dry-run"
+    echo "+++ Running in PR and setting branch main and --dry-run"
 fi
 
 if [[ -z "${WORKFLOW}" ]]; then
