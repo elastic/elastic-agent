@@ -5,6 +5,7 @@
 package filters
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -66,7 +67,7 @@ func StreamChecker(log *logger.Logger, ast *transpiler.AST) error {
 		}
 
 		if !matchesNamespaceContraints(namespace) {
-			return ErrInvalidNamespace
+			return fmt.Errorf("%w. Namespace: %q ", ErrInvalidNamespace, namespace)
 		}
 
 		// get the type, longest type for now is metrics
@@ -96,7 +97,7 @@ func StreamChecker(log *logger.Logger, ast *transpiler.AST) error {
 		}
 
 		if !matchesTypeConstraints(datasetType) {
-			return ErrInvalidIndex
+			return fmt.Errorf("%w: Dataset type: %q", ErrInvalidIndex, datasetType)
 		}
 
 		streamsNode, ok := inputNode.Find("streams")
@@ -143,7 +144,7 @@ func StreamChecker(log *logger.Logger, ast *transpiler.AST) error {
 			}
 		}
 		if !matchesDatasetConstraints(datasetName) {
-			return ErrInvalidDataset
+			return fmt.Errorf("%w. Dataset name: %q", ErrInvalidDataset, datasetName)
 		}
 	}
 
@@ -152,9 +153,9 @@ func StreamChecker(log *logger.Logger, ast *transpiler.AST) error {
 
 // The only two requirement are that it has only characters allowed in an Elasticsearch index name
 // Index names must meet the following criteria:
-//     Not longer than 100 bytes
-//     Lowercase only
-//     Cannot include \, /, *, ?, ", <, >, |, ` ` (space character), ,, #
+//   - Not longer than 100 bytes
+//   - Lowercase only
+//   - Cannot include \, /, *, ?, ", <, >, |, ` ` (space character), ,, #
 func matchesNamespaceContraints(namespace string) bool {
 	// length restriction is in bytes, not characters
 	if len(namespace) <= 0 || len(namespace) > 100 {
@@ -165,10 +166,10 @@ func matchesNamespaceContraints(namespace string) bool {
 }
 
 // matchesTypeConstraints fails for following rules. As type is first element of resulting index prefix restrictions need to be applied.
-//     Not longer than 20 bytes
-//     Lowercase only
-//     Cannot start with -, _, +
-//     Cannot include \, /, *, ?, ", <, >, |, ` ` (space character), ,, #
+//   - Not longer than 20 bytes
+//   - Lowercase only
+//   - Cannot start with -, _, +
+//   - Cannot include \, /, *, ?, ", <, >, |, ` ` (space character), ,, #
 func matchesTypeConstraints(dsType string) bool {
 	// length restriction is in bytes, not characters
 	if len(dsType) <= 0 || len(dsType) > 20 {
@@ -183,9 +184,10 @@ func matchesTypeConstraints(dsType string) bool {
 }
 
 // matchesDatasetConstraints fails for following rules
-//     Not longer than 100 bytes
-//     Lowercase only
-//     Cannot include \, /, *, ?, ", <, >, |, ` ` (space character), ,, #
+//
+//	Not longer than 100 bytes
+//	Lowercase only
+//	Cannot include \, /, *, ?, ", <, >, |, ` ` (space character), ,, #
 func matchesDatasetConstraints(dataset string) bool {
 	// length restriction is in bytes, not characters
 	if len(dataset) <= 0 || len(dataset) > 100 {
