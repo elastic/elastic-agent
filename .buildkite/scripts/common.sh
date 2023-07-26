@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -exuo pipefail
+set -euo pipefail
 
 if [[ -z "${WORKSPACE-""}" ]]; then
     WORKSPACE=$(git rev-parse --show-toplevel)
