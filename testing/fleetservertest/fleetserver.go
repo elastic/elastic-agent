@@ -40,6 +40,10 @@ type options struct {
 // of http://[::]:PORT, not valid to be used directly. Use Server.LocalhostURL
 // or
 func NewServer(h *Handlers, opts ...Option) *Server {
+	if h.logFn == nil {
+		h.logFn = func(format string, a ...any) {}
+	}
+
 	optns := options{}
 	for _, o := range opts {
 		o(&optns)

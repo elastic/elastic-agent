@@ -124,15 +124,7 @@ func (p *ProxyURL) TestEnrollProxyAndNoProxyInThePolicy() {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	var status integrationtest.AgentStatusOutput
-	if !assert.Eventually(t, func() bool {
-		status, err = p.fixture.ExecStatus(context.Background())
-		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 5*time.Minute, 5*time.Second) {
-		t.Errorf("want fleet state %s, got %s",
-			cproto.State_HEALTHY, cproto.State(status.FleetState))
-		t.Logf("agent status: %#v", status)
-	}
+	p.assertConnectedFleet(t)
 }
 
 func (p *ProxyURL) TestEnrollProxyAndEmptyProxyInThePolicy() {
@@ -167,12 +159,7 @@ func (p *ProxyURL) TestEnrollProxyAndEmptyProxyInThePolicy() {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	var status integrationtest.AgentStatusOutput
-	assert.Eventually(t, func() bool {
-		status, err = p.fixture.ExecStatus(context.Background())
-		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 5*time.Minute, 5*time.Second, "want fleet state %d, got %d. agent status: %v",
-		cproto.State_HEALTHY, status.FleetState, status)
+	p.assertConnectedFleet(t)
 }
 
 func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
@@ -208,16 +195,7 @@ func (p *ProxyURL) TestProxyInThePolicyTakesPrecedence() {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	// assert the agent is actually connected to fleet.
-	var status integrationtest.AgentStatusOutput
-	if !assert.Eventually(t, func() bool {
-		status, err = p.fixture.ExecStatus(context.Background())
-		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 5*time.Minute, 5*time.Second) {
-		t.Errorf("want fleet state %s, got %s",
-			cproto.State_HEALTHY, cproto.State(status.FleetState))
-		t.Logf("agent status: %v", status)
-	}
+	p.assertConnectedFleet(t)
 
 	// ensure the agent is communicating through the proxy set in the policy
 	want := fleetservertest.NewPathCheckin(p.policyData.AgentID)
@@ -270,16 +248,7 @@ func (p *ProxyURL) TestNoEnrollProxyAndProxyInThePolicy() {
 		require.NoError(t, err, "failed to install agent")
 	}
 
-	// assert the agent is actually connected to fleet.
-	var status integrationtest.AgentStatusOutput
-	if !assert.Eventually(t, func() bool {
-		status, err = p.fixture.ExecStatus(context.Background())
-		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 5*time.Minute, 5*time.Second) {
-		t.Errorf("want fleet state %d, got %d",
-			cproto.State_HEALTHY, status.FleetState)
-		t.Logf("agent status: %v", status)
-	}
+	p.assertConnectedFleet(t)
 
 	// ensure the agent is communicating through the new proxy
 	if !assert.Eventually(t, func() bool {
@@ -331,15 +300,7 @@ func (p *ProxyURL) TestRemoveProxyFromThePolicy() {
 	}
 
 	// assert the agent is actually connected to fleet.
-	var status integrationtest.AgentStatusOutput
-	if !assert.Eventually(t, func() bool {
-		status, err = p.fixture.ExecStatus(context.Background())
-		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 5*time.Minute, 5*time.Second) {
-		t.Errorf("want fleet state %d, got %d",
-			cproto.State_HEALTHY, status.FleetState)
-		t.Logf("agent status: %v", status)
-	}
+	p.assertConnectedFleet(t)
 
 	// ensure the agent is communicating through the proxy set in the policy
 	if !assert.Eventually(t, func() bool {
@@ -385,13 +346,23 @@ func (p *ProxyURL) TestRemoveProxyFromThePolicy() {
 	assert.Equal(t, inspect.Fleet.ProxyURL, want)
 
 	// assert, again, the agent is actually connected to fleet.
+	p.assertConnectedFleet(t)
+}
+
+func (p *ProxyURL) assertConnectedFleet(t *testing.T) {
+	t.Helper()
+
+	var err error
+	var agentStatus integrationtest.AgentStatusOutput
 	if !assert.Eventually(t, func() bool {
-		status, err = p.fixture.ExecStatus(context.Background())
-		return status.FleetState == int(cproto.State_HEALTHY)
-	}, 5*time.Minute, 5*time.Second) {
-		t.Errorf("want fleet state %d, got %d",
-			cproto.State_HEALTHY, status.FleetState)
-		t.Logf("agent status: %v", status)
+		agentStatus, err = p.fixture.ExecStatus(context.Background())
+		return agentStatus.FleetState == int(cproto.State_HEALTHY)
+	}, 5*time.Minute, 5*time.Second,
+		"want fleet state %s, got %s. agent status: %v",
+		cproto.State_HEALTHY, cproto.State(agentStatus.FleetState), agentStatus) {
+		if err != nil {
+			t.Logf("[assertConnectedFleet] last error from agent status command: %v", err)
+		}
 	}
 }
 

@@ -121,12 +121,12 @@ func NewRouter(handlers *Handlers) *mux.Router {
 
 					ww := &statusResponseWriter{w: w}
 
+					handlers.logFn("STARTING - %s %s %s %s\n",
+						r.Method, r.URL, r.Proto, r.RemoteAddr)
 					route.Handler.
 						ServeHTTP(ww, r)
-					if handlers.logFn != nil {
-						handlers.logFn("%d - %s %s %s %s\n",
-							ww.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr)
-					}
+					handlers.logFn("%d - %s %s %s %s\n",
+						ww.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr)
 				}))
 	}
 
