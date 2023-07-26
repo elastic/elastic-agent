@@ -3,7 +3,8 @@
 set -exuo pipefail
 
 if [[ -z "${WORKSPACE-""}" ]]; then
-    export WORKSPACE=$(git rev-parse --show-toplevel)
+    WORKSPACE=$(git rev-parse --show-toplevel)
+    export WORKSPACE
 fi
 PIPELINE="${WORKSPACE}/.buildkite/pipeline.elastic-agent-package.yml"
 if [[ -z "${SETUP_MAGE_VERSION-""}" ]]; then
