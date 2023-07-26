@@ -8,6 +8,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/elastic/elastic-agent-libs/atomic"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -41,7 +43,7 @@ func makeComponentState(name string, proxiedActions []string) runtime.ComponentC
 
 type MockActionCoordinator struct {
 	st               coordinator.State
-	performedActions int
+	performedActions atomic.Int
 }
 
 func (c *MockActionCoordinator) State() coordinator.State {
@@ -49,12 +51,12 @@ func (c *MockActionCoordinator) State() coordinator.State {
 }
 
 func (c *MockActionCoordinator) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
-	c.performedActions++
+	c.performedActions.Inc()
 	return nil, nil
 }
 
 func (c *MockActionCoordinator) Clear() {
-	c.performedActions = 0
+	c.performedActions.Store(0)
 }
 
 type MockAcker struct {
@@ -205,7 +207,7 @@ func TestActionUnenrollHandler(t *testing.T) {
 			if tc.wantErr == nil {
 				require.Len(t, acker.Acked, 1)
 			}
-			require.Equal(t, tc.wantPerformedActions, coord.performedActions)
+			require.Equal(t, tc.wantPerformedActions, coord.performedActions.Load())
 		})
 	}
 }

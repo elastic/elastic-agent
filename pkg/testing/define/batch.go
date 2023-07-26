@@ -69,7 +69,7 @@ type BatchPackageTests struct {
 
 // DetermineBatches parses the package directory with the possible extra build
 // tags to determine the set of batches for the package.
-func DetermineBatches(dir string, buildTags ...string) ([]Batch, error) {
+func DetermineBatches(dir string, testFlags string, buildTags ...string) ([]Batch, error) {
 	const (
 		defineMatcher = "define skip; requirements: "
 	)
@@ -86,7 +86,13 @@ func DetermineBatches(dir string, buildTags ...string) ([]Batch, error) {
 
 	// run 'go test' and collect the JSON output to be parsed
 	// #nosec G204 -- test function code, it will be okay
-	cmdArgs := []string{"test", "-v", "--tags", strings.Join(buildTags, ","), "-json", dir}
+	cmdArgs := []string{"test", "-v", "--tags", strings.Join(buildTags, ","), "-json"}
+	if testFlags != "" {
+		flags := strings.Split(testFlags, " ")
+		cmdArgs = append(cmdArgs, flags...)
+	}
+
+	cmdArgs = append(cmdArgs, dir)
 	testCmd := exec.Command("go", cmdArgs...)
 	output, err := testCmd.Output()
 	if err != nil {
@@ -202,6 +208,13 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 func appendPackageTest(tests []BatchPackageTests, pkg string, name string) []BatchPackageTests {
 	for i, pt := range tests {
 		if pt.Name == pkg {
+			for _, testName := range pt.Tests {
+				if testName == name {
+					// we already selected this test for this package for this batch,
+					// we can return immediately
+					return tests
+				}
+			}
 			pt.Tests = append(pt.Tests, name)
 			tests[i] = pt
 			return tests
