@@ -26,6 +26,20 @@ steps:
           - label: "False"
             value: "0"
         hint: "Increase verbosity of the mage commands, defaults to 0"
+      - select: "DRA Workflow"
+        key: "DRA_WORKFLOW"
+        required: "true"
+        options:
+          - label: "snapshot"
+            value: "snapshot"
+          - label: "staging"
+            value: "staging"
+        hint: "What workflow of the DRA release process this build is going to be triggered for"
+      - select: "DRA Version"
+        key: "DRA_VERSION"
+        required: "true"
+        default: ""
+        hint: "The packaging version to use"
       - select: "DRA DRY-RUN"
         key: "DRA_DRY_RUN"
         required: "false"
@@ -107,7 +121,7 @@ steps:
         export DRA_DRY_RUN
       fi
       if [[ -z "${DRA_VERSION}" ]]; then
-        DRA_VERSION=$(curl -s -XGET "${ManifestURL}" |jq '.version' -r | sed 's/-.*//')
+        DRA_VERSION=$(buildkite-agent meta-data get DRA_VERSION --default "")
         export DRA_VERSION
       fi
       if [[ -z "${DRA_COMMIT}" ]]; then
