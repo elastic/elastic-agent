@@ -107,9 +107,8 @@ func DownloadComponentsFromManifest(manifest string, platforms []string, platfor
 			if err != nil {
 				return fmt.Errorf("failed to create directory %s", targetPath)
 			}
-			if mg.Verbose() {
-				log.Printf(">>>>>>> Prepare to download project [%s] for [%s]", component, platform)
-			}
+			log.Printf("+++ Prepare to download project [%s] for [%s]", component, platform)
+
 			for _, pkg := range pkgs {
 				reqPackage := platformPackages[platform]
 				pkgURL := resolveManifestPackage(projects[component], pkg, reqPackage, manifestResponse.Version)

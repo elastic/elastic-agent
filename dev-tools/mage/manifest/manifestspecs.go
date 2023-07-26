@@ -56,7 +56,7 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 
 	resp, reqErr := http.DefaultClient.Do(req)
 	if reqErr != nil {
-		return filepath, fmt.Errorf("failse to download manifest [%s]\n %w", url, err)
+		return filepath, fmt.Errorf("failed to download manifest [%s]\n %w", url, err)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -66,7 +66,7 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 
 	_, errCopy := io.Copy(outFile, resp.Body)
 	if errCopy != nil {
-		return "", fmt.Errorf("failse to decode manifest response [%s]\n %w", url, err)
+		return "", fmt.Errorf("failed to decode manifest response [%s]\n %w", url, err)
 	}
 	if mg.Verbose() {
 		log.Printf("<<<<<<<<< Downloaded: %s to %s", url, filepath)
