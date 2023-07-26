@@ -37,8 +37,9 @@ func (p *Proxy) ProxiedRequests() []string {
 	p.proxiedRequestsMu.Lock()
 	defer p.proxiedRequestsMu.Unlock()
 
-	rs := make([]string, len(p.proxiedRequests))
-	return append(rs, p.proxiedRequests...)
+	var rs []string
+	rs = append(rs, p.proxiedRequests...)
+	return rs
 }
 
 type Option func(o *options)
@@ -75,6 +76,9 @@ func WithRewriteFn(f func(u *url.URL)) Option {
 	}
 }
 
+// New returns a new Proxy ready for use. Use:
+//   - WithAddress to set the proxy's address,
+//   - WithRewrite or WithRewriteFn to rewrite the URL before forwarding the request.
 func New(t *testing.T, optns ...Option) *Proxy {
 	t.Helper()
 
@@ -104,7 +108,8 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 			s.proxiedRequestsMu.Lock()
 			s.proxiedRequests = append(s.proxiedRequests,
-				fmt.Sprintf("%s - %s %s %s", r.Method, r.URL.Scheme, r.URL.Host, r.URL.String()))
+				fmt.Sprintf("%s - %s %s %s",
+					r.Method, r.URL.Scheme, r.URL.Host, r.URL.String()))
 			s.proxiedRequestsMu.Unlock()
 
 			r.RequestURI = ""
