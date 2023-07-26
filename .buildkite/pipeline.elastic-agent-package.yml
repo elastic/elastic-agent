@@ -60,8 +60,8 @@ steps:
         key: package_elastic-agent
         agents:
           provider: "gcp"
-          machineType: "c2-standard-16"
-          disk_size: 50
+          machineType: "c2-standard-30"
+          disk_size: 100
         command: |
           if [[ -z "${ManifestURL}" ]]; then
             export ManifestURL=$(buildkite-agent meta-data get ManifestURL --default "")
