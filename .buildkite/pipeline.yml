@@ -29,7 +29,6 @@ steps:
       - "buildkite-agent artifact download build/TEST-go-unit.cov ."
       - "buildkite-agent artifact download build/TEST-go-unit.out.json ."
       - "/scan-source-code.sh"
-    branches: "main"
     depends_on:
       - "unit-tests"
     retry:
