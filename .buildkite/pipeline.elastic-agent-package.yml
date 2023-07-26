@@ -35,7 +35,7 @@ steps:
           - label: "staging"
             value: "staging"
         hint: "What workflow of the DRA release process this build is going to be triggered for"
-      - select: "DRA Version"
+      - text: "DRA Version"
         key: "DRA_VERSION"
         required: "true"
         default: ""
