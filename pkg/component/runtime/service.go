@@ -451,6 +451,9 @@ func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *t
 			if err := s.start(ctx); err != nil {
 				msg := fmt.Sprintf("Failed to restart %s service after it missed %d check-ins: %s", s.name(), maxCheckinMisses, err.Error())
 				s.forceCompState(client.UnitStateFailed, msg)
+			} else {
+				// service successfully restarted; reset missed checkin counter
+				*missedCheckins = 0
 			}
 		}
 	}
