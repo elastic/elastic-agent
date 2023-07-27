@@ -78,10 +78,10 @@ func (p *provisioner) Provision(ctx context.Context, requests []runner.StackRequ
 			return func() error {
 				ready, err := p.client.DeploymentIsReady(gCtx, resp.ID, 30*time.Second)
 				if err != nil {
-					return fmt.Errorf("failed to check for cloud %s to be ready: %s", req.Version, err)
+					return fmt.Errorf("failed to check for cloud %s to be ready: %w", req.Version, err)
 				}
 				if !ready {
-					return fmt.Errorf("cloud %s never became ready: %s", req.Version, err)
+					return fmt.Errorf("cloud %s never became ready: %w", req.Version, err)
 				}
 				return nil
 			}

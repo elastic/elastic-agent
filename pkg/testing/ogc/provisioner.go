@@ -53,10 +53,18 @@ func (p *provisioner) Supported(os define.OS) bool {
 }
 
 func (p *provisioner) Provision(ctx context.Context, batches []runner.OSBatch) ([]runner.Instance, error) {
+	// ensure the latest version
+	pullCtx, pullCancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer pullCancel()
+	err := p.ogcPull(pullCtx)
+	if err != nil {
+		return nil, err
+	}
+
 	// import the calculated layouts
 	importCtx, importCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer importCancel()
-	err := p.ogcImport(importCtx, batches)
+	err = p.ogcImport(importCtx, batches)
 	if err != nil {
 		return nil, err
 	}

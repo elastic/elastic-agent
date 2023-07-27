@@ -119,7 +119,7 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 	copyBuild := true
 	localSHA512, err := os.ReadFile(build.SHA512Path)
 	if err != nil {
-		return fmt.Errorf("failed to read local SHA52 contents %s: %q", build.SHA512Path, err)
+		return fmt.Errorf("failed to read local SHA52 contents %s: %w", build.SHA512Path, err)
 	}
 	hostSHA512Path := filepath.Base(build.SHA512Path)
 	hostSHA512, err := sshGetFileContents(ctx, sshClient, hostSHA512Path)
