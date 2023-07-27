@@ -151,7 +151,7 @@ func appendTest(batches []Batch, tar testActionResult, req Requirements) []Batch
 		} else {
 			set = append(set, OS{
 				Type:    o.Type,
-				Arch:    AMD64,
+				Arch:    o.Arch,
 				Version: o.Version,
 				Distro:  o.Distro,
 			})
