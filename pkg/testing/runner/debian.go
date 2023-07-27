@@ -116,6 +116,7 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 	// determine if the build needs to be replaced on the host
 	// if it already exists and the SHA512 are the same contents, then
 	// there is no reason to waste time uploading the build
+	copyBuild := true
 	localSHA512, err := os.ReadFile(build.SHA512Path)
 	if err != nil {
 		return fmt.Errorf("failed to read local SHA52 contents %s: %q", build.SHA512Path, err)
@@ -125,20 +126,24 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 	if err == nil {
 		if string(localSHA512) == string(hostSHA512) {
 			logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
-			return nil
+			copyBuild = false
 		}
 	}
 
-	// ensure the existing copies are removed first
-	_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.Path)}, nil)
-	_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.SHA512Path)}, nil)
+	if copyBuild {
+		// ensure the existing copies are removed first
+		_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.Path)}, nil)
+		_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.SHA512Path)}, nil)
 
-	// place the build for the agent on the host
-	logger.Logf("Copying agent build %s", filepath.Base(build.Path))
+		logger.Logf("Copying agent build %s", filepath.Base(build.Path))
+	}
+
 	for _, buildPath := range []string{build.Path, build.SHA512Path} {
-		err = sshSCP(sshClient, buildPath, filepath.Base(buildPath))
-		if err != nil {
-			return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+		if copyBuild {
+			err = sshSCP(sshClient, buildPath, filepath.Base(buildPath))
+			if err != nil {
+				return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
+			}
 		}
 		insideAgentDir := filepath.Join("agent", buildPath)
 		stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
