@@ -35,17 +35,6 @@ type Proxy struct {
 	opts options
 }
 
-// ProxiedRequests returns a slice with the "request log" with every request the
-// proxy received.
-func (p *Proxy) ProxiedRequests() []string {
-	p.proxiedRequestsMu.Lock()
-	defer p.proxiedRequestsMu.Unlock()
-
-	var rs []string
-	rs = append(rs, p.proxiedRequests...)
-	return rs
-}
-
 type Option func(o *options)
 
 type options struct {
@@ -75,20 +64,20 @@ func WithRequestLog(name string, logFn func(format string, a ...any)) Option {
 	}
 }
 
-// WithVerboseLog sets the proxy to log every request verbosely. WithRequestLog
-// must be used as well, otherwise WithVerboseLog will not take effect.
-func WithVerboseLog() Option {
-	return func(o *options) {
-		o.verbose = true
-	}
-}
-
 // WithRewrite will replace old by new on the request URL host when forwarding it.
 func WithRewrite(old, new string) Option {
 	return func(o *options) {
 		o.rewriteHost = func(s string) string {
 			return strings.Replace(s, old, new, 1)
 		}
+	}
+}
+
+// WithVerboseLog sets the proxy to log every request verbosely. WithRequestLog
+// must be used as well, otherwise WithVerboseLog will not take effect.
+func WithVerboseLog() Option {
+	return func(o *options) {
+		o.verbose = true
 	}
 }
 
@@ -104,6 +93,8 @@ func WithRewriteFn(f func(u *url.URL)) Option {
 // New returns a new Proxy ready for use. Use:
 //   - WithAddress to set the proxy's address,
 //   - WithRewrite or WithRewriteFn to rewrite the URL before forwarding the request.
+//
+// Check the other With* functions for more options.
 func New(t *testing.T, optns ...Option) *Proxy {
 	t.Helper()
 
@@ -193,6 +184,17 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, err = io.Copy(w, resp.Body); err != nil {
 		p.opts.logFn("[ERROR] could not write response body: %v", err)
 	}
+}
+
+// ProxiedRequests returns a slice with the "request log" with every request the
+// proxy received.
+func (p *Proxy) ProxiedRequests() []string {
+	p.proxiedRequestsMu.Lock()
+	defer p.proxiedRequestsMu.Unlock()
+
+	var rs []string
+	rs = append(rs, p.proxiedRequests...)
+	return rs
 }
 
 // statusResponseWriter wraps a http.ResponseWriter to expose the status code
