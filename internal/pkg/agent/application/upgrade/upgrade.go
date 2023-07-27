@@ -163,7 +163,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	if err := InvokeWatcher(u.log); err != nil {
+	if err := InvokeWatcher(u.log, newHash); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
 		rollbackInstall(ctx, u.log, newHash)
 		return nil, err
