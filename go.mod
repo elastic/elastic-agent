@@ -42,7 +42,6 @@ require (
 	github.com/otiai10/copy v1.11.0
 	github.com/pierrre/gotestcover v0.0.0-20160517101806-924dca7d15f0
 	github.com/pkg/errors v0.9.1
-	github.com/rs/xid v1.3.0
 	github.com/rs/zerolog v1.27.0
 	github.com/shirou/gopsutil/v3 v3.21.12
 	github.com/sirupsen/logrus v1.9.0
