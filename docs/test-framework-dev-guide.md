@@ -49,6 +49,13 @@ pass `[testName]` to `go test` as `--run=[testName]`.
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
+#### Cleaning up resources
+
+The test run will keep provisioned resources (instances and stacks) around after the tests have been ran. This allows
+following `mage integration:*` commands to re-use the already provisioned resources.
+
+- `mage integration:clean` will de-provision the allocated resources and cleanup any local state.
+
 #### Passing additional go test flags
 
 When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
@@ -139,6 +146,14 @@ whereas the package names in the error message do not, either omit `SNAPSHOT=tru
 the `mage package` command OR set the `AGENT_VERSION` environment variable to a version
 that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 `mage integration:local`.
+
+### Failures on reused resources
+The integration framework tries to re-use resource when it can. This improves the speed at
+which the tests can run, but also means its possible for a failed test to leave state behind
+that can break future runs.
+
+Run `mage integration:clean` before running `mage integration:test` to ensure the tests are
+being run with fresh instances and stack.
 
 ### OGC-related errors
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
