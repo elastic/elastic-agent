@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -eo pipefail
 
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then

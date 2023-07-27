@@ -51,12 +51,18 @@ type Package struct {
 	Os           []string `json:"os"`
 	Classifier   string   `json:"classifier"`
 	Attributes   struct {
+		IncludeInRepo string `json:"include_in_repo"`
 		ArtifactNoKpi string `json:"artifactNoKpi"`
 		Internal      string `json:"internal"`
 		ArtifactID    string `json:"artifact_id"`
 		Oss           string `json:"oss"`
 		Group         string `json:"group"`
 	} `json:"attributes"`
+}
+
+type Dependency struct {
+	Prefix   string `json:"prefix"`
+	BuildUri string `json:"build_uri"`
 }
 
 type Project struct {
@@ -66,22 +72,24 @@ type Project struct {
 	ExternalArtifactsManifestURL string             `json:"external_artifacts_manifest_url"`
 	BuildDurationSeconds         int                `json:"build_duration_seconds"`
 	Packages                     map[string]Package `json:"packages"`
-	Dependencies                 []any              `json:"dependencies"`
+	Dependencies                 []Dependency       `json:"dependencies"`
+}
+
+type Build struct {
+	Projects             map[string]Project `json:"projects"`
+	StartTime            string             `json:"start_time"`
+	ReleaseBranch        string             `json:"release_branch"`
+	Prefix               string             `json:"prefix"`
+	EndTime              string             `json:"end_time"`
+	ManifestVersion      string             `json:"manifest_version"`
+	Version              string             `json:"version"`
+	Branch               string             `json:"branch"`
+	BuildID              string             `json:"build_id"`
+	BuildDurationSeconds int                `json:"build_duration_seconds"`
 }
 
 type BuildDetails struct {
-	Build struct {
-		Projects             map[string]Project `json:"projects"`
-		StartTime            string             `json:"start_time"`
-		ReleaseBranch        string             `json:"release_branch"`
-		Prefix               string             `json:"prefix"`
-		EndTime              string             `json:"end_time"`
-		ManifestVersion      string             `json:"manifest_version"`
-		Version              string             `json:"version"`
-		Branch               string             `json:"branch"`
-		BuildID              string             `json:"build_id"`
-		BuildDurationSeconds int                `json:"build_duration_seconds"`
-	} `json:"build"`
+	Build     Build
 	Manifests struct {
 		LastUpdateTime         string `json:"last-update-time"`
 		SecondsSinceLastUpdate int    `json:"seconds-since-last-update"`
