@@ -65,6 +65,15 @@ type Logger interface {
 	Logf(format string, args ...any)
 }
 
+type essCloudResponse struct {
+	resp   *ess.CreateResponse
+	ready  bool
+	done   bool
+	subCh  []chan *ess.CreateResponse
+	subMx  sync.RWMutex
+	client ess.DeplymentHandler
+}
+
 // Result is the complete result from the runner.
 type Result struct {
 	// Tests is the number of tests ran.
@@ -264,11 +273,11 @@ func (r *Runner) runMachine(ctx context.Context, sshAuth ssh.AuthMethod, logger 
 			logger.Logf("Will continue stack is ready")
 			env = map[string]string{
 				"ELASTICSEARCH_HOST":     resp.ElasticsearchEndpoint,
-				"ELASTICSEARCH_USERNAME": resp.Username,
-				"ELASTICSEARCH_PASSWORD": resp.Password,
+				"ELASTICSEARCH_USERNAME": resp.ESUser,
+				"ELASTICSEARCH_PASSWORD": resp.ESPassword,
 				"KIBANA_HOST":            resp.KibanaEndpoint,
-				"KIBANA_USERNAME":        resp.Username,
-				"KIBANA_PASSWORD":        resp.Password,
+				"KIBANA_USERNAME":        resp.ESUser,
+				"KIBANA_PASSWORD":        resp.ESPassword,
 			}
 		}
 	}
@@ -493,9 +502,10 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 			return fmt.Errorf("failed to create ESS cloud for version %s: %w", version, err)
 		}
 		essResp := &essCloudResponse{
-			resp:  resp,
-			ready: false,
-			subCh: nil,
+			resp:   resp,
+			ready:  false,
+			subCh:  nil,
+			client: essClient,
 		}
 		for batchID, batchVersion := range batchToVersion {
 			if batchVersion == version {
@@ -505,18 +515,18 @@ func (r *Runner) setupCloud(ctx context.Context) error {
 		go func(ctx context.Context, version string, resp *essCloudResponse) {
 			ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 			defer cancel()
-			ready, err := essClient.DeploymentIsReady(ctx, resp.resp.ID, 30*time.Second)
+			ready, err := essClient.DeploymentIsReady(ctx, 30*time.Second)
 			if err != nil {
 				fmt.Fprintf(os.Stdout, ">>> Failed to check for cloud %s to be ready: %s\n", version, err)
 			}
 			resp.subMx.RLock()
-			subs := make([]chan *ess.CreateDeploymentResponse, len(resp.subCh))
+			subs := make([]chan *ess.CreateResponse, len(resp.subCh))
 			copy(subs, resp.subCh)
-			resp.subCh = make([]chan *ess.CreateDeploymentResponse, 0)
+			resp.subCh = make([]chan *ess.CreateResponse, 0)
 			resp.done = true
 			resp.ready = ready
 			resp.subMx.RUnlock()
-			var send *ess.CreateDeploymentResponse
+			var send *ess.CreateResponse
 			if ready {
 				send = resp.resp
 			}
@@ -550,7 +560,7 @@ func (r *Runner) cleanupCloud() {
 		err := func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
-			return essClient.ShutdownDeployment(ctx, cloud.resp.ID)
+			return essClient.ShutdownDeployment(ctx)
 		}()
 		if err != nil {
 			fmt.Fprintf(os.Stdout, ">>> Failed to cleanup cloud %s: %s\n", cloud.resp.ID, err)
@@ -560,7 +570,7 @@ func (r *Runner) cleanupCloud() {
 	r.batchToCloud = make(map[string]*essCloudResponse)
 }
 
-func (r *Runner) getCloudForBatchID(id string) (chan *ess.CreateDeploymentResponse, error) {
+func (r *Runner) getCloudForBatchID(id string) (chan *ess.CreateResponse, error) {
 	r.batchToCloudMx.RLock()
 	essResp, ok := r.batchToCloud[id]
 	if !ok {
@@ -570,7 +580,7 @@ func (r *Runner) getCloudForBatchID(id string) (chan *ess.CreateDeploymentRespon
 	r.batchToCloudMx.RUnlock()
 
 	essResp.subMx.RLock()
-	subCh := make(chan *ess.CreateDeploymentResponse, 1)
+	subCh := make(chan *ess.CreateResponse, 1)
 	if essResp.done {
 		if essResp.ready {
 			subCh <- essResp.resp
@@ -931,14 +941,6 @@ func filterSingleTestBatch(batch LayoutBatch, testName string) (LayoutBatch, boo
 		}
 	}
 	return batch, false
-}
-
-type essCloudResponse struct {
-	resp  *ess.CreateDeploymentResponse
-	ready bool
-	done  bool
-	subCh []chan *ess.CreateDeploymentResponse
-	subMx sync.RWMutex
 }
 
 type batchLogger struct {

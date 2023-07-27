@@ -70,10 +70,20 @@ func (c *Config) Validate() error {
 	return err
 }
 
+// ESSType is a selector for the runner's underlying ESS instance
+type ESSType string
+
+// StatefulESS will start a traditional ESS deployment
+var StatefulESS ESSType = "stateful"
+
+// ServerlessESS will start a serverless ESS deployment
+var ServerlessESS ESSType = "serverless"
+
 // ESSConfig is the configuration for communicating with ESS.
 type ESSConfig struct {
-	APIKey string
-	Region string
+	APIKey         string
+	Region         string
+	DeploymentType ESSType
 }
 
 // Validate returns an error if the information is invalid.

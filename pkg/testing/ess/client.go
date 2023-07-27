@@ -13,8 +13,9 @@ import (
 )
 
 type Client struct {
-	config *Config
-	client *http.Client
+	config       *Config
+	client       *http.Client
+	deploymentID string
 }
 
 func NewClient(config Config) *Client {

@@ -1527,6 +1527,13 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 	if essRegion == "" {
 		essRegion = "gcp-us-central1"
 	}
+
+	eessDeploymentType := runner.StatefulESS
+	essDeploymentEnv := os.Getenv("TEST_INTEG_ESS_SERVERLESS")
+	if essDeploymentEnv != "" {
+		essDeploymentType = runner.ServerlessESS
+	}
+
 	r, err := runner.NewRunner(runner.Config{
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
@@ -1534,8 +1541,9 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 		GOVersion:         goVersion,
 		RepoDir:           ".",
 		ESS: &runner.ESSConfig{
-			APIKey: essToken,
-			Region: essRegion,
+			APIKey:         essToken,
+			Region:         essRegion,
+			DeploymentType: eessDeploymentType,
 		},
 		GCE: &runner.GCEConfig{
 			ServiceTokenPath: serviceTokenPath,
