@@ -6,4 +6,5 @@ e2e/elastic-agent-*/
 e2e/*.gz
 e2e/infra
 .integration-cache
+.ogc-cache
 e2e/e2e_artifacts
