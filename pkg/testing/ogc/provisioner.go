@@ -153,8 +153,9 @@ func (p *provisioner) ogcImport(ctx context.Context, batches []runner.OSBatch) e
 		return fmt.Errorf("failed to marshal layouts YAML: %w", err)
 	}
 
+	var output bytes.Buffer
 	p.logger.Logf("Import layouts into ogc")
-	proc, err := p.ogcRun(ctx, []string{"layout", "import"}, true)
+	proc, err := p.ogcRun(ctx, []string{"layout", "import"}, true, process.WithCmdOptions(runner.AttachOut(&output), runner.AttachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run ogc import: %w", err)
 	}
@@ -163,11 +164,15 @@ func (p *provisioner) ogcImport(ctx context.Context, batches []runner.OSBatch) e
 		_ = proc.Stdin.Close()
 		_ = proc.Kill()
 		<-proc.Wait()
+		// print the output so its clear what went wrong
+		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
 		return fmt.Errorf("failed to write layouts to stdin: %w", err)
 	}
 	_ = proc.Stdin.Close()
 	ps := <-proc.Wait()
 	if ps.ExitCode() != 0 {
+		// print the output so its clear what went wrong
+		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
 		return fmt.Errorf("failed to run ogc import: docker run exited with code: %d", ps.ExitCode())
 	}
 	return nil
