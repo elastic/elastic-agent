@@ -7,6 +7,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,7 @@ import (
 type DebianRunner struct{}
 
 // Prepare the test
-func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPaths []string) error {
+func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger Logger, arch string, goVersion string) error {
 	// prepare build-essential and unzip
 	//
 	// apt-get update and install are so terrible that we have to place this in a loop, because in some cases the
@@ -84,19 +85,26 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger L
 		return fmt.Errorf("failed to symlink /usr/local/go/bin/gofmt to /usr/bin/gofmt: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
+	return nil
+}
+
+// Copy places the required files on the host.
+func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logger, repoArchive string, build Build) error {
 	// copy the archive and extract it on the host
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
-	err = sshSCP(sshClient, repoArchive, destRepoName)
+	err := sshSCP(sshClient, repoArchive, destRepoName)
 	if err != nil {
 		return fmt.Errorf("failed to SCP repo archive %s: %w", repoArchive, err)
 	}
-	stdOut, errOut, err = sshRunCommand(ctx, sshClient, "unzip", []string{destRepoName, "-d", "agent"}, nil)
+	// ensure that agent directory is removed (possible it already exists if instance already used)
+	_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-rf", "agent"}, nil)
+	stdOut, errOut, err := sshRunCommand(ctx, sshClient, "unzip", []string{destRepoName, "-d", "agent"}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to unzip %s to agent directory: %w (stdout: %s, stderr: %s)", destRepoName, err, stdOut, errOut)
 	}
 
-	// install mage and prepare for testing
+	// prepare for testing
 	logger.Logf("Running make mage and prepareOnRemote")
 	envs := `GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH"`
 	installMage := strings.NewReader(fmt.Sprintf(`cd agent && %s make mage && %s mage integration:prepareOnRemote`, envs, envs))
@@ -105,9 +113,29 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger L
 		return fmt.Errorf("failed to to perform make mage and prepareOnRemote: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
+	// determine if the build needs to be replaced on the host
+	// if it already exists and the SHA512 are the same contents, then
+	// there is no reason to waste time uploading the build
+	localSHA512, err := os.ReadFile(build.SHA512Path)
+	if err != nil {
+		return fmt.Errorf("failed to read local SHA52 contents %s: %q", build.SHA512Path, err)
+	}
+	hostSHA512Path := filepath.Base(build.SHA512Path)
+	hostSHA512, err := sshGetFileContents(ctx, sshClient, hostSHA512Path)
+	if err == nil {
+		if string(localSHA512) == string(hostSHA512) {
+			logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
+			return nil
+		}
+	}
+
+	// ensure the existing copies are removed first
+	_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.Path)}, nil)
+	_, _, _ = sshRunCommand(ctx, sshClient, "rm", []string{"-f", filepath.Base(build.SHA512Path)}, nil)
+
 	// place the build for the agent on the host
-	for _, buildPath := range buildPaths {
-		logger.Logf("Copying agent build %s", filepath.Base(buildPath))
+	logger.Logf("Copying agent build %s", filepath.Base(build.Path))
+	for _, buildPath := range []string{build.Path, build.SHA512Path} {
 		err = sshSCP(sshClient, buildPath, filepath.Base(buildPath))
 		if err != nil {
 			return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
@@ -117,9 +145,9 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger L
 		if err != nil {
 			return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", filepath.Dir(insideAgentDir), err, stdOut, errOut)
 		}
-		stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mv", []string{filepath.Base(buildPath), insideAgentDir}, nil)
+		stdOut, errOut, err = sshRunCommand(ctx, sshClient, "ln", []string{filepath.Base(buildPath), insideAgentDir}, nil)
 		if err != nil {
-			return fmt.Errorf("failed to move %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
+			return fmt.Errorf("failed to hard link %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
 		}
 	}
 

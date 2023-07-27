@@ -36,6 +36,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	bversion "github.com/elastic/elastic-agent/version"
 
@@ -1293,12 +1294,13 @@ func majorMinor() string {
 func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
 
-	// Clean out .ogc-cache always
+	// Clean out .integration-cache/.ogc-cache always
+	defer os.RemoveAll(".integration-cache")
 	defer os.RemoveAll(".ogc-cache")
 
-	_, err := os.Stat(".ogc-cache")
+	_, err := os.Stat(".integration-cache")
 	if err == nil {
-		// .ogc-cache exists; need to run `Clean` from the runner
+		// .integration-cache exists; need to run `Clean` from the runner
 		r, err := createTestRunner(false, "")
 		if err != nil {
 			return fmt.Errorf("error creating test runner: %w", err)
@@ -1364,19 +1366,16 @@ func (Integration) Auth(ctx context.Context) error {
 
 // run integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
-	mg.CtxDeps(ctx, Integration.Clean)
 	return integRunner(ctx, false, "")
 }
 
 // run integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
-	mg.CtxDeps(ctx, Integration.Clean)
 	return integRunner(ctx, true, "")
 }
 
 // run single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
-	mg.CtxDeps(ctx, Integration.Clean)
 	return integRunner(ctx, false, testName)
 }
 
@@ -1543,25 +1542,40 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 		essRegion = "gcp-us-central1"
 	}
 	timestamp := timestampEnabled()
-	r, err := runner.NewRunner(runner.Config{
+
+	cfg := runner.Config{
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
 		BuildDir:          agentBuildDir,
 		GOVersion:         goVersion,
 		RepoDir:           ".",
-		ESS: &runner.ESSConfig{
-			APIKey: essToken,
-			Region: essRegion,
-		},
-		GCE: &runner.GCEConfig{
-			ServiceTokenPath: serviceTokenPath,
-			Datacenter:       datacenter,
-		},
-		Matrix:      matrix,
-		SingleTest:  singleTest,
-		VerboseMode: mg.Verbose(),
-		Timestamp:   timestamp,
-	}, batches...)
+		Matrix:            matrix,
+		SingleTest:        singleTest,
+		VerboseMode:       mg.Verbose(),
+		Timestamp:         timestamp,
+	}
+	ogcCfg := ogc.Config{
+		ServiceTokenPath: serviceTokenPath,
+		Datacenter:       datacenter,
+	}
+	ogcProvisioner, err := ogc.NewProvisoner(ogcCfg)
+	if err != nil {
+		return nil, err
+	}
+	email, err := ogcCfg.ClientEmail()
+	if err != nil {
+		return nil, err
+	}
+	essProvisioner, err := ess.NewProvisoner(ess.ProvisionerConfig{
+		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
+		APIKey:     essToken,
+		Region:     essRegion,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := runner.NewRunner(cfg, ogcProvisioner, essProvisioner, batches...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
