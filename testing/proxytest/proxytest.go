@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 type Proxy struct {
@@ -29,6 +31,8 @@ type Proxy struct {
 	// proxiedRequests is a "request log" for every request the proxy receives.
 	proxiedRequests   []string
 	proxiedRequestsMu sync.Mutex
+
+	opts options
 }
 
 // ProxiedRequests returns a slice with the "request log" with every request the
@@ -66,7 +70,7 @@ func WithAddress(addr string) Option {
 func WithRequestLog(name string, logFn func(format string, a ...any)) Option {
 	return func(o *options) {
 		o.logFn = func(format string, a ...any) {
-			logFn("[proxy-"+name+"]"+format, a...)
+			logFn("[proxy-"+name+"] "+format, a...)
 		}
 	}
 }
@@ -117,56 +121,100 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		t.Fatalf("NewServer failed to create a net.Listener: %v", err)
 	}
 
-	s := Proxy{}
+	p := Proxy{opts: opts}
 
-	s.Server = &httptest.Server{
+	p.Server = &httptest.Server{
 		Listener: l,
 		//nolint:gosec,nolintlint // it's a test
-		Config: &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Config: &http.Server{Handler: http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
+			w := &statusResponseWriter{w: ww}
 
-			switch {
-			case opts.rewriteURL != nil:
-				opts.rewriteURL(r.URL)
-			case opts.rewriteHost != nil:
-				r.URL.Host = opts.rewriteHost(r.URL.Host)
-			}
+			requestID := uuid.New().String()
+			opts.logFn("[%s] STARTING - %s %s %s %s\n",
+				requestID, r.Method, r.URL, r.Proto, r.RemoteAddr)
 
-			s.proxiedRequestsMu.Lock()
-			s.proxiedRequests = append(s.proxiedRequests,
-				fmt.Sprintf("%s - %s %s %s",
-					r.Method, r.URL.Scheme, r.URL.Host, r.URL.String()))
-			s.proxiedRequestsMu.Unlock()
+			p.ServeHTTP(w, r)
 
-			r.RequestURI = ""
-
-			resp, err := http.DefaultClient.Do(r)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				msg := fmt.Sprintf("could not make request: %#v", err.Error())
-				log.Print(msg)
-				_, _ = fmt.Fprint(w, msg)
-				return
-			}
-			defer resp.Body.Close()
-
-			w.WriteHeader(resp.StatusCode)
-			for k, v := range resp.Header {
-				w.Header()[k] = v
-			}
-
-			if _, err = io.Copy(w, resp.Body); err != nil {
-				t.Logf("could not write response body: %v", err)
-			}
+			opts.logFn(fmt.Sprintf("[%s] DONE %d - %s %s %s %s\n",
+				requestID, w.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr))
 		})}}
-	s.Start()
+	p.Start()
 
-	u, err := url.Parse(s.URL)
+	u, err := url.Parse(p.URL)
 	if err != nil {
 		panic(fmt.Sprintf("could parse fleet-server URL: %v", err))
 	}
 
-	s.Port = u.Port()
-	s.LocalhostURL = "http://localhost:" + s.Port
+	p.Port = u.Port()
+	p.LocalhostURL = "http://localhost:" + p.Port
 
-	return &s
+	opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
+	return &p
+}
+
+func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	origURL := r.URL.String()
+
+	switch {
+	case p.opts.rewriteURL != nil:
+		p.opts.rewriteURL(r.URL)
+	case p.opts.rewriteHost != nil:
+		r.URL.Host = p.opts.rewriteHost(r.URL.Host)
+	}
+
+	if p.opts.verbose {
+		p.opts.logFn("original URL: %s, new URL: %s",
+			origURL, r.URL.String())
+	}
+
+	p.proxiedRequestsMu.Lock()
+	p.proxiedRequests = append(p.proxiedRequests,
+		fmt.Sprintf("%s - %s %s %s",
+			r.Method, r.URL.Scheme, r.URL.Host, r.URL.String()))
+	p.proxiedRequestsMu.Unlock()
+
+	r.RequestURI = ""
+
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		msg := fmt.Sprintf("could not make request: %#v", err.Error())
+		log.Print(msg)
+		_, _ = fmt.Fprint(w, msg)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.WriteHeader(resp.StatusCode)
+	for k, v := range resp.Header {
+		w.Header()[k] = v
+	}
+
+	if _, err = io.Copy(w, resp.Body); err != nil {
+		p.opts.logFn("[ERROR] could not write response body: %v", err)
+	}
+}
+
+// statusResponseWriter wraps a http.ResponseWriter to expose the status code
+// through statusResponseWriter.statusCode
+type statusResponseWriter struct {
+	w          http.ResponseWriter
+	statusCode int
+}
+
+func (s *statusResponseWriter) Header() http.Header {
+	return s.w.Header()
+}
+
+func (s *statusResponseWriter) Write(bs []byte) (int, error) {
+	return s.w.Write(bs)
+}
+
+func (s *statusResponseWriter) WriteHeader(statusCode int) {
+	s.statusCode = statusCode
+	s.w.WriteHeader(statusCode)
+}
+
+func (s *statusResponseWriter) StatusCode() int {
+	return s.statusCode
 }
