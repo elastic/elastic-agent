@@ -28,6 +28,9 @@ type Config struct {
 
 	// Timestamp enables timestamps on the console output.
 	Timestamp bool
+
+	// Testflags contains extra go test flags to be set when running tests
+	TestFlags string
 }
 
 // Validate returns an error if the information is invalid.

@@ -11,6 +11,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
@@ -76,10 +80,16 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policyResp, err := tools.InstallAgentWithPolicy(t, fixture, info.KibanaClient, createPolicyReq)
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	policyResp, err := tools.InstallAgentWithPolicy(t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
-	installElasticDefendPackage(t, info, policyResp.ID)
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
 	t.Log("Polling for endpoint-security to become Healthy")
 	ctx, cancel := context.WithTimeout(context.Background(), endpointHealthPollingTimeout)
@@ -113,7 +123,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 		Isolate: false,
 		Sudo:    true, // requires Agent installation
 		OS: []define.OS{
-			define.OS{Type: define.Linux, Arch: define.AMD64},
+			{Type: define.Linux, Arch: define.AMD64},
 		},
 	})
 
@@ -132,7 +142,12 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 			kibana.MonitoringEnabledMetrics,
 		},
 	}
-	policyResp, err := tools.InstallAgentWithPolicy(t, fixture, info.KibanaClient, createPolicyReq)
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+	policyResp, err := tools.InstallAgentWithPolicy(t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
 	installElasticDefendPackage(t, info, policyResp.ID)
@@ -215,12 +230,14 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 }
 
 // Installs the Elastic Defend package to cause the agent to install the endpoint-security service.
-func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) {
+func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) (*tools.PackagePolicyResponse, error) {
 	t.Helper()
 
 	t.Log("Templating endpoint package policy request")
 	tmpl, err := template.New("pkgpolicy").Parse(endpointPackagePolicyTemplate)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("error creating new template: %w", err)
+	}
 
 	packagePolicyID := uuid.New().String()
 	var pkgPolicyBuf bytes.Buffer
@@ -230,21 +247,96 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 		PolicyID: policyID,
 		Version:  endpointPackageVersion,
 	})
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("error executing template: %w", err)
+	}
 
 	// Make sure the templated value is actually valid JSON before making the API request.
 	// Using json.Unmarshal will give us the actual syntax error, calling json.Valid() would not.
 	packagePolicyReq := tools.PackagePolicyRequest{}
 	err = json.Unmarshal(pkgPolicyBuf.Bytes(), &packagePolicyReq)
-	require.NoErrorf(t, err, "Templated package policy is not valid JSON:\n%s", pkgPolicyBuf.String())
+	if err != nil {
+		return nil, fmt.Errorf("templated package policy is not valid JSON: %s, %w", pkgPolicyBuf.String(), err)
+	}
 
 	t.Log("POST /api/fleet/package_policies")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	pkgResp, err := tools.InstallFleetPackage(ctx, info.KibanaClient, &packagePolicyReq)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("error installing fleet package: %w", err)
+	}
 	t.Logf("Endpoint package Policy Response:\n%+v", pkgResp)
+	return pkgResp, err
+}
+
+// Tests that install of Elastic Defend fails if Agent is installed in a base
+// path other than default
+func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack:   &define.Stack{},
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation
+	})
+
+	// Get path to agent executable.
+	fixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.New().String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
+	}
+	policyResp, err := tools.InstallAgentWithPolicy(t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
+
+	t.Log("Installing Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	c := fixture.Client()
+
+	require.Eventually(t, func() bool {
+		err := c.Connect(ctx)
+		if err != nil {
+			t.Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("agent state: %+v", state)
+		if state.State != cproto.State_DEGRADED {
+			return false
+		}
+		for _, c := range state.Components {
+			if strings.Contains(c.Message,
+				"Elastic Defend requires Elastic Agent be installed at the default installation path") {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Minute, 10*time.Second, "Agent never became DEGRADED with default install message")
 }
 
 func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {

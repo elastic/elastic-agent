@@ -12,13 +12,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
@@ -73,6 +78,9 @@ var Aliases = map[string]interface{}{
 	"build": Build.All,
 	"demo":  Demo.Enroll,
 }
+var errNoManifest = errors.New("missing ManifestURL environment variable")
+var errNoAgentDropPath = errors.New("missing AGENT_DROP_PATH environment variable")
+var errAtLeastOnePlatform = errors.New("elastic-agent package is expected to build at least one platform package")
 
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
@@ -395,6 +403,95 @@ func Package() {
 	packageAgent(platforms, devtools.UseElasticAgentPackaging)
 }
 
+// DownloadManifest downloads the provided manifest file into the predefined folder
+func DownloadManifest() error {
+	fmt.Println("--- Downloading manifest")
+	start := time.Now()
+	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
+
+	dropPath, found := os.LookupEnv(agentDropPath)
+
+	if !found {
+		return errNoAgentDropPath
+	}
+
+	if !devtools.PackagingFromManifest {
+		return errNoManifest
+	}
+
+	platforms := devtools.Platforms.Names()
+	if len(platforms) == 0 {
+		return errAtLeastOnePlatform
+	}
+
+	platformPackages := map[string]string{
+		"darwin/amd64":  "darwin-x86_64.tar.gz",
+		"darwin/arm64":  "darwin-aarch64.tar.gz",
+		"linux/amd64":   "linux-x86_64.tar.gz",
+		"linux/arm64":   "linux-arm64.tar.gz",
+		"windows/amd64": "windows-x86_64.zip",
+	}
+
+	var requiredPackages []string
+	for _, p := range platforms {
+		requiredPackages = append(requiredPackages, platformPackages[p])
+	}
+
+	if e := manifest.DownloadComponentsFromManifest(devtools.ManifestURL, platforms, platformPackages, dropPath); e != nil {
+		return fmt.Errorf("failed to download the manifest file, %w", e)
+	}
+	log.Printf(">> Completed downloading packages from manifest into drop-in %s", dropPath)
+
+	return nil
+}
+
+// FixDRADockerArtifacts is a workaround for the DRA artifacts produced by the package target. We had to do
+// because the initial unified release manager DSL code required specific names that the package does not produce,
+// we wanted to keep backwards compatibility with the artifacts of the unified release and the DRA.
+// this follows the same logic as https://github.com/elastic/beats/blob/2fdefcfbc783eb4710acef07d0ff63863fa00974/.ci/scripts/prepare-release-manager.sh
+func FixDRADockerArtifacts() error {
+	fmt.Println("--- Fixing Docker DRA artifacts")
+	distributionsPath := filepath.Join("build", "distributions")
+	// Find all the files with the given name
+	matches, err := filepath.Glob(filepath.Join(distributionsPath, "*docker.tar.gz*"))
+	if err != nil {
+		return err
+	}
+	if mg.Verbose() {
+		log.Printf("--- Found artifacts to rename %s %d", distributionsPath, len(matches))
+	}
+	// Match the artifact name and break down into groups so that we can reconstruct the names as its expected by the DRA DSL
+	artifactRegexp, err := regexp.Compile(`([\w+-]+)-(([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+)?)-([\w]+)-([\w]+)-([\w]+)\.([\w]+)\.([\w.]+)`)
+	if err != nil {
+		return err
+	}
+	for _, m := range matches {
+		artifactFile, err := os.Stat(m)
+		if err != nil {
+			return fmt.Errorf("failed stating file: %w", err)
+		}
+		if artifactFile.IsDir() {
+			continue
+		}
+		match := artifactRegexp.FindAllStringSubmatch(artifactFile.Name(), -1)
+		// The groups here is tightly coupled with the regexp above.
+		targetName := fmt.Sprintf("%s-%s-%s-%s-image-%s-%s.%s", match[0][1], match[0][2], match[0][7], match[0][10], match[0][8], match[0][9], match[0][11])
+		if mg.Verbose() {
+			fmt.Printf("%#v\n", match)
+			fmt.Printf("Artifact: %s \n", artifactFile.Name())
+			fmt.Printf("Renamed:  %s \n", targetName)
+		}
+		renameErr := os.Rename(filepath.Join(distributionsPath, artifactFile.Name()), filepath.Join(distributionsPath, targetName))
+		if renameErr != nil {
+			return renameErr
+		}
+		if mg.Verbose() {
+			fmt.Println("Renamed artifact")
+		}
+	}
+	return nil
+}
+
 func getPackageName(beat, version, pkg string) (string, string) {
 	if _, ok := os.LookupEnv(snapshotEnv); ok {
 		version += "-SNAPSHOT"
@@ -417,6 +514,7 @@ func requiredPackagesPresent(basePath, beat, version string, requiredPackages []
 
 // TestPackages tests the generated packages (i.e. file modes, owners, groups).
 func TestPackages() error {
+	fmt.Println("--- TestPackages, the generated packages (i.e. file modes, owners, groups).")
 	return devtools.TestPackages()
 }
 
@@ -755,9 +853,30 @@ func runAgent(env map[string]string) error {
 }
 
 func packageAgent(platforms []string, packagingFn func()) {
-	version, found := os.LookupEnv("BEAT_VERSION")
-	if !found {
-		version = bversion.GetDefaultVersion()
+	fmt.Println("--- Package Elastic-Agent")
+	var packageVersion string
+	// if we have defined a manifest URL to package Agent from, we sould be using the same packageVersion of that manifest
+	if devtools.PackagingFromManifest {
+		if manifestResponse, err := manifest.DownloadManifest(devtools.ManifestURL); err != nil {
+			log.Panicf("failed to download remote manifest file %s", err)
+		} else {
+			if parsedVersion, err := version.ParseVersion(manifestResponse.Version); err != nil {
+				log.Panicf("the manifest version from manifest is not semver, got %s", manifestResponse.Version)
+			} else {
+				// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
+				// something that we use as an implicit parameter to various functions
+				if parsedVersion.IsSnapshot() {
+					os.Setenv(snapshotEnv, "true")
+					mage.Snapshot = true
+				}
+				os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
+			}
+		}
+	}
+	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+		packageVersion = bversion.GetDefaultVersion()
+	} else {
+		packageVersion = beatVersion
 	}
 
 	dropPath, found := os.LookupEnv(agentDropPath)
@@ -775,7 +894,9 @@ func packageAgent(platforms []string, packagingFn func()) {
 	for _, p := range platforms {
 		requiredPackages = append(requiredPackages, platformPackages[p])
 	}
-
+	if mg.Verbose() {
+		log.Printf("--- Packaging packageVersion[%s], %+v \n", packageVersion, requiredPackages)
+	}
 	// build deps only when drop is not provided
 	if !found || len(dropPath) == 0 {
 		// prepare new drop
@@ -785,6 +906,9 @@ func packageAgent(platforms []string, packagingFn func()) {
 			panic(err)
 		}
 
+		if mg.Verbose() {
+			log.Printf(">> Creating drop-in folder %+v \n", dropPath)
+		}
 		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 
 		defer os.RemoveAll(dropPath)
@@ -813,7 +937,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 					reqPackage := platformPackages[platform]
 					targetPath := filepath.Join(archivePath, reqPackage)
 					os.MkdirAll(targetPath, 0755)
-					newVersion, packageName := getPackageName(binary, version, reqPackage)
+					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
 					err := fetchBinaryFromArtifactsApi(ctx, packageName, binary, newVersion, targetPath)
 					if err != nil {
 						if strings.Contains(err.Error(), "object not found") {
@@ -836,7 +960,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 				packagesMissing := false
 				packagesCopied := 0
 
-				if !requiredPackagesPresent(pwd, b, version, requiredPackages) {
+				if !requiredPackagesPresent(pwd, b, packageVersion, requiredPackages) {
 					cmd := exec.Command("mage", "package")
 					cmd.Dir = pwd
 					cmd.Stdout = os.Stdout
@@ -883,6 +1007,9 @@ func packageAgent(platforms []string, packagingFn func()) {
 
 	// create flat dir
 	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
+	if mg.Verbose() {
+		log.Printf("--- creating flat dir in .elastic-agent_flat")
+	}
 	os.MkdirAll(flatPath, 0755)
 	defer os.RemoveAll(flatPath)
 
@@ -905,6 +1032,9 @@ func packageAgent(platforms []string, packagingFn func()) {
 		}
 		matches = append(matches, zipMatches...)
 
+		if mg.Verbose() {
+			log.Printf("--- Extracting into the flat dir")
+		}
 		for _, m := range matches {
 			stat, err := os.Stat(m)
 			if os.IsNotExist(err) {
@@ -916,17 +1046,22 @@ func packageAgent(platforms []string, packagingFn func()) {
 			if stat.IsDir() {
 				continue
 			}
-
+			if mg.Verbose() {
+				log.Printf(">>> Extracting %s to %s", m, versionedFlatPath)
+			}
 			if err := devtools.Extract(m, versionedFlatPath); err != nil {
 				panic(err)
 			}
 		}
 
-		files, err := filepath.Glob(filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", version)))
+		files, err := filepath.Glob(filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion)))
 		if err != nil {
 			panic(err)
 		}
-
+		if mg.Verbose() {
+			log.Printf("Validating checksums for %+v", files)
+			log.Printf("--- Copy files into %s", versionedDropPath)
+		}
 		checksums := make(map[string]string)
 		for _, f := range files {
 			options := copy.Options{
@@ -935,7 +1070,9 @@ func packageAgent(platforms []string, packagingFn func()) {
 				},
 				Sync: true,
 			}
-
+			if mg.Verbose() {
+				log.Printf("> prepare to copy %s ", f)
+			}
 			err = copy.Copy(f, versionedDropPath, options)
 			if err != nil {
 				panic(err)
@@ -943,7 +1080,7 @@ func packageAgent(platforms []string, packagingFn func()) {
 
 			// copy spec file for match
 			specName := filepath.Base(f)
-			idx := strings.Index(specName, "-"+version)
+			idx := strings.Index(specName, "-"+packageVersion)
 			if idx != -1 {
 				specName = specName[:idx]
 			}
@@ -962,8 +1099,10 @@ func packageAgent(platforms []string, packagingFn func()) {
 	}
 
 	// package agent
+	log.Println("--- Running packaging function")
 	packagingFn()
 
+	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
 	mg.Deps(CrossBuild, CrossBuildGoDaemon)
 	mg.SerialDeps(devtools.Package, TestPackages)
@@ -976,6 +1115,9 @@ func copyComponentSpecs(componentName, versionedDropPath string) (string, error)
 	if _, err := os.Stat(targetPath); err != nil {
 		// spec not present copy from local
 		sourceSpecFile := filepath.Join("specs", specFileName)
+		if mg.Verbose() {
+			log.Printf("Copy spec from %s to %s", sourceSpecFile, targetPath)
+		}
 		err := devtools.Copy(sourceSpecFile, targetPath)
 		if err != nil {
 			return "", fmt.Errorf("failed copying spec file %q to %q: %w", sourceSpecFile, targetPath, err)
@@ -996,7 +1138,7 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		componentFile := strings.TrimSuffix(file, specSuffix)
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf(">>> Computing hash for %q failed: file not present\n", componentFile)
+			fmt.Printf(">>> Computing hash for %q failed: file not present %w \n", componentFile, err)
 			continue
 		} else if err != nil {
 			return err
@@ -1013,6 +1155,7 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 	return os.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0644)
 }
 
+// movePackagesToArchive Create archive folder and move any pre-existing artifacts into it.
 func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 	archivePath := filepath.Join(dropPath, "archives")
 	os.MkdirAll(archivePath, 0755)
@@ -1301,7 +1444,7 @@ func (Integration) Clean() error {
 	_, err := os.Stat(".integration-cache")
 	if err == nil {
 		// .integration-cache exists; need to run `Clean` from the runner
-		r, err := createTestRunner(false, "")
+		r, err := createTestRunner(false, "", "")
 		if err != nil {
 			return fmt.Errorf("error creating test runner: %w", err)
 		}
@@ -1337,6 +1480,10 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	params := devtools.DefaultGoTestIntegrationArgs()
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
+
+	goTestFlags := strings.SplitN(os.Getenv("GOTEST_FLAGS"), " ", -1)
+	params.ExtraFlags = goTestFlags
+
 	if testName == "all" {
 		params.RunExpr = ""
 	} else {
@@ -1399,6 +1546,13 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	if testsStr == "" {
 		return errors.New("TEST_DEFINE_TESTS environment variable must be set")
 	}
+
+	var goTestFlags []string
+	rawTestFlags := os.Getenv("GOTEST_FLAGS")
+	if rawTestFlags != "" {
+		goTestFlags = strings.Split(rawTestFlags, " ")
+	}
+
 	tests := strings.Split(testsStr, ",")
 	testsByPackage := make(map[string][]string)
 	for _, testStr := range tests {
@@ -1424,17 +1578,19 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 		testPrefix := fmt.Sprintf("%s.%s", prefix, filepath.Base(packageName))
 		testName := fmt.Sprintf("remote-%s", testPrefix)
 		fileName := fmt.Sprintf("build/TEST-go-%s", testName)
+		extraFlags := make([]string, 0, len(goTestFlags)+6)
+		if len(goTestFlags) > 0 {
+			extraFlags = append(extraFlags, goTestFlags...)
+		}
+		extraFlags = append(extraFlags, "-test.shuffle", "on",
+			"-test.timeout", "0", "-test.run", "^("+strings.Join(packageTests, "|")+")$")
 		params := mage.GoTestArgs{
 			LogName:         testName,
 			OutputFile:      fileName + ".out",
 			JUnitReportFile: fileName + ".xml",
 			Packages:        []string{packageName},
 			Tags:            []string{"integration"},
-			ExtraFlags: []string{
-				"-test.run", strings.Join(packageTests, "|"),
-				"-test.shuffle", "on",
-				"-test.timeout", "0",
-			},
+			ExtraFlags:      extraFlags,
 			Env: map[string]string{
 				"AGENT_VERSION":      version,
 				"TEST_DEFINE_PREFIX": testPrefix,
@@ -1449,11 +1605,13 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
-	batches, err := define.DetermineBatches("testing/integration", "integration")
+	goTestFlags := os.Getenv("GOTEST_FLAGS")
+
+	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
 		return fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(matrix, singleTest, batches...)
+	r, err := createTestRunner(matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -1490,7 +1648,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	return nil
 }
 
-func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
 	if err != nil {
 		return nil, err
@@ -1553,6 +1711,7 @@ func createTestRunner(matrix bool, singleTest string, batches ...define.Batch) (
 		SingleTest:        singleTest,
 		VerboseMode:       mg.Verbose(),
 		Timestamp:         timestamp,
+		TestFlags:         goTestFlags,
 	}
 	ogcCfg := ogc.Config{
 		ServiceTokenPath: serviceTokenPath,

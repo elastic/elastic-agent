@@ -351,7 +351,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	}
 
 	// ensure that we have all the requirements for the stack if required
-	var env map[string]string
+	env := map[string]string{}
 	if batch.Batch.Stack != nil {
 		// wait for the stack to be ready before continuing
 		r.stacksReady.Wait()
@@ -362,16 +362,17 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		if !ok {
 			return OSRunnerResult{}, fmt.Errorf("failed to find stack for batch %s", batch.ID)
 		}
-		env = map[string]string{
-			"ELASTICSEARCH_HOST":     stack.Elasticsearch,
-			"ELASTICSEARCH_USERNAME": stack.Username,
-			"ELASTICSEARCH_PASSWORD": stack.Password,
-			"KIBANA_HOST":            stack.Kibana,
-			"KIBANA_USERNAME":        stack.Username,
-			"KIBANA_PASSWORD":        stack.Password,
-		}
+		env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
+		env["ELASTICSEARCH_USERNAME"] = stack.Username
+		env["ELASTICSEARCH_PASSWORD"] = stack.Password
+		env["KIBANA_HOST"] = stack.Kibana
+		env["KIBANA_USERNAME"] = stack.Username
+		env["KIBANA_PASSWORD"] = stack.Password
 		logger.Logf("Using Stack with Kibana host %s, %s/%s", stack.Kibana, stack.Username, stack.Password)
 	}
+
+	// set the go test flags
+	env["GOTEST_FLAGS"] = r.cfg.TestFlags
 
 	// run the actual tests on the host
 	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
