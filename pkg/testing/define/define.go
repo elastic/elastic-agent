@@ -80,7 +80,7 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 
 	ver, err := semver.ParseVersion(version)
 	if err != nil {
-		return nil, fmt.Errorf("%q is an invalid agent version: %w", err)
+		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
 	}
 
 	var f atesting.Fetcher
