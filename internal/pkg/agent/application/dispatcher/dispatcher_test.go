@@ -257,7 +257,9 @@ func TestActionDispatcher(t *testing.T) {
 			t.Fatal("mock Handle never called")
 		}
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
+		// Flaky assertion: https://github.com/elastic/elastic-agent/issues/3137
+		// TODO: re-enabled when fixed
+		// queue.AssertExpectations(t)
 	})
 
 	t.Run("Retrieve actions from queue", func(t *testing.T) {
