@@ -27,6 +27,7 @@ DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=
 set +e
 TEST_INTEG_TIMESTAMP=true SNAPSHOT=true mage integration:test
 TESTS_EXIT_STATUS=$?
+mage integration:clean
 set -e
 
 # HTML report
