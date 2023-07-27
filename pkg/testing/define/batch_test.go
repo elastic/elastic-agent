@@ -92,7 +92,6 @@ func TestBatch(t *testing.T) {
 			Tests:     linuxLocalTests,
 			SudoTests: linuxSudoTests,
 		},
-
 		{
 			OS: OS{
 				Type:    Linux,
