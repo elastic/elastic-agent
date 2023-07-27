@@ -57,24 +57,19 @@ func SetupTest(t *testing.T) *ProxyURL {
 		proxytest.WithRequestLog("proxy-2", t.Logf),
 		proxytest.WithVerboseLog())
 
-	t.Log("before nre fixture")
-
 	f, err := define.NewFixture(t,
 		p.agentVersion,
 		integrationtest.WithAllowErrors(),
 		integrationtest.WithLogOutput())
-	require.NoError(t, err, "SetupSuite: NewFixture failed")
-	t.Log("after nre fixture")
+	require.NoError(t, err, "SetupTest: NewFixture failed")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	err = f.Prepare(ctx)
-	require.NoError(t, err, "SetupSuite: fixture.Prepare failed")
+	require.NoError(t, err, "SetupTest: fixture.Prepare failed")
 
 	p.fixture = f
-
-	t.Log("finished setup")
 	return p
 }
 
@@ -104,8 +99,6 @@ func TestProxyURL_EnrollProxyAndNoProxyInThePolicy(t *testing.T) {
 	t.Cleanup(func() {
 		TearDownTest(t, p)
 	})
-
-	t.Log("after setup")
 
 	ackToken := "ackToken-AckTokenTestNoProxyInThePolicy"
 

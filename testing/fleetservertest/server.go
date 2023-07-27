@@ -17,15 +17,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Handlers holds the handlers for the fleet-api, see https://petstore.swagger.io/?url=https://raw.githubusercontent.com/elastic/fleet-server/main/model/openapi.yml
+// Handlers holds the handlers for the fleet-server-api,
+// see https://petstore.swagger.io/?url=https://raw.githubusercontent.com/elastic/fleet-server/main/model/openapi.yml
 // for rendered OpenAPI definition. If any of the handlers are nil, a
 // http.StatusNotImplemented is returned for the route.
 //
-// Authentication is done by extracting the API key or enrollment token,
-// from the HeaderAuthorization header and compared against API.APIKey or
-// API.EnrollmentToken. API.EnrollmentToken is used for Enroll requests and
-// API.APIKey for all others.
-// TODO(Anderson): fix me!
+// There is no authentication for the moment.
+// Check NewServerWithHandlers for a ready to use server or use Handlers in
+// conjunction with NewServer.
 type Handlers struct {
 	// AgentID is the ID of agent communicating with this fleet-server:
 	//  - on Enroll this ID is set and returned to the enrolling agent,

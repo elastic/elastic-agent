@@ -33,12 +33,42 @@ type options struct {
 	agentID string
 }
 
+// NewServerWithHandlers returns a Fleet Server ready for use to Agent's
+// e2e tests. The server has the Status, Checkin, Enroll and Ack handlers
+// configured. You need to implement:
+//   - nextAction, called on every checkin to get the actions to return
+//   - acker, responsible for ack-ing the actions.
+//
+// See TestRunFleetServer and ExampleNewServer_checkin_and_ackWithAcker for more
+// details on how to use it and define `nextAction` and `acker`.
+func NewServerWithHandlers(
+	apiKey APIKey,
+	enrolmentToken string,
+	agentID string,
+	policyID string,
+	nextAction func() (CheckinAction, *HTTPError),
+	acker func(id string) (AckResponseItem, bool),
+	opts ...Option) *Server {
+
+	handlers := &Handlers{
+		APIKey:          apiKey.Key,
+		EnrollmentToken: enrolmentToken,
+		AgentID:         agentID, // as there is no enroll, the agentID needs to be manually set
+		CheckinFn:       NewHandlerCheckin(nextAction),
+		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
+		AckFn:           NewHandlerAckWithAcker(acker),
+		StatusFn:        NewHandlerStatusHealthy(),
+	}
+
+	return NewServer(handlers, opts...)
+}
+
 // NewServer returns a new started *httptest.Server mocking the Fleet Server API.
 // If a route is called and its handler (the *Fn field) is nil a
 // http.StatusNotImplemented error will be returned.
 // By default, it binds to all network interfaces, thus Server.URL is in the form
 // of http://[::]:PORT, not valid to be used directly. Use Server.LocalhostURL
-// or
+// for a URL using localhost or Server.Port to get the port it is listening on.
 func NewServer(h *Handlers, opts ...Option) *Server {
 	if h.logFn == nil {
 		h.logFn = func(format string, a ...any) {}
@@ -109,34 +139,4 @@ func WithAgentID(id string) Option {
 	return func(o *options) {
 		o.agentID = id
 	}
-}
-
-// NewServerWithHandlers returns a Fleet Server ready for use to Agent's
-// e2e tests. The server has the Status, Checkin, Enroll and Ack handlers
-// configured. You need to implement:
-//   - nextAction, called on every checkin to get the actions to return
-//   - acker, responsible for ack-ing the actions.
-//
-// See TestRunFleetServer and ExampleNewServer_checkin_and_ackWithAcker for more
-// details on how to use it and define `nextAction` and `acker`.
-func NewServerWithHandlers(
-	apiKey APIKey,
-	enrolmentToken string,
-	agentID string,
-	policyID string,
-	nextAction func() (CheckinAction, *HTTPError),
-	acker func(id string) (AckResponseItem, bool),
-	opts ...Option) *Server {
-
-	handlers := &Handlers{
-		APIKey:          apiKey.Key,
-		EnrollmentToken: enrolmentToken,
-		AgentID:         agentID, // as there is no enroll, the agentID needs to be manually set
-		CheckinFn:       NewHandlerCheckin(nextAction),
-		EnrollFn:        NewHandlerEnroll(agentID, policyID, apiKey),
-		AckFn:           NewHandlerAckWithAcker(acker),
-		StatusFn:        NewHandlerStatusHealthy(),
-	}
-
-	return NewServer(handlers, opts...)
 }
