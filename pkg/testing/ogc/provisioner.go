@@ -123,17 +123,20 @@ func (p *provisioner) Clean(ctx context.Context, _ []runner.Instance) error {
 // ogcPull pulls the latest ogc version.
 func (p *provisioner) ogcPull(ctx context.Context) error {
 	args := []string{
-		"ogcPull",
+		"pull",
 		"docker.io/gorambo/ogc:blake", // switch back to :latest when ready
 	}
+	var output bytes.Buffer
 	p.logger.Logf("Pulling latest ogc image")
-	proc, err := process.Start("docker", process.WithContext(ctx), process.WithArgs(args))
+	proc, err := process.Start("docker", process.WithContext(ctx), process.WithArgs(args), process.WithCmdOptions(runner.AttachOut(&output), runner.AttachErr(&output)))
 	if err != nil {
 		return fmt.Errorf("failed to run docker ogcPull: %w", err)
 	}
 	ps := <-proc.Wait()
 	if ps.ExitCode() != 0 {
-		return fmt.Errorf("failed to run ogc import: docker run exited with code: %d", ps.ExitCode())
+		// print the output so its clear what went wrong
+		fmt.Fprintf(os.Stdout, "%s\n", output.Bytes())
+		return fmt.Errorf("failed to run ogc pull: docker run exited with code: %d", ps.ExitCode())
 	}
 	return nil
 }
