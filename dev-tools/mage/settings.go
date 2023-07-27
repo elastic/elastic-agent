@@ -76,6 +76,17 @@ var (
 	versionQualified bool
 	versionQualifier string
 
+<<<<<<< HEAD
+=======
+	// Env var to set the agent package version
+	agentPackageVersion string
+
+	// PackagingFromManifest This value is set to tru when we have defined a ManifestURL variable
+	PackagingFromManifest bool
+	// ManifestURL Location of the manifest file to package
+	ManifestURL string
+
+>>>>>>> 56403908d1 (Add pipeline for packaging Elastic-agent (#2727))
 	FuncMap = map[string]interface{}{
 		"beat_doc_branch":   BeatDocBranch,
 		"beat_version":      BeatQualifiedVersion,
@@ -123,6 +134,14 @@ func init() {
 	}
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
+<<<<<<< HEAD
+=======
+
+	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
+
+	ManifestURL = EnvOr("ManifestURL", "")
+	PackagingFromManifest = ManifestURL != ""
+>>>>>>> 56403908d1 (Add pipeline for packaging Elastic-agent (#2727))
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).

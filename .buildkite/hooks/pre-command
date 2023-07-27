@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+<<<<<<< HEAD
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 
@@ -11,6 +12,49 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
     export DOCKER_PASSWORD_SECRET=$(vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
     docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
     unset DOCKER_USERNAME_SECRET DOCKER_PASSWORD_SECRET
+=======
+if [[ -z "${WORKSPACE-""}" ]]; then
+    WORKSPACE=$(git rev-parse --show-toplevel)
+    export WORKSPACE
+fi
+
+source "${WORKSPACE}/.buildkite/scripts/common.sh"
+
+if [[ -z "${GO_VERSION-""}" ]]; then
+    export GO_VERSION=$(cat "${WORKSPACE}/.go-version")
+fi
+
+DOCKER_REGISTRY="docker.elastic.co"
+DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
+CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
+CI_GCP_OBS_PATH="kv/ci-shared/observability-ingest/cloud/gcp"
+CI_AGENT_QA_OBS_PATH="kv/ci-shared/observability-ingest/elastic-agent-ess-qa"
+CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
+
+
+function docker_login {
+  DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
+  DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
+  docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+  unset DOCKER_USERNAME_SECRET DOCKER_PASSWORD_SECRET
+}
+
+function release_manager_login {
+  DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
+  VAULT_ADDR_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.vault_addr')
+  VAULT_ROLE_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.role_id')
+  VAULT_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.secret_id')
+  export VAULT_ADDR_SECRET VAULT_ROLE_ID_SECRET VAULT_SECRET
+}
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
+    docker_login
+  fi
+
+  if [[ "$BUILDKITE_STEP_KEY" == "dra-publish" ]]; then
+    release_manager_login
+>>>>>>> 56403908d1 (Add pipeline for packaging Elastic-agent (#2727))
   fi
 fi
 
@@ -25,4 +69,21 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == 
   export API_KEY_TOKEN=$(vault kv get -field api_key kv/ci-shared/observability-ingest/elastic-agent-ess-qa)
   echo ${API_KEY_TOKEN} > ./apiKey
   export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
+<<<<<<< HEAD
  fi 
+=======
+fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
+  if command -v docker &>/dev/null; then
+    docker_login
+  else
+    echo "+++ docker not found"
+  fi
+  if [[ ("$BUILDKITE_STEP_KEY" == "publish-dra-snapshot" || "$BUILDKITE_STEP_KEY" == "publish-dra-staging") ]]; then
+    echo "+++ Setting DRA params"
+    # Shared secret path containing the dra creds for project teams
+    release_manager_login
+  fi
+fi
+>>>>>>> 56403908d1 (Add pipeline for packaging Elastic-agent (#2727))
