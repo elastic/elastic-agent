@@ -356,7 +356,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		// wait for the stack to be ready before continuing
 		r.stacksReady.Wait()
 		if r.stacksErr != nil {
-			return OSRunnerResult{}, fmt.Errorf("failed to save instance state %s: %w", instance.Name, err)
+			return OSRunnerResult{}, fmt.Errorf("%s unable to continue because stack never became ready: %w", instance.Name, r.stacksErr)
 		}
 		stack, ok := r.getStackForBatchID(batch.ID)
 		if !ok {
