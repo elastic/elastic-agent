@@ -347,7 +347,7 @@ func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion s
 			// skip upgrade to the same version
 			continue
 		}
-		
+
 		if parsedVersion.IsSnapshot() {
 			// skip all snapshots
 			continue
