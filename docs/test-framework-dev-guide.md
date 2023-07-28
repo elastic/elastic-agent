@@ -56,6 +56,10 @@ following `mage integration:*` commands to re-use the already provisioned resour
 
 - `mage integration:clean` will de-provision the allocated resources and cleanup any local state.
 
+Tests with external dependencies might need more environment variables to be set
+when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
+`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
+
 #### Passing additional go test flags
 
 When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
@@ -91,6 +95,16 @@ We pass a `-test.run` flag along with the names of the tests we want to run in O
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
 is split on space, so not all combination of flags and their values may be correctly split.
+
+## Manually running the tests
+
+If you want to run the tests manually, skipping the test runner, set the
+`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
+with `go test`. E.g.:
+
+```shell
+TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
+```
 
 ## Writing tests
 

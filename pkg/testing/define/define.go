@@ -24,6 +24,7 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	semver "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -77,7 +78,18 @@ func NewFixture(t *testing.T, version string, opts ...atesting.FixtureOpt) (*ate
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
 
-	f := atesting.LocalFetcher(buildsDir)
+	ver, err := semver.ParseVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
+	}
+
+	var f atesting.Fetcher
+	if ver.IsSnapshot() {
+		f = atesting.LocalFetcher(buildsDir, atesting.WithLocalSnapshotOnly())
+	} else {
+		f = atesting.LocalFetcher(buildsDir)
+	}
+
 	opts = append(opts, atesting.WithFetcher(f), atesting.WithLogOutput())
 	return atesting.NewFixture(t, version, opts...)
 }

@@ -2,7 +2,18 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package version
+//go:build !windows
 
-const defaultBeatVersion = "8.10.0"
-const Agent = defaultBeatVersion
+package install
+
+func isBlockingOnExe(_ error) bool {
+	return false
+}
+
+func removeBlockingExe(_ error) error {
+	return nil
+}
+
+func isRetryableError(_ error) bool {
+	return false
+}
