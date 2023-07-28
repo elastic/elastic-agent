@@ -203,6 +203,7 @@ func (p *noopPidProvider) Name() string { return "noop" }
 func (p *noopPidProvider) PID(ctx context.Context) (int, error) { return 0, nil }
 
 func invokeCmd() *exec.Cmd {
+	// #nosec G204 -- user cannot inject any parameters to this command
 	cmd := exec.Command(paths.TopBinaryPath(), watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),

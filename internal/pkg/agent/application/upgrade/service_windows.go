@@ -61,6 +61,7 @@ func (p *pidProvider) PID(ctx context.Context) (int, error) {
 }
 
 func invokeCmd() *exec.Cmd {
+	// #nosec G204 -- user cannot inject any parameters to this command
 	cmd := exec.Command(paths.TopBinaryPath(), watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
