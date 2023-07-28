@@ -193,7 +193,7 @@ func (f *Fixture) WorkDir() string {
 	return f.workDir
 }
 
-// SrcPackage returns the location on disk of the elastic agent package usded by this fixture.
+// SrcPackage returns the location on disk of the elastic agent package used by this fixture.
 func (f *Fixture) SrcPackage(ctx context.Context) (string, error) {
 	err := f.ensurePrepared(ctx)
 	if err != nil {
