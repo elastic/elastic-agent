@@ -53,6 +53,7 @@ agent.upgrade.watcher:
 `
 
 // notable versions used in tests
+var version_8_2_0 = version.NewParsedSemVer(8, 2, 0, "", "")
 var version_8_6_0 = version.NewParsedSemVer(8, 6, 0, "", "")
 var version_8_7_0 = version.NewParsedSemVer(8, 7, 0, "", "")
 var version_8_9_0_SNAPSHOT = version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")
@@ -84,12 +85,12 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
-			testUpgradeFleetManagedElasticAgent(t, info, agentFixture, define.Version())
+			testUpgradeFleetManagedElasticAgent(t, info, agentFixture, uv, define.Version())
 		})
 	}
 }
 
-func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentFixture *atesting.Fixture, toVersion string) {
+func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentFixture *atesting.Fixture, fromVersion, toVersion string) {
 	kibClient := info.KibanaClient
 	policyUUID := uuid.New().String()
 
@@ -117,9 +118,16 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentF
 	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
 	require.NoError(t, err)
 
+	parsedFromVersion, err := version.ParseVersion(fromVersion)
+	require.NoError(t, err)
+
 	t.Log("Enrolling Elastic Agent...")
+	var nonInteractiveFlag bool
+	if version_8_2_0.Less(*parsedFromVersion) {
+		nonInteractiveFlag = true
+	}
 	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
+		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		EnrollOpts: atesting.EnrollOpts{
 			URL:             fleetServerURL,
