@@ -86,8 +86,16 @@ func TestBatch(t *testing.T) {
 		},
 		{
 			OS: OS{
+				Type: Linux,
+				Arch: AMD64,
+			},
+			Tests:     linuxLocalTests,
+			SudoTests: linuxSudoTests,
+		},
+		{
+			OS: OS{
 				Type:    Linux,
-				Arch:    AMD64,
+				Arch:    ARM64,
 				Version: "20.04",
 				Distro:  "ubuntu",
 			},
@@ -106,14 +114,6 @@ func TestBatch(t *testing.T) {
 					},
 				},
 			},
-			SudoTests: linuxSudoTests,
-		},
-		{
-			OS: OS{
-				Type: Linux,
-				Arch: ARM64,
-			},
-			Tests:     linuxLocalTests,
 			SudoTests: linuxSudoTests,
 		},
 		{
