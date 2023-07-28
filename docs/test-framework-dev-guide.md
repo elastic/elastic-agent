@@ -67,6 +67,20 @@ between, and it can be very specific or not very specific.
 > **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
 
+### Manually running the tests
+
+If you want to run the tests manually, skipping the test runner, set the
+`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
+with `go test`. E.g.:
+
+```shell
+TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
+```
+
+Tests with external dependencies might need more environment variables to be set
+when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
+`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
+
 #### Passing additional go test flags
 
 When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.

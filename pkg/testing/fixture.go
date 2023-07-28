@@ -6,6 +6,7 @@ package testing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
@@ -360,6 +362,90 @@ func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOp
 	return cmd.CombinedOutput()
 }
 
+type ExecErr struct {
+	err    error
+	Output []byte
+}
+
+func (e *ExecErr) Error() string {
+	return e.err.Error()
+}
+
+func (e *ExecErr) String() string {
+	return fmt.Sprintf("error: %v, output: %s", e.err, e.Output)
+}
+
+func (e *ExecErr) As(target any) bool {
+	switch target.(type) {
+	case *ExecErr:
+		target = e
+		return true
+	case ExecErr:
+		target = *e
+		return true
+	default:
+		return errors.As(e.err, &target)
+	}
+}
+
+func (e *ExecErr) Unwrap() error {
+	return e.err
+}
+
+// ExecStatus executes the status subcommand on the prepared Elastic Agent binary.
+// It returns the parsed output and the error from the execution. Keep in mind
+// the agent exits with status 1 if it's unhealthy, but it still outputs the
+// status successfully. Therefore, a not empty AgentStatusOutput is valid
+// regardless of the error. An empty AgentStatusOutput and non nil error
+// means the output could not be parsed.
+// It should work with any 8.6+ agent
+func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
+	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
+	status := AgentStatusOutput{}
+	if uerr := json.Unmarshal(out, &status); uerr != nil {
+		return AgentStatusOutput{},
+			fmt.Errorf("could not unmarshal agent status output: %w",
+				errors.Join(&ExecErr{
+					err:    err,
+					Output: out,
+				}, uerr))
+	}
+
+	return status, err
+}
+
+// ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
+// It returns the parsed output and the error from the execution or an empty
+// AgentInspectOutput and the unmarshalling error if it cannot unmarshal the
+// output.
+// It should work with any 8.6+ agent
+func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (AgentInspectOutput, error) {
+	out, err := f.Exec(ctx, []string{"inspect"}, opts...)
+	inspect := AgentInspectOutput{}
+	if uerr := yaml.Unmarshal(out, &inspect); uerr != nil {
+		return AgentInspectOutput{},
+			fmt.Errorf("could not unmarshal agent inspect output: %w",
+				errors.Join(&ExecErr{
+					err:    err,
+					Output: out,
+				}, uerr))
+	}
+
+	return inspect, err
+}
+
+// IsHealthy returns if the prepared Elastic Agent reports itself as healthy.
+// It returns false, err if it cannot determine the state of the agent.
+// It should work with any 8.6+ agent
+func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) (bool, error) {
+	status, err := f.ExecStatus(ctx, opts...)
+	if err != nil {
+		return false, fmt.Errorf("agent status returned and error: %w", err)
+	}
+
+	return status.State == int(cproto.State_HEALTHY), nil
+}
+
 func (f *Fixture) ensurePrepared(ctx context.Context) error {
 	if f.workDir == "" {
 		return f.Prepare(ctx)
@@ -684,4 +770,127 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 		return fmt.Errorf("state management failed update configuration: %w", err)
 	}
 	return nil
+}
+
+type AgentStatusOutput struct {
+	Info struct {
+		ID        string `json:"id"`
+		Version   string `json:"version"`
+		Commit    string `json:"commit"`
+		BuildTime string `json:"build_time"`
+		Snapshot  bool   `json:"snapshot"`
+	} `json:"info"`
+	State      int    `json:"state"`
+	Message    string `json:"message"`
+	Components []struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		State   int    `json:"state"`
+		Message string `json:"message"`
+		Units   []struct {
+			UnitID   string `json:"unit_id"`
+			UnitType int    `json:"unit_type"`
+			State    int    `json:"state"`
+			Message  string `json:"message"`
+			Payload  struct {
+				OsqueryVersion string `json:"osquery_version"`
+			} `json:"payload"`
+		} `json:"units"`
+		VersionInfo struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+			Meta    struct {
+				BuildTime string `json:"build_time"`
+				Commit    string `json:"commit"`
+			} `json:"meta"`
+		} `json:"version_info,omitempty"`
+	} `json:"components"`
+	FleetState   int    `json:"FleetState"`
+	FleetMessage string `json:"FleetMessage"`
+}
+
+type AgentInspectOutput struct {
+	Agent struct {
+		Download struct {
+			SourceURI string `yaml:"sourceURI"`
+		} `yaml:"download"`
+		Features interface{} `yaml:"features"`
+		Headers  interface{} `yaml:"headers"`
+		ID       string      `yaml:"id"`
+		Logging  struct {
+			Level string `yaml:"level"`
+		} `yaml:"logging"`
+		Monitoring struct {
+			Enabled bool `yaml:"enabled"`
+			HTTP    struct {
+				Buffer  interface{} `yaml:"buffer"`
+				Enabled bool        `yaml:"enabled"`
+				Host    string      `yaml:"host"`
+				Port    int         `yaml:"port"`
+			} `yaml:"http"`
+			Logs      bool   `yaml:"logs"`
+			Metrics   bool   `yaml:"metrics"`
+			Namespace string `yaml:"namespace"`
+			UseOutput string `yaml:"use_output"`
+		} `yaml:"monitoring"`
+		Protection struct {
+			Enabled            bool   `yaml:"enabled"`
+			SigningKey         string `yaml:"signing_key"`
+			UninstallTokenHash string `yaml:"uninstall_token_hash"`
+		} `yaml:"protection"`
+	} `yaml:"agent"`
+	Fleet struct {
+		AccessAPIKey string `yaml:"access_api_key"`
+		Agent        struct {
+			ID string `yaml:"id"`
+		} `yaml:"agent"`
+		Enabled   bool     `yaml:"enabled"`
+		Host      string   `yaml:"host"`
+		Hosts     []string `yaml:"hosts"`
+		Protocol  string   `yaml:"protocol"`
+		ProxyURL  string   `yaml:"proxy_url"`
+		Reporting struct {
+			CheckFrequencySec int `yaml:"check_frequency_sec"`
+			Threshold         int `yaml:"threshold"`
+		} `yaml:"reporting"`
+		Ssl struct {
+			Renegotiation    string `yaml:"renegotiation"`
+			VerificationMode string `yaml:"verification_mode"`
+		} `yaml:"ssl"`
+		Timeout string `yaml:"timeout"`
+	} `yaml:"fleet"`
+	Host struct {
+		ID string `yaml:"id"`
+	} `yaml:"host"`
+	ID      string      `yaml:"id"`
+	Inputs  interface{} `yaml:"inputs"`
+	Outputs struct {
+		Default struct {
+			APIKey string   `yaml:"api_key"`
+			Hosts  []string `yaml:"hosts"`
+			Type   string   `yaml:"type"`
+		} `yaml:"default"`
+	} `yaml:"outputs"`
+	Path struct {
+		Config string `yaml:"config"`
+		Data   string `yaml:"data"`
+		Home   string `yaml:"home"`
+		Logs   string `yaml:"logs"`
+	} `yaml:"path"`
+	Revision int `yaml:"revision"`
+	Runtime  struct {
+		Arch   string `yaml:"arch"`
+		Os     string `yaml:"os"`
+		Osinfo struct {
+			Family  string `yaml:"family"`
+			Major   int    `yaml:"major"`
+			Minor   int    `yaml:"minor"`
+			Patch   int    `yaml:"patch"`
+			Type    string `yaml:"type"`
+			Version string `yaml:"version"`
+		} `yaml:"osinfo"`
+	} `yaml:"runtime"`
+	Signed struct {
+		Data string `yaml:"data"`
+	} `yaml:"signed"`
 }

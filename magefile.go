@@ -1290,7 +1290,7 @@ func majorMinor() string {
 	return ""
 }
 
-// cleans up the integration testing leftovers
+// Clean cleans up the integration testing leftovers
 func (Integration) Clean() error {
 	_ = os.RemoveAll(".agent-testing")
 
@@ -1314,13 +1314,13 @@ func (Integration) Clean() error {
 	return nil
 }
 
-// checks that integration tests are using define.Require
+// Check checks that integration tests are using define.Require
 func (Integration) Check() error {
 	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
 	return define.ValidateDir("testing/integration")
 }
 
-// runs only the integration tests that support local mode
+// Local runs only the integration tests that support local mode
 // it takes as argument the test name to run or all if we want to run them all.
 func (Integration) Local(ctx context.Context, testName string) error {
 	if shouldBuildAgent() {
@@ -1349,7 +1349,7 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	return devtools.GoTest(ctx, params)
 }
 
-// authenticates users who run it to various IaaS CSPs and ESS
+// Auth authenticates users who run it to various IaaS CSPs and ESS
 func (Integration) Auth(ctx context.Context) error {
 	if err := authGCP(ctx); err != nil {
 		return fmt.Errorf("unable to authenticate to GCP: %w", err)
@@ -1368,27 +1368,27 @@ func (Integration) Auth(ctx context.Context) error {
 	return nil
 }
 
-// run integration tests on remote hosts
+// Test runs integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
 	return integRunner(ctx, false, "")
 }
 
-// run integration tests on a matrix of all supported remote hosts
+// Matrix runs integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
 	return integRunner(ctx, true, "")
 }
 
-// run single integration test on remote host
+// Single runs single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
 	return integRunner(ctx, false, testName)
 }
 
-// don't call locally (called on remote host to prepare it for testing)
+// PrepareOnRemote shouldn't be called locally (called on remote host to prepare it for testing)
 func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
 }
 
-// don't call locally (called on remote host to perform testing)
+// TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	mg.Deps(Build.TestBinaries)
 	version := os.Getenv("AGENT_VERSION")
