@@ -383,7 +383,16 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 	parsedUpgradeVersion, err := version.ParseVersion(toVersion)
 	require.NoErrorf(t, err, "unable to parse version %w", toVersion)
 
-	output, err := tools.InstallStandaloneAgent(f)
+	var nonInteractiveFlag bool
+	if version_8_2_0.Less(*parsedFromVersion) {
+		nonInteractiveFlag = true
+	}
+	installOpts := atesting.InstallOpts{
+		NonInteractive: nonInteractiveFlag,
+		Force:          true,
+	}
+
+	output, err := tools.InstallAgent(installOpts, f)
 	t.Logf("Agent installation output: %q", string(output))
 	require.NoError(t, err)
 
