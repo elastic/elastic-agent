@@ -106,6 +106,10 @@ type RuntimeManager interface {
 	// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 	// it performs diagnostics for all current units.
 	PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+
+	//PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
+	// then it performs the diagnostics for all current units.
+	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -468,6 +472,11 @@ func (c *Coordinator) PerformAction(ctx context.Context, comp component.Componen
 // Called from external goroutines.
 func (c *Coordinator) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	return c.runtimeMgr.PerformDiagnostics(ctx, req...)
+}
+
+// PerformComponentDiagnostics executes the diagnostic action for the provided components.
+func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	return c.runtimeMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
 }
 
 // SetLogLevel changes the entire log level for the running Elastic Agent.
