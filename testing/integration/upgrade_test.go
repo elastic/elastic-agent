@@ -53,9 +53,17 @@ agent.upgrade.watcher:
 `
 
 // notable versions used in tests
+
+// first version to include --non-interactive flag during install
 var version_8_2_0 = version.NewParsedSemVer(8, 2, 0, "", "")
+
+// first version to use agent v2 protocol
 var version_8_6_0 = version.NewParsedSemVer(8, 6, 0, "", "")
+
+// minimum version for passing --skip-verify when upgrading
 var version_8_7_0 = version.NewParsedSemVer(8, 7, 0, "", "")
+
+// minimum version for upgrade to specific snapshot + minimum version for setting shorter watch period after upgrade
 var version_8_9_0_SNAPSHOT = version.NewParsedSemVer(8, 9, 0, "SNAPSHOT", "")
 
 func TestFleetManagedUpgrade(t *testing.T) {
@@ -71,12 +79,12 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 	upgradableVersions := getUpgradableVersions(ctx, t, define.Version())
 
-	for _, uv := range upgradableVersions {
+	for _, parsedVersion := range upgradableVersions {
 
-		t.Run(fmt.Sprintf("Upgrade managed agent from %s to %s", uv, define.Version()), func(t *testing.T) {
+		t.Run(fmt.Sprintf("Upgrade managed agent from %s to %s", parsedVersion, define.Version()), func(t *testing.T) {
 			agentFixture, err := atesting.NewFixture(
 				t,
-				uv,
+				parsedVersion.String(),
 				atesting.WithFetcher(atesting.ArtifactFetcher()),
 			)
 			require.NoError(t, err)
@@ -85,12 +93,12 @@ func TestFleetManagedUpgrade(t *testing.T) {
 
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
-			testUpgradeFleetManagedElasticAgent(t, info, agentFixture, uv, define.Version())
+			testUpgradeFleetManagedElasticAgent(t, info, agentFixture, parsedVersion, define.Version())
 		})
 	}
 }
 
-func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentFixture *atesting.Fixture, fromVersion, toVersion string) {
+func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentFixture *atesting.Fixture, parsedFromVersion *version.ParsedSemVer, toVersion string) {
 	kibClient := info.KibanaClient
 	policyUUID := uuid.New().String()
 
@@ -116,9 +124,6 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentF
 
 	t.Log("Getting default Fleet Server URL...")
 	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
-	require.NoError(t, err)
-
-	parsedFromVersion, err := version.ParseVersion(fromVersion)
 	require.NoError(t, err)
 
 	t.Log("Enrolling Elastic Agent...")
@@ -181,22 +186,18 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 	versionList := getUpgradableVersions(ctx, t, define.Version())
 
-	for _, v := range versionList {
-		parsedVersion, err := version.ParseVersion(v)
-		if err != nil {
-			t.Logf("version %q returned by artifact api is not parseable: %v", v, err)
+	for _, parsedVersion := range versionList {
+
+		if parsedVersion.String() == define.Version() || parsedVersion.IsSnapshot() {
+			t.Logf("Skipping upgrade test for version %q: same version as destination: %v snapshot: %v",
+				parsedVersion, parsedVersion.String() == define.Version(), parsedVersion.IsSnapshot())
 			continue
 		}
 
-		if v == define.Version() || parsedVersion.IsSnapshot() {
-			t.Logf("Skipping upgrade test for version %q", v)
-			continue
-		}
-
-		t.Run(fmt.Sprintf("Upgrade %s to %s", v, define.Version()), func(t *testing.T) {
+		t.Run(fmt.Sprintf("Upgrade %s to %s", parsedVersion, define.Version()), func(t *testing.T) {
 			agentFixture, err := atesting.NewFixture(
 				t,
-				v,
+				parsedVersion.String(),
 				atesting.WithFetcher(atesting.ArtifactFetcher()),
 			)
 
@@ -208,7 +209,9 @@ func TestStandaloneUpgrade(t *testing.T) {
 			err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 			require.NoError(t, err, "error configuring agent fixture")
 
-			testStandaloneUpgrade(ctx, t, agentFixture, v, define.Version(), "", true)
+			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
+			require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
+			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", true)
 		})
 	}
 }
@@ -228,9 +231,7 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 	}
 
 	// prepare the agent fixture
-	agentFixture, err := define.NewFixture(
-		t, define.Version(),
-	)
+	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -312,11 +313,13 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 	)
 
 	t.Logf("Targeting upgrade to version %+v", upgradeInputVersion)
-	testStandaloneUpgrade(ctx, t, agentFixture, define.Version(), upgradeInputVersion.String(), expectedAgentHashAfterUpgrade, false)
+	parsedFromVersion, err := version.ParseVersion(define.Version())
+	require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
+	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false)
 
 }
 
-func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string) (upgradableVersions []string) {
+func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string) (upgradableVersions []*version.ParsedSemVer) {
 	t.Helper()
 
 	const currentMajorVersions = 2
@@ -362,13 +365,13 @@ func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion s
 		}
 
 		if parsedVersion.Major() == currentMajor && currentMajorSelected < currentMajorVersions {
-			upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
+			upgradableVersions = append(upgradableVersions, parsedVersion)
 			currentMajorSelected++
 			continue
 		}
 
 		if parsedVersion.Major() < currentMajor && previousMajorSelected < previousMajorVersions {
-			upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
+			upgradableVersions = append(upgradableVersions, parsedVersion)
 			previousMajorSelected++
 			continue
 		}
@@ -377,11 +380,15 @@ func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion s
 	return
 }
 
-func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixture, fromVersion, toVersion, expectedAgentHashAfterUpgrade string, allowLocalPackage bool) {
-	parsedFromVersion, err := version.ParseVersion(fromVersion)
-	require.NoErrorf(t, err, "unable to parse version %w", fromVersion)
-	parsedUpgradeVersion, err := version.ParseVersion(toVersion)
-	require.NoErrorf(t, err, "unable to parse version %w", toVersion)
+func testStandaloneUpgrade(
+	ctx context.Context,
+	t *testing.T,
+	f *atesting.Fixture,
+	parsedFromVersion *version.ParsedSemVer,
+	parsedUpgradeVersion *version.ParsedSemVer,
+	expectedAgentHashAfterUpgrade string,
+	allowLocalPackage bool,
+) {
 
 	var nonInteractiveFlag bool
 	if version_8_2_0.Less(*parsedFromVersion) {
@@ -406,15 +413,15 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 		return checkAgentHealthAndVersion(t, ctx, f, parsedFromVersion.CoreVersion(), parsedFromVersion.IsSnapshot(), "")
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
-	t.Logf("Upgrading from version %q to version %q", fromVersion, toVersion)
+	t.Logf("Upgrading from version %q to version %q", parsedFromVersion, parsedUpgradeVersion)
 
-	upgradeCmdArgs := []string{"upgrade", toVersion}
+	upgradeCmdArgs := []string{"upgrade", parsedFromVersion.String()}
 
 	if allowLocalPackage && version_8_7_0.Less(*parsedFromVersion) {
 		// if we are upgrading from a version > 8.7.0 (min version to skip signature verification) we pass :
 		// - a file:// sourceURI pointing the agent package under test
 		// - flag --skip-verify to bypass pgp signature verification (we don't produce signatures for PR/main builds)
-		tof, err := define.NewFixture(t, toVersion)
+		tof, err := define.NewFixture(t, parsedUpgradeVersion.String())
 		require.NoError(t, err)
 
 		srcPkg, err := tof.SrcPackage(ctx)
@@ -425,16 +432,13 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 	}
 
 	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s%", toVersion, upgradeTriggerOutput)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s%", parsedUpgradeVersion, upgradeTriggerOutput)
 
 	require.Eventuallyf(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, f, parsedUpgradeVersion.CoreVersion(), parsedUpgradeVersion.IsSnapshot(), expectedAgentHashAfterUpgrade)
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
-	parsedFromV, err := version.ParseVersion(fromVersion)
-	require.NoErrorf(t, err, "version %q is not a valid agent version", fromVersion)
-
-	checkUpgradeWatcherRan(t, f, parsedFromV)
+	checkUpgradeWatcherRan(t, f, parsedFromVersion)
 
 	if expectedAgentHashAfterUpgrade != "" {
 		aVersion, err := c.Version(ctx)
