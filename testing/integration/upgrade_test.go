@@ -175,7 +175,6 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentF
 
 func TestStandaloneUpgrade(t *testing.T) {
 	define.Require(t, define.Requirements{
-		// Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
 		Isolate: true,
 		Sudo:    true, // requires Agent installation
@@ -187,12 +186,6 @@ func TestStandaloneUpgrade(t *testing.T) {
 	versionList := getUpgradableVersions(ctx, t, define.Version())
 
 	for _, parsedVersion := range versionList {
-
-		if parsedVersion.String() == define.Version() || parsedVersion.IsSnapshot() {
-			t.Logf("Skipping upgrade test for version %q: same version as destination: %v snapshot: %v",
-				parsedVersion, parsedVersion.String() == define.Version(), parsedVersion.IsSnapshot())
-			continue
-		}
 
 		t.Run(fmt.Sprintf("Upgrade %s to %s", parsedVersion, define.Version()), func(t *testing.T) {
 			agentFixture, err := atesting.NewFixture(
@@ -218,10 +211,8 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 	define.Require(t, define.Requirements{
-		// Stack:   &define.Stack{},
-		Local:   false, // requires Agent installation
-		Isolate: true,
-		Sudo:    true, // requires Agent installation
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
 	})
 
 	minVersion := version_8_9_0_SNAPSHOT
