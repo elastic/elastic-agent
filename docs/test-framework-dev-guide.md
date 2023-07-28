@@ -60,7 +60,7 @@ TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./te
 ```
 
 Tests with external dependencies might need more environment variables to be set
-when running they manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
+when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
 `ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
 
 #### Passing additional go test flags
