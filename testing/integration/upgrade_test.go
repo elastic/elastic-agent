@@ -68,7 +68,7 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	upgradableVersions := getUpgradableVersions(ctx, t)
+	upgradableVersions := getUpgradableVersions(ctx, t, define.Version())
 
 	for _, uv := range upgradableVersions {
 
@@ -171,7 +171,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	versionList := getUpgradableVersions(ctx, t)
+	versionList := getUpgradableVersions(ctx, t, define.Version())
 
 	for _, v := range versionList {
 		parsedVersion, err := version.ParseVersion(v)
@@ -308,27 +308,63 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 
 }
 
-func getUpgradableVersions(ctx context.Context, t *testing.T) (upgradableVersions []string) {
+func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion string) (upgradableVersions []string) {
 	t.Helper()
+
+	const currentMajorVersions = 2
+	const previousMajorVersions = 1
+
 	aac := tools.NewArtifactAPIClient()
 	vList, err := aac.GetVersions(ctx)
 	require.NoError(t, err, "error retrieving versions from Artifact API")
 	require.NotEmpty(t, vList)
 
-	if testing.Short() {
-		upgradableVersions = []string{"8.6.2", "8.7.1", "8.8.1"}
-	} else {
-		artifactAPIVersions := vList.Versions[:len(vList.Versions)-1]
-		for _, aav := range artifactAPIVersions {
-			parsedVersion, err := version.ParseVersion(aav)
-			require.NoError(t, err, "Received unparseable version from Artifact API")
-			if parsedVersion.IsSnapshot() {
-				// skip all snapshots
-				continue
-			}
+	parsedUpgradeToVersion, err := version.ParseVersion(upgradeToVersion)
+	require.NoErrorf(t, err, "upgradeToVersion %q is not a valid version string", upgradeToVersion)
+	currentMajor := parsedUpgradeToVersion.Major()
+	var currentMajorSelected, previousMajorSelected int
 
-			upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
+	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
+	for _, v := range vList.Versions {
+		pv, err := version.ParseVersion(v)
+		require.NoErrorf(t, err, "invalid version retrieved from artifact API: %q", v)
+		sortedParsedVersions = append(sortedParsedVersions, pv)
+	}
+
+	require.NotEmpty(t, sortedParsedVersions)
+
+	// normally the output of the versions returned by artifact API is already sorted in ascending order,
+	// we want to sort in descending orders, so we sort them
+	sort.Sort(sort.Reverse(sortedParsedVersions))
+
+	for _, parsedVersion := range sortedParsedVersions {
+		if currentMajorSelected == currentMajorVersions && previousMajorSelected == previousMajorVersions {
+			// we got all the versions we need, break the loop
+			break
 		}
+
+		if parsedVersion == parsedUpgradeToVersion {
+			// skip upgrade to the same version
+			continue
+		}
+		
+		if parsedVersion.IsSnapshot() {
+			// skip all snapshots
+			continue
+		}
+
+		if parsedVersion.Major() == currentMajor && currentMajorSelected < currentMajorVersions {
+			upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
+			currentMajorSelected++
+			continue
+		}
+
+		if parsedVersion.Major() < currentMajor && previousMajorSelected < previousMajorVersions {
+			upgradableVersions = append(upgradableVersions, parsedVersion.VersionWithPrerelease())
+			previousMajorSelected++
+			continue
+		}
+
 	}
 	return
 }
@@ -371,8 +407,8 @@ func testStandaloneUpgrade(ctx context.Context, t *testing.T, f *atesting.Fixtur
 		upgradeCmdArgs = append(upgradeCmdArgs, "--source-uri", sourceURI, "--skip-verify")
 	}
 
-	_, err = f.Exec(ctx, upgradeCmdArgs)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", toVersion)
+	upgradeTriggerOutput, err := f.Exec(ctx, upgradeCmdArgs)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q, output:\n%s%", toVersion, upgradeTriggerOutput)
 
 	require.Eventuallyf(t, func() bool {
 		return checkAgentHealthAndVersion(t, ctx, f, parsedUpgradeVersion.CoreVersion(), parsedUpgradeVersion.IsSnapshot(), expectedAgentHashAfterUpgrade)
