@@ -206,7 +206,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	}
 
 	// initiate agent watcher
-	if err := upgrade.InvokeWatcher(l, ""); err != nil {
+	if err := upgrade.InvokeWatcher(l); err != nil {
 		// we should not fail because watcher is not working
 		l.Error(errors.New(err, "failed to invoke rollback watcher"))
 	}

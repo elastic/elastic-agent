@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -109,18 +108,13 @@ func Cleanup(log *logger.Logger, currentHash string, removeMarker bool, keepLogs
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
 // agent during upgrade period.
-func InvokeWatcher(log *logger.Logger, targetHash string) error {
+func InvokeWatcher(log *logger.Logger) error {
 	if !IsUpgradeable() {
 		log.Debug("agent is not upgradable, not starting watcher")
 		return nil
 	}
 
-	if targetHash == "" {
-		// when targetHash is not provided then we use the current running hash
-		targetHash = release.ShortCommit()
-	}
-	hashedDir := fmt.Sprintf("%s-%s", agentName, targetHash)
-	cmd := invokeCmd(filepath.Join(paths.Top(), "data", hashedDir))
+	cmd := invokeCmd()
 	defer func() {
 		if cmd.Process != nil {
 			log.Debugf("releasing watcher %v", cmd.Process.Pid)
