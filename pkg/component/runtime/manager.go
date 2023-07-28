@@ -242,19 +242,6 @@ func (m *Manager) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// waitForReady waits until the RPC server is ready to be used.
-// Used for testing.
-func (m *Manager) waitForReady(ctx context.Context) error {
-	for m.serverReady.Load() == false {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
-	return nil
-}
-
 // Errors returns channel that errors are reported on.
 func (m *Manager) Errors() <-chan error {
 	return m.errCh
@@ -990,9 +977,4 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
 	return res.Diagnostic, nil
-}
-
-type waitForReady struct {
-	name string
-	cert *authority.Pair
 }
