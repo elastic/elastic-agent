@@ -204,7 +204,7 @@ func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgen
 		switch metric {
 		case cproto.AdditionalDiagnosticRequest_CPU:
 			duration := time.Second * 30
-			s.logger.Infof("cpu metrics collected, waiting for %s", duration)
+			s.logger.Infof("Collecting CPU metrics, waiting for %s", duration)
 			cpuResults, err := diagnostics.CreateCPUProfile(ctx, duration)
 			if err != nil {
 				return nil, fmt.Errorf("error gathering CPU profile: %w", err)

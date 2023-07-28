@@ -150,7 +150,8 @@ func CreateCPUProfile(ctx context.Context, period time.Duration) ([]byte, error)
 	tc := time.After(period)
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("got context done")
+		pprof.StopCPUProfile()
+		return nil, ctx.Err()
 	case <-tc:
 		break
 	}
