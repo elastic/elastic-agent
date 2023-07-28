@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/stretchr/testify/require"
 
@@ -48,7 +49,9 @@ func (e EnrollOpts) toCmdArgs() []string {
 type InstallOpts struct {
 	BasePath       string // --base-path
 	Force          bool   // --force
+	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
+	ProxyURL       string // --proxy-url
 
 	EnrollOpts
 }
@@ -61,8 +64,14 @@ func (i InstallOpts) toCmdArgs() []string {
 	if i.Force {
 		args = append(args, "--force")
 	}
+	if i.Insecure {
+		args = append(args, "--insecure")
+	}
 	if i.NonInteractive {
 		args = append(args, "--non-interactive")
+	}
+	if i.ProxyURL != "" {
+		args = append(args, "--proxy-url="+i.ProxyURL)
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
@@ -99,7 +108,11 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.t.Cleanup(func() {
 		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
 		f.setClient(nil)
-		if errors.Is(err, ErrNotInstalled) {
+		if err != nil &&
+			(errors.Is(err, ErrNotInstalled) ||
+				strings.Contains(
+					err.Error(),
+					"elastic-agent: no such file or directory")) {
 			// Agent fixture has already been uninstalled, perhaps by
 			// an explicit call to fixture.Uninstall, so nothing needs
 			// to be done here.
