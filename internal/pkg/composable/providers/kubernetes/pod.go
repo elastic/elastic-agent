@@ -516,7 +516,7 @@ func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, pre
 			logger.Debugf("Generated hints mappings are :%v", hintsMapping)
 
 			processorMapping = utils.GetConfigs(annotations, prefix, "hints/processors")
-			logger.Debugf("Generated Processor mappings are :%v", processorMapping)
+			logger.Debugf("Generated Processors are :%v", processorMapping)
 		}
 
 	}
