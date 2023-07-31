@@ -406,7 +406,7 @@ func testStandaloneUpgrade(
 
 	t.Logf("Upgrading from version %q to version %q", parsedFromVersion, parsedUpgradeVersion)
 
-	upgradeCmdArgs := []string{"upgrade", parsedFromVersion.String()}
+	upgradeCmdArgs := []string{"upgrade", parsedUpgradeVersion.String()}
 
 	if allowLocalPackage && version_8_7_0.Less(*parsedFromVersion) {
 		// if we are upgrading from a version > 8.7.0 (min version to skip signature verification) we pass :
