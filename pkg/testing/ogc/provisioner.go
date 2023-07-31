@@ -31,8 +31,8 @@ type provisioner struct {
 	cfg    Config
 }
 
-// NewProvisoner creates the OGC provisioner
-func NewProvisoner(cfg Config) (runner.InstanceProvisioner, error) {
+// NewProvisioner creates the OGC provisioner
+func NewProvisioner(cfg Config) (runner.InstanceProvisioner, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err

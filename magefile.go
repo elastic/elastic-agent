@@ -1717,7 +1717,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		ServiceTokenPath: serviceTokenPath,
 		Datacenter:       datacenter,
 	}
-	ogcProvisioner, err := ogc.NewProvisoner(ogcCfg)
+	ogcProvisioner, err := ogc.NewProvisioner(ogcCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -1725,7 +1725,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if err != nil {
 		return nil, err
 	}
-	essProvisioner, err := ess.NewProvisoner(ess.ProvisionerConfig{
+	essProvisioner, err := ess.NewProvisioner(ess.ProvisionerConfig{
 		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
 		APIKey:     essToken,
 		Region:     essRegion,

@@ -43,8 +43,8 @@ type provisioner struct {
 	client *Client
 }
 
-// NewProvisoner creates the ESS provisioner
-func NewProvisoner(cfg ProvisionerConfig) (runner.StackProvisioner, error) {
+// NewProvisioner creates the ESS provisioner
+func NewProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err
