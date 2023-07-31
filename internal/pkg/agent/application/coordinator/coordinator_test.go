@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/apmtest"
@@ -722,7 +723,7 @@ func (r *fakeRuntimeManager) State() []runtime.ComponentComponentState {
 }
 
 // PerformAction executes an action on a unit.
-func (r *fakeRuntimeManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+func (r *fakeRuntimeManager) PerformAction(_ context.Context, _ component.Component, _ component.Unit, _ string, _ map[string]interface{}) (map[string]interface{}, error) {
 	return nil, nil
 }
 
@@ -735,6 +736,11 @@ func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.Subscription
 // it performs diagnostics for all current units.
 func (r *fakeRuntimeManager) PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	return nil
+}
+
+// PerformComponentDiagnostics  executes the diagnostic action for the provided components.
+func (r *fakeRuntimeManager) PerformComponentDiagnostics(_ context.Context, _ []cproto.AdditionalDiagnosticRequest, _ ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	return nil, nil
 }
 
 func testBinary(t *testing.T, name string) string {

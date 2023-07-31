@@ -201,6 +201,24 @@ message DiagnosticFileResult {
 
 // DiagnosticAgentRequest is request to gather diagnostic information about the Elastic Agent.
 message DiagnosticAgentRequest {
+  repeated AdditionalDiagnosticRequest additional_metrics = 1;
+}
+
+// DiagnosticAgentRequestAdditional is an enum of additional diagnostic metrics that can be requested from Elastic Agent.
+enum AdditionalDiagnosticRequest {
+  CPU = 0;
+}
+
+// DiagnosticComponentsRequest is the message to request diagnostics from individual components. 
+message DiagnosticComponentsRequest {
+  repeated DiagnosticComponentRequest components  = 1;
+  repeated AdditionalDiagnosticRequest additional_metrics = 2;
+}
+
+// DiagnosticComponentRequest specifies the component to send a diagnostic request to.
+message DiagnosticComponentRequest {
+  // ID of the component.
+  string component_id = 1;
 }
 
 // DiagnosticAgentResponse is response to gathered diagnostic information about the Elastic Agent.
@@ -233,6 +251,16 @@ message DiagnosticUnitResponse {
   UnitType unit_type = 2;
   // ID of the unit.
   string unit_id = 3;
+  // Error message for the failure fetching diagnostic information for this unit.
+  string error = 4;
+  // Diagnostic results for the unit.
+  repeated DiagnosticFileResult results = 5;
+}
+
+// DiagnosticComponentResponse is the response diagnostic information for a component-level diagnostic request
+message DiagnosticComponentResponse {
+  // ID of the component.
+  string component_id = 1;
   // Error message for the failure fetching diagnostic information for this unit.
   string error = 4;
   // Diagnostic results for the unit.
@@ -275,6 +303,9 @@ service ElasticAgentControl {
 
   // Gather diagnostic information for the running units.
   rpc DiagnosticUnits(DiagnosticUnitsRequest) returns (stream DiagnosticUnitResponse);
+
+  // Gather diagnostic information for the running components.
+  rpc DiagnosticComponents(DiagnosticComponentsRequest) returns (stream DiagnosticComponentResponse);
 
   // Configure adjusts the running Elastic Agent configuration with the configuration
   // provided over the RPC.

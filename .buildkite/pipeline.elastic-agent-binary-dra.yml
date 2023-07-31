@@ -1,6 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 env:
+  # this is required in order to allow the build process to override the default PWD of the BEAT_NAME.
+  BEAT_NAME: "elastic-agent"
+  # after moving elastic-agent out of beats, we should update the URL of the packaging.
+  BEAT_URL: "https://www.elastic.co/elastic-agent"
   DRA_PROJECT: "elastic-agent-core"
-  DRA_ARTIFACT_SET: "agent-core"
+  DRA_PROJECT_ARTIFACT_ID: "agent-core"
+
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
     key: "dra-core-snapshot"
@@ -22,7 +28,15 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
       command: |
+        echo "+++ Restoring Artifacts"
         buildkite-agent artifact download "build/**/*" .
+        echo "+++ Changing permissions for the release manager"
+        sudo chown -R :1000 build/distributions/
+        echo "+++ Running DRA publish step"
+        DRA_COMMIT=$BUILDKITE_COMMIT
+        export DRA_COMMIT
+        DRA_BRANCH=$BUILDKITE_BRANCH
+        export DRA_BRANCH
         .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-snapshot"
       agents:
@@ -51,7 +65,15 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core staging"
       command: |
+        echo "+++ Restoring Artifacts"
         buildkite-agent artifact download "build/**/*" .
+        echo "+++ Changing permissions for the release manager"
+        sudo chown -R :1000 build/distributions/
+        echo "+++ Running DRA publish step"
+        DRA_COMMIT=$BUILDKITE_COMMIT
+        export DRA_COMMIT
+        DRA_BRANCH=$BUILDKITE_BRANCH
+        export DRA_BRANCH
         .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-staging"
       agents:
