@@ -163,14 +163,18 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentF
 	// https://github.com/elastic/elastic-agent/issues/2977 is resolved.
 	// checkUpgradeWatcherRan(t, s.agentFixture)
 
-	t.Log("Getting Agent version...")
-	newVersion, err := tools.GetAgentVersion(kibClient)
-	require.NoError(t, err)
-
 	// We remove the `-SNAPSHOT` suffix because, post-upgrade, the version reported
 	// by the Agent will not contain this suffix, even if a `-SNAPSHOT`-suffixed
 	// version was used as the target version for the upgrade.
-	require.Equal(t, strings.TrimRight(toVersion, `-SNAPSHOT`), newVersion)
+	require.Eventually(t, func() bool {
+		t.Log("Getting Agent version...")
+		newVersion, err := tools.GetAgentVersion(kibClient)
+		if err != nil {
+			t.Logf("error getting agent version: %v", err)
+			return false
+		}
+		return strings.TrimRight(toVersion, `-SNAPSHOT`) == newVersion
+	}, 5*time.Minute, time.Second)
 }
 
 func TestStandaloneUpgrade(t *testing.T) {
