@@ -358,6 +358,8 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 		}, // modifying /etc/hosts
 	})
 
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/3155")
+
 	upgradeFromVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
