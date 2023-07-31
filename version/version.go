@@ -4,9 +4,9 @@
 
 package version
 
-<<<<<<< HEAD
-const defaultBeatVersion = "8.9.1"
-=======
-const defaultBeatVersion = "8.10.0"
-const Agent = defaultBeatVersion
->>>>>>> 732d7c0e59 (enhance mock fleet-server and add --proxy-url integration test  (#2834))
+const (
+	defaultBeatVersion = "8.9.1"
+
+	// Agent is the exported version of defaultBeatVersion.
+	Agent = defaultBeatVersion
+)

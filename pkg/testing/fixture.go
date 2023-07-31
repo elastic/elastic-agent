@@ -19,11 +19,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-
+	"github.com/hashicorp/go-multierror"
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -403,12 +403,12 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (Ag
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
 	status := AgentStatusOutput{}
 	if uerr := json.Unmarshal(out, &status); uerr != nil {
-		return AgentStatusOutput{},
-			fmt.Errorf("could not unmarshal agent status output: %w",
-				errors.Join(&ExecErr{
-					err:    err,
-					Output: out,
-				}, uerr))
+		return AgentStatusOutput{}, multierror.Append(
+			fmt.Errorf("could not unmarshal agent status output: %w", uerr),
+			&ExecErr{
+				err:    err,
+				Output: out,
+			})
 	}
 
 	return status, err
@@ -424,11 +424,12 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 	inspect := AgentInspectOutput{}
 	if uerr := yaml.Unmarshal(out, &inspect); uerr != nil {
 		return AgentInspectOutput{},
-			fmt.Errorf("could not unmarshal agent inspect output: %w",
-				errors.Join(&ExecErr{
+			multierror.Append(
+				fmt.Errorf("could not unmarshal agent inspect output: %w", uerr),
+				&ExecErr{
 					err:    err,
 					Output: out,
-				}, uerr))
+				})
 	}
 
 	return inspect, err
