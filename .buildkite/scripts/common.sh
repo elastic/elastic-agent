@@ -58,7 +58,9 @@ mage() {
     fi
     pushd "$WORKSPACE"
     command "mage" "$@"
+    ACTUAL_EXIT_CODE=$?
     popd
+    return $ACTUAL_EXIT_CODE
 }
 
 # Wrapper function for executing go
@@ -78,7 +80,9 @@ go(){
     fi
     pushd "$WORKSPACE"
     command go "$@"
+    ACTUAL_EXIT_CODE=$?
     popd
+    return $ACTUAL_EXIT_CODE
 }
 
 google_cloud_auth() {
