@@ -210,7 +210,7 @@ func (p *pod) emitRunning(pod *kubernetes.Pod) {
 				if len(hints) > 0 {
 					p.logger.Debugf("Extracted hints are :%v", hints)
 					hintsMapping := GenerateHintsMapping(hints, data.mapping, p.logger, "")
-					p.logger.Debugf("Generated Pods  hints mappings are :%v", hintsMapping)
+					p.logger.Debugf("Generated Pods' hints mappings are :%v", hintsMapping)
 					_ = p.comm.AddOrUpdate(
 						data.uid,
 						PodPriority,
