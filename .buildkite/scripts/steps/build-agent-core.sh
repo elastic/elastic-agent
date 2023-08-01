@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source ../scripts/common.sh
+source .buildkite/scripts/common.sh
 BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
 export BEAT_VERSION
 
