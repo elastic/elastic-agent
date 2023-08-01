@@ -80,7 +80,7 @@ func (psv ParsedSemVer) VersionWithPrerelease() string {
 }
 
 func (psv ParsedSemVer) IsSnapshot() bool {
-	return psv.prerelease == "SNAPSHOT"
+	return psv.prerelease == "SNAPSHOT" || strings.HasSuffix(psv.prerelease, "-SNAPSHOT")
 }
 
 func (psv ParsedSemVer) Less(other ParsedSemVer) bool {

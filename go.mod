@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.19
+go 1.20
 
 require (
 	github.com/Microsoft/go-winio v0.6.0
@@ -14,11 +14,11 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/e2e-testing v1.99.2-0.20221205111528-ade3c840d0c0
 	github.com/elastic/elastic-agent-autodiscover v0.6.2
-	github.com/elastic/elastic-agent-client/v7 v7.1.2
+	github.com/elastic/elastic-agent-client/v7 v7.2.0
 	github.com/elastic/elastic-agent-libs v0.3.9-0.20230608184016-1f368a55a6ac
 	github.com/elastic/elastic-agent-system-metrics v0.6.1
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
-	github.com/elastic/go-elasticsearch/v8 v8.8.1
+	github.com/elastic/go-elasticsearch/v8 v8.8.2
 	github.com/elastic/go-licenser v0.4.1
 	github.com/elastic/go-sysinfo v1.11.0
 	github.com/elastic/go-ucfg v0.8.6
@@ -42,7 +42,6 @@ require (
 	github.com/otiai10/copy v1.11.0
 	github.com/pierrre/gotestcover v0.0.0-20160517101806-924dca7d15f0
 	github.com/pkg/errors v0.9.1
-	github.com/rs/xid v1.3.0
 	github.com/rs/zerolog v1.27.0
 	github.com/shirou/gopsutil/v3 v3.21.12
 	github.com/sirupsen/logrus v1.9.0
@@ -60,8 +59,8 @@ require (
 	golang.org/x/text v0.9.0
 	golang.org/x/time v0.3.0
 	golang.org/x/tools v0.7.0
-	google.golang.org/grpc v1.46.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/grpc v1.53.0
+	google.golang.org/protobuf v1.29.1
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v1.7.0
@@ -139,10 +138,10 @@ require (
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.9.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
+	golang.org/x/oauth2 v0.4.0 // indirect
 	golang.org/x/term v0.7.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220426171045-31bebdecfb46 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 	google.golang.org/grpc/examples v0.0.0-20220304170021-431ea809a767 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

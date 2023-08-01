@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
@@ -23,7 +24,7 @@ func TestInstallPath(t *testing.T) {
 
 	for name, basePath := range tests {
 		t.Run(name, func(t *testing.T) {
-			p := installPath(basePath)
+			p := paths.InstallPath(basePath)
 			require.Equal(t, basePath+`\Elastic\Agent`, p)
 		})
 	}

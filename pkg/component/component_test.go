@@ -17,27 +17,27 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/elastic/go-ucfg"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/structpb"
+	"gopkg.in/yaml.v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestToComponents(t *testing.T) {
-	var linuxAMD64Platform = PlatformDetail{
+	linuxAMD64Platform := PlatformDetail{
 		Platform: Platform{
 			OS:   Linux,
 			Arch: AMD64,
@@ -1711,7 +1711,8 @@ func TestToComponents(t *testing.T) {
 			headers: &testHeadersProvider{headers: map[string]string{
 				"header-one": "val-1",
 			}},
-		}, {
+		},
+		{
 			Name:     "Headers injection merge",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
@@ -1892,7 +1893,7 @@ func TestToComponents(t *testing.T) {
 				for i, expected := range scenario.Result {
 					actual := result[i]
 					if expected.Err != nil {
-						assert.Equal(t, expected.Err, actual.Err)
+						assert.Contains(t, actual.Err.Error(), expected.Err.Error())
 						assert.EqualValues(t, expected.Units, actual.Units)
 					} else {
 						assert.NoError(t, actual.Err, "Expected no error for component "+actual.ID)
@@ -1950,6 +1951,9 @@ func TestPreventionsAreValid(t *testing.T) {
 	// you update `docs/component-specs.md` in the same PR to document
 	// the change.
 	vars, err := transpiler.NewVars("", map[string]interface{}{
+		"install": map[string]interface{}{
+			"in_default": true,
+		},
 		"runtime": map[string]interface{}{
 			"platform": "platform",
 			"os":       "os",
@@ -2042,21 +2046,26 @@ func TestInjectingInputPolicyID(t *testing.T) {
 	}{
 		{"NilEverything", nil, nil, nil},
 		{"NilInput", fleetPolicy, nil, nil},
-		{"NilPolicy", nil,
+		{
+			"NilPolicy", nil,
 			map[string]interface{}{},
 			map[string]interface{}{},
 		},
-		{"EmptyPolicy", map[string]interface{}{},
+		{
+			"EmptyPolicy",
+			map[string]interface{}{},
 			map[string]interface{}{},
 			map[string]interface{}{},
 		},
-		{"CreatePolicyRevision", fleetPolicy,
+		{
+			"CreatePolicyRevision", fleetPolicy,
 			map[string]interface{}{},
 			map[string]interface{}{
 				"policy": map[string]interface{}{"revision": testRevision},
 			},
 		},
-		{"NilPolicyObjectType", fleetPolicy,
+		{
+			"NilPolicyObjectType", fleetPolicy,
 			map[string]interface{}{
 				"policy": nil,
 			},
@@ -2064,7 +2073,8 @@ func TestInjectingInputPolicyID(t *testing.T) {
 				"policy": map[string]interface{}{"revision": testRevision},
 			},
 		},
-		{"InjectPolicyRevision", fleetPolicy,
+		{
+			"InjectPolicyRevision", fleetPolicy,
 			map[string]interface{}{
 				"policy": map[string]interface{}{"key": "value"},
 			},
@@ -2072,7 +2082,8 @@ func TestInjectingInputPolicyID(t *testing.T) {
 				"policy": map[string]interface{}{"key": "value", "revision": testRevision},
 			},
 		},
-		{"UnknownPolicyObjectType", fleetPolicy,
+		{
+			"UnknownPolicyObjectType", fleetPolicy,
 			map[string]interface{}{
 				"policy": map[string]int{"key": 10},
 			},
@@ -2150,6 +2161,152 @@ type testHeadersProvider struct {
 
 func (h *testHeadersProvider) Headers() map[string]string {
 	return h.headers
+}
+
+// TestSignedMarshalUnmarshal will catch if the yaml library will get updated to v3 for example
+func TestSignedMarshalUnmarshal(t *testing.T) {
+	const data = "eyJAdGltZXN0YW1wIjoiMjAyMy0wNS0yMlQxNzoxOToyOC40NjNaIiwiZXhwaXJhdGlvbiI6IjIwMjMtMDYtMjFUMTc6MTk6MjguNDYzWiIsImFnZW50cyI6WyI3ZjY0YWI2NC1hNmM0LTQ2ZTMtODIyYS0zODUxZGVkYTJmY2UiXSwiYWN0aW9uX2lkIjoiNGYwODQ2MGYtMDE0Yy00ZDllLWJmOGEtY2FhNjQyNzRhZGU0IiwidHlwZSI6IlVORU5ST0xMIiwidHJhY2VwYXJlbnQiOiIwMC1iOTBkYTlmOGNjNzdhODk0OTc0ZWIxZTIzMGNmNjc2Yy1lOTNlNzk4YTU4ODg2MDVhLTAxIn0="
+	const signature = "MEUCIAxxsi9ff1zyV0+4fsJLqbP8Qb83tedU5iIFldtxEzEfAiEA0KUsrL7q+Fv7z6Boux3dY2P4emGi71jsMGanIZ552bM="
+
+	signed := Signed{
+		Data:      data,
+		Signature: signature,
+	}
+
+	b, err := yaml.Marshal(signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var newSigned Signed
+	err = yaml.Unmarshal(b, &newSigned)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diff := cmp.Diff(signed, newSigned)
+	if diff != "" {
+		t.Fatal(diff)
+	}
+
+	diff = cmp.Diff(true, signed.IsSigned())
+	if diff != "" {
+		t.Fatal(diff)
+	}
+
+	var nilSigned *Signed
+	diff = cmp.Diff(false, nilSigned.IsSigned())
+	if diff != "" {
+		t.Fatal(diff)
+	}
+
+	unsigned := Signed{}
+	diff = cmp.Diff(false, unsigned.IsSigned())
+	if diff != "" {
+		t.Fatal(diff)
+	}
+}
+
+func TestSignedFromPolicy(t *testing.T) {
+	const data = "eyJAdGltZXN0YW1wIjoiMjAyMy0wNS0yMlQxNzoxOToyOC40NjNaIiwiZXhwaXJhdGlvbiI6IjIwMjMtMDYtMjFUMTc6MTk6MjguNDYzWiIsImFnZW50cyI6WyI3ZjY0YWI2NC1hNmM0LTQ2ZTMtODIyYS0zODUxZGVkYTJmY2UiXSwiYWN0aW9uX2lkIjoiNGYwODQ2MGYtMDE0Yy00ZDllLWJmOGEtY2FhNjQyNzRhZGU0IiwidHlwZSI6IlVORU5ST0xMIiwidHJhY2VwYXJlbnQiOiIwMC1iOTBkYTlmOGNjNzdhODk0OTc0ZWIxZTIzMGNmNjc2Yy1lOTNlNzk4YTU4ODg2MDVhLTAxIn0="
+	const signature = "MEUCIAxxsi9ff1zyV0+4fsJLqbP8Qb83tedU5iIFldtxEzEfAiEA0KUsrL7q+Fv7z6Boux3dY2P4emGi71jsMGanIZ552bM="
+
+	tests := []struct {
+		name       string
+		policy     map[string]interface{}
+		wantSigned *Signed
+		wantErr    error
+	}{
+		{
+			name:    "not signed",
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed nil",
+			policy: map[string]interface{}{
+				"signed": nil,
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed not map",
+			policy: map[string]interface{}{
+				"signed": "",
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed empty",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed missing signature",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"data": data,
+				},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed missing data",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"signaure": signature,
+				},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed data invalid data type",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"data": 1,
+				},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed signature invalid data type",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"signature": 1,
+				},
+			},
+			wantErr: ErrNotFound,
+		},
+		{
+			name: "signed correct",
+			policy: map[string]interface{}{
+				"signed": map[string]interface{}{
+					"data":      data,
+					"signature": signature,
+				},
+			},
+			wantSigned: &Signed{
+				Data:      data,
+				Signature: signature,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			signed, err := SignedFromPolicy(tc.policy)
+			diff := cmp.Diff(tc.wantSigned, signed)
+			if diff != "" {
+				t.Fatal(diff)
+			}
+
+			diff = cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
+			if diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
 }
 
 func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {

@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-zeek
+      id: filestream-zeek-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -862,10 +863,13 @@ inputs:
             - zeek-x509
       data_stream.namespace: default
     - name: httpjson-zeek
+      id: httpjson-zeek-${kubernetes.hints.container_id}
       type: httpjson
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.zeek.capture_loss.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.capture_loss.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.capture_loss.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.capture_loss.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -901,7 +905,9 @@ inputs:
           tags:
             - forwarded
             - zeek-capture-loss
-        - condition: ${kubernetes.hints.zeek.connection.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.connection.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.connection.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.connection.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -937,7 +943,9 @@ inputs:
           tags:
             - forwarded
             - zeek-connection
-        - condition: ${kubernetes.hints.zeek.dce_rpc.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.dce_rpc.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.dce_rpc.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.dce_rpc.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -973,7 +981,9 @@ inputs:
           tags:
             - forwarded
             - zeek-dce-rpc
-        - condition: ${kubernetes.hints.zeek.dhcp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.dhcp.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.dhcp.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.dhcp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1009,7 +1019,9 @@ inputs:
           tags:
             - forwarded
             - zeek-dhcp
-        - condition: ${kubernetes.hints.zeek.dnp3.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.dnp3.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.dnp3.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.dnp3.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1045,7 +1057,9 @@ inputs:
           tags:
             - forwarded
             - zeek-dnp3
-        - condition: ${kubernetes.hints.zeek.dns.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.dns.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.dns.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.dns.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1081,7 +1095,9 @@ inputs:
           tags:
             - forwarded
             - zeek-dns
-        - condition: ${kubernetes.hints.zeek.dpd.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.dpd.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.dpd.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.dpd.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1117,7 +1133,9 @@ inputs:
           tags:
             - forwarded
             - zeek-dpd
-        - condition: ${kubernetes.hints.zeek.files.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.files.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.files.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.files.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1153,7 +1171,9 @@ inputs:
           tags:
             - forwarded
             - zeek-files
-        - condition: ${kubernetes.hints.zeek.ftp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.ftp.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.ftp.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.ftp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1189,7 +1209,9 @@ inputs:
           tags:
             - forwarded
             - zeek-ftp
-        - condition: ${kubernetes.hints.zeek.http.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.http.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.http.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.http.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1225,7 +1247,9 @@ inputs:
           tags:
             - forwarded
             - zeek-http
-        - condition: ${kubernetes.hints.zeek.intel.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.intel.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.intel.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.intel.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1261,7 +1285,9 @@ inputs:
           tags:
             - forwarded
             - zeek-intel
-        - condition: ${kubernetes.hints.zeek.irc.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.irc.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.irc.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.irc.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1297,7 +1323,9 @@ inputs:
           tags:
             - forwarded
             - zeek-irc
-        - condition: ${kubernetes.hints.zeek.kerberos.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.kerberos.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.kerberos.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.kerberos.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1333,7 +1361,9 @@ inputs:
           tags:
             - forwarded
             - zeek-kerberos
-        - condition: ${kubernetes.hints.zeek.modbus.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.modbus.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.modbus.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.modbus.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1369,7 +1399,9 @@ inputs:
           tags:
             - forwarded
             - zeek-modbus
-        - condition: ${kubernetes.hints.zeek.mysql.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.mysql.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.mysql.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.mysql.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1405,7 +1437,9 @@ inputs:
           tags:
             - forwarded
             - zeek-mysql
-        - condition: ${kubernetes.hints.zeek.notice.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.notice.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.notice.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.notice.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1441,7 +1475,9 @@ inputs:
           tags:
             - forwarded
             - zeek-notice
-        - condition: ${kubernetes.hints.zeek.ntlm.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.ntlm.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.ntlm.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.ntlm.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1477,7 +1513,9 @@ inputs:
           tags:
             - forwarded
             - zeek-ntlm
-        - condition: ${kubernetes.hints.zeek.ntp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.ntp.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.ntp.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.ntp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1513,7 +1551,9 @@ inputs:
           tags:
             - forwarded
             - zeek-ntp
-        - condition: ${kubernetes.hints.zeek.ocsp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.ocsp.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.ocsp.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.ocsp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1549,7 +1589,9 @@ inputs:
           tags:
             - forwarded
             - zeek-ocsp
-        - condition: ${kubernetes.hints.zeek.pe.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.pe.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.pe.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.pe.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1585,7 +1627,9 @@ inputs:
           tags:
             - forwarded
             - zeek-pe
-        - condition: ${kubernetes.hints.zeek.radius.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.radius.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.radius.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.radius.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1621,7 +1665,9 @@ inputs:
           tags:
             - forwarded
             - zeek-radius
-        - condition: ${kubernetes.hints.zeek.rdp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.rdp.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.rdp.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.rdp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1657,7 +1703,9 @@ inputs:
           tags:
             - forwarded
             - zeek-rdp
-        - condition: ${kubernetes.hints.zeek.rfb.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.rfb.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.rfb.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.rfb.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1693,7 +1741,9 @@ inputs:
           tags:
             - forwarded
             - zeek-rfb
-        - condition: ${kubernetes.hints.zeek.signature.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.signature.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.signature.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.signature.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1729,7 +1779,9 @@ inputs:
           tags:
             - forwarded
             - zeek-signature
-        - condition: ${kubernetes.hints.zeek.sip.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.sip.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.sip.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.sip.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1765,7 +1817,9 @@ inputs:
           tags:
             - forwarded
             - zeek-sip
-        - condition: ${kubernetes.hints.zeek.smb_cmd.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.smb_cmd.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.smb_cmd.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.smb_cmd.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1801,7 +1855,9 @@ inputs:
           tags:
             - forwarded
             - zeek-smb-cmd
-        - condition: ${kubernetes.hints.zeek.smb_files.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.smb_files.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.smb_files.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.smb_files.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1837,7 +1893,9 @@ inputs:
           tags:
             - forwarded
             - zeek-smb-files
-        - condition: ${kubernetes.hints.zeek.smb_mapping.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.smb_mapping.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.smb_mapping.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.smb_mapping.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1872,7 +1930,9 @@ inputs:
             type: string
           tags:
             - forwarded
-        - condition: ${kubernetes.hints.zeek.smtp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.smtp.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.smtp.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.smtp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1908,7 +1968,9 @@ inputs:
           tags:
             - forwarded
             - zeek-smtp
-        - condition: ${kubernetes.hints.zeek.snmp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.snmp.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.snmp.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.snmp.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1944,7 +2006,9 @@ inputs:
           tags:
             - forwarded
             - zeek-snmp
-        - condition: ${kubernetes.hints.zeek.socks.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.socks.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.socks.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.socks.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -1980,7 +2044,9 @@ inputs:
           tags:
             - forwarded
             - zeek-socks
-        - condition: ${kubernetes.hints.zeek.ssh.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.ssh.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.ssh.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.ssh.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -2016,7 +2082,9 @@ inputs:
           tags:
             - forwarded
             - zeek-ssh
-        - condition: ${kubernetes.hints.zeek.ssl.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.ssl.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.ssl.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.ssl.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -2052,7 +2120,9 @@ inputs:
           tags:
             - forwarded
             - zeek-ssl
-        - condition: ${kubernetes.hints.zeek.stats.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.stats.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.stats.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.stats.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -2088,7 +2158,9 @@ inputs:
           tags:
             - forwarded
             - zeek-stats
-        - condition: ${kubernetes.hints.zeek.syslog.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.syslog.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.syslog.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.syslog.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -2124,7 +2196,9 @@ inputs:
           tags:
             - forwarded
             - zeek-syslog
-        - condition: ${kubernetes.hints.zeek.traceroute.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.traceroute.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.traceroute.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.traceroute.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -2160,7 +2234,9 @@ inputs:
           tags:
             - forwarded
             - zeek-traceroute
-        - condition: ${kubernetes.hints.zeek.tunnel.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.tunnel.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.tunnel.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.tunnel.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -2196,7 +2272,9 @@ inputs:
           tags:
             - forwarded
             - zeek-tunnel
-        - condition: ${kubernetes.hints.zeek.weird.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.weird.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.weird.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.weird.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:
@@ -2232,7 +2310,9 @@ inputs:
           tags:
             - forwarded
             - zeek-weird
-        - condition: ${kubernetes.hints.zeek.x509.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
+        - auth.basic.password: ${kubernetes.hints.zeek.x509.password|kubernetes.hints.zeek.password|''}
+          auth.basic.user: ${kubernetes.hints.zeek.x509.username|kubernetes.hints.zeek.username|''}
+          condition: ${kubernetes.hints.zeek.x509.enabled} == true and ${kubernetes.hints.zeek.enabled} == true
           config_version: 2
           cursor:
             index_earliest:

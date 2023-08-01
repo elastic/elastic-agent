@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-rabbitmq
+      id: filestream-rabbitmq-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -28,6 +29,7 @@ inputs:
             - forwarded
       data_stream.namespace: default
     - name: rabbitmq/metrics-rabbitmq
+      id: rabbitmq/metrics-rabbitmq-${kubernetes.hints.container_id}
       type: rabbitmq/metrics
       use_output: default
       streams:

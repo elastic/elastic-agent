@@ -4,6 +4,12 @@
 
 package fleetservertest
 
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
 // =============================================================================
 // ================================== Ack ======================================
 // =============================================================================
@@ -104,17 +110,17 @@ type CheckinRequest struct {
 	AckToken string `json:"ack_token,omitempty"`
 
 	// An embedded JSON object that holds meta-data values. Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent. elastic-agent will populate the object with information from the binary and host/system environment. fleet-server will update the agent record if a checkin response contains different data from the record.
-	LocalMetadata string `json:"local_metadata,omitempty"`
+	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
 
 	// An embedded JSON object that holds component information that the agent is running. Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent. fleet-server will update the components in an agent record if they differ from this object.
-	Components string `json:"components,omitempty"`
+	Components json.RawMessage `json:"components,omitempty"`
 
 	// An optional timeout value that informs fleet-server of when a client will time out on it's checkin request. If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout). The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration). If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
 	PollTimeout string `json:"poll_timeout,omitempty"`
 }
 type CheckinResponse struct {
 
-	// The acknowlegment token used to indicate action delivery.
+	// The acknowledgment token used to indicate action delivery.
 	AckToken string `json:"ack_token,omitempty"`
 
 	// The action result. Set to \"checkin\".
@@ -199,13 +205,13 @@ type EnrollResponse struct {
 type EnrollResponseItem struct {
 
 	// The agent ID
-	Id string `json:"id"`
+	AgentID string `json:"id"`
 
 	// If the agent is active in fleet. Will be set to true upon enrollment.
 	Active bool `json:"active"`
 
-	// The policy ID that the agent is enrolled with. Decoded from the API key used in the request.
-	PolicyId string `json:"policy_id"`
+	// The policy ID that the agent is enrolled with. Decoded from the Handlers key used in the request.
+	PolicyID string `json:"policy_id"`
 
 	// The enrollment request type.
 	Type string `json:"type"`
@@ -214,16 +220,16 @@ type EnrollResponseItem struct {
 	EnrolledAt string `json:"enrolled_at"`
 
 	// A copy of the user provided metadata from the enrollment request. Currently will be empty.
-	UserProvidedMetadata string `json:"user_provided_metadata"`
+	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata"`
 
 	// A copy of the (updated) local metadata provided in the enrollment request.
-	LocalMetadata string `json:"local_metadata"`
+	LocalMetadata json.RawMessage `json:"local_metadata"`
 
 	// Defined in fleet-server and elastic-agent as `[]interface{}` but never used.
 	Actions []map[string]interface{} `json:"actions"`
 
 	// The id of the ApiKey that fleet-server has generated for the enrolling agent.
-	AccessApiKeyId string `json:"access_api_key_id"`
+	AccessApiKeyID string `json:"access_api_key_id"`
 
 	// The ApiKey token that fleet-server has generated for the enrolling agent.
 	AccessApiKey string `json:"access_api_key"`
@@ -239,10 +245,10 @@ type EnrollResponseItem struct {
 type EnrollMetadata struct {
 
 	// An embedded JSON object that holds user-provided meta-data values. Defined in fleet-server as a `json.RawMessage`. fleet-server does not use these values on enrollment of an agent. Defined in the elastic-agent as a `map[string]interface{}` with no way to specify any values.
-	UserProvided string `json:"user_provided"`
+	UserProvided json.RawMessage `json:"user_provided"`
 
 	// An embedded JSON object that holds meta-data values. Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent. elastic-agent will populate the object with information from the binary and host/system environment. If not empty fleet-server will update the value of `local[\"elastic\"][\"agent\"][\"id\"]` to the agent ID (assuming the keys exist). The (possibly updated) value is sent by fleet-server when creating the record for a new agent.
-	Local string `json:"local"`
+	Local json.RawMessage `json:"local"`
 
 	// User provided tags for the agent. fleet-server will pass the tags to the agent record on enrollment.
 	Tags []string `json:"tags"`
@@ -353,14 +359,53 @@ type UploadCompleteRequestTransithash struct {
 // =============================================================================
 
 // HTTPError is the HTTP error to be returned to the client.
+// If no StatusCode is defined, http.StatusInternalServerError will be used by
+// String() and Error().
 type HTTPError struct {
 
 	// The HTTP status code of the error.
 	StatusCode int `json:"statusCode"`
 
-	// Error type.
-	Error string `json:"error"`
+	// Error is the Status Code as text.
+	Status string `json:"error"`
 
 	// (optional) Error message.
 	Message string `json:"message,omitempty"`
+}
+
+func (e HTTPError) Error() string {
+	return e.String()
+}
+
+func (e HTTPError) String() string {
+	statusCode := e.StatusCode
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
+
+	status := e.Status
+	if status == "" {
+		status = http.StatusText(statusCode)
+	}
+
+	return fmt.Sprintf("%d - %s: %s", statusCode, status, e.Message)
+}
+
+func (e HTTPError) MarshalJSON() ([]byte, error) {
+	statusCode := e.StatusCode
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
+
+	status := e.Status
+	if status == "" {
+		status = http.StatusText(statusCode)
+	}
+
+	type tmp HTTPError
+	return json.Marshal(tmp(HTTPError{
+		StatusCode: statusCode,
+		Status:     status,
+		Message:    e.Message,
+	}))
 }

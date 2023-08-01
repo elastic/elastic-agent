@@ -17,7 +17,6 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
@@ -117,6 +116,7 @@ type crossBuildParams struct {
 
 // CrossBuild executes a given build target once for each target platform.
 func CrossBuild(options ...CrossBuildOption) error {
+	fmt.Println("--- CrossBuild Elastic-Agent")
 	params := crossBuildParams{Platforms: Platforms, Target: defaultCrossBuildTarget, ImageSelector: CrossBuildImage}
 	for _, opt := range options {
 		opt(&params)
@@ -133,7 +133,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 		for _, platform := range params.Platforms {
 			if platform.GOOS() == "aix" {
 				if len(params.Platforms) != 1 {
-					return errors.New("AIX cannot be crossbuilt with other platforms. Set PLATFORMS='aix/ppc64'")
+					return fmt.Errorf("platform AIX cannot be crossbuilt with other platforms. Set PLATFORMS='aix/ppc64'")
 				}
 				// This is basically a short-out so we can attempt to build on AIX in a relatively generic way
 				log.Printf("Target is building for AIX, skipping normal crossbuild process")
@@ -145,7 +145,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 			}
 		}
 		// If we're here, something isn't set.
-		return errors.New("Cannot crossbuild on AIX. Either run `mage build` or set PLATFORMS='aix/ppc64'")
+		return fmt.Errorf("cannot crossbuild on AIX. Either run `mage build` or set PLATFORMS='aix/ppc64'")
 	}
 
 	// Docker is required for this target.
@@ -171,8 +171,8 @@ func CrossBuild(options ...CrossBuildOption) error {
 		builder := GolangCrossBuilder{buildPlatform.Name, params.Target, params.InDir, params.ImageSelector}
 		if params.Serial {
 			if err := builder.Build(); err != nil {
-				return errors.Wrapf(err, "failed cross-building target=%s for platform=%s",
-					params.Target, buildPlatform.Name)
+				return fmt.Errorf("failed cross-building target=%s for platform=%s: %w",
+					params.Target, buildPlatform.Name, err)
 			}
 		} else {
 			deps = append(deps, builder.Build)
@@ -253,7 +253,7 @@ func (b GolangCrossBuilder) Build() error {
 
 	repoInfo, err := GetProjectRepoInfo()
 	if err != nil {
-		return errors.Wrap(err, "failed to determine repo root and package sub dir")
+		return fmt.Errorf("failed to determine repo root and package sub dir: %w", err)
 	}
 
 	mountPoint := filepath.ToSlash(filepath.Join("/go", "src", repoInfo.CanonicalRootImportPath))
@@ -268,13 +268,13 @@ func (b GolangCrossBuilder) Build() error {
 	buildCmd, err := filepath.Rel(workDir,
 		filepath.Join(mountPoint, repoInfo.SubDir, "build/mage-linux-"+builderArch))
 	if err != nil {
-		return errors.Wrap(err, "failed to determine mage-linux-"+builderArch+" relative path")
+		return fmt.Errorf("failed to determine mage-linux-%s relative path: %w", builderArch, err)
 	}
 
 	dockerRun := sh.RunCmd("docker", "run")
 	image, err := b.ImageSelector(b.Platform)
 	if err != nil {
-		return errors.Wrap(err, "failed to determine golang-crossbuild image tag")
+		return fmt.Errorf("failed to determine golang-crossbuild image tag: %w", err)
 	}
 	verbose := ""
 	if mg.Verbose() {
@@ -371,7 +371,7 @@ func chownPaths(uid, gid int, path string) error {
 		}
 
 		if err := os.Chown(name, uid, gid); err != nil {
-			return errors.Wrapf(err, "failed to chown path=%v", name)
+			return fmt.Errorf("failed to chown path=%v : %w", name, err)
 		}
 		numFixed++
 		return nil

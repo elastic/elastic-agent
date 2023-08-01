@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -119,7 +120,7 @@ func isProcessRedirectable(componentID string) bool {
 }
 
 func redirectToPath(w http.ResponseWriter, r *http.Request, id, path, operatingSystem string) error {
-	endpoint := prefixedEndpoint(endpointPath(id, operatingSystem))
+	endpoint := prefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
 	metricsBytes, statusCode, metricsErr := processMetrics(r.Context(), endpoint, path)
 	if metricsErr != nil {
 		return metricsErr

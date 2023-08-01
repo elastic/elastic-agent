@@ -224,14 +224,15 @@ func (a *ActionPolicyChange) AckEvent() AckEvent {
 
 // ActionUpgrade is a request for agent to upgrade.
 type ActionUpgrade struct {
-	ActionID         string `yaml:"action_id"`
-	ActionType       string `yaml:"type"`
-	ActionStartTime  string `json:"start_time" yaml:"start_time,omitempty"` // TODO change to time.Time in unmarshal
-	ActionExpiration string `json:"expiration" yaml:"expiration,omitempty"`
-	Version          string `json:"version" yaml:"version,omitempty"`
-	SourceURI        string `json:"source_uri,omitempty" yaml:"source_uri,omitempty"`
-	Retry            int    `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty"`
-	Err              error
+	ActionID         string  `yaml:"action_id" mapstructure:"id"`
+	ActionType       string  `yaml:"type" mapstructure:"type"`
+	ActionStartTime  string  `json:"start_time" yaml:"start_time,omitempty" mapstructure:"-"` // TODO change to time.Time in unmarshal
+	ActionExpiration string  `json:"expiration" yaml:"expiration,omitempty" mapstructure:"-"`
+	Version          string  `json:"version" yaml:"version,omitempty" mapstructure:"-"`
+	SourceURI        string  `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
+	Retry            int     `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
+	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+	Err              error   `json:"-" yaml:"-" mapstructure:"-"`
 }
 
 func (a *ActionUpgrade) String() string {
@@ -322,11 +323,19 @@ func (a *ActionUpgrade) SetStartTime(t time.Time) {
 	a.ActionStartTime = t.Format(time.RFC3339)
 }
 
+// MarshalMap marshals ActionUpgrade into a corresponding map
+func (a *ActionUpgrade) MarshalMap() (map[string]interface{}, error) {
+	var res map[string]interface{}
+	err := mapstructure.Decode(a, &res)
+	return res, err
+}
+
 // ActionUnenroll is a request for agent to unhook from fleet.
 type ActionUnenroll struct {
-	ActionID   string `yaml:"action_id"`
-	ActionType string `yaml:"type"`
-	IsDetected bool   `json:"is_detected,omitempty" yaml:"is_detected,omitempty"`
+	ActionID   string  `yaml:"action_id" mapstructure:"id"`
+	ActionType string  `yaml:"type" mapstructure:"type"`
+	IsDetected bool    `json:"is_detected,omitempty" yaml:"is_detected,omitempty" mapstructure:"-"`
+	Signed     *Signed `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 }
 
 func (a *ActionUnenroll) String() string {
@@ -350,6 +359,13 @@ func (a *ActionUnenroll) ID() string {
 
 func (a *ActionUnenroll) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
+}
+
+// MarshalMap marshals ActionUnenroll into a corresponding map
+func (a *ActionUnenroll) MarshalMap() (map[string]interface{}, error) {
+	var res map[string]interface{}
+	err := mapstructure.Decode(a, &res)
+	return res, err
 }
 
 // ActionSettings is a request to change agent settings.
@@ -562,6 +578,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 			action = &ActionUnenroll{
 				ActionID:   response.ActionID,
 				ActionType: response.ActionType,
+				Signed:     response.Signed,
 			}
 		case ActionTypeUpgrade:
 			action = &ActionUpgrade{
@@ -569,6 +586,7 @@ func (a *Actions) UnmarshalJSON(data []byte) error {
 				ActionType:       response.ActionType,
 				ActionStartTime:  response.ActionStartTime,
 				ActionExpiration: response.ActionExpiration,
+				Signed:           response.Signed,
 			}
 
 			if err := json.Unmarshal(response.Data, action); err != nil {
@@ -656,11 +674,13 @@ func (a *Actions) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				InputType:  n.InputType,
 				Timeout:    n.Timeout,
 				Data:       n.Data,
+				Signed:     n.Signed,
 			}
 		case ActionTypeUnenroll:
 			action = &ActionUnenroll{
 				ActionID:   n.ActionID,
 				ActionType: n.ActionType,
+				Signed:     n.Signed,
 			}
 		case ActionTypeUpgrade:
 			action = &ActionUpgrade{

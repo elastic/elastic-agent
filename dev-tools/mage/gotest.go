@@ -7,6 +7,7 @@ package mage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
@@ -28,7 +28,8 @@ import (
 // GoTestArgs are the arguments used for the "go*Test" targets and they define
 // how "go test" is invoked. "go test" is always invoked with -v for verbose.
 type GoTestArgs struct {
-	TestName            string            // Test name used in logging.
+	LogName             string            // Test name used in logging.
+	RunExpr             string            // Expression to pass to the -run argument of go test.
 	Race                bool              // Enable race detector.
 	Tags                []string          // Build tags to enable.
 	ExtraFlags          []string          // Extra flags to pass to 'go test'.
@@ -49,7 +50,7 @@ type TestBinaryArgs struct {
 func makeGoTestArgs(name string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s", strings.Replace(strings.ToLower(name), " ", "_", -1))
 	params := GoTestArgs{
-		TestName:        name,
+		LogName:         name,
 		Race:            RaceDetector,
 		Packages:        []string{"./..."},
 		OutputFile:      fileName + ".out",
@@ -66,7 +67,7 @@ func makeGoTestArgsForModule(name, module string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s-%s", strings.Replace(strings.ToLower(name), " ", "_", -1),
 		strings.Replace(strings.ToLower(module), " ", "_", -1))
 	params := GoTestArgs{
-		TestName:        fmt.Sprintf("%s-%s", name, module),
+		LogName:         fmt.Sprintf("%s-%s", name, module),
 		Race:            RaceDetector,
 		Packages:        []string{fmt.Sprintf("./module/%s/...", module)},
 		OutputFile:      fileName + ".out",
@@ -146,7 +147,7 @@ func GoTestIntegrationForModule(ctx context.Context) error {
 		passThroughEnvs(env, IntegrationTestEnvVars()...)
 		runners, err := NewIntegrationRunners(path.Join("./module", fi.Name()), env)
 		if err != nil {
-			return errors.Wrapf(err, "test setup failed for module %s", fi.Name())
+			return fmt.Errorf("test setup failed for module %s: %w", fi.Name(), err)
 		}
 		err = runners.Test("goIntegTest", func() error {
 			err := GoTest(ctx, GoTestIntegrationArgsForModule(fi.Name()))
@@ -170,8 +171,8 @@ func GoTestIntegrationForModule(ctx context.Context) error {
 }
 
 // InstallGoTestTools installs additional tools that are required to run unit and integration tests.
-func InstallGoTestTools() {
-	gotool.Install(
+func InstallGoTestTools() error {
+	return gotool.Install(
 		gotool.Install.Package("gotest.tools/gotestsum"),
 	)
 }
@@ -182,7 +183,7 @@ func InstallGoTestTools() {
 func GoTest(ctx context.Context, params GoTestArgs) error {
 	mg.Deps(InstallGoTestTools)
 
-	fmt.Println(">> go test:", params.TestName, "Testing")
+	fmt.Println(">> go test:", params.LogName, "Testing")
 
 	// We use gotestsum to drive the tests and produce a junit report.
 	// The tool runs `go test -json` in order to produce a structured log which makes it easier
@@ -213,12 +214,10 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 
 	var testArgs []string
 
-	// -race is only supported on */amd64
-	if os.Getenv("DEV_ARCH") == "amd64" {
-		if params.Race {
-			testArgs = append(testArgs, "-race")
-		}
+	if params.Race {
+		testArgs = append(testArgs, "-race")
 	}
+
 	if len(params.Tags) > 0 {
 		params := strings.Join(params.Tags, " ")
 		if params != "" {
@@ -233,11 +232,26 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		)
 	}
 
-	if params.TestName != "" {
-		testArgs = append(testArgs, "-run", params.TestName)
-	}
-
+	// Pass the go test extra flags BEFORE the RunExpr.
+	// TL;DR: This is needed to make sure that a -test.run flag specified in the GOTEST_FLAGS environment variable does
+	// not interfere with the batching done by the framework.
+	//
+	// Full explanation:
+	// The integration test framework runs the tests twice:
+	// - the first time we pass a special tag that make all the define statements in the tests skip the test and dump the requirements.
+	//   This output is processed by the integration test framework to discover the tests and the set of environments/machines
+	//   we will need to spawn and allocate the tests to the various machines. (see batch.go for details)
+	// - the second time we run the tests (here) the integration test framework adds a -test.run flag when launching go test
+	//   on the remote machine to make sure that only the tests corresponding to that batch are executed.
+	//
+	// By specifying the extra flags before the -test.run for the batch we make sure that the last flag definition "wins"
+	// (have a look at the unit test in batch_test.go), so that whatever run constraint is specified in GOTEST_FLAGS
+	// participates in the discovery and batching (1st go test execution) but doesn't override the actual execution on
+	// the remote machine (2nd go test execution).
 	testArgs = append(testArgs, params.ExtraFlags...)
+	if params.RunExpr != "" {
+		testArgs = append(testArgs, "-run", params.RunExpr)
+	}
 	testArgs = append(testArgs, params.Packages...)
 
 	args := append(gotestsumArgs, append([]string{"--"}, testArgs...)...)
@@ -252,7 +266,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	if params.OutputFile != "" {
 		fileOutput, err := os.Create(createDir(params.OutputFile))
 		if err != nil {
-			return errors.Wrap(err, "failed to create go test output file")
+			return fmt.Errorf("failed to create go test output file: %w", err)
 		}
 		defer fileOutput.Close()
 		outputs = append(outputs, fileOutput)
@@ -273,7 +287,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		// Command ran.
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
-			return errors.Wrap(err, "failed to execute go")
+			return fmt.Errorf("failed to execute go: %w", err)
 		}
 
 		// Command ran but failed. Process the output.
@@ -282,7 +296,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 
 	if goTestErr != nil {
 		// No packages were tested. Probably the code didn't compile.
-		return errors.Wrap(goTestErr, "go test returned a non-zero value")
+		return fmt.Errorf("go test returned a non-zero value: %w", goTestErr)
 	}
 
 	// Generate a HTML code coverage report.
@@ -294,7 +308,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 			"-html="+params.CoverageProfileFile,
 			"-o", htmlCoverReport)
 		if err = coverToHTML(); err != nil {
-			return errors.Wrap(err, "failed to write HTML code coverage report")
+			return fmt.Errorf("failed to write HTML code coverage report: %w", err)
 		}
 	}
 
@@ -307,7 +321,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		// install pre-requisites
 		installCobertura := sh.RunCmd("go", "install", "github.com/boumenot/gocover-cobertura@latest")
 		if err = installCobertura(); err != nil {
-			return errors.Wrap(err, "failed to install gocover-cobertura")
+			return fmt.Errorf("failed to install gocover-cobertura: %w", err)
 		}
 
 		codecovReport = strings.TrimSuffix(params.CoverageProfileFile,
@@ -315,7 +329,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 
 		coverage, err := ioutil.ReadFile(params.CoverageProfileFile)
 		if err != nil {
-			return errors.Wrap(err, "failed to read code coverage report")
+			return fmt.Errorf("failed to read code coverage report: %w", err)
 		}
 
 		coberturaFile, err := os.Create(codecovReport)
@@ -329,18 +343,18 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		coverToXML.Stderr = os.Stderr
 		coverToXML.Stdin = bytes.NewReader(coverage)
 		if err = coverToXML.Run(); err != nil {
-			return errors.Wrap(err, "failed to write XML code coverage report")
+			return fmt.Errorf("failed to write XML code coverage report: %w", err)
 		}
 		fmt.Println(">> go run gocover-cobertura:", params.CoverageProfileFile, "Created")
 	}
 
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
-		fmt.Println(">> go test:", params.TestName, "Test Failed")
-		return errors.Wrap(goTestErr, "go test returned a non-zero value")
+		fmt.Println(">> go test:", params.LogName, "Test Failed")
+		return fmt.Errorf("go test returned a non-zero value: %w", goTestErr)
 	}
 
-	fmt.Println(">> go test:", params.TestName, "Test Passed")
+	fmt.Println(">> go test:", params.LogName, "Test Passed")
 	return nil
 }
 

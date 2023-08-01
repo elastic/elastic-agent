@@ -34,6 +34,7 @@ Unless -f is used this command will ask confirmation before performing removal.
 	}
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
+	cmd.Flags().String("uninstall-token", "", "Uninstall token required for protected agent uninstall")
 
 	return cmd
 }
@@ -55,6 +56,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
+	uninstallToken, _ := cmd.Flags().GetString("uninstall-token")
 	if status == install.Broken {
 		if !force {
 			fmt.Fprintf(streams.Out, "Elastic Agent is installed but currently broken: %s\n", reason)
@@ -78,7 +80,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
-	err = install.Uninstall(paths.ConfigFile(), paths.Top())
+	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken)
 	if err != nil {
 		return err
 	}

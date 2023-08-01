@@ -25,6 +25,9 @@ type UnitType = cproto.UnitType
 // State is the state codes
 type State = cproto.State
 
+// AdditionalMetrics is the type for additional diagnostic requests
+type AdditionalMetrics = cproto.AdditionalDiagnosticRequest
+
 const (
 	// UnitTypeInput is an input unit.
 	UnitTypeInput UnitType = cproto.UnitType_INPUT
@@ -51,6 +54,11 @@ const (
 	Upgrading State = cproto.State_UPGRADING
 	// Rollback is when it is upgrading is rolling back.
 	Rollback State = cproto.State_ROLLBACK
+)
+
+const (
+	// CPU requests additional CPU diagnostics
+	CPU AdditionalMetrics = cproto.AdditionalDiagnosticRequest_CPU
 )
 
 // Version is the current running version of the daemon.
@@ -127,11 +135,23 @@ type DiagnosticUnitRequest struct {
 	UnitType    UnitType
 }
 
+// DiagnosticComponentRequest targets a specific component for diagnostics
+type DiagnosticComponentRequest struct {
+	ComponentID string
+}
+
 // DiagnosticUnitResult is a set of results for a unit.
 type DiagnosticUnitResult struct {
 	ComponentID string
 	UnitID      string
 	UnitType    UnitType
+	Err         error
+	Results     []DiagnosticFileResult
+}
+
+// DiagnosticComponentResult is a set of diagnostic results for a component
+type DiagnosticComponentResult struct {
+	ComponentID string
 	Err         error
 	Results     []DiagnosticFileResult
 }
@@ -153,11 +173,13 @@ type Client interface {
 	// Upgrade triggers upgrade of the current running daemon.
 	Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, pgpBytes ...string) (string, error)
 	// DiagnosticAgent gathers diagnostics information for the running Elastic Agent.
-	DiagnosticAgent(ctx context.Context) ([]DiagnosticFileResult, error)
+	DiagnosticAgent(ctx context.Context, additionalDiags []AdditionalMetrics) ([]DiagnosticFileResult, error)
 	// DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).
 	DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitRequest) ([]DiagnosticUnitResult, error)
+	// DiagnosticComponents gathers diagnostic information for specific components
+	// the additionalDiags field specifies optional diagnostics that can also be collected.
+	DiagnosticComponents(ctx context.Context, additionalDiags []AdditionalMetrics, components ...DiagnosticComponentRequest) ([]DiagnosticComponentResult, error)
 	// Configure sends a new configuration to the Elastic Agent.
-	//
 	// Only works in the case that Elastic Agent is started in testing mode.
 	Configure(ctx context.Context, config string) error
 }
@@ -296,10 +318,10 @@ func (c *client) Upgrade(ctx context.Context, version string, sourceURI string, 
 }
 
 // DiagnosticAgent gathers diagnostics information for the running Elastic Agent.
-func (c *client) DiagnosticAgent(ctx context.Context) ([]DiagnosticFileResult, error) {
-	resp, err := c.client.DiagnosticAgent(ctx, &cproto.DiagnosticAgentRequest{})
+func (c *client) DiagnosticAgent(ctx context.Context, additionalMetrics []AdditionalMetrics) ([]DiagnosticFileResult, error) {
+	resp, err := c.client.DiagnosticAgent(ctx, &cproto.DiagnosticAgentRequest{AdditionalMetrics: additionalMetrics})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error in DiagnosticAgent RPC call: %w", err)
 	}
 
 	files := make([]DiagnosticFileResult, 0, len(resp.Results))
@@ -314,6 +336,55 @@ func (c *client) DiagnosticAgent(ctx context.Context) ([]DiagnosticFileResult, e
 		})
 	}
 	return files, nil
+}
+
+// DiagnosticComponents gathers diagnostic information for components running under elastic-agent
+// errors at the DiagnosticComponents() level are returned as an error value, errors at the level of individual components are returned in
+// the DiagnosticComponentResult struct.
+func (c *client) DiagnosticComponents(ctx context.Context, additionalMetrics []AdditionalMetrics, components ...DiagnosticComponentRequest) ([]DiagnosticComponentResult, error) {
+	reqs := make([]*cproto.DiagnosticComponentRequest, 0, len(components))
+	for _, u := range components {
+		reqs = append(reqs, &cproto.DiagnosticComponentRequest{
+			ComponentId: u.ComponentID,
+		})
+	}
+	respStream, err := c.client.DiagnosticComponents(ctx, &cproto.DiagnosticComponentsRequest{AdditionalMetrics: additionalMetrics, Components: reqs})
+	if err != nil {
+		return nil, fmt.Errorf("error in DiagnosticComponents RPC call: %w", err)
+	}
+
+	results := []DiagnosticComponentResult{}
+	for {
+		compResp, err := respStream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("error reading response stream: %w", err)
+		}
+		resultFiles := []DiagnosticFileResult{}
+		for _, file := range compResp.Results {
+			resultFiles = append(resultFiles, DiagnosticFileResult{
+				Name:        file.Name,
+				Filename:    file.Filename,
+				Description: file.Description,
+				ContentType: file.ContentType,
+				Content:     file.Content,
+				Generated:   file.Generated.AsTime(),
+			})
+		}
+		if compResp.Error != "" {
+			err = errors.New(compResp.Error)
+		}
+		results = append(results, DiagnosticComponentResult{
+			ComponentID: compResp.ComponentId,
+			Err:         err,
+			Results:     resultFiles,
+		})
+	}
+
+	return results, nil
+
 }
 
 // DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).

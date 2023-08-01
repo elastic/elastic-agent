@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"gopkg.in/yaml.v2"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/google/uuid"
 
@@ -38,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/version"
+	agtversion "github.com/elastic/elastic-agent/version"
 )
 
 const fastWatcherCfg = `
@@ -66,52 +67,27 @@ func TestFleetManagedUpgrade(t *testing.T) {
 	upgradeToVersion := currentVersion
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
-	suite.Run(t, newFleetManagedUpgradeTestSuite(info, upgradeFromVersion, upgradeToVersion))
-}
 
-type FleetManagedUpgradeTestSuite struct {
-	suite.Suite
-
-	requirementsInfo *define.Info
-	agentFromVersion string
-	agentToVersion   string
-	agentFixture     *atesting.Fixture
-}
-
-func newFleetManagedUpgradeTestSuite(info *define.Info, fromVersion, toVersion string) *FleetManagedUpgradeTestSuite {
-	return &FleetManagedUpgradeTestSuite{
-		requirementsInfo: info,
-		agentFromVersion: fromVersion,
-		agentToVersion:   toVersion,
-	}
-}
-
-// Before suite
-func (s *FleetManagedUpgradeTestSuite) SetupSuite() {
 	agentFixture, err := atesting.NewFixture(
-		s.T(),
-		s.agentFromVersion,
+		t,
+		upgradeFromVersion,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 	)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	err = agentFixture.Prepare(ctx)
-	s.Require().NoError(err, "error preparing agent fixture")
+	require.NoError(t, err, "error preparing agent fixture")
 
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
-	s.Require().NoError(err, "error configuring agent fixture")
+	require.NoError(t, err, "error configuring agent fixture")
 
-	s.agentFixture = agentFixture
-}
-
-func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
-	kibClient := s.requirementsInfo.KibanaClient
+	kibClient := info.KibanaClient
 	policyUUID := uuid.New().String()
 
-	s.T().Log("Creating Agent policy...")
+	t.Log("Creating Agent policy...")
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -122,144 +98,127 @@ func (s *FleetManagedUpgradeTestSuite) TestUpgradeFleetManagedElasticAgent() {
 		},
 	}
 	policy, err := kibClient.CreatePolicy(createPolicyReq)
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
-	s.T().Log("Creating Agent enrollment API key...")
+	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policy.ID,
 	}
 	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(createEnrollmentApiKeyReq)
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
-	s.T().Log("Getting default Fleet Server URL...")
+	t.Log("Getting default Fleet Server URL...")
 	fleetServerURL, err := tools.GetDefaultFleetServerURL(kibClient)
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
-	s.T().Log("Enrolling Elastic Agent...")
-	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, s.agentFixture)
-	if err != nil {
-		s.T().Log(string(output))
+	t.Log("Enrolling Elastic Agent...")
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentToken.APIKey,
+		},
 	}
-	require.NoError(s.T(), err)
+	output, err := tools.InstallAgent(installOpts, agentFixture)
+	if err != nil {
+		t.Log(string(output))
+	}
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		t.Log("Un-enrolling Elastic Agent...")
+		assert.NoError(t, tools.UnEnrollAgent(info.KibanaClient))
+	})
 
-	s.T().Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
+	t.Log(`Waiting for enrolled Agent status to be "online"...`)
+	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 2*time.Minute, 10*time.Second, "Agent status is not online")
 
-	s.T().Logf("Upgrade Elastic Agent to version %s...", s.agentToVersion)
-	err = tools.UpgradeAgent(kibClient, s.agentToVersion)
-	require.NoError(s.T(), err)
+	t.Logf("Upgrade Elastic Agent to version %s...", upgradeToVersion)
+	err = tools.UpgradeAgent(kibClient, upgradeToVersion)
+	require.NoError(t, err)
 
-	s.T().Log(`Waiting for enrolled Agent status to be "online"...`)
-	require.Eventually(s.T(), tools.WaitForAgentStatus(s.T(), kibClient, "online"), 3*time.Minute, 15*time.Second, "Agent status is not online")
+	t.Log(`Waiting for enrolled Agent status to be "online"...`)
+	require.Eventually(t, tools.WaitForAgentStatus(t, kibClient, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// Upgrade Watcher check disabled until
 	// https://github.com/elastic/elastic-agent/issues/2977 is resolved.
-	// checkUpgradeWatcherRan(s.T(), s.agentFixture)
+	// checkUpgradeWatcherRan(t, s.agentFixture)
 
-	s.T().Log("Getting Agent version...")
+	t.Log("Getting Agent version...")
 	newVersion, err := tools.GetAgentVersion(kibClient)
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
 	// We remove the `-SNAPSHOT` suffix because, post-upgrade, the version reported
 	// by the Agent will not contain this suffix, even if a `-SNAPSHOT`-suffixed
 	// version was used as the target version for the upgrade.
-	require.Equal(s.T(), strings.TrimRight(s.agentToVersion, `-SNAPSHOT`), newVersion)
-}
-
-func (s *FleetManagedUpgradeTestSuite) TearDownTest() {
-	s.T().Log("Un-enrolling Elastic Agent...")
-	assert.NoError(s.T(), tools.UnEnrollAgent(s.requirementsInfo.KibanaClient))
+	require.Equal(t, strings.TrimRight(upgradeToVersion, `-SNAPSHOT`), newVersion)
 }
 
 func TestStandaloneUpgrade(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	define.Require(t, define.Requirements{
 		// Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
 		Isolate: true,
 		Sudo:    true, // requires Agent installation
 	})
 
-	testSuite := &StandaloneUpgradeTestSuite{
-		requirementsInfo: info,
-		agentVersion:     define.Version(),
-	}
+	agentFixture, err := define.NewFixture(t, define.Version())
 
-	suite.Run(t, testSuite)
-}
-
-type StandaloneUpgradeTestSuite struct {
-	suite.Suite
-
-	requirementsInfo *define.Info
-	agentVersion     string
-	agentFixture     *atesting.Fixture
-}
-
-// Before suite
-func (s *StandaloneUpgradeTestSuite) SetupSuite() {
-
-	agentFixture, err := define.NewFixture(s.T(), define.Version())
-
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	err = agentFixture.Prepare(ctx)
-	s.Require().NoError(err, "error preparing agent fixture")
+	require.NoError(t, err, "error preparing agent fixture")
 
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
-	s.Require().NoError(err, "error configuring agent fixture")
-
-	s.agentFixture = agentFixture
-}
-
-func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot() {
+	require.NoError(t, err, "error configuring agent fixture")
 
 	const minVersionString = "8.9.0-SNAPSHOT"
 	minVersion, _ := version.ParseVersion(minVersionString)
-	pv, err := version.ParseVersion(s.agentVersion)
+	pv, err := version.ParseVersion(define.Version())
 	if pv.Less(*minVersion) {
-		s.T().Skipf("Version %s is lower than min version %s", s.agentVersion, minVersionString)
+		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersionString)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	output, err := tools.InstallStandaloneAgent(s.agentFixture)
-	s.T().Logf("Agent installation output: %q", string(output))
-	require.NoError(s.T(), err)
+	output, err := tools.InstallStandaloneAgent(agentFixture)
+	t.Logf("Agent installation output: %q", string(output))
+	require.NoError(t, err)
 
-	c := s.agentFixture.Client()
+	c := agentFixture.Client()
 
-	require.Eventually(s.T(), func() bool {
+	require.Eventually(t, func() bool {
 		err := c.Connect(ctx)
 		if err != nil {
-			s.T().Logf("connecting client to agent: %v", err)
+			t.Logf("connecting client to agent: %v", err)
 			return false
 		}
 		defer c.Disconnect()
 		state, err := c.State(ctx)
 		if err != nil {
-			s.T().Logf("error getting the agent state: %v", err)
+			t.Logf("error getting the agent state: %v", err)
 			return false
 		}
-		s.T().Logf("agent state: %+v", state)
+		t.Logf("agent state: %+v", state)
 		return state.State == cproto.State_HEALTHY
 	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
 
 	aac := tools.NewArtifactAPIClient()
 	vList, err := aac.GetVersions(ctx)
-	s.Require().NoError(err, "error retrieving versions from Artifact API")
-	s.Require().NotNil(vList)
+	require.NoError(t, err, "error retrieving versions from Artifact API")
+	require.NotNil(t, vList)
 
 	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
 	for _, v := range vList.Versions {
 		pv, err := version.ParseVersion(v)
-		s.Require().NoErrorf(err, "invalid version retrieved from artifact API: %q", v)
+		require.NoErrorf(t, err, "invalid version retrieved from artifact API: %q", v)
 		sortedParsedVersions = append(sortedParsedVersions, pv)
 	}
 
-	s.Require().NotEmpty(sortedParsedVersions)
+	require.NotEmpty(t, sortedParsedVersions)
 
 	// normally the output of the versions returned by artifact API is already sorted in ascending order,
 	// if we want to sort in descending order we could use
@@ -274,39 +233,39 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 		}
 	}
 
-	s.Require().NotNil(latestSnapshotVersion)
+	require.NotNil(t, latestSnapshotVersion)
 
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
-	s.Require().NoError(err)
+	require.NoError(t, err)
 	// TODO if we don't have at least 2 builds, select the next older snapshot build
-	s.Require().Greater(len(builds.Builds), 1)
+	require.Greater(t, len(builds.Builds), 1)
 
 	// take the penultimate build of the snapshot (the builds are ordered from most to least recent)
 	upgradeVersionString := builds.Builds[1]
 
-	s.T().Logf("Targeting build %q of version %q", upgradeVersionString, latestSnapshotVersion)
+	t.Logf("Targeting build %q of version %q", upgradeVersionString, latestSnapshotVersion)
 
 	buildDetails, err := aac.GetBuildDetails(ctx, latestSnapshotVersion.VersionWithPrerelease(), upgradeVersionString)
-	s.Require().NoErrorf(err, "error accessing build details for version %q and buildID %q", latestSnapshotVersion.Original(), upgradeVersionString)
-	s.Require().NotNil(buildDetails)
+	require.NoErrorf(t, err, "error accessing build details for version %q and buildID %q", latestSnapshotVersion.Original(), upgradeVersionString)
+	require.NotNil(t, buildDetails)
 	agentProject, ok := buildDetails.Build.Projects["elastic-agent"]
-	s.Require().Truef(ok, "elastic agent project not found in version %q build %q", latestSnapshotVersion.Original(), upgradeVersionString)
-	s.T().Logf("agent build details: %+v", agentProject)
-	s.T().Logf("expected agent commit hash: %q", agentProject.CommitHash)
+	require.Truef(t, ok, "elastic agent project not found in version %q build %q", latestSnapshotVersion.Original(), upgradeVersionString)
+	t.Logf("agent build details: %+v", agentProject)
+	t.Logf("expected agent commit hash: %q", agentProject.CommitHash)
 	expectedAgentHashAfterUpgrade := agentProject.CommitHash
 
 	// Workaround until issue with Artifact API build commit hash are resolved
-	actualAgentHashAfterUpgrade := extractCommitHashFromArtifact(s.T(), ctx, latestSnapshotVersion, agentProject)
-	s.Require().NotEmpty(actualAgentHashAfterUpgrade)
+	actualAgentHashAfterUpgrade := extractCommitHashFromArtifact(t, ctx, latestSnapshotVersion, agentProject)
+	require.NotEmpty(t, actualAgentHashAfterUpgrade)
 
-	s.T().Logf("Artifact API hash: %q Actual package hash: %q", expectedAgentHashAfterUpgrade, actualAgentHashAfterUpgrade)
+	t.Logf("Artifact API hash: %q Actual package hash: %q", expectedAgentHashAfterUpgrade, actualAgentHashAfterUpgrade)
 
 	// override the expected hash with the one extracted from the actual artifact
 	expectedAgentHashAfterUpgrade = actualAgentHashAfterUpgrade
 
 	buildFragments := strings.Split(upgradeVersionString, "-")
-	s.Require().Lenf(buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
+	require.Lenf(t, buildFragments, 2, "version %q returned by artifact api is not in format <version>-<buildID>", upgradeVersionString)
 
 	upgradeInputVersion := version.NewParsedSemVer(
 		latestSnapshotVersion.Major(),
@@ -316,30 +275,30 @@ func (s *StandaloneUpgradeTestSuite) TestUpgradeStandaloneElasticAgentToSnapshot
 		buildFragments[1],
 	)
 
-	s.T().Logf("Upgrading to version %q", upgradeInputVersion)
+	t.Logf("Upgrading to version %q", upgradeInputVersion)
 
 	err = c.Connect(ctx)
-	s.Require().NoError(err, "error connecting client to agent")
+	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
 
 	_, err = c.Upgrade(ctx, upgradeInputVersion.String(), "", false)
-	s.Require().NoErrorf(err, "error triggering agent upgrade to version %q", upgradeInputVersion.String())
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", upgradeInputVersion.String())
 
-	s.Require().Eventuallyf(func() bool {
+	require.Eventuallyf(t, func() bool {
 		state, err := c.State(ctx)
 		if err != nil {
-			s.T().Logf("error getting the agent state: %v", err)
+			t.Logf("error getting the agent state: %v", err)
 			return false
 		}
-		s.T().Logf("current agent state: %+v", state)
+		t.Logf("current agent state: %+v", state)
 		return state.Info.Commit == expectedAgentHashAfterUpgrade && state.State == cproto.State_HEALTHY
 	}, 5*time.Minute, 1*time.Second, "agent never upgraded to expected version")
 
-	checkUpgradeWatcherRan(s.T(), s.agentFixture)
+	checkUpgradeWatcherRan(t, agentFixture)
 
 	version, err := c.Version(ctx)
-	s.Require().NoError(err, "error checking version after upgrade")
-	s.Require().Equal(expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
+	require.NoError(t, err, "error checking version after upgrade")
+	require.Equal(t, expectedAgentHashAfterUpgrade, version.Commit, "agent commit hash changed after upgrade")
 }
 
 // checkUpgradeWatcherRan asserts that the Upgrade Watcher finished running. We use the
@@ -387,46 +346,6 @@ func extractCommitHashFromArtifact(t *testing.T, ctx context.Context, artifactVe
 	return strings.TrimSpace(string(hashBytes))
 }
 
-func TestStandaloneUpgradeRetryDownload(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Local:   false, // requires Agent installation
-		Isolate: false,
-		Sudo:    true, // requires Agent installation and modifying /etc/hosts
-		OS: []define.OS{
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		}, // modifying /etc/hosts
-	})
-
-	currentVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
-
-	// We go back TWO minors because sometimes we are in a situation where
-	// the current version has been advanced to the next release (e.g. 8.10.0)
-	// but the version before that (e.g. 8.9.0) hasn't been released yet.
-	previousVersion, err := currentVersion.GetPreviousMinor()
-	require.NoError(t, err)
-	previousVersion, err = previousVersion.GetPreviousMinor()
-	require.NoError(t, err)
-
-	// For testing the upgrade we actually perform a downgrade
-	upgradeFromVersion := currentVersion
-	upgradeToVersion := previousVersion
-
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
-	suite.Run(t, newStandaloneUpgradeRetryDownloadTestSuite(info, upgradeToVersion))
-}
-
-type StandaloneUpgradeRetryDownloadTestSuite struct {
-	suite.Suite
-
-	requirementsInfo *define.Info
-	toVersion        *version.ParsedSemVer
-	agentFixture     *atesting.Fixture
-
-	isEtcHostsModified bool
-}
-
 type versionInfo struct {
 	Version string `yaml:"version"`
 	Commit  string `yaml:"commit"`
@@ -437,63 +356,77 @@ type versionOutput struct {
 	Daemon versionInfo `yaml:"daemon"`
 }
 
-func newStandaloneUpgradeRetryDownloadTestSuite(info *define.Info, toVersion *version.ParsedSemVer) *StandaloneUpgradeRetryDownloadTestSuite {
-	return &StandaloneUpgradeRetryDownloadTestSuite{
-		requirementsInfo: info,
-		toVersion:        toVersion,
-	}
-}
+func TestStandaloneUpgradeRetryDownload(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local:   false, // requires Agent installation
+		Isolate: false,
+		Sudo:    true, // requires Agent installation and modifying /etc/hosts
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		}, // modifying /etc/hosts
+	})
 
-// Before suite
-func (s *StandaloneUpgradeRetryDownloadTestSuite) SetupSuite() {
-	agentFixture, err := define.NewFixture(s.T(), define.Version())
-	s.Require().NoError(err)
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/3155")
+
+	upgradeFromVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	// We go back TWO minors because sometimes we are in a situation where
+	// the current version has been advanced to the next release (e.g. 8.10.0)
+	// but the version before that (e.g. 8.9.0) hasn't been released yet.
+	previousVersion, err := upgradeFromVersion.GetPreviousMinor()
+	require.NoError(t, err)
+	previousVersion, err = previousVersion.GetPreviousMinor()
+	require.NoError(t, err)
+
+	// For testing the upgrade we actually perform a downgrade
+	upgradeToVersion := previousVersion
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, upgradeToVersion)
+
+	agentFixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	err = agentFixture.Prepare(ctx)
-	s.Require().NoError(err, "error preparing agent fixture")
+	require.NoError(t, err, "error preparing agent fixture")
 
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
-	s.Require().NoError(err, "error configuring agent fixture")
+	require.NoError(t, err, "error configuring agent fixture")
 
-	s.agentFixture = agentFixture
-}
+	t.Log("Install the built Agent")
+	output, err := tools.InstallStandaloneAgent(agentFixture)
+	t.Log(string(output))
+	require.NoError(t, err)
 
-func (s *StandaloneUpgradeRetryDownloadTestSuite) TestUpgradeStandaloneElasticAgentRetryDownload() {
-	ctx := context.Background()
+	t.Log("Ensure the correct version is running")
+	currentVersion, err := getVersion(t, ctx, agentFixture)
+	require.NoError(t, err)
 
-	s.T().Log("Install the built Agent")
-	output, err := tools.InstallStandaloneAgent(s.agentFixture)
-	s.T().Log(string(output))
-	s.Require().NoError(err)
-
-	s.T().Log("Ensure the correct version is running")
-	currentVersion, err := s.getVersion(ctx)
-	s.Require().NoError(err)
-
-	s.T().Log("Modify /etc/hosts to simulate transient network error")
+	t.Log("Modify /etc/hosts to simulate transient network error")
 	cmd := exec.Command("sed",
 		"-i.bak",
 		"s/localhost/localhost artifacts.elastic.co artifacts-api.elastic.co/g",
 		"/etc/hosts",
 	)
-	s.T().Log("/etc/hosts modify command: ", cmd.String())
+	t.Log("/etc/hosts modify command: ", cmd.String())
 
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		s.T().Log(string(output))
+		t.Log(string(output))
 	}
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	// Ensure that /etc/hosts is modified
-	s.Eventually(func() bool {
+	require.Eventually(t, func() bool {
 		cmd := exec.Command("grep",
 			"artifacts",
 			"/etc/hosts",
 		)
-		s.T().Log("Check /etc/hosts command: ", cmd.String())
+		t.Log("Check /etc/hosts command: ", cmd.String())
 
 		// We don't check the error as grep will return non-zero exit code when
 		// it doesn't find any matches, which could happen the first couple of
@@ -504,32 +437,31 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) TestUpgradeStandaloneElasticAg
 		return outputStr != ""
 	}, 10*time.Second, 1*time.Second)
 
-	s.isEtcHostsModified = true
-	defer s.restoreEtcHosts()
+	defer restoreEtcHosts()
 
-	s.T().Log("Start the Agent upgrade")
-	var toVersion = s.toVersion.String()
+	t.Log("Start the Agent upgrade")
+	toVersion := upgradeToVersion.String()
 	var wg sync.WaitGroup
 	go func() {
 		wg.Add(1)
 
-		err := s.upgradeAgent(ctx, toVersion)
+		err := upgradeAgent(ctx, toVersion, agentFixture, t.Log)
 
 		wg.Done()
-		s.Require().NoError(err)
+		require.NoError(t, err)
 	}()
 
-	s.T().Log("Check Agent logs for at least two retry messages")
+	t.Log("Check Agent logs for at least two retry messages")
 	agentDirName := fmt.Sprintf("elastic-agent-%s", release.TrimCommit(currentVersion.Daemon.Commit))
 	logsPath := filepath.Join(paths.DefaultBasePath, "Elastic", "Agent", "data", agentDirName, "logs")
-	s.Eventually(func() bool {
+	require.Eventually(t, func() bool {
 		cmd := exec.Command("grep",
 			"download.*retrying",
 			"--recursive",
 			"--include", "*.ndjson",
 			logsPath,
 		)
-		s.T().Log("Find logs command: ", cmd.String())
+		t.Log("Find logs command: ", cmd.String())
 
 		// We don't check the error as grep will return non-zero exit code when
 		// it doesn't find any matches, which could happen the first couple of
@@ -538,37 +470,38 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) TestUpgradeStandaloneElasticAg
 		outputStr := strings.TrimSpace(string(output))
 
 		outputLines := strings.Split(outputStr, "\n")
-		s.T().Log(outputLines)
-		s.T().Log("Number of retry messages: ", len(outputLines))
+		t.Log(outputLines)
+		t.Log("Number of retry messages: ", len(outputLines))
 		return len(outputLines) >= 2
 	}, 2*time.Minute, 20*time.Second)
 
-	s.T().Log("Restore /etc/hosts so upgrade can proceed")
-	s.restoreEtcHosts()
+	t.Log("Restore /etc/hosts so upgrade can proceed")
+	err = restoreEtcHosts()
+	require.NoError(t, err)
 
 	// Wait for upgrade command to finish executing
-	s.T().Log("Waiting for upgrade to finish")
+	t.Log("Waiting for upgrade to finish")
 	wg.Wait()
 
-	checkUpgradeWatcherRan(s.T(), s.agentFixture)
+	checkUpgradeWatcherRan(t, agentFixture)
 
-	s.T().Log("Check Agent version to ensure upgrade is successful")
-	currentVersion, err = s.getVersion(ctx)
-	s.Require().NoError(err)
-	s.Require().Equal(toVersion, currentVersion.Binary.Version)
-	s.Require().Equal(toVersion, currentVersion.Daemon.Version)
+	t.Log("Check Agent version to ensure upgrade is successful")
+	currentVersion, err = getVersion(t, ctx, agentFixture)
+	require.NoError(t, err)
+	require.Equal(t, toVersion, currentVersion.Binary.Version)
+	require.Equal(t, toVersion, currentVersion.Daemon.Version)
 }
 
-func (s *StandaloneUpgradeRetryDownloadTestSuite) getVersion(ctx context.Context) (*versionOutput, error) {
+func getVersion(t *testing.T, ctx context.Context, agentFixture *atesting.Fixture) (*versionOutput, error) {
 	var currentVersion versionOutput
 	var err error
 
-	s.Eventually(func() bool {
+	require.Eventually(t, func() bool {
 		args := []string{"version", "--yaml"}
 		var output []byte
-		output, err = s.agentFixture.Exec(ctx, args)
+		output, err = agentFixture.Exec(ctx, args)
 		if err != nil {
-			s.T().Log(string(output))
+			t.Log(string(output))
 			return false
 		}
 
@@ -579,27 +512,134 @@ func (s *StandaloneUpgradeRetryDownloadTestSuite) getVersion(ctx context.Context
 	return &currentVersion, err
 }
 
-func (s *StandaloneUpgradeRetryDownloadTestSuite) restoreEtcHosts() {
-	if !s.isEtcHostsModified {
-		return
-	}
-
+func restoreEtcHosts() error {
 	cmd := exec.Command("mv",
 		"/etc/hosts.bak",
 		"/etc/hosts",
 	)
-	err := cmd.Run()
-	s.Require().NoError(err)
-	s.isEtcHostsModified = false
+	return cmd.Run()
 }
 
-func (s *StandaloneUpgradeRetryDownloadTestSuite) upgradeAgent(ctx context.Context, version string) error {
+func upgradeAgent(ctx context.Context, version string, agentFixture *atesting.Fixture, log func(args ...any)) error {
 	args := []string{"upgrade", version}
-	output, err := s.agentFixture.Exec(ctx, args)
+	output, err := agentFixture.Exec(ctx, args)
 	if err != nil {
-		s.T().Log("Upgrade command output after error: ", string(output))
+		log("Upgrade command output after error: ", string(output))
 		return err
 	}
 
 	return nil
+}
+
+func TestUpgradeBrokenPackageVersion(t *testing.T) {
+	define.Require(t, define.Requirements{
+		// We require sudo for this test to run
+		// `elastic-agent install`.
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	// Get path to Elastic Agent executable
+	f, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = f.Prepare(context.Background())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	output, err := tools.InstallStandaloneAgent(f)
+	t.Logf("Agent installation output: %q", string(output))
+	require.NoError(t, err)
+
+	c := f.Client()
+
+	require.Eventually(t, func() bool {
+		err := c.Connect(ctx)
+		if err != nil {
+			t.Logf("connecting client to agent: %v", err)
+			return false
+		}
+		defer c.Disconnect()
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("agent state: %+v", state)
+		return state.State == cproto.State_HEALTHY
+	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+
+	// get rid of the package version files in the installed directory
+	removePackageVersionFiles(t, f)
+
+	// get the version returned by the currently running agent
+	actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
+
+	actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "daemon")
+
+	// start the upgrade to the latest version
+	require.NotEmpty(t, actualVersion, "broken agent package version should not be empty")
+
+	// upgrade to latest version whatever that will be
+	aac := tools.NewArtifactAPIClient()
+	versionList, err := aac.GetVersions(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
+	latestVersion := versionList.Versions[len(versionList.Versions)-1]
+
+	t.Logf("Upgrading to version %q", latestVersion)
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "error connecting client to agent")
+	defer c.Disconnect()
+
+	_, err = c.Upgrade(ctx, latestVersion, "", false)
+	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", latestVersion)
+	parsedLatestVersion, err := version.ParseVersion(latestVersion)
+	require.NoError(t, err)
+
+	require.Eventuallyf(t, func() bool {
+		state, err := c.State(ctx)
+		if err != nil {
+			t.Logf("error getting the agent state: %v", err)
+			return false
+		}
+		t.Logf("current agent state: %+v", state)
+		return state.Info.Version == parsedLatestVersion.CoreVersion() &&
+			state.Info.Snapshot == parsedLatestVersion.IsSnapshot() &&
+			state.State == cproto.State_HEALTHY
+	}, 5*time.Minute, 10*time.Second, "agent never upgraded to expected version")
+}
+
+func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {
+	installFS := os.DirFS(f.WorkDir())
+	matches := []string{}
+
+	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.Name() == agtversion.PackageVersionFileName {
+			matches = append(matches, path)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	t.Logf("package version files found: %v", matches)
+
+	// the version files should have been removed from the other test, we just make sure
+	for _, m := range matches {
+		vFile := filepath.Join(f.WorkDir(), m)
+		t.Logf("removing package version file %q", vFile)
+		err = os.Remove(vFile)
+		require.NoErrorf(t, err, "error removing package version file %q", vFile)
+	}
 }

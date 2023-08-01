@@ -75,7 +75,7 @@ func (c *failedRuntime) Stop() error {
 }
 
 // Teardown marks it stopped.
-func (c *failedRuntime) Teardown() error {
+func (c *failedRuntime) Teardown(_ *component.Signed) error {
 	return c.Stop()
 }
 

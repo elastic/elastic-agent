@@ -101,6 +101,13 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
+
+	// fetch package hash
+	err = DownloadPackage(ctx, l, r.doer, r.src+hashExt, filepath.Join(dir, r.path+hashExt))
+	if err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src, err)
+	}
+
 	return nil
 }
 

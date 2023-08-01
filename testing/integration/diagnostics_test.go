@@ -19,7 +19,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -30,8 +29,9 @@ import (
 const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
 
 var diagnosticsFiles = []string{
+	".package.version",
 	"allocs.pprof.gz",
-	"block.pprog.gz",
+	"block.pprof.gz",
 	"components-actual.yaml",
 	"components-expected.yaml",
 	"computed-config.yaml",
@@ -47,7 +47,7 @@ var diagnosticsFiles = []string{
 	"version.txt",
 }
 
-var unitsDiagnosticsFiles []string = []string{
+var compDiagnosticsFiles = []string{
 	"allocs.pprof.gz",
 	"block.pprof.gz",
 	"goroutine.pprof.gz",
@@ -56,86 +56,111 @@ var unitsDiagnosticsFiles []string = []string{
 	"threadcreate.pprof.gz",
 }
 
+var componentSetup = map[string]integrationtest.ComponentState{
+	"fake-default": {
+		State: integrationtest.NewClientState(client.Healthy),
+		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+		},
+	},
+	"fake-shipper-default": {
+		State: integrationtest.NewClientState(client.Healthy),
+		Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+			integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
+				State: integrationtest.NewClientState(client.Healthy),
+			},
+		},
+	},
+}
+
 type componentAndUnitNames struct {
 	name      string
 	unitNames []string
 }
 
-type DiagnosticsIntegrationTestSuite struct {
-	suite.Suite
-	f *integrationtest.Fixture
+func TestDiagnosticsOptionalValues(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local: true,
+	})
+
+	fixture, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err = fixture.Prepare(ctx, fakeComponent, fakeShipper)
+	require.NoError(t, err)
+
+	diagpprof := append(diagnosticsFiles, "cpu.pprof")
+	diagCompPprof := append(compDiagnosticsFiles, "cpu.pprof")
+
+	err = fixture.Run(ctx, integrationtest.State{
+		Configure:  simpleConfig2,
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: componentSetup,
+		After:      testDiagnosticsFactory(ctx, t, diagpprof, diagCompPprof, fixture, []string{"diagnostics", "-p"}),
+	})
+
 }
 
-func (s *DiagnosticsIntegrationTestSuite) SetupSuite() {
-	f, err := define.NewFixture(s.T(), define.Version())
-	s.Require().NoError(err)
+func TestDiagnosticsCommand(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Local: true,
+	})
+
+	f, err := define.NewFixture(t, define.Version())
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	err = f.Prepare(ctx, fakeComponent, fakeShipper)
-	s.Require().NoError(err)
-	s.f = f
-}
+	require.NoError(t, err)
 
-func (s *DiagnosticsIntegrationTestSuite) TestDiagnosticsFromHealthyAgent() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	testDiagnostics := func() error {
-		diagnosticCommandWD := s.T().TempDir()
-		diagnosticCmdOutput, err := s.f.Exec(ctx, []string{"diagnostics", "collect"}, process.WithWorkDir(diagnosticCommandWD))
+	err = f.Run(ctx, integrationtest.State{
+		Configure:  simpleConfig2,
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: componentSetup,
+		After:      testDiagnosticsFactory(ctx, t, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+	})
+	assert.NoError(t, err)
+}
 
-		s.T().Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
-		s.Require().NoErrorf(err, "error running diagnostic command: %v", err)
+func testDiagnosticsFactory(ctx context.Context, t *testing.T, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func() error {
+	return func() error {
+		diagnosticCommandWD := t.TempDir()
+		diagnosticCmdOutput, err := fix.Exec(ctx, cmd, process.WithWorkDir(diagnosticCommandWD))
 
-		s.T().Logf("checking directory %q for the generated archive", diagnosticCommandWD)
+		t.Logf("diagnostic command completed with output \n%q\n", diagnosticCmdOutput)
+		require.NoErrorf(t, err, "error running diagnostic command: %v", err)
+
+		t.Logf("checking directory %q for the generated archive", diagnosticCommandWD)
 		files, err := filepath.Glob(filepath.Join(diagnosticCommandWD, diagnosticsArchiveGlobPattern))
-		s.Require().NoError(err)
-		s.Require().Len(files, 1)
-		s.T().Logf("Found %q diagnostic archive.", files[0])
+		require.NoError(t, err)
+		require.Len(t, files, 1)
+		t.Logf("Found %q diagnostic archive.", files[0])
 
 		// get the version of the running agent
-		avi, err := s.getRunningAgentVersion(ctx)
-		s.Require().NoError(err)
+		avi, err := getRunningAgentVersion(ctx, fix)
+		require.NoError(t, err)
 
-		verifyDiagnosticArchive(s.T(), ctx, files[0], avi)
+		verifyDiagnosticArchive(t, files[0], diagFiles, diagCompFiles, avi)
 
 		return nil
 	}
-
-	err := s.f.Run(ctx, integrationtest.State{
-		Configure:  simpleConfig2,
-		AgentState: integrationtest.NewClientState(client.Healthy),
-		Components: map[string]integrationtest.ComponentState{
-			"fake-default": {
-				State: integrationtest.NewClientState(client.Healthy),
-				Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-					integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}: {
-						State: integrationtest.NewClientState(client.Healthy),
-					},
-					integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}: {
-						State: integrationtest.NewClientState(client.Healthy),
-					},
-				},
-			},
-			"fake-shipper-default": {
-				State: integrationtest.NewClientState(client.Healthy),
-				Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-					integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-shipper-default"}: {
-						State: integrationtest.NewClientState(client.Healthy),
-					},
-					integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}: {
-						State: integrationtest.NewClientState(client.Healthy),
-					},
-				},
-			},
-		},
-		After: testDiagnostics,
-	})
-	s.Assert().NoError(err)
 }
 
-func verifyDiagnosticArchive(t *testing.T, ctx context.Context, diagArchive string, avi *client.Version) {
+func verifyDiagnosticArchive(t *testing.T, diagArchive string, diagFiles []string, diagCompFiles []string, avi *client.Version) {
 	// check that the archive is not an empty file
 	stat, err := os.Stat(diagArchive)
 	require.NoErrorf(t, err, "stat file %q failed", diagArchive)
@@ -146,7 +171,7 @@ func verifyDiagnosticArchive(t *testing.T, ctx context.Context, diagArchive stri
 
 	extractZipArchive(t, diagArchive, extractionDir)
 
-	expectedDiagArchiveFilePatterns := compileExpectedDiagnosticFilePatterns(avi, []componentAndUnitNames{
+	expectedDiagArchiveFilePatterns := compileExpectedDiagnosticFilePatterns(avi, diagFiles, diagCompFiles, []componentAndUnitNames{
 		{
 			name:      "fake-default",
 			unitNames: []string{"fake-default", "fake"},
@@ -190,13 +215,6 @@ func verifyDiagnosticArchive(t *testing.T, ctx context.Context, diagArchive stri
 	assert.ElementsMatch(t, extractKeysFromMap(expectedExtractedFiles), extractKeysFromMap(actualExtractedDiagFiles))
 }
 
-func TestDiagnosticsCommandIntegrationTestSuite(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Local: true,
-	})
-	suite.Run(t, new(DiagnosticsIntegrationTestSuite))
-}
-
 func extractZipArchive(t *testing.T, zipFile string, dst string) {
 	zReader, err := zip.OpenReader(zipFile)
 	require.NoErrorf(t, err, "file %q is not a valid zip archive", zipFile)
@@ -210,7 +228,8 @@ func extractZipArchive(t *testing.T, zipFile string, dst string) {
 
 		if zf.FileInfo().IsDir() {
 			t.Logf("creating directory %q", filePath)
-			os.MkdirAll(filePath, os.ModePerm)
+			err := os.MkdirAll(filePath, os.ModePerm)
+			assert.NoError(t, err)
 			continue
 		}
 
@@ -237,16 +256,19 @@ func extractSingleFileFromArchive(t *testing.T, src *zip.File, dst string) {
 	require.NoErrorf(t, err, "error copying content from zipped file %q to extracted file %q", src.Name, dst)
 }
 
-func (s *DiagnosticsIntegrationTestSuite) getRunningAgentVersion(ctx context.Context) (*client.Version, error) {
-	avi, err := s.f.Client().Version(ctx)
-	s.Require().NoErrorf(err, "error executing version command")
+func getRunningAgentVersion(ctx context.Context, f *integrationtest.Fixture) (*client.Version, error) {
+	avi, err := f.Client().Version(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &avi, err
 }
 
-func compileExpectedDiagnosticFilePatterns(avi *client.Version, comps []componentAndUnitNames) []filePattern {
-	files := make([]filePattern, 0, len(diagnosticsFiles)+len(comps)*len(unitsDiagnosticsFiles))
+func compileExpectedDiagnosticFilePatterns(avi *client.Version, diagfiles []string, diagCompFiles []string, comps []componentAndUnitNames) []filePattern {
+	files := make([]filePattern, 0, len(diagnosticsFiles)+len(comps)*len(compDiagnosticsFiles))
 
-	for _, file := range diagnosticsFiles {
+	for _, file := range diagfiles {
 		files = append(files, filePattern{
 			pattern:  file,
 			optional: false,
@@ -254,15 +276,13 @@ func compileExpectedDiagnosticFilePatterns(avi *client.Version, comps []componen
 	}
 
 	for _, comp := range comps {
-		for _, unitName := range comp.unitNames {
-			unitPath := path.Join("components", comp.name, unitName)
-			for _, fileName := range unitsDiagnosticsFiles {
-				files = append(files,
-					filePattern{
-						pattern:  path.Join(unitPath, fileName),
-						optional: false,
-					})
-			}
+		compPath := path.Join("components", comp.name)
+		for _, fileName := range diagCompFiles {
+			files = append(files,
+				filePattern{
+					pattern:  path.Join(compPath, fileName),
+					optional: false,
+				})
 		}
 	}
 
