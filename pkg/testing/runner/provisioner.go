@@ -47,9 +47,6 @@ type InstanceProvisioner interface {
 	Clean(ctx context.Context, instances []Instance) error
 }
 
-// InstanceProvisionerCreator creates a new provisioner.
-type InstanceProvisionerCreator func(l Logger, cfg Config) InstanceProvisioner
-
 // Stack is a created stack.
 type Stack struct {
 	// ID is the identifier of the instance.
@@ -100,6 +97,3 @@ type StackProvisioner interface {
 	// Clean cleans up all provisioned resources.
 	Clean(ctx context.Context, stacks []Stack) error
 }
-
-// StackProvisionerCreator creates a new provisioner.
-type StackProvisionerCreator func(l Logger, cfg Config) StackProvisioner
