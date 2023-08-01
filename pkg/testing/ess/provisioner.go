@@ -65,14 +65,21 @@ func (p *provisioner) SetLogger(l runner.Logger) {
 func (p *provisioner) Provision(ctx context.Context, requests []runner.StackRequest) ([]runner.Stack, error) {
 	results := make(map[runner.StackRequest]*CreateDeploymentResponse)
 	for _, r := range requests {
-		resp, err := p.createDeployment(ctx, r)
+		// allow up to 2 minutes for each create request
+		createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
+		resp, err := p.createDeployment(createCtx, r)
+		createCancel()
 		if err != nil {
 			return nil, err
 		}
 		results[r] = resp
 	}
 
-	g, gCtx := errgroup.WithContext(ctx)
+	// wait 15 minutes for all stacks to be ready
+	readyCtx, readyCancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer readyCancel()
+
+	g, gCtx := errgroup.WithContext(readyCtx)
 	for req, resp := range results {
 		g.Go(func(req runner.StackRequest, resp *CreateDeploymentResponse) func() error {
 			return func() error {

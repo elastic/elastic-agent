@@ -591,9 +591,6 @@ func (r *Runner) startStacks(ctx context.Context) error {
 	go func(ctx context.Context) {
 		defer r.stacksReady.Done()
 
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-		defer cancel()
-
 		stacks, err := r.sp.Provision(ctx, requests)
 		if err != nil {
 			r.stacksErr = err
