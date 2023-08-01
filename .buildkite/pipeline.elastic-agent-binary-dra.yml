@@ -22,7 +22,7 @@ steps:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        WORKFLOW: "snapshot"
+        DRA_WORKFLOW: "snapshot"
 
     - wait
 
@@ -43,7 +43,7 @@ steps:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        WORKFLOW: "snapshot"
+        DRA_WORKFLOW: "snapshot"
 
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
@@ -59,7 +59,7 @@ steps:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        WORKFLOW: "staging"
+        DRA_WORKFLOW: "staging"
 
     - wait
 
@@ -80,7 +80,7 @@ steps:
         provider: "gcp"
         machineType: "c2-standard-16"
       env:
-        WORKFLOW: "staging"
+        DRA_WORKFLOW: "staging"
 
 notify:
   - slack: "#ingest-notifications"

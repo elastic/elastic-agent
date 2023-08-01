@@ -9,7 +9,7 @@ export BEAT_VERSION
 echo "+++ Build Agent artifacts"
 SNAPSHOT=""
 BEAT_VERSION_FULL=$BEAT_VERSION
-if [ "$WORKFLOW" == "snapshot" ]; then
+if [ "$DRA_WORKFLOW" == "snapshot" ]; then
     SNAPSHOT="true"
     BEAT_VERSION_FULL="${BEAT_VERSION}-SNAPSHOT"
 fi
