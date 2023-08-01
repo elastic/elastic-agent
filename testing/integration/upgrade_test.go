@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -155,6 +154,13 @@ func TestStandaloneUpgrade(t *testing.T) {
 		Sudo:    true, // requires Agent installation
 	})
 
+	const minVersionString = "8.9.0-SNAPSHOT"
+	minVersion, _ := version.ParseVersion(minVersionString)
+	pv, err := version.ParseVersion(define.Version())
+	if pv.Less(*minVersion) {
+		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersionString)
+	}
+
 	agentFixture, err := define.NewFixture(t, define.Version())
 
 	require.NoError(t, err)
@@ -167,13 +173,6 @@ func TestStandaloneUpgrade(t *testing.T) {
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
 
-	const minVersionString = "8.9.0-SNAPSHOT"
-	minVersion, _ := version.ParseVersion(minVersionString)
-	pv, err := version.ParseVersion(define.Version())
-	if pv.Less(*minVersion) {
-		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersionString)
-	}
-
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
@@ -182,51 +181,11 @@ func TestStandaloneUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	c := agentFixture.Client()
-
-	require.Eventually(t, func() bool {
-		err := c.Connect(ctx)
-		if err != nil {
-			t.Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+	tools.WaitForAgent(ctx, t, c)
 
 	aac := tools.NewArtifactAPIClient()
-	vList, err := aac.GetVersions(ctx)
-	require.NoError(t, err, "error retrieving versions from Artifact API")
-	require.NotNil(t, vList)
-
-	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
-	for _, v := range vList.Versions {
-		pv, err := version.ParseVersion(v)
-		require.NoErrorf(t, err, "invalid version retrieved from artifact API: %q", v)
-		sortedParsedVersions = append(sortedParsedVersions, pv)
-	}
-
-	require.NotEmpty(t, sortedParsedVersions)
-
-	// normally the output of the versions returned by artifact API is already sorted in ascending order,
-	// if we want to sort in descending order we could use
-	sort.Sort(sort.Reverse(sortedParsedVersions))
-
-	var latestSnapshotVersion *version.ParsedSemVer
-	// fetch the latest SNAPSHOT build
-	for _, pv := range sortedParsedVersions {
-		if pv.IsSnapshot() {
-			latestSnapshotVersion = pv
-			break
-		}
-	}
-
-	require.NotNil(t, latestSnapshotVersion)
+	latestSnapshotVersion, err := tools.GetLatestSnapshotVersion(ctx, t, aac)
+	require.NoError(t, err)
 
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
@@ -299,11 +258,20 @@ func TestStandaloneUpgrade_FailInitialCheck(t *testing.T) {
 		// Stack:   &define.Stack{},
 		Local:   false, // requires Agent installation
 		Isolate: true,
-		Sudo:    true, // requires Agent installation
+		Sudo:    false, // requires Agent installation
 	})
 
-	agentFixture, err := define.NewFixture(t, define.Version())
+	const minVersionString = "8.10.0-SNAPSHOT"
+	minVersion, err := version.ParseVersion(minVersionString)
+	require.NoError(t, err)
+	pv, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
 
+	if pv.Less(*minVersion) {
+		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersionString)
+	}
+
+	agentFixture, err := define.NewFixture(t, define.Version())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -314,13 +282,6 @@ func TestStandaloneUpgrade_FailInitialCheck(t *testing.T) {
 	err = agentFixture.Configure(ctx, []byte(fastWatcherCfg))
 	require.NoError(t, err, "error configuring agent fixture")
 
-	const minVersionString = "8.10.0-SNAPSHOT"
-	minVersion, _ := version.ParseVersion(minVersionString)
-	pv, err := version.ParseVersion(define.Version())
-	if pv.Less(*minVersion) {
-		t.Skipf("Version %s is lower than min version %s", define.Version(), minVersionString)
-	}
-
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
@@ -329,51 +290,11 @@ func TestStandaloneUpgrade_FailInitialCheck(t *testing.T) {
 	require.NoError(t, err)
 
 	c := agentFixture.Client()
-
-	require.Eventually(t, func() bool {
-		err := c.Connect(ctx)
-		if err != nil {
-			t.Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+	tools.WaitForAgent(ctx, t, c)
 
 	aac := tools.NewArtifactAPIClient()
-	vList, err := aac.GetVersions(ctx)
-	require.NoError(t, err, "error retrieving versions from Artifact API")
-	require.NotNil(t, vList)
-
-	sortedParsedVersions := make(version.SortableParsedVersions, 0, len(vList.Versions))
-	for _, v := range vList.Versions {
-		pv, err := version.ParseVersion(v)
-		require.NoErrorf(t, err, "invalid version retrieved from artifact API: %q", v)
-		sortedParsedVersions = append(sortedParsedVersions, pv)
-	}
-
-	require.NotEmpty(t, sortedParsedVersions)
-
-	// normally the output of the versions returned by artifact API is already sorted in ascending order,
-	// if we want to sort in descending order we could use
-	sort.Sort(sort.Reverse(sortedParsedVersions))
-
-	var latestSnapshotVersion *version.ParsedSemVer
-	// fetch the latest SNAPSHOT build
-	for _, pv := range sortedParsedVersions {
-		if pv.IsSnapshot() {
-			latestSnapshotVersion = pv
-			break
-		}
-	}
-
-	require.NotNil(t, latestSnapshotVersion)
+	latestSnapshotVersion, err := tools.GetLatestSnapshotVersion(ctx, t, aac)
+	require.NoError(t, err)
 
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
@@ -707,22 +628,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	c := f.Client()
-
-	require.Eventually(t, func() bool {
-		err := c.Connect(ctx)
-		if err != nil {
-			t.Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("agent state: %+v", state)
-		return state.State == cproto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
+	tools.WaitForAgent(ctx, t, c)
 
 	// get rid of the package version files in the installed directory
 	removePackageVersionFiles(t, f)
