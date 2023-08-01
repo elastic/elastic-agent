@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -455,7 +456,15 @@ func (f *Fixture) ensurePrepared(ctx context.Context) error {
 }
 
 func (f *Fixture) binaryPath() string {
-	binary := filepath.Join(f.workDir, "elastic-agent")
+	workDir := f.workDir
+	if f.installed {
+		if f.installOpts != nil && f.installOpts.BasePath != "" {
+			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", "Agent")
+		} else {
+			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+		}
+	}
+	binary := filepath.Join(workDir, "elastic-agent")
 	if f.operatingSystem == "windows" {
 		binary += ".exe"
 	}

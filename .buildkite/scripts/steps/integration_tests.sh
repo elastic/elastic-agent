@@ -10,7 +10,7 @@ DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64,linux/arm64 PACKAGES=
 set +e
 SNAPSHOT=true mage integration:test
 TESTS_EXIT_STATUS=$?
-mage integration:clean
+mage integration:single TestSimple
 set -e
 
 # HTML report
