@@ -91,7 +91,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -186,7 +186,7 @@ func TestManager_FakeInput_StartStop(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -313,7 +313,7 @@ func TestManager_FakeInput_Features(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -502,7 +502,7 @@ func TestManager_FakeInput_BadUnitToGood(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -668,7 +668,7 @@ func TestManager_FakeInput_GoodUnitToBad(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -824,7 +824,7 @@ func TestManager_FakeInput_NoDeadlock(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -958,7 +958,7 @@ func TestManager_FakeInput_Configure(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1078,7 +1078,7 @@ func TestManager_FakeInput_RemoveUnit(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1231,7 +1231,7 @@ func TestManager_FakeInput_ActionState(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1355,7 +1355,7 @@ func TestManager_FakeInput_Restarts(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1490,7 +1490,7 @@ func TestManager_FakeInput_Restarts_ConfigKill(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1632,7 +1632,7 @@ func TestManager_FakeInput_KeepsRestarting(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1774,7 +1774,7 @@ func TestManager_FakeInput_RestartsOnMissedCheckins(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -1889,7 +1889,7 @@ func TestManager_FakeInput_InvalidAction(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2014,7 +2014,7 @@ func TestManager_FakeInput_MultiComponent(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2227,7 +2227,7 @@ func TestManager_FakeInput_LogLevel(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2371,7 +2371,7 @@ func TestManager_FakeShipper(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2672,7 +2672,7 @@ func TestManager_FakeInput_OutputChange(t *testing.T) {
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
-	if err := m.waitForReady(waitCtx); err != nil {
+	if err := waitForReady(waitCtx, m); err != nil {
 		require.NoError(t, err)
 	}
 
@@ -2998,3 +2998,15 @@ func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManag
 func (*testMonitoringManager) EnrichArgs(_ string, _ string, args []string) []string { return args }
 func (*testMonitoringManager) Prepare(_ string) error                                { return nil }
 func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
+
+// waitForReady waits until the RPC server is ready to be used.
+func waitForReady(ctx context.Context, m *Manager) error {
+	for !m.serverReady.Load() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	return nil
+}

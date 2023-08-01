@@ -24,24 +24,23 @@ var (
 	ErrOSNotSupported = errors.New("os/arch not current supported")
 )
 
-// LayoutOS defines the minimal information for a mapping of an OS to the
-// provider, instance size, and runs on for that OS.
-type LayoutOS struct {
-	OS           define.OS
-	Provider     string
-	InstanceSize string
-	RunsOn       string
-	Username     string
-	RemotePath   string
-	Runner       OSRunner
+// SupportedOS maps a OS definition to a OSRunner.
+type SupportedOS struct {
+	define.OS
+
+	// Runner is the runner to use for the OS.
+	Runner OSRunner
 }
 
-// Supported defines the set of supported OS's the runner currently supports.
+// supported defines the set of supported OS's.
+//
+// A provisioner might support a lesser number of this OS's, but the following
+// are known to be supported by out OS runner logic.
 //
 // In the case that a batch is not specific on the version and/or distro the first
 // one in this list will be picked. So it's best to place the one that we want the
 // most testing at the top.
-var supported = []LayoutOS{
+var supported = []SupportedOS{
 	{
 		OS: define.OS{
 			Type:    define.Linux,
@@ -49,12 +48,7 @@ var supported = []LayoutOS{
 			Distro:  Ubuntu,
 			Version: "22.04",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-2", // 2 amd64 cpus
-		RunsOn:       "ubuntu-2204-lts",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
+		Runner: DebianRunner{},
 	},
 	{
 		OS: define.OS{
@@ -63,12 +57,7 @@ var supported = []LayoutOS{
 			Distro:  Ubuntu,
 			Version: "20.04",
 		},
-		Provider:     Google,
-		InstanceSize: "e2-standard-2", // 2 amd64 cpus
-		RunsOn:       "ubuntu-2004-lts",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
+		Runner: DebianRunner{},
 	},
 	{
 		OS: define.OS{
@@ -77,12 +66,7 @@ var supported = []LayoutOS{
 			Distro:  Ubuntu,
 			Version: "22.04",
 		},
-		Provider:     Google,
-		InstanceSize: "t2a-standard-2", // 2 arm64 cpus
-		RunsOn:       "ubuntu-2204-lts-arm64",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
+		Runner: DebianRunner{},
 	},
 	{
 		OS: define.OS{
@@ -91,27 +75,8 @@ var supported = []LayoutOS{
 			Distro:  Ubuntu,
 			Version: "20.04",
 		},
-		Provider:     Google,
-		InstanceSize: "t2a-standard-2", // 2 arm64 cpus
-		RunsOn:       "ubuntu-2004-lts-arm64",
-		Username:     "ubuntu",
-		RemotePath:   "/home/ubuntu/agent",
-		Runner:       DebianRunner{},
+		Runner: DebianRunner{},
 	},
-}
-
-// getSupported returns all the supported layout based on the provided OS profile.
-func getSupported(os define.OS) ([]LayoutOS, error) {
-	var match []LayoutOS
-	for _, s := range supported {
-		if osMatch(s.OS, os) {
-			match = append(match, s)
-		}
-	}
-	if len(match) > 0 {
-		return match, nil
-	}
-	return nil, fmt.Errorf("%w: %s/%s", ErrOSNotSupported, os.Type, os.Arch)
 }
 
 // osMatch returns true when the specific OS is a match for a non-specific OS.
@@ -126,4 +91,18 @@ func osMatch(specific define.OS, notSpecific define.OS) bool {
 		return false
 	}
 	return true
+}
+
+// getSupported returns all the supported based on the provided OS profile.
+func getSupported(os define.OS) ([]SupportedOS, error) {
+	var match []SupportedOS
+	for _, s := range supported {
+		if osMatch(s.OS, os) {
+			match = append(match, s)
+		}
+	}
+	if len(match) > 0 {
+		return match, nil
+	}
+	return nil, fmt.Errorf("%w: %s/%s", ErrOSNotSupported, os.Type, os.Arch)
 }
