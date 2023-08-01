@@ -918,9 +918,10 @@ func packageAgent(platforms []string, packagingFn func()) {
 		defer os.Unsetenv(agentDropPath)
 
 		if devtools.ExternalBuild == true {
+			// for external go for all dependencies
 			externalBinaries := []string{
 				"auditbeat", "filebeat", "heartbeat", "metricbeat", "osquerybeat", "packetbeat",
-				// "cloudbeat", // TODO: add once working
+				"cloudbeat", // only supporting linux/amd64 or linux/arm64
 				"cloud-defend",
 				"elastic-agent-shipper",
 				"apm-server",
