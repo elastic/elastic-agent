@@ -42,6 +42,18 @@ const (
 	stateUnknownMessage = "Unknown"
 )
 
+func (m actionMode) String() string {
+	switch m {
+	case actionTeardown:
+		return "teardown"
+	case actionStop:
+		return "stop"
+	case actionStart:
+		return "start"
+	}
+	return ""
+}
+
 type MonitoringManager interface {
 	EnrichArgs(string, string, []string) []string
 	Prepare(string) error
@@ -269,7 +281,7 @@ func (c *commandRuntime) Stop() error {
 // Teardown tears down the component.
 //
 // Non-blocking and never returns an error.
-func (c *commandRuntime) Teardown() error {
+func (c *commandRuntime) Teardown(_ *component.Signed) error {
 	// clear channel so it's the latest action
 	select {
 	case <-c.actionCh:

@@ -53,7 +53,7 @@ func BuildTime() time.Time {
 
 // Version returns the version of the application.
 func Version() string {
-	return version.GetDefaultVersion()
+	return version.GetAgentPackageVersion()
 }
 
 // Snapshot returns true if binary was built as snapshot.

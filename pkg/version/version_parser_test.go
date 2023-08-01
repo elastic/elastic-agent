@@ -130,6 +130,21 @@ func TestParseVersion(t *testing.T) {
 			},
 		},
 		{
+			name:  "Semver string version, with double prerelease(er and snapshot)",
+			input: "1.2.5-er.1-SNAPSHOT",
+			expected: expected{
+				parsed: &ParsedSemVer{
+					original:      "1.2.5-er.1-SNAPSHOT",
+					major:         1,
+					minor:         2,
+					patch:         5,
+					prerelease:    "er.1-SNAPSHOT",
+					buildMetadata: "",
+				},
+				versionPrerelease: "1.2.5-er.1-SNAPSHOT",
+			},
+		},
+		{
 			name:  "Error truncated semver",
 			input: "2.3",
 			expected: expected{
@@ -179,14 +194,6 @@ func TestParseVersion(t *testing.T) {
 		},
 		{
 			name:  "Almost semver string version, with patch containing non-digits",
-			input: "1.2.5ab0",
-			expected: expected{
-				parsed: nil,
-				err:    ErrNoMatch,
-			},
-		},
-		{
-			name:  "Almost semver string version, with double prerelease separator",
 			input: "1.2.5ab0",
 			expected: expected{
 				parsed: nil,
@@ -264,6 +271,11 @@ func TestIsSnapshot(t *testing.T) {
 			name:     "Emergency release is not snapshot",
 			input:    "8.8.0-er.1",
 			snapshot: false,
+		},
+		{
+			name:     "Emergency release snapshot is actually a snapshot",
+			input:    "8.8.0-er.1-SNAPSHOT ",
+			snapshot: true,
 		},
 	}
 

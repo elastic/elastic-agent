@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-nginx_ingress_controller
+      id: filestream-nginx_ingress_controller-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

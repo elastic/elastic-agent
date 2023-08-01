@@ -1,5 +1,6 @@
 inputs:
     - name: udp-udp
+      id: udp-udp-${kubernetes.hints.container_id}
       type: udp
       use_output: default
       streams:
@@ -9,8 +10,10 @@ inputs:
             type: logs
           host: localhost:8080
           max_message_size: 10KiB
+          timeout: ${kubernetes.hints.udp.generic.timeout|kubernetes.hints.udp.timeout|''}
       data_stream.namespace: default
     - name: filestream-udp
+      id: filestream-udp-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

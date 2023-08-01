@@ -114,7 +114,7 @@ pipeline {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
                   dir("${BASE_DIR}"){
-                    withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                    withEnv(["RACE_DETECTOR=true", "TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
                       cmd(label: 'Go unitTest', script: 'mage unitTest')
                     }
                   }
@@ -330,7 +330,7 @@ pipeline {
               withGithubNotify(context: "Test-${PLATFORM}") {
                 withMageEnv(){
                   dir("${BASE_DIR}"){
-                    withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                    withEnv(["RACE_DETECTOR=true", "TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
                       cmd(label: 'Go unitTest', script: 'mage unitTest')
                     }
                   }
@@ -380,7 +380,7 @@ pipeline {
             withGithubNotify(context: "Test-darwin-aarch64") {
               withMageEnv(){
                 dir("${BASE_DIR}"){
-                  withEnv(["TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
+                  withEnv(["RACE_DETECTOR=true", "TEST_COVERAGE=${isCodeCoverageEnabled()}"]) {
                     cmd(label: 'Go unitTest', script: 'mage unitTest')
                   }
                 }

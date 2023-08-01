@@ -92,7 +92,7 @@ type RuntimeManager interface {
 	Runner
 
 	// Update updates the current components model.
-	Update([]component.Component) error
+	Update(model component.Model) error
 
 	// State returns the current components model state.
 	State() []runtime.ComponentComponentState
@@ -106,6 +106,10 @@ type RuntimeManager interface {
 	// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 	// it performs diagnostics for all current units.
 	PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+
+	//PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
+	// then it performs the diagnostics for all current units.
+	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -172,7 +176,7 @@ type Coordinator struct {
 	configMgr  ConfigManager
 	varsMgr    VarsManager
 
-	caps      capabilities.Capability
+	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
 
 	// The current state of the Coordinator. This value and its subfields are
@@ -214,10 +218,25 @@ type Coordinator struct {
 	// into the reported state before broadcasting -- State() will report
 	// agentclient.Failed if one of these is set, even if the underlying
 	// coordinator state is agentclient.Healthy.
-	runtimeMgrErr error
+	runtimeMgrErr error // Currently unused
 	configMgrErr  error
 	actionsErr    error
 	varsMgrErr    error
+
+	// Errors resulting from different possible failure modes when setting a
+	// new policy. Right now there are three different stages where a policy
+	// update can fail:
+	// - in generateAST, converting the policy to an AST
+	// - in process, converting the AST and vars into a full component model
+	// - while sending the final component model to the runtime manager
+	//
+	// The plan is to improve our preprocessing so we can always detect
+	// failures immediately https://github.com/elastic/elastic-agent/issues/2887.
+	// For now, we track three distinct errors for those three failure types,
+	// and merge them into a readable error in generateReportableState.
+	configErr        error
+	componentGenErr  error
+	runtimeUpdateErr error
 
 	// The raw policy before spec lookup or variable substitution
 	ast *transpiler.AST
@@ -259,7 +278,7 @@ type managerChans struct {
 var ErrFatalCoordinator = errors.New("fatal error in coordinator")
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capability, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo *info.AgentInfo, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -402,10 +421,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// early check capabilities to ensure this upgrade actions is allowed
 	if c.caps != nil {
-		if _, err := c.caps.Apply(map[string]interface{}{
-			"version":   version,
-			"sourceURI": sourceURI,
-		}); errors.Is(err, capabilities.ErrBlocked) {
+		if !c.caps.AllowUpgrade(version, sourceURI) {
 			return ErrNotUpgradable
 		}
 	}
@@ -456,6 +472,11 @@ func (c *Coordinator) PerformAction(ctx context.Context, comp component.Componen
 // Called from external goroutines.
 func (c *Coordinator) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	return c.runtimeMgr.PerformDiagnostics(ctx, req...)
+}
+
+// PerformComponentDiagnostics executes the diagnostic action for the provided components.
+func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	return c.runtimeMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
 }
 
 // SetLogLevel changes the entire log level for the running Elastic Agent.
@@ -570,7 +591,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	go c.watchRuntimeComponents(watchCtx)
 
 	for {
-		c.setState(agentclient.Starting, "Waiting for initial configuration and composable variables")
+		c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
 		// The usual state refresh happens in the main run loop in Coordinator.runner,
 		// so before/after the runner call we need to trigger state change broadcasts
 		// manually.
@@ -578,20 +599,20 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		err := c.runner(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				c.setState(agentclient.Stopped, "Requested to be stopped")
+				c.setCoordinatorState(agentclient.Stopped, "Requested to be stopped")
 				c.setFleetState(agentclient.Stopped, "Requested to be stopped")
 				c.refreshState()
 				// do not restart
 				return err
 			}
 			if errors.Is(err, ErrFatalCoordinator) {
-				c.setState(agentclient.Failed, "Fatal coordinator error")
+				c.setCoordinatorState(agentclient.Failed, "Fatal coordinator error")
 				c.setFleetState(agentclient.Stopped, "Fatal coordinator error")
 				c.refreshState()
 				return err
 			}
 		}
-		c.setState(agentclient.Failed, fmt.Sprintf("Coordinator failed and will be restarted: %s", err))
+		c.setCoordinatorState(agentclient.Failed, fmt.Sprintf("Coordinator failed and will be restarted: %s", err))
 		c.refreshState()
 		c.logger.Errorf("coordinator failed and will be restarted: %s", err)
 	}
@@ -860,31 +881,36 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case change := <-c.managerChans.configManagerUpdate:
 		if err := c.processConfig(ctx, change.Config()); err != nil {
-			c.setState(agentclient.Failed, err.Error())
-			c.logger.Errorf("%s", err)
+			c.logger.Errorf("applying new policy: %s", err.Error())
 			change.Fail(err)
 		} else {
 			if err := change.Ack(); err != nil {
 				err = fmt.Errorf("failed to ack configuration change: %w", err)
-				c.setState(agentclient.Failed, err.Error())
-				c.logger.Errorf("%s", err)
+				// Workaround: setConfigManagerError is usually used by the config
+				// manager to report failed ACKs / etc when communicating with Fleet.
+				// We need to report a failed ACK here, but the policy change has
+				// already been successfully applied so we don't want to report it as
+				// a general Coordinator or policy failure.
+				// This arises uniquely here because this is the only case where an
+				// action is responsible for reporting the failure of its own ACK
+				// call. The "correct" fix is to make this Ack() call unfailable
+				// and handle ACK retries and reporting in the config manager like
+				// with other action types -- this error would then end up invoking
+				// setConfigManagerError "organically" via the config manager's
+				// reporting channel. In the meantime, we do it manually.
+				c.setConfigManagerError(err)
+				c.logger.Errorf("%s", err.Error())
 			}
 		}
 
 	case vars := <-c.managerChans.varsManagerUpdate:
 		if ctx.Err() == nil {
-			if err := c.processVars(ctx, vars); err != nil {
-				c.setState(agentclient.Failed, err.Error())
-				c.logger.Errorf("%s", err)
-			}
+			c.processVars(ctx, vars)
 		}
 
 	case ll := <-c.logLevelCh:
 		if ctx.Err() == nil {
-			if err := c.processLogLevel(ctx, ll); err != nil {
-				c.setState(agentclient.Failed, err.Error())
-				c.logger.Errorf("%s", err)
-			}
+			c.processLogLevel(ctx, ll)
 		}
 	}
 
@@ -903,7 +929,34 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		span.End()
 	}()
 
-	if err := info.InjectAgentConfig(cfg); err != nil {
+	err = c.generateAST(cfg)
+	c.setConfigError(err)
+	if err != nil {
+		return err
+	}
+
+	// Disabled for 8.8.0 release in order to limit the surface
+	// https://github.com/elastic/security-team/issues/6501
+
+	// c.setProtection(protectionConfig)
+
+	if c.vars != nil {
+		return c.refreshComponentModel(ctx)
+	}
+	return nil
+}
+
+// Generate the AST for a new incoming configuration and, if successful,
+// assign it to the Coordinator's ast field.
+func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
+	defer func() {
+		// Update configErr, which stores the results of the most recent policy
+		// update and is merged into the Coordinator state in
+		// generateReportableState.
+		c.setConfigError(err)
+	}()
+
+	if err = info.InjectAgentConfig(cfg); err != nil {
 		return err
 	}
 
@@ -923,19 +976,6 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	rawAst, err := transpiler.NewAST(m)
 	if err != nil {
 		return fmt.Errorf("could not create the AST from the configuration: %w", err)
-	}
-
-	if c.caps != nil {
-		var ok bool
-		updatedAst, err := c.caps.Apply(rawAst)
-		if err != nil {
-			return fmt.Errorf("failed to apply capabilities: %w", err)
-		}
-
-		rawAst, ok = updatedAst.(*transpiler.AST)
-		if !ok {
-			return fmt.Errorf("failed to transform object returned from capabilities to AST: %w", err)
-		}
 	}
 
 	if err := features.Apply(cfg); err != nil {
@@ -959,80 +999,86 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 
 	c.ast = rawAst
-
-	// Disabled for 8.8.0 release in order to limit the surface
-	// https://github.com/elastic/security-team/issues/6501
-
-	// c.setProtection(protectionConfig)
-
-	if c.vars != nil {
-		return c.process(ctx)
-	}
 	return nil
 }
 
 // processVars updates the transpiler vars in the Coordinator.
 // Called on the main Coordinator goroutine.
-func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) (err error) {
-	span, ctx := apm.StartSpan(ctx, "vars", "app.internal")
-	defer func() {
-		apm.CaptureError(ctx, err).Send()
-		span.End()
-	}()
-
+func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) {
 	c.vars = vars
-
-	if c.ast != nil {
-		return c.process(ctx)
+	err := c.refreshComponentModel(ctx)
+	if err != nil {
+		c.logger.Errorf("updating Coordinator variables: %s", err.Error())
 	}
-	return nil
 }
 
 // Called on the main Coordinator goroutine.
-func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) (err error) {
-	span, ctx := apm.StartSpan(ctx, "log_level", "app.internal")
-	defer func() {
-		apm.CaptureError(ctx, err).Send()
-		span.End()
-	}()
-
+func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) {
 	c.setLogLevel(ll)
-
-	if c.ast != nil && c.vars != nil {
-		return c.process(ctx)
+	err := c.refreshComponentModel(ctx)
+	if err != nil {
+		c.logger.Errorf("updating log level: %s", err.Error())
 	}
-	return nil
 }
 
+// Regenerate the component model based on the current vars and AST, then
+// forward the result to the runtime manager.
 // Always called on the main Coordinator goroutine.
-func (c *Coordinator) process(ctx context.Context) (err error) {
-	span, ctx := apm.StartSpan(ctx, "process", "app.internal")
+func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
+	if c.ast == nil || c.vars == nil {
+		// Nothing to process yet
+		return nil
+	}
+
+	span, ctx := apm.StartSpan(ctx, "refreshComponentModel", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
 
 	// regenerate the component model
-	err = c.recomputeConfigAndComponents()
+	err = c.generateComponentModel()
 	if err != nil {
-		return err
+		return fmt.Errorf("generating component model: %w", err)
+	}
+
+	signed, err := component.SignedFromPolicy(c.derivedConfig)
+	if err != nil {
+		if !errors.Is(err, component.ErrNotFound) {
+			c.logger.Errorf("Failed to parse \"signed\" properties: %v", err)
+			return err
+		}
+
+		// Some "signed" properties are not found, continue.
+		c.logger.Debugf("Continue with missing \"signed\" properties: %v", err)
+	}
+
+	model := component.Model{
+		Components: c.componentModel,
+		Signed:     signed,
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", c.componentModel).Debug("Updating running component model")
-	err = c.runtimeMgr.Update(c.componentModel)
+	c.logger.With("components", model.Components).Debug("Updating running component model")
+	err = c.runtimeMgr.Update(model)
+	c.setRuntimeUpdateError(err)
 	if err != nil {
-		return err
+		return fmt.Errorf("updating runtime: %w", err)
 	}
-	c.setState(agentclient.Healthy, "Running")
+	c.setCoordinatorState(agentclient.Healthy, "Running")
 	return nil
 }
 
-// recomputeConfigAndComponents regenerates the configuration tree and
+// generateComponentModel regenerates the configuration tree and
 // components from the current AST and vars and returns the result.
 // Called from both the main Coordinator goroutine and from external
 // goroutines via diagnostics hooks.
-func (c *Coordinator) recomputeConfigAndComponents() error {
+func (c *Coordinator) generateComponentModel() (err error) {
+	defer func() {
+		// Update componentGenErr with the results.
+		c.setComponentGenError(err)
+	}()
+
 	ast := c.ast.Clone()
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
@@ -1065,6 +1111,9 @@ func (c *Coordinator) recomputeConfigAndComponents() error {
 		return fmt.Errorf("failed to render components: %w", err)
 	}
 
+	// Filter any disallowed inputs/outputs from the components
+	comps = c.filterByCapabilities(comps)
+
 	for _, modifier := range c.modifiers {
 		comps, err = modifier(comps, cfg)
 		if err != nil {
@@ -1077,6 +1126,29 @@ func (c *Coordinator) recomputeConfigAndComponents() error {
 	c.derivedConfig = cfg
 	c.componentModel = comps
 	return nil
+}
+
+// Filter any inputs and outputs in the generated component model
+// based on whether they're excluded by the capabilities config
+func (c *Coordinator) filterByCapabilities(comps []component.Component) []component.Component {
+	if c.caps == nil {
+		// No active filters, return unchanged
+		return comps
+	}
+	result := []component.Component{}
+	for _, component := range comps {
+		// If this is an input component (not a shipper), make sure its type is allowed
+		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
+			c.logger.Info("Component %q with input type %q filtered by capabilities.yml", component.InputType)
+			continue
+		}
+		if !c.caps.AllowOutput(component.OutputType) {
+			c.logger.Info("Component %q with output type %q filtered by capabilities.yml", component.ID, component.OutputType)
+			continue
+		}
+		result = append(result, component)
+	}
+	return result
 }
 
 // handleCoordinatorDone is called when the Coordinator's context is

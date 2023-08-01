@@ -20,7 +20,7 @@ func createListener(path string) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	return npipe.NewListener(path, sd)
+	return npipe.NewListener(npipe.TransformString(path), sd)
 }
 
 func securityDescriptor() (string, error) {

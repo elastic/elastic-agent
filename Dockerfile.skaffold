@@ -1,0 +1,27 @@
+ARG GO_VERSION=1.20.6
+ARG crossbuild_image="docker.elastic.co/beats-dev/golang-crossbuild"
+ARG AGENT_VERSION=8.9.0-SNAPSHOT
+ARG AGENT_IMAGE="docker.elastic.co/beats/elastic-agent"
+
+
+FROM ${crossbuild_image}:${GO_VERSION}-main-debian8 as build
+ARG DEV="true"
+ARG SNAPSHOT="true"
+RUN go install github.com/magefile/mage@v1.15.0
+WORKDIR /elastic-agent/
+COPY go.mod go.sum /elastic-agent/
+RUN go mod download
+COPY . /elastic-agent/
+RUN mage golangcrossBuild
+RUN git rev-parse HEAD | cut -c 1-6 > .build_hash.txt
+
+
+FROM ${AGENT_IMAGE}:${AGENT_VERSION}
+
+
+COPY --from=build /elastic-agent/build/golang-crossbuild/elastic-agent-linux-amd64 /usr/share/elastic-agent/elastic-agent
+COPY --from=build /elastic-agent/.build_hash.txt /usr/share/elastic-agent/.build_hash.txt.new
+RUN mv /usr/share/elastic-agent/data/elastic-agent-$(cat /usr/share/elastic-agent/.build_hash.txt| cut -c 1-6) /usr/share/elastic-agent/data/elastic-agent-$(cat /usr/share/elastic-agent/.build_hash.txt.new| cut -c 1-6) && \
+ln -s -f /usr/share/elastic-agent/data/elastic-agent-$(cat /usr/share/elastic-agent/.build_hash.txt.new| cut -c 1-6)/elastic-agent /usr/share/elastic-agent/elastic-agent &&\
+mv /usr/share/elastic-agent/.build_hash.txt /usr/share/elastic-agent/.build_hash.txt.old && \
+mv /usr/share/elastic-agent/.build_hash.txt.new /usr/share/elastic-agent/.build_hash.txt
