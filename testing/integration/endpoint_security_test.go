@@ -243,7 +243,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 	var pkgPolicyBuf bytes.Buffer
 	err = tmpl.Execute(&pkgPolicyBuf, endpointPackageTemplateVars{
 		ID:       packagePolicyID,
-		Name:     "Defend-" + info.Namespace,
+		Name:     "Defend-" + packagePolicyID,
 		PolicyID: policyID,
 		Version:  endpointPackageVersion,
 	})

@@ -49,15 +49,12 @@ pass `[testName]` to `go test` as `--run=[testName]`.
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
-### Manually running the tests
+#### Cleaning up resources
 
-If you want to run the tests manually, skipping the test runner, set the
-`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
-with `go test`. E.g.:
+The test run will keep provisioned resources (instances and stacks) around after the tests have been ran. This allows
+following `mage integration:*` commands to re-use the already provisioned resources.
 
-```shell
-TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
-```
+- `mage integration:clean` will de-provision the allocated resources and cleanup any local state.
 
 Tests with external dependencies might need more environment variables to be set
 when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
@@ -98,6 +95,16 @@ We pass a `-test.run` flag along with the names of the tests we want to run in O
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
 is split on space, so not all combination of flags and their values may be correctly split.
+
+## Manually running the tests
+
+If you want to run the tests manually, skipping the test runner, set the
+`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
+with `go test`. E.g.:
+
+```shell
+TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
+```
 
 ## Writing tests
 
@@ -153,6 +160,14 @@ whereas the package names in the error message do not, either omit `SNAPSHOT=tru
 the `mage package` command OR set the `AGENT_VERSION` environment variable to a version
 that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 `mage integration:local`.
+
+### Failures on reused resources
+The integration framework tries to re-use resource when it can. This improves the speed at
+which the tests can run, but also means its possible for a failed test to leave state behind
+that can break future runs.
+
+Run `mage integration:clean` before running `mage integration:test` to ensure the tests are
+being run with fresh instances and stack.
 
 ### OGC-related errors
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
