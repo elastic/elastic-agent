@@ -46,6 +46,7 @@ func Rollback(ctx context.Context, log *logger.Logger, prevHash string, currentH
 	// Restart
 	log.Info("Restarting the agent after rollback")
 	if err := restartAgent(ctx, log); err != nil {
+		log.Errorf("Restarting the agent after rollback FAILED: %s", err.Error())
 		return err
 	}
 
