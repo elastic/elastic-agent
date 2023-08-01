@@ -2,7 +2,7 @@
 
 set -uo pipefail
 
-DRY_RUN="${DRA_DRY_RUN}"
+DRY_RUN="${DRA_DRY_RUN:=""}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
 COMMIT="${DRA_COMMIT:=""}"
 BRANCH="${DRA_BRANCH:=""}"
