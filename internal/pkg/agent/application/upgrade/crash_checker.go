@@ -100,7 +100,7 @@ func (ch *CrashChecker) checkNotRunning() {
 	}
 
 	recentPIDs := ch.q.Peek(crashesAllowed)
-	ch.log.Debugf("most recent %d service PIDs within %d: %v", crashesAllowed, recentPIDs, evaluatedPeriods)
+	ch.log.Debugf("most recent %d service PIDs within %d evaulations: %v", crashesAllowed, evaluatedPeriods, recentPIDs)
 
 	allZeroPIDs := true
 	for _, recentPID := range recentPIDs {
@@ -118,7 +118,7 @@ func (ch *CrashChecker) checkNotRunning() {
 // has crashed.
 func (ch *CrashChecker) checkRestarted() {
 	restarts := ch.q.Distinct()
-	ch.log.Debugf("service PID changed %d times within %d", restarts, evaluatedPeriods)
+	ch.log.Debugf("service PID changed %d times within %d evaluations", restarts, evaluatedPeriods)
 
 	if restarts > crashesAllowed {
 		msg := fmt.Sprintf("service restarted '%d' times within '%v' seconds", restarts, ch.checkInterval.Seconds())
