@@ -214,7 +214,7 @@ func (DebianRunner) Diagnostics(ctx context.Context, c *ssh.Client, logger Logge
 	_, _, _ = sshRunCommand(ctx, c, "sudo", []string{"chown", "-R", "$USER:$USER", diagnosticDir}, nil)
 	stdOut, _, err := sshRunCommand(ctx, c, "ls", []string{"-1", diagnosticDir}, nil)
 	if err != nil {
-		// failed to list the directory, probably don't have any diagnostics (do nothing)
+		//nolint:nilerr // failed to list the directory, probably don't have any diagnostics (do nothing)
 		return nil
 	}
 	eachDiagnostic := strings.Split(string(stdOut), "\n")

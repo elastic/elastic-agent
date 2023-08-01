@@ -8,16 +8,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/elastic-agent/pkg/core/process"
-	"github.com/stretchr/testify/require"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // ErrNotInstalled is returned in cases where Agent isn't installed
@@ -106,6 +108,11 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
+		if !f.installed {
+			// not installed; no need to clean up or collect diagnostics
+			return
+		}
+
 		// diagnostics is collected when either the environment variable
 		// AGENT_KEEP_INSTALLED=true or the test is marked failed
 		collect := collectDiag()

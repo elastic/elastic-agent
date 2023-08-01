@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -19,6 +18,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
