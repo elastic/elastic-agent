@@ -29,7 +29,7 @@ type serviceHandler interface {
 // CrashChecker checks agent for crash pattern in Elastic Agent lifecycle.
 type CrashChecker struct {
 	notifyChan    chan error
-	q             *disctintQueue
+	q             *distinctQueue
 	log           *logger.Logger
 	sc            serviceHandler
 	checkInterval time.Duration
@@ -126,23 +126,23 @@ func (ch *CrashChecker) checkRestarted() {
 	}
 }
 
-type disctintQueue struct {
+type distinctQueue struct {
 	q    []int
 	size int
 	lock sync.Mutex
 }
 
-func newDistinctQueue(size int) (*disctintQueue, error) {
+func newDistinctQueue(size int) (*distinctQueue, error) {
 	if size < 1 {
 		return nil, errors.New("invalid size", errors.TypeUnexpected)
 	}
-	return &disctintQueue{
+	return &distinctQueue{
 		q:    make([]int, 0, size),
 		size: size,
 	}, nil
 }
 
-func (dq *disctintQueue) Push(id int) {
+func (dq *distinctQueue) Push(id int) {
 	dq.lock.Lock()
 	defer dq.lock.Unlock()
 
@@ -153,7 +153,7 @@ func (dq *disctintQueue) Push(id int) {
 	dq.q = append([]int{id}, dq.q[:cutIdx]...)
 }
 
-func (dq *disctintQueue) Distinct() int {
+func (dq *distinctQueue) Distinct() int {
 	dq.lock.Lock()
 	defer dq.lock.Unlock()
 
@@ -166,11 +166,11 @@ func (dq *disctintQueue) Distinct() int {
 	return len(dm)
 }
 
-func (dq *disctintQueue) Len() int {
+func (dq *distinctQueue) Len() int {
 	return len(dq.q)
 }
 
-func (dq *disctintQueue) Peek(size int) []int {
+func (dq *distinctQueue) Peek(size int) []int {
 	if size > len(dq.q) {
 		size = len(dq.q)
 	}
