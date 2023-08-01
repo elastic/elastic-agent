@@ -132,12 +132,14 @@ func restartAgent(ctx context.Context, log *logger.Logger) error {
 		c := client.New()
 		err := c.Connect(ctx)
 		if err != nil {
+			log.Errorf("Failed communicating with running Agent daemon: %s", err.Error())
 			return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 		}
 		defer c.Disconnect()
 
 		err = c.Restart(ctx)
 		if err != nil {
+			log.Errorf("Failed to trigger restart of running Agent daemon: %s", err.Error())
 			return errors.New(err, "failed trigger restart of daemon")
 		}
 
