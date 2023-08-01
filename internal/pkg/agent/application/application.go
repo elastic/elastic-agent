@@ -16,6 +16,7 @@ import (
 	"go.elastic.co/apm"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
@@ -145,7 +146,7 @@ func New(
 		if err != nil {
 			return nil, nil, nil, err
 		}
-
+		log.Info("configuration loaded: %v", cfg)
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
