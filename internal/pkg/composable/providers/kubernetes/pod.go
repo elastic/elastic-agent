@@ -24,6 +24,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 )
 
+const (
+	processorhints = "hints/processors"
+)
+
 type pod struct {
 	watcher           kubernetes.Watcher
 	nodeWatcher       kubernetes.Watcher
@@ -48,6 +52,12 @@ type providerData struct {
 	uid        string
 	mapping    map[string]interface{}
 	processors []map[string]interface{}
+}
+
+// Will hold the generated mapping data needed for hints based autodsicovery
+type mappingsData struct {
+	hints      mapstr.M
+	processors []mapstr.M
 }
 
 // NewPodEventer creates an eventer that can discover and process pod objects
@@ -423,12 +433,14 @@ func generateContainerData(
 
 		// add container metadata under kubernetes.container.* to
 		// make them available to dynamic var resolution
+
 		containerMeta := mapstr.M{
 			"id":      c.ID,
 			"name":    c.Spec.Name,
 			"image":   c.Spec.Image,
 			"runtime": c.Runtime,
 		}
+
 		if len(c.Spec.Ports) > 0 {
 			for _, port := range c.Spec.Ports {
 				_, _ = containerMeta.Put("port", fmt.Sprintf("%v", port.ContainerPort))
@@ -437,10 +449,11 @@ func generateContainerData(
 
 				if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 					if !managed {
-						hintsMapping, processorMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
-						if len(hintsMapping) > 0 {
-							if len(processorMapping) > 0 {
-								for _, processor := range processorMapping {
+						mappingData := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+						if len(mappingData.hints) > 0 {
+							//mappingData.processors will hold any additional processors identfied from annotations and we need to update the processors map
+							if len(mappingData.processors) > 0 {
+								for _, processor := range mappingData.processors {
 									processors = append(processors, processor)
 								}
 							}
@@ -448,17 +461,17 @@ func generateContainerData(
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
-								map[string]interface{}{"hints": hintsMapping},
+								map[string]interface{}{"hints": mappingData.hints},
 								processors,
 							)
 						} else if config.Hints.DefaultContainerLogs {
 							// in case of no package detected in the hints fallback to the generic log collection
-							_, _ = hintsMapping.Put("container_logs.enabled", true)
-							_, _ = hintsMapping.Put("container_id", c.ID)
+							_, _ = mappingData.hints.Put("container_logs.enabled", true)
+							_, _ = mappingData.hints.Put("container_id", c.ID)
 							_ = comm.AddOrUpdate(
 								eventID,
 								PodPriority,
-								map[string]interface{}{"hints": hintsMapping},
+								map[string]interface{}{"hints": mappingData.hints},
 								processors,
 							)
 						}
@@ -471,27 +484,28 @@ func generateContainerData(
 			k8sMapping["container"] = containerMeta
 			if config.Hints.Enabled { // This is "hints based autodiscovery flow"
 				if !managed {
-					hintsMapping, processorMapping := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
-					if len(hintsMapping) > 0 {
-						if len(processorMapping) > 0 {
-							for _, processor := range processorMapping {
+					mappingData := getHintsMapping(k8sMapping, logger, config.Prefix, c.ID)
+					if len(mappingData.hints) > 0 {
+						//mappingData.processors will hold any additional processors identfied from annotations and we need to update the processors map
+						if len(mappingData.processors) > 0 {
+							for _, processor := range mappingData.processors {
 								processors = append(processors, processor)
 							}
 						}
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
-							map[string]interface{}{"hints": hintsMapping},
+							map[string]interface{}{"hints": mappingData.processors},
 							processors,
 						)
 					} else if config.Hints.DefaultContainerLogs {
 						// in case of no package detected in the hints fallback to the generic log collection
-						_, _ = hintsMapping.Put("container_logs.enabled", true)
-						_, _ = hintsMapping.Put("container_id", c.ID)
+						_, _ = mappingData.hints.Put("container_logs.enabled", true)
+						_, _ = mappingData.hints.Put("container_id", c.ID)
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
-							map[string]interface{}{"hints": hintsMapping},
+							map[string]interface{}{"hints": mappingData.hints},
 							processors,
 						)
 					}
@@ -503,22 +517,22 @@ func generateContainerData(
 	}
 }
 
-func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) (mapstr.M, []mapstr.M) {
-	hintsMapping := mapstr.M{}
-	processorMapping := []mapstr.M{}
+// Generates the hints and processor mappings from provided pod annotation map
+func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) mappingsData {
+	var mappingData mappingsData
 
 	if ann, ok := k8sMapping["annotations"]; ok {
 		annotations, _ := ann.(mapstr.M)
 		hints := utils.GenerateHints(annotations, "", prefix)
 		if len(hints) > 0 {
 			logger.Debugf("Extracted hints are :%v", hints)
-			hintsMapping = GenerateHintsMapping(hints, k8sMapping, logger, cID)
-			logger.Debugf("Generated hints mappings are :%v", hintsMapping)
+			mappingData.hints = GenerateHintsMapping(hints, k8sMapping, logger, cID)
+			logger.Debugf("Generated hints mappings are :%v", mappingData.hints)
 
-			processorMapping = utils.GetConfigs(annotations, prefix, "hints/processors")
-			logger.Debugf("Generated Processors are :%v", processorMapping)
+			mappingData.processors = utils.GetConfigs(annotations, prefix, processorhints)
+			logger.Debugf("Generated Processors are :%v", mappingData.processors)
 		}
 
 	}
-	return hintsMapping, processorMapping
+	return mappingData
 }

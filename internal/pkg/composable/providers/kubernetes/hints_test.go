@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-autodiscover/utils"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
@@ -363,6 +364,122 @@ func TestGenerateHintsMappingWithLogStream(t *testing.T) {
 	}
 
 	hintsMapping := GenerateHintsMapping(hints, mapping, logger, "asdfghjkl")
+
+	assert.Equal(t, expected, hintsMapping)
+}
+
+func TestGenerateHintsMappingWithProcessors(t *testing.T) {
+	logger := getLogger()
+	pod := &kubernetes.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testpod",
+			UID:       types.UID(uid),
+			Namespace: "testns",
+			Labels: map[string]string{
+				"foo":        "bar",
+				"with-dash":  "dash-value",
+				"with/slash": "some/path",
+			},
+			Annotations: map[string]string{
+				"app": "production",
+			},
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		Spec: kubernetes.PodSpec{
+			NodeName: "testnode",
+		},
+		Status: kubernetes.PodStatus{PodIP: "127.0.0.5"},
+	}
+
+	mapping := map[string]interface{}{
+		"namespace": pod.GetNamespace(),
+		"pod": mapstr.M{
+			"uid":  string(pod.GetUID()),
+			"name": pod.GetName(),
+			"ip":   pod.Status.PodIP,
+		},
+		"namespace_annotations": mapstr.M{
+			"nsa": "nsb",
+		},
+		"labels": mapstr.M{
+			"foo":        "bar",
+			"with-dash":  "dash-value",
+			"with/slash": "some/path",
+		},
+		"annotations": mapstr.M{
+			"app": "production",
+			"co.elastic.hints/processors.1.add_fields.target":      "project",
+			"co.elastic.hints/processors.1.add_fields.fields.name": "myproject",
+			"co.elastic.hints/processors.rename.fields.0.from":     "a.g",
+			"co.elastic.hints/processors.rename.fields.1.to":       "e.d",
+			"co.elastic.hints/processors.rename.fail_on_error":     false,
+		},
+	}
+	hints := mapstr.M{
+		"hints": mapstr.M{
+			"data_streams": "access, error",
+			"access":       mapstr.M{"stream": "stdout"},
+			"error":        mapstr.M{"stream": "stderr"},
+			"package":      "apache",
+		},
+	}
+
+	processors := mapstr.M{
+		"hints/processors": mapstr.M{
+			"add_fields": mapstr.M{
+				"target": "project",
+				"name":   "myproject",
+			},
+			"rename": mapstr.M{
+				"fail_on_error": "false",
+				"fields": mapstr.M{
+					"from": "a.g",
+					"to":   "e.d",
+				},
+			},
+		},
+	}
+
+	expected := mapstr.M{
+		"container_id": "asdfghjkl",
+		"apache": mapstr.M{
+			"container_logs": mapstr.M{
+				"enabled": true,
+			},
+			"access": mapstr.M{
+				"enabled": true,
+				"stream":  "stdout",
+			}, "error": mapstr.M{
+				"enabled": true,
+				"stream":  "stderr",
+			},
+		},
+		"processors": []mapstr.M{
+			0: {
+				"add_fields": mapstr.M{
+					"target": "project",
+					"name":   "myproject",
+				},
+			},
+			1: {
+				"rename": mapstr.M{
+					"fail_on_error": "false",
+					"fields": mapstr.M{
+						"from": "a.g",
+						"to":   "e.d",
+					},
+				},
+			},
+		},
+	}
+
+	hintsMapping := GenerateHintsMapping(hints, mapping, logger, "asdfghjkl")
+	processorMapping := utils.GetConfigs(processors, "", processorhints)
+
+	hintsMapping.Put("processors", processorMapping)
 
 	assert.Equal(t, expected, hintsMapping)
 }
