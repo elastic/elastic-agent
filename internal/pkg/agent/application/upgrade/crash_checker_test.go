@@ -21,7 +21,7 @@ var (
 
 func TestChecker(t *testing.T) {
 	t.Run("no failure when no change", func(t *testing.T) {
-		pider := &testPider{}
+		pider := &testPider{pid: 111}
 		ch, errChan := testableChecker(t, pider)
 		ctx, canc := context.WithCancel(context.Background())
 
@@ -46,7 +46,8 @@ func TestChecker(t *testing.T) {
 	})
 
 	t.Run("no failure when unfrequent change", func(t *testing.T) {
-		pider := &testPider{}
+		const startingPID = 222
+		pider := &testPider{pid: startingPID}
 		ch, errChan := testableChecker(t, pider)
 		ctx, canc := context.WithCancel(context.Background())
 
@@ -60,7 +61,7 @@ func TestChecker(t *testing.T) {
 		wg.Wait()
 		for i := 0; i < 2; i++ {
 			<-time.After(3 * testCheckPeriod)
-			pider.Change(i)
+			pider.Change(startingPID + i)
 		}
 		var err error
 		select {
@@ -73,7 +74,8 @@ func TestChecker(t *testing.T) {
 	})
 
 	t.Run("no failure when change lower than limit", func(t *testing.T) {
-		pider := &testPider{}
+		const startingPID = 333
+		pider := &testPider{pid: startingPID}
 		ch, errChan := testableChecker(t, pider)
 		ctx, canc := context.WithCancel(context.Background())
 
@@ -87,7 +89,7 @@ func TestChecker(t *testing.T) {
 		wg.Wait()
 		for i := 0; i < 3; i++ {
 			<-time.After(7 * testCheckPeriod)
-			pider.Change(i)
+			pider.Change(startingPID + i)
 		}
 		var err error
 		select {
@@ -123,7 +125,35 @@ func TestChecker(t *testing.T) {
 		}
 
 		canc()
-		require.Error(t, err)
+		require.ErrorContains(t, err, "service restarted '3' times within '0.1' seconds")
+	})
+
+	t.Run("fails when pid remains 0", func(t *testing.T) {
+		const startingPID = 0
+		pider := &testPider{pid: startingPID}
+		ch, errChan := testableChecker(t, pider)
+		ctx, canc := context.WithCancel(context.Background())
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			wg.Done()
+			ch.Run(ctx)
+		}()
+
+		wg.Wait()
+		for i := 0; i < 3; i++ {
+			<-time.After(testCheckPeriod * 3)
+			pider.Change(startingPID) // don't change PID
+		}
+		var err error
+		select {
+		case err = <-errChan:
+		default:
+		}
+
+		canc()
+		require.ErrorContains(t, err, "service remained crashed (PID = 0) within '0.1' seconds")
 	})
 }
 
