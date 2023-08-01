@@ -20,12 +20,97 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/google/pprof/profile"
 
+	agentclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	agentruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/version"
 )
+
+func TestRedactResults(t *testing.T) {
+	exampleConfig := mapstr.M{
+		"root": mapstr.M{
+			"passphrase": "unredacted",
+			"nested1": mapstr.M{
+				"certificate": "unredacted",
+				"nested2": mapstr.M{
+					"passphrase": "unredacted",
+					"password":   "unredacted",
+					"nested3": mapstr.M{
+						"token": "unredacted",
+						"key":   "unredacted",
+					},
+				},
+			},
+		},
+	}
+
+	formatted, err := yaml.Marshal(exampleConfig)
+	require.NoError(t, err)
+	errOut := strings.Builder{}
+	outWriter := strings.Builder{}
+	res := client.DiagnosticFileResult{Content: formatted, ContentType: "application/yaml"}
+
+	err = writeRedacted(&errOut, &outWriter, "test/path", res)
+	require.NoError(t, err)
+
+	require.Empty(t, errOut.String())
+	require.NotContains(t, outWriter.String(), "unredacted")
+}
+
+func TestRedactComplexKeys(t *testing.T) {
+	// taken directly from the yaml spec: https://yaml.org/spec/1.1/#c-mapping-key
+	// This test mostly serves to document that part of the YAML library doesn't work properly
+	t.Skip("YAML library currently can't do this, come back to see if the library works.")
+	testComplexKey := `
+sequence:
+- one
+- two
+mapping:
+  ? sky 
+  : blue
+  ? sea : green`
+
+	errOut := strings.Builder{}
+	outWriter := strings.Builder{}
+
+	res := client.DiagnosticFileResult{Content: []byte(testComplexKey), ContentType: "application/yaml"}
+	err := writeRedacted(&errOut, &outWriter, "test/path", res)
+	require.NoError(t, err)
+
+	require.Empty(t, errOut.String())
+}
+
+func TestUnitAndStateMapping(t *testing.T) {
+	// this structure causes problems due to the compound agentruntime.ComponentUnitKey map key
+	exampleState := agentruntime.ComponentState{
+		State:   agentclient.UnitStateStarting,
+		Message: "test",
+		Units: map[agentruntime.ComponentUnitKey]agentruntime.ComponentUnitState{
+			{UnitType: agentclient.UnitTypeInput, UnitID: "test-unit"}:    {Message: "test unit"},
+			{UnitType: agentclient.UnitTypeOutput, UnitID: "test-unit-2"}: {Message: "test unit 2"},
+		},
+		VersionInfo: agentruntime.ComponentVersionInfo{Name: "test-component", Version: "0"},
+	}
+
+	formatted, err := yaml.Marshal(exampleState)
+	require.NoError(t, err)
+	t.Logf("%s", formatted)
+	errOut := strings.Builder{}
+	outWriter := strings.Builder{}
+	res := client.DiagnosticFileResult{Content: formatted, ContentType: "application/yaml"}
+
+	err = writeRedacted(&errOut, &outWriter, "test/path", res)
+	require.NoError(t, err)
+
+	require.Empty(t, errOut.String())
+	require.NotContains(t, outWriter.String(), "unredacted")
+}
 
 func TestZipLogs(t *testing.T) {
 	// Setup a directory structure of: logs/httpjson/log.ndjson
