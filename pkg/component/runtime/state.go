@@ -43,7 +43,7 @@ type ComponentUnitKey struct {
 	UnitID   string
 }
 
-// MarshalYAML implements the Marshaller interfce for the componentUnitKey
+// MarshalYAML implements the Marshaller interface for the componentUnitKey
 func (key ComponentUnitKey) MarshalYAML() (interface{}, error) {
 	return fmt.Sprintf("%s-%s", key.UnitType.String(), key.UnitID), nil
 }
