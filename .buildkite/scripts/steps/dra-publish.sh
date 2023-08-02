@@ -5,7 +5,7 @@ set -uo pipefail
 DRY_RUN="${DRA_DRY_RUN:=""}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
 COMMIT="${DRA_COMMIT:=""}"
-BRANCH="${DRA_BRANCH:=""}"
+BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 PACKAGE_VERSION="${DRA_VERSION:=""}"
 
 # force main branch on PR's or it won't execute
