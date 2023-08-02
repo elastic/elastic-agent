@@ -349,8 +349,9 @@ func getUpgradableVersions(ctx context.Context, t *testing.T, upgradeToVersion s
 			break
 		}
 
-		if parsedVersion == parsedUpgradeToVersion {
-			// skip upgrade to the same version
+		if !parsedVersion.Less(*parsedUpgradeToVersion) {
+			// skip upgrade from newer versions than the one under test
+			t.Logf("Skipping version %q since it's newer or equal to version after upgrade %q", parsedVersion, parsedUpgradeToVersion)
 			continue
 		}
 
