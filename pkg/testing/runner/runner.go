@@ -61,13 +61,9 @@ type OSRunnerResult struct {
 // OSRunner provides an interface to run the tests on the OS.
 type OSRunner interface {
 	// Prepare prepares the runner to actual run on the host.
-<<<<<<< HEAD
-	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error
-=======
 	Prepare(ctx context.Context, c *ssh.Client, logger Logger, arch string, goVersion string) error
 	// Copy places the required files on the host.
 	Copy(ctx context.Context, c *ssh.Client, logger Logger, repoArchive string, build Build) error
->>>>>>> 110a7fee61 (Improve test runner to re-use instances and make provisioners pluggable (#3136))
 	// Run runs the actual tests and provides the result.
 	Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
 }
@@ -392,18 +388,12 @@ func (r *Runner) validate() error {
 	var requiredFiles []string
 	for _, b := range r.batches {
 		if !b.Skip {
-<<<<<<< HEAD
-			buildPath := r.getBuildPath(b)
-			if !slices.Contains(requiredFiles, buildPath) {
-				requiredFiles = append(requiredFiles, buildPath)
-=======
 			build := r.getBuild(b)
 			if !slices.Contains(requiredFiles, build.Path) {
 				requiredFiles = append(requiredFiles, build.Path)
 			}
 			if !slices.Contains(requiredFiles, build.SHA512Path) {
 				requiredFiles = append(requiredFiles, build.SHA512Path)
->>>>>>> 110a7fee61 (Improve test runner to re-use instances and make provisioners pluggable (#3136))
 			}
 		}
 	}
@@ -422,15 +412,9 @@ func (r *Runner) validate() error {
 	return nil
 }
 
-<<<<<<< HEAD
-// getBuildPath returns the path of the build required for the test.
-func (r *Runner) getBuildPath(b LayoutBatch) string {
-	arch := b.LayoutOS.OS.Arch
-=======
 // getBuild returns the build for the batch.
 func (r *Runner) getBuild(b OSBatch) Build {
 	arch := b.OS.Arch
->>>>>>> 110a7fee61 (Improve test runner to re-use instances and make provisioners pluggable (#3136))
 	if arch == define.AMD64 {
 		arch = "x86_64"
 	}
@@ -438,9 +422,6 @@ func (r *Runner) getBuild(b OSBatch) Build {
 	if b.OS.Type == define.Windows {
 		ext = "zip"
 	}
-<<<<<<< HEAD
-	return filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.LayoutOS.OS.Type, arch, ext))
-=======
 	hashExt := ".sha512"
 	packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s-%s.%s", r.cfg.AgentVersion, b.OS.Type, arch, ext))
 	return Build{
@@ -450,7 +431,6 @@ func (r *Runner) getBuild(b OSBatch) Build {
 		Path:       packageName,
 		SHA512Path: packageName + hashExt,
 	}
->>>>>>> 110a7fee61 (Improve test runner to re-use instances and make provisioners pluggable (#3136))
 }
 
 // prepare prepares for the runner to run.

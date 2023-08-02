@@ -22,11 +22,7 @@ import (
 type DebianRunner struct{}
 
 // Prepare the test
-<<<<<<< HEAD
-func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger Logger, arch string, goVersion string, repoArchive string, buildPath string) error {
-=======
 func (DebianRunner) Prepare(ctx context.Context, sshClient *ssh.Client, logger Logger, arch string, goVersion string) error {
->>>>>>> 110a7fee61 (Improve test runner to re-use instances and make provisioners pluggable (#3136))
 	// prepare build-essential and unzip
 	//
 	// apt-get update and install are so terrible that we have to place this in a loop, because in some cases the
@@ -117,22 +113,6 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 		return fmt.Errorf("failed to to perform make mage and prepareOnRemote: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
-<<<<<<< HEAD
-	// place the build for the agent on the host
-	logger.Logf("Copying agent build %s", filepath.Base(buildPath))
-	err = sshSCP(sshClient, buildPath, filepath.Base(buildPath))
-	if err != nil {
-		return fmt.Errorf("failed to SCP build %s: %w", filepath.Base(buildPath), err)
-	}
-	insideAgentDir := filepath.Join("agent", buildPath)
-	stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mkdir", []string{"-p", filepath.Dir(insideAgentDir)}, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create %s directory: %w (stdout: %s, stderr: %s)", filepath.Dir(insideAgentDir), err, stdOut, errOut)
-	}
-	stdOut, errOut, err = sshRunCommand(ctx, sshClient, "mv", []string{filepath.Base(buildPath), insideAgentDir}, nil)
-	if err != nil {
-		return fmt.Errorf("failed to move %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
-=======
 	// determine if the build needs to be replaced on the host
 	// if it already exists and the SHA512 are the same contents, then
 	// there is no reason to waste time uploading the build
@@ -174,7 +154,6 @@ func (DebianRunner) Copy(ctx context.Context, sshClient *ssh.Client, logger Logg
 		if err != nil {
 			return fmt.Errorf("failed to hard link %s to %s: %w (stdout: %s, stderr: %s)", filepath.Base(buildPath), insideAgentDir, err, stdOut, errOut)
 		}
->>>>>>> 110a7fee61 (Improve test runner to re-use instances and make provisioners pluggable (#3136))
 	}
 
 	return nil
