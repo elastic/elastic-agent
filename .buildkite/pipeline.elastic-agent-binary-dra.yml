@@ -4,7 +4,7 @@ env:
   BEAT_NAME: "elastic-agent"
   # after moving elastic-agent out of beats, we should update the URL of the packaging.
   BEAT_URL: "https://www.elastic.co/elastic-agent"
-  DRA_PROJECT: "elastic-agent-core"
+  DRA_PROJECT_ID: "elastic-agent-core"
   DRA_PROJECT_ARTIFACT_ID: "agent-core"
 
 steps:
