@@ -30,6 +30,9 @@ func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runne
 	for _, req := range requests {
 		client := NewServerlessClient(prov.cfg.Region, "observability", prov.cfg.APIKey)
 		req := ServerlessRequest{Name: req.ID, RegionID: prov.cfg.Region}
-		client.DeployStack(ctx, req)
+		response, err := client.DeployStack(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("error deploying stack for request %s: %w", req.ID, err)
+		}
 	}
 }
