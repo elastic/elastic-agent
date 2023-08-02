@@ -50,6 +50,9 @@ type Fixture struct {
 
 	c   client.Client
 	cMx sync.RWMutex
+
+	// Uninstall token value that is needed for the agent uninstall if it's tamper protected
+	uninstallToken string
 }
 
 // FixtureOpt is an option for the fixture.
@@ -185,6 +188,11 @@ func (f *Fixture) Configure(ctx context.Context, yamlConfig []byte) error {
 
 	cfgFilePath := filepath.Join(f.workDir, "elastic-agent.yml")
 	return os.WriteFile(cfgFilePath, yamlConfig, 0600)
+}
+
+// SetUninstallToken sets uninstall token
+func (f *Fixture) SetUninstallToken(uninstallToken string) {
+	f.uninstallToken = uninstallToken
 }
 
 // WorkDir returns the installed fixture's work dir AKA base dir AKA top dir. This
