@@ -11,12 +11,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-<<<<<<< HEAD
-=======
 	"strconv"
 	"strings"
 	"time"
->>>>>>> 75438b6f0c (Add auto diagnostic collection on test failure and ability to skip uninstall for inspection of installed agent (#3163))
 
 	"github.com/stretchr/testify/require"
 
@@ -103,17 +100,8 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
-<<<<<<< HEAD
-		out, err := f.Uninstall(ctx, &UninstallOpts{Force: true})
-		f.setClient(nil)
-		if errors.Is(err, ErrNotInstalled) {
-			// Agent fixture has already been uninstalled, perhaps by
-			// an explicit call to fixture.Uninstall, so nothing needs
-			// to be done here.
-=======
 		if !f.installed {
 			// not installed; no need to clean up or collect diagnostics
->>>>>>> 75438b6f0c (Add auto diagnostic collection on test failure and ability to skip uninstall for inspection of installed agent (#3163))
 			return
 		}
 
