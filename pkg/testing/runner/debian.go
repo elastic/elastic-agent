@@ -225,8 +225,10 @@ func (DebianRunner) Diagnostics(ctx context.Context, c *ssh.Client, logger Logge
 		}
 
 		// don't use filepath.Join as we need this to work in Windows as well
+		// this is because if we use `filepath.Join` on a Windows host connected to a Linux host
+		// it will use a `\` and that will be incorrect for Linux
 		fp := fmt.Sprintf("%s/%s", diagnosticDir, filename)
-		// use filepath.Join on this host so it works on Windows
+		// use filepath.Join on this path because it's a path on this specific host platform
 		dp := filepath.Join(destination, filename)
 		logger.Logf("Copying diagnostic %s", filename)
 		out, err := os.Create(dp)
