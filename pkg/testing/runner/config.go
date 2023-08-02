@@ -15,6 +15,7 @@ type Config struct {
 	BuildDir          string
 	GOVersion         string
 	RepoDir           string
+	DiagnosticsDir    string
 
 	// Matrix enables matrix testing. This explodes each test to
 	// run on all supported platforms the runner supports.
@@ -31,6 +32,9 @@ type Config struct {
 
 	// Testflags contains extra go test flags to be set when running tests
 	TestFlags string
+
+	// ExtraEnv contains extra environment flags to pass to the runner.
+	ExtraEnv map[string]string
 }
 
 // Validate returns an error if the information is invalid.
