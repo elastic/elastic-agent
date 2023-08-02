@@ -205,3 +205,23 @@ func sshGetFileContents(ctx context.Context, c *ssh.Client, filename string) ([]
 	}
 	return stdout.Bytes(), nil
 }
+
+// sshGetFileContentsOutput writes the file contents into output.
+func sshGetFileContentsOutput(ctx context.Context, c *ssh.Client, filename string, output io.Writer) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	session, err := c.NewSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	session.Stdout = output
+	err = session.Run(fmt.Sprintf("cat %s", filename))
+	if err != nil {
+		return err
+	}
+	return nil
+}

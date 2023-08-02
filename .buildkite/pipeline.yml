@@ -10,6 +10,7 @@ steps:
     branches: "main"
     artifact_paths:
       - "build/TEST-**"
+      - "build/diagnostics/*"
     agents:
       provider: "gcp"
 

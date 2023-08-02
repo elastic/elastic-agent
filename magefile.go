@@ -1499,6 +1499,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	r.Logger().Logf("Console output written here: build/TEST-go-integration.out")
 	r.Logger().Logf("Console JSON output written here: build/TEST-go-integration.out.json")
 	r.Logger().Logf("JUnit XML written here: build/TEST-go-integration.xml")
+	r.Logger().Logf("Diagnostic output (if present) here: build/diagnostics")
 	if results.Failures > 0 {
 		os.Exit(1)
 	}
@@ -1558,17 +1559,30 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 	timestamp := timestampEnabled()
 
+	extraEnv := map[string]string{}
+	if os.Getenv("AGENT_COLLECT_DIAG") != "" {
+		extraEnv["AGENT_COLLECT_DIAG"] = os.Getenv("AGENT_COLLECT_DIAG")
+	}
+	if os.Getenv("AGENT_KEEP_INSTALLED") != "" {
+		extraEnv["AGENT_KEEP_INSTALLED"] = os.Getenv("AGENT_KEEP_INSTALLED")
+	}
+
+	diagDir := filepath.Join("build", "diagnostics")
+	_ = os.MkdirAll(diagDir, 0755)
+
 	cfg := runner.Config{
 		AgentVersion:      agentVersion,
 		AgentStackVersion: agentStackVersion,
 		BuildDir:          agentBuildDir,
 		GOVersion:         goVersion,
 		RepoDir:           ".",
+		DiagnosticsDir:    diagDir,
 		Matrix:            matrix,
 		SingleTest:        singleTest,
 		VerboseMode:       mg.Verbose(),
 		Timestamp:         timestamp,
 		TestFlags:         goTestFlags,
+		ExtraEnv:          extraEnv,
 	}
 	ogcCfg := ogc.Config{
 		ServiceTokenPath: serviceTokenPath,
