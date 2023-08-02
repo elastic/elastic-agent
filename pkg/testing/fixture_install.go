@@ -211,7 +211,11 @@ func (f *Fixture) collectDiagnostics() {
 		return
 	}
 	diagPath := filepath.Join(dir, "build", "diagnostics")
-	_ = os.MkdirAll(diagPath, 0755)
+	err = os.MkdirAll(diagPath, 0755)
+	if err != nil {
+		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
+		return
+	}
 	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", f.t.Name(), time.Now().Format(time.RFC3339)))
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})

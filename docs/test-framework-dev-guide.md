@@ -99,7 +99,7 @@ when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAM
 ### Debugging tests
 
 #### Auto diagnostics retrieval
-When an integration test fails and the testing fixture will try its best to automatically collect the diagnostic
+When an integration test fails the testing fixture will try its best to automatically collect the diagnostic
 information of the installed Elastic Agent. In the case that diagnostics is collected the test runner will
 automatically transfer any collected diagnostics from the instance back to the running host. The results of the
 diagnostic collection are placed in `build/diagnostics`.
