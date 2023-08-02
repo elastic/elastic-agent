@@ -2,10 +2,6 @@
 
 set -euo pipefail
 
-source .buildkite/scripts/common.sh
-BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
-export DRA_VERSION="${BEAT_VERSION}"
-
 echo "+++ Build Agent artifacts"
 SNAPSHOT=""
 BEAT_VERSION_FULL=$BEAT_VERSION
