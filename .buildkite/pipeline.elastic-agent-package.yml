@@ -125,12 +125,4 @@ steps:
         DRA_VERSION=$(buildkite-agent meta-data get DRA_VERSION --default "")
         export DRA_VERSION
       fi
-      if [[ -z "${DRA_COMMIT}" ]]; then
-        DRA_COMMIT=$BUILDKITE_COMMIT
-        export DRA_COMMIT
-      fi
-      if [[ -z "${DRA_BRANCH}" ]]; then
-        DRA_BRANCH=$BUILDKITE_BRANCH
-        export DRA_BRANCH
-      fi
       .buildkite/scripts/steps/dra-publish.sh
