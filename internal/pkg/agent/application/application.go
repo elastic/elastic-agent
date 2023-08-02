@@ -139,6 +139,8 @@ func New(
 			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
 			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
 		}
+
+		compModifiers = append(compModifiers, InjectAPMConfig)
 	} else {
 		isManaged = true
 		var store storage.Store
@@ -150,7 +152,7 @@ func New(
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
-			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
+			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server), InjectAPMConfig)
 			configMgr = newFleetServerBootstrapManager(log)
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
@@ -159,6 +161,7 @@ func New(
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
 				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
 				EndpointSignedComponentModifier(),
+				InjectAPMConfig,
 			)
 
 			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout)

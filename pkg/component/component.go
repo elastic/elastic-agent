@@ -13,9 +13,11 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install/pkgmgr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
@@ -141,6 +143,12 @@ func getStringValue(m map[string]interface{}, key string) (string, error) {
 	return s, nil
 }
 
+type ElasticAPM config.APMConfig
+
+type APMConfig struct {
+	Elastic *ElasticAPM `yaml:"elastic"`
+}
+
 // Component is a set of units that needs to run.
 type Component struct {
 	// ID is the unique ID of the component.
@@ -177,6 +185,9 @@ type Component struct {
 	// ShipperRef references the component/unit that this component used as its output.
 	// (only applies to inputs targeting a shipper, not set when ShipperSpec is)
 	ShipperRef *ShipperReference `yaml:"shipper,omitempty"`
+
+	//TODO document this
+	APM *APMConfig `yaml:"apm,omitempty"`
 }
 
 // Type returns the type of the component.

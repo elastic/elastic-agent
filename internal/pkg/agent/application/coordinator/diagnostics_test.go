@@ -9,13 +9,16 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -55,11 +58,54 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 				Protocol: "test-protocol",
 			},
 		},
+		Settings: &configuration.SettingsConfig{
+			MonitoringConfig: &monitoringCfg.MonitoringConfig{
+				MonitorTraces: true,
+				APM: monitoringCfg.APMConfig{
+					Environment: "diag-unit-test",
+					APIKey:      "apikey",
+					SecretToken: "secret",
+					Hosts:       []string{"host1", "host2"},
+					TLS: monitoringCfg.APMTLS{
+						SkipVerify:        false,
+						ServerCertificate: "/path/to/server/cert",
+						ServerCA:          "/path/to/server/ca",
+					},
+				},
+			},
+		},
 	}
 
 	// The YAML we expect to see from the preceding config
 	expectedCfg := `
 agent:
+  download: null
+  grpc: null
+  id: ""
+  path: ""
+  process: null
+  reload: null
+  upgrade: null
+  v1_monitoring_enabled: false
+  monitoring:
+    enabled: false
+    http: null
+    logs: false
+    metrics: false
+    namespace: ""
+    pprof: null
+    traces: true
+    apm:
+      hosts:
+        - host1
+        - host2
+      environment: diag-unit-test
+      apikey: apikey
+      secrettoken: secret
+      tls:
+        skipverify: false
+        servercertificate: "/path/to/server/cert"
+        serverca: "/path/to/server/ca"
 fleet:
   enabled: true
   access_api_key: "test-key"
@@ -237,6 +283,59 @@ components:
 	assert.YAMLEq(t, expected, string(result), "components-expected diagnostic returned unexpected value")
 }
 
+func TestDiagnosticComponentsExpectedWithAPM(t *testing.T) {
+	// Create a Coordinator with a test component model and make sure it's
+	// reported by the components-expected diagnostic
+	components := []component.Component{
+		{
+			ID:         "some-apm-aware-component",
+			InputType:  "filestream",
+			OutputType: "elasticsearch",
+			APM: &component.APMConfig{
+				Elastic: &component.ElasticAPM{
+					Environment: "diag-unit-test",
+					APIKey:      "apikey",
+					SecretToken: "st",
+					Hosts:       []string{"host1", "host2"},
+					TLS: monitoringCfg.APMTLS{
+						SkipVerify:        true,
+						ServerCertificate: "servercert",
+						ServerCA:          "serverca",
+					},
+				},
+			},
+		},
+	}
+
+	expected := `
+components:
+  - id: some-apm-aware-component
+    input_type: filestream
+    output_type: elasticsearch
+    units: []
+    apm:
+      elastic:
+        environment: diag-unit-test
+        apikey: apikey
+        secrettoken: st
+        hosts:
+        - host1
+        - host2
+        tls:
+          skipverify: true
+          servercertificate: servercert
+          serverca: serverca
+`
+
+	coord := &Coordinator{componentModel: components}
+
+	hook, ok := diagnosticHooksMap(coord)["components-expected"]
+	require.True(t, ok, "diagnostic hooks should have an entry for components-expected")
+
+	result := hook.Hook(context.Background())
+	assert.YAMLEq(t, expected, string(result), "components-expected diagnostic returned unexpected value")
+}
+
 func TestDiagnosticComponentsActual(t *testing.T) {
 	// Create a Coordinator with observed component data in the state broadcaster
 	// and make sure the components-actual diagnostic reports it
@@ -341,6 +440,85 @@ components:
       version_info:
         name: "version name"
         version: "version value"
+`
+
+	coord := &Coordinator{
+		// This test needs a broadcaster since the components-actual diagnostic
+		// fetches the state via State().
+		stateBroadcaster: broadcaster.New(state, 0, 0),
+	}
+
+	hook, ok := diagnosticHooksMap(coord)["state"]
+	require.True(t, ok, "diagnostic hooks should have an entry for state")
+
+	result := hook.Hook(context.Background())
+	assert.YAMLEq(t, expected, string(result), "state diagnostic returned unexpected value")
+}
+
+func TestDiagnosticStateForAPM(t *testing.T) {
+	// Create a coordinator with a test state and verify that the state
+	// diagnostic reports it
+
+	token := "st"
+	state := State{
+		State:        agentclient.Starting,
+		Message:      "starting up",
+		FleetState:   agentclient.Configuring,
+		FleetMessage: "configuring",
+		LogLevel:     1,
+		Components: []runtime.ComponentComponentState{
+			{
+				Component: component.Component{ID: "comp-1"},
+				State: runtime.ComponentState{
+					State:   client.UnitStateDegraded,
+					Message: "degraded message",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:    "version name",
+						Version: "version value",
+					},
+					APMConfig: &proto.APMConfig{
+						Elastic: &proto.ElasticAPM{
+							Environment: "diag-state-ut",
+							SecretToken: &token,
+							Hosts:       []string{"apmhost"},
+							Tls: &proto.ElasticAPMTLS{
+								SkipVerify: true,
+								ServerCert: "sc",
+								ServerCa:   "sca",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expected := `
+state: 0
+message: "starting up"
+fleet_state: 1
+fleet_message: "configuring"
+log_level: "warning"
+components:
+  - id: "comp-1"
+    state:
+      state: 3
+      message: "degraded message"
+      features_idx: 0
+      units: {}
+      version_info:
+        name: "version name"
+        version: "version value"
+      apm:
+        elastic:
+          apikey: null
+          environment: diag-state-ut
+          hosts: [apmhost]
+          secrettoken: st
+          tls:
+            skipverify: true
+            serverca: sca
+            servercert: sc
 `
 
 	coord := &Coordinator{
