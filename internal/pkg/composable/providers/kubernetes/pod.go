@@ -495,7 +495,7 @@ func generateContainerData(
 						_ = comm.AddOrUpdate(
 							eventID,
 							PodPriority,
-							map[string]interface{}{"hints": mappingData.processors},
+							map[string]interface{}{"hints": mappingData.hints},
 							processors,
 						)
 					} else if config.Hints.DefaultContainerLogs {
@@ -519,7 +519,10 @@ func generateContainerData(
 
 // Generates the hints and processor mappings from provided pod annotation map
 func getHintsMapping(k8sMapping map[string]interface{}, logger *logp.Logger, prefix string, cID string) mappingsData {
-	var mappingData mappingsData
+	mappingData := mappingsData{
+		hints:      mapstr.M{},
+		processors: []mapstr.M{},
+	}
 
 	if ann, ok := k8sMapping["annotations"]; ok {
 		annotations, _ := ann.(mapstr.M)
