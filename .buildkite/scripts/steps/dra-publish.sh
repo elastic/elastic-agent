@@ -4,9 +4,9 @@ set -uo pipefail
 
 DRY_RUN="${DRA_DRY_RUN:=""}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
-COMMIT="${DRA_COMMIT:=""}"
+COMMIT="${DRA_COMMIT:="${BUILDKITE_COMMIT:=""}"}"
 BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
-PACKAGE_VERSION="${DRA_VERSION:=""}"
+PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
 
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager

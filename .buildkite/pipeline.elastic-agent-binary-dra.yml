@@ -13,12 +13,8 @@ steps:
     if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_SNAPSHOT") == "true"
     steps:
     - label: ":package: Build Elastic-Agent Core Snapshot"
-      command: |
-        source .buildkite/scripts/common.sh
-        BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
-        export BEAT_VERSION
-        .buildkite/scripts/steps/build-agent-core.sh
-        buildkite-agent meta-data set DRA_VERSION "${BEAT_VERSION}"
+      commands:
+        - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-snapshot"
       artifact_paths:
         - "build/distributions/**/*"
@@ -37,12 +33,6 @@ steps:
         echo "+++ Changing permissions for the release manager"
         sudo chown -R :1000 build/distributions/
         echo "+++ Running DRA publish step"
-        DRA_COMMIT=$BUILDKITE_COMMIT
-        export DRA_COMMIT
-        DRA_BRANCH=$BUILDKITE_BRANCH
-        export DRA_BRANCH
-        DRA_VERSION=$(buildkite-agent meta-data get DRA_VERSION --default "")
-        export DRA_VERSION
         .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-snapshot"
       agents:
@@ -56,12 +46,8 @@ steps:
     if: build.branch =~ /^[0-9]+\.[0-9]+\$/ || build.env("RUN_STAGING") == "true"
     steps:
     - label: ":package: Build Elastic-Agent Core staging"
-      command: |
-        source .buildkite/scripts/common.sh
-        BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
-        export BEAT_VERSION
-        .buildkite/scripts/steps/build-agent-core.sh
-        buildkite-agent meta-data set DRA_VERSION "${BEAT_VERSION}"
+      commands:
+        - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-staging"
       artifact_paths:
         - "build/distributions/**/*"
@@ -80,12 +66,6 @@ steps:
         echo "+++ Changing permissions for the release manager"
         sudo chown -R :1000 build/distributions/
         echo "+++ Running DRA publish step"
-        DRA_COMMIT=$BUILDKITE_COMMIT
-        export DRA_COMMIT
-        DRA_BRANCH=$BUILDKITE_BRANCH
-        export DRA_BRANCH
-        DRA_VERSION=$(buildkite-agent meta-data get DRA_VERSION --default "")
-        export DRA_VERSION
         .buildkite/scripts/steps/dra-publish.sh
       key: "publish-dra-staging"
       agents:
