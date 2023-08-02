@@ -35,13 +35,13 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	require.NotEmpty(t, resp.ID)
 	require.NotEmpty(t, resp.ElasticsearchEndpoint)
 	require.NotEmpty(t, resp.KibanaEndpoint)
-	require.NotEmpty(t, resp.ESUser)
-	require.NotEmpty(t, resp.ESPassword)
+	require.NotEmpty(t, resp.Username)
+	require.NotEmpty(t, resp.Password)
 
 	// Wait until deployment is started
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	isReady, err := client.DeploymentIsReady(ctx, 10*time.Second)
+	isReady, err := client.DeploymentIsReady(ctx, resp.ID, 10*time.Second)
 	require.NoError(t, err)
 	require.True(t, isReady)
 
@@ -57,6 +57,6 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	}
 
 	// Shutdown deployment
-	err = client.ShutdownDeployment(context.Background())
+	err = client.ShutdownDeployment(context.Background(), resp.ID)
 	require.NoError(t, err)
 }

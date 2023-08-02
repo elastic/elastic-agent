@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/testing/runner"
 )
 
 var serverlessURL = "https://global.qa.cld.elstc.co"
@@ -21,7 +22,7 @@ type ServerlessClient struct {
 	projectType string
 	api         string
 	proj        Project
-	log         *logp.Logger
+	log         runner.Logger
 }
 
 // ServerlessRequest contains the data needed for a new serverless instance
@@ -50,25 +51,39 @@ type Project struct {
 	} `json:"endpoints"`
 }
 
+type defaultLogger struct {
+	wrapped *logp.Logger
+}
+
+// / implements the runner.Logger interface
+func (log *defaultLogger) Logf(format string, args ...any) {
+	log.wrapped.Infof(format, args)
+}
+
 // NewServerlessClient creates a new instance of the serverless client
 func NewServerlessClient(region, projectType, api string) *ServerlessClient {
 	return &ServerlessClient{
-		log:         logp.L(),
 		region:      region,
 		api:         api,
 		projectType: projectType,
+		log:         &defaultLogger{wrapped: logp.L()},
 	}
 }
 
-// CreateDeployment creates a new serverless elastic stack
-func (srv *ServerlessClient) CreateDeployment(ctx context.Context, req ServerlessRequest) (Project, error) {
-	p, err := json.Marshal(req)
+// SetLogger sets the logger for the
+func (srv *ServerlessClient) SetLogger(l runner.Logger) {
+	srv.log = l
+}
+
+// DeployStack creates a new serverless elastic stack
+func (srv *ServerlessClient) DeployStack(ctx context.Context, req ServerlessRequest) (Project, error) {
+	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return Project{}, fmt.Errorf("error marshaling JSON request %w", err)
 	}
 	urlPath := fmt.Sprintf("%s/api/v1/serverless/projects/%s", serverlessURL, srv.projectType)
 
-	httpHandler, err := http.NewRequestWithContext(ctx, "POST", urlPath, bytes.NewReader(p))
+	httpHandler, err := http.NewRequestWithContext(ctx, "POST", urlPath, bytes.NewReader(reqBody))
 	if err != nil {
 		return Project{}, fmt.Errorf("error creating new httpRequest: %w", err)
 	}
@@ -102,17 +117,17 @@ func (srv *ServerlessClient) DeploymentIsReady(ctx context.Context) (bool, error
 	if err != nil {
 		return false, fmt.Errorf("error waiting for endpoints to become available: %w", err)
 	}
-	srv.log.Infof("Endpoints available: ES: %s Fleet: %s Kibana: %s", srv.proj.Endpoints.Elasticsearch, srv.proj.Endpoints.Fleet, srv.proj.Endpoints.Kibana)
+	srv.log.Logf("Endpoints available: ES: %s Fleet: %s Kibana: %s", srv.proj.Endpoints.Elasticsearch, srv.proj.Endpoints.Fleet, srv.proj.Endpoints.Kibana)
 	err = srv.WaitForElasticsearch(ctx)
 	if err != nil {
 		return false, fmt.Errorf("error waiting for ES to become available: %w", err)
 	}
-	srv.log.Infof("Elasticsearch healthy...")
+	srv.log.Logf("Elasticsearch healthy...")
 	err = srv.WaitForKibana(ctx)
 	if err != nil {
 		return false, fmt.Errorf("error waiting for Kibana to become available: %w", err)
 	}
-	srv.log.Infof("Kibana healthy...")
+	srv.log.Logf("Kibana healthy...")
 
 	return true, nil
 }
@@ -153,7 +168,7 @@ func (srv *ServerlessClient) WaitForEndpoints(ctx context.Context) error {
 		err = json.NewDecoder(resp.Body).Decode(project)
 		resp.Body.Close()
 		if err != nil {
-			srv.log.Infof("response decoding error: %v", err)
+			srv.log.Logf("response decoding error: %v", err)
 			return false
 		}
 		if project.Endpoints.Elasticsearch != "" {
@@ -192,7 +207,7 @@ func (srv *ServerlessClient) WaitForElasticsearch(ctx context.Context) error {
 		err = json.NewDecoder(resp.Body).Decode(&health)
 		resp.Body.Close()
 		if err != nil {
-			srv.log.Infof("response decoding error: %v", err)
+			srv.log.Logf("response decoding error: %v", err)
 			return false
 		}
 		if health.Status == "green" {
@@ -226,7 +241,7 @@ func (srv *ServerlessClient) WaitForKibana(ctx context.Context) error {
 		}
 		err = json.NewDecoder(resp.Body).Decode(&status)
 		if err != nil {
-			srv.log.Infof("response decoding error: %v", err)
+			srv.log.Logf("response decoding error: %v", err)
 			return false
 		}
 		resp.Body.Close()
@@ -257,7 +272,7 @@ func (srv *ServerlessClient) waitForRemoteState(ctx context.Context, httpHandler
 		resp, err := http.DefaultClient.Do(httpHandler)
 		if err != nil {
 			errMsg := fmt.Errorf("request error: %w", err)
-			srv.log.Debugf(errMsg.Error())
+			srv.log.Logf(errMsg.Error())
 			lastErr = errMsg
 			timer.Reset(time.Second * 5)
 			continue
@@ -265,7 +280,7 @@ func (srv *ServerlessClient) waitForRemoteState(ctx context.Context, httpHandler
 		if resp.StatusCode != http.StatusOK {
 			errBody, _ := io.ReadAll(resp.Body)
 			errMsg := fmt.Errorf("unexpected status code %d in request to %s, body: %s", resp.StatusCode, httpHandler.URL, errBody)
-			srv.log.Debugf(errMsg.Error())
+			srv.log.Logf(errMsg.Error())
 			lastErr = errMsg
 			resp.Body.Close()
 			timer.Reset(time.Second * 5)

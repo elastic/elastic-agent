@@ -15,6 +15,12 @@ import (
 	"time"
 )
 
+type CreateDeploymentRequest struct {
+	Name    string `json:"name"`
+	Region  string `json:"region"`
+	Version string `json:"version"`
+}
+
 type CreateDeploymentResponse struct {
 	ID string `json:"id"`
 
@@ -77,7 +83,7 @@ type DeploymentStatusResponse struct {
 }
 
 // CreateDeployment creates the deployment with the specified configuration.
-func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentRequest) (*CreateResponse, error) {
+func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentRequest) (*CreateDeploymentResponse, error) {
 	tpl, err := template.New("create_deployment_request").Parse(createDeploymentRequestTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse deployment creation template: %w", err)
@@ -122,20 +128,20 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 		return nil, fmt.Errorf("failed to create: (%s) %s", createRespBody.Errors[0].Code, createRespBody.Errors[0].Message)
 	}
 
-	createReturn := CreateResponse{
+	r := CreateDeploymentResponse{
 		ID: createRespBody.ID,
 	}
 
 	for _, resource := range createRespBody.Resources {
 		if resource.Kind == "elasticsearch" {
-			createReturn.ESUser = resource.Credentials.Username
-			createReturn.ESPassword = resource.Credentials.Password
+			r.Username = resource.Credentials.Username
+			r.Password = resource.Credentials.Password
 			break
 		}
 	}
 
 	// Get Elasticsearch and Kibana endpoint URLs
-	getResp, err := c.getDeployment(ctx, createReturn.ID)
+	getResp, err := c.getDeployment(ctx, r.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error calling deployment retrieval API: %w", err)
 	}
@@ -164,18 +170,15 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 		return nil, fmt.Errorf("error parsing deployment retrieval API response: %w", err)
 	}
 
-	createReturn.ElasticsearchEndpoint = getRespBody.Resources.Elasticsearch[0].Info.Metadata.ServiceUrl
-	createReturn.KibanaEndpoint = getRespBody.Resources.Kibana[0].Info.Metadata.ServiceUrl
-	c.deploymentID = createReturn.ID
-	return &createReturn, nil
+	r.ElasticsearchEndpoint = getRespBody.Resources.Elasticsearch[0].Info.Metadata.ServiceUrl
+	r.KibanaEndpoint = getRespBody.Resources.Kibana[0].Info.Metadata.ServiceUrl
+
+	return &r, nil
 }
 
 // ShutdownDeployment attempts to shut down the ESS deployment with the specified ID.
-func (c *Client) ShutdownDeployment(ctx context.Context) error {
-	if c.deploymentID == "" {
-		return ErrDeploymentDoesNotExist
-	}
-	u, err := url.JoinPath("deployments", c.deploymentID, "_shutdown")
+func (c *Client) ShutdownDeployment(ctx context.Context, deploymentID string) error {
+	u, err := url.JoinPath("deployments", deploymentID, "_shutdown")
 	if err != nil {
 		return fmt.Errorf("unable to create deployment shutdown API URL: %w", err)
 	}
@@ -237,10 +240,7 @@ func (c *Client) DeploymentStatus(ctx context.Context, deploymentID string) (*De
 
 // DeploymentIsReady returns true when the deployment is ready, checking its status
 // every `tick` until `waitFor` duration.
-func (c *Client) DeploymentIsReady(ctx context.Context, tick time.Duration) (bool, error) {
-	if c.deploymentID == "" {
-		return false, ErrDeploymentDoesNotExist
-	}
+func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tick time.Duration) (bool, error) {
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
@@ -255,7 +255,7 @@ func (c *Client) DeploymentIsReady(ctx context.Context, tick time.Duration) (boo
 			statusCtx, statusCancel := context.WithTimeout(ctx, tick)
 			defer statusCancel()
 			go func() {
-				status, err := c.DeploymentStatus(statusCtx, c.deploymentID)
+				status, err := c.DeploymentStatus(statusCtx, deploymentID)
 				if err != nil {
 					errCh <- err
 					return

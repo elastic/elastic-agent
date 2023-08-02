@@ -17,7 +17,7 @@ func TestStartServerless(t *testing.T) {
 	defer cancel()
 
 	req := ServerlessRequest{Name: "ingest-e2e-test", RegionID: "aws-eu-west-1"}
-	_, err := clientHandle.CreateDeployment(ctx, req)
+	_, err := clientHandle.DeployStack(ctx, req)
 	require.NoError(t, err)
 
 	t.Logf("Waiting...")

@@ -23,7 +23,6 @@ import (
 	"k8s.io/utils/strings/slices"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/ess"
 )
 
 // OSBatch defines the mapping between a SupportedOS and a define.Batch.
@@ -73,15 +72,6 @@ type OSRunner interface {
 type Logger interface {
 	// Logf logs the message for this runner.
 	Logf(format string, args ...any)
-}
-
-type essCloudResponse struct {
-	resp   *ess.CreateResponse
-	ready  bool
-	done   bool
-	subCh  []chan *ess.CreateResponse
-	subMx  sync.RWMutex
-	client ess.DeplymentHandler
 }
 
 // Result is the complete result from the runner.
