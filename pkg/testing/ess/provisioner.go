@@ -126,7 +126,8 @@ func (p *provisioner) Clean(ctx context.Context, stacks []runner.Stack) error {
 		}
 	}
 	if len(errs) > 0 {
-		return errors.Join(errs...)
+		// go 1.19 doesn't have errors.Join, for now we just return the first error
+		return errs[0]
 	}
 	return nil
 }
