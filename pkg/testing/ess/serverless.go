@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 )
 
@@ -51,28 +50,14 @@ type Project struct {
 	} `json:"endpoints"`
 }
 
-type defaultLogger struct {
-	wrapped *logp.Logger
-}
-
-// / implements the runner.Logger interface
-func (log *defaultLogger) Logf(format string, args ...any) {
-	log.wrapped.Infof(format, args)
-}
-
 // NewServerlessClient creates a new instance of the serverless client
-func NewServerlessClient(region, projectType, api string) *ServerlessClient {
+func NewServerlessClient(region, projectType, api string, logger runner.Logger) *ServerlessClient {
 	return &ServerlessClient{
 		region:      region,
 		api:         api,
 		projectType: projectType,
-		log:         &defaultLogger{wrapped: logp.L()},
+		log:         logger,
 	}
-}
-
-// SetLogger sets the logger for the
-func (srv *ServerlessClient) SetLogger(l runner.Logger) {
-	srv.log = l
 }
 
 // DeployStack creates a new serverless elastic stack
@@ -279,7 +264,7 @@ func (srv *ServerlessClient) waitForRemoteState(ctx context.Context, httpHandler
 		}
 		if resp.StatusCode != http.StatusOK {
 			errBody, _ := io.ReadAll(resp.Body)
-			errMsg := fmt.Errorf("unexpected status code %d in request to %s, body: %s", resp.StatusCode, httpHandler.URL, errBody)
+			errMsg := fmt.Errorf("unexpected status code %d in request to %s, body: %s", resp.StatusCode, httpHandler.URL.String(), string(errBody))
 			srv.log.Logf(errMsg.Error())
 			lastErr = errMsg
 			resp.Body.Close()

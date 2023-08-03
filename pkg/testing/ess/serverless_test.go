@@ -6,18 +6,83 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	"github.com/stretchr/testify/require"
 )
 
+func TestProvisionGetRegions(t *testing.T) {
+	logp.DevelopmentSetup()
+	key, found, err := GetESSAPIKey()
+	if !found {
+		t.Skip("No credentials found for ESS")
+	}
+	require.NoError(t, err)
+	require.True(t, found)
+
+	cfg := ProvisionerConfig{Region: "bad-region-ID", APIKey: key}
+	prov := &ServerlessProvision{
+		cfg:    cfg,
+		stacks: map[string]stackhandlerData{},
+		log:    &defaultLogger{wrapped: logp.L()},
+	}
+	err = prov.CheckCloudRegion()
+	require.NoError(t, err)
+	require.NotEqual(t, "bad-region-ID", prov.cfg.Region)
+
+}
+
+func TestStackProvisioner(t *testing.T) {
+	logp.DevelopmentSetup()
+	key, found, err := GetESSAPIKey()
+	if !found {
+		t.Skip("No credentials found for ESS")
+	}
+	require.NoError(t, err)
+	require.True(t, found)
+
+	cfg := ProvisionerConfig{Region: "aws-eu-west-1", APIKey: key}
+	provClient, err := NewServerlessProvisioner(cfg)
+	require.NoError(t, err)
+	stacks := []runner.StackRequest{
+		{ID: "stack-test-one", Version: "8.9.0"},
+		{ID: "stack-test-two", Version: "8.9.0"},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+	res, err := provClient.Provision(ctx, stacks)
+	require.NoError(t, err)
+	t.Logf("got results:")
+	for _, stack := range res {
+		t.Logf("stack: %#v", stack)
+		require.NotEmpty(t, stack.Elasticsearch)
+		require.NotEmpty(t, stack.Kibana)
+		require.NotEmpty(t, stack.Password)
+		require.NotEmpty(t, stack.Username)
+	}
+	t.Logf("tearing down...")
+	err = provClient.Clean(ctx, res)
+	require.NoError(t, err)
+
+}
+
 func TestStartServerless(t *testing.T) {
 	logp.DevelopmentSetup()
-	clientHandle := NewServerlessClient("aws-eu-west-1", "observability", "dVhuaUw0Z0JLcGpvUzVkeWxFVkE6a2w3d3RtXzRUTEMzLTZhZTBBWW81dw==")
+	key, found, err := GetESSAPIKey()
+	if !found {
+		t.Skip("No credentials found for ESS")
+	}
+	require.NoError(t, err)
+	clientHandle := NewServerlessClient("aws-eu-west-1",
+		"observability",
+		key,
+		&defaultLogger{wrapped: logp.L()})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*240)
 	defer cancel()
 
 	req := ServerlessRequest{Name: "ingest-e2e-test", RegionID: "aws-eu-west-1"}
-	_, err := clientHandle.DeployStack(ctx, req)
+	_, err = clientHandle.DeployStack(ctx, req)
 	require.NoError(t, err)
 
 	t.Logf("Waiting...")
