@@ -211,7 +211,8 @@ func TestStandaloneUpgrade(t *testing.T) {
 
 			parsedUpgradeVersion, err := version.ParseVersion(define.Version())
 			require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
-			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", true, true, false, "")
+			skipVerify:=version_8_7_0.Less(parsedVersion)
+			testStandaloneUpgrade(ctx, t, agentFixture, parsedVersion, parsedUpgradeVersion, "", skipVerify, true, false, "")
 		})
 	}
 }
