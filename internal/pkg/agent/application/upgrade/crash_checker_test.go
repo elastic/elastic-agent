@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -189,3 +190,7 @@ func (p *testPider) PID(ctx context.Context) (int, error) {
 func (p *testPider) Close() {}
 
 func (p *testPider) Name() string { return "testPider" }
+
+func (p *testPider) Restart() error {
+	return errors.New("not yet implemented")
+}

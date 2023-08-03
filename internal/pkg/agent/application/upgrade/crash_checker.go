@@ -23,6 +23,10 @@ const (
 type serviceHandler interface {
 	PID(ctx context.Context) (int, error)
 	Name() string
+
+	// Restart restarts the Elastic Agent service
+	Restart(ctx context.Context) error
+
 	Close()
 }
 
@@ -49,9 +53,11 @@ func NewCrashChecker(ctx context.Context, ch chan error, log *logger.Logger, che
 		checkInterval: checkInterval,
 	}
 
-	if err := c.Init(ctx, log); err != nil {
+	sc, err := newServiceHandler()
+	if err != nil {
 		return nil, err
 	}
+	c.sc = sc
 
 	log.Debugf("running checks using '%s' controller", c.sc.Name())
 

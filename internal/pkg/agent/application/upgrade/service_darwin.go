@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -33,11 +32,8 @@ const (
 	afterRestartDelay = 2 * time.Second
 )
 
-// Init initializes os dependent properties.
-func (ch *CrashChecker) Init(ctx context.Context, _ *logger.Logger) error {
-	ch.sc = &darwinPidProvider{}
-
-	return nil
+func newServiceHandler() (serviceHandler, error) {
+	return &darwinPidProvider{}, nil
 }
 
 type darwinPidProvider struct{}
@@ -68,6 +64,11 @@ func (p *darwinPidProvider) PID(ctx context.Context) (int, error) {
 	}
 
 	return 0, pidErrors
+}
+
+func (p *darwinPidProvider) Restart(ctx context.Context) error {
+	// TODO
+	return errors.New("not yet implemented")
 }
 
 func (p *darwinPidProvider) piderFromCmd(name string, args ...string) func(context.Context) (int, error) {
