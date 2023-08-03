@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 
 	"github.com/stretchr/testify/require"
@@ -79,7 +80,13 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 
 	// Enroll agent
 	t.Logf("Unpacking and installing Elastic Agent")
-	output, err := InstallAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
+	// this is a partial backport of https://github.com/elastic/elastic-agent/pull/3114
+	installOpts := atesting.InstallOpts{}
+	installOpts.EnrollOpts = atesting.EnrollOpts{
+		URL:             fleetServerURL,
+		EnrollmentToken: enrollmentToken.APIKey,
+	}
+	output, err := InstallAgent(installOpts, agentFixture)
 	if err != nil {
 		t.Log(string(output))
 		return nil, fmt.Errorf("unable to enroll Elastic Agent: %w", err)

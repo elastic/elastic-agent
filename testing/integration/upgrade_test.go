@@ -126,9 +126,6 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentF
 	require.NoError(t, err)
 
 	t.Log("Enrolling Elastic Agent...")
-<<<<<<< HEAD
-	output, err := tools.InstallAgent(fleetServerURL, enrollmentToken.APIKey, agentFixture)
-=======
 	var nonInteractiveFlag bool
 	if version_8_2_0.Less(*parsedFromVersion) {
 		nonInteractiveFlag = true
@@ -142,7 +139,6 @@ func testUpgradeFleetManagedElasticAgent(t *testing.T, info *define.Info, agentF
 		},
 	}
 	output, err := tools.InstallAgent(installOpts, agentFixture)
->>>>>>> cfd059dab9 (Introduce upgrade tests from released versions (#2955))
 	if err != nil {
 		t.Log(string(output))
 	}
@@ -750,119 +746,3 @@ func upgradeAgent(ctx context.Context, version string, agentFixture *atesting.Fi
 
 	return nil
 }
-<<<<<<< HEAD
-=======
-
-func TestUpgradeBrokenPackageVersion(t *testing.T) {
-	define.Require(t, define.Requirements{
-		// We require sudo for this test to run
-		// `elastic-agent install`.
-		Sudo: true,
-
-		// It's not safe to run this test locally as it
-		// installs Elastic Agent.
-		Local: false,
-	})
-
-	// Get path to Elastic Agent executable
-	f, err := define.NewFixture(t, define.Version())
-	require.NoError(t, err)
-
-	// Prepare the Elastic Agent so the binary is extracted and ready to use.
-	err = f.Prepare(context.Background())
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	output, err := tools.InstallStandaloneAgent(f)
-	t.Logf("Agent installation output: %q", string(output))
-	require.NoError(t, err)
-
-	c := f.Client()
-
-	require.Eventually(t, func() bool {
-		err := c.Connect(ctx)
-		if err != nil {
-			t.Logf("connecting client to agent: %v", err)
-			return false
-		}
-		defer c.Disconnect()
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("agent state: %+v", state)
-		return state.State == v2proto.State_HEALTHY
-	}, 2*time.Minute, 10*time.Second, "Agent never became healthy")
-
-	// get rid of the package version files in the installed directory
-	removePackageVersionFiles(t, f)
-
-	// get the version returned by the currently running agent
-	actualVersionBytes := getAgentVersion(t, f, context.Background(), false)
-
-	actualVersion := unmarshalVersionOutput(t, actualVersionBytes, "daemon")
-
-	// start the upgrade to the latest version
-	require.NotEmpty(t, actualVersion, "broken agent package version should not be empty")
-
-	// upgrade to latest version whatever that will be
-	aac := tools.NewArtifactAPIClient()
-	versionList, err := aac.GetVersions(ctx)
-	require.NoError(t, err)
-	require.NotEmpty(t, versionList.Versions, "Artifact API returned no versions")
-	latestVersion := versionList.Versions[len(versionList.Versions)-1]
-
-	t.Logf("Upgrading to version %q", latestVersion)
-
-	err = c.Connect(ctx)
-	require.NoError(t, err, "error connecting client to agent")
-	defer c.Disconnect()
-
-	_, err = c.Upgrade(ctx, latestVersion, "", false)
-	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", latestVersion)
-	parsedLatestVersion, err := version.ParseVersion(latestVersion)
-	require.NoError(t, err)
-
-	require.Eventuallyf(t, func() bool {
-		state, err := c.State(ctx)
-		if err != nil {
-			t.Logf("error getting the agent state: %v", err)
-			return false
-		}
-		t.Logf("current agent state: %+v", state)
-		return state.Info.Version == parsedLatestVersion.CoreVersion() &&
-			state.Info.Snapshot == parsedLatestVersion.IsSnapshot() &&
-			state.State == v2proto.State_HEALTHY
-	}, 5*time.Minute, 10*time.Second, "agent never upgraded to expected version")
-}
-
-func removePackageVersionFiles(t *testing.T, f *atesting.Fixture) {
-	installFS := os.DirFS(f.WorkDir())
-	matches := []string{}
-
-	err := fs.WalkDir(installFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if d.Name() == agtversion.PackageVersionFileName {
-			matches = append(matches, path)
-		}
-		return nil
-	})
-	require.NoError(t, err)
-
-	t.Logf("package version files found: %v", matches)
-
-	// the version files should have been removed from the other test, we just make sure
-	for _, m := range matches {
-		vFile := filepath.Join(f.WorkDir(), m)
-		t.Logf("removing package version file %q", vFile)
-		err = os.Remove(vFile)
-		require.NoErrorf(t, err, "error removing package version file %q", vFile)
-	}
-}
->>>>>>> cfd059dab9 (Introduce upgrade tests from released versions (#2955))
