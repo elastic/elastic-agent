@@ -242,8 +242,8 @@ func TestStandaloneUpgradeToSpecificSnapshotBuildWithGPGFallback(t *testing.T) {
 
 	// retrieve all the versions of agent from the artifact API
 	aac := tools.NewArtifactAPIClient()
-	latestSnapshotVersion, err := tools.GetLatestSnapshotVersion(ctx, log, aac)
-	require.NoError(err)
+	latestSnapshotVersion, err := tools.GetLatestSnapshotVersion(ctx, t, aac)
+	require.NoError(t, err)
 
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
@@ -289,15 +289,15 @@ func TestStandaloneUpgradeToSpecificSnapshotBuildWithGPGFallback(t *testing.T) {
 	parsedFromVersion, err := version.ParseVersion(define.Version())
 	require.NoErrorf(t, err, "define.Version() %q cannot be parsed as agent version", define.Version())
 	_, defaultPGP := release.PGP()
-	firstSeven := default[:7]
-	customPGP = strings.Replace(
+	firstSeven := string(defaultPGP[:7])
+	customPGP := strings.Replace(
 		string(defaultPGP),
 		firstSeven,
 		"abcDEFg",
 		1,
 	)
 
-	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, false, true, "")
+	testStandaloneUpgrade(ctx, t, agentFixture, parsedFromVersion, upgradeInputVersion, expectedAgentHashAfterUpgrade, false, false, true, customPGP)
 }
 
 func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
@@ -326,8 +326,8 @@ func TestStandaloneUpgradeToSpecificSnapshotBuild(t *testing.T) {
 
 	// retrieve all the versions of agent from the artifact API
 	aac := tools.NewArtifactAPIClient()
-	latestSnapshotVersion, err := tools.GetLatestSnapshotVersion(ctx, log, aac)
-	require.NoError(err)
+	latestSnapshotVersion, err := tools.GetLatestSnapshotVersion(ctx, t, aac)
+	require.NoError(t, err)
 
 	// get all the builds of the snapshot version (need to pass x.y.z-SNAPSHOT format)
 	builds, err := aac.GetBuildsForVersion(ctx, latestSnapshotVersion.VersionWithPrerelease())
@@ -893,7 +893,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	require.NoError(t, err, "error connecting client to agent")
 	defer c.Disconnect()
 
-	_, err = c.Upgrade(ctx, latestVersion, "", false)
+	_, err = c.Upgrade(ctx, latestVersion, "", false, false)
 	require.NoErrorf(t, err, "error triggering agent upgrade to version %q", latestVersion)
 	parsedLatestVersion, err := version.ParseVersion(latestVersion)
 	require.NoError(t, err)
