@@ -9,5 +9,6 @@ steps:
     command: ".buildkite/scripts/steps/integration_tests.sh"
     artifact_paths:
       - "build/TEST-**"
+      - "build/diagnostics/*"
     agents:
       provider: "gcp"

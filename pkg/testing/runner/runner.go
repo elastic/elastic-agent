@@ -66,6 +66,8 @@ type OSRunner interface {
 	Copy(ctx context.Context, c *ssh.Client, logger Logger, repoArchive string, build Build) error
 	// Run runs the actual tests and provides the result.
 	Run(ctx context.Context, verbose bool, c *ssh.Client, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
+	// Diagnostics gathers any diagnostics from the host.
+	Diagnostics(ctx context.Context, c *ssh.Client, logger Logger, destination string) error
 }
 
 // Logger is a simple logging interface used by each runner type.
@@ -350,8 +352,14 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		return OSRunnerResult{}, fmt.Errorf("failed to copy files to instance %s: %w", instance.Name, err)
 	}
 
-	// ensure that we have all the requirements for the stack if required
+	// start with the ExtraEnv first preventing the other environment flags below
+	// from being overwritten
 	env := map[string]string{}
+	for k, v := range r.cfg.ExtraEnv {
+		env[k] = v
+	}
+
+	// ensure that we have all the requirements for the stack if required
 	if batch.Batch.Stack != nil {
 		// wait for the stack to be ready before continuing
 		r.stacksReady.Wait()
@@ -380,6 +388,17 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		logger.Logf("Failed to execute tests on instance: %s", err)
 		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
 	}
+
+	// fetch any diagnostics
+	if r.cfg.DiagnosticsDir != "" {
+		err = batch.OS.Runner.Diagnostics(ctx, client, logger, r.cfg.DiagnosticsDir)
+		if err != nil {
+			logger.Logf("Failed to fetch diagnostics: %s", err)
+		}
+	} else {
+		logger.Logf("Skipping diagnostics fetch as DiagnosticsDir was not set")
+	}
+
 	return result, nil
 }
 

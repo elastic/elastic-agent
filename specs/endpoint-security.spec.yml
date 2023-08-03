@@ -10,6 +10,7 @@ inputs:
     outputs:
       - elasticsearch
       - logstash
+      - kafka
     proxied_actions:
       - UNENROLL
       - UPGRADE

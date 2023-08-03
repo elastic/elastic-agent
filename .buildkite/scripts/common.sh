@@ -13,6 +13,8 @@ fi
 if [[ -z "${SETUP_GVM_VERSION-""}" ]]; then
     SETUP_GVM_VERSION=$(grep -oe "SETUP_GVM_VERSION\: [\"'].*[\"']" "$PIPELINE" | awk '{print $2}' | sed "s/'//g" )
 fi
+BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
+export BEAT_VERSION
 
 getOSOptions() {
   case $(uname | tr '[:upper:]' '[:lower:]') in
