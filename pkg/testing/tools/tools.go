@@ -81,7 +81,11 @@ func InstallAgentWithPolicy(t *testing.T, agentFixture *atesting.Fixture, kibCli
 	// Enroll agent
 	t.Logf("Unpacking and installing Elastic Agent")
 	// this is a partial backport of https://github.com/elastic/elastic-agent/pull/3114
-	installOpts := atesting.InstallOpts{}
+	// normally the installOpts are passed as parameter, and we just add URL and Enrollment Token
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
 	installOpts.EnrollOpts = atesting.EnrollOpts{
 		URL:             fleetServerURL,
 		EnrollmentToken: enrollmentToken.APIKey,
