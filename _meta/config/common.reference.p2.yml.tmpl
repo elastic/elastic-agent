@@ -121,6 +121,14 @@ inputs:
 #   # Default is false
 #   exponential: false
 
+# agent.limits:
+#   # limits the number of operating system threads per process.
+#   # For Go processes it translates into GOMAXPROCS, for other platforms it can differ.
+#   # The agent sets it for itself and sends this value to all components via the control protocol.
+#   # It's up to the components to handle this value.
+#   # By default, it's set to the amount of available cores.
+#   max_procs: 4
+
 # agent.monitoring:
 #   # enabled turns on monitoring of running processes
 #   enabled: false

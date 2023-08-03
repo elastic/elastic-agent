@@ -21,6 +21,7 @@ type SettingsConfig struct {
 	MonitoringConfig *monitoringCfg.MonitoringConfig `yaml:"monitoring" config:"monitoring" json:"monitoring"`
 	LoggingConfig    *logger.Config                  `yaml:"logging,omitempty" config:"logging,omitempty" json:"logging,omitempty"`
 	Upgrade          *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
+	Limits           *LimitsConfig                   `yaml:"limits" config:"limits" json:"limits"`
 
 	// standalone config
 	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
@@ -38,6 +39,7 @@ func DefaultSettingsConfig() *SettingsConfig {
 		GRPC:                DefaultGRPCConfig(),
 		Upgrade:             DefaultUpgradeConfig(),
 		Reload:              DefaultReloadConfig(),
+		Limits:              DefaultLimitsConfig(),
 		V1MonitoringEnabled: true,
 	}
 }

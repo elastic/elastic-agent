@@ -5,10 +5,15 @@
 package runtime
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestAddToBucket(t *testing.T) {
@@ -46,4 +51,31 @@ func TestAddToBucket(t *testing.T) {
 			require.Equal(t, tc.shouldBlock, blocked)
 		})
 	}
+}
+
+func TestGoMaxProcs(t *testing.T) {
+	log, obs := logger.NewTesting("TestGoMaxProcs")
+	c := component.Component{
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryPath: "test-binary", // does not exist
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{},
+			},
+		},
+	}
+	r, err := newCommandRuntime(c, log, newTestMonitoringMgr(), &configuration.LimitsConfig{
+		MaxProcs: 255, // less likely to much the real core count
+	})
+	require.NoError(t, err)
+
+	err = r.start(nil)
+	require.Error(t, err, "the fake command should fail")
+
+	correctError := strings.Contains(err.Error(), "test-binary") &&
+		strings.Contains(err.Error(), "test-binary: no such file or directory") ||
+		strings.Contains(err.Error(), "file does not exist")
+	require.Truef(t, correctError, "the fake command should not be found, error message %s", err.Error())
+
+	logs := obs.FilterMessageSnippet(`GOMAXPROCS for "test-binary" is set to 255`)
+	require.Equalf(t, 1, logs.Len(), "expected one log message about GOMAXPROCS")
 }

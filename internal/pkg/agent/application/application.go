@@ -6,6 +6,7 @@ package application
 
 import (
 	"fmt"
+	goruntime "runtime"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -95,6 +96,10 @@ func New(
 		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	// setting the limit for the agent itself
+	_ = goruntime.GOMAXPROCS(cfg.Settings.Limits.MaxProcs)
+	log.Debugf("GOMAXPROCS for the agent is set to %d", cfg.Settings.Limits.MaxProcs)
+
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 	upgrader := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
@@ -108,6 +113,7 @@ func New(
 		tracer,
 		monitor,
 		cfg.Settings.GRPC,
+		cfg.Settings.Limits,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)

@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -38,6 +39,7 @@ const (
 
 	envAgentComponentID   = "AGENT_COMPONENT_ID"
 	envAgentComponentType = "AGENT_COMPONENT_TYPE"
+	goMaxProcs            = "GOMAXPROCS"
 
 	stateUnknownMessage = "Unknown"
 )
@@ -69,6 +71,7 @@ type procState struct {
 type commandRuntime struct {
 	logStd *logWriter
 	logErr *logWriter
+	log    *logger.Logger
 
 	current component.Component
 	monitor MonitoringManager
@@ -85,19 +88,23 @@ type commandRuntime struct {
 	lastCheckin    time.Time
 	missedCheckins int
 	restartBucket  *rate.Limiter
+
+	limitsConfig *configuration.LimitsConfig
 }
 
 // newCommandRuntime creates a new command runtime for the provided component.
-func newCommandRuntime(comp component.Component, log *logger.Logger, monitor MonitoringManager) (*commandRuntime, error) {
+func newCommandRuntime(comp component.Component, log *logger.Logger, monitor MonitoringManager, limitsConfig *configuration.LimitsConfig) (*commandRuntime, error) {
 	c := &commandRuntime{
-		current:     comp,
-		monitor:     monitor,
-		ch:          make(chan ComponentState),
-		actionCh:    make(chan actionMode, 1),
-		procCh:      make(chan procState),
-		compCh:      make(chan component.Component, 1),
-		actionState: actionStop,
-		state:       newComponentState(&comp),
+		current:      comp,
+		monitor:      monitor,
+		log:          log,
+		ch:           make(chan ComponentState),
+		actionCh:     make(chan actionMode, 1),
+		procCh:       make(chan procState),
+		compCh:       make(chan component.Component, 1),
+		actionState:  actionStop,
+		state:        newComponentState(&comp),
+		limitsConfig: limitsConfig,
 	}
 	cmdSpec := c.getCommandSpec()
 	if cmdSpec == nil {
@@ -325,18 +332,23 @@ func (c *commandRuntime) start(comm Communicator) error {
 		return nil
 	}
 	cmdSpec := c.getCommandSpec()
+	specBinaryPath := c.getSpecBinaryPath()
+
 	env := make([]string, 0, len(cmdSpec.Env)+2)
 	for _, e := range cmdSpec.Env {
 		env = append(env, fmt.Sprintf("%s=%s", e.Name, e.Value))
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
+	env = append(env, fmt.Sprintf("%s=%d", goMaxProcs, c.limitsConfig.MaxProcs))
+	c.log.Debugf("GOMAXPROCS for %q is set to %d", specBinaryPath, c.limitsConfig.MaxProcs)
+
 	uid, gid := os.Geteuid(), os.Getegid()
 	workDir, err := c.workDir(uid, gid)
 	if err != nil {
 		return err
 	}
-	path, err := filepath.Abs(c.getSpecBinaryPath())
+	path, err := filepath.Abs(specBinaryPath)
 	if err != nil {
 		return fmt.Errorf("failed to determine absolute path: %w", err)
 	}
