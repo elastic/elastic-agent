@@ -69,7 +69,6 @@ func (srv *ServerlessProvision) SetLogger(l runner.Logger) {
 
 // Provision a new set of serverless instances
 func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runner.StackRequest) ([]runner.Stack, error) {
-
 	upWaiter := sync.WaitGroup{}
 	depErrs := make(chan error, len(requests))
 	depUp := make(chan bool, len(requests))
@@ -128,8 +127,8 @@ func (prov *ServerlessProvision) Provision(ctx context.Context, requests []runne
 
 }
 
+// Clean shuts down and removes the deployments
 func (prov *ServerlessProvision) Clean(ctx context.Context, stacks []runner.Stack) error {
-
 	for _, stack := range stacks {
 		prov.stacksMut.RLock()
 		stackRef, ok := prov.stacks[stack.ID]
