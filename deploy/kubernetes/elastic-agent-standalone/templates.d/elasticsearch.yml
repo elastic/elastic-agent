@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-elasticsearch
+      id: filestream-elasticsearch-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -124,6 +125,7 @@ inputs:
                 symlinks: true
       data_stream.namespace: default
     - name: elasticsearch/metrics-elasticsearch
+      id: elasticsearch/metrics-elasticsearch-${kubernetes.hints.container_id}
       type: elasticsearch/metrics
       use_output: default
       streams:

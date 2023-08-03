@@ -1,5 +1,0 @@
-kind: feature
-summary: Add the logs subcommand to the agent CLI
-component: CLI
-pr: https://github.com/elastic/elastic-agent/pull/2745
-issue: https://github.com/elastic/elastic-agent/issues/114

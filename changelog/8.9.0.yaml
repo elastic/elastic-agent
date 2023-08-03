@@ -1,0 +1,93 @@
+version: 8.9.0
+entries:
+    - kind: bug-fix
+      summary: Bump node to 18.16.0
+      description: ""
+      component: synthetics
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2696
+      issue: []
+      timestamp: 1684175757
+      file:
+        name: 1684175757-bump-node-deps.yaml
+        checksum: 7539b8e2aa9f7fef1d1ea74874cd48b774193b6f
+    - kind: feature
+      summary: Allow upgrade to snapshots
+      description: Allow upgrade to a specific snapshot version by specifying the build id
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2752
+      issue: []
+      timestamp: 1684731814
+      file:
+        name: 1684731814-Allow-upgrade-to-snapshots.yaml
+        checksum: b60b174e5b776e82e5ad58921f316b9af8fce3c1
+    - kind: feature
+      summary: Add the logs subcommand to the agent CLI
+      description: ""
+      component: CLI
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2745
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/114
+      timestamp: 1685442237
+      file:
+        name: 1685442237-add-logs-subcommand.yaml
+        checksum: 1ab375b6c055d8e4571c495fab96a88294971795
+    - kind: enhancement
+      summary: Lowercase reported hostnames per Elastic Common Schema (ECS) guidelines for the host.name field.
+      description: Upgraded github.com/elastic/go-sysinfo from 1.10.0 to 1.11.0.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2767
+      issue: []
+      timestamp: 1686142189
+      file:
+        name: 1686142189-Lowercase-reported-hostnames-per-Elastic-Common-Schema-(ECS)-guidelines-for-the-host.name-field..yaml
+        checksum: e001fc5b954d119ea4e0875e42e15a574d64423b
+    - kind: enhancement
+      summary: deployment/kubernetes - add elements for Universal Profiling
+      description: ""
+      component: Universal Profiling
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2881
+      issue: []
+      timestamp: 1686845318
+      file:
+        name: 1686845318-deployment-kubernetes-add-elements-for-Universal-Profiling.yaml
+        checksum: cf794c0ef5a74d8fc2ad78a5597979eacc7f46a0
+    - kind: breaking-change
+      summary: status command, change human output to be a summary, added full output
+      description: status command has been changed, the default human output now uses a list format and summaries output. Full human output can be obtained with the new `full` option.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2890
+      issue: []
+      timestamp: 1686949146
+      file:
+        name: 1686949146-update-status-command.yaml
+        checksum: c8f2acfa356af46f991b9bda477e142ab3f3ce21
+    - kind: bug-fix
+      summary: change monitoring socket
+      description: Change monitoring socket to use a hash of the id instead of the actual id.  This shortens the path to be less than the 104 character limit.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3096
+        - https://github.com/elastic/elastic-agent/pull/2912
+      issue: []
+      timestamp: 1687362147
+      file:
+        name: 1687362147-change-monitoring-socket.yaml
+        checksum: 2e0a2d398075cde723ca95d7b4e8d44a53bd2439
+    - kind: bug-fix
+      summary: Fix drop processor for monitoring components
+      description: It fixes the drop processor for monitoring component logs, instead of using the dataset that does not include any information about whether the component is a monitoring component it now uses the `component.id`.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/2982
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2388
+      timestamp: 1688401847
+      file:
+        name: 1688401847-Fix-drop-processor-for-monitoring-components.yaml
+        checksum: 915711cf01de806c374675cbcad89d5f29b12254

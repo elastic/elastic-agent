@@ -8,10 +8,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/kardianos/service"
 
@@ -26,16 +26,18 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath string) error {
+func Uninstall(cfgFile, topPath, uninstallToken string) error {
 	// uninstall the current service
 	svc, err := newService(topPath)
 	if err != nil {
 		return err
 	}
 	status, _ := svc.Status()
+
 	if status == service.StatusRunning {
 		err := svc.Stop()
 		if err != nil {
@@ -45,11 +47,24 @@ func Uninstall(cfgFile, topPath string) error {
 				errors.M("service", paths.ServiceName))
 		}
 	}
-	_ = svc.Uninstall()
 
-	if err := uninstallComponents(context.Background(), cfgFile); err != nil {
+	// Uninstall components first
+	if err := uninstallComponents(context.Background(), cfgFile, uninstallToken); err != nil {
+		// If service status was running it was stopped to uninstall the components.
+		// If the components uninstall failed start the service again
+		if status == service.StatusRunning {
+			if startErr := svc.Start(); startErr != nil {
+				return errors.New(
+					err,
+					fmt.Sprintf("failed to restart service (%s), after failed components uninstall: %v", paths.ServiceName, startErr),
+					errors.M("service", paths.ServiceName))
+			}
+		}
 		return err
 	}
+
+	// Uninstall service only after components were uninstalled successfully
+	_ = svc.Uninstall()
 
 	// remove, if present on platform
 	if paths.ShellWrapperPath != "" {
@@ -63,13 +78,8 @@ func Uninstall(cfgFile, topPath string) error {
 	}
 
 	// remove existing directory
-	err = os.RemoveAll(topPath)
+	err = RemovePath(topPath)
 	if err != nil {
-		if runtime.GOOS == "windows" { //nolint:goconst // it is more readable this way
-			// possible to fail on Windows, because elastic-agent.exe is running from
-			// this directory.
-			return nil
-		}
 		return errors.New(
 			err,
 			fmt.Sprintf("failed to remove installation directory (%s)", paths.Top()),
@@ -80,15 +90,37 @@ func Uninstall(cfgFile, topPath string) error {
 }
 
 // RemovePath helps with removal path where there is a probability
-// of running into self which might prevent removal.
-// Removal will be initiated 2 seconds after a call.
+// of running into an executable running that might prevent removal
+// on Windows.
+//
+// On Windows it is possible that a removal can spuriously error due
+// to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
+// seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	cleanupErr := os.RemoveAll(path)
-	if cleanupErr != nil && isBlockingOnSelf(cleanupErr) {
-		delayedRemoval(path)
+	const arbitraryTimeout = 2 * time.Second
+	var start time.Time
+	nextSleep := 1 * time.Millisecond
+	for {
+		err := os.RemoveAll(path)
+		if err == nil {
+			return nil
+		}
+		if isBlockingOnExe(err) {
+			// try to remove the blocking exe
+			err = removeBlockingExe(err)
+		}
+		if err == nil {
+			return nil
+		}
+		if !isRetryableError(err) {
+			return err
+		}
+		if start.IsZero() {
+			start = time.Now()
+		} else if d := time.Since(start) + nextSleep; d >= arbitraryTimeout {
+			return err
+		}
 	}
-
-	return cleanupErr
 }
 
 func RemoveBut(path string, bestEffort bool, exceptions ...string) error {
@@ -131,28 +163,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func isBlockingOnSelf(err error) bool {
-	// cannot remove self, this is expected on windows
-	// fails with  remove {path}}\elastic-agent.exe: Access is denied
-	return runtime.GOOS == "windows" &&
-		err != nil &&
-		strings.Contains(err.Error(), "elastic-agent.exe") &&
-		strings.Contains(err.Error(), "Access is denied")
-}
-
-func delayedRemoval(path string) {
-	// The installation path will still exists because we are executing from that
-	// directory. So cmd.exe is spawned that sleeps for 2 seconds (using ping, recommend way from
-	// from Windows) then rmdir is performed.
-	//nolint:gosec // it's not tainted
-	rmdir := exec.Command(
-		filepath.Join(os.Getenv("windir"), "system32", "cmd.exe"),
-		"/C", "ping", "-n", "2", "127.0.0.1", "&&", "rmdir", "/s", "/q", path)
-	_ = rmdir.Start()
-
-}
-
-func uninstallComponents(ctx context.Context, cfgFile string) error {
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string) error {
 	log, err := logger.NewWithLogpLevel("", logp.ErrorLevel, false)
 	if err != nil {
 		return err
@@ -188,6 +199,11 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 		return nil
 	}
 
+	// Need to read the features from config on uninstall, in order to set the tamper protection feature flag correctly
+	if err := features.Apply(cfg); err != nil {
+		return fmt.Errorf("could not parse and apply feature flags config: %w", err)
+	}
+
 	// check caps so we don't try uninstalling things that were already
 	// prevented from installing
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), log)
@@ -201,19 +217,23 @@ func uninstallComponents(ctx context.Context, cfgFile string) error {
 			// This component is not active
 			continue
 		}
-		if err := uninstallServiceComponent(ctx, log, comp); err != nil {
+		if err := uninstallServiceComponent(ctx, log, comp, uninstallToken); err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
+			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
+			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
+			// Thus returning error here.
+			return err
 		}
 	}
 
 	return nil
 }
 
-func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component) error {
+func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string) error {
 	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
 	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
 	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
-	return comprt.UninstallService(ctx, log, comp)
+	return comprt.UninstallService(ctx, log, comp, uninstallToken)
 }
 
 func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {

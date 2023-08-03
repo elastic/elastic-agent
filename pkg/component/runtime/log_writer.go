@@ -36,8 +36,9 @@ type logWriter struct {
 	loggerCore zapcoreWriter
 	logCfg     component.CommandLogSpec
 	logLevel   zap.AtomicLevel
+
+	mx         sync.Mutex
 	unitLevels map[string]zapcore.Level
-	levelMx    sync.RWMutex
 	remainder  []byte
 
 	// inheritLevel is the level that will be used for a log message in the case it doesn't define a log level
@@ -60,9 +61,10 @@ func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec, ll zapcor
 }
 
 func (r *logWriter) SetLevels(ll zapcore.Level, unitLevels map[string]zapcore.Level) {
+	// must hold to lock so Write doesn't access the unitLevels
+	r.mx.Lock()
+	defer r.mx.Unlock()
 	r.logLevel.SetLevel(ll)
-	r.levelMx.Lock()
-	defer r.levelMx.Unlock()
 	r.unitLevels = unitLevels
 }
 
@@ -71,6 +73,12 @@ func (r *logWriter) Write(p []byte) (int, error) {
 		// nothing to do
 		return 0, nil
 	}
+
+	// hold the lock so SetLevels and the remainder is not touched
+	// from multiple go routines
+	r.mx.Lock()
+	defer r.mx.Unlock()
+
 	offset := 0
 	for {
 		idx := bytes.IndexByte(p[offset:], '\n')
@@ -127,13 +135,11 @@ func (r *logWriter) handleJSON(line string) bool {
 	allowedLvl := r.logLevel.Level()
 	unitId := getUnitId(evt)
 	if unitId != "" {
-		r.levelMx.RLock()
 		if r.unitLevels != nil {
 			if unitLevel, ok := r.unitLevels[unitId]; ok {
 				allowedLvl = unitLevel
 			}
 		}
-		r.levelMx.RUnlock()
 	}
 	if allowedLvl.Enabled(lvl) {
 		_ = r.loggerCore.Write(zapcore.Entry{

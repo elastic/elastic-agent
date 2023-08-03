@@ -49,6 +49,83 @@ pass `[testName]` to `go test` as `--run=[testName]`.
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
+#### Passing additional go test flags
+
+When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
+
+These flags are passed also when calculating batches for remote execution of integration tests.
+This allows for selecting a subset of test in a convenient way (see examples below)
+
+This feature is intended mostly for integration tests debugging/development without the need for
+new mage targets corresponding to a new set of test flags.
+
+A few examples:
+
+##### Run a single test with an exact match
+We want to run only the test named "TestStandaloneUpgrade"
+`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$" mage integration:test`
+
+##### Run a tests matching a partial expression
+We want to run any test with "Upgrade" in the name
+`GOTEST_FLAGS="-test.run Upgrade" mage integration:test`
+
+##### Run a single test and signal that we want the short version
+We pass a `-test.short` flag along with the name match
+`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$ -test.short" mage integration:test`
+
+##### Run a single test multiple times
+We pass a `-test.count` flag along with the name match
+`GOTEST_FLAGS="-test.run ^TestStandaloneUpgrade$ -test.count 10" mage integration:test`
+
+##### Run specific tests
+We pass a `-test.run` flag along with the names of the tests we want to run in OR
+`GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
+
+##### Limitations
+Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
+is split on space, so not all combination of flags and their values may be correctly split.
+
+### Cleaning up resources
+
+The test run will keep provisioned resources (instances and stacks) around after the tests have been ran. This allows
+following `mage integration:*` commands to re-use the already provisioned resources.
+
+- `mage integration:clean` will de-provision the allocated resources and cleanup any local state.
+
+Tests with external dependencies might need more environment variables to be set
+when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
+`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
+
+### Debugging tests
+
+#### Auto diagnostics retrieval
+When an integration test fails the testing fixture will try its best to automatically collect the diagnostic
+information of the installed Elastic Agent. In the case that diagnostics is collected the test runner will
+automatically transfer any collected diagnostics from the instance back to the running host. The results of the
+diagnostic collection are placed in `build/diagnostics`.
+
+#### Gather diagnostics manually
+In the case that you want to run the integration testing suite and have it gather the diagnostics at the end of
+every tests you can use the environment variable `AGENT_COLLECT_DIAG=true`. When that environment variable is defined
+it will cause the testing fixture to always collect diagnostics before the uninstall in the cleanup step of a test.
+
+#### Keeping Elastic Agent installed
+When the testing fixture installs the Elastic Agent it will automatically uninstall the Elastic Agent during the
+cleanup process of the test. In the case that you do not want that to happen you can disable the auto-uninstallation
+using `AGENT_KEEP_INSTALLED=true` environment variable. It is recommend to only do this when inspecting a single test.
+
+- `AGENT_KEEP_INSTALLED=true mage integration:single [testName]`
+
+## Manually running the tests
+
+If you want to run the tests manually, skipping the test runner, set the
+`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
+with `go test`. E.g.:
+
+```shell
+TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
+```
+
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
@@ -62,6 +139,25 @@ to write tests using the integration and E2E testing framework. Also look at
 the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
 framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
 package for helper utilities.
+
+### Test namespaces
+
+Every test has access to its own unique namespace (a string value). This namespace can
+be accessed from the `info.Namespace` field, where `info` is the struct value returned
+from the `define.Require(...)` call made at the start of the test.
+
+Namespaces should be used whenever test data is being written to or read from a persistent store that's
+shared across all tests. Most commonly, this store will be the Elasticsearch cluster that Agent
+components may index their data into. All tests share a single stack deployment and, therefore,
+a single Elasticsearch cluster as well.
+
+Some examples of where namespaces should be used:
+* When creating a policy in Fleet. The Create Policy and Update Policy APIs takes a namespace parameter.
+* When searching for documents in `logs-*` or `metrics-*` data streams. Every document in these
+  data streams has a `data_stream.namespace` field.
+
+:warning: Not using namespaces when accessing data in a shared persistent store can cause tests to
+be flaky.
 
 ## Troubleshooting Tips
 
@@ -84,6 +180,14 @@ whereas the package names in the error message do not, either omit `SNAPSHOT=tru
 the `mage package` command OR set the `AGENT_VERSION` environment variable to a version
 that includes the `-SNAPSHOT` suffix when running `mage integration:test` or
 `mage integration:local`.
+
+### Failures on reused resources
+The integration framework tries to re-use resource when it can. This improves the speed at
+which the tests can run, but also means its possible for a failed test to leave state behind
+that can break future runs.
+
+Run `mage integration:clean` before running `mage integration:test` to ensure the tests are
+being run with fresh instances and stack.
 
 ### OGC-related errors
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then

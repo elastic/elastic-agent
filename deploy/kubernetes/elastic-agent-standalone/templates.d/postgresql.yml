@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-postgresql
+      id: filestream-postgresql-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -26,6 +27,7 @@ inputs:
             - postgresql-log
       data_stream.namespace: default
     - name: postgresql/metrics-postgresql
+      id: postgresql/metrics-postgresql-${kubernetes.hints.container_id}
       type: postgresql/metrics
       use_output: default
       streams:

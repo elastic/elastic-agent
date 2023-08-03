@@ -1,5 +1,6 @@
 inputs:
     - name: filestream-zeek
+      id: filestream-zeek-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
@@ -862,6 +863,7 @@ inputs:
             - zeek-x509
       data_stream.namespace: default
     - name: httpjson-zeek
+      id: httpjson-zeek-${kubernetes.hints.container_id}
       type: httpjson
       use_output: default
       streams:

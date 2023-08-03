@@ -8,17 +8,15 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: breaking-change
+kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: status command, change human output to be a summary, added full output
+summary: Elastic Defend runtime prevention, if agent is installed in non-default location
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: >-
-  status command has been changed, the default human output now uses a list format
-  and summaries output. Full human output can be obtained with the new `full` option.
+#description:
 
 # Affected component; a word indicating the component this changeset affects.
 component: agent

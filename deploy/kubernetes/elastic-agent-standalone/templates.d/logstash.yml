@@ -1,5 +1,6 @@
 inputs:
     - name: logstash/metrics-logstash
+      id: logstash/metrics-logstash-${kubernetes.hints.container_id}
       type: logstash/metrics
       use_output: default
       streams:
@@ -27,6 +28,7 @@ inputs:
           username: ${kubernetes.hints.logstash.node_stats.username|kubernetes.hints.logstash.username|''}
       data_stream.namespace: default
     - name: filestream-logstash
+      id: filestream-logstash-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

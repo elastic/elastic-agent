@@ -1,5 +1,6 @@
 inputs:
     - name: tcp-tcp
+      id: tcp-tcp-${kubernetes.hints.container_id}
       type: tcp
       use_output: default
       streams:
@@ -11,6 +12,7 @@ inputs:
           timeout: ${kubernetes.hints.tcp.generic.timeout|kubernetes.hints.tcp.timeout|''}
       data_stream.namespace: default
     - name: filestream-tcp
+      id: filestream-tcp-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:

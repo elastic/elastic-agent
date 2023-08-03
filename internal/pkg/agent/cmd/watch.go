@@ -92,7 +92,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
 		if err := upgrade.Cleanup(log, release.ShortCommit(), true, false); err != nil {
-			log.Error("rollback failed", err)
+			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely
 		return nil
@@ -100,8 +100,13 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 
 	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
 	crashCheckInterval := cfg.Settings.Upgrade.Watcher.CrashCheck.Interval
+	installCheckInterval := cfg.Settings.Upgrade.Watcher.InstallCheck.Interval
 	ctx := context.Background()
-	if err := watch(ctx, tilGrace, errorCheckInterval, crashCheckInterval, log); err != nil {
+	if err := watch(ctx, tilGrace, errorCheckInterval, crashCheckInterval, installCheckInterval, log); err != nil {
+		if errors.Is(err, upgrade.ErrAgentUninstall) {
+			log.Error("Exiting early due to: %v", err)
+			return err
+		}
 		log.Error("Error detected proceeding to rollback: %v", err)
 		err = upgrade.Rollback(ctx, log, marker.PrevHash, marker.Hash)
 		if err != nil {
@@ -116,7 +121,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	removeMarker := !isWindows()
 	err = upgrade.Cleanup(log, marker.Hash, removeMarker, false)
 	if err != nil {
-		log.Error("rollback failed", err)
+		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
 }
@@ -125,9 +130,10 @@ func isWindows() bool {
 	return runtime.GOOS == "windows"
 }
 
-func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval, crashCheckInterval time.Duration, log *logger.Logger) error {
+func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval, crashCheckInterval, installCheckInterval time.Duration, log *logger.Logger) error {
 	errChan := make(chan error)
 	crashChan := make(chan error)
+	installChan := make(chan error)
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -136,6 +142,7 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval, cras
 		cancel()
 		close(errChan)
 		close(crashChan)
+		close(installChan)
 	}()
 
 	errorChecker, err := upgrade.NewErrorChecker(errChan, log, errorCheckInterval)
@@ -148,8 +155,14 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval, cras
 		return err
 	}
 
+	installChecker, err := upgrade.NewInstallChecker(installChan, log, installCheckInterval)
+	if err != nil {
+		return err
+	}
+
 	go errorChecker.Run(ctx)
 	go crashChecker.Run(ctx)
+	go installChecker.Run(ctx)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
@@ -176,6 +189,10 @@ WATCHLOOP:
 		// Agent keeps crashing unexpectedly
 		case err := <-crashChan:
 			log.Error("Agent crash detected", err)
+			return err
+		// Agent removed
+		case err := <-installChan:
+			log.Warn("Agent uninstall detected")
 			return err
 		}
 	}

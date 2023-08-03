@@ -46,8 +46,8 @@ func TestVarsManagerError(t *testing.T) {
 	varsErrorChan := make(chan error, 1)
 	coord := &Coordinator{
 		state: State{
-			State:   agentclient.Healthy,
-			Message: "Running",
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
 		},
 		stateBroadcaster: &broadcaster.Broadcaster[State]{
 			InputChan: stateChan,
@@ -57,14 +57,16 @@ func TestVarsManagerError(t *testing.T) {
 		},
 	}
 	// Send an error via the vars manager channel, and let Coordinator update
-	varsErrorChan <- errors.New("force error")
+	const errorStr = "force error"
+	varsErrorChan <- errors.New(errorStr)
 	coord.runLoopIteration(ctx)
 
 	// Make sure the new state reflects the error
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "expected Failed State")
-		assert.Equal(t, "force error", state.Message, "state message should match what was sent")
+		assert.Contains(t, state.Message, "Vars manager:", "state message should report the error as coming from the Vars manager")
+		assert.Contains(t, state.Message, errorStr, "state message should contain the error that was sent")
 	default:
 		assert.Fail(t, "Coordinator's state didn't change")
 	}
@@ -95,8 +97,8 @@ func TestCoordinatorReportsUnhealthyComponents(t *testing.T) {
 	runtimeChan := make(chan runtime.ComponentComponentState, 1)
 	coord := &Coordinator{
 		state: State{
-			State:   agentclient.Healthy,
-			Message: "Running",
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
 		},
 		stateBroadcaster: &broadcaster.Broadcaster[State]{
 			InputChan: stateChan,
@@ -168,8 +170,8 @@ func TestCoordinatorComponentStatesAreSeparate(t *testing.T) {
 	// goroutines.
 	runtimeChan := make(chan runtime.ComponentComponentState, 1)
 	initialState := State{
-		State:   agentclient.Healthy,
-		Message: "Running",
+		CoordinatorState:   agentclient.Healthy,
+		CoordinatorMessage: "Running",
 	}
 	coord := &Coordinator{
 		state: initialState,
@@ -241,8 +243,8 @@ func TestCoordinatorReportsUnhealthyUnits(t *testing.T) {
 	runtimeChan := make(chan runtime.ComponentComponentState, 1)
 	coord := &Coordinator{
 		state: State{
-			State:   agentclient.Healthy,
-			Message: "Running",
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
 		},
 		stateBroadcaster: &broadcaster.Broadcaster[State]{
 			InputChan: stateChan,
@@ -320,11 +322,8 @@ func TestCoordinatorReportsUnhealthyUnits(t *testing.T) {
 
 func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	// Test that an obviously invalid policy sent to Coordinator will call
-	// its Fail callback with an appropriate error.
-	// Coordinator also sets its own state to Failed on this error, but
-	// currently that state will be discarded by the next update, see
-	// https://github.com/elastic/elastic-agent/issues/2852. When that
-	// issue is fixed we should test that here too.
+	// its Fail callback with an appropriate error, and will save and report
+	// the error in its state until a policy update succeeds.
 
 	// Set a one-second timeout -- nothing here should block, but if it
 	// does let's report a failure instead of timing out the test runner.
@@ -340,8 +339,8 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	coord := &Coordinator{
 		logger: logger,
 		state: State{
-			State:   agentclient.Healthy,
-			Message: "Running",
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
 		},
 		stateBroadcaster: &broadcaster.Broadcaster[State]{InputChan: stateChan},
 		managerChans: managerChans{
@@ -356,20 +355,12 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 			&artifact.Config{},
 			&info.AgentInfo{},
 		),
-	}
+		// Add a placeholder runtime manager that will accept any updates
+		runtimeMgr: &fakeRuntimeManager{},
 
-	// Send an empty vars update, since Coordinator won't try to apply a policy
-	// change unless it has received valid vars.
-	varsChan <- []*transpiler.Vars{{}}
-	coord.runLoopIteration(ctx)
-
-	// Setting the vars alone doesn't trigger a state change unless it
-	// causes an error, which can't happen until there's a policy to run
-	// against. Make sure no new state has arrived.
-	select {
-	case <-stateChan:
-		assert.Fail(t, "Setting empty vars with no policy shouldn't trigger a Coordinator state change")
-	default:
+		// Set valid but empty initial values for ast and vars
+		vars: emptyVars(t),
+		ast:  emptyAST(t),
 	}
 
 	// Send an invalid config update and confirm that Coordinator reports
@@ -379,23 +370,153 @@ name: "this config is invalid"
 agent.download.sourceURI:
   the.problem: "URIs shouldn't have subfields"
 `)
-	configChange := &configChange{cfg: cfg}
-	configChan <- configChange
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 
-	assert.True(t, configChange.failed, "Policy with invalid field should have reported failed config change")
+	assert.True(t, cfgChange.failed, "Policy with invalid field should have reported failed config change")
 	assert.Truef(t,
-		strings.HasPrefix(configChange.err.Error(),
+		strings.HasPrefix(cfgChange.err.Error(),
 			"failed to reload upgrade manager configuration"),
 		"wrong error message, expected 'failed to reload upgrade manager configuration...' got %v",
-		configChange.err.Error())
+		cfgChange.err.Error())
+	require.Error(t, coord.configErr, "Policy error should be saved in configErr")
+	assert.Contains(t, coord.configErr.Error(),
+		"failed to reload upgrade manager configuration", "configErr should match policy failure")
 
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Failed policy change should cause Failed coordinator state")
-		assert.Equal(t, configChange.err.Error(), state.Message, "Coordinator state should report failed policy change")
+		assert.Contains(t, state.Message, cfgChange.err.Error(), "Coordinator state should report failed policy change")
 	default:
 		assert.Fail(t, "Coordinator's state didn't change")
+	}
+
+	// Send an empty vars update. This should regenerate the component model
+	// based on the last good (empty) policy, producing a "successful" update,
+	// but the overall reported state should still be Failed because the last
+	// policy update didn't take effect.
+	// (This check is based on a previous bug in which a vars update could
+	// discard active policy errors.)
+	varsChan <- emptyVars(t)
+	coord.runLoopIteration(ctx)
+
+	assert.Error(t, coord.configErr, "Vars update shouldn't affect configErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Failed, state.State, "Variable update should not overwrite policy error")
+		assert.Contains(t, state.Message, cfgChange.err.Error(), "Variable update should not overwrite policy error")
+	default:
+		assert.Fail(t, "Vars change should cause state update")
+	}
+
+	// Finally, send an empty (valid) policy update and confirm that it
+	// overwrites the previous error states.
+	cfg = config.MustNewConfigFrom("")
+	cfgChange = &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	assert.NoError(t, coord.configErr, "Valid policy change should clear configErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Healthy, state.State, "Valid policy change should produce healthy state")
+		assert.Equal(t, state.Message, "Running", "Valid policy change should restore previous state message")
+	default:
+		assert.Fail(t, "Policy change should cause state update")
+	}
+}
+
+func TestCoordinatorReportsComponentModelError(t *testing.T) {
+	// Test the failure mode where a new policy passes the initial checks
+	// and produces a valid AST, but can't be converted into a valid
+	// component model (which we trigger with invalid conditional
+	// expressions). In this case the resulting error should be stored
+	// in Coordinator.componentGenErr, and reported by Coordinator.State.
+
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	// Channels have buffer length 1 so we don't have to run on multiple
+	// goroutines.
+	stateChan := make(chan State, 1)
+	configChan := make(chan ConfigChange, 1)
+	varsChan := make(chan []*transpiler.Vars, 1)
+	coord := &Coordinator{
+		logger: logger,
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{InputChan: stateChan},
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			varsManagerUpdate:   varsChan,
+		},
+		// Add a placeholder runtime manager that will accept any updates
+		runtimeMgr: &fakeRuntimeManager{},
+
+		// Set valid but empty initial values for ast and vars
+		vars: emptyVars(t),
+		ast:  emptyAST(t),
+	}
+
+	// This configuration produces a valid AST but its EQL condition is
+	// invalid, so its failure should be reported in componentGenErr.
+	cfg := config.MustNewConfigFrom(`
+inputs:
+  - type: filestream
+    condition: invalidExpression
+`)
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	require.Error(t, coord.componentGenErr)
+	require.Contains(t, coord.componentGenErr.Error(), "rendering inputs failed:")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Failed, state.State, "Failed component generation should cause failed state")
+		assert.Contains(t, state.Message, "Invalid component model", "Failed component generation should report error")
+	default:
+		assert.Fail(t, "Config change should cause state update")
+	}
+
+	// Send an empty vars update. This should regenerate the component model
+	// based on the last good (empty) policy, producing a "successful" update,
+	// but the overall reported state should still be Failed because the last
+	// policy update didn't take effect.
+	// (This check is based on a previous bug in which a vars update could
+	// discard active policy errors.)
+	varsChan <- emptyVars(t)
+	coord.runLoopIteration(ctx)
+
+	assert.Error(t, coord.componentGenErr, "Vars update shouldn't affect componentGenErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Failed, state.State, "Variable update should not overwrite component generation error")
+		assert.Contains(t, state.Message, "Invalid component model", "Variable update should not overwrite component generation error")
+	default:
+		assert.Fail(t, "Vars change should cause state update")
+	}
+
+	// Send an empty (valid) policy update and confirm that it overwrites the
+	// previous error states.
+	cfg = config.MustNewConfigFrom("")
+	cfgChange = &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	assert.NoError(t, coord.configErr, "Valid policy change should clear configErr")
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Healthy, state.State, "Valid policy change should produce healthy state")
+		assert.Equal(t, state.Message, "Running", "Valid policy change should restore previous state message")
+	default:
+		assert.Fail(t, "Policy change should cause state update")
 	}
 }
 
@@ -412,7 +533,6 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
 	logger := logp.NewLogger("testing")
 
 	configChan := make(chan ConfigChange, 1)
-	varsChan := make(chan []*transpiler.Vars, 1)
 
 	// Create a mocked runtime manager that will report the update call
 	var updated bool                     // Set by runtime manager callback
@@ -431,15 +551,10 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
 		stateBroadcaster: broadcaster.New(State{}, 0, 0),
 		managerChans: managerChans{
 			configManagerUpdate: configChan,
-			varsManagerUpdate:   varsChan,
 		},
 		runtimeMgr: runtimeManager,
+		vars:       emptyVars(t),
 	}
-
-	// Send an empty vars update, since Coordinator won't try to apply a policy
-	// change unless it has received valid vars.
-	varsChan <- []*transpiler.Vars{{}}
-	coord.runLoopIteration(ctx)
 
 	// Create a policy with one input and one output
 	cfg := config.MustNewConfigFrom(`
@@ -503,12 +618,12 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	logger := logp.NewLogger("testing")
 
 	configChan := make(chan ConfigChange, 1)
-	varsChan := make(chan []*transpiler.Vars, 1)
 
+	const errorStr = "update failed for testing reasons"
 	// Create a mocked runtime manager that always reports an error
 	runtimeManager := &fakeRuntimeManager{
 		updateCallback: func(comp []component.Component) error {
-			return fmt.Errorf("update failed for testing reasons")
+			return fmt.Errorf(errorStr)
 		},
 	}
 
@@ -518,15 +633,10 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 		stateBroadcaster: broadcaster.New(State{}, 0, 0),
 		managerChans: managerChans{
 			configManagerUpdate: configChan,
-			varsManagerUpdate:   varsChan,
 		},
 		runtimeMgr: runtimeManager,
+		vars:       emptyVars(t),
 	}
-
-	// Send an empty vars update, since Coordinator won't try to apply a policy
-	// change unless it has received valid vars.
-	varsChan <- []*transpiler.Vars{{}}
-	coord.runLoopIteration(ctx)
 
 	// Send an empty policy which should forward an empty component model to
 	// the runtime manager (which we have set up to report an error).
@@ -538,14 +648,16 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	// Make sure the failure was reported to the config manager
 	assert.True(t, configChange.failed, "Config change should report failure if the runtime manager returns an error")
 	require.Error(t, configChange.err, "Config change should get an error if runtime manager update fails")
-	assert.Equal(t, "update failed for testing reasons", configChange.err.Error())
+	assert.Contains(t, configChange.err.Error(), errorStr)
 
-	// Make sure the error was reported in Coordinator state.
-	// (Note: this reported failure will not be stable, see
-	// https://github.com/elastic/elastic-agent/issues/2852)
+	// Make sure the error is saved in Coordinator.runtimeUpdateErr
+	require.Error(t, coord.runtimeUpdateErr, "Runtime update failure should be saved in runtimeUpdateErr")
+	assert.Equal(t, errorStr, coord.runtimeUpdateErr.Error(), "runtimeUpdateErr should match the error reported by the runtime manager")
+
+	// Make sure the error is reported in Coordinator state.
 	state := coord.State()
 	assert.Equal(t, agentclient.Failed, state.State, "Failed policy update should cause failed Coordinator")
-	assert.Equal(t, "update failed for testing reasons", state.Message, "Failed policy update should be reported in Coordinator state message")
+	assert.Contains(t, state.Message, errorStr, "Failed policy update should be reported in Coordinator state message")
 }
 
 func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
@@ -582,16 +694,8 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 			varsManagerUpdate:   varsChan,
 		},
 		runtimeMgr: runtimeManager,
+		vars:       emptyVars(t),
 	}
-
-	// Send an empty vars update, since Coordinator won't try to apply a policy
-	// change unless it has received valid vars.
-
-	vars, err := transpiler.NewVars("", map[string]interface{}{}, nil)
-	require.NoError(t, err, "Vars creation must succeed")
-
-	varsChan <- []*transpiler.Vars{vars}
-	coord.runLoopIteration(ctx)
 
 	// Create a policy with one input and one output
 	cfg := config.MustNewConfigFrom(`
@@ -616,7 +720,7 @@ inputs:
 	// Send a vars update adding the undefined variable
 	updated = false
 	components = nil
-	vars, err = transpiler.NewVars("", map[string]interface{}{
+	vars, err := transpiler.NewVars("", map[string]interface{}{
 		"TEST_VAR": "input-id",
 	}, nil)
 	require.NoError(t, err, "Vars creation must succeed")
@@ -659,8 +763,8 @@ func TestCoordinatorReportsOverrideState(t *testing.T) {
 	overrideStateChan := make(chan *coordinatorOverrideState, 1)
 	coord := &Coordinator{
 		state: State{
-			State:   agentclient.Degraded,
-			Message: "Running",
+			CoordinatorState:   agentclient.Degraded,
+			CoordinatorMessage: "Running",
 		},
 		stateBroadcaster: &broadcaster.Broadcaster[State]{
 			InputChan: stateChan,
@@ -741,4 +845,19 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	default:
 		assert.Fail(t, "Failed upgrade should clear the override state")
 	}
+}
+
+// Returns an empty but non-nil set of transpiler variables for testing
+// (Coordinator will only regenerate its component model when it has non-nil
+// vars).
+func emptyVars(t *testing.T) []*transpiler.Vars {
+	vars, err := transpiler.NewVars("", map[string]interface{}{}, nil)
+	require.NoError(t, err, "Vars creation must succeed")
+	return []*transpiler.Vars{vars}
+}
+
+func emptyAST(t *testing.T) *transpiler.AST {
+	ast, err := transpiler.NewAST(nil)
+	require.NoError(t, err, "AST creation must succeed")
+	return ast
 }
