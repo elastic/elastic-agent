@@ -12,10 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	"github.com/stretchr/testify/require"
 )
 
 // GetAgentByHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
